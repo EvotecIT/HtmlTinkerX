@@ -1,9 +1,11 @@
-Describe 'Optimize-Email' {
-    It 'Given HTML content - Should inline CSS and remove style elements' {
+Describe 'Optimize-Email' {    It 'Given HTML content - Should inline CSS and remove style elements' {
         $html = '<html><head><style>p{color:red}</style></head><body><p>Hi</p></body></html>'
         $expected = '<html><head></head><body><p style="color: red">Hi</p></body></html>'
         $result = Optimize-Email -Body $html -RemoveStyleElements
-        $result | Should -Be $expected
+        # Normalize line endings to handle cross-platform differences
+        $normalizedResult = $result -replace '\r\n', "`n" -replace '\r', "`n"
+        $normalizedExpected = $expected -replace '\r\n', "`n" -replace '\r', "`n"
+        $normalizedResult | Should -Be $normalizedExpected
     }
 
     It 'Given HTML with media query - Should preserve media queries when requested' {
@@ -12,7 +14,6 @@ Describe 'Optimize-Email' {
         Should -Actual $result -Match '<style>@media'
         Should -Not -Actual $result -Match 'p{color:red}'
     }
-
     It 'Given file input - Should process HTML file' {
         $file = Join-Path $TestDrive 'email.html'
         '<html><head><style>p{color:red}</style></head><body><p>File</p></body></html>' | Set-Content -Path $file
@@ -21,6 +22,9 @@ Describe 'Optimize-Email' {
 </body></html>
 "@
         $result = Optimize-Email -Path $file -RemoveStyleElements
-        Should -Actual $result -Be $expected
+        # Normalize line endings to handle cross-platform differences
+        $normalizedResult = $result -replace '\r\n', "`n" -replace '\r', "`n"
+        $normalizedExpected = $expected -replace '\r\n', "`n" -replace '\r', "`n"
+        Should -Actual $normalizedResult -Be $normalizedExpected
     }
 }
