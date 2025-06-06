@@ -1,0 +1,563 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<helpItems schema="maml" xmlns="http://msh">
+  <!-- Cmdlet: Optimize-Email -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Optimize-Email</command:name>
+      <command:verb>Optimize</command:verb>
+      <command:noun>Email</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that inlines CSS for email bodies using PreMailer.Net.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Body -->
+      <command:syntaxItem>
+        <maml:name>Optimize-Email</maml:name>
+        <!-- Parameter: Body -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named" aliases="Content">
+          <maml:name>Body</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AddAnalyticsTags -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AddAnalyticsTags</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AnalyticsCampaign -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsCampaign</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsContent -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsContent</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsDomain -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsDomain</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsMedium -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsMedium</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsSource -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsSource</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: BaseUri -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>BaseUri</maml:name>
+          <command:parameterValue required="true">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: Css -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Css</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: CssFilePath -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CssFilePath</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: IgnoreElements -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>IgnoreElements</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: PreserveMediaQueries -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>PreserveMediaQueries</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveComments -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveComments</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveStyleElements -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveStyleElements</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: StripIdAndClassAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>StripIdAndClassAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: UseEmailFormatter -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>UseEmailFormatter</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Optimize-Email</maml:name>
+        <!-- Parameter: Path -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Path</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AddAnalyticsTags -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AddAnalyticsTags</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AnalyticsCampaign -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsCampaign</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsContent -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsContent</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsDomain -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsDomain</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsMedium -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsMedium</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AnalyticsSource -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AnalyticsSource</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: BaseUri -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>BaseUri</maml:name>
+          <command:parameterValue required="true">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: Css -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Css</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: CssFilePath -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CssFilePath</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: IgnoreElements -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>IgnoreElements</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: PreserveMediaQueries -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>PreserveMediaQueries</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveComments -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveComments</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveStyleElements -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveStyleElements</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: StripIdAndClassAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>StripIdAndClassAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: UseEmailFormatter -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>UseEmailFormatter</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Body -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named" aliases="Content">
+        <maml:name>Body</maml:name>
+        <maml:description>
+          <maml:para>HTML content to process.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Path -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Path to a HTML file to process.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: BaseUri -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>BaseUri</maml:name>
+        <maml:description>
+          <maml:para>Base URI for resolving relative URLs.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">Uri</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Uri</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: RemoveStyleElements -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveStyleElements</maml:name>
+        <maml:description>
+          <maml:para>Remove &lt;style&gt; elements after inlining.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: IgnoreElements -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>IgnoreElements</maml:name>
+        <maml:description>
+          <maml:para>CSS selector for elements to ignore.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: Css -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Css</maml:name>
+        <maml:description>
+          <maml:para>Additional CSS content to inline.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: CssFilePath -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CssFilePath</maml:name>
+        <maml:description>
+          <maml:para>Path to a CSS file to include.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: StripIdAndClassAttributes -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>StripIdAndClassAttributes</maml:name>
+        <maml:description>
+          <maml:para>Strip id and class attributes from output.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: RemoveComments -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveComments</maml:name>
+        <maml:description>
+          <maml:para>Remove comments from HTML and CSS.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: PreserveMediaQueries -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>PreserveMediaQueries</maml:name>
+        <maml:description>
+          <maml:para>Preserve media queries from style nodes.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: UseEmailFormatter -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>UseEmailFormatter</maml:name>
+        <maml:description>
+          <maml:para>Use the email formatter when generating HTML.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: AddAnalyticsTags -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AddAnalyticsTags</maml:name>
+        <maml:description>
+          <maml:para>Add Google Analytics tags.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: AnalyticsSource -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AnalyticsSource</maml:name>
+        <maml:description>
+          <maml:para>Value for utm_source.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: AnalyticsMedium -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AnalyticsMedium</maml:name>
+        <maml:description>
+          <maml:para>Value for utm_medium.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: AnalyticsCampaign -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AnalyticsCampaign</maml:name>
+        <maml:description>
+          <maml:para>Value for utm_campaign.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: AnalyticsContent -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AnalyticsContent</maml:name>
+        <maml:description>
+          <maml:para>Value for utm_content.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: AnalyticsDomain -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AnalyticsDomain</maml:name>
+        <maml:description>
+          <maml:para>Analytics domain.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Optimize-Email -Body $html -RemoveComments</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+</helpItems>

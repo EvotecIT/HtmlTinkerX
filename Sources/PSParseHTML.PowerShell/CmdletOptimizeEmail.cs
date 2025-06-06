@@ -1,64 +1,148 @@
+using System;
+using System.IO;
+using System.Management.Automation;
+
 namespace PSParseHTML.PowerShell;
 
 /// <summary>
-/// Cmdlet that optimizes HTML e-mail content by inlining CSS.
+/// Cmdlet that inlines CSS for email bodies using PreMailer.Net.
 /// </summary>
-[Cmdlet(VerbsCommon.Optimize, "Email", DefaultParameterSetName = "Body", SupportsShouldProcess = true)]
-[CmdletBinding]
-public sealed class CmdletOptimizeEmail : PSCmdlet
-{
+/// <example>
+/// <code>
+/// Optimize-Email -Body $html -RemoveComments
+/// </code>
+/// </example>
+[Cmdlet(VerbsCommon.Optimize, "Email", DefaultParameterSetName = "Body")]
+[OutputType(typeof(string))]
+public sealed class CmdletOptimizeEmail : PSCmdlet {
     /// <summary>
-    /// HTML body to process. Alias of this parameter is <c>Content</c>.
+    /// HTML content to process.
     /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "Body")]
+    [Parameter(Mandatory = true, ParameterSetName = "Body", ValueFromPipeline = true)]
     [Alias("Content")]
-    public string Body { get; set; }
+    public string Body { get; set; } = string.Empty;
 
     /// <summary>
-    /// When set, HTML comments will be removed from the output.
+    /// Path to a HTML file to process.
     /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "Body")]
+    [Parameter(Mandatory = true, ParameterSetName = "File")]
+    public string Path { get; set; } = string.Empty;
+
+    /// <summary>Base URI for resolving relative URLs.</summary>
+    [Parameter]
+    public Uri? BaseUri { get; set; }
+
+    /// <summary>Remove &lt;style&gt; elements after inlining.</summary>
+    [Parameter]
+    public SwitchParameter RemoveStyleElements { get; set; }
+
+    /// <summary>CSS selector for elements to ignore.</summary>
+    [Parameter]
+    public string? IgnoreElements { get; set; }
+
+    /// <summary>Additional CSS content to inline.</summary>
+    [Parameter]
+    public string? Css { get; set; }
+
+    /// <summary>Path to a CSS file to include.</summary>
+    [Parameter]
+    public string? CssFilePath { get; set; }
+
+    /// <summary>Strip id and class attributes from output.</summary>
+    [Parameter]
+    public SwitchParameter StripIdAndClassAttributes { get; set; }
+
+    /// <summary>Remove comments from HTML and CSS.</summary>
+    [Parameter]
     public SwitchParameter RemoveComments { get; set; }
 
-    /// <summary>
-    /// When set, <c>&lt;style&gt;</c> elements are removed after inlining.
-    /// </summary>
-    [Parameter(Mandatory = false, ParameterSetName = "Body")]
-    public SwitchParameter RemoveStyleElements { get; set; }
+    /// <summary>Preserve media queries from style nodes.</summary>
+    [Parameter]
+    public SwitchParameter PreserveMediaQueries { get; set; }
+
+    /// <summary>Use the email formatter when generating HTML.</summary>
+    [Parameter]
+    public SwitchParameter UseEmailFormatter { get; set; }
+
+    /// <summary>Add Google Analytics tags.</summary>
+    [Parameter]
+    public SwitchParameter AddAnalyticsTags { get; set; }
+
+    /// <summary>Value for utm_source.</summary>
+    [Parameter]
+    public string? AnalyticsSource { get; set; }
+
+    /// <summary>Value for utm_medium.</summary>
+    [Parameter]
+    public string? AnalyticsMedium { get; set; }
+
+    /// <summary>Value for utm_campaign.</summary>
+    [Parameter]
+    public string? AnalyticsCampaign { get; set; }
+
+    /// <summary>Value for utm_content.</summary>
+    [Parameter]
+    public string? AnalyticsContent { get; set; }
+
+    /// <summary>Analytics domain.</summary>
+    [Parameter]
+    public string? AnalyticsDomain { get; set; }
 
     private ActionPreference errorAction;
 
-    /// <inheritdoc/>
-    protected override void BeginProcessing()
-    {
-        // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
+    /// <summary>
+    /// Initializes logging and resolves ErrorActionPreference.
+    /// </summary>
+    protected override void BeginProcessing() {
         var internalLogger = new InternalLogger();
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        var internalLoggerPowerShell = new InternalLoggerPowerShell(
+            internalLogger,
+            WriteVerbose,
+            WriteWarning,
+            WriteDebug,
+            WriteError,
+            WriteProgress,
+            WriteInformation);
         LoggingMessages.Logger = internalLogger;
 
-        // Get the error action preference as user requested
-        // It first sets the error action to the default error action preference
-        // If the user has specified the error action, it will set the error action to the user specified error action
-        errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
-        if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction"))
-        {
-            string errorActionString = this.MyInvocation.BoundParameters["ErrorAction"].ToString();
-            if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference))
-            {
+        errorAction = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
+        if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+            string errorActionString = MyInvocation.BoundParameters["ErrorAction"].ToString();
+            if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
             }
         }
     }
 
-    /// <inheritdoc/>
-    protected override void ProcessRecord()
-    {
-        var result = PreMailer.Net.PreMailer.MoveCssInline(Body, removeComments: RemoveComments, removeStyleElements: RemoveStyleElements);
+    /// <summary>
+    /// Processes the input HTML or file and outputs optimized HTML.
+    /// </summary>
+    protected override void ProcessRecord() {
+        PreMailerOptions options = new() {
+            BaseUri = BaseUri,
+            RemoveStyleElements = RemoveStyleElements,
+            IgnoreElements = IgnoreElements,
+            Css = Css,
+            CssFilePath = CssFilePath,
+            StripIdAndClassAttributes = StripIdAndClassAttributes,
+            RemoveComments = RemoveComments,
+            PreserveMediaQueries = PreserveMediaQueries,
+            UseEmailFormatter = UseEmailFormatter,
+            AddAnalyticsTags = AddAnalyticsTags,
+            AnalyticsSource = AnalyticsSource,
+            AnalyticsMedium = AnalyticsMedium,
+            AnalyticsCampaign = AnalyticsCampaign,
+            AnalyticsContent = AnalyticsContent,
+            AnalyticsDomain = AnalyticsDomain
+        };
+
+        PreMailerResult result = ParameterSetName == "File"
+            ? PreMailerClient.MoveCssInlineFromFile(Path, options)
+            : PreMailerClient.MoveCssInline(Body, options);
+
         WriteObject(result.Html);
 
-        // Log the information message
-        foreach (var warning in result.Warnings)
-        {
+        foreach (var warning in result.Warnings) {
             LoggingMessages.Logger.WriteWarning(warning);
         }
     }
