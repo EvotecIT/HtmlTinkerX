@@ -7,7 +7,7 @@
     Copyright              = '(c) Przemyslaw Klys. All rights reserved.'
     Description            = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
     DotNetFrameworkVersion = '4.7.2'
-    FunctionsToExport      = @('ConvertFrom-HTMLAttributes', 'ConvertFrom-HtmlTable')
+    FunctionsToExport      = @('ConvertFrom-HTML', 'ConvertFrom-HtmlTable')
     GUID                   = 'f0387960-7034-4918-a1e1-d5847cbf90df'
     ModuleVersion          = '2.0.0'
     PowerShellVersion      = '5.1'
