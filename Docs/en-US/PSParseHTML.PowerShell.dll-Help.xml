@@ -1755,4 +1755,105 @@
       </command:example>
     </command:examples>
   </command:command>
+  <!-- Cmdlet: ConvertFrom-HtmlTable -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>ConvertFrom-HtmlTable</command:name>
+      <command:verb>ConvertFrom</command:verb>
+      <command:noun>HtmlTable</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that extracts HTML tables into PowerShell objects.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>ConvertFrom-HtmlTable</maml:name>
+        <command:parameter required="true" globbing="false" pipelineInput="true(ByValue, ByPropertyName)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReplaceContent</maml:name>
+          <command:parameterValue required="true">IDictionary</command:parameterValue>
+          <dev:type><maml:name>System.Collections.IDictionary</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReplaceHeaders</maml:name>
+          <command:parameterValue required="true">IDictionary</command:parameterValue>
+          <dev:type><maml:name>System.Collections.IDictionary</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Engine</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReverseTable</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type><maml:name>System.Management.Automation.SwitchParameter</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Url -->
+      <command:syntaxItem>
+        <maml:name>ConvertFrom-HtmlTable</maml:name>
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Uri">
+          <maml:name>Url</maml:name>
+          <command:parameterValue required="true">Uri</command:parameterValue>
+          <dev:type><maml:name>System.Uri</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReplaceContent</maml:name>
+          <command:parameterValue required="true">IDictionary</command:parameterValue>
+          <dev:type><maml:name>System.Collections.IDictionary</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReplaceHeaders</maml:name>
+          <command:parameterValue required="true">IDictionary</command:parameterValue>
+          <dev:type><maml:name>System.Collections.IDictionary</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Engine</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ReverseTable</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type><maml:name>System.Management.Automation.SwitchParameter</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="true" globbing="false" pipelineInput="true(ByValue, ByPropertyName)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description><maml:para>HTML content to parse.</maml:para></maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Uri">
+        <maml:name>Url</maml:name>
+        <maml:description><maml:para>URL containing tables.</maml:para></maml:description>
+        <command:parameterValue required="true">Uri</command:parameterValue>
+        <dev:type><maml:name>System.Uri</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type><maml:name>System.Object[]</maml:name><maml:uri /></dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>ConvertFrom-HtmlTable -Url https://example.com</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
 </helpItems>
