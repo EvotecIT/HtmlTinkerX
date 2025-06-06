@@ -3,25 +3,25 @@
 	<PropertyGroup>
 		<Company>Evotec</Company>
 		<Authors>Przemyslaw Klys</Authors>
-		<VersionPrefix>1.0.0</VersionPrefix>
-		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0</TargetFrameworks>
+		<VersionPrefix>1.0.3</VersionPrefix>
+		<TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
 		<AssemblyName>PSParseHTML</AssemblyName>
-
-		<Copyright>(c) 2011 - 2022 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
-		<LangVersion>10.0</LangVersion>
+		<AssemblyTitle>PSParseHTML</AssemblyTitle>
+		<Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AngleSharp" Version="1.1.0" />
-		<PackageReference Include="AngleSharp.Css" Version="1.0.0-alpha-99" />
-		<PackageReference Include="AngleSharp.Diffing" Version="0.18.2" />
-		<PackageReference Include="AngleSharp.Js" Version="0.15.0" />
+		<PackageReference Include="AngleSharp" Version="1.2.0-beta.439" />
+		<PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.144" />
+		<PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
+		<PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.36" />
 		<!-- <PackageReference Include="DotNetSeleniumExtras.WaitHelpers" Version="3.11.0" /> -->
-		<PackageReference Include="HtmlAgilityPack" Version="1.11.59" />
+		<PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
 		<PackageReference Include="Jsbeautifier" Version="0.0.1" />
-		<PackageReference Include="NUglify" Version="1.21.4" />
+		<PackageReference Include="NUglify" Version="1.21.11" />
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
-		<PackageReference Include="PreMailer.Net" Version="2.5.0" />
+		<PackageReference Include="PreMailer.Net" Version="2.6.0" />
 		<!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
 	</ItemGroup>
 
