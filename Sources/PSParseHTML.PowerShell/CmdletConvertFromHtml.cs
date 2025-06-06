@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>ConvertFrom-HTML -Url https://example.com</code>
 /// </example>
-[Cmdlet(VerbsData.Convert, "FromHtml", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HTML", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(object))]
 public sealed class CmdletConvertFromHtml : PSCmdlet {
     private const string ParameterSetContent = "Content";
