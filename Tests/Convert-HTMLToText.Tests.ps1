@@ -52,6 +52,9 @@
         </html>
 "@
 
+        $cmd = Get-Command Convert-HTMLToText
+        $cmd.CommandType | Should -Be 'Cmdlet'
+
         $Output = Convert-HTMLToText -Content $HTMLContentFormatted
         $Output.Trim() | Should -Be 'Name Id HandleCount WorkingSet   1Password 22268 1007 87146496  aesm_service 25340 189 3948544'
     }
