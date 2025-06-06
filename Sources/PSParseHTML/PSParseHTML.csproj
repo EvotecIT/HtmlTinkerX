@@ -25,9 +25,6 @@
 		<!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
         </ItemGroup>
 
-        <ItemGroup>
-                <Compile Include="PreMailer\*.cs" />
-        </ItemGroup>
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
 		<DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>

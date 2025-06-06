@@ -1,5 +1,5 @@
 using System;
-using AngleSharp.Html;
+using global::AngleSharp;
 
 namespace PSParseHTML;
 
@@ -29,7 +29,7 @@ public class PreMailerOptions {
     public bool RemoveComments { get; set; }
 
     /// <summary>Formatter used for generating HTML output.</summary>
-    public IMarkupFormatter? CustomFormatter { get; set; }
+    public global::AngleSharp.IMarkupFormatter? CustomFormatter { get; set; }
 
     /// <summary>Preserve media queries from style nodes.</summary>
     public bool PreserveMediaQueries { get; set; }

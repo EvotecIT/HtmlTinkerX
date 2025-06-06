@@ -68,8 +68,7 @@ public class PreMailerClient {
                 Options.StripIdAndClassAttributes,
                 Options.RemoveComments,
                 Options.CustomFormatter,
-                Options.PreserveMediaQueries,
-                Options.UseEmailFormatter);
+                Options.PreserveMediaQueries);
 
             if (result.Warnings != null) {
                 foreach (string warning in result.Warnings) {
@@ -110,7 +109,7 @@ public class PreMailerClient {
         string? cssFilePath = null,
         bool stripIdAndClassAttributes = false,
         bool removeComments = false,
-        AngleSharp.Html.IMarkupFormatter? customFormatter = null,
+        global::AngleSharp.IMarkupFormatter? customFormatter = null,
         bool preserveMediaQueries = false,
         bool useEmailFormatter = false,
         bool addAnalyticsTags = false,
@@ -154,7 +153,7 @@ public class PreMailerClient {
         string? cssFilePath = null,
         bool stripIdAndClassAttributes = false,
         bool removeComments = false,
-        AngleSharp.Html.IMarkupFormatter? customFormatter = null,
+        global::AngleSharp.IMarkupFormatter? customFormatter = null,
         bool preserveMediaQueries = false,
         bool useEmailFormatter = false,
         bool addAnalyticsTags = false,
