@@ -1,0 +1,68 @@
+# Build and Package Workflow
+name: Build & Package
+
+# This workflow is disabled but ready for use
+# To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
+on:
+  workflow_dispatch:  # Manual trigger only
+
+env:
+  DOTNET_VERSION: '8.x'
+  BUILD_CONFIGURATION: 'Release'
+
+jobs:
+  package:
+    name: 'Package Libraries'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore Sources/PSParseHTML.sln
+
+      - name: Build release
+        run: dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Create libraries package
+        shell: pwsh
+        run: |
+          # Create libraries directory for .NET assemblies
+          if (-not (Test-Path "Libraries")) {
+              New-Item -Path "Libraries" -ItemType Directory -Force
+          }
+
+          # Copy built .NET assemblies to Libraries directory
+          $SourcePath = "Sources\PSParseHTML\bin\Release"
+          if (Test-Path $SourcePath) {
+              Copy-Item -Path "$SourcePath\*" -Destination "Libraries" -Recurse -Force
+              Write-Host "Copied .NET assemblies to Libraries directory"
+          }
+
+          # PowerShell module packaging would be handled separately by Manage-Module.ps1
+          Write-Host "PowerShell module packaging should be done via Build/Manage-Module.ps1"
+
+      - name: Upload libraries artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSParseHTML-Libraries
+          path: Libraries/
+
+      - name: Create release assets (on tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          # Create a zip file for release
+          Compress-Archive -Path "Libraries\*" -DestinationPath "PSParseHTML-Libraries-${{ github.ref_name }}.zip"
+
+      - name: Upload to release (on tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSParseHTML-Release-${{ github.ref_name }}
+          path: "PSParseHTML-Libraries-*.zip"
