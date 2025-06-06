@@ -1,15 +1,11 @@
-using System.Collections.Generic;
-using System.Management.Automation;
-using System.Net;
 using AngleSharp.Dom;
-using AngleSharp.Html.Parser;
 
 namespace PSParseHTML.PowerShell;
 
 /// <summary>
 /// Cmdlet that extracts elements from HTML by tag, class, id or name attributes.
 /// </summary>
-[Cmdlet(VerbsData.Convert, "FromHtmlAttributes", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlAttributes", DefaultParameterSetName = ParameterSetContent)]
 [Alias("ConvertFrom-HTMLTag", "ConvertFrom-HTMLClass")]
 [OutputType(typeof(string), typeof(IElement))]
 public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
@@ -49,8 +45,7 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
     protected override void ProcessRecord() {
         string html = ParameterSetName == ParameterSetUrl ? DownloadHtml() : Content;
 
-        var parser = new HtmlParser();
-        IEnumerable<IElement> elements = parser.GetElements(html, Tag, Class, Id, Name);
+        IEnumerable<IElement> elements = HtmlParserExtensions.GetElements(html, Tag, Class, Id, Name);
 
         if (ReturnObject.IsPresent) {
             foreach (var e in elements) {
