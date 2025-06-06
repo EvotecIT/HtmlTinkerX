@@ -24,7 +24,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         # A URL to the main website for this project.
         ProjectUri           = 'https://github.com/EvotecIT/PSParseHTML'
 
-            IconUri                = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
+        IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
 
         #DotNetFrameworkVersion = '4.7.2'
     }
@@ -95,19 +95,15 @@ Build-Module -ModuleName 'PSParseHTML' {
         #DeleteTargetModuleBeforeBuild     = $true
 
         ResolveBinaryConflicts            = $true
-        ResolveBinaryConflictsName        = 'PSParseHTML'
-        NETProjectName                    = 'PSParseHTML'
+        ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
+        NETProjectName                    = 'PSParseHTML.PowerShell'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'netstandard2.0' #, 'net472'
-        #NETExcludeMainLibrary             = $true
-        # NETExcludeLibraryFilter           = @(
-        #     'System.Management.*.dll'
-        # )
+        NETFramework                      = 'net8.0', 'net472'
+        NETHandleAssemblyWithSameName     = $true
+        #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
-        #DotSourceClasses                  = $true
-        #SeparateFileLibraries             = $true
+        DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        #MergeLibraryDebugging             = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
