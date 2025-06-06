@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport        = @('ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @('Optimize-Email', 'Convert-HTMLToText', 'Format-CSS')
+    CmdletsToExport        = @('Optimize-Email', 'Convert-HTMLToText', 'Format-CSS','Format-JavaScript')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) Przemyslaw Klys. All rights reserved.'
