@@ -19,7 +19,7 @@ pr:
 variables:
   buildConfiguration: 'Release'
   dotNetVersion: '8.x'
-  
+
 stages:
 - stage: Build
   displayName: 'Build and Test'
@@ -34,37 +34,37 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
-          
+
       - powershell: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
         displayName: "Install Required PowerShell Modules"
-        
+
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
           projects: 'Sources/PSParseHTML.sln'
-          
+
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
-          
+
       - powershell: |
           .\PSParseHTML.Tests.ps1
         displayName: "Run PowerShell Tests"
-        
+
       - task: DotNetCoreCLI@2
         displayName: 'Run .NET Tests'
         inputs:
           command: 'test'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage"'
-          
+
       - task: PublishTestResults@2
         displayName: 'Publish Test Results'
         inputs:
@@ -72,7 +72,6 @@ stages:
           testResultsFiles: '**/*.trx'
           mergeTestResults: true
         condition: succeededOrFailed()
-
   - job: Build_Windows_PS7
     displayName: 'Windows - PowerShell 7'
     pool:
@@ -83,33 +82,26 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
-          
-      - task: PowerShell@2
-        displayName: 'Install PowerShell 7'
-        inputs:
-          targetType: 'inline'
-          script: |
-            Invoke-RestMethod -Uri https://aka.ms/install-powershell.ps1 | Invoke-Expression
-            
+
       - pwsh: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
         displayName: "Install Required PowerShell Modules"
-        
+
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
           projects: 'Sources/PSParseHTML.sln'
-          
+
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
-          
+
       - pwsh: |
           .\PSParseHTML.Tests.ps1
         displayName: "Run PowerShell Tests"
@@ -124,7 +116,14 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
-          
+
+      - script: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+          sudo apt-get update
+          sudo apt-get install -y powershell
+        displayName: "Install PowerShell Core"
+
       - task: PowerShell@2
         displayName: 'Install Required PowerShell Modules'
         inputs:
@@ -133,20 +132,20 @@ stages:
             Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
             Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
             Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-            
+
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
           projects: 'Sources/PSParseHTML.sln'
-          
+
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
-          
+
       - task: PowerShell@2
         displayName: 'Run PowerShell Tests'
         inputs:
@@ -163,11 +162,11 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
-          
+
       - bash: |
           brew install --cask powershell
         displayName: "Install PowerShell 7"
-        
+
       - task: PowerShell@2
         displayName: 'Install Required PowerShell Modules'
         inputs:
@@ -176,20 +175,20 @@ stages:
             Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
             Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
             Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-            
+
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
           projects: 'Sources/PSParseHTML.sln'
-          
+
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
-          
+
       - task: PowerShell@2
         displayName: 'Run PowerShell Tests'
         inputs:
@@ -211,7 +210,7 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
-          
+
       - task: DotNetCoreCLI@2
         displayName: 'Build Release'
         inputs:
@@ -223,18 +222,18 @@ stages:
           if (-not (Test-Path "Libraries")) {
               New-Item -Path "Libraries" -ItemType Directory -Force
           }
-          
+
           # Copy built .NET assemblies to Libraries directory
           $SourcePath = "Sources\PSParseHTML\bin\Release"
           if (Test-Path $SourcePath) {
               Copy-Item -Path "$SourcePath\*" -Destination "Libraries" -Recurse -Force
               Write-Host "Copied .NET assemblies to Libraries directory"
           }
-          
+
           # PowerShell module packaging would be handled separately by Manage-Module.ps1
           Write-Host "PowerShell module packaging should be done via Build/Manage-Module.ps1"
         displayName: "Copy .NET Libraries"
-        
+
       - task: PublishBuildArtifacts@1
         displayName: 'Publish .NET Libraries'
         inputs:
