@@ -1,13 +1,13 @@
 ﻿@{
     AliasesToExport        = @('ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @('Optimize-Email', 'Convert-HTMLToText', 'Optimize-CSS')
+    CmdletsToExport        = @('Optimize-Email', 'Convert-HTMLToText', 'Format-CSS','Format-JavaScript','Optimize-JavaScript')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) Przemyslaw Klys. All rights reserved.'
     Description            = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
     DotNetFrameworkVersion = '4.7.2'
-    FunctionsToExport      = @('ConvertFrom-HTML', 'ConvertFrom-HTMLAttributes', 'ConvertFrom-HtmlTable', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Optimize-HTML', 'Optimize-JavaScript')
+    FunctionsToExport      = @('ConvertFrom-HTML', 'ConvertFrom-HTMLAttributes', 'ConvertFrom-HtmlTable', 'Format-HTML', 'Format-JavaScript', 'Optimize-CSS', 'Optimize-HTML', 'Optimize-JavaScript')
     GUID                   = 'f0387960-7034-4918-a1e1-d5847cbf90df'
     ModuleVersion          = '1.0.3'
     PowerShellVersion      = '5.1'
