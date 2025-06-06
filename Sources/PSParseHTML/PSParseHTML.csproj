@@ -23,7 +23,11 @@
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 		<PackageReference Include="PreMailer.Net" Version="2.6.0" />
 		<!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
-	</ItemGroup>
+        </ItemGroup>
+
+        <ItemGroup>
+                <Compile Include="PreMailer\*.cs" />
+        </ItemGroup>
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
 		<DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
