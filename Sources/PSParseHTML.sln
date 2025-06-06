@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PSParseHTML", "PSParseHTML\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSParseHTML.Examples", "PSParseHTML.Examples\PSParseHTML.Examples.csproj", "{F654AF8D-015C-431F-A75F-0C8E09C23EEF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PSParseHTML.PowerShell", "PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj", "{6F061A54-EB45-4032-A0CE-48BE6C3FE2C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{F654AF8D-015C-431F-A75F-0C8E09C23EEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F654AF8D-015C-431F-A75F-0C8E09C23EEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F654AF8D-015C-431F-A75F-0C8E09C23EEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F061A54-EB45-4032-A0CE-48BE6C3FE2C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F061A54-EB45-4032-A0CE-48BE6C3FE2C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F061A54-EB45-4032-A0CE-48BE6C3FE2C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F061A54-EB45-4032-A0CE-48BE6C3FE2C5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
