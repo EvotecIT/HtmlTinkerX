@@ -7,6 +7,8 @@ jobs:
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
           .\PSParseHTML.Tests.ps1
         displayName: "Run Pester Tests - PowerShell 5"
+      - script: dotnet test Sources/PSParseHTML.sln --no-build --verbosity normal
+        displayName: "Run .NET Tests"
       #  - script: |
       #        pwsh -c '.\PSWriteHTML.Tests.ps1'
       #    displayName: "Run Pester Tests - PowerShell 6+"
@@ -24,6 +26,8 @@ jobs:
       - script: |
           pwsh -c '.\PSParseHTML.Tests.ps1'
         displayName: "Run Pester Tests"
+      - script: dotnet test Sources/PSParseHTML.sln --no-build --verbosity normal
+        displayName: "Run .NET Tests"
 
   - job: Build_PSCore_MacOS1013
     pool:
@@ -38,3 +42,5 @@ jobs:
       - script: |
           pwsh -c '.\PSParseHTML.Tests.ps1'
         displayName: "Run Pester Tests"
+      - script: dotnet test Sources/PSParseHTML.sln --no-build --verbosity normal
+        displayName: "Run .NET Tests"
