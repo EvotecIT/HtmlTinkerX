@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport        = @('ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @('Convert-HTMLToText', 'ConvertFrom-HTML', 'Format-CSS', 'Format-JavaScript', 'Format-HTML', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript')
+    CmdletsToExport        = @('ConvertFrom-HTML', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) Przemyslaw Klys. All rights reserved.'
@@ -9,7 +9,7 @@
     DotNetFrameworkVersion = '4.7.2'
     FunctionsToExport      = @('ConvertFrom-HTMLAttributes', 'ConvertFrom-HtmlTable')
     GUID                   = 'f0387960-7034-4918-a1e1-d5847cbf90df'
-    ModuleVersion          = '1.0.3'
+    ModuleVersion          = '2.0.0'
     PowerShellVersion      = '5.1'
     PrivateData            = @{
         PSData = @{
