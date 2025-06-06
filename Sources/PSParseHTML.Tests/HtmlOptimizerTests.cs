@@ -5,6 +5,10 @@ namespace PSParseHTML.Tests;
 
 public class HtmlOptimizerTests {
     [Fact]
+    public void OptimizeCss_MinifiesContent() {
+        const string css = "body { color: red; }";
+        string result = HtmlOptimizer.OptimizeCss(css);
+        Assert.Equal("body{color:#f00}", result);
     public void OptimizeHtml_MinifiesContent() {
         const string input = "<html><!--c--><body> <p>Hi</p></body></html>";
         string result = HtmlOptimizer.OptimizeHtml(input, false);
