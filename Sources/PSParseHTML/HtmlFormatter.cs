@@ -34,9 +34,8 @@ public static class HtmlFormatter {
         beautifier.Opts.BreakChainedMethods = false;
 
         return beautifier.Beautify(js);
-/// Helper methods for formatting markup and style sheets.
-/// </summary>
-public static class HtmlFormatter {
+    }
+
     /// <summary>
     /// Formats CSS using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
     /// </summary>

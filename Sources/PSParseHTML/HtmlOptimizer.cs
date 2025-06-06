@@ -19,17 +19,15 @@ public static class HtmlOptimizer {
             throw new ArgumentNullException(nameof(css));
         }
 
-        var settings = new NUglify.Css.CssSettings {
-            DecodeEscapes = false
-        };
+        var settings = new NUglify.Css.CssSettings { DecodeEscapes = false };
         var result = NUglify.Uglify.Css(css, settings);
         if (result.HasErrors) {
             string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
             LoggingMessages.Logger.WriteWarning($"OptimizeCss -Errors: {errors}");
         }
-/// Provides HTML optimization utilities using NUglify.
-/// </summary>
-public static class HtmlOptimizer {
+        return result.Code ?? string.Empty;
+    }
+
     /// <summary>
     /// Minifies the provided HTML content.
     /// </summary>
@@ -41,13 +39,11 @@ public static class HtmlOptimizer {
             throw new ArgumentNullException(nameof(html));
         }
 
-        HtmlSettings settings = new() {
-            RemoveOptionalTags = false,
-            RemoveComments = true
-        };
+        HtmlSettings settings = new() { RemoveOptionalTags = false, RemoveComments = true };
         settings.CssSettings.DecodeEscapes = cssDecodeEscapes;
 
-        bool hasMotw = html.IndexOf("<!-- saved from url=(0014)about:internet -->", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool hasMotw =
+            html.IndexOf("<!-- saved from url=(0014)about:internet -->", StringComparison.OrdinalIgnoreCase) >= 0;
 
         UglifyResult result = Uglify.Html(html, settings);
         string output = result.Code ?? string.Empty;
@@ -55,10 +51,10 @@ public static class HtmlOptimizer {
         if (hasMotw) {
             return "<!-- saved from url=(0014)about:internet -->" + Environment.NewLine + output;
         }
+
         return output;
-/// Helper methods for optimizing markup and script content.
-/// </summary>
-public static class HtmlOptimizer {
+    }
+
     /// <summary>
     /// Minifies JavaScript code using NUglify.
     /// </summary>
