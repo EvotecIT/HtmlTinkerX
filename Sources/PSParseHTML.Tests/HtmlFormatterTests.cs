@@ -32,4 +32,13 @@ public class HtmlFormatterTests {
         string result = HtmlFormatter.FormatCss(content);
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public void FormatHtml_FormatsMinifiedHtml() {
+        const string input = "<html><body><div><p>Test</p></div></body></html>";
+        const string expected = "<html>\n    <body>\n        <div>\n            <p>Test</p>\n        </div>\n    </body>\n</html>";
+
+        string result = HtmlFormatter.FormatHtml(input);
+        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
+    }
 }

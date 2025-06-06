@@ -1,5 +1,249 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <helpItems schema="maml" xmlns="http://msh">
+  <!-- Cmdlet: Format-CSS -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Format-CSS</command:name>
+      <command:verb>Format</command:verb>
+      <command:noun>CSS</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that formats CSS content using AngleSharp.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Format-CSS</maml:name>
+        <!-- Parameter: File -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Path">
+          <maml:name>File</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Format-CSS</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: File -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Path">
+        <maml:name>File</maml:name>
+        <maml:description>
+          <maml:para>Path to a CSS file to format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>CSS content to format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional path to write the formatted CSS.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Format-CSS -Content "body{margin:0}"</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Optimize-CSS -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Optimize-CSS</command:name>
+      <command:verb>Optimize</command:verb>
+      <command:noun>CSS</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that minifies CSS content.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Css -->
+      <command:syntaxItem>
+        <maml:name>Optimize-CSS</maml:name>
+        <!-- Parameter: Css -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named">
+          <maml:name>Css</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Path -->
+      <command:syntaxItem>
+        <maml:name>Optimize-CSS</maml:name>
+        <!-- Parameter: Path -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Path</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Css -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named">
+        <maml:name>Css</maml:name>
+        <maml:description>
+          <maml:para>CSS content to optimize.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Path -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Path to a CSS file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional output file for the optimized CSS.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Optimize-CSS -Css $css</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
   <!-- Cmdlet: Optimize-Email -->
   <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
     <command:details>
@@ -557,6 +801,957 @@
       <command:example>
         <maml:title>----------  Example 1  ----------</maml:title>
         <dev:code>Optimize-Email -Body $html -RemoveComments</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Format-HTML -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Format-HTML</command:name>
+      <command:verb>Format</command:verb>
+      <command:noun>HTML</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that formats HTML markup using NUglify.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Format-HTML</maml:name>
+        <!-- Parameter: File -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Path">
+          <maml:name>File</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AlphabeticallyOrderAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AlphabeticallyOrderAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: BlockStartLine -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>BlockStartLine</maml:name>
+          <command:parameterValue required="true">BlockStart</command:parameterValue>
+          <dev:type>
+            <maml:name>NUglify.BlockStart</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>SameLine</dev:defaultValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">NewLine</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SameLine</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">UseSource</command:parameterValue>
+          </command:parameterValueGroup>
+        </command:parameter>
+        <!-- Parameter: Indent -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Indent</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>    </dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: OutputTextNodesOnNewLine -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputTextNodesOnNewLine</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveEmptyAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveEmptyAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveEmptyBlocks -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveEmptyBlocks</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveHTMLComments -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveHTMLComments</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveOptionalTags -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveOptionalTags</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Format-HTML</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: AlphabeticallyOrderAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AlphabeticallyOrderAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: BlockStartLine -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>BlockStartLine</maml:name>
+          <command:parameterValue required="true">BlockStart</command:parameterValue>
+          <dev:type>
+            <maml:name>NUglify.BlockStart</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>SameLine</dev:defaultValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">NewLine</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SameLine</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">UseSource</command:parameterValue>
+          </command:parameterValueGroup>
+        </command:parameter>
+        <!-- Parameter: Indent -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Indent</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>    </dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: OutputTextNodesOnNewLine -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputTextNodesOnNewLine</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveEmptyAttributes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveEmptyAttributes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveEmptyBlocks -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveEmptyBlocks</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveHTMLComments -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveHTMLComments</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: RemoveOptionalTags -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>RemoveOptionalTags</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: File -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Path">
+        <maml:name>File</maml:name>
+        <maml:description>
+          <maml:para>Path to an HTML file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>HTML content to format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional path to write the formatted HTML.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: Indent -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Indent</maml:name>
+        <maml:description>
+          <maml:para>Indentation string.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>    </dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: BlockStartLine -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>BlockStartLine</maml:name>
+        <maml:description>
+          <maml:para>Determines how blocks start.</maml:para>
+          <maml:para>Possible values: NewLine, SameLine, UseSource</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">BlockStart</command:parameterValue>
+        <dev:type>
+          <maml:name>NUglify.BlockStart</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>SameLine</dev:defaultValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">NewLine</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SameLine</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">UseSource</command:parameterValue>
+        </command:parameterValueGroup>
+      </command:parameter>
+      <!-- Parameter: RemoveHTMLComments -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveHTMLComments</maml:name>
+        <maml:description>
+          <maml:para>Remove HTML comments.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: RemoveOptionalTags -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveOptionalTags</maml:name>
+        <maml:description>
+          <maml:para>Remove optional tags.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputTextNodesOnNewLine -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputTextNodesOnNewLine</maml:name>
+        <maml:description>
+          <maml:para>Output text nodes on new line.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: RemoveEmptyAttributes -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveEmptyAttributes</maml:name>
+        <maml:description>
+          <maml:para>Remove empty attributes.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: AlphabeticallyOrderAttributes -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AlphabeticallyOrderAttributes</maml:name>
+        <maml:description>
+          <maml:para>Alphabetically order attributes.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: RemoveEmptyBlocks -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>RemoveEmptyBlocks</maml:name>
+        <maml:description>
+          <maml:para>Remove empty CSS blocks.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Format-HTML -Content '&lt;div&gt;test&lt;/div&gt;'</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Optimize-HTML -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Optimize-HTML</command:name>
+      <command:verb>Optimize</command:verb>
+      <command:noun>HTML</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that minifies HTML content using NUglify.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Optimize-HTML</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: CSSDecodeEscapes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CSSDecodeEscapes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Optimize-HTML</maml:name>
+        <!-- Parameter: File -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>File</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: CSSDecodeEscapes -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CSSDecodeEscapes</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>HTML content to optimize.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: File -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>File</maml:name>
+        <maml:description>
+          <maml:para>Path to a HTML file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional path to write the optimized HTML.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: CSSDecodeEscapes -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CSSDecodeEscapes</maml:name>
+        <maml:description>
+          <maml:para>Decode CSS escape sequences while minifying.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Optimize-HTML -Content $html</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Convert-HTMLToText -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Convert-HTMLToText</command:name>
+      <command:verb>Convert</command:verb>
+      <command:noun>HTMLToText</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that converts HTML content to plain text.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Convert-HTMLToText</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Convert-HTMLToText</maml:name>
+        <!-- Parameter: File -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>File</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Url -->
+      <command:syntaxItem>
+        <maml:name>Convert-HTMLToText</maml:name>
+        <!-- Parameter: Url -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Uri">
+          <maml:name>Url</maml:name>
+          <command:parameterValue required="true">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>HTML content to convert.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: File -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>File</maml:name>
+        <maml:description>
+          <maml:para>Path to a HTML file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Url -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="Uri">
+        <maml:name>Url</maml:name>
+        <maml:description>
+          <maml:para>URL of a HTML page to download and convert.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">Uri</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Uri</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional path to write the resulting text.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Convert-HTMLToText -Content "&lt;p&gt;Hello&lt;/p&gt;"</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Format-JavaScript -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Format-JavaScript</command:name>
+      <command:verb>Format</command:verb>
+      <command:noun>JavaScript</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that formats JavaScript code using JsBeautifier.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Format-JavaScript</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named" aliases="FileContent">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Format-JavaScript</maml:name>
+        <!-- Parameter: File -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>File</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named" aliases="FileContent">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>JavaScript code to format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: File -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>File</maml:name>
+        <maml:description>
+          <maml:para>Path to a JavaScript file to format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional path to write the formatted JavaScript.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+  </command:command>
+  <!-- Cmdlet: Optimize-JavaScript -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Optimize-JavaScript</command:name>
+      <command:verb>Optimize</command:verb>
+      <command:noun>JavaScript</command:noun>
+      <maml:description>
+        <maml:para>Cmdlet that minifies JavaScript code.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <!-- Parameter set: File -->
+      <command:syntaxItem>
+        <maml:name>Optimize-JavaScript</maml:name>
+        <!-- Parameter: Path -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="File">
+          <maml:name>Path</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Content -->
+      <command:syntaxItem>
+        <maml:name>Optimize-JavaScript</maml:name>
+        <!-- Parameter: Content -->
+        <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+          <maml:name>Content</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue></dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: OutputFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutputFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Path -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named" aliases="File">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Path to a JavaScript file to optimize.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Content -->
+      <command:parameter required="true" globbing="false" pipelineInput="true (ByValue, ByPropertyName)" position="named">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>JavaScript content to optimize.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: OutputFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutputFile</maml:name>
+        <maml:description>
+          <maml:para>Optional file path to write optimized output.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <!-- OutputType: String -->
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>Optimize-JavaScript -Content $js</dev:code>
       </command:example>
     </command:examples>
   </command:command>
