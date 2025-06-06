@@ -16,8 +16,8 @@
             <GenerateDocumentationFile>true</GenerateDocumentationFile>
         </PropertyGroup>
 
-	<ItemGroup>
-		<PackageReference Include="AngleSharp" Version="1.2.0-beta.439" />
+  <ItemGroup>
+        <PackageReference Include="AngleSharp" Version="1.2.0-beta.439" />
 		<PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.144" />
 		<PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
 		<PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.36" />
@@ -26,9 +26,14 @@
 		<PackageReference Include="Jsbeautifier" Version="0.0.1" />
 		<PackageReference Include="NUglify" Version="1.21.11" />
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
-		<PackageReference Include="PreMailer.Net" Version="2.6.0" />
-		<!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
-        </ItemGroup>
+        <PackageReference Include="PreMailer.Net" Version="2.6.0" />
+        <!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
 
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
