@@ -18,4 +18,17 @@ public class HeadlessTableTests {
         Assert.True(tables[0].Data.Count > 0);
         Assert.Equal("Column1", tables[0].Metadata.Headers[0]);
     }
+
+    [Fact]
+    public void ParseHeadlessTable_DetectsAllTables() {
+        string html = GetHtml();
+        var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, true);
+
+        Assert.Equal(4, tables.Count);
+
+        Assert.Equal("Data64-bit", tables[0].Data[0]["Column3"]);
+        Assert.Equal("Source", tables[2].Data[0]["Column1"]);
+        Assert.Equal("D:", tables[2].Data[0]["Column2"]);
+        Assert.Contains("Column3", tables[3].Metadata.Headers);
+    }
 }
