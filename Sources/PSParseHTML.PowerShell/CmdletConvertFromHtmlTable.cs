@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
@@ -59,6 +60,10 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     [Parameter]
     public SwitchParameter CleanHeaders { get; set; }
 
+    /// <summary>Filter out rows that appear to be footnotes or metadata (contain symbols like †, ‡, §, *, etc.).</summary>
+    [Parameter]
+    public SwitchParameter FilterFootnotes { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (IncludeMetadata.IsPresent) {
@@ -116,9 +121,14 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         }
     }
 
-    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+        private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
         var list = new List<PSObject>();
         foreach (var row in rows) {
+            // Filter out footnote rows if requested
+            if (FilterFootnotes.IsPresent && IsFootnoteRow(row)) {
+                continue;
+            }
+
             PSObject obj = new();
             foreach (var kv in row) {
                 var value = kv.Value;
@@ -135,7 +145,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         return list.ToArray();
     }
 
-    private static string CleanHeaderName(string headerName) {
+        private static string CleanHeaderName(string headerName) {
         if (string.IsNullOrEmpty(headerName)) {
             return headerName;
         }
@@ -174,6 +184,24 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             .Replace("+", "")           // Remove plus
             .Replace("-", "")           // Remove hyphens
             .Trim();                    // Remove leading/trailing whitespace
+    }
+
+    private static bool IsFootnoteRow(Dictionary<string, string?> row) {
+        // Check if the first cell (usually "Products and services") contains footnote indicators
+        var firstValue = row.Values.FirstOrDefault();
+        if (string.IsNullOrEmpty(firstValue)) {
+            return false;
+        }
+
+        // Look for common footnote symbols and patterns
+        return firstValue.Contains("†") ||      // Dagger
+               firstValue.Contains("‡") ||      // Double dagger
+               firstValue.Contains("§") ||      // Section sign
+               firstValue.Contains("*Note") ||  // Note indicators
+               firstValue.Contains("View the") || // Azure status footnotes
+               firstValue.Contains("To learn more") || // Help text
+               firstValue.Contains("regions are available to") || // Regional disclaimers
+               (firstValue.StartsWith("*") && firstValue.Length > 10); // Asterisk footnotes
     }
 
     private static IDictionary<string, string>? Cast(IDictionary? data) {
