@@ -114,9 +114,12 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
                 }
             }
 
+            // Return array of arrays - each table as a separate array
+            var tableArrays = new List<PSObject[]>();
             foreach (var table in tables) {
-                WriteObject(ConvertRows(table), true);
+                tableArrays.Add(ConvertRows(table));
             }
+            WriteObject(tableArrays.ToArray(), false);
         }
     }
 
