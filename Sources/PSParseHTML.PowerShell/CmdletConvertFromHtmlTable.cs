@@ -99,25 +99,28 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
                 WriteObject(tableObject);
             }
         } else {
-            List<List<Dictionary<string, string?>>> tables;
+            // Use the detailed parsing methods but extract only the Data part
+            List<HtmlParser.TableParseResult> detailedTables;
             if (ParameterSetName == ParameterSetUrl) {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    tables = HtmlParser.ParseUrlTablesWithAngleSharpAsync(Url.ToString(), Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent).GetAwaiter().GetResult();
+                    string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 } else {
-                    tables = HtmlParser.ParseUrlTablesWithHtmlAgilityPackAsync(Url.ToString(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent).GetAwaiter().GetResult();
+                    var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 }
             } else {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    tables = HtmlParser.ParseTablesWithAngleSharp(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 } else {
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPack(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 }
             }
 
-            // Return array of arrays - each table as a separate array
+            // Return array of arrays - each table as a separate array (extract Data from detailed results)
             var tableArrays = new List<PSObject[]>();
-            foreach (var table in tables) {
-                tableArrays.Add(ConvertRows(table));
+            foreach (var tableResult in detailedTables) {
+                tableArrays.Add(ConvertRows(tableResult.Data));
             }
             WriteObject(tableArrays.ToArray(), false);
         }
