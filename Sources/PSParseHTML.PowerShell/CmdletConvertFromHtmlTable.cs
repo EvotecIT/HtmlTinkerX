@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
@@ -58,8 +59,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     /// <summary>Automatically clean special characters from header names that can cause PowerShell formatting issues.</summary>
     [Parameter]
     public SwitchParameter CleanHeaders { get; set; }
-    /// <summary>Filter out rows that appear to be footnotes or metadata (contain symbols like †, ‡, §, *, etc.).</summary>
-
+    /// <summary>Skip HTML table footer (&lt;tfoot&gt;) elements when parsing tables.</summary>
     [Parameter]
     public SwitchParameter SkipFooter { get; set; }
 
@@ -70,16 +70,16 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             if (ParameterSetName == ParameterSetUrl) {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
                     string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 } else {
                     var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 }
             } else {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 } else {
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent);
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
                 }
             }
 
@@ -128,10 +128,6 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
         var list = new List<PSObject>();
         foreach (var row in rows) {
-            // Filter out footnote rows if requested
-            if (SkipFooter.IsPresent && IsFootnoteRow(row)) {
-                continue;
-            }
             PSObject obj = new();
             foreach (var kv in row) {
                 var value = kv.Value;
@@ -194,18 +190,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             .Trim();                    // Remove leading/trailing whitespace
     }
 
-    /// <summary>
-    /// Check if the row is a footnote row.
-    /// </summary>
-    /// <param name="row">The row to check.</param>
-    /// <returns>True if the row is a footnote row, false otherwise.</returns>
-    private static bool IsFootnoteRow(Dictionary<string, string?> row) {
-        var firstValue = row.Values.FirstOrDefault();
-        if (string.IsNullOrEmpty(firstValue)) {
-            return false;
-        }
-        return true;
-    }
+
 
     /// <summary>
     /// Cast the dictionary to a dictionary of strings.

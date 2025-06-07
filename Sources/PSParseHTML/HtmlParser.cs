@@ -101,7 +101,8 @@ public static class HtmlParser {
         string html,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
-        bool allProperties = false) {
+        bool allProperties = false,
+        bool skipFooter = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -130,7 +131,9 @@ public static class HtmlParser {
             metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
                                 !style.ToLowerInvariant().Contains("display: none");
 
-            var rows = table.QuerySelectorAll("tr");
+            var rows = skipFooter ?
+                table.QuerySelectorAll("tr:not(tfoot tr)") :
+                table.QuerySelectorAll("tr");
             metadata.RowCount = rows.Length;
 
             if (rows.Length == 0) {
@@ -328,7 +331,8 @@ public static class HtmlParser {
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
-        bool allProperties = false) {
+        bool allProperties = false,
+        bool skipFooter = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -361,7 +365,9 @@ public static class HtmlParser {
             metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
                                 !style.ToLowerInvariant().Contains("display: none");
 
-            var rows = table.SelectNodes(".//tr");
+            var rows = skipFooter ?
+                table.SelectNodes(".//tr[not(ancestor::tfoot)]") :
+                table.SelectNodes(".//tr");
             metadata.RowCount = rows?.Count ?? 0;
 
             if (rows == null || rows.Count == 0) {
