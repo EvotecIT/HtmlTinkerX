@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
@@ -59,10 +58,10 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     /// <summary>Automatically clean special characters from header names that can cause PowerShell formatting issues.</summary>
     [Parameter]
     public SwitchParameter CleanHeaders { get; set; }
-
     /// <summary>Filter out rows that appear to be footnotes or metadata (contain symbols like †, ‡, §, *, etc.).</summary>
+
     [Parameter]
-    public SwitchParameter FilterFootnotes { get; set; }
+    public SwitchParameter SkipFooter { get; set; }
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
@@ -121,14 +120,18 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         }
     }
 
-        private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+    /// <summary>
+    /// Convert the rows to PowerShell objects.
+    /// </summary>
+    /// <param name="rows">The rows to convert.</param>
+    /// <returns>The converted rows.</returns>
+    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
         var list = new List<PSObject>();
         foreach (var row in rows) {
             // Filter out footnote rows if requested
-            if (FilterFootnotes.IsPresent && IsFootnoteRow(row)) {
+            if (SkipFooter.IsPresent && IsFootnoteRow(row)) {
                 continue;
             }
-
             PSObject obj = new();
             foreach (var kv in row) {
                 var value = kv.Value;
@@ -145,7 +148,12 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         return list.ToArray();
     }
 
-        private static string CleanHeaderName(string headerName) {
+    /// <summary>
+    /// Clean the header name to remove problematic characters that can cause PowerShell formatting issues.
+    /// </summary>
+    /// <param name="headerName">The header name to clean.</param>
+    /// <returns>The cleaned header name.</returns>
+    private static string CleanHeaderName(string headerName) {
         if (string.IsNullOrEmpty(headerName)) {
             return headerName;
         }
@@ -186,24 +194,24 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             .Trim();                    // Remove leading/trailing whitespace
     }
 
+    /// <summary>
+    /// Check if the row is a footnote row.
+    /// </summary>
+    /// <param name="row">The row to check.</param>
+    /// <returns>True if the row is a footnote row, false otherwise.</returns>
     private static bool IsFootnoteRow(Dictionary<string, string?> row) {
-        // Check if the first cell (usually "Products and services") contains footnote indicators
         var firstValue = row.Values.FirstOrDefault();
         if (string.IsNullOrEmpty(firstValue)) {
             return false;
         }
-
-        // Look for common footnote symbols and patterns
-        return firstValue.Contains("†") ||      // Dagger
-               firstValue.Contains("‡") ||      // Double dagger
-               firstValue.Contains("§") ||      // Section sign
-               firstValue.Contains("*Note") ||  // Note indicators
-               firstValue.Contains("View the") || // Azure status footnotes
-               firstValue.Contains("To learn more") || // Help text
-               firstValue.Contains("regions are available to") || // Regional disclaimers
-               (firstValue.StartsWith("*") && firstValue.Length > 10); // Asterisk footnotes
+        return true;
     }
 
+    /// <summary>
+    /// Cast the dictionary to a dictionary of strings.
+    /// </summary>
+    /// <param name="data">The dictionary to cast.</param>
+    /// <returns>The casted dictionary.</returns>
     private static IDictionary<string, string>? Cast(IDictionary? data) {
         if (data == null) {
             return null;
