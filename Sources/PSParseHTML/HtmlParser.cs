@@ -96,13 +96,19 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<TableParseResult> ParseTablesWithAngleSharpDetailed(
         string html,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        bool skipFooter = false) {
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -160,6 +166,9 @@ public static class HtmlParser {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
+                    if (cleanHeaders) {
+                        header = CleanHeaderName(header);
+                    }
                     headers.Add(header);
                 }
             } else {
@@ -189,9 +198,13 @@ public static class HtmlParser {
                                 value = value.Replace(kv.Key, kv.Value);
                             }
                         }
+                        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
+                            value = emptyValuePlaceholder;
+                        }
                         dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
                     } else if (allProperties) {
-                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = null;
+                        string? emptyValue = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = emptyValue;
                     }
                 }
                 if (dict.Count > 0) {
@@ -325,6 +338,10 @@ public static class HtmlParser {
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<TableParseResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
@@ -332,7 +349,9 @@ public static class HtmlParser {
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        bool skipFooter = false) {
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -433,6 +452,9 @@ public static class HtmlParser {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
+                    if (cleanHeaders) {
+                        header = CleanHeaderName(header);
+                    }
                     headers.Add(header);
                 }
             } else {
@@ -461,9 +483,13 @@ public static class HtmlParser {
                                 value = value.Replace(kv.Key, kv.Value);
                             }
                         }
+                        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
+                            value = emptyValuePlaceholder;
+                        }
                         dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
                     } else if (allProperties) {
-                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = null;
+                        string? emptyValue = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = emptyValue;
                     }
                 }
                 if (dict.Count > 0) {
@@ -629,5 +655,52 @@ public static class HtmlParser {
 
         string content = await _client.GetStringAsync(url).ConfigureAwait(false);
         return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+    }
+
+    /// <summary>
+    /// Clean the header name to remove problematic characters that can cause PowerShell formatting issues.
+    /// This method is useful for both PowerShell and C# consumers to ensure header names are safe for property access.
+    /// </summary>
+    /// <param name="headerName">The header name to clean.</param>
+    /// <returns>The cleaned header name.</returns>
+    public static string CleanHeaderName(string headerName) {
+        if (string.IsNullOrEmpty(headerName)) {
+            return headerName;
+        }
+
+        // Remove or replace problematic characters that can cause PowerShell formatting issues
+        return headerName
+            .Replace("*", "")           // Remove asterisks
+            .Replace("‡", "")           // Remove double dagger symbols
+            .Replace("†", "")           // Remove dagger symbols
+            .Replace("#", "")           // Remove hash symbols
+            .Replace("$", "")           // Remove dollar signs
+            .Replace("@", "")           // Remove at symbols
+            .Replace("!", "")           // Remove exclamation marks
+            .Replace("?", "")           // Remove question marks
+            .Replace("%", "")           // Remove percent symbols
+            .Replace("&", "and")        // Replace ampersand with "and"
+            .Replace("(", "")           // Remove opening parenthesis
+            .Replace(")", "")           // Remove closing parenthesis
+            .Replace("[", "")           // Remove opening bracket
+            .Replace("]", "")           // Remove closing bracket
+            .Replace("{", "")           // Remove opening brace
+            .Replace("}", "")           // Remove closing brace
+            .Replace("|", "")           // Remove pipe symbols
+            .Replace("\\", "")          // Remove backslashes
+            .Replace("/", "")           // Remove forward slashes
+            .Replace(":", "")           // Remove colons
+            .Replace(";", "")           // Remove semicolons
+            .Replace("\"", "")          // Remove quotes
+            .Replace("'", "")           // Remove apostrophes
+            .Replace("`", "")           // Remove backticks
+            .Replace("~", "")           // Remove tildes
+            .Replace("^", "")           // Remove carets
+            .Replace("<", "")           // Remove less than
+            .Replace(">", "")           // Remove greater than
+            .Replace("=", "")           // Remove equals
+            .Replace("+", "")           // Remove plus
+            .Replace("-", "")           // Remove hyphens
+            .Trim();                    // Remove leading/trailing whitespace
     }
 }

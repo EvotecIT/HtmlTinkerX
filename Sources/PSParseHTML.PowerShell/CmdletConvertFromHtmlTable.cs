@@ -70,33 +70,21 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             if (ParameterSetName == ParameterSetUrl) {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
                     string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
                     var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             }
 
             foreach (var tableResult in tables) {
-                PSObject tableObject = new();
-                tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
-                if (IncludeMetadata.IsPresent) {
-                    tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
-                    tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
-                    tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
-                    tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
-                    tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
-                    tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
-                    tableObject.Properties.Add(new PSNoteProperty("Headers", tableResult.Metadata.Headers.ToArray()));
-                    tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
-                }
-                WriteObject(tableObject);
+                WriteObject(CreateTableObject(tableResult));
             }
         } else {
             // Use the detailed parsing methods but extract only the Data part
@@ -104,16 +92,16 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             if (ParameterSetName == ParameterSetUrl) {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
                     string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
-                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
                     var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
-                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent);
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             }
 
@@ -136,14 +124,8 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         foreach (var row in rows) {
             PSObject obj = new();
             foreach (var kv in row) {
-                var value = kv.Value;
-                // If the value is empty and we have a placeholder, use it
-                if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(EmptyValuePlaceholder)) {
-                    value = EmptyValuePlaceholder;
-                }
-
-                var propertyName = CleanHeaders.IsPresent ? CleanHeaderName(kv.Key) : kv.Key;
-                obj.Properties.Add(new PSNoteProperty(propertyName, value));
+                // Core library now handles CleanHeaders and EmptyValuePlaceholder processing
+                obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
             }
             list.Add(obj);
         }
@@ -151,49 +133,26 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     }
 
     /// <summary>
-    /// Clean the header name to remove problematic characters that can cause PowerShell formatting issues.
+    /// Creates a PSObject with flattened table metadata and data.
     /// </summary>
-    /// <param name="headerName">The header name to clean.</param>
-    /// <returns>The cleaned header name.</returns>
-    private static string CleanHeaderName(string headerName) {
-        if (string.IsNullOrEmpty(headerName)) {
-            return headerName;
+    /// <param name="tableResult">The table parse result containing metadata and data.</param>
+    /// <returns>A PSObject with flattened structure.</returns>
+    private PSObject CreateTableObject(HtmlParser.TableParseResult tableResult) {
+        PSObject tableObject = new();
+        tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
+
+        if (IncludeMetadata.IsPresent) {
+            tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
+            tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
+            tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
+            tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
+            tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
+            tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
+            tableObject.Properties.Add(new PSNoteProperty("Headers", tableResult.Metadata.Headers.ToArray()));
+            tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
         }
 
-        // Remove or replace problematic characters that can cause PowerShell formatting issues
-        return headerName
-            .Replace("*", "")           // Remove asterisks
-            .Replace("‡", "")           // Remove double dagger symbols
-            .Replace("†", "")           // Remove dagger symbols
-            .Replace("#", "")           // Remove hash symbols
-            .Replace("$", "")           // Remove dollar signs
-            .Replace("@", "")           // Remove at symbols
-            .Replace("!", "")           // Remove exclamation marks
-            .Replace("?", "")           // Remove question marks
-            .Replace("%", "")           // Remove percent symbols
-            .Replace("&", "and")        // Replace ampersand with "and"
-            .Replace("(", "")           // Remove opening parenthesis
-            .Replace(")", "")           // Remove closing parenthesis
-            .Replace("[", "")           // Remove opening bracket
-            .Replace("]", "")           // Remove closing bracket
-            .Replace("{", "")           // Remove opening brace
-            .Replace("}", "")           // Remove closing brace
-            .Replace("|", "")           // Remove pipe symbols
-            .Replace("\\", "")          // Remove backslashes
-            .Replace("/", "")           // Remove forward slashes
-            .Replace(":", "")           // Remove colons
-            .Replace(";", "")           // Remove semicolons
-            .Replace("\"", "")          // Remove quotes
-            .Replace("'", "")           // Remove apostrophes
-            .Replace("`", "")           // Remove backticks
-            .Replace("~", "")           // Remove tildes
-            .Replace("^", "")           // Remove carets
-            .Replace("<", "")           // Remove less than
-            .Replace(">", "")           // Remove greater than
-            .Replace("=", "")           // Remove equals
-            .Replace("+", "")           // Remove plus
-            .Replace("-", "")           // Remove hyphens
-            .Trim();                    // Remove leading/trailing whitespace
+        return tableObject;
     }
 
 
