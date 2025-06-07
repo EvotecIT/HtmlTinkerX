@@ -14,4 +14,21 @@ Describe -Name 'ConvertFrom-HtmlTable' {
         $doc = ConvertFrom-HTML -Url 'https://example.com'
         $doc | Should -Not -BeNullOrEmpty
     }
+
+    It 'Parses headless_table.html and detects four tables' {
+        $Path = Join-Path $PSScriptRoot 'Documents/headless_table.html'
+        $Content = Get-Content -LiteralPath $Path -Raw
+        $Tables = ConvertFrom-HtmlTable -Content $Content -Engine AgilityPack -IncludeMetadata
+
+        $Tables.Count | Should -Be 4
+
+        $Tables[0].TableIndex | Should -Be 0
+        $Tables[0].ColumnCount | Should -Be 3
+        $Tables[0].Data[0].Column3 | Should -Be 'Data64-bit'
+
+        $Tables[2].Data[0].Column1 | Should -Be 'Source'
+        $Tables[2].Data[0].Column2 | Should -Be 'D:'
+
+        $Tables[3].Data[1].Column3 | Should -Match 'PrepareCopying failed'
+    }
 }
