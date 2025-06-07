@@ -1,4 +1,6 @@
 using AngleSharp.Dom;
+using System.Management.Automation;
+using System.Net.Http;
 
 namespace PSParseHTML.PowerShell;
 
@@ -37,6 +39,12 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
     [Parameter]
     public string? Name { get; set; }
 
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Return matching <see cref="IElement"/> objects instead of text.</summary>
     [Parameter]
     public SwitchParameter ReturnObject { get; set; }
@@ -59,7 +67,7 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
     }
 
     private string DownloadHtml() {
-        using WebClient client = new();
-        return client.DownloadString(Url);
+        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        return client.GetStringAsync(Url).GetAwaiter().GetResult();
     }
 }

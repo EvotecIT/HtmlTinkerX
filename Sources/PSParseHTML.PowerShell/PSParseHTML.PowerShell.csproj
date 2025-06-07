@@ -36,6 +36,7 @@
         <Using Include="System.Text" />
         <Using Include="System.IO" />
         <Using Include="System.Net" />
+        <Using Include="System.Net.Http" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->

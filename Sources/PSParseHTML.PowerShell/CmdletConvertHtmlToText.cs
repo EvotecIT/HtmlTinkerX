@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
@@ -43,6 +44,12 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     [Parameter]
     public string? OutputFile { get; set; }
 
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string html = GetHtmlContent();
@@ -63,8 +70,8 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
                 }
                 return System.IO.File.ReadAllText(File);
             case ParameterSetUrl:
-                using (var webClient = new WebClient()) {
-                    return webClient.DownloadString(Url);
+                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                    return client.GetStringAsync(Url).GetAwaiter().GetResult();
                 }
             case ParameterSetContent:
             default:
