@@ -51,6 +51,14 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     [Parameter]
     public SwitchParameter AllProperties { get; set; }
 
+    /// <summary>Value to use for empty cells to improve PowerShell formatting compatibility.</summary>
+    [Parameter]
+    public string? EmptyValuePlaceholder { get; set; }
+
+    /// <summary>Automatically clean special characters from header names that can cause PowerShell formatting issues.</summary>
+    [Parameter]
+    public SwitchParameter CleanHeaders { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (IncludeMetadata.IsPresent) {
@@ -108,16 +116,64 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
         }
     }
 
-    private static PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
         var list = new List<PSObject>();
         foreach (var row in rows) {
             PSObject obj = new();
             foreach (var kv in row) {
-                obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
+                var value = kv.Value;
+                // If the value is empty and we have a placeholder, use it
+                if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(EmptyValuePlaceholder)) {
+                    value = EmptyValuePlaceholder;
+                }
+
+                var propertyName = CleanHeaders.IsPresent ? CleanHeaderName(kv.Key) : kv.Key;
+                obj.Properties.Add(new PSNoteProperty(propertyName, value));
             }
             list.Add(obj);
         }
         return list.ToArray();
+    }
+
+    private static string CleanHeaderName(string headerName) {
+        if (string.IsNullOrEmpty(headerName)) {
+            return headerName;
+        }
+
+        // Remove or replace problematic characters that can cause PowerShell formatting issues
+        return headerName
+            .Replace("*", "")           // Remove asterisks
+            .Replace("‡", "")           // Remove double dagger symbols
+            .Replace("†", "")           // Remove dagger symbols
+            .Replace("#", "")           // Remove hash symbols
+            .Replace("$", "")           // Remove dollar signs
+            .Replace("@", "")           // Remove at symbols
+            .Replace("!", "")           // Remove exclamation marks
+            .Replace("?", "")           // Remove question marks
+            .Replace("%", "")           // Remove percent symbols
+            .Replace("&", "and")        // Replace ampersand with "and"
+            .Replace("(", "")           // Remove opening parenthesis
+            .Replace(")", "")           // Remove closing parenthesis
+            .Replace("[", "")           // Remove opening bracket
+            .Replace("]", "")           // Remove closing bracket
+            .Replace("{", "")           // Remove opening brace
+            .Replace("}", "")           // Remove closing brace
+            .Replace("|", "")           // Remove pipe symbols
+            .Replace("\\", "")          // Remove backslashes
+            .Replace("/", "")           // Remove forward slashes
+            .Replace(":", "")           // Remove colons
+            .Replace(";", "")           // Remove semicolons
+            .Replace("\"", "")          // Remove quotes
+            .Replace("'", "")           // Remove apostrophes
+            .Replace("`", "")           // Remove backticks
+            .Replace("~", "")           // Remove tildes
+            .Replace("^", "")           // Remove carets
+            .Replace("<", "")           // Remove less than
+            .Replace(">", "")           // Remove greater than
+            .Replace("=", "")           // Remove equals
+            .Replace("+", "")           // Remove plus
+            .Replace("-", "")           // Remove hyphens
+            .Trim();                    // Remove leading/trailing whitespace
     }
 
     private static IDictionary<string, string>? Cast(IDictionary? data) {
