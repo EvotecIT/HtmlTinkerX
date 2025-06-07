@@ -6,11 +6,18 @@ using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
 
-/// <summary>
-/// Cmdlet that converts HTML content to plain text.
-/// </summary>
+/// <summary>Converts HTML content to plain text.</summary>
+/// <para>
+/// You can provide raw HTML, a local file, or download a page with <c>-Url</c>.
+/// When downloading, optional <c>-Proxy</c> and <c>-ProxyCredential</c> can be used.
+/// </para>
 /// <example>
-/// <code>Convert-HTMLToText -Content "&lt;p&gt;Hello&lt;/p&gt;"</code>
+///   <summary>Convert a simple HTML string</summary>
+///   <code>Convert-HTMLToText -Content "&lt;p&gt;Hello&lt;/p&gt;"</code>
+/// </example>
+/// <example>
+///   <summary>Download through a proxy</summary>
+///   <code>Convert-HTMLToText -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.Convert, "HTMLToText", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
@@ -44,9 +51,16 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     [Parameter]
     public string? OutputFile { get; set; }
 
+    /// <summary>
+    /// Proxy server address used when downloading from <see cref="Url"/>.
+    /// Include the protocol and port if necessary.
+    /// </summary>
     [Parameter]
     public string? Proxy { get; set; }
 
+    /// <summary>
+    /// Credentials used for the <see cref="Proxy"/> server.
+    /// </summary>
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 
