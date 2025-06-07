@@ -55,11 +55,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <returns>The parsed <see cref="IDocument"/>.</returns>
-    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url) {
+    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        string content = await _client.GetStringAsync(url).ConfigureAwait(false);
+        HttpClient http = client ?? _client;
+        string content = await http.GetStringAsync(url).ConfigureAwait(false);
         return ParseWithAngleSharp(content);
     }
 
@@ -82,11 +83,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <returns>The parsed <see cref="HtmlDocument"/>.</returns>
-    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url) {
+    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        string content = await _client.GetStringAsync(url).ConfigureAwait(false);
+        HttpClient http = client ?? _client;
+        string content = await http.GetStringAsync(url).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
     }
 
@@ -322,12 +324,14 @@ public static class HtmlParser {
         string url,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
-        bool allProperties = false) {
+        bool allProperties = false,
+        HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        string content = await _client.GetStringAsync(url).ConfigureAwait(false);
+        HttpClient http = client ?? _client;
+        string content = await http.GetStringAsync(url).ConfigureAwait(false);
         return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
     }
 
@@ -648,12 +652,14 @@ public static class HtmlParser {
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
-        bool allProperties = false) {
+        bool allProperties = false,
+        HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        string content = await _client.GetStringAsync(url).ConfigureAwait(false);
+        HttpClient http = client ?? _client;
+        string content = await http.GetStringAsync(url).ConfigureAwait(false);
         return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
     }
 

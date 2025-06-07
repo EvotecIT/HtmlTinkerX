@@ -1,5 +1,6 @@
 using System;
 using System.Management.Automation;
+using System.Net.Http;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
 
@@ -31,6 +32,12 @@ public sealed class CmdletConvertFromHtml : PSCmdlet {
     [ValidateSet("AngleSharp", "AgilityPack")]
     public string Engine { get; set; } = "AgilityPack";
 
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Return raw document object.</summary>
     [Parameter]
     public SwitchParameter Raw { get; set; }
@@ -38,12 +45,13 @@ public sealed class CmdletConvertFromHtml : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (ParameterSetName == ParameterSetUrl) {
+            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
-                IDocument doc = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult();
+                IDocument doc = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult();
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
                 return;
             }
-            HtmlDocument doc2 = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
+            HtmlDocument doc2 = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).GetAwaiter().GetResult();
             WriteObject(Raw.IsPresent ? doc2 : doc2.DocumentNode);
             return;
         }
