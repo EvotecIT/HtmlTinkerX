@@ -9,3 +9,5 @@ $Tables[0] | Format-Table -AutoSize
 $Tables[1] | Format-Table -AutoSize
 
 $Tables[2] | Format-Table -AutoSize
+
+$Tables[3] | Format-Table -AutoSize
