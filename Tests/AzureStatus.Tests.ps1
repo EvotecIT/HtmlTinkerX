@@ -2,7 +2,7 @@ Describe 'AzureStatus HTML parsing' {
     It 'ConvertFrom-HtmlTableDetailed parses tables with headers' {
         $Path = Join-Path $PSScriptRoot 'Documents/azure_status.html'
         $Content = Get-Content -LiteralPath $Path -Raw
-        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content)
+        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content, $false, $null, $null, $true)
         $DataTables = $Tables | Where-Object { $_.Metadata.RowCount -gt 1 }
 
         $DataTables.Count | Should -BeGreaterOrEqual 7

@@ -34,7 +34,7 @@ public static class HtmlParser {
     /// </summary>
     public class TableParseResult {
         public TableMetadata Metadata { get; set; } = new();
-        public List<Dictionary<string, string>> Data { get; set; } = new();
+        public List<Dictionary<string, string?>> Data { get; set; } = new();
     }
 
     /// <summary>
@@ -96,11 +96,19 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<TableParseResult> ParseTablesWithAngleSharpDetailed(
         string html,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -129,55 +137,85 @@ public static class HtmlParser {
             metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
                                 !style.ToLowerInvariant().Contains("display: none");
 
-            var rows = table.QuerySelectorAll("tr");
+            var rows = skipFooter ?
+                table.QuerySelectorAll("tr:not(tfoot tr)") :
+                table.QuerySelectorAll("tr");
             metadata.RowCount = rows.Length;
 
             if (rows.Length == 0) {
-                results.Add(result);
                 continue;
             }
 
-            var headerCells = rows[0].QuerySelectorAll("th,td");
-            List<string> headers = new();
-            foreach (var cell in headerCells) {
-                string header = cell.TextContent.Trim();
-                if (replaceHeaders != null) {
-                    foreach (var kv in replaceHeaders) {
-                        header = header.Replace(kv.Key, kv.Value);
-                    }
+            int headerRowIndex = 0;
+            bool hasHeader = false;
+            for (int i = 0; i < rows.Length; i++) {
+                if (rows[i].QuerySelectorAll("th").Length > 0) {
+                    headerRowIndex = i;
+                    hasHeader = true;
+                    break;
                 }
-                headers.Add(header);
+            }
+            var headerRow = rows[headerRowIndex];
+            var headerCells = headerRow.QuerySelectorAll("th,td");
+            List<string> headers = new();
+            if (hasHeader) {
+                foreach (var cell in headerCells) {
+                    string header = cell.TextContent.Trim();
+                    if (replaceHeaders != null) {
+                        foreach (var kv in replaceHeaders) {
+                            header = header.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    if (cleanHeaders) {
+                        header = CleanHeaderName(header);
+                    }
+                    headers.Add(header);
+                }
+            } else {
+                for (int i = 0; i < headerCells.Length; i++) {
+                    headers.Add($"Column{ i + 1 }");
+                }
             }
 
             metadata.Headers = headers;
             metadata.ColumnCount = headers.Count;
 
             if (headers.Count == 0) {
-                results.Add(result);
                 continue;
             }
 
-            List<Dictionary<string, string>> tableRows = new();
-            foreach (var row in rows.Skip(1)) {
+            int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            List<Dictionary<string, string?>> tableRows = new();
+            foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.QuerySelectorAll("th,td");
-                Dictionary<string, string> dict = new();
-                for (int i = 0; i < headers.Count && i < cells.Length; i++) {
-                    string value = cells[i].TextContent.Trim();
-                    if (replaceContent != null) {
-                        foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
-                        }
-                    }
+                Dictionary<string, string?> dict = new();
+                for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    if (i < cells.Length) {
+                        string value = cells[i].TextContent.Trim();
+                        if (replaceContent != null) {
+                            foreach (var kv in replaceContent) {
+                                value = value.Replace(kv.Key, kv.Value);
+                            }
+                        }
+                        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
+                            value = emptyValuePlaceholder;
+                        }
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    } else if (allProperties) {
+                        string? emptyValue = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = emptyValue;
+                    }
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
                 }
             }
 
-            result.Data = tableRows;
-            results.Add(result);
+            if (tableRows.Count > 0) {
+                result.Data = tableRows;
+                results.Add(result);
+            }
         }
 
         return results;
@@ -190,17 +228,18 @@ public static class HtmlParser {
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
-    public static List<List<Dictionary<string, string>>> ParseTablesWithAngleSharp(
+    public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
 
         var document = ParseWithAngleSharp(html);
         var tables = document.QuerySelectorAll("table");
-        List<List<Dictionary<string, string>>> result = new();
+        List<List<Dictionary<string, string?>>> result = new();
 
         foreach (var table in tables) {
             var rows = table.QuerySelectorAll("tr");
@@ -208,35 +247,56 @@ public static class HtmlParser {
                 continue;
             }
 
-            var headerCells = rows[0].QuerySelectorAll("th,td");
-            List<string> headers = new();
-            foreach (var cell in headerCells) {
-                string header = cell.TextContent.Trim();
-                if (replaceHeaders != null) {
-                    foreach (var kv in replaceHeaders) {
-                        header = header.Replace(kv.Key, kv.Value);
-                    }
+            int headerRowIndex = 0;
+            bool hasHeader = false;
+            for (int i = 0; i < rows.Length; i++) {
+                if (rows[i].QuerySelectorAll("th").Length > 0) {
+                    headerRowIndex = i;
+                    hasHeader = true;
+                    break;
                 }
-                headers.Add(header);
+            }
+            var headerRow = rows[headerRowIndex];
+            var headerCells = headerRow.QuerySelectorAll("th,td");
+            List<string> headers = new();
+            if (hasHeader) {
+                foreach (var cell in headerCells) {
+                    string header = cell.TextContent.Trim();
+                    if (replaceHeaders != null) {
+                        foreach (var kv in replaceHeaders) {
+                            header = header.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    headers.Add(header);
+                }
+            } else {
+                for (int i = 0; i < headerCells.Length; i++) {
+                    headers.Add($"Column{ i + 1 }");
+                }
             }
 
             if (headers.Count == 0) {
                 continue;
             }
 
-            List<Dictionary<string, string>> tableRows = new();
-            foreach (var row in rows.Skip(1)) {
+            int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            List<Dictionary<string, string?>> tableRows = new();
+            foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.QuerySelectorAll("th,td");
-                Dictionary<string, string> dict = new();
-                for (int i = 0; i < headers.Count && i < cells.Length; i++) {
-                    string value = cells[i].TextContent.Trim();
-                    if (replaceContent != null) {
-                        foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
-                        }
-                    }
+                Dictionary<string, string?> dict = new();
+                for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    if (i < cells.Length) {
+                        string value = cells[i].TextContent.Trim();
+                        if (replaceContent != null) {
+                            foreach (var kv in replaceContent) {
+                                value = value.Replace(kv.Key, kv.Value);
+                            }
+                        }
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    } else if (allProperties) {
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = null;
+                    }
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
@@ -258,16 +318,17 @@ public static class HtmlParser {
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
-    public static async Task<List<List<Dictionary<string, string>>>> ParseUrlTablesWithAngleSharpAsync(
+    public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
         string content = await _client.GetStringAsync(url).ConfigureAwait(false);
-        return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders);
+        return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
     }
 
     /// <summary>
@@ -277,12 +338,20 @@ public static class HtmlParser {
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<TableParseResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -315,11 +384,12 @@ public static class HtmlParser {
             metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
                                 !style.ToLowerInvariant().Contains("display: none");
 
-            var rows = table.SelectNodes(".//tr");
+            var rows = skipFooter ?
+                table.SelectNodes(".//tr[not(ancestor::tfoot)]") :
+                table.SelectNodes(".//tr");
             metadata.RowCount = rows?.Count ?? 0;
 
             if (rows == null || rows.Count == 0) {
-                results.Add(result);
                 continue;
             }
 
@@ -350,7 +420,7 @@ public static class HtmlParser {
                 }
 
                 if (obj.Count > 0) {
-                    result.Data = new List<Dictionary<string, string>> { obj };
+                    result.Data = new List<Dictionary<string, string?>> { obj };
                     metadata.Headers = obj.Keys.ToList();
                     metadata.ColumnCount = obj.Count;
                 }
@@ -358,50 +428,79 @@ public static class HtmlParser {
                 continue;
             }
 
-            var headerCells = rows[0].SelectNodes("th|td");
+            int headerRowIndex = 0;
+            bool hasHeader = false;
+            for (int i = 0; i < rows.Count; i++) {
+                if (rows[i].SelectNodes("th")?.Count > 0) {
+                    headerRowIndex = i;
+                    hasHeader = true;
+                    break;
+                }
+            }
+            var headerRow = rows[headerRowIndex];
+            var headerCells = headerRow.SelectNodes("th|td");
             if (headerCells == null) {
-                results.Add(result);
                 continue;
             }
 
             List<string> headers = new();
-            foreach (var cell in headerCells) {
-                string header = HtmlEntity.DeEntitize(cell.InnerText).Trim();
-                if (replaceHeaders != null) {
-                    foreach (var kv in replaceHeaders) {
-                        header = header.Replace(kv.Key, kv.Value);
+            if (hasHeader) {
+                foreach (var cell in headerCells) {
+                    string header = HtmlEntity.DeEntitize(cell.InnerText).Trim();
+                    if (replaceHeaders != null) {
+                        foreach (var kv in replaceHeaders) {
+                            header = header.Replace(kv.Key, kv.Value);
+                        }
                     }
+                    if (cleanHeaders) {
+                        header = CleanHeaderName(header);
+                    }
+                    headers.Add(header);
                 }
-                headers.Add(header);
+            } else {
+                for (int i = 0; i < headerCells.Count; i++) {
+                    headers.Add($"Column{ i + 1 }");
+                }
             }
 
             metadata.Headers = headers;
             metadata.ColumnCount = headers.Count;
 
-            List<Dictionary<string, string>> tableRows = new();
-            foreach (var row in rows.Skip(1)) {
+            int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            List<Dictionary<string, string?>> tableRows = new();
+            foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.SelectNodes("th|td");
                 if (cells == null) {
                     continue;
                 }
-                Dictionary<string, string> dict = new();
-                for (int i = 0; i < headers.Count && i < cells.Count; i++) {
-                    string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
-                    if (replaceContent != null) {
-                        foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
-                        }
-                    }
+                Dictionary<string, string?> dict = new();
+                for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    if (i < cells.Count) {
+                        string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
+                        if (replaceContent != null) {
+                            foreach (var kv in replaceContent) {
+                                value = value.Replace(kv.Key, kv.Value);
+                            }
+                        }
+                        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
+                            value = emptyValuePlaceholder;
+                        }
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    } else if (allProperties) {
+                        string? emptyValue = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = emptyValue;
+                    }
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
                 }
             }
 
-            result.Data = tableRows;
-            results.Add(result);
+            if (tableRows.Count > 0) {
+                result.Data = tableRows;
+                results.Add(result);
+            }
         }
 
         return results;
@@ -415,18 +514,19 @@ public static class HtmlParser {
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
-    public static List<List<Dictionary<string, string>>> ParseTablesWithHtmlAgilityPack(
+    public static List<List<Dictionary<string, string?>>> ParseTablesWithHtmlAgilityPack(
         string html,
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
 
         HtmlDocument doc = ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
-        List<List<Dictionary<string, string>>> result = new();
+        List<List<Dictionary<string, string?>>> result = new();
         if (tables == null) {
             return result;
         }
@@ -464,43 +564,63 @@ public static class HtmlParser {
                 }
 
                 if (obj.Count > 0) {
-                    result.Add(new List<Dictionary<string, string>> { obj });
+                    result.Add(new List<Dictionary<string, string?>> { obj });
                 }
                 continue;
             }
 
-            var headerCells = rows[0].SelectNodes("th|td");
+            int headerRowIndex = 0;
+            bool hasHeader = false;
+            for (int i = 0; i < rows.Count; i++) {
+                if (rows[i].SelectNodes("th")?.Count > 0) {
+                    headerRowIndex = i;
+                    hasHeader = true;
+                    break;
+                }
+            }
+            var headerRow = rows[headerRowIndex];
+            var headerCells = headerRow.SelectNodes("th|td");
             if (headerCells == null) {
                 continue;
             }
-
             List<string> headers = new();
-            foreach (var cell in headerCells) {
-                string header = HtmlEntity.DeEntitize(cell.InnerText).Trim();
-                if (replaceHeaders != null) {
-                    foreach (var kv in replaceHeaders) {
-                        header = header.Replace(kv.Key, kv.Value);
+            if (hasHeader) {
+                foreach (var cell in headerCells) {
+                    string header = HtmlEntity.DeEntitize(cell.InnerText).Trim();
+                    if (replaceHeaders != null) {
+                        foreach (var kv in replaceHeaders) {
+                            header = header.Replace(kv.Key, kv.Value);
+                        }
                     }
+                    headers.Add(header);
                 }
-                headers.Add(header);
+            } else {
+                for (int i = 0; i < headerCells.Count; i++) {
+                    headers.Add($"Column{ i + 1 }");
+                }
             }
 
-            List<Dictionary<string, string>> tableRows = new();
-            foreach (var row in rows.Skip(1)) {
+            int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            List<Dictionary<string, string?>> tableRows = new();
+            foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.SelectNodes("th|td");
                 if (cells == null) {
                     continue;
                 }
-                Dictionary<string, string> dict = new();
-                for (int i = 0; i < headers.Count && i < cells.Count; i++) {
-                    string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
-                    if (replaceContent != null) {
-                        foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
-                        }
-                    }
+                Dictionary<string, string?> dict = new();
+                for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    if (i < cells.Count) {
+                        string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
+                        if (replaceContent != null) {
+                            foreach (var kv in replaceContent) {
+                                value = value.Replace(kv.Key, kv.Value);
+                            }
+                        }
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                    } else if (allProperties) {
+                        dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = null;
+                    }
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
@@ -523,16 +643,64 @@ public static class HtmlParser {
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
-    public static async Task<List<List<Dictionary<string, string>>>> ParseUrlTablesWithHtmlAgilityPackAsync(
+    public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithHtmlAgilityPackAsync(
         string url,
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null) {
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
         string content = await _client.GetStringAsync(url).ConfigureAwait(false);
-        return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders);
+        return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+    }
+
+    /// <summary>
+    /// Clean the header name to remove problematic characters that can cause PowerShell formatting issues.
+    /// This method is useful for both PowerShell and C# consumers to ensure header names are safe for property access.
+    /// </summary>
+    /// <param name="headerName">The header name to clean.</param>
+    /// <returns>The cleaned header name.</returns>
+    public static string CleanHeaderName(string headerName) {
+        if (string.IsNullOrEmpty(headerName)) {
+            return headerName;
+        }
+
+        // Remove or replace problematic characters that can cause PowerShell formatting issues
+        return headerName
+            .Replace("*", "")           // Remove asterisks
+            .Replace("‡", "")           // Remove double dagger symbols
+            .Replace("†", "")           // Remove dagger symbols
+            .Replace("#", "")           // Remove hash symbols
+            .Replace("$", "")           // Remove dollar signs
+            .Replace("@", "")           // Remove at symbols
+            .Replace("!", "")           // Remove exclamation marks
+            .Replace("?", "")           // Remove question marks
+            .Replace("%", "")           // Remove percent symbols
+            .Replace("&", "and")        // Replace ampersand with "and"
+            .Replace("(", "")           // Remove opening parenthesis
+            .Replace(")", "")           // Remove closing parenthesis
+            .Replace("[", "")           // Remove opening bracket
+            .Replace("]", "")           // Remove closing bracket
+            .Replace("{", "")           // Remove opening brace
+            .Replace("}", "")           // Remove closing brace
+            .Replace("|", "")           // Remove pipe symbols
+            .Replace("\\", "")          // Remove backslashes
+            .Replace("/", "")           // Remove forward slashes
+            .Replace(":", "")           // Remove colons
+            .Replace(";", "")           // Remove semicolons
+            .Replace("\"", "")          // Remove quotes
+            .Replace("'", "")           // Remove apostrophes
+            .Replace("`", "")           // Remove backticks
+            .Replace("~", "")           // Remove tildes
+            .Replace("^", "")           // Remove carets
+            .Replace("<", "")           // Remove less than
+            .Replace(">", "")           // Remove greater than
+            .Replace("=", "")           // Remove equals
+            .Replace("+", "")           // Remove plus
+            .Replace("-", "")           // Remove hyphens
+            .Trim();                    // Remove leading/trailing whitespace
     }
 }

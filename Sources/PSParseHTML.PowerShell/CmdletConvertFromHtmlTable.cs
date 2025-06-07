@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
@@ -43,36 +44,124 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     [Parameter]
     public SwitchParameter ReverseTable { get; set; }
 
+    /// <summary>Include table metadata information.</summary>
+    [Parameter]
+    public SwitchParameter IncludeMetadata { get; set; }
+
+    /// <summary>Pad rows with missing cells.</summary>
+    [Parameter]
+    public SwitchParameter AllProperties { get; set; }
+
+    /// <summary>Value to use for empty cells to improve PowerShell formatting compatibility.</summary>
+    [Parameter]
+    public string? EmptyValuePlaceholder { get; set; }
+
+    /// <summary>Automatically clean special characters from header names that can cause PowerShell formatting issues.</summary>
+    [Parameter]
+    public SwitchParameter CleanHeaders { get; set; }
+    /// <summary>Skip HTML table footer (&lt;tfoot&gt;) elements when parsing tables.</summary>
+    [Parameter]
+    public SwitchParameter SkipFooter { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        List<List<Dictionary<string, string>>> tables;
-        if (ParameterSetName == ParameterSetUrl) {
-            if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                tables = HtmlParser.ParseUrlTablesWithAngleSharpAsync(Url.ToString(), Cast(ReplaceContent), Cast(ReplaceHeaders)).GetAwaiter().GetResult();
+        if (IncludeMetadata.IsPresent) {
+            List<HtmlParser.TableParseResult> tables;
+            if (ParameterSetName == ParameterSetUrl) {
+                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                    string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                } else {
+                    var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                }
             } else {
-                tables = HtmlParser.ParseUrlTablesWithHtmlAgilityPackAsync(Url.ToString(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders)).GetAwaiter().GetResult();
+                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                } else {
+                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                }
+            }
+
+            foreach (var tableResult in tables) {
+                WriteObject(CreateTableObject(tableResult));
             }
         } else {
-            if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                tables = HtmlParser.ParseTablesWithAngleSharp(Content, Cast(ReplaceContent), Cast(ReplaceHeaders));
-            } else {
-                tables = HtmlParser.ParseTablesWithHtmlAgilityPack(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders));
-            }
-        }
-
-        foreach (var table in tables) {
-            var list = new List<PSObject>();
-            foreach (var row in table) {
-                PSObject obj = new();
-                foreach (var kv in row) {
-                    obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
+            // Use the detailed parsing methods but extract only the Data part
+            List<HtmlParser.TableParseResult> detailedTables;
+            if (ParameterSetName == ParameterSetUrl) {
+                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                    string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString()).GetAwaiter().GetResult().DocumentElement.OuterHtml;
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                } else {
+                    var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString()).GetAwaiter().GetResult();
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
-                list.Add(obj);
+            } else {
+                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                } else {
+                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
+                }
             }
-            WriteObject(list.ToArray());
+
+            // Return array of arrays - each table as a separate array (extract Data from detailed results)
+            var tableArrays = new List<PSObject[]>();
+            foreach (var tableResult in detailedTables) {
+                tableArrays.Add(ConvertRows(tableResult.Data));
+            }
+            WriteObject(tableArrays.ToArray(), false);
         }
     }
 
+    /// <summary>
+    /// Convert the rows to PowerShell objects.
+    /// </summary>
+    /// <param name="rows">The rows to convert.</param>
+    /// <returns>The converted rows.</returns>
+    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+        var list = new List<PSObject>();
+        foreach (var row in rows) {
+            PSObject obj = new();
+            foreach (var kv in row) {
+                // Core library now handles CleanHeaders and EmptyValuePlaceholder processing
+                obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
+            }
+            list.Add(obj);
+        }
+        return list.ToArray();
+    }
+
+    /// <summary>
+    /// Creates a PSObject with flattened table metadata and data.
+    /// </summary>
+    /// <param name="tableResult">The table parse result containing metadata and data.</param>
+    /// <returns>A PSObject with flattened structure.</returns>
+    private PSObject CreateTableObject(HtmlParser.TableParseResult tableResult) {
+        PSObject tableObject = new();
+        tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
+
+        if (IncludeMetadata.IsPresent) {
+            tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
+            tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
+            tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
+            tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
+            tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
+            tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
+            tableObject.Properties.Add(new PSNoteProperty("Headers", tableResult.Metadata.Headers.ToArray()));
+            tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
+        }
+
+        return tableObject;
+    }
+
+
+
+    /// <summary>
+    /// Cast the dictionary to a dictionary of strings.
+    /// </summary>
+    /// <param name="data">The dictionary to cast.</param>
+    /// <returns>The casted dictionary.</returns>
     private static IDictionary<string, string>? Cast(IDictionary? data) {
         if (data == null) {
             return null;
