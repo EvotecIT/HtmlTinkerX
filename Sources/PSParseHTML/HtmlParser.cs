@@ -16,6 +16,28 @@ public static class HtmlParser {
     private static readonly HttpClient _client = new();
 
     /// <summary>
+    /// Metadata about a parsed table.
+    /// </summary>
+    public class TableMetadata {
+        public int TableIndex { get; set; }
+        public string? Id { get; set; }
+        public string? Classes { get; set; }
+        public Dictionary<string, string> Attributes { get; set; } = new();
+        public int RowCount { get; set; }
+        public int ColumnCount { get; set; }
+        public List<string> Headers { get; set; } = new();
+        public bool IsVisible { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Result of table parsing with metadata.
+    /// </summary>
+    public class TableParseResult {
+        public TableMetadata Metadata { get; set; } = new();
+        public List<Dictionary<string, string>> Data { get; set; } = new();
+    }
+
+    /// <summary>
     /// Parses HTML markup from a string using AngleSharp.
     /// </summary>
     /// <param name="html">HTML content to parse.</param>
@@ -66,6 +88,99 @@ public static class HtmlParser {
         }
         string content = await _client.GetStringAsync(url).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
+    }
+
+    /// <summary>
+    /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing tables.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<TableParseResult> ParseTablesWithAngleSharpDetailed(
+        string html,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        var document = ParseWithAngleSharp(html);
+        var tables = document.QuerySelectorAll("table");
+        List<TableParseResult> results = new();
+
+        for (int tableIndex = 0; tableIndex < tables.Length; tableIndex++) {
+            var table = tables[tableIndex];
+            var result = new TableParseResult();
+            var metadata = result.Metadata;
+
+            // Extract metadata
+            metadata.TableIndex = tableIndex;
+            metadata.Id = table.Id;
+            metadata.Classes = table.ClassName;
+
+            // Extract all attributes
+            foreach (var attr in table.Attributes) {
+                metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
+            }
+
+            // Check visibility (simple check for display:none)
+            var style = table.GetAttribute("style") ?? string.Empty;
+            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
+                                !style.ToLowerInvariant().Contains("display: none");
+
+            var rows = table.QuerySelectorAll("tr");
+            metadata.RowCount = rows.Length;
+
+            if (rows.Length == 0) {
+                results.Add(result);
+                continue;
+            }
+
+            var headerCells = rows[0].QuerySelectorAll("th,td");
+            List<string> headers = new();
+            foreach (var cell in headerCells) {
+                string header = cell.TextContent.Trim();
+                if (replaceHeaders != null) {
+                    foreach (var kv in replaceHeaders) {
+                        header = header.Replace(kv.Key, kv.Value);
+                    }
+                }
+                headers.Add(header);
+            }
+
+            metadata.Headers = headers;
+            metadata.ColumnCount = headers.Count;
+
+            if (headers.Count == 0) {
+                results.Add(result);
+                continue;
+            }
+
+            List<Dictionary<string, string>> tableRows = new();
+            foreach (var row in rows.Skip(1)) {
+                var cells = row.QuerySelectorAll("th,td");
+                Dictionary<string, string> dict = new();
+                for (int i = 0; i < headers.Count && i < cells.Length; i++) {
+                    string value = cells[i].TextContent.Trim();
+                    if (replaceContent != null) {
+                        foreach (var kv in replaceContent) {
+                            value = value.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    string header = headers[i];
+                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                }
+                if (dict.Count > 0) {
+                    tableRows.Add(dict);
+                }
+            }
+
+            result.Data = tableRows;
+            results.Add(result);
+        }
+
+        return results;
     }
 
     /// <summary>
@@ -153,6 +268,143 @@ public static class HtmlParser {
 
         string content = await _client.GetStringAsync(url).ConfigureAwait(false);
         return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders);
+    }
+
+    /// <summary>
+    /// Extracts table data from HTML markup using HtmlAgilityPack with detailed metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing tables.</param>
+    /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<TableParseResult> ParseTablesWithHtmlAgilityPackDetailed(
+        string html,
+        bool reverseTable = false,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        HtmlDocument doc = ParseWithHtmlAgilityPack(html);
+        var tables = doc.DocumentNode.SelectNodes("//table");
+        List<TableParseResult> results = new();
+
+        if (tables == null) {
+            return results;
+        }
+
+        for (int tableIndex = 0; tableIndex < tables.Count; tableIndex++) {
+            var table = tables[tableIndex];
+            var result = new TableParseResult();
+            var metadata = result.Metadata;
+
+            // Extract metadata
+            metadata.TableIndex = tableIndex;
+            metadata.Id = table.GetAttributeValue("id", string.Empty);
+            metadata.Classes = table.GetAttributeValue("class", string.Empty);
+
+            // Extract all attributes
+            foreach (var attr in table.Attributes) {
+                metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
+            }
+
+            // Check visibility (simple check for display:none)
+            var style = table.GetAttributeValue("style", string.Empty);
+            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
+                                !style.ToLowerInvariant().Contains("display: none");
+
+            var rows = table.SelectNodes(".//tr");
+            metadata.RowCount = rows?.Count ?? 0;
+
+            if (rows == null || rows.Count == 0) {
+                results.Add(result);
+                continue;
+            }
+
+            if (reverseTable) {
+                Dictionary<string, string> obj = new();
+                int index = 0;
+                foreach (var row in rows) {
+                    var cells = row.SelectNodes("th|td");
+                    if (cells == null || cells.Count == 0) {
+                        continue;
+                    }
+                    string header = HtmlEntity.DeEntitize(cells[0].InnerText).Trim();
+                    if (replaceHeaders != null) {
+                        foreach (var kv in replaceHeaders) {
+                            header = header.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText).Trim() : string.Empty;
+                    if (replaceContent != null) {
+                        foreach (var kv in replaceContent) {
+                            value = value.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    if (string.IsNullOrEmpty(header)) {
+                        header = (++index).ToString();
+                    }
+                    obj[header] = value;
+                }
+
+                if (obj.Count > 0) {
+                    result.Data = new List<Dictionary<string, string>> { obj };
+                    metadata.Headers = obj.Keys.ToList();
+                    metadata.ColumnCount = obj.Count;
+                }
+                results.Add(result);
+                continue;
+            }
+
+            var headerCells = rows[0].SelectNodes("th|td");
+            if (headerCells == null) {
+                results.Add(result);
+                continue;
+            }
+
+            List<string> headers = new();
+            foreach (var cell in headerCells) {
+                string header = HtmlEntity.DeEntitize(cell.InnerText).Trim();
+                if (replaceHeaders != null) {
+                    foreach (var kv in replaceHeaders) {
+                        header = header.Replace(kv.Key, kv.Value);
+                    }
+                }
+                headers.Add(header);
+            }
+
+            metadata.Headers = headers;
+            metadata.ColumnCount = headers.Count;
+
+            List<Dictionary<string, string>> tableRows = new();
+            foreach (var row in rows.Skip(1)) {
+                var cells = row.SelectNodes("th|td");
+                if (cells == null) {
+                    continue;
+                }
+                Dictionary<string, string> dict = new();
+                for (int i = 0; i < headers.Count && i < cells.Count; i++) {
+                    string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
+                    if (replaceContent != null) {
+                        foreach (var kv in replaceContent) {
+                            value = value.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    string header = headers[i];
+                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = value;
+                }
+                if (dict.Count > 0) {
+                    tableRows.Add(dict);
+                }
+            }
+
+            result.Data = tableRows;
+            results.Add(result);
+        }
+
+        return results;
     }
 
     /// <summary>
