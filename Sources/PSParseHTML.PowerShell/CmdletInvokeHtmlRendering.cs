@@ -6,6 +6,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that retrieves HTML content after executing JavaScript using a headless browser.
 /// </summary>
+/// <example>
+/// <code>Invoke-HTMLRendering -Url https://example.com -Browser Chromium -Clean</code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HTMLRendering", DefaultParameterSetName = ParameterSetDefault)]
 [OutputType(typeof(string))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
@@ -23,12 +26,16 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
+    /// <summary>Force re-download of browser runtimes.</summary>
+    [Parameter]
+    public SwitchParameter Clean { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (!string.IsNullOrEmpty(OutFile)) {
-            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser).ConfigureAwait(false);
+            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser).ConfigureAwait(false);
+            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent).ConfigureAwait(false);
             WriteObject(html);
         }
     }

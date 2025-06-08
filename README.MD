@@ -72,8 +72,18 @@ Optimize-HTML -Path '.\page.html'
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
-Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium
+Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
 ```
+
+The first run triggers Playwright to download the selected browser. You'll see output similar to:
+
+```
+Downloading Chromium 136.0.7103.25 (playwright build v1169) from https://...
+144.4 MiB [====================] 100% 0.0s
+Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppData\Local\ms-playwright\chromium-1169
+```
+
+Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
