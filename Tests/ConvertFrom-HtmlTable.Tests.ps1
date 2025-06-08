@@ -1,4 +1,4 @@
-Describe -Name 'ConvertFrom-HtmlTable' {
+﻿Describe -Name 'ConvertFrom-HtmlTable' {
     It 'Given a HTML table online with polish chars - Should convert it to a PowerShell object' {
         $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
 
