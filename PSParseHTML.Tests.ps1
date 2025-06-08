@@ -16,6 +16,9 @@ $RequiredModules = @(
     }
 )
 foreach ($Module in $RequiredModules) {
+    if ($Module -eq 'PSParseHTML') {
+        continue
+    }
     if ($Module -is [System.Collections.IDictionary]) {
         $Exists = Get-Module -ListAvailable -Name $Module.ModuleName
         if (-not $Exists) {
