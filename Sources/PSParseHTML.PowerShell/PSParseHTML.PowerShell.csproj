@@ -38,6 +38,7 @@
         <Using Include="System.IO" />
         <Using Include="System.Net" />
         <Using Include="System.Net.Http" />
+        <Using Include="Microsoft.Playwright" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->

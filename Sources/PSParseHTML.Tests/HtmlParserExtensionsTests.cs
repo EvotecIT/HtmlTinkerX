@@ -1,6 +1,8 @@
-using System.Linq;
 using AngleSharp.Html.Parser;
 using PSParseHTML;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace PSParseHTML.Tests;
@@ -20,5 +22,16 @@ public class HtmlParserExtensionsTests {
         var elements = HtmlParserExtensions.GetElements(html, className: "info").ToArray();
         Assert.Single(elements);
         Assert.Equal("A", elements[0].TextContent);
+    }
+
+    [Fact]
+    public async Task GetElements_FromUrl_ByTag() {
+        using var client = new HttpClient();
+        string html = await HttpContentHelper.GetStringWithProperEncodingAsync(
+            client,
+            "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/em");
+
+        var elements = HtmlParserExtensions.GetElements(html, tag: "em");
+        Assert.NotEmpty(elements);
     }
 }
