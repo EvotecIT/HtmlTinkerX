@@ -89,6 +89,18 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000 -Selector '#content'
 Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
+# Keep a logged in browser session and reuse it
+$session = Invoke-HTMLRendering -Url 'https://example.com/protected' `
+    -Credential $cred `
+    -LoginUrl 'https://example.com/login' `
+    -UsernameSelector 'input[name=user]' `
+    -PasswordSelector 'input[name=pass]' `
+    -SubmitSelector 'button[type=submit]' `
+    -Session
+Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#content'
+$session.Page.GotoAsync('https://example.com/downloads') | Out-Null
+Save-HTMLDownload -Session $session -Path '.\Downloads'
+[PSParseHTML.HtmlBrowserRenderer]::CloseSessionAsync($session)
 ```
 
 The first run triggers Playwright to download the selected browser. You'll see output similar to:

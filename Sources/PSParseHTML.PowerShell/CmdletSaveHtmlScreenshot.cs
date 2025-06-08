@@ -14,21 +14,31 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetClip = "Clip";
+    private const string ParameterSetSessionDefault = "SessionDefault";
+    private const string ParameterSetSessionClip = "SessionClip";
 
     /// <summary>URL of the web page.</summary>
-    [Parameter(Mandatory = true, Position = 0)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetDefault)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetClip)]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Existing browser session.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionDefault)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionClip)]
+    public BrowserSession Session { get; set; } = null!;
 
     /// <summary>File path for the screenshot.</summary>
     [Parameter(Mandatory = true, Position = 1)]
     public string OutFile { get; set; } = string.Empty;
 
     /// <summary>Browser engine to use for rendering.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
     public SwitchParameter Clean { get; set; }
 
     /// <summary>Open the screenshot after saving.</summary>
@@ -37,6 +47,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
     /// <summary>Capture the entire page.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetSessionDefault)]
     public SwitchParameter Full { get; set; }
 
     /// <summary>Milliseconds to wait after the page loads.</summary>
@@ -50,44 +61,71 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
     public int X { get; set; }
 
     /// <summary>Y coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
     public int Y { get; set; }
 
     /// <summary>Width of the clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
     public int Width { get; set; }
 
     /// <summary>Height of the clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
     public int Height { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        if (ParameterSetName == ParameterSetClip) {
-            await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                Url,
-                OutFile,
-                Browser,
-                Clean.IsPresent,
-                false,
-                Delay,
-                Selector,
-                X,
-                Y,
-                Width,
-                Height).ConfigureAwait(false);
-        } else {
-            await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                Url,
-                OutFile,
-                Browser,
-                Clean.IsPresent,
-                Full.IsPresent,
-                Delay,
-                Selector).ConfigureAwait(false);
+        switch (ParameterSetName) {
+            case ParameterSetClip:
+                await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                    Url,
+                    OutFile,
+                    Browser,
+                    Clean.IsPresent,
+                    false,
+                    Delay,
+                    Selector,
+                    X,
+                    Y,
+                    Width,
+                    Height).ConfigureAwait(false);
+                break;
+            case ParameterSetSessionClip:
+                await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                    Session.Page,
+                    OutFile,
+                    false,
+                    Delay,
+                    Selector,
+                    X,
+                    Y,
+                    Width,
+                    Height).ConfigureAwait(false);
+                break;
+            case ParameterSetSessionDefault:
+                await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                    Session.Page,
+                    OutFile,
+                    Full.IsPresent,
+                    Delay,
+                    Selector).ConfigureAwait(false);
+                break;
+            default:
+                await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                    Url,
+                    OutFile,
+                    Browser,
+                    Clean.IsPresent,
+                    Full.IsPresent,
+                    Delay,
+                    Selector).ConfigureAwait(false);
+                break;
         }
 
         if (Open.IsPresent) {

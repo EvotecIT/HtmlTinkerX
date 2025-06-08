@@ -15,21 +15,26 @@ namespace PSParseHTML.PowerShell;
 [OutputType(typeof(string[]))]
 public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
+    private const string ParameterSetSession = "Session";
 
     /// <summary>URL of the web page.</summary>
-    [Parameter(Mandatory = true, Position = 0)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetDefault)]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Existing browser session.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSession)]
+    public BrowserSession Session { get; set; } = null!;
 
     /// <summary>Directory where downloads will be saved.</summary>
     [Parameter(Mandatory = true)]
     public string Path { get; set; } = string.Empty;
 
     /// <summary>Browser engine to use for rendering.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
     public SwitchParameter Clean { get; set; }
 
     /// <summary>Optional filter applied to download URLs or file names.</summary>
@@ -38,12 +43,18 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        List<string> files = await HtmlBrowserRenderer.SavePageDownloadsAsync(
-            Url,
-            Path,
-            Browser,
-            Clean.IsPresent,
-            Filter).ConfigureAwait(false);
+        List<string> files = ParameterSetName switch {
+            ParameterSetSession => await HtmlBrowserRenderer.SavePageDownloadsAsync(
+                Session.Page,
+                Path,
+                Filter).ConfigureAwait(false),
+            _ => await HtmlBrowserRenderer.SavePageDownloadsAsync(
+                Url,
+                Path,
+                Browser,
+                Clean.IsPresent,
+                Filter).ConfigureAwait(false)
+        };
 
         WriteObject(files.ToArray(), true);
     }
