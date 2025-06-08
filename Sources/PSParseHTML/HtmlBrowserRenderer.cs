@@ -102,17 +102,17 @@ public static class HtmlBrowserRenderer {
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
     /// <param name="clipHeight">Optional clip region height.</param>
-public static async Task CaptureScreenshotAsync(
-    string url,
-    string path,
-    BrowserEngine browser = BrowserEngine.Chromium,
-    bool clean = false,
-    bool fullPage = false,
-    int delayMs = 0,
-    int? clipX = null,
-    int? clipY = null,
-    int? clipWidth = null,
-    int? clipHeight = null) {
+    public static async Task CaptureScreenshotAsync(
+        string url,
+        string path,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        bool fullPage = false,
+        int delayMs = 0,
+        int? clipX = null,
+        int? clipY = null,
+        int? clipWidth = null,
+        int? clipHeight = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -194,6 +194,19 @@ public static async Task CaptureScreenshotAsync(
 
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        if (!string.IsNullOrEmpty(filter)) {
+            var anchors = await page.QuerySelectorAllAsync($"a[href*=\"{filter}\"]");
+            foreach (var anchor in anchors) {
+                var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
+                string filePath = Path.Combine(directory, download.SuggestedFilename);
+                await download.SaveAsAsync(filePath);
+                if (!downloads.Contains(filePath)) {
+                    downloads.Add(filePath);
+                }
+            }
+        }
+
         await page.WaitForTimeoutAsync(500);
         return downloads;
     }
