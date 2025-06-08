@@ -123,6 +123,7 @@ public static class HtmlBrowserRenderer {
     /// <param name="clean">Force re-download of browser runtimes.</param>
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
@@ -134,6 +135,7 @@ public static async Task CaptureScreenshotAsync(
     bool clean = false,
     bool fullPage = false,
     int delayMs = 0,
+    string? selector = null,
     int? clipX = null,
     int? clipY = null,
     int? clipWidth = null,
@@ -181,6 +183,9 @@ public static async Task CaptureScreenshotAsync(
         }
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        if (!string.IsNullOrEmpty(selector)) {
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+        }
         if (delayMs > 0) {
             await page.WaitForTimeoutAsync(delayMs);
         }
@@ -246,6 +251,9 @@ public static async Task CaptureScreenshotAsync(
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         if (!string.IsNullOrEmpty(filter)) {
+            await page.WaitForSelectorAsync(
+                $"a[href*=\"{filter}\"]",
+                new PageWaitForSelectorOptions { Timeout = 10000 });
             var anchors = await page.QuerySelectorAllAsync($"a[href*=\"{filter}\"]");
             foreach (var anchor in anchors) {
                 var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());

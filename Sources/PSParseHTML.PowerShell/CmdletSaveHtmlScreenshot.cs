@@ -44,6 +44,10 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int Delay { get; set; } = 0;
 
+    /// <summary>CSS selector to wait for before capturing.</summary>
+    [Parameter]
+    public string? Selector { get; set; }
+
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     public int X { get; set; }
@@ -63,9 +67,27 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == ParameterSetClip) {
-            await HtmlBrowserRenderer.CaptureScreenshotAsync(Url, OutFile, Browser, Clean.IsPresent, false, Delay, X, Y, Width, Height).ConfigureAwait(false);
+            await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                Url,
+                OutFile,
+                Browser,
+                Clean.IsPresent,
+                false,
+                Delay,
+                Selector,
+                X,
+                Y,
+                Width,
+                Height).ConfigureAwait(false);
         } else {
-            await HtmlBrowserRenderer.CaptureScreenshotAsync(Url, OutFile, Browser, Clean.IsPresent, Full.IsPresent, Delay).ConfigureAwait(false);
+            await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                Url,
+                OutFile,
+                Browser,
+                Clean.IsPresent,
+                Full.IsPresent,
+                Delay,
+                Selector).ConfigureAwait(false);
         }
 
         if (Open.IsPresent) {

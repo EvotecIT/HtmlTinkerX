@@ -37,7 +37,7 @@
 
 - `Optimize-JavaScript` – minify JavaScript
 - `Invoke-HTMLRendering` – render pages with a headless browser (supports basic and form authentication)
-- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters and `-Delay`)
+- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
 
 ### Cmdlet quick start
 
@@ -85,7 +85,7 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -UsernameSelector 'input[name=log]' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
-Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000 -Selector '#content'
 ```
 
 The first run triggers Playwright to download the selected browser. You'll see output similar to:
@@ -97,7 +97,7 @@ Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppD
 ```
 
 Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
-Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
+Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` or `-Selector` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 

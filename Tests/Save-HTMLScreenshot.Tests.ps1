@@ -3,7 +3,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'shot.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Delay 200
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -11,7 +11,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'full.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Full -Delay 200
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Full -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -19,7 +19,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'clip.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 50 -Height 50 -Delay 200
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 50 -Height 50 -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 }
