@@ -4,5 +4,6 @@ Save-HTMLScreenshot -Url 'https://www.goal.com/en-us/premier-league/table/2kwbbc
 Save-HTMLScreenshot -Url 'https://evotec.xyz' -OutFile "$PSScriptRoot\Output\EvotecPage.png" -Open -Browser Chromium
 Save-HTMLScreenshot -Url 'https://evotec.xyz' -OutFile "$PSScriptRoot\Output\EvotecPageFull.png" -Full -Open -Browser Chromium
 Save-HTMLScreenshot -Url 'https://evotec.xyz/hub' -OutFile "$PSScriptRoot\Output\EvotecPageHub.png" -Full -Open -Browser Chromium
-Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser Chromium
+Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser Firefox
+Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser Webkit
 Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Open -Browser Chromium -X 100 -Y 100 -Width 500 -Height 500
