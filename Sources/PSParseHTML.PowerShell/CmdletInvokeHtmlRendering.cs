@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -42,15 +43,40 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public string? Password { get; set; }
 
+    /// <summary>URL for login form when using form authentication.</summary>
+    [Parameter]
+    public string? LoginUrl { get; set; }
+
+    /// <summary>CSS selector for the username field of the login form.</summary>
+    [Parameter]
+    public string? UsernameSelector { get; set; }
+
+    /// <summary>CSS selector for the password field of the login form.</summary>
+    [Parameter]
+    public string? PasswordSelector { get; set; }
+
+    /// <summary>CSS selector for the submit element of the login form.</summary>
+    [Parameter]
+    public string? SubmitSelector { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+        FormLoginOptions? form = null;
+        if (!string.IsNullOrEmpty(LoginUrl) && !string.IsNullOrEmpty(UsernameSelector) && !string.IsNullOrEmpty(PasswordSelector) && !string.IsNullOrEmpty(SubmitSelector)) {
+            form = new FormLoginOptions {
+                LoginUrl = LoginUrl!,
+                UsernameSelector = UsernameSelector!,
+                PasswordSelector = PasswordSelector!,
+                SubmitSelector = SubmitSelector!
+            };
+        }
 
         if (!string.IsNullOrEmpty(OutFile)) {
-            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass).ConfigureAwait(false);
+            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent, user, pass).ConfigureAwait(false);
+            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
             WriteObject(html);
         }
     }

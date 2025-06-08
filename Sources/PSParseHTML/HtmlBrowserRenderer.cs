@@ -49,7 +49,13 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
+    public static async Task<string> GetPageContentAsync(
+        string url,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        FormLoginOptions? formLogin = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -63,7 +69,7 @@ public static class HtmlBrowserRenderer {
         };
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
         BrowserNewContextOptions? contextOptions = null;
-        if (!string.IsNullOrEmpty(username) && password != null) {
+        if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
                 HttpCredentials = new HttpCredentials {
                     Username = username,
@@ -73,6 +79,18 @@ public static class HtmlBrowserRenderer {
         }
         await using var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
+        if (formLogin != null) {
+            await page.GotoAsync(formLogin.LoginUrl);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            if (username != null) {
+                await page.FillAsync(formLogin.UsernameSelector, username);
+            }
+            if (password != null) {
+                await page.FillAsync(formLogin.PasswordSelector, password);
+            }
+            await page.ClickAsync(formLogin.SubmitSelector);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        }
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         return await page.ContentAsync();
@@ -83,8 +101,15 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
-        string content = await GetPageContentAsync(url, browser, clean, username, password).ConfigureAwait(false);
+    public static async Task SavePageContentAsync(
+        string url,
+        string path,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        FormLoginOptions? formLogin = null) {
+        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin).ConfigureAwait(false);
         File.WriteAllText(path, content);
     }
 
@@ -111,7 +136,10 @@ public static async Task CaptureScreenshotAsync(
     int? clipX = null,
     int? clipY = null,
     int? clipWidth = null,
-    int? clipHeight = null) {
+    int? clipHeight = null,
+    string? username = null,
+    string? password = null,
+    FormLoginOptions? formLogin = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -127,7 +155,29 @@ public static async Task CaptureScreenshotAsync(
         };
 
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        var page = await browserInstance.NewPageAsync();
+        BrowserNewContextOptions? contextOptions = null;
+        if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
+            contextOptions = new BrowserNewContextOptions {
+                HttpCredentials = new HttpCredentials {
+                    Username = username,
+                    Password = password
+                }
+            };
+        }
+        await using var context = await browserInstance.NewContextAsync(contextOptions);
+        var page = await context.NewPageAsync();
+        if (formLogin != null) {
+            await page.GotoAsync(formLogin.LoginUrl);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            if (username != null) {
+                await page.FillAsync(formLogin.UsernameSelector, username);
+            }
+            if (password != null) {
+                await page.FillAsync(formLogin.PasswordSelector, password);
+            }
+            await page.ClickAsync(formLogin.SubmitSelector);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        }
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         if (delayMs > 0) {
