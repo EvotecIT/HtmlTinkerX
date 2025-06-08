@@ -6,11 +6,19 @@ using HtmlAgilityPack;
 
 namespace PSParseHTML.PowerShell;
 
-/// <summary>
-/// Cmdlet that parses HTML content from a string or URL.
-/// </summary>
+/// <summary>Parses HTML content from a string or a remote page.</summary>
+/// <para>
+/// The cmdlet can read raw HTML or download a web page specified with
+/// <c>-Url</c>. When downloading, optional <c>-Proxy</c> and
+/// <c>-ProxyCredential</c> parameters control the web request.
+/// </para>
 /// <example>
-/// <code>ConvertFrom-HTML -Url https://example.com</code>
+///   <summary>Download a web page and parse it</summary>
+///   <code>ConvertFrom-HTML -Url https://example.com</code>
+/// </example>
+/// <example>
+///   <summary>Use a proxy server when downloading</summary>
+///   <code>ConvertFrom-HTML -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HTML", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(object))]
@@ -32,9 +40,16 @@ public sealed class CmdletConvertFromHtml : PSCmdlet {
     [ValidateSet("AngleSharp", "AgilityPack")]
     public string Engine { get; set; } = "AgilityPack";
 
+    /// <summary>
+    /// Optional proxy server address used when fetching content from <see cref="Url"/>.
+    /// Include the protocol and port number if required.
+    /// </summary>
     [Parameter]
     public string? Proxy { get; set; }
 
+    /// <summary>
+    /// Credentials used to authenticate against the <see cref="Proxy"/> server.
+    /// </summary>
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 

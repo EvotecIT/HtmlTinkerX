@@ -108,7 +108,6 @@ public static class HtmlFormatter {
         settings.JsSettings.PreserveFunctionNames = true;
         settings.JsSettings.LocalRenaming = NUglify.JavaScript.LocalRenaming.KeepAll;
         settings.JsSettings.NoAutoRenameList = true.ToString();
-        settings.JsSettings.PreserveFunctionNames = true;
         settings.JsSettings.ReorderScopeDeclarations = false;
         settings.JsSettings.TermSemicolons = true;
         settings.JsSettings.RemoveUnneededCode = false;
