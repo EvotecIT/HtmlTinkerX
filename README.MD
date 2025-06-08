@@ -36,7 +36,7 @@
 - `Optimize-HTML` – minify HTML
 
 - `Optimize-JavaScript` – minify JavaScript
-- `Invoke-HTMLRendering` – render pages with a headless browser (supports basic authentication)
+- `Invoke-HTMLRendering` – render pages with a headless browser (supports basic and form authentication)
 - `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters and `-Delay`)
 
 ### Cmdlet quick start
@@ -78,6 +78,13 @@ Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
 # Render a protected page using credentials
 $cred = Get-Credential
 Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
+# Login using a form and render the target page
+Invoke-HTMLRendering -Url 'https://example.com/protected' `
+    -Credential $cred `
+    -LoginUrl 'https://example.com/wp-login.php' `
+    -UsernameSelector 'input[name=log]' `
+    -PasswordSelector 'input[name=pwd]' `
+    -SubmitSelector '#wp-submit'
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000
 ```
 
