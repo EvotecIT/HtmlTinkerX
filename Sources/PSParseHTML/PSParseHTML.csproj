@@ -8,7 +8,8 @@
 		<AssemblyName>PSParseHTML</AssemblyName>
 		<AssemblyTitle>PSParseHTML</AssemblyTitle>
 		<Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
-		<LangVersion>latest</LangVersion>
+                <LangVersion>latest</LangVersion>
+                <Nullable>enable</Nullable>
 	</PropertyGroup>
 
   <ItemGroup>
