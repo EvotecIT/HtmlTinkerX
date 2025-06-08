@@ -123,6 +123,7 @@ public static class HtmlBrowserRenderer {
     /// <param name="clean">Force re-download of browser runtimes.</param>
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
@@ -134,6 +135,7 @@ public static async Task CaptureScreenshotAsync(
     bool clean = false,
     bool fullPage = false,
     int delayMs = 0,
+    string? selector = null,
     int? clipX = null,
     int? clipY = null,
     int? clipWidth = null,
@@ -181,6 +183,9 @@ public static async Task CaptureScreenshotAsync(
         }
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        if (!string.IsNullOrEmpty(selector)) {
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+        }
         if (delayMs > 0) {
             await page.WaitForTimeoutAsync(delayMs);
         }
@@ -244,16 +249,21 @@ public static async Task CaptureScreenshotAsync(
 
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        if (!string.IsNullOrEmpty(filter)) {
-            var anchors = await page.QuerySelectorAllAsync($"a[href*=\"{filter}\"]");
-            foreach (var anchor in anchors) {
-                var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
-                string filePath = Path.Combine(directory, download.SuggestedFilename);
-                await download.SaveAsAsync(filePath);
-                if (!downloads.Contains(filePath)) {
-                    downloads.Add(filePath);
-                }
+        string selector = string.IsNullOrEmpty(filter)
+            ? "a[download],a[href*='/download/'],a[href*='/archive/']"
+            : $"a[href*=\"{filter}\"]";
+
+        await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+        var anchors = await page.QuerySelectorAllAsync(selector);
+        foreach (var anchor in anchors) {
+            var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
+            string filePath = Path.Combine(directory, download.SuggestedFilename);
+            await download.SaveAsAsync(filePath);
+            if (!downloads.Contains(filePath)) {
+                downloads.Add(filePath);
             }
         }
 
