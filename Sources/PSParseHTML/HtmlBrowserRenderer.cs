@@ -77,4 +77,33 @@ public static class HtmlBrowserRenderer {
         string content = await GetPageContentAsync(url, browser, clean).ConfigureAwait(false);
         File.WriteAllText(path, content);
     }
+
+    /// <summary>
+    /// Captures a screenshot of the specified page.
+    /// </summary>
+    /// <param name="url">URL to load.</param>
+    /// <param name="path">File path for the screenshot.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    public static async Task CaptureScreenshotAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
+        if (clean) {
+            CleanInstallDir();
+        }
+
+        string engine = browser.ToString().ToLowerInvariant();
+        Microsoft.Playwright.Program.Main(new[] { "install", engine });
+
+        using var playwright = await Playwright.CreateAsync();
+        IBrowserType type = browser switch {
+            BrowserEngine.Firefox => playwright.Firefox,
+            BrowserEngine.Webkit => playwright.Webkit,
+            _ => playwright.Chromium,
+        };
+
+        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        var page = await browserInstance.NewPageAsync();
+        await page.GotoAsync(url);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.ScreenshotAsync(new PageScreenshotOptions { Path = path });
+    }
 }
