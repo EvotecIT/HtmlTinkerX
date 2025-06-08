@@ -182,6 +182,42 @@ public static class HtmlParser {
         return await HtmlTableParser.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client);
     }
 
+    /// <summary>
+    /// Extracts list items from HTML markup using AngleSharp.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static List<List<string>> ParseListsWithAngleSharp(string html) {
+        return HtmlListParser.ParseListsWithAngleSharp(html);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using AngleSharp.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithAngleSharpAsync(url, client);
+    }
+
+    /// <summary>
+    /// Extracts list items from HTML markup using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static List<List<string>> ParseListsWithHtmlAgilityPack(string html) {
+        return HtmlListParser.ParseListsWithHtmlAgilityPack(html);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithHtmlAgilityPackAsync(url, client);
+    }
+
 
 
     /// <summary>
