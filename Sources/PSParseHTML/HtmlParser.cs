@@ -98,6 +98,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
@@ -113,14 +114,16 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
-        return await HtmlTableParser.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client);
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
+        return await HtmlTableParser.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client, clientFactory);
     }
 
     /// <summary>
@@ -178,8 +181,9 @@ public static class HtmlParser {
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
-        return await HtmlTableParser.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client);
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
+        return await HtmlTableParser.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client, clientFactory);
     }
 
     /// <summary>
