@@ -87,4 +87,63 @@ public static class HtmlBrowserRenderer {
         string content = await GetPageContentAsync(url, browser, clean, username, password).ConfigureAwait(false);
         File.WriteAllText(path, content);
     }
+
+    /// <summary>
+    /// Captures a screenshot of the specified page.
+    /// </summary>
+    /// <param name="url">URL to load.</param>
+    /// <param name="path">File path for the screenshot.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
+    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="clipX">Optional clip region X coordinate.</param>
+    /// <param name="clipY">Optional clip region Y coordinate.</param>
+    /// <param name="clipWidth">Optional clip region width.</param>
+    /// <param name="clipHeight">Optional clip region height.</param>
+public static async Task CaptureScreenshotAsync(
+    string url,
+    string path,
+    BrowserEngine browser = BrowserEngine.Chromium,
+    bool clean = false,
+    bool fullPage = false,
+    int delayMs = 0,
+    int? clipX = null,
+    int? clipY = null,
+    int? clipWidth = null,
+    int? clipHeight = null) {
+        if (clean) {
+            CleanInstallDir();
+        }
+
+        string engine = browser.ToString().ToLowerInvariant();
+        Microsoft.Playwright.Program.Main(new[] { "install", engine });
+
+        using var playwright = await Playwright.CreateAsync();
+        IBrowserType type = browser switch {
+            BrowserEngine.Firefox => playwright.Firefox,
+            BrowserEngine.Webkit => playwright.Webkit,
+            _ => playwright.Chromium,
+        };
+
+        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        var page = await browserInstance.NewPageAsync();
+        await page.GotoAsync(url);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        if (delayMs > 0) {
+            await page.WaitForTimeoutAsync(delayMs);
+        }
+
+        var options = new PageScreenshotOptions { Path = path, FullPage = fullPage };
+        if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
+            options.Clip = new Clip {
+                X = clipX.Value,
+                Y = clipY.Value,
+                Width = clipWidth.Value,
+                Height = clipHeight.Value,
+            };
+        }
+
+        await page.ScreenshotAsync(options);
+    }
 }

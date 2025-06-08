@@ -22,7 +22,7 @@
 
 **PSParseHTML** started as a suite of data processing Cmdlets to help [PSWriteHTML](https://github.com/EvotecIT/PSWriteHTML), but it has gained functionality enough to be its own module. Basic usage instructions are described [on this blog post](https://evotec.xyz/formatting-and-minifying-resources-html-css-javascript-with-powershell/).
 
-**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with twelve cmdlets:
+**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
 
 - `Convert-HTMLToText` – convert markup to plain text
 - `ConvertFrom-HtmlTable` – turn table elements into objects
@@ -37,6 +37,7 @@
 
 - `Optimize-JavaScript` – minify JavaScript
 - `Invoke-HTMLRendering` – render pages with a headless browser (supports basic authentication)
+- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters and `-Delay`)
 
 ### Cmdlet quick start
 
@@ -77,6 +78,7 @@ Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
 # Render a protected page using credentials
 $cred = Get-Credential
 Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000
 ```
 
 The first run triggers Playwright to download the selected browser. You'll see output similar to:
@@ -88,10 +90,11 @@ Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppD
 ```
 
 Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
+Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
-It may not seem like much, but those twelve cmdlets are powerful enough to enable robust HTML processing in shell.
+It may not seem like much, but those thirteen cmdlets are powerful enough to enable robust HTML processing in shell.
 
 ## Examples
 
