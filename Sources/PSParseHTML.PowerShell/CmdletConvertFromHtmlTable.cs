@@ -87,7 +87,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (IncludeMetadata.IsPresent) {
-            List<HtmlParser.TableParseResult> tables;
+            List<TableParseResult> tables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
@@ -110,7 +110,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             }
         } else {
             // Use the detailed parsing methods but extract only the Data part
-            List<HtmlParser.TableParseResult> detailedTables;
+            List<TableParseResult> detailedTables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
@@ -160,7 +160,7 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     /// </summary>
     /// <param name="tableResult">The table parse result containing metadata and data.</param>
     /// <returns>A PSObject with flattened structure.</returns>
-    private PSObject CreateTableObject(HtmlParser.TableParseResult tableResult) {
+    private PSObject CreateTableObject(TableParseResult tableResult) {
         PSObject tableObject = new();
         tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
 

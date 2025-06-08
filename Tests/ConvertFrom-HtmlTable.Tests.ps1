@@ -5,6 +5,78 @@ Describe -Name 'ConvertFrom-HtmlTable' {
         $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
         $AllTables.Count | Should -BeGreaterThan 0
     }
+
+    It 'Parses local HTML file with Polish characters correctly - AgilityPack' {
+        $Path = Join-Path $PSScriptRoot 'Documents/polish_table.html'
+        $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+
+        $Tables = ConvertFrom-HtmlTable -Content $Content -Engine AgilityPack
+        $Tables.Count | Should -Be 1
+
+        $Table = $Tables[0]
+        $Table.Count | Should -Be 2
+
+        # Check that Polish characters are preserved correctly
+        $Table[0].Column1 | Should -Be 'Komórka a1'
+        $Table[0].Column2 | Should -Be 'Komórka a2'
+        $Table[1].Column1 | Should -Be 'Komórka a3'
+        $Table[1].Column2 | Should -Be 'Komórka a4'
+    }
+
+    It 'Parses local HTML file with Polish characters correctly - AngleSharp' {
+        $Path = Join-Path $PSScriptRoot 'Documents/polish_table.html'
+        $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+
+        $Tables = ConvertFrom-HtmlTable -Content $Content -Engine AngleSharp
+        $Tables.Count | Should -Be 1
+
+        $Table = $Tables[0]
+        $Table.Count | Should -Be 2
+
+        # Check that Polish characters are preserved correctly
+        $Table[0].Column1 | Should -Be 'Komórka a1'
+        $Table[0].Column2 | Should -Be 'Komórka a2'
+        $Table[1].Column1 | Should -Be 'Komórka a3'
+        $Table[1].Column2 | Should -Be 'Komórka a4'
+    }
+
+    It 'Parses URL with Polish characters correctly - AgilityPack' {
+        $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
+
+        $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
+        $AllTables.Count | Should -BeGreaterThan 0
+
+        # Find the specific table we're testing (should be table index 12)
+        if ($AllTables.Count -gt 12) {
+            $Table = $AllTables[12]
+            $Table.Count | Should -BeGreaterOrEqual 2
+
+            # Check that Polish characters are preserved correctly
+            $Table[0].Column1 | Should -Be 'Komórka a1'
+            $Table[0].Column2 | Should -Be 'Komórka a2'
+            $Table[1].Column1 | Should -Be 'Komórka a3'
+            $Table[1].Column2 | Should -Be 'Komórka a4'
+        }
+    }
+
+    It 'Parses URL with Polish characters correctly - AngleSharp' {
+        $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
+
+        $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AngleSharp
+        $AllTables.Count | Should -BeGreaterThan 0
+
+        # Find the specific table we're testing (should be table index 12)
+        if ($AllTables.Count -gt 12) {
+            $Table = $AllTables[12]
+            $Table.Count | Should -BeGreaterOrEqual 2
+
+            # Check that Polish characters are preserved correctly
+            $Table[0].Column1 | Should -Be 'Komórka a1'
+            $Table[0].Column2 | Should -Be 'Komórka a2'
+            $Table[1].Column1 | Should -Be 'Komórka a3'
+            $Table[1].Column2 | Should -Be 'Komórka a4'
+        }
+    }
     It 'Given a HTML Page with Tables' {
         $AllTables = ConvertFrom-HtmlTable -Url 'https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference'
         $AllTables.Count | Should -BeGreaterThan 0
@@ -53,6 +125,7 @@ Describe -Name 'ConvertFrom-HtmlTable' {
         $First.Headers | Should -Contain 'NonRegional'
         $First.Headers | Should -Not -Contain '*Non-Regional'
         $First.Data[0].NonRegional | Should -Be '--'
+    }
     It 'Parses headless_table.html and detects four tables' {
         $Path = Join-Path $PSScriptRoot 'Documents/headless_table.html'
         $Content = Get-Content -LiteralPath $Path -Raw

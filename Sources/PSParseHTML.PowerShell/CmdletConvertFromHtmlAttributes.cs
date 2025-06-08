@@ -85,6 +85,6 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
 
     private string DownloadHtml() {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return client.GetStringAsync(Url).GetAwaiter().GetResult();
-    }
+        return HttpContentHelper.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
+        }
 }

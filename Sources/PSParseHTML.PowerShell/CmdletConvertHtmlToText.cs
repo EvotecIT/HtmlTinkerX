@@ -85,11 +85,11 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
                 return System.IO.File.ReadAllText(File);
             case ParameterSetUrl:
                 using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
-                    return client.GetStringAsync(Url).GetAwaiter().GetResult();
+                    return HttpContentHelper.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
                 }
             case ParameterSetContent:
             default:
                 return Content;
         }
-    }
+        }
 }
