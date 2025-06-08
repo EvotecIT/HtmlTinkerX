@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -12,6 +13,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.Save, "HTMLScreenshot", DefaultParameterSetName = ParameterSetDefault)]
 public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
+    private const string ParameterSetClip = "Clip";
 
     /// <summary>URL of the web page.</summary>
     [Parameter(Mandatory = true, Position = 0)]
@@ -29,8 +31,43 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Open the screenshot after saving.</summary>
+    [Parameter]
+    public SwitchParameter Open { get; set; }
+
+    /// <summary>Capture the entire page.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    public SwitchParameter Full { get; set; }
+
+    /// <summary>X coordinate for a clip region.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    public int X { get; set; }
+
+    /// <summary>Y coordinate for a clip region.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    public int Y { get; set; }
+
+    /// <summary>Width of the clip region.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    public int Width { get; set; }
+
+    /// <summary>Height of the clip region.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
+    public int Height { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        await HtmlBrowserRenderer.CaptureScreenshotAsync(Url, OutFile, Browser, Clean.IsPresent).ConfigureAwait(false);
+        if (ParameterSetName == ParameterSetClip) {
+            await HtmlBrowserRenderer.CaptureScreenshotAsync(Url, OutFile, Browser, Clean.IsPresent, false, X, Y, Width, Height).ConfigureAwait(false);
+        } else {
+            await HtmlBrowserRenderer.CaptureScreenshotAsync(Url, OutFile, Browser, Clean.IsPresent, Full.IsPresent).ConfigureAwait(false);
+        }
+
+        if (Open.IsPresent) {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
+                FileName = OutFile,
+                UseShellExecute = true,
+            });
+        }
     }
 }
