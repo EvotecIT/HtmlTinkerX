@@ -9,6 +9,7 @@
         <AssemblyTitle>PSParseHTML.PowerShell</AssemblyTitle>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
@@ -37,6 +38,7 @@
         <Using Include="System.IO" />
         <Using Include="System.Net" />
         <Using Include="System.Net.Http" />
+        <Using Include="Microsoft.Playwright" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->

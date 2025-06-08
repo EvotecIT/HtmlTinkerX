@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const div = document.getElementById('content');
+    setTimeout(function() {
+      div.innerHTML = '<p id="loaded">Dynamic Content</p>';
+    }, 50);
+  });
+</script>
+</head>
+<body>
+  <div id="content"></div>
+</body>
+</html>
