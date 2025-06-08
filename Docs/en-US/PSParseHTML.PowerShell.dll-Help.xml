@@ -1856,4 +1856,104 @@
       </command:example>
     </command:examples>
   </command:command>
+  <!-- Cmdlet: Invoke-HTMLRendering -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>Invoke-HTMLRendering</command:name>
+      <command:verb>Invoke</command:verb>
+      <command:noun>HTMLRendering</command:noun>
+      <maml:description>
+        <maml:para>Renders pages with a headless browser and supports basic authentication.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-HTMLRendering</maml:name>
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="0">
+          <maml:name>Url</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>OutFile</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Browser</maml:name>
+          <command:parameterValue required="true">BrowserEngine</command:parameterValue>
+          <dev:type><maml:name>PSParseHTML.BrowserEngine</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Clean</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type><maml:name>System.Management.Automation.SwitchParameter</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Credential</maml:name>
+          <command:parameterValue required="true">PSCredential</command:parameterValue>
+          <dev:type><maml:name>System.Management.Automation.PSCredential</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Username</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Password</maml:name>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="0">
+        <maml:name>Url</maml:name>
+        <maml:description><maml:para>URL of the page to render.</maml:para></maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>OutFile</maml:name>
+        <maml:description><maml:para>Optional file path for the rendered HTML.</maml:para></maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Browser</maml:name>
+        <maml:description><maml:para>Browser engine used for rendering.</maml:para></maml:description>
+        <command:parameterValue required="true">BrowserEngine</command:parameterValue>
+        <dev:type><maml:name>PSParseHTML.BrowserEngine</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Clean</maml:name>
+        <maml:description><maml:para>Force re-download of browser runtimes.</maml:para></maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type><maml:name>System.Management.Automation.SwitchParameter</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Credential</maml:name>
+        <maml:description><maml:para>PSCredential for basic authentication.</maml:para></maml:description>
+        <command:parameterValue required="true">PSCredential</command:parameterValue>
+        <dev:type><maml:name>System.Management.Automation.PSCredential</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Username</maml:name>
+        <maml:description><maml:para>Username for basic authentication.</maml:para></maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Password</maml:name>
+        <maml:description><maml:para>Password for basic authentication.</maml:para></maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type><maml:name>System.String</maml:name><maml:uri /></dev:type>
+      </command:returnValue>
+    </command:returnValues>
+  </command:command>
 </helpItems>

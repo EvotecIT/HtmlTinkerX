@@ -50,7 +50,7 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
+    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -63,7 +63,17 @@ public static class HtmlBrowserRenderer {
             _ => playwright.Chromium,
         };
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        var page = await browserInstance.NewPageAsync();
+        BrowserNewContextOptions? contextOptions = null;
+        if (!string.IsNullOrEmpty(username) && password != null) {
+            contextOptions = new BrowserNewContextOptions {
+                HttpCredentials = new HttpCredentials {
+                    Username = username,
+                    Password = password
+                }
+            };
+        }
+        await using var context = await browserInstance.NewContextAsync(contextOptions);
+        var page = await context.NewPageAsync();
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         return await page.ContentAsync();
@@ -74,26 +84,35 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
-        string content = await GetPageContentAsync(url, browser, clean).ConfigureAwait(false);
+    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
+        string content = await GetPageContentAsync(url, browser, clean, username, password).ConfigureAwait(false);
         File.WriteAllText(path, content);
     }
 
     /// <summary>
-    /// Saves any files downloaded while loading the specified URL.
+    /// Captures a screenshot of the specified page.
     /// </summary>
     /// <param name="url">URL to load.</param>
-    /// <param name="directory">Directory where downloads should be saved.</param>
+    /// <param name="path">File path for the screenshot.</param>
     /// <param name="browser">Browser engine to use.</param>
-    /// <param name="clean">Reinstall the browser runtime.</param>
-    /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
-    /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(
-        string url,
-        string directory,
-        BrowserEngine browser = BrowserEngine.Chromium,
-        bool clean = false,
-        string? filter = null) {
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
+    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="clipX">Optional clip region X coordinate.</param>
+    /// <param name="clipY">Optional clip region Y coordinate.</param>
+    /// <param name="clipWidth">Optional clip region width.</param>
+    /// <param name="clipHeight">Optional clip region height.</param>
+public static async Task CaptureScreenshotAsync(
+    string url,
+    string path,
+    BrowserEngine browser = BrowserEngine.Chromium,
+    bool clean = false,
+    bool fullPage = false,
+    int delayMs = 0,
+    int? clipX = null,
+    int? clipY = null,
+    int? clipWidth = null,
+    int? clipHeight = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -107,25 +126,25 @@ public static class HtmlBrowserRenderer {
             BrowserEngine.Webkit => playwright.Webkit,
             _ => playwright.Chromium,
         };
+
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
         var page = await browserInstance.NewPageAsync();
-
-        Directory.CreateDirectory(directory);
-        List<string> downloads = new();
-        page.Download += async (_, dl) => {
-            bool match = string.IsNullOrEmpty(filter) ||
-                         dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
-            if (match) {
-                string filePath = Path.Combine(directory, dl.SuggestedFilename);
-                await dl.SaveAsAsync(filePath);
-                downloads.Add(filePath);
-            }
-        };
-
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.WaitForTimeoutAsync(500);
-        return downloads;
+        if (delayMs > 0) {
+            await page.WaitForTimeoutAsync(delayMs);
+        }
+
+        var options = new PageScreenshotOptions { Path = path, FullPage = fullPage };
+        if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
+            options.Clip = new Clip {
+                X = clipX.Value,
+                Y = clipY.Value,
+                Width = clipWidth.Value,
+                Height = clipHeight.Value,
+            };
+        }
+
+        await page.ScreenshotAsync(options);
     }
 }
