@@ -1,0 +1,119 @@
+# PowerShell Testing Workflow (Disabled)
+name: Test PowerShell (PowerShell 7)
+
+# This workflow is disabled but ready for use
+# To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
+# on:
+#   workflow_dispatch:  # Manual trigger only
+on:
+  push:
+    branches:
+      - v1-legacy
+      - v2-speedygonzales
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'Docs/**'
+  pull_request:
+    branches:
+      - v1-legacy
+      - v2-speedygonzales
+
+env:
+  DOTNET_VERSION: '8.x'
+  BUILD_CONFIGURATION: 'Debug'
+
+jobs:
+  test-windows-ps7:
+    name: 'Windows PowerShell 7'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build .NET solution
+        run: |
+          dotnet restore Sources/PSParseHTML.sln
+          dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: .\PSParseHTML.Tests.ps1
+
+  test-ubuntu:
+    name: 'Ubuntu PowerShell 7'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build .NET solution
+        run: |
+          dotnet restore Sources/PSParseHTML.sln
+          dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: ./PSParseHTML.Tests.ps1
+
+  test-macos:
+    name: 'macOS PowerShell 7'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell
+        run: brew install --cask powershell
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build .NET solution
+        run: |
+          dotnet restore Sources/PSParseHTML.sln
+          dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: ./PSParseHTML.Tests.ps1
