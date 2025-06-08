@@ -49,13 +49,8 @@ public static class HtmlBrowserRenderer {
     /// Retrieves the fully rendered HTML from the specified URL after executing JavaScript.
     /// </summary>
     /// <param name="url">The URL to load.</param>
-    /// <returns>The rendered HTML markup and any downloaded files.</returns>
-    public static async Task<HtmlRenderResult> GetPageContentAsync(
-        string url,
-        BrowserEngine browser = BrowserEngine.Chromium,
-        bool clean = false,
-        string? downloadPath = null,
-        string? downloadFilter = null) {
+    /// <returns>The rendered HTML markup.</returns>
+    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
         if (clean) {
             CleanInstallDir();
         }
@@ -69,29 +64,9 @@ public static class HtmlBrowserRenderer {
         };
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
         var page = await browserInstance.NewPageAsync();
-        List<string> downloads = new();
-        if (!string.IsNullOrEmpty(downloadPath)) {
-            Directory.CreateDirectory(downloadPath);
-            page.Download += async (_, dl) => {
-                bool match = string.IsNullOrEmpty(downloadFilter);
-                if (!match) {
-                    match = dl.Url.IndexOf(downloadFilter, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            dl.SuggestedFilename.IndexOf(downloadFilter, StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-                if (match) {
-                    string filePath = Path.Combine(downloadPath, dl.SuggestedFilename);
-                    await dl.SaveAsAsync(filePath);
-                    downloads.Add(filePath);
-                }
-            };
-        }
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        if (!string.IsNullOrEmpty(downloadPath)) {
-            await page.WaitForTimeoutAsync(500);
-        }
-        string html = await page.ContentAsync();
-        return new HtmlRenderResult { Html = html, Downloads = downloads };
+        return await page.ContentAsync();
     }
 
     /// <summary>
@@ -100,7 +75,57 @@ public static class HtmlBrowserRenderer {
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
     public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
-        HtmlRenderResult result = await GetPageContentAsync(url, browser, clean).ConfigureAwait(false);
-        File.WriteAllText(path, result.Html);
+        string content = await GetPageContentAsync(url, browser, clean).ConfigureAwait(false);
+        File.WriteAllText(path, content);
+    }
+
+    /// <summary>
+    /// Saves any files downloaded while loading the specified URL.
+    /// </summary>
+    /// <param name="url">URL to load.</param>
+    /// <param name="directory">Directory where downloads should be saved.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Reinstall the browser runtime.</param>
+    /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
+    /// <returns>Paths of downloaded files.</returns>
+    public static async Task<List<string>> SavePageDownloadsAsync(
+        string url,
+        string directory,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        string? filter = null) {
+        if (clean) {
+            CleanInstallDir();
+        }
+
+        string engine = browser.ToString().ToLowerInvariant();
+        Microsoft.Playwright.Program.Main(new[] { "install", engine });
+
+        using var playwright = await Playwright.CreateAsync();
+        IBrowserType type = browser switch {
+            BrowserEngine.Firefox => playwright.Firefox,
+            BrowserEngine.Webkit => playwright.Webkit,
+            _ => playwright.Chromium,
+        };
+        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        var page = await browserInstance.NewPageAsync();
+
+        Directory.CreateDirectory(directory);
+        List<string> downloads = new();
+        page.Download += async (_, dl) => {
+            bool match = string.IsNullOrEmpty(filter) ||
+                         dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (match) {
+                string filePath = Path.Combine(directory, dl.SuggestedFilename);
+                await dl.SaveAsAsync(filePath);
+                downloads.Add(filePath);
+            }
+        };
+
+        await page.GotoAsync(url);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForTimeoutAsync(500);
+        return downloads;
     }
 }
