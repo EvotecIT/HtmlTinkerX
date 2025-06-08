@@ -99,7 +99,7 @@ public static class HtmlFormatter {
         settings.RemoveEmptyAttributes = removeEmptyAttributes;
         settings.AlphabeticallyOrderAttributes = alphabeticallyOrderAttributes;
         settings.RemoveComments = removeComments;
-        settings.RemoveQuotedAttributes = false;
+        settings.RemoveAttributeQuotes = false;
 
         settings.JsSettings.MinifyCode = true;
         settings.JsSettings.OutputMode = OutputMode.MultipleLines;
