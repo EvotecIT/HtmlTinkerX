@@ -8,7 +8,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.x'
-  BUILD_CONFIGURATION: 'Release'
+  BUILD_CONFIGURATION: 'Debug'
 
 jobs:
   test-windows-ps5:
