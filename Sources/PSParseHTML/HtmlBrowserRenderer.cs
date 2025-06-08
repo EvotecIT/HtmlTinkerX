@@ -249,6 +249,8 @@ public static async Task CaptureScreenshotAsync(
 
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         if (!string.IsNullOrEmpty(filter)) {
             await page.WaitForSelectorAsync(
