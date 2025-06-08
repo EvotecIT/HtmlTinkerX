@@ -45,30 +45,29 @@ public static class HtmlBrowserRenderer {
             Directory.Delete(path, recursive: true);
         }
     }
-    /// <summary>
-    /// Retrieves the fully rendered HTML from the specified URL after executing JavaScript.
-    /// </summary>
-    /// <param name="url">The URL to load.</param>
-    /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(
+
+    private static async Task<BrowserSession> CreatePageAsync(
         string url,
-        BrowserEngine browser = BrowserEngine.Chromium,
-        bool clean = false,
-        string? username = null,
-        string? password = null,
-        FormLoginOptions? formLogin = null) {
+        BrowserEngine browser,
+        bool clean,
+        string? username,
+        string? password,
+        FormLoginOptions? formLogin) {
         if (clean) {
             CleanInstallDir();
         }
+
         string engine = browser.ToString().ToLowerInvariant();
         Microsoft.Playwright.Program.Main(new[] { "install", engine });
-        using var playwright = await Playwright.CreateAsync();
+
+        var playwright = await Playwright.CreateAsync();
         IBrowserType type = browser switch {
             BrowserEngine.Firefox => playwright.Firefox,
             BrowserEngine.Webkit => playwright.Webkit,
             _ => playwright.Chromium,
         };
-        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+
+        var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
         BrowserNewContextOptions? contextOptions = null;
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -78,8 +77,10 @@ public static class HtmlBrowserRenderer {
                 }
             };
         }
-        await using var context = await browserInstance.NewContextAsync(contextOptions);
+
+        var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
+
         if (formLogin != null) {
             await page.GotoAsync(formLogin.LoginUrl);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -92,9 +93,33 @@ public static class HtmlBrowserRenderer {
             await page.ClickAsync(formLogin.SubmitSelector);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         }
+
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        return await page.ContentAsync();
+
+        return new BrowserSession(playwright, browserInstance, context, page);
+    }
+    /// <summary>
+    /// Retrieves the fully rendered HTML from the specified URL after executing JavaScript.
+    /// </summary>
+    /// <param name="url">The URL to load.</param>
+    /// <returns>The rendered HTML markup.</returns>
+    public static async Task<string> GetPageContentAsync(
+        string url,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        FormLoginOptions? formLogin = null) {
+        await using BrowserSession session = await CreatePageAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin).ConfigureAwait(false);
+
+        return await session.Page.ContentAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -143,46 +168,14 @@ public static async Task CaptureScreenshotAsync(
     string? username = null,
     string? password = null,
     FormLoginOptions? formLogin = null) {
-        if (clean) {
-            CleanInstallDir();
-        }
-
-        string engine = browser.ToString().ToLowerInvariant();
-        Microsoft.Playwright.Program.Main(new[] { "install", engine });
-
-        using var playwright = await Playwright.CreateAsync();
-        IBrowserType type = browser switch {
-            BrowserEngine.Firefox => playwright.Firefox,
-            BrowserEngine.Webkit => playwright.Webkit,
-            _ => playwright.Chromium,
-        };
-
-        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        BrowserNewContextOptions? contextOptions = null;
-        if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
-            contextOptions = new BrowserNewContextOptions {
-                HttpCredentials = new HttpCredentials {
-                    Username = username,
-                    Password = password
-                }
-            };
-        }
-        await using var context = await browserInstance.NewContextAsync(contextOptions);
-        var page = await context.NewPageAsync();
-        if (formLogin != null) {
-            await page.GotoAsync(formLogin.LoginUrl);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-            if (username != null) {
-                await page.FillAsync(formLogin.UsernameSelector, username);
-            }
-            if (password != null) {
-                await page.FillAsync(formLogin.PasswordSelector, password);
-            }
-            await page.ClickAsync(formLogin.SubmitSelector);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        }
-        await page.GotoAsync(url);
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await using BrowserSession session = await CreatePageAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin).ConfigureAwait(false);
+        var page = session.Page;
         if (!string.IsNullOrEmpty(selector)) {
             await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
@@ -218,21 +211,14 @@ public static async Task CaptureScreenshotAsync(
         BrowserEngine browser = BrowserEngine.Chromium,
         bool clean = false,
         string? filter = null) {
-        if (clean) {
-            CleanInstallDir();
-        }
-
-        string engine = browser.ToString().ToLowerInvariant();
-        Microsoft.Playwright.Program.Main(new[] { "install", engine });
-
-        using var playwright = await Playwright.CreateAsync();
-        IBrowserType type = browser switch {
-            BrowserEngine.Firefox => playwright.Firefox,
-            BrowserEngine.Webkit => playwright.Webkit,
-            _ => playwright.Chromium,
-        };
-        await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        var page = await browserInstance.NewPageAsync();
+        await using BrowserSession session = await CreatePageAsync(
+            url,
+            browser,
+            clean,
+            null,
+            null,
+            null).ConfigureAwait(false);
+        var page = session.Page;
 
         Directory.CreateDirectory(directory);
         List<string> downloads = new();
@@ -247,8 +233,6 @@ public static async Task CaptureScreenshotAsync(
             }
         };
 
-        await page.GotoAsync(url);
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
