@@ -20,7 +20,7 @@ pr:
     - v2-speedygonzales
 
 variables:
-  buildConfiguration: 'Release'
+  buildConfiguration: 'Debug'
   dotNetVersion: '8.x'
 
 stages:
