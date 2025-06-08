@@ -86,11 +86,22 @@ public static class HtmlBrowserRenderer {
     /// <param name="browser">Browser engine to use.</param>
     /// <param name="clean">Force re-download of browser runtimes.</param>
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
+    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
     /// <param name="clipHeight">Optional clip region height.</param>
-    public static async Task CaptureScreenshotAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, bool fullPage = false, int? clipX = null, int? clipY = null, int? clipWidth = null, int? clipHeight = null) {
+public static async Task CaptureScreenshotAsync(
+    string url,
+    string path,
+    BrowserEngine browser = BrowserEngine.Chromium,
+    bool clean = false,
+    bool fullPage = false,
+    int delayMs = 0,
+    int? clipX = null,
+    int? clipY = null,
+    int? clipWidth = null,
+    int? clipHeight = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -109,6 +120,9 @@ public static class HtmlBrowserRenderer {
         var page = await browserInstance.NewPageAsync();
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        if (delayMs > 0) {
+            await page.WaitForTimeoutAsync(delayMs);
+        }
 
         var options = new PageScreenshotOptions { Path = path, FullPage = fullPage };
         if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {

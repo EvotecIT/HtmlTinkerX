@@ -37,7 +37,7 @@
 
 - `Optimize-JavaScript` – minify JavaScript
 - `Invoke-HTMLRendering` – render pages with a headless browser
-- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open` and clipping parameters)
+- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters and `-Delay`)
 
 ### Cmdlet quick start
 
@@ -74,7 +74,7 @@ Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
 Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
-Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000
 ```
 
 The first run triggers Playwright to download the selected browser. You'll see output similar to:
@@ -86,7 +86,7 @@ Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppD
 ```
 
 Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
-Use `-Full` to capture the entire document, `-Open` to automatically view the image, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
+Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
