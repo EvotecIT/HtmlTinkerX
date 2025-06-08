@@ -51,7 +51,6 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Playwright" Version="1.42.0" />
     </ItemGroup>
 
     <ItemGroup>
