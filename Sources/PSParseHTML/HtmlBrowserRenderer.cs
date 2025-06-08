@@ -49,7 +49,7 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
+    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -62,7 +62,17 @@ public static class HtmlBrowserRenderer {
             _ => playwright.Chromium,
         };
         await using var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        var page = await browserInstance.NewPageAsync();
+        BrowserNewContextOptions? contextOptions = null;
+        if (!string.IsNullOrEmpty(username) && password != null) {
+            contextOptions = new BrowserNewContextOptions {
+                HttpCredentials = new HttpCredentials {
+                    Username = username,
+                    Password = password
+                }
+            };
+        }
+        await using var context = await browserInstance.NewContextAsync(contextOptions);
+        var page = await context.NewPageAsync();
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         return await page.ContentAsync();
@@ -73,8 +83,8 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false) {
-        string content = await GetPageContentAsync(url, browser, clean).ConfigureAwait(false);
+    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null) {
+        string content = await GetPageContentAsync(url, browser, clean, username, password).ConfigureAwait(false);
         File.WriteAllText(path, content);
     }
 }
