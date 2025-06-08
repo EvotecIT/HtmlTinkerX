@@ -1,9 +1,9 @@
 # .NET Testing Workflow
-name: .NET Tests
+name: Test .NET Libraries
 
 on:
   push:
-    branches: 
+    branches:
       - master
       - main
       - v2-speedygonzales
@@ -12,7 +12,7 @@ on:
       - 'CHANGELOG.md'
       - 'Docs/**'
   pull_request:
-    branches: 
+    branches:
       - master
       - main
       - v2-speedygonzales

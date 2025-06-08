@@ -1,10 +1,25 @@
 # PowerShell Testing Workflow (Disabled)
-name: PowerShell Tests
+name: Test PowerShell Module
 
 # This workflow is disabled but ready for use
 # To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
+# on:
+#   workflow_dispatch:  # Manual trigger only
 on:
-  workflow_dispatch:  # Manual trigger only
+  push:
+    branches:
+      - master
+      - main
+      - v2-speedygonzales
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'Docs/**'
+  pull_request:
+    branches:
+      - master
+      - main
+      - v2-speedygonzales
 
 env:
   DOTNET_VERSION: '8.x'
