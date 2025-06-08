@@ -252,18 +252,18 @@ public static async Task CaptureScreenshotAsync(
         await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        if (!string.IsNullOrEmpty(filter)) {
-            await page.WaitForSelectorAsync(
-                $"a[href*=\"{filter}\"]",
-                new PageWaitForSelectorOptions { Timeout = 10000 });
-            var anchors = await page.QuerySelectorAllAsync($"a[href*=\"{filter}\"]");
-            foreach (var anchor in anchors) {
-                var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
-                string filePath = Path.Combine(directory, download.SuggestedFilename);
-                await download.SaveAsAsync(filePath);
-                if (!downloads.Contains(filePath)) {
-                    downloads.Add(filePath);
-                }
+        string selector = string.IsNullOrEmpty(filter)
+            ? "a[download],a[href*='/download/'],a[href*='/archive/']"
+            : $"a[href*=\"{filter}\"]";
+
+        await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+        var anchors = await page.QuerySelectorAllAsync(selector);
+        foreach (var anchor in anchors) {
+            var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
+            string filePath = Path.Combine(directory, download.SuggestedFilename);
+            await download.SaveAsAsync(filePath);
+            if (!downloads.Contains(filePath)) {
+                downloads.Add(filePath);
             }
         }
 

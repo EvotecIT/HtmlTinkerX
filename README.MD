@@ -38,7 +38,7 @@
 - `Optimize-JavaScript` – minify JavaScript
 - `Invoke-HTMLRendering` – render pages with a headless browser (supports basic and form authentication)
 - `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
-- `Save-HTMLDownload` – download files discovered on a rendered page (supports `-Filter`)
+- `Save-HTMLDownload` – download files discovered on a rendered page (optionally filter with `-Filter`)
 
 ### Cmdlet quick start
 
@@ -87,6 +87,7 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
 ```
 
