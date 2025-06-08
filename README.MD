@@ -36,7 +36,7 @@
 - `Optimize-HTML` – minify HTML
 
 - `Optimize-JavaScript` – minify JavaScript
-- `Invoke-HTMLRendering` – render pages with a headless browser
+- `Invoke-HTMLRendering` – render pages with a headless browser (supports basic authentication)
 - `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters and `-Delay`)
 
 ### Cmdlet quick start
@@ -74,6 +74,10 @@ Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
 Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
+
+# Render a protected page using credentials
+$cred = Get-Credential
+Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000
 ```
 
