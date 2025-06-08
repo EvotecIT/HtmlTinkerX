@@ -22,7 +22,7 @@
 
 **PSParseHTML** started as a suite of data processing Cmdlets to help [PSWriteHTML](https://github.com/EvotecIT/PSWriteHTML), but it has gained functionality enough to be its own module. Basic usage instructions are described [on this blog post](https://evotec.xyz/formatting-and-minifying-resources-html-css-javascript-with-powershell/).
 
-**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with eleven cmdlets:
+**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with twelve cmdlets:
 
 - `Convert-HTMLToText` – convert markup to plain text
 - `ConvertFrom-HtmlTable` – turn table elements into objects
@@ -36,6 +36,7 @@
 - `Optimize-HTML` – minify HTML
 
 - `Optimize-JavaScript` – minify JavaScript
+- `Invoke-HTMLRendering` – render pages with a headless browser
 
 ### Cmdlet quick start
 
@@ -69,11 +70,14 @@ Optimize-HTML -Path '.\page.html'
 
 # Minify JavaScript and save to a new file
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
+
+# Render a page after executing JavaScript
+Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium
 ```
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
-It may not seem like much, but those eleven cmdlets are powerful enough to enable robust HTML processing in shell.
+It may not seem like much, but those twelve cmdlets are powerful enough to enable robust HTML processing in shell.
 
 ## Examples
 
