@@ -28,6 +28,18 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
     [ValidateSet("AngleSharp", "AgilityPack")]
     public string Engine { get; set; } = "AgilityPack";
 
+    /// <summary>Include list metadata information.</summary>
+    [Parameter]
+    public SwitchParameter IncludeMetadata { get; set; }
+
+    /// <summary>Return each list item as an object with properties.</summary>
+    [Parameter]
+    public SwitchParameter AsObject { get; set; }
+
+    /// <summary>Placeholder inserted between text segments when joining item text.</summary>
+    [Parameter]
+    public string TagPlaceholder { get; set; } = " ";
+
     /// <summary>
     /// Proxy server address used when <see cref="Url"/> is specified.
     /// Include protocol and port if required.
@@ -43,26 +55,69 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        List<List<string>> lists;
+        List<ListParseResult> results;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
-                lists = HtmlParser.ParseUrlListsWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult();
+                results = HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).GetAwaiter().GetResult();
             } else {
-                lists = HtmlParser.ParseUrlListsWithHtmlAgilityPackAsync(Url.ToString(), client).GetAwaiter().GetResult();
+                results = HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).GetAwaiter().GetResult();
             }
         } else {
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
-                lists = HtmlParser.ParseListsWithAngleSharp(Content);
+                results = HtmlParser.ParseListsWithAngleSharpDetailed(Content, TagPlaceholder);
             } else {
-                lists = HtmlParser.ParseListsWithHtmlAgilityPack(Content);
+                results = HtmlParser.ParseListsWithHtmlAgilityPackDetailed(Content, TagPlaceholder);
             }
         }
 
-        var arrays = new List<string[]>();
-        foreach (var list in lists) {
-            arrays.Add(list.ToArray());
+        if (IncludeMetadata.IsPresent) {
+            foreach (var result in results) {
+                WriteObject(CreateListObject(result));
+            }
+        } else {
+            var output = new List<object>();
+            foreach (var result in results) {
+                if (AsObject.IsPresent) {
+                    output.Add(ConvertItems(result.Items));
+                } else {
+                    output.Add(result.Items.Select(i => string.Join(TagPlaceholder, i)).ToArray());
+                }
+            }
+            WriteObject(output.ToArray(), false);
         }
-        WriteObject(arrays.ToArray(), false);
+    }
+
+    private PSObject[] ConvertItems(List<List<string>> items) {
+        var list = new List<PSObject>();
+        int max = items.Count == 0 ? 0 : items.Max(i => i.Count);
+        foreach (var item in items) {
+            PSObject obj = new();
+            for (int i = 0; i < max; i++) {
+                string name = $"Column{i + 1}";
+                string? value = i < item.Count ? item[i] : null;
+                obj.Properties.Add(new PSNoteProperty(name, value));
+            }
+            list.Add(obj);
+        }
+        return list.ToArray();
+    }
+
+    private PSObject CreateListObject(ListParseResult result) {
+        PSObject listObject = new();
+        if (AsObject.IsPresent) {
+            listObject.Properties.Add(new PSNoteProperty("Data", ConvertItems(result.Items)));
+        } else {
+            listObject.Properties.Add(new PSNoteProperty("Data", result.Items.Select(i => string.Join(TagPlaceholder, i)).ToArray()));
+        }
+
+        listObject.Properties.Add(new PSNoteProperty("ListIndex", result.Metadata.ListIndex));
+        listObject.Properties.Add(new PSNoteProperty("ListId", result.Metadata.Id ?? string.Empty));
+        listObject.Properties.Add(new PSNoteProperty("ListClasses", result.Metadata.Classes ?? string.Empty));
+        listObject.Properties.Add(new PSNoteProperty("ListAttributes", result.Metadata.Attributes));
+        listObject.Properties.Add(new PSNoteProperty("ItemCount", result.Metadata.ItemCount));
+        listObject.Properties.Add(new PSNoteProperty("IsOrdered", result.Metadata.IsOrdered));
+        listObject.Properties.Add(new PSNoteProperty("IsVisible", result.Metadata.IsVisible));
+        return listObject;
     }
 }
