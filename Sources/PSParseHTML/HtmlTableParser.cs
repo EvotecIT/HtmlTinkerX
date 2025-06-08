@@ -116,7 +116,7 @@ public static class HtmlTableParser {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     if (i < cells.Length) {
-                    string value = cells![i].TextContent.Trim();
+                    string? value = cells![i].TextContent.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
