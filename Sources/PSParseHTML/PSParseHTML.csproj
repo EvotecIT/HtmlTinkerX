@@ -16,14 +16,12 @@
 		<PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.154" />
 		<PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
 		<PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.43" />
-		<!-- <PackageReference Include="DotNetSeleniumExtras.WaitHelpers" Version="3.11.0" /> -->
 		<PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
 		<PackageReference Include="Jsbeautifier" Version="0.0.1" />
-		<PackageReference Include="NUglify" Version="1.21.15" />
-		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
+        <PackageReference Include="NUglify" Version="1.21.15" />
         <PackageReference Include="PreMailer.Net" Version="2.7.0" />
-        <!-- <PackageReference Include="Selenium.WebDriver" Version="4.16.2" /> -->
         <PackageReference Include="System.Net.Http" Version="4.3.4" />
+        <PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
   </ItemGroup>
 
   <ItemGroup>
