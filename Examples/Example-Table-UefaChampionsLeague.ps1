@@ -9,8 +9,13 @@ $Urls = @(
 foreach ($Url in $Urls) {
     $HTML = Invoke-HTMLRendering -Url $Url -Browser Chromium
 
-    $Test = ConvertFrom-HtmlTable -Content $HTML
-    for ($Count = 0; $Count -lt $Test.Count; $Count++) {
-        $Test[$Count] | Format-Table -AutoSize *
+    $Tables = ConvertFrom-HtmlTable -Content $HTML
+    for ($Count = 0; $Count -lt $Tables.Count; $Count++) {
+        $Tables[$Count] | Format-Table -AutoSize *
+    }
+
+    $List = ConvertFrom-HtmlList -Content $HTML -IncludeMetadata -AsObject
+    for ($Count = 0; $Count -lt $List.Count; $Count++) {
+        $List[$Count].Data | Format-Table -AutoSize *
     }
 }
