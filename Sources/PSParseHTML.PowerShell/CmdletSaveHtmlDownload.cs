@@ -22,8 +22,7 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
 
     /// <summary>Directory where downloads will be saved.</summary>
     [Parameter(Mandatory = true)]
-    [Alias("Path")]
-    public string Destination { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter]
@@ -41,7 +40,7 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         List<string> files = await HtmlBrowserRenderer.SavePageDownloadsAsync(
             Url,
-            Destination,
+            Path,
             Browser,
             Clean.IsPresent,
             Filter).ConfigureAwait(false);
