@@ -37,6 +37,7 @@
         <Using Include="System.IO" />
         <Using Include="System.Net" />
         <Using Include="System.Net.Http" />
+        <Using Include="Microsoft.Playwright" />
     </ItemGroup>
 
     <!-- We need to remove PowerShell conflicting libraries as it will break output -->
@@ -50,6 +51,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="Microsoft.Playwright" Version="1.42.0" />
     </ItemGroup>
 
     <ItemGroup>
