@@ -56,8 +56,9 @@ public static class HtmlTableParser {
 
             // Check visibility (simple check for display:none)
             var style = table.GetAttribute("style") ?? string.Empty;
-            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
-                                !style.ToLowerInvariant().Contains("display: none");
+            var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
+            var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
+            metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
             var rows = skipFooter ?
                 table.QuerySelectorAll("tr:not(tfoot tr)") :
@@ -301,8 +302,9 @@ public static class HtmlTableParser {
 
             // Check visibility (simple check for display:none)
             var style = table.GetAttributeValue("style", string.Empty);
-            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
-                                !style.ToLowerInvariant().Contains("display: none");
+            var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
+            var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
+            metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
             var rows = skipFooter ?
                 table.SelectNodes(".//tr[not(ancestor::tfoot)]") :
