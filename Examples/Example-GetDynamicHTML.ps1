@@ -16,8 +16,8 @@ Downloading Winldd playwright build v1007 from https://cdn.playwright.dev/dbazur
 Winldd playwright build v1007 downloaded to C:\Users\przemyslaw.klys\AppData\Local\ms-playwright\winldd-1007
 #>
 
-$HTML = Get-RenderedHtml -Url "https://www.evotec.xyz"
+$HTML = Invoke-HTMLRendering -Url "https://www.evotec.xyz"
 $HTML
 
-#$HTML = Get-RenderedHtml -Url "https://www.evotec.xyz" -OutFile "$PSScriptRoot\Output\evotec.html"
+#$HTML = Invoke-HTMLRendering -Url "https://www.evotec.xyz" -OutFile "$PSScriptRoot\Output\evotec.html"
 #$HTML

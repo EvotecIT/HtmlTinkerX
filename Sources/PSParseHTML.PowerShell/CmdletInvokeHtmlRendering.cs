@@ -30,12 +30,27 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Credentials used when accessing authenticated pages.</summary>
+    [Parameter]
+    public PSCredential? Credential { get; set; }
+
+    /// <summary>Username for pages secured with basic authentication.</summary>
+    [Parameter]
+    public string? Username { get; set; }
+
+    /// <summary>Password for pages secured with basic authentication.</summary>
+    [Parameter]
+    public string? Password { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        string? user = Credential?.UserName ?? Username;
+        string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+
         if (!string.IsNullOrEmpty(OutFile)) {
-            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent).ConfigureAwait(false);
+            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent).ConfigureAwait(false);
+            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent, user, pass).ConfigureAwait(false);
             WriteObject(html);
         }
     }
