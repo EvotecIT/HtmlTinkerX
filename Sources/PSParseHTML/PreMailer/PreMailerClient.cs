@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using PreMailer.Net;
 
 namespace PSParseHTML;
@@ -76,7 +77,7 @@ public class PreMailerClient {
                 }
             }
 
-            return new PreMailerResult(result.Html, result.Warnings);
+            return new PreMailerResult(result.Html, result.Warnings ?? new List<string>());
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("MoveCssInline failed with error: {0}", ex.Message);
             throw;
