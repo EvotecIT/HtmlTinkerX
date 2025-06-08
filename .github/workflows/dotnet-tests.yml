@@ -4,8 +4,7 @@ name: Test .NET Libraries
 on:
   push:
     branches:
-      - master
-      - main
+      - v1-legacy
       - v2-speedygonzales
     paths-ignore:
       - 'README.md'
@@ -13,8 +12,7 @@ on:
       - 'Docs/**'
   pull_request:
     branches:
-      - master
-      - main
+      - v1-legacy
       - v2-speedygonzales
 
 env:
