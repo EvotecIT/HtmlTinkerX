@@ -12,6 +12,7 @@ namespace PSParseHTML;
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
 public static class HtmlTableParser {
+    private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
     /// </summary>
@@ -149,6 +150,7 @@ public static class HtmlTableParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
@@ -235,20 +237,38 @@ public static class HtmlTableParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        HttpClient http = client ?? new HttpClient();
-        string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
-        return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
+        bool disposeClient = false;
+        HttpClient http;
+        if (client != null) {
+            http = client;
+        } else if (clientFactory != null) {
+            http = clientFactory();
+            disposeClient = true;
+        } else {
+            http = _sharedClient;
+        }
+
+        try {
+            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
+        } finally {
+            if (disposeClient) {
+                http.Dispose();
+            }
+        }
     }
 
     /// <summary>
@@ -569,13 +589,30 @@ public static class HtmlTableParser {
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        HttpClient http = client ?? new HttpClient();
-        string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
-        return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+        bool disposeClient = false;
+        HttpClient http;
+        if (client != null) {
+            http = client;
+        } else if (clientFactory != null) {
+            http = clientFactory();
+            disposeClient = true;
+        } else {
+            http = _sharedClient;
+        }
+
+        try {
+            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+        } finally {
+            if (disposeClient) {
+                http.Dispose();
+            }
+        }
     }
 }
