@@ -42,6 +42,7 @@
 - `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
 - `Save-HTMLDownload` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLAttachment`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
+- `Get-HTMLInteractable` - list clickable elements from the current page
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 ### Cmdlet quick start
