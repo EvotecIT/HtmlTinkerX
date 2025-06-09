@@ -312,4 +312,77 @@ public static async Task CaptureScreenshotAsync(
         await page.WaitForTimeoutAsync(500);
         return downloads;
     }
+
+    /// <summary>
+    /// Returns clickable or interactable elements found on an already loaded page.
+    /// </summary>
+    public static async Task<List<InteractableElement>> GetInteractableElementsAsync(
+        IPage page,
+        bool includeHidden = false,
+        int limit = 100) {
+        string filter = includeHidden ? "true" : "isVisible(el)";
+        string script = $@"(() => {{
+    const isVisible = el => !!( el.offsetWidth || el.offsetHeight || el.getClientRects().length );
+    const elements = Array.from(document.querySelectorAll('a, button, input[type=""submit""]'));
+    return elements
+        .filter(el => {filter})
+        .slice(0, {limit})
+        .map((el, index) => {{
+            return {{
+                Index: index,
+                Text: el.innerText || el.value || '',
+                Tag: el.tagName.toLowerCase(),
+                Selector: el.outerHTML.slice(0, 80),
+                Href: el.href || el.getAttribute('onclick') || null
+            }};
+        }});
+}})();";
+
+        var result = await page.EvaluateAsync<InteractableElement[]>(script).ConfigureAwait(false);
+        return new List<InteractableElement>(result);
+    }
+
+    /// <summary>
+    /// Opens a page at the specified URL and returns clickable elements.
+    /// </summary>
+    public static async Task<List<InteractableElement>> GetInteractableElementsAsync(
+        string url,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        bool includeHidden = false,
+        int limit = 100,
+        string? username = null,
+        string? password = null,
+        FormLoginOptions? formLogin = null) {
+        await using BrowserSession session = await OpenSessionAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin).ConfigureAwait(false);
+
+        return await GetInteractableElementsAsync(session.Page, includeHidden, limit).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Loads a local HTML file and returns clickable elements.
+    /// </summary>
+    public static async Task<List<InteractableElement>> GetInteractableElementsFromFileAsync(
+        string path,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        bool includeHidden = false,
+        int limit = 100) {
+        string fileUrl = new Uri(Path.GetFullPath(path)).AbsoluteUri;
+        await using BrowserSession session = await OpenSessionAsync(
+            fileUrl,
+            browser,
+            clean,
+            null,
+            null,
+            null).ConfigureAwait(false);
+
+        return await GetInteractableElementsAsync(session.Page, includeHidden, limit).ConfigureAwait(false);
+    }
 }
