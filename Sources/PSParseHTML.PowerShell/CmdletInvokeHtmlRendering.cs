@@ -64,6 +64,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Session { get; set; }
 
+    /// <summary>Do not set the opened session as the default session.</summary>
+    [Parameter]
+    public SwitchParameter NoDefault { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -86,6 +90,9 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 user,
                 pass,
                 form).ConfigureAwait(false);
+            if (!NoDefault.IsPresent) {
+                SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
+            }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
