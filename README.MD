@@ -24,23 +24,25 @@
 
 **PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
 
-- `Convert-HTMLToText` – convert markup to plain text
-- `ConvertFrom-HtmlTable` – turn table elements into objects
-- `ConvertFrom-HTMLAttributes` – extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
-- `ConvertFrom-HTML` – parse full documents or fragments
-- `Format-CSS` – pretty‑print style sheets
-- `Format-HTML` – tidy up HTML markup
-- `Format-JavaScript` – beautify JavaScript (`Format-JS` alias)
-- `Optimize-CSS` – minify style sheets
-- `Optimize-Email` – inline CSS for email bodies
-- `Optimize-HTML` – minify HTML
+## Processing of HTML/CSS/JS
+- `Convert-HTMLToText` - convert markup to plain text
+- `ConvertFrom-HtmlTable` - turn table elements into objects
+- `ConvertFrom-HTMLAttributes` - extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
+- `ConvertFrom-HTML` - parse full documents or fragments
+- `Format-CSS` - pretty‑print style sheets
+- `Format-HTML` - tidy up HTML markup
+- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
+- `Optimize-CSS` - minify style sheets
+- `Optimize-Email` - inline CSS for email bodies
+- `Optimize-HTML` - minify HTML
+- `Optimize-JavaScript` - minify JavaScript
 
-- `Optimize-JavaScript` – minify JavaScript
-- `Invoke-HTMLRendering` – render pages with a headless browser (supports basic and form authentication)
-- `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
- - `Save-HTMLDownload` – download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLAttachment`)
- - `Invoke-HTMLNavigation` – navigate an existing session to another URL
- - `Close-HTMLSession` – dispose an active browser session (`Stop-HTMLSession` alias)
+## Browsing
+- `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
+- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Save-HTMLDownload` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLAttachment`)
+- `Invoke-HTMLNavigation` - navigate an existing session to another URL
+- `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 ### Cmdlet quick start
 
@@ -181,12 +183,12 @@ Refer to each project's repository for complete license information.
 
 If you are writing your own .NET applications you can reference the compiled libraries directly. All classes live in the `PSParseHTML` namespace and expose methods equivalent to the cmdlets:
 
-- `HtmlParser` – `ParseWithAngleSharp`, `ParseWithHtmlAgilityPack` and table extraction helpers such as `ParseTablesWithAngleSharpDetailed`
-- `HtmlParserExtensions` – `GetElements` for quick element queries
-- `HtmlFormatter` – `FormatHtml`, `FormatCss`, `FormatJavaScript`
-- `HtmlOptimizer` – `OptimizeHtml`, `OptimizeCss`, `OptimizeJavaScript`
-- `HtmlUtilities` – `ConvertToText` to strip markup
-- `PreMailerClient` – methods like `MoveCssInline` and `MoveCssInlineFromFile`
+- `HtmlParser` - `ParseWithAngleSharp`, `ParseWithHtmlAgilityPack` and table extraction helpers such as `ParseTablesWithAngleSharpDetailed`
+- `HtmlParserExtensions` - `GetElements` for quick element queries
+- `HtmlFormatter` - `FormatHtml`, `FormatCss`, `FormatJavaScript`
+- `HtmlOptimizer` - `OptimizeHtml`, `OptimizeCss`, `OptimizeJavaScript`
+- `HtmlUtilities` - `ConvertToText` to strip markup
+- `PreMailerClient` - methods like `MoveCssInline` and `MoveCssInlineFromFile`
 
 These methods can be consumed from C# or directly from PowerShell. For example:
 
