@@ -38,7 +38,9 @@
 - `Optimize-JavaScript` – minify JavaScript
 - `Invoke-HTMLRendering` – render pages with a headless browser (supports basic and form authentication)
 - `Save-HTMLScreenshot` – capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
-- `Save-HTMLDownload` – download files discovered on a rendered page (optionally filter with `-Filter`)
+ - `Save-HTMLDownload` – download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLAttachment`)
+ - `Invoke-HTMLNavigation` – navigate an existing session to another URL
+ - `Close-HTMLSession` – dispose an active browser session (`Stop-HTMLSession` alias)
 
 ### Cmdlet quick start
 
@@ -90,17 +92,17 @@ Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open
 Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLDownload -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
 # Keep a logged in browser session and reuse it
-$session = Invoke-HTMLRendering -Url 'https://example.com/protected' `
+$session = Start-HTMLSession -Url 'https://example.com/protected' `
     -Credential $cred `
     -LoginUrl 'https://example.com/login' `
     -UsernameSelector 'input[name=user]' `
     -PasswordSelector 'input[name=pass]' `
-    -SubmitSelector 'button[type=submit]' `
-    -Session
+    -SubmitSelector 'button[type=submit]'
 Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#content'
-$session.Page.GotoAsync('https://example.com/downloads') | Out-Null
-Save-HTMLDownload -Session $session -Path '.\Downloads'
-[PSParseHTML.HtmlBrowserRenderer]::CloseSessionAsync($session)
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
+    Save-HTMLScreenshot -OutFile '.\downloads.png'
+Save-HTMLAttachment -Session $session -Path '.\Downloads'
+Close-HTMLSession -Session $session
 ```
 
 The first run triggers Playwright to download the selected browser. You'll see output similar to:

@@ -12,6 +12,7 @@ namespace PSParseHTML.PowerShell;
 ///   <code>Save-HTMLDownload -Url https://example.com/download.html -Path C:\temp</code>
 /// </example>
 [Cmdlet(VerbsData.Save, "HTMLDownload", DefaultParameterSetName = ParameterSetDefault)]
+[Alias("Save-HTMLAttachment")]
 [OutputType(typeof(string[]))]
 public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
@@ -22,7 +23,7 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Existing browser session.</summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSession)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
     public BrowserSession Session { get; set; } = null!;
 
     /// <summary>Directory where downloads will be saved.</summary>

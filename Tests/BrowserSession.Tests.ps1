@@ -1,9 +1,9 @@
-# Describe 'Browser session workflow' {
-#     It 'Logs in and reuses the session' {
-#         $server = Start-Process -FilePath python3 -ArgumentList '-u', (Join-Path $PSScriptRoot 'forms_auth_server.py') -WorkingDirectory $PSScriptRoot -PassThru
-#         Start-Sleep -Seconds 1
-#         try {
-#             $base = 'http://localhost:8000'
+            $session = Start-HTMLSession -Url "$base/secret.html" -Credential $cred -LoginUrl "$base/login" -UsernameSelector "input[name=user]" -PasswordSelector "input[name=pass]" -SubmitSelector "input[type=submit]"
+            Invoke-HTMLNavigation -Session $session -Url "$base/secret.html" |
+                Save-HTMLScreenshot -OutFile $png -Selector '#secret'
+            Invoke-HTMLNavigation -Session $session -Url "$base/Documents/download.html" |
+                Save-HTMLAttachment -Path $dest -Filter 'download.txt' | Out-Null
+            Close-HTMLSession -Session $session
 #             $cred = New-Object PSCredential('user', (ConvertTo-SecureString 'pass' -AsPlainText -Force))
 #             $session = Invoke-HTMLRendering -Url "$base/secret.html" -Credential $cred -LoginUrl "$base/login" -UsernameSelector "input[name=user]" -PasswordSelector "input[name=pass]" -SubmitSelector "input[type=submit]" -Session
 #             $png = Join-Path $TestDrive 'secure.png'

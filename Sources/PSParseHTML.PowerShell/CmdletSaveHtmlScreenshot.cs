@@ -23,8 +23,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Existing browser session.</summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionDefault)]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionClip)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionDefault, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionClip, ValueFromPipeline = true)]
     public BrowserSession Session { get; set; } = null!;
 
     /// <summary>File path for the screenshot.</summary>
