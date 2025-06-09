@@ -12,6 +12,8 @@ Typical use includes discovering links, buttons, or form elements a user or scri
 ```powershell
 Get-HTMLInteractable
     [-Session <BrowserSession>]
+    [-Url <string>]
+    [-Path <string>]
     [-IncludeHidden]
     [-Limit <int>]
 ```
@@ -22,9 +24,13 @@ Get-HTMLInteractable
 
 | Name             | Type     | Required | Description                                                                 |
 |------------------|----------|----------|-----------------------------------------------------------------------------|
-| `-Session`       | BrowserSession | Yes | The session object returned by `Start-HTMLSession`. |
+| `-Session`       | BrowserSession | Yes* | The session object returned by `Start-HTMLSession`. |
+| `-Url`           | string   | Yes* | Load a page at the specified URL and list elements. |
+| `-Path`          | string   | Yes* | Load a local HTML file. Alias: `-File`. |
 | `-IncludeHidden` | switch   | No       | If specified, includes elements not visible to the user (e.g. `display:none`).     |
 | `-Limit`         | int      | No       | Limits the number of results returned. Default is 100.                      |
+
+`*` Exactly one of `-Session`, `-Url` or `-Path` must be specified.
 
 ---
 
@@ -60,6 +66,18 @@ Index  Text         Tag     Selector                            Href
 
 ```powershell
 Get-HTMLInteractable -Session $Session
+```
+
+### 🧪 Load a URL directly
+
+```powershell
+Get-HTMLInteractable -Url 'https://example.com'
+```
+
+### 🧪 Parse a local HTML file
+
+```powershell
+Get-HTMLInteractable -Path './report.html'
 ```
 
 ### 🧪 Include hidden elements, limit results to 10

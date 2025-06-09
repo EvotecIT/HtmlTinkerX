@@ -364,4 +364,25 @@ public static async Task CaptureScreenshotAsync(
 
         return await GetInteractableElementsAsync(session.Page, includeHidden, limit).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Loads a local HTML file and returns clickable elements.
+    /// </summary>
+    public static async Task<List<InteractableElement>> GetInteractableElementsFromFileAsync(
+        string path,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        bool includeHidden = false,
+        int limit = 100) {
+        string fileUrl = new Uri(Path.GetFullPath(path)).AbsoluteUri;
+        await using BrowserSession session = await OpenSessionAsync(
+            fileUrl,
+            browser,
+            clean,
+            null,
+            null,
+            null).ConfigureAwait(false);
+
+        return await GetInteractableElementsAsync(session.Page, includeHidden, limit).ConfigureAwait(false);
+    }
 }
