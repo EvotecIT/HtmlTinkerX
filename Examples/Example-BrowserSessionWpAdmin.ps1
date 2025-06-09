@@ -24,6 +24,6 @@ Invoke-HTMLNavigation -Session $Session -Url 'https://evotec.xyz/wp-admin/edit.p
 # Navigate to plugins page and save screenshot
 Invoke-HTMLNavigation -Session $Session -Url 'https://evotec.xyz/wp-admin/edit.php?post_type=page' -PassThru | Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\EvotecPageAdmin4.png" -Open
 #
-Invoke-HTMLNavigation -Session $Session -Text "Profile" -PassThru | Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\EvotecPageAdmin4.png" -Open
+Invoke-HTMLNavigation -Session $Session -Text "Profile" -PassThru -WaitForNavigation | Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\EvotecPageAdmin5.png" -Open
 # Close the session using new cmdlet alias (Stop-HTMLSession)
 Close-HTMLSession -Session $Session | Out-Null
