@@ -314,6 +314,38 @@ public static async Task CaptureScreenshotAsync(
     }
 
     /// <summary>
+    /// Gets HTML content from an already loaded page or element.
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="selector">Optional CSS selector for the element.</param>
+    /// <param name="innerHtml">Return inner HTML instead of outer HTML.</param>
+    /// <param name="asText">Return text content instead of markup.</param>
+    /// <returns>Extracted markup or text.</returns>
+    public static async Task<string> GetContentAsync(
+        IPage page,
+        string? selector = null,
+        bool innerHtml = false,
+        bool asText = false) {
+        if (string.IsNullOrEmpty(selector)) {
+            if (asText) {
+                return await page.InnerTextAsync("html").ConfigureAwait(false);
+            }
+            return await page.ContentAsync().ConfigureAwait(false);
+        }
+
+        var locator = page.Locator(selector);
+        await locator.WaitForAsync();
+
+        if (asText) {
+            return await locator.InnerTextAsync().ConfigureAwait(false);
+        }
+        if (innerHtml) {
+            return await locator.InnerHTMLAsync().ConfigureAwait(false);
+        }
+        return await locator.EvaluateAsync<string>("el => el.outerHTML").ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Returns clickable or interactable elements found on an already loaded page.
     /// </summary>
     public static async Task<List<InteractableElement>> GetInteractableElementsAsync(

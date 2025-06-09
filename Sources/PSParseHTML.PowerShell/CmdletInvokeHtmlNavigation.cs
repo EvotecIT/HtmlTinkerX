@@ -59,10 +59,15 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
                 await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
                 break;
             case ParameterSetSelector:
-                if (WaitForNavigation.IsPresent) {
-                    await session.Page.RunAndWaitForNavigationAsync(() => session.Page.ClickAsync(Selector!)).ConfigureAwait(false);
-                } else {
-                    await session.Page.ClickAsync(Selector!).ConfigureAwait(false);
+                try {
+                    if (WaitForNavigation.IsPresent) {
+                        await session.Page.RunAndWaitForNavigationAsync(() => session.Page.ClickAsync(Selector!)).ConfigureAwait(false);
+                    } else {
+                        await session.Page.ClickAsync(Selector!).ConfigureAwait(false);
+                    }
+                } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
+                    HandleStrictMode(ex, Selector!);
+                    return;
                 }
                 break;
             case ParameterSetText:
@@ -75,10 +80,15 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
                     locator = session.Page.GetByText(Text!);
                 }
 
-                if (WaitForNavigation.IsPresent) {
-                    await session.Page.RunAndWaitForNavigationAsync(() => locator.ClickAsync()).ConfigureAwait(false);
-                } else {
-                    await locator.ClickAsync().ConfigureAwait(false);
+                try {
+                    if (WaitForNavigation.IsPresent) {
+                        await session.Page.RunAndWaitForNavigationAsync(() => locator.ClickAsync()).ConfigureAwait(false);
+                    } else {
+                        await locator.ClickAsync().ConfigureAwait(false);
+                    }
+                } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
+                    HandleStrictMode(ex, Text!);
+                    return;
                 }
                 break;
         }
@@ -86,6 +96,25 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
         if (PassThru.IsPresent) {
             WriteObject(session);
         }
+    }
+
+    private void HandleStrictMode(PlaywrightException ex, string query) {
+        string text = ex.Message;
+        int start = text.IndexOf("strict mode violation:", System.StringComparison.Ordinal);
+        if (start >= 0) {
+            text = text.Substring(start + "strict mode violation:".Length).Trim();
+        }
+        int idx = text.IndexOf("Call log:", System.StringComparison.Ordinal);
+        if (idx > 0) {
+            text = text.Substring(0, idx).TrimEnd();
+        }
+        string[] parts = text.Replace("  ", " ").Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+        string message = $"Strict mode violation for '{query}':" + System.Environment.NewLine + string.Join(System.Environment.NewLine, parts);
+        WriteError(new ErrorRecord(
+            new InvalidOperationException(message),
+            "StrictModeViolation",
+            ErrorCategory.InvalidOperation,
+            query));
     }
 }
 
