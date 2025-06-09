@@ -7,7 +7,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Represents a headless browser session consisting of Playwright objects.
 /// </summary>
-internal sealed class BrowserSession : IAsyncDisposable {
+public sealed class BrowserSession : IAsyncDisposable {
     public IPlaywright Playwright { get; }
     public IBrowser Browser { get; }
     public IBrowserContext Context { get; }

@@ -11,7 +11,8 @@ namespace PSParseHTML.PowerShell;
 /// <code>Invoke-HTMLRendering -Url https://example.com -Browser Chromium -Clean</code>
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HTMLRendering", DefaultParameterSetName = ParameterSetDefault)]
-[OutputType(typeof(string))]
+[Alias("Start-HTMLSession", "Open-HTMLSession")]
+[OutputType(typeof(string), typeof(BrowserSession))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
 
@@ -59,6 +60,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public string? SubmitSelector { get; set; }
 
+    /// <summary>Return a browser session instead of HTML.</summary>
+    [Parameter]
+    public SwitchParameter Session { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -73,7 +78,16 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             };
         }
 
-        if (!string.IsNullOrEmpty(OutFile)) {
+        if (Session.IsPresent) {
+            BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
+                Url,
+                Browser,
+                Clean.IsPresent,
+                user,
+                pass,
+                form).ConfigureAwait(false);
+            WriteObject(sess);
+        } else if (!string.IsNullOrEmpty(OutFile)) {
             await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
         } else {
             string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);

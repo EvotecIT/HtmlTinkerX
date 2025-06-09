@@ -77,6 +77,8 @@ public static class HtmlBrowserRenderer {
                 }
             };
         }
+        contextOptions ??= new BrowserNewContextOptions();
+        contextOptions.IgnoreHTTPSErrors = true;
 
         var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
@@ -99,6 +101,27 @@ public static class HtmlBrowserRenderer {
 
         return new BrowserSession(playwright, browserInstance, context, page);
     }
+
+    /// <summary>
+    /// Creates a new <see cref="BrowserSession"/> and navigates to the specified URL.
+    /// </summary>
+    public static Task<BrowserSession> OpenSessionAsync(
+        string url,
+        BrowserEngine browser = BrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        FormLoginOptions? formLogin = null)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin);
+
+    /// <summary>
+    /// Disposes the specified browser session.
+    /// </summary>
+    public static async Task CloseSessionAsync(BrowserSession session) {
+        if (session != null) {
+            await session.DisposeAsync().ConfigureAwait(false);
+        }
+    }
     /// <summary>
     /// Retrieves the fully rendered HTML from the specified URL after executing JavaScript.
     /// </summary>
@@ -111,7 +134,7 @@ public static class HtmlBrowserRenderer {
         string? username = null,
         string? password = null,
         FormLoginOptions? formLogin = null) {
-        await using BrowserSession session = await CreatePageAsync(
+        await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
@@ -168,14 +191,39 @@ public static async Task CaptureScreenshotAsync(
     string? username = null,
     string? password = null,
     FormLoginOptions? formLogin = null) {
-        await using BrowserSession session = await CreatePageAsync(
+        await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
             username,
             password,
             formLogin).ConfigureAwait(false);
-        var page = session.Page;
+
+        await CaptureScreenshotAsync(
+            session.Page,
+            path,
+            fullPage,
+            delayMs,
+            selector,
+            clipX,
+            clipY,
+            clipWidth,
+            clipHeight).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Captures a screenshot of an already loaded page.
+    /// </summary>
+    public static async Task CaptureScreenshotAsync(
+        IPage page,
+        string path,
+        bool fullPage = false,
+        int delayMs = 0,
+        string? selector = null,
+        int? clipX = null,
+        int? clipY = null,
+        int? clipWidth = null,
+        int? clipHeight = null) {
         if (!string.IsNullOrEmpty(selector)) {
             await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
@@ -211,7 +259,7 @@ public static async Task CaptureScreenshotAsync(
         BrowserEngine browser = BrowserEngine.Chromium,
         bool clean = false,
         string? filter = null) {
-        await using BrowserSession session = await CreatePageAsync(
+        await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
@@ -219,7 +267,17 @@ public static async Task CaptureScreenshotAsync(
             null,
             null).ConfigureAwait(false);
         var page = session.Page;
+        return await SavePageDownloadsAsync(page, directory, filter).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Saves files downloaded from an already loaded page.
+    /// </summary>
+    public static async Task<List<string>> SavePageDownloadsAsync(
+        IPage page,
+        string directory,
+        string? filter = null) {
+        
         Directory.CreateDirectory(directory);
         List<string> downloads = new();
         page.Download += async (_, dl) => {
