@@ -12,11 +12,11 @@ $invokeHTMLRenderingSplat = @{
     Credential       = $Credentials
     Session          = $true
 }
-$session = Invoke-HTMLRendering @invokeHTMLRenderingSplat
+$session = Open-HTMLSession @invokeHTMLRenderingSplat
 # Save screenshot of the page should work with session
 Save-HTMLScreenshot -Session $Session -OutFile "$PSScriptRoot\Output\EvotecPageAdmin1.png" -Open
 # We should add new cmdlet that will navigate to the page we tell it to navigate to
-Invoke-HTMLNavigation -Session $Session -Url 'https://evotec.xyz/wp-admin/edit.php'
+$null = Invoke-HTMLNavigation -Session $Session -Url 'https://evotec.xyz/wp-admin/edit.php'
 # Save screenshot of the page should work with session
 Save-HTMLScreenshot -Session $Session -OutFile "$PSScriptRoot\Output\EvotecPageAdmin2.png" -Open
 # We should add new cmdlet that will navigate to the page we tell it to navigate to, but also allow Save-HTMLScreenshot to work with session from the page we navigate to
