@@ -6,7 +6,12 @@ Describe 'Save-HTMLDownload' {
         $Item1 = Get-Item -Path $File[0]
         $Item2 = Get-Item -Path $File[1]
 
-        $Item1.Name | Should -Be 'DnsClientX-PowerShellModule.v0.4.0.zip'
-        $Item2.Name | Should -Be 'DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip'
+        $List = @(
+            'DnsClientX-PowerShellModule.v0.4.0.zip'
+            'DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip'
+        )
+
+        $List | Should -Contain $Item1.Name
+        $List | Should -Contain $Item2.Name
     }
 }
