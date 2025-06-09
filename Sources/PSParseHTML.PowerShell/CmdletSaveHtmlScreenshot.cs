@@ -23,9 +23,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Existing browser session.</summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionDefault, ValueFromPipeline = true)]
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSessionClip, ValueFromPipeline = true)]
-    public BrowserSession Session { get; set; } = null!;
+    [Parameter(Position = 0, ParameterSetName = ParameterSetSessionDefault, ValueFromPipeline = true)]
+    [Parameter(Position = 0, ParameterSetName = ParameterSetSessionClip, ValueFromPipeline = true)]
+    public BrowserSession? Session { get; set; }
 
     /// <summary>File path for the screenshot.</summary>
     [Parameter(Mandatory = true, Position = 1)]
@@ -81,6 +81,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        BrowserSession? session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+
         switch (ParameterSetName) {
             case ParameterSetClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
@@ -98,7 +100,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                 break;
             case ParameterSetSessionClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                    Session.Page,
+                    (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     OutFile,
                     false,
                     Delay,
@@ -110,7 +112,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                 break;
             case ParameterSetSessionDefault:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                    Session.Page,
+                    (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     OutFile,
                     Full.IsPresent,
                     Delay,
