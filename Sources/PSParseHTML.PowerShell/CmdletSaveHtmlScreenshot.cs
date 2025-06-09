@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>Save-HTMLScreenshot -Url https://example.com -OutFile page.png</code>
 /// </example>
-[Cmdlet(VerbsData.Save, "HTMLScreenshot", DefaultParameterSetName = ParameterSetDefault)]
+[Cmdlet(VerbsData.Save, "HTMLScreenshot", DefaultParameterSetName = ParameterSetSessionDefault)]
 public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetClip = "Clip";
