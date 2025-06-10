@@ -13,8 +13,14 @@ public sealed class HtmlInteractableInfo {
     /// <summary>HTML tag name.</summary>
     public string Tag { get; set; } = string.Empty;
 
-    /// <summary>Snippet of the outer HTML for reference.</summary>
+    /// <summary>CSS selector identifying the element.</summary>
     public string Selector { get; set; } = string.Empty;
+
+    /// <summary>Element id attribute if present.</summary>
+    public string? Id { get; set; }
+
+    /// <summary>Element class attribute if present.</summary>
+    public string? Class { get; set; }
 
     /// <summary>Link target when applicable.</summary>
     public string? Href { get; set; }

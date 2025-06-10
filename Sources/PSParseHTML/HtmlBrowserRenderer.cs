@@ -356,16 +356,30 @@ public static async Task CaptureScreenshotAsync(
         List<HtmlInteractableInfo> list = new();
         int index = 0;
         foreach (var el in elements) {
-            string text = (await el.InnerTextAsync()).Trim();
+            string rawText = await el.InnerTextAsync();
+            string text = Regex.Replace(rawText, "\\s+", " ").Trim();
             string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
-            string outer = await el.EvaluateAsync<string>("el => el.outerHTML");
             string? href = await el.GetAttributeAsync("href");
+            string? id = await el.GetAttributeAsync("id");
+            string? cls = await el.GetAttributeAsync("class");
+            string selector = await el.EvaluateAsync<string>(@"el => {
+                const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
+                let sel = el.tagName.toLowerCase();
+                if (el.id) return sel + '#' + esc(el.id);
+                const href = el.getAttribute('href');
+                if (href) return sel + '[href=""' + esc(href) + '""]';
+                const cls = el.className;
+                if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
+                return sel;
+            }");
             list.Add(new HtmlInteractableInfo {
                 Index = index++,
                 Text = text,
                 Tag = tag,
-                Selector = outer.Length > 100 ? outer.Substring(0, 100) : outer,
-                Href = href
+                Selector = selector,
+                Href = href,
+                Id = id,
+                Class = cls
             });
         }
         return list;
