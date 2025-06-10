@@ -346,6 +346,31 @@ public static async Task CaptureScreenshotAsync(
     }
 
     /// <summary>
+    /// Retrieves a list of elements that can be interacted with (links, buttons, etc.).
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <returns>List of interactable element descriptions.</returns>
+    public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page) {
+        var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]");
+        List<HtmlInteractableInfo> list = new();
+        int index = 0;
+        foreach (var el in elements) {
+            string text = (await el.InnerTextAsync()).Trim();
+            string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+            string outer = await el.EvaluateAsync<string>("el => el.outerHTML");
+            string? href = await el.GetAttributeAsync("href");
+            list.Add(new HtmlInteractableInfo {
+                Index = index++,
+                Text = text,
+                Tag = tag,
+                Selector = outer.Length > 100 ? outer.Substring(0, 100) : outer,
+                Href = href
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
     /// Returns clickable or interactable elements found on an already loaded page.
     /// </summary>
     public static async Task<List<InteractableElement>> GetInteractableElementsAsync(

@@ -47,6 +47,10 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     /// <summary>Return the session object.</summary>
     [Parameter]
     public SwitchParameter PassThru { get; set; }
+    /// <summary>Timeout in milliseconds for navigation and clicks.</summary>
+    [Parameter]
+    [ValidateRange(0,int.MaxValue)]
+    public int Timeout { get; set; } = 30000;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
@@ -55,15 +59,17 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
 
         switch (ParameterSetName) {
             case ParameterSetUrl:
-                await session.Page.GotoAsync(Url!).ConfigureAwait(false);
-                await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
+                await session.Page.GotoAsync(Url!, new PageGotoOptions { Timeout = Timeout }).ConfigureAwait(false);
+                await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = Timeout }).ConfigureAwait(false);
                 break;
             case ParameterSetSelector:
                 try {
                     if (WaitForNavigation.IsPresent) {
-                        await session.Page.RunAndWaitForNavigationAsync(() => session.Page.ClickAsync(Selector!)).ConfigureAwait(false);
+                        await session.Page.RunAndWaitForNavigationAsync(
+                            () => session.Page.ClickAsync(Selector!, new PageClickOptions { Timeout = Timeout }),
+                            new PageRunAndWaitForNavigationOptions { Timeout = Timeout }).ConfigureAwait(false);
                     } else {
-                        await session.Page.ClickAsync(Selector!).ConfigureAwait(false);
+                        await session.Page.ClickAsync(Selector!, new PageClickOptions { Timeout = Timeout }).ConfigureAwait(false);
                     }
                 } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
                     HandleStrictMode(ex, Selector!);
@@ -82,9 +88,11 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
 
                 try {
                     if (WaitForNavigation.IsPresent) {
-                        await session.Page.RunAndWaitForNavigationAsync(() => locator.ClickAsync()).ConfigureAwait(false);
+                        await session.Page.RunAndWaitForNavigationAsync(
+                            () => locator.ClickAsync(new LocatorClickOptions { Timeout = Timeout }),
+                            new PageRunAndWaitForNavigationOptions { Timeout = Timeout }).ConfigureAwait(false);
                     } else {
-                        await locator.ClickAsync().ConfigureAwait(false);
+                        await locator.ClickAsync(new LocatorClickOptions { Timeout = Timeout }).ConfigureAwait(false);
                     }
                 } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
                     HandleStrictMode(ex, Text!);
