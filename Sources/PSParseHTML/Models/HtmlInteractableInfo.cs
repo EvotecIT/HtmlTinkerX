@@ -10,18 +10,21 @@ public sealed class HtmlInteractableInfo {
     /// <summary>Visible text for the element.</summary>
     public string Text { get; set; } = string.Empty;
 
-    /// <summary>HTML tag name.</summary>
-    public string Tag { get; set; } = string.Empty;
+    /// <summary>Indicates whether the element is visible.</summary>
+    public bool Visible { get; set; }
 
     /// <summary>CSS selector identifying the element.</summary>
     public string Selector { get; set; } = string.Empty;
+
+    /// <summary>Link target when applicable.</summary>
+    public string? Href { get; set; }
+
+    /// <summary>HTML tag name.</summary>
+    public string Tag { get; set; } = string.Empty;
 
     /// <summary>Element id attribute if present.</summary>
     public string? Id { get; set; }
 
     /// <summary>Element class attribute if present.</summary>
     public string? Class { get; set; }
-
-    /// <summary>Link target when applicable.</summary>
-    public string? Href { get; set; }
 }

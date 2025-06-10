@@ -50,7 +50,7 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     /// <summary>Timeout in milliseconds for navigation and clicks.</summary>
     [Parameter]
     [ValidateRange(0,int.MaxValue)]
-    public int Timeout { get; set; } = 10000;
+    public int Timeout { get; set; } = 30000;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
