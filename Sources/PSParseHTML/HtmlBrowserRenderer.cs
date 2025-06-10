@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace PSParseHTML;
@@ -277,7 +278,7 @@ public static async Task CaptureScreenshotAsync(
         IPage page,
         string directory,
         string? filter = null) {
-        
+
         Directory.CreateDirectory(directory);
         List<string> downloads = new();
         page.Download += async (_, dl) => {
@@ -311,6 +312,142 @@ public static async Task CaptureScreenshotAsync(
 
         await page.WaitForTimeoutAsync(500);
         return downloads;
+    }
+
+    /// <summary>
+    /// Gets HTML content from an already loaded page or element.
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="selector">Optional CSS selector for the element.</param>
+    /// <param name="innerHtml">Return inner HTML instead of outer HTML.</param>
+    /// <param name="asText">Return text content instead of markup.</param>
+    /// <returns>Extracted markup or text.</returns>
+    public static async Task<string> GetContentAsync(
+        IPage page,
+        string? selector = null,
+        bool innerHtml = false,
+        bool asText = false) {
+        if (string.IsNullOrEmpty(selector)) {
+            if (asText) {
+                return await page.InnerTextAsync("html").ConfigureAwait(false);
+            }
+            return await page.ContentAsync().ConfigureAwait(false);
+        }
+
+        var locator = page.Locator(selector);
+        await locator.WaitForAsync();
+
+        if (asText) {
+            return await locator.InnerTextAsync().ConfigureAwait(false);
+        }
+        if (innerHtml) {
+            return await locator.InnerHTMLAsync().ConfigureAwait(false);
+        }
+        return await locator.EvaluateAsync<string>("el => el.outerHTML").ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Retrieves a list of elements that can be interacted with (links, buttons, etc.).
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <returns>List of interactable element descriptions.</returns>
+    public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page) {
+        var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]");
+        List<HtmlInteractableInfo> list = new();
+        int index = 0;
+        foreach (var el in elements) {
+            string rawText = await el.InnerTextAsync();
+            string text = Regex.Replace(rawText, "\\s+", " ").Trim();
+            string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+            string? href = await el.GetAttributeAsync("href");
+            string? id = await el.GetAttributeAsync("id");
+            string? cls = await el.GetAttributeAsync("class");
+
+            string selector = tag;
+            if (!string.IsNullOrEmpty(id)) {
+                selector += "#" + id;
+            } else if (!string.IsNullOrEmpty(href)) {
+                selector += "[href=\"" + href.Replace("\"", "\\\"") + "\"]";
+            } else if (!string.IsNullOrEmpty(cls)) {
+                string[] parts = cls.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) {
+                    selector += "." + string.Join(".", parts);
+                }
+            }
+            list.Add(new HtmlInteractableInfo {
+                Index = index++,
+                Text = text,
+                Tag = tag,
+                Selector = selector,
+                Href = href,
+                Id = id,
+                Class = cls
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Navigates the specified session to a new URL and waits for the network to be idle.
+    /// </summary>
+    public static async Task NavigateAsync(BrowserSession session, string url, int timeout = 10000) {
+        await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
+        await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element by CSS selector.
+    /// </summary>
+    public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000) {
+        if (waitForNavigation) {
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+        } else {
+            await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Clicks an element specified by text content.
+    /// </summary>
+    public static async Task ClickTextAsync(
+        BrowserSession session,
+        string text,
+        bool exact = false,
+        string? regex = null,
+        bool waitForNavigation = false,
+        int timeout = 10000) {
+        ILocator locator = !string.IsNullOrEmpty(regex)
+            ? session.Page.GetByText(new Regex(regex))
+            : exact
+                ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true })
+                : session.Page.GetByText(text);
+
+        if (waitForNavigation) {
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+        } else {
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Extracts a concise message from a Playwright strict mode violation error.
+    /// </summary>
+    public static string FormatStrictModeMessage(string query, PlaywrightException ex) {
+        string text = ex.Message;
+        int start = text.IndexOf("strict mode violation:", StringComparison.Ordinal);
+        if (start >= 0) {
+            text = text.Substring(start + "strict mode violation:".Length).Trim();
+        }
+        int idx = text.IndexOf("Call log:", StringComparison.Ordinal);
+        if (idx > 0) {
+            text = text.Substring(0, idx).TrimEnd();
+        }
+        string[] parts = text.Replace("  ", " ").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        return $"Strict mode violation for '{query}':" + Environment.NewLine + string.Join(Environment.NewLine, parts);
     }
 
     /// <summary>

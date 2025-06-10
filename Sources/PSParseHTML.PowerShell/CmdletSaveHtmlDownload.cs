@@ -23,8 +23,8 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Existing browser session.</summary>
-    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
-    public BrowserSession Session { get; set; } = null!;
+    [Parameter(Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
+    public BrowserSession? Session { get; set; }
 
     /// <summary>Directory where downloads will be saved.</summary>
     [Parameter(Mandatory = true)]
@@ -44,9 +44,11 @@ public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        BrowserSession? session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+
         List<string> files = ParameterSetName switch {
             ParameterSetSession => await HtmlBrowserRenderer.SavePageDownloadsAsync(
-                Session.Page,
+                (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                 Path,
                 Filter).ConfigureAwait(false),
             _ => await HtmlBrowserRenderer.SavePageDownloadsAsync(
