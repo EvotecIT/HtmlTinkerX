@@ -51,6 +51,8 @@ A list of objects with the following structure:
 | `Tag`     | string | Tag name (e.g., `a`, `button`, `input`)                |
 | `Selector`| string | First 80 characters of the outer HTML (for preview)    |
 | `Href`    | string | The `href` or `onclick` attribute value if applicable  |
+| `Visible` | bool   | `True` when Playwright reports the element as visible   |
+| `PotentiallyHidden` | bool | `True` when the element or an ancestor has attributes or styles that may hide it |
 
 ---
 

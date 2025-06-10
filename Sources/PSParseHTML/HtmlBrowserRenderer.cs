@@ -354,6 +354,21 @@ public static async Task CaptureScreenshotAsync(
             string? id = await el.GetAttributeAsync("id");
             string? cls = await el.GetAttributeAsync("class");
             bool visible = await el.IsVisibleAsync();
+            bool potentiallyHidden = await el.EvaluateAsync<bool>(@"el => {
+                const check = node => {
+                    if (!node) return false;
+                    if (node.getAttribute('aria-hidden') === 'true' || node.hidden) {
+                        return true;
+                    }
+                    const style = window.getComputedStyle(node);
+                    if (!style) return false;
+                    return style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0;
+                };
+                for (let n = el; n; n = n.parentElement) {
+                    if (check(n)) return true;
+                }
+                return false;
+            }");
             string selector = await el.EvaluateAsync<string>(@"el => {
                 const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
                 let sel = el.tagName.toLowerCase();
@@ -372,7 +387,8 @@ public static async Task CaptureScreenshotAsync(
                 Href = href,
                 Id = id,
                 Class = cls,
-                Visible = visible
+                Visible = visible,
+                PotentiallyHidden = potentiallyHidden
             });
         }
         return list;

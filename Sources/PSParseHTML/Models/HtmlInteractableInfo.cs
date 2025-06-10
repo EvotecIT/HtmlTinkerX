@@ -27,4 +27,10 @@ public sealed class HtmlInteractableInfo {
 
     /// <summary>Element class attribute if present.</summary>
     public string? Class { get; set; }
+
+    /// <summary>
+    /// True when the element or one of its ancestors has attributes or styles
+    /// that may hide it from assistive technologies.
+    /// </summary>
+    public bool PotentiallyHidden { get; set; }
 }
