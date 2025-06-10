@@ -9,12 +9,12 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that saves files downloaded while rendering a web page.
 /// </summary>
 /// <example>
-///   <code>Save-HTMLDownload -Url https://example.com/download.html -Path C:\temp</code>
+///   <code>Save-HTMLAttachment -Url https://example.com/download.html -Path C:\temp</code>
 /// </example>
-[Cmdlet(VerbsData.Save, "HTMLDownload", DefaultParameterSetName = ParameterSetDefault)]
-[Alias("Save-HTMLAttachment")]
+[Cmdlet(VerbsData.Save, "HTMLAttachment", DefaultParameterSetName = ParameterSetDefault)]
+[Alias("Save-HTMLDownload")]
 [OutputType(typeof(string[]))]
-public sealed class CmdletSaveHtmlDownload : AsyncPSCmdlet {
+public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetSession = "Session";
 
