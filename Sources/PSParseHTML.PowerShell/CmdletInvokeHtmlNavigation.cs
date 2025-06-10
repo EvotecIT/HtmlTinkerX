@@ -57,48 +57,26 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
         BrowserSession session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
-        switch (ParameterSetName) {
-            case ParameterSetUrl:
-                await session.Page.GotoAsync(Url!, new PageGotoOptions { Timeout = Timeout }).ConfigureAwait(false);
-                await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = Timeout }).ConfigureAwait(false);
-                break;
-            case ParameterSetSelector:
-                try {
-                    if (WaitForNavigation.IsPresent) {
-                        await session.Page.RunAndWaitForNavigationAsync(
-                            () => session.Page.ClickAsync(Selector!, new PageClickOptions { Timeout = Timeout }),
-                            new PageRunAndWaitForNavigationOptions { Timeout = Timeout }).ConfigureAwait(false);
-                    } else {
-                        await session.Page.ClickAsync(Selector!, new PageClickOptions { Timeout = Timeout }).ConfigureAwait(false);
-                    }
-                } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
-                    HandleStrictMode(ex, Selector!);
-                    return;
-                }
-                break;
-            case ParameterSetText:
-                ILocator locator;
-                if (!string.IsNullOrEmpty(Regex)) {
-                    locator = session.Page.GetByText(new Regex(Regex));
-                } else if (Exact.IsPresent) {
-                    locator = session.Page.GetByText(Text!, new PageGetByTextOptions { Exact = true });
-                } else {
-                    locator = session.Page.GetByText(Text!);
-                }
-
-                try {
-                    if (WaitForNavigation.IsPresent) {
-                        await session.Page.RunAndWaitForNavigationAsync(
-                            () => locator.ClickAsync(new LocatorClickOptions { Timeout = Timeout }),
-                            new PageRunAndWaitForNavigationOptions { Timeout = Timeout }).ConfigureAwait(false);
-                    } else {
-                        await locator.ClickAsync(new LocatorClickOptions { Timeout = Timeout }).ConfigureAwait(false);
-                    }
-                } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
-                    HandleStrictMode(ex, Text!);
-                    return;
-                }
-                break;
+        try {
+            switch (ParameterSetName) {
+                case ParameterSetUrl:
+                    await HtmlBrowserRenderer.NavigateAsync(session, Url!, Timeout).ConfigureAwait(false);
+                    break;
+                case ParameterSetSelector:
+                    await HtmlBrowserRenderer.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    break;
+                case ParameterSetText:
+                    await HtmlBrowserRenderer.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    break;
+            }
+        } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
+            string query = ParameterSetName switch {
+                ParameterSetSelector => Selector!,
+                _ => Text!
+            };
+            string message = HtmlBrowserRenderer.FormatStrictModeMessage(query, ex);
+            WriteError(new ErrorRecord(new InvalidOperationException(message), "StrictModeViolation", ErrorCategory.InvalidOperation, query));
+            return;
         }
 
         if (PassThru.IsPresent) {
@@ -106,23 +84,5 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
         }
     }
 
-    private void HandleStrictMode(PlaywrightException ex, string query) {
-        string text = ex.Message;
-        int start = text.IndexOf("strict mode violation:", System.StringComparison.Ordinal);
-        if (start >= 0) {
-            text = text.Substring(start + "strict mode violation:".Length).Trim();
-        }
-        int idx = text.IndexOf("Call log:", System.StringComparison.Ordinal);
-        if (idx > 0) {
-            text = text.Substring(0, idx).TrimEnd();
-        }
-        string[] parts = text.Replace("  ", " ").Split(new[] { '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
-        string message = $"Strict mode violation for '{query}':" + System.Environment.NewLine + string.Join(System.Environment.NewLine, parts);
-        WriteError(new ErrorRecord(
-            new InvalidOperationException(message),
-            "StrictModeViolation",
-            ErrorCategory.InvalidOperation,
-            query));
-    }
 }
 

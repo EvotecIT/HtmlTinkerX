@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace PSParseHTML;
@@ -368,6 +369,69 @@ public static async Task CaptureScreenshotAsync(
             });
         }
         return list;
+    }
+
+    /// <summary>
+    /// Navigates the specified session to a new URL and waits for the network to be idle.
+    /// </summary>
+    public static async Task NavigateAsync(BrowserSession session, string url, int timeout = 30000) {
+        await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
+        await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element by CSS selector.
+    /// </summary>
+    public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
+        if (waitForNavigation) {
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+        } else {
+            await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Clicks an element specified by text content.
+    /// </summary>
+    public static async Task ClickTextAsync(
+        BrowserSession session,
+        string text,
+        bool exact = false,
+        string? regex = null,
+        bool waitForNavigation = false,
+        int timeout = 30000) {
+        ILocator locator = !string.IsNullOrEmpty(regex)
+            ? session.Page.GetByText(new Regex(regex))
+            : exact
+                ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true })
+                : session.Page.GetByText(text);
+
+        if (waitForNavigation) {
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+        } else {
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Extracts a concise message from a Playwright strict mode violation error.
+    /// </summary>
+    public static string FormatStrictModeMessage(string query, PlaywrightException ex) {
+        string text = ex.Message;
+        int start = text.IndexOf("strict mode violation:", StringComparison.Ordinal);
+        if (start >= 0) {
+            text = text.Substring(start + "strict mode violation:".Length).Trim();
+        }
+        int idx = text.IndexOf("Call log:", StringComparison.Ordinal);
+        if (idx > 0) {
+            text = text.Substring(0, idx).TrimEnd();
+        }
+        string[] parts = text.Replace("  ", " ").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        return $"Strict mode violation for '{query}':" + Environment.NewLine + string.Join(Environment.NewLine, parts);
     }
 
     /// <summary>
