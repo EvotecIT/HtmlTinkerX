@@ -6,10 +6,10 @@ using System.Net.Http;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>
-/// Converts HTML lists into PowerShell string arrays.
+/// Converts HTML lists into PowerShell objects by default.
 /// </summary>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlList", DefaultParameterSetName = ParameterSetContent)]
-[OutputType(typeof(string[]))]
+[OutputType(typeof(PSObject[]))]
 public sealed class CmdletConvertFromHtmlList : PSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
@@ -32,9 +32,9 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
     [Parameter]
     public SwitchParameter IncludeMetadata { get; set; }
 
-    /// <summary>Return each list item as an object with properties.</summary>
+    /// <summary>Return list items as strings.</summary>
     [Parameter]
-    public SwitchParameter AsObject { get; set; }
+    public SwitchParameter AsString { get; set; }
 
     /// <summary>Placeholder inserted between text segments when joining item text.</summary>
     [Parameter]
@@ -71,14 +71,16 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
             }
         }
 
+        bool returnObjects = !AsString.IsPresent;
+
         if (IncludeMetadata.IsPresent) {
             foreach (var result in results) {
-                WriteObject(CreateListObject(result));
+                WriteObject(CreateListObject(result, returnObjects));
             }
         } else {
             var output = new List<object>();
             foreach (var result in results) {
-                if (AsObject.IsPresent) {
+                if (returnObjects) {
                     output.Add(ConvertItems(result.Items));
                 } else {
                     output.Add(result.Items.Select(i => string.Join(TagPlaceholder, i)).ToArray());
@@ -103,9 +105,9 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
         return list.ToArray();
     }
 
-    private PSObject CreateListObject(ListParseResult result) {
+    private PSObject CreateListObject(ListParseResult result, bool returnObjects) {
         PSObject listObject = new();
-        if (AsObject.IsPresent) {
+        if (returnObjects) {
             listObject.Properties.Add(new PSNoteProperty("Data", ConvertItems(result.Items)));
         } else {
             listObject.Properties.Add(new PSNoteProperty("Data", result.Items.Select(i => string.Join(TagPlaceholder, i)).ToArray()));
