@@ -11,15 +11,6 @@ namespace PSParseHTML;
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public enum BrowserEngine {
-    Chromium,
-    Firefox,
-    Webkit,
-}
-
-/// <summary>
-/// Helper methods for retrieving HTML content using a headless browser.
-/// </summary>
 public static class HtmlBrowserRenderer {
     private static string GetBrowserInstallPath() {
         string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
