@@ -362,16 +362,18 @@ public static async Task CaptureScreenshotAsync(
             string? href = await el.GetAttributeAsync("href");
             string? id = await el.GetAttributeAsync("id");
             string? cls = await el.GetAttributeAsync("class");
-            string selector = await el.EvaluateAsync<string>(@"el => {
-                const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
-                let sel = el.tagName.toLowerCase();
-                if (el.id) return sel + '#' + esc(el.id);
-                const href = el.getAttribute('href');
-                if (href) return sel + '[href=""' + esc(href) + '""]';
-                const cls = el.className;
-                if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
-                return sel;
-            }");
+
+            string selector = tag;
+            if (!string.IsNullOrEmpty(id)) {
+                selector += "#" + id;
+            } else if (!string.IsNullOrEmpty(href)) {
+                selector += "[href=\"" + href.Replace("\"", "\\\"") + "\"]";
+            } else if (!string.IsNullOrEmpty(cls)) {
+                string[] parts = cls.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) {
+                    selector += "." + string.Join(".", parts);
+                }
+            }
             list.Add(new HtmlInteractableInfo {
                 Index = index++,
                 Text = text,
