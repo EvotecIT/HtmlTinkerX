@@ -16,6 +16,10 @@ public sealed class CmdletCloseHtmlSession : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         await HtmlBrowserRenderer.CloseSessionAsync(Session).ConfigureAwait(false);
+        object? defaultSession = GetVariableValue("PSParseHTML_DefaultSession");
+        if (defaultSession is BrowserSession sess && ReferenceEquals(sess, Session)) {
+            SessionState.PSVariable.Remove("PSParseHTML_DefaultSession");
+        }
     }
 }
 
