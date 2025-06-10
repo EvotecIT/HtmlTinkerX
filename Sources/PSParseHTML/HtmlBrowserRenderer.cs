@@ -278,7 +278,7 @@ public static async Task CaptureScreenshotAsync(
         IPage page,
         string directory,
         string? filter = null) {
-        
+
         Directory.CreateDirectory(directory);
         List<string> downloads = new();
         page.Download += async (_, dl) => {
@@ -388,7 +388,7 @@ public static async Task CaptureScreenshotAsync(
     /// <summary>
     /// Navigates the specified session to a new URL and waits for the network to be idle.
     /// </summary>
-    public static async Task NavigateAsync(BrowserSession session, string url, int timeout = 30000) {
+    public static async Task NavigateAsync(BrowserSession session, string url, int timeout = 10000) {
         await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
         await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
     }
@@ -396,7 +396,7 @@ public static async Task CaptureScreenshotAsync(
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
+    public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000) {
         if (waitForNavigation) {
             await session.Page.RunAndWaitForNavigationAsync(
                 () => session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }),
@@ -415,7 +415,7 @@ public static async Task CaptureScreenshotAsync(
         bool exact = false,
         string? regex = null,
         bool waitForNavigation = false,
-        int timeout = 30000) {
+        int timeout = 10000) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact
