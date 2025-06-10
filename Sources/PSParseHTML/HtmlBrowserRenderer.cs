@@ -278,7 +278,7 @@ public static async Task CaptureScreenshotAsync(
         IPage page,
         string directory,
         string? filter = null) {
-        
+
         Directory.CreateDirectory(directory);
         List<string> downloads = new();
         page.Download += async (_, dl) => {
