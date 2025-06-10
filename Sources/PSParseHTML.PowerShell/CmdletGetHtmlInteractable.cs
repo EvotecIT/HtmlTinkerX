@@ -14,12 +14,19 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [Parameter(Position = 0, ValueFromPipeline = true)]
     public BrowserSession? Session { get; set; }
 
+    /// <summary>Optional case-insensitive filter applied to the element text.</summary>
+    [Parameter]
+    public string? Filter { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         BrowserSession session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
         List<HtmlInteractableInfo> list = await HtmlBrowserRenderer.GetInteractablesAsync(session.Page).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(Filter)) {
+            list = list.FindAll(x => x.Text.IndexOf(Filter, System.StringComparison.OrdinalIgnoreCase) >= 0);
+        }
         WriteObject(list, true);
     }
 }
