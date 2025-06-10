@@ -359,7 +359,7 @@ public static async Task CaptureScreenshotAsync(
                 let sel = el.tagName.toLowerCase();
                 if (el.id) return sel + '#' + esc(el.id);
                 const href = el.getAttribute('href');
-                if (href) return sel + '[href=""' + esc(href) + '""]';
+                if (href) return `${sel}[href='${href.replace(/'/g, ""\\'"")}']`;
                 const cls = el.className;
                 if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
                 return sel;
