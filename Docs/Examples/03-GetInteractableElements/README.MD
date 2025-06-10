@@ -57,11 +57,11 @@ A list of objects with the following structure:
 ## 📋 Example Output
 
 ```plaintext
-Index  Text         Tag     Selector                            Href
------  ----         ---     --------                            ----
-0      Login        button  <button type="submit">              null
-1      Dashboard    a       <a href="/admin">Dashboard</a>      /admin
-2      Settings     a       <a href="/settings">Settings</a>    /settings
+Index Text Visible Selector                                        Href                                      Tag Id Class
+----- ---- ------- --------                                        ----                                      --- -- -----
+10    Media True    a[href='upload.php']                            upload.php                                a      wp-has-submenu
+12    AddMedia True a[href='media-new.php']                         media-new.php                             a
+51    Media False   a[href='https://evotec.xyz/wp-admin/media-new.php'] https://evotec.xyz/wp-admin/media-new.php a      ab-item
 ```
 
 ---
@@ -90,6 +90,12 @@ Get-HTMLInteractable -Path './report.html'
 
 ```powershell
 Get-HTMLInteractable -Session $Session -IncludeHidden -Limit 10
+```
+
+### 🧪 Filter elements and show table output
+
+```powershell
+Get-HTMLInteractable -Session $Session -Filter 'Media' -IncludeHidden | Format-Table
 ```
 
 ### 🧪 Use interactively with `Out-GridView`
