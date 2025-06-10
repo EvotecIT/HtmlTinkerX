@@ -14,8 +14,11 @@ Get-HTMLInteractable
     [-Session <BrowserSession>]
     [-Url <string>]
     [-Path <string>]
+    [-Browser <BrowserEngine>]
+    [-Clean]
     [-IncludeHidden]
     [-Limit <int>]
+    [-Filter <string>]
 ```
 
 ---
@@ -27,8 +30,11 @@ Get-HTMLInteractable
 | `-Session`       | BrowserSession | Yes* | The session object returned by `Start-HTMLSession`. |
 | `-Url`           | string   | Yes* | Load a page at the specified URL and list elements. |
 | `-Path`          | string   | Yes* | Load a local HTML file. Alias: `-File`. |
+| `-Browser`       | BrowserEngine | No | Choose browser engine when using `-Url` or `-Path`. |
+| `-Clean`         | switch   | No | Reinstall browser runtimes for `-Url` or `-Path`. |
 | `-IncludeHidden` | switch   | No       | If specified, includes elements not visible to the user (e.g. `display:none`).     |
 | `-Limit`         | int      | No       | Limits the number of results returned. Default is 100.                      |
+| `-Filter`        | string   | No       | Case-insensitive text filter applied to element text. |
 
 `*` Exactly one of `-Session`, `-Url` or `-Path` must be specified.
 
