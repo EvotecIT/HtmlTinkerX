@@ -14,7 +14,7 @@ foreach ($Url in $Urls) {
         $Tables[$Count] | Format-Table -AutoSize *
     }
 
-    $List = ConvertFrom-HtmlList -Content $HTML -IncludeMetadata -AsObject
+    $List = ConvertFrom-HtmlList -Content $HTML -IncludeMetadata
     for ($Count = 0; $Count -lt $List.Count; $Count++) {
         $List[$Count].Data | Format-Table -AutoSize *
     }
