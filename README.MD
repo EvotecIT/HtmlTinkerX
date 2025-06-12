@@ -39,6 +39,8 @@
 
 ## Browsing
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
+  - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
+  - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
 - `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
