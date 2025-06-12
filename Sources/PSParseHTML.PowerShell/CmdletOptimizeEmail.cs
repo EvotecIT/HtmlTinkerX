@@ -26,6 +26,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
     /// Path to a HTML file to process.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "File")]
+    [Alias("File")]
     public string Path { get; set; } = string.Empty;
 
     /// <summary>Base URI for resolving relative URLs.</summary>

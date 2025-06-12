@@ -21,6 +21,7 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
 
     /// <summary>Path to a CSS file.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetPath)]
+    [Alias("File")]
     public string Path { get; set; } = string.Empty;
 
     /// <summary>Optional output file for the optimized CSS.</summary>
@@ -29,11 +30,9 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string cssContent = ParameterSetName == ParameterSetPath
-            ? File.ReadAllText(Path)
-            : Css;
-
-        string result = HtmlOptimizer.OptimizeCss(cssContent);
+        string result = ParameterSetName == ParameterSetPath
+            ? HtmlOptimizer.OptimizeCssFile(Path)
+            : HtmlOptimizer.OptimizeCss(Css);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             File.WriteAllText(OutputFile, result);

@@ -37,6 +37,8 @@
 
 - `Optimize-JavaScript` – minify JavaScript
 
+All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
+
 ### Cmdlet quick start
 
 ```powershell

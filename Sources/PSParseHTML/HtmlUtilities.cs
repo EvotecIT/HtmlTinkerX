@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 
 namespace PSParseHTML;
@@ -22,5 +23,16 @@ public static class HtmlUtilities {
             LoggingMessages.Logger.WriteWarning($"Convert-HTMLToText -Errors: {errors}");
         }
         return result.Code ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Converts HTML markup from a file to plain text using NUglify.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <returns>Plain text extracted from the provided HTML file.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string ConvertFileToText(string filePath) {
+        string html = FileUtilities.ReadFileChecked(filePath);
+        return ConvertToText(html);
     }
 }

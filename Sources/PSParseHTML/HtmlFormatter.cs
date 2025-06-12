@@ -40,6 +40,17 @@ public static class HtmlFormatter {
     }
 
     /// <summary>
+    /// Formats JavaScript code from a file using default JsBeautifier options.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatJavaScriptFile(string filePath) {
+        string js = FileUtilities.ReadFileChecked(filePath);
+        return FormatJavaScript(js);
+    }
+
+    /// <summary>
     /// Formats CSS using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
     /// </summary>
     /// <param name="css">CSS content to format.</param>
@@ -55,6 +66,17 @@ public static class HtmlFormatter {
         var formatter = new CssStyleFormatter();
         sheet.ToCss(writer, formatter);
         return writer.ToString();
+    }
+
+    /// <summary>
+    /// Formats a CSS file using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the CSS file.</param>
+    /// <returns>Formatted CSS string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatCssFile(string filePath) {
+        string css = FileUtilities.ReadFileChecked(filePath);
+        return FormatCss(css);
     }
 
     /// <summary>
@@ -127,5 +149,36 @@ public static class HtmlFormatter {
         }
 
         return result.Code ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="indent">Indentation string to use.</param>
+    /// <param name="blockStartLine">How blocks should start.</param>
+    /// <param name="removeComments">Whether to remove HTML comments.</param>
+    /// <param name="removeOptionalTags">Whether to remove optional tags.</param>
+    /// <param name="outputTextNodesOnNewLine">Whether to output text nodes on a new line.</param>
+    /// <param name="removeEmptyAttributes">Whether to remove empty attributes.</param>
+    /// <param name="alphabeticallyOrderAttributes">Whether to order attributes alphabetically.</param>
+    /// <param name="removeEmptyBlocks">Whether to remove empty CSS blocks.</param>
+    /// <param name="isFragment">Treat input as HTML fragment.</param>
+    /// <returns>Formatted HTML string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatHtmlFile(
+        string filePath,
+        string indent = "    ",
+        BlockStart blockStartLine = BlockStart.SameLine,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool outputTextNodesOnNewLine = false,
+        bool removeEmptyAttributes = false,
+        bool alphabeticallyOrderAttributes = false,
+        bool removeEmptyBlocks = false,
+        bool isFragment = false) {
+
+        string html = FileUtilities.ReadFileChecked(filePath);
+        return FormatHtml(html, indent, blockStartLine, removeComments, removeOptionalTags, outputTextNodesOnNewLine, removeEmptyAttributes, alphabeticallyOrderAttributes, removeEmptyBlocks, isFragment);
     }
 }

@@ -23,6 +23,7 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     /// Path to a JavaScript file to format.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
+    [Alias("Path")]
     public string File { get; set; } = string.Empty;
 
     /// <summary>
@@ -33,8 +34,9 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string js = ParameterSetName == ParameterSetFile ? System.IO.File.ReadAllText(File) : Content;
-        string formatted = HtmlFormatter.FormatJavaScript(js);
+        string formatted = ParameterSetName == ParameterSetFile
+            ? HtmlFormatter.FormatJavaScriptFile(File)
+            : HtmlFormatter.FormatJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             System.IO.File.WriteAllText(OutputFile, formatted);

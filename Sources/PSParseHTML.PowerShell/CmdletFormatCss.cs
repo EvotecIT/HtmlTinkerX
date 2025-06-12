@@ -31,26 +31,14 @@ public sealed class CmdletFormatCss : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string css = GetCssContent();
-        string formatted = HtmlFormatter.FormatCss(css);
+        string formatted = ParameterSetName == ParameterSetFile
+            ? HtmlFormatter.FormatCssFile(File)
+            : HtmlFormatter.FormatCss(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             System.IO.File.WriteAllText(OutputFile, formatted);
         } else {
             WriteObject(formatted);
-        }
-    }
-
-    private string GetCssContent() {
-        switch (ParameterSetName) {
-            case ParameterSetFile:
-                if (!System.IO.File.Exists(File)) {
-                    ThrowTerminatingError(new ErrorRecord(new FileNotFoundException($"CSS file not found: {File}", File), "FileNotFound", ErrorCategory.InvalidArgument, File));
-                }
-                return System.IO.File.ReadAllText(File);
-            case ParameterSetContent:
-            default:
-                return Content;
         }
     }
 }
