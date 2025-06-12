@@ -23,10 +23,16 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
+    private const string ParameterSetFile = "File";
 
     /// <summary>HTML content to parse.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>Path to an HTML file.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>URL of HTML page to download.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -68,9 +74,21 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string html = ParameterSetName == ParameterSetUrl ? DownloadHtml() : Content;
-
-        IEnumerable<IElement> elements = HtmlParserExtensions.GetElements(html, Tag, Class, Id, Name);
+        IEnumerable<IElement> elements = ParameterSetName switch {
+            ParameterSetUrl => HtmlParserExtensions.GetElements(
+                DownloadHtml(),
+                Tag,
+                Class,
+                Id,
+                Name),
+            ParameterSetFile => HtmlParserExtensions.GetElementsFromFile(
+                Path,
+                Tag,
+                Class,
+                Id,
+                Name),
+            _ => HtmlParserExtensions.GetElements(Content, Tag, Class, Id, Name)
+        };
 
         if (ReturnObject.IsPresent) {
             foreach (var e in elements) {

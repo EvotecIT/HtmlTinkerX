@@ -30,8 +30,9 @@ public sealed class CmdletOptimizeJavaScript : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string js = ParameterSetName == ParameterSetFile ? File.ReadAllText(Path) : Content;
-        string optimized = HtmlOptimizer.OptimizeJavaScript(js);
+        string optimized = ParameterSetName == ParameterSetFile
+            ? HtmlOptimizer.OptimizeJavaScriptFile(Path)
+            : HtmlOptimizer.OptimizeJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             File.WriteAllText(OutputFile, optimized);

@@ -61,9 +61,19 @@ public sealed class CmdletFormatHtml : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string html = ParameterSetName == ParameterSetFile ? System.IO.File.ReadAllText(File) : Content;
-        string result = HtmlFormatter.FormatHtml(
-            html,
+        string result = ParameterSetName == ParameterSetFile
+            ? HtmlFormatter.FormatHtmlFile(
+                File,
+                Indent,
+                BlockStartLine,
+                RemoveHTMLComments.IsPresent,
+                RemoveOptionalTags.IsPresent,
+                OutputTextNodesOnNewLine.IsPresent,
+                RemoveEmptyAttributes.IsPresent,
+                AlphabeticallyOrderAttributes.IsPresent,
+                RemoveEmptyBlocks.IsPresent)
+            : HtmlFormatter.FormatHtml(
+                Content,
             Indent,
             BlockStartLine,
             RemoveHTMLComments.IsPresent,

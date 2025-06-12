@@ -21,6 +21,7 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
 
     /// <summary>Path to a HTML file.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
+    [Alias("Path")]
     public string File { get; set; } = string.Empty;
 
     /// <summary>Optional path to write the optimized HTML.</summary>
@@ -33,8 +34,9 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string html = ParameterSetName == ParameterSetFile ? System.IO.File.ReadAllText(File) : Content;
-        string result = HtmlOptimizer.OptimizeHtml(html, CSSDecodeEscapes.IsPresent);
+        string result = ParameterSetName == ParameterSetFile
+            ? HtmlOptimizer.OptimizeHtmlFile(File, CSSDecodeEscapes.IsPresent)
+            : HtmlOptimizer.OptimizeHtml(Content, CSSDecodeEscapes.IsPresent);
         if (!string.IsNullOrEmpty(OutputFile)) {
             System.IO.File.WriteAllText(OutputFile, result);
         } else {

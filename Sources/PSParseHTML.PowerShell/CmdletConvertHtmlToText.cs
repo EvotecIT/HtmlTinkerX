@@ -36,6 +36,7 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     /// Path to a HTML file.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
+    [Alias("Path")]
     public string File { get; set; } = string.Empty;
 
     /// <summary>
@@ -66,8 +67,14 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string html = GetHtmlContent();
-        string text = HtmlUtilities.ConvertToText(html);
+        string text = ParameterSetName switch {
+            ParameterSetFile => HtmlUtilities.ConvertFileToText(File),
+            ParameterSetUrl => HtmlUtilities.ConvertToText(
+                HttpContentHelper.GetStringWithProperEncodingAsync(
+                    HttpClientHelper.Create(Proxy, ProxyCredential),
+                    Url.ToString()).GetAwaiter().GetResult()),
+            _ => HtmlUtilities.ConvertToText(Content)
+        };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             System.IO.File.WriteAllText(OutputFile, text);
@@ -75,21 +82,4 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
             WriteObject(text);
         }
     }
-
-    private string GetHtmlContent() {
-        switch (ParameterSetName) {
-            case ParameterSetFile:
-                if (!System.IO.File.Exists(File)) {
-                    ThrowTerminatingError(new ErrorRecord(new FileNotFoundException($"HTML file not found: {File}", File), "FileNotFound", ErrorCategory.InvalidArgument, File));
-                }
-                return System.IO.File.ReadAllText(File);
-            case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
-                    return HttpContentHelper.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
-                }
-            case ParameterSetContent:
-            default:
-                return Content;
-        }
-        }
 }

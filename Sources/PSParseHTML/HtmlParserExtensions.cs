@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using AngleSharp.Dom;
 
 namespace PSParseHTML;
@@ -40,5 +41,20 @@ public static class HtmlParserExtensions {
         }
 
         return Array.Empty<IElement>();
+    }
+
+    /// <summary>
+    /// Parses the provided HTML file and returns elements matching the specified attributes.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="tag">Tag name to search for.</param>
+    /// <param name="className">Class name to search for.</param>
+    /// <param name="id">ID attribute to search for.</param>
+    /// <param name="name">Name attribute to search for.</param>
+    /// <returns>Enumeration of matching elements.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static IEnumerable<IElement> GetElementsFromFile(string filePath, string? tag = null, string? className = null, string? id = null, string? name = null) {
+        string html = FileUtilities.ReadFileChecked(filePath);
+        return GetElements(html, tag, className, id, name);
     }
 }

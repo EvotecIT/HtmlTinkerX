@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using NUglify;
 using NUglify.Html;
 using System.Linq;
@@ -29,6 +30,17 @@ public static class HtmlOptimizer {
     }
 
     /// <summary>
+    /// Minifies CSS from a file.
+    /// </summary>
+    /// <param name="filePath">Path to the CSS file.</param>
+    /// <returns>Minified CSS string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string OptimizeCssFile(string filePath) {
+        string css = FileUtilities.ReadFileChecked(filePath);
+        return OptimizeCss(css);
+    }
+
+    /// <summary>
     /// Minifies the provided HTML content.
     /// </summary>
     /// <param name="html">HTML string to optimize.</param>
@@ -56,6 +68,18 @@ public static class HtmlOptimizer {
     }
 
     /// <summary>
+    /// Minifies HTML content from a file.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="cssDecodeEscapes">Whether to decode CSS escape sequences.</param>
+    /// <returns>Optimized HTML output.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string OptimizeHtmlFile(string filePath, bool cssDecodeEscapes) {
+        string html = FileUtilities.ReadFileChecked(filePath);
+        return OptimizeHtml(html, cssDecodeEscapes);
+    }
+
+    /// <summary>
     /// Minifies JavaScript code using NUglify.
     /// </summary>
     /// <param name="js">JavaScript code to optimize.</param>
@@ -73,5 +97,16 @@ public static class HtmlOptimizer {
         }
 
         return result.Code ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Minifies JavaScript code from a file using NUglify.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <returns>Minified JavaScript.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string OptimizeJavaScriptFile(string filePath) {
+        string js = FileUtilities.ReadFileChecked(filePath);
+        return OptimizeJavaScript(js);
     }
 }
