@@ -4,7 +4,7 @@
     CmdletsToExport        = @('Close-HTMLSession', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLContent', 'Get-HTMLInteractable', 'Invoke-HTMLNavigation', 'Invoke-HTMLRendering', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Save-HTMLAttachment', 'Save-HTMLScreenshot')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
-    Copyright              = '(c) Przemyslaw Klys. All rights reserved.'
+    Copyright              = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description            = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
     DotNetFrameworkVersion = '4.7.2'
     FunctionsToExport      = @()
@@ -15,6 +15,7 @@
         PSData = @{
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
+            Prerelease                 = 'Preview1'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
