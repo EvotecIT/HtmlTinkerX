@@ -42,6 +42,7 @@
   - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
 - `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Save-HTMLPdf` - generate a PDF of a rendered page
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
@@ -95,7 +96,8 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -UsernameSelector 'input[name=log]' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
-Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\page.png -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
 # Keep a logged in browser session and reuse it
