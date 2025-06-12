@@ -19,6 +19,8 @@ Get-HTMLInteractable -Filter "Media" -IncludeHidden | Format-Table
 
 Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\WP1.png" -Open
 
+Save-HTMLPdf -OutFile "$PSScriptRoot\Output\WP1.pdf" -Open
+
 Get-HTMLInteractable -Filter "Galleries" -IncludeHidden | Format-Table
 
 Invoke-HTMLNavigation -Text "Galleries" -Exact
