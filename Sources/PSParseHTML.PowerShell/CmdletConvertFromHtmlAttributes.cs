@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using System.Management.Automation;
 using System.Net.Http;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -82,7 +83,7 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
                 Id,
                 Name),
             ParameterSetFile => HtmlParserExtensions.GetElementsFromFile(
-                Path,
+                FileUtilities.ResolvePath(Path),
                 Tag,
                 Class,
                 Id,

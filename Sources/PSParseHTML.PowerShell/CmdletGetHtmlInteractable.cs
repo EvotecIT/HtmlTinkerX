@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using PSParseHTML;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -111,7 +112,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri;
+                string fileUrl = new Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri;
                 await using (BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
                     fileUrl,
                     Browser,

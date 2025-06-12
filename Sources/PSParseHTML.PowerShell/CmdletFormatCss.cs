@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -18,8 +19,8 @@ public sealed class CmdletFormatCss : PSCmdlet {
 
     /// <summary>Path to a CSS file to format.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string File { get; set; } = string.Empty;
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>CSS content to format.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
@@ -32,11 +33,12 @@ public sealed class CmdletFormatCss : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatCssFile(File)
+            ? HtmlFormatter.FormatCssFile(FileUtilities.ResolvePath(Path))
             : HtmlFormatter.FormatCss(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            System.IO.File.WriteAllText(OutputFile, formatted);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);
         }

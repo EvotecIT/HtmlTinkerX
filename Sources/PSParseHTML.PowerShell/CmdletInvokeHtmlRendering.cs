@@ -92,7 +92,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri
+            ? new System.Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri
             : Url;
 
         if (Session.IsPresent) {
@@ -108,7 +108,8 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
-            await HtmlBrowserRenderer.SavePageContentAsync(target, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
+            string outPath = FileUtilities.ResolvePath(OutFile);
+            await HtmlBrowserRenderer.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
         } else {
             string html = await HtmlBrowserRenderer.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
             WriteObject(html);

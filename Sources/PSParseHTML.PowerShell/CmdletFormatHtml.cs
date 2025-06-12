@@ -1,4 +1,5 @@
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -16,8 +17,8 @@ public sealed class CmdletFormatHtml : PSCmdlet {
 
     /// <summary>Path to an HTML file.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string File { get; set; } = string.Empty;
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>HTML content to format.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
@@ -63,7 +64,7 @@ public sealed class CmdletFormatHtml : PSCmdlet {
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetFile
             ? HtmlFormatter.FormatHtmlFile(
-                File,
+                FileUtilities.ResolvePath(Path),
                 Indent,
                 BlockStartLine,
                 RemoveHTMLComments.IsPresent,
@@ -84,7 +85,8 @@ public sealed class CmdletFormatHtml : PSCmdlet {
             RemoveEmptyBlocks.IsPresent);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            System.IO.File.WriteAllText(OutputFile, result);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);
         }

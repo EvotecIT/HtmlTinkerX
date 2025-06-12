@@ -1,4 +1,5 @@
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -23,8 +24,8 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     /// Path to a JavaScript file to format.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string File { get; set; } = string.Empty;
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>
     /// Optional path to write the formatted JavaScript.
@@ -35,11 +36,12 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatJavaScriptFile(File)
+            ? HtmlFormatter.FormatJavaScriptFile(FileUtilities.ResolvePath(Path))
             : HtmlFormatter.FormatJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            System.IO.File.WriteAllText(OutputFile, formatted);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);
         }
