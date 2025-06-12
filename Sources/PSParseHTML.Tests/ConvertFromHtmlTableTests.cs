@@ -125,7 +125,7 @@ public class ConvertFromHtmlTableTests {
                 Assert.DoesNotContain("�", cell4);
 
                 // Verify the correct Polish characters if they match our expected values
-                if (cell1.Contains("Komórka")) {
+                if (!string.IsNullOrEmpty(cell1) && cell1.Contains("Komórka")) {
                     Assert.Equal("Komórka a1", cell1);
                     Assert.Equal("Komórka a2", cell2);
                     Assert.Equal("Komórka a3", cell3);

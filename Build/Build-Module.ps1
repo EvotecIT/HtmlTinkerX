@@ -16,7 +16,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         # Company or vendor of this module
         CompanyName          = 'Evotec'
         # Copyright statement for this module
-        Copyright            = '(c) Przemyslaw Klys. All rights reserved.'
+        Copyright            = "(c) 2011 - $((Get-Date).Year) Przemyslaw Klys @ Evotec. All rights reserved."
         # Description of the functionality provided by this module
         Description          = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
         # Tags applied to this module. These help with module discovery in online galleries.
@@ -26,7 +26,7 @@ Build-Module -ModuleName 'PSParseHTML' {
 
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
 
-        #DotNetFrameworkVersion = '4.7.2'
+        PreReleaseTag        = 'Preview1'
     }
     New-ConfigurationManifest @Manifest
     # Add external module dependencies, using loop for simplicity
@@ -104,6 +104,8 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
+        RefreshPSD1Only                   = $false
+        NETBinaryModuleDocumenation       = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat

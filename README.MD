@@ -1,5 +1,5 @@
 ﻿<p align="center">
-  <a href="https://dev.azure.com/evotecpl/PSParseHTML/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/PSParseHTML/_apis/build/status/EvotecIT.PSParseHTML"></a>
+  <a href="https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml"><img src="https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml/badge.svg"></a>
   <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/v/PSParseHTML.svg"></a>
   <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/vpre/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
   <a href="https://github.com/EvotecIT/PSParseHTML"><img src="https://img.shields.io/github/license/EvotecIT/PSParseHTML.svg"></a>
@@ -22,20 +22,28 @@
 
 **PSParseHTML** started as a suite of data processing Cmdlets to help [PSWriteHTML](https://github.com/EvotecIT/PSWriteHTML), but it has gained functionality enough to be its own module. Basic usage instructions are described [on this blog post](https://evotec.xyz/formatting-and-minifying-resources-html-css-javascript-with-powershell/).
 
-**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with eleven cmdlets:
+**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
 
-- `Convert-HTMLToText` – convert markup to plain text
-- `ConvertFrom-HtmlTable` – turn table elements into objects
-- `ConvertFrom-HTMLAttributes` – extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
-- `ConvertFrom-HTML` – parse full documents or fragments
-- `Format-CSS` – pretty‑print style sheets
-- `Format-HTML` – tidy up HTML markup
-- `Format-JavaScript` – beautify JavaScript (`Format-JS` alias)
-- `Optimize-CSS` – minify style sheets
-- `Optimize-Email` – inline CSS for email bodies
-- `Optimize-HTML` – minify HTML
+## Processing of HTML/CSS/JS
+- `Convert-HTMLToText` - convert markup to plain text
+- `ConvertFrom-HtmlTable` - turn table elements into objects
+- `ConvertFrom-HTMLAttributes` - extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
+- `ConvertFrom-HTML` - parse full documents or fragments
+- `Format-CSS` - pretty‑print style sheets
+- `Format-HTML` - tidy up HTML markup
+- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
+- `Optimize-CSS` - minify style sheets
+- `Optimize-Email` - inline CSS for email bodies
+- `Optimize-HTML` - minify HTML
+- `Optimize-JavaScript` - minify JavaScript
 
-- `Optimize-JavaScript` – minify JavaScript
+## Browsing
+- `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
+- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
+- `Invoke-HTMLNavigation` - navigate an existing session to another URL
+- `Get-HTMLInteractable` - list clickable elements from a session, URL or file
+- `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
 
@@ -71,11 +79,51 @@ Optimize-HTML -Path '.\page.html'
 
 # Minify JavaScript and save to a new file
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
+
+# Render a page after executing JavaScript
+Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
+
+# Render a protected page using credentials
+$cred = Get-Credential
+Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
+# Login using a form and render the target page
+Invoke-HTMLRendering -Url 'https://example.com/protected' `
+    -Credential $cred `
+    -LoginUrl 'https://example.com/wp-login.php' `
+    -UsernameSelector 'input[name=log]' `
+    -PasswordSelector 'input[name=pwd]' `
+    -SubmitSelector '#wp-submit'
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile '.\page.png' -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
+Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
+# Keep a logged in browser session and reuse it
+$session = Start-HTMLSession -Url 'https://example.com/protected' `
+    -Credential $cred `
+    -LoginUrl 'https://example.com/login' `
+    -UsernameSelector 'input[name=user]' `
+    -PasswordSelector 'input[name=pass]' `
+    -SubmitSelector 'button[type=submit]'
+Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#content'
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
+    Save-HTMLScreenshot -OutFile '.\downloads.png'
+Save-HTMLAttachment -Session $session -Path '.\Downloads'
+Close-HTMLSession -Session $session
 ```
+
+The first run triggers Playwright to download the selected browser. You'll see output similar to:
+
+```
+Downloading Chromium 136.0.7103.25 (playwright build v1169) from https://...
+144.4 MiB [====================] 100% 0.0s
+Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppData\Local\ms-playwright\chromium-1169
+```
+
+Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
+Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` or `-Selector` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
-It may not seem like much, but those eleven cmdlets are powerful enough to enable robust HTML processing in shell.
+It may not seem like much, but those thirteen cmdlets are powerful enough to enable robust HTML processing in shell.
 
 ## Examples
 
@@ -138,12 +186,12 @@ Refer to each project's repository for complete license information.
 
 If you are writing your own .NET applications you can reference the compiled libraries directly. All classes live in the `PSParseHTML` namespace and expose methods equivalent to the cmdlets:
 
-- `HtmlParser` – `ParseWithAngleSharp`, `ParseWithHtmlAgilityPack` and table extraction helpers such as `ParseTablesWithAngleSharpDetailed`
-- `HtmlParserExtensions` – `GetElements` for quick element queries
-- `HtmlFormatter` – `FormatHtml`, `FormatCss`, `FormatJavaScript`
-- `HtmlOptimizer` – `OptimizeHtml`, `OptimizeCss`, `OptimizeJavaScript`
-- `HtmlUtilities` – `ConvertToText` to strip markup
-- `PreMailerClient` – methods like `MoveCssInline` and `MoveCssInlineFromFile`
+- `HtmlParser` - `ParseWithAngleSharp`, `ParseWithHtmlAgilityPack` and table extraction helpers such as `ParseTablesWithAngleSharpDetailed`
+- `HtmlParserExtensions` - `GetElements` for quick element queries
+- `HtmlFormatter` - `FormatHtml`, `FormatCss`, `FormatJavaScript`
+- `HtmlOptimizer` - `OptimizeHtml`, `OptimizeCss`, `OptimizeJavaScript`
+- `HtmlUtilities` - `ConvertToText` to strip markup
+- `PreMailerClient` - methods like `MoveCssInline` and `MoveCssInlineFromFile`
 
 These methods can be consumed from C# or directly from PowerShell. For example:
 

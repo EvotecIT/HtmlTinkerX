@@ -7,11 +7,18 @@ using System.Net.Http;
 
 namespace PSParseHTML.PowerShell;
 
-/// <summary>
-/// Cmdlet that converts HTML tables into PowerShell objects.
-/// </summary>
+/// <summary>Converts HTML tables into PowerShell objects.</summary>
+/// <para>
+/// The cmdlet accepts raw HTML or downloads a page using <c>-Url</c>. When
+/// downloading you can specify <c>-Proxy</c> and <c>-ProxyCredential</c>.
+/// </para>
 /// <example>
-/// <code>ConvertFrom-HtmlTable -Url https://example.com</code>
+///   <summary>Parse the first table from a URL</summary>
+///   <code>ConvertFrom-HtmlTable -Url https://example.com</code>
+/// </example>
+/// <example>
+///   <summary>Download through a proxy server</summary>
+///   <code>ConvertFrom-HtmlTable -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]))]
@@ -64,9 +71,16 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     [Parameter]
     public SwitchParameter SkipFooter { get; set; }
 
+    /// <summary>
+    /// Proxy server address used when <see cref="Url"/> is specified.
+    /// Include protocol and port if required.
+    /// </summary>
     [Parameter]
     public string? Proxy { get; set; }
 
+    /// <summary>
+    /// Credentials used for authenticating with the specified <see cref="Proxy"/> server.
+    /// </summary>
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 

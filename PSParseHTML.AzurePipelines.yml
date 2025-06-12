@@ -1,26 +1,26 @@
 # Azure DevOps Pipeline for PSParseHTML (DISABLED - Using GitHub Actions)
-# trigger: none  # Disabled - using GitHub Actions instead
+trigger: none  # Disabled - using GitHub Actions instead
 
-# pr: none  # Disabled - using GitHub Actions instead
-trigger:
-  branches:
-    include:
-    - master
-    - v2-speedygonzales
-  paths:
-    exclude:
-    - README.md
-    - CHANGELOG.md
-    - Docs/*
+pr: none  # Disabled - using GitHub Actions instead
+# trigger:
+#   branches:
+#     include:
+#     - master
+#     - v2-speedygonzales
+#   paths:
+#     exclude:
+#     - README.md
+#     - CHANGELOG.md
+#     - Docs/*
 
-pr:
-  branches:
-    include:
-    - master
-    - v2-speedygonzales
+# pr:
+#   branches:
+#     include:
+#     - master
+#     - v2-speedygonzales
 
 variables:
-  buildConfiguration: 'Release'
+  buildConfiguration: 'Debug'
   dotNetVersion: '8.x'
 
 stages:

@@ -98,6 +98,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
@@ -113,14 +114,16 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
-        return await HtmlTableParser.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client);
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
+        return await HtmlTableParser.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client, clientFactory);
     }
 
     /// <summary>
@@ -178,8 +181,89 @@ public static class HtmlParser {
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
-        return await HtmlTableParser.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client);
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
+        return await HtmlTableParser.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client, clientFactory);
+    }
+
+    /// <summary>
+    /// Extracts list items from HTML markup using AngleSharp.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static List<List<string>> ParseListsWithAngleSharp(string html, string tagPlaceholder = " ") {
+        return HtmlListParser.ParseListsWithAngleSharp(html, tagPlaceholder);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using AngleSharp.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithAngleSharpAsync(url, tagPlaceholder, client);
+    }
+
+    /// <summary>
+    /// Extracts list items from HTML markup using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static List<List<string>> ParseListsWithHtmlAgilityPack(string html, string tagPlaceholder = " ") {
+        return HtmlListParser.ParseListsWithHtmlAgilityPack(html, tagPlaceholder);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List of lists with item texts.</returns>
+    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithHtmlAgilityPackAsync(url, tagPlaceholder, client);
+    }
+
+    /// <summary>
+    /// Extracts list items from HTML markup using AngleSharp with metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List parse results with metadata.</returns>
+    public static List<ListParseResult> ParseListsWithAngleSharpDetailed(string html, string tagPlaceholder = " ") {
+        return HtmlListParser.ParseListsWithAngleSharpDetailed(html, tagPlaceholder);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using AngleSharp with metadata.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List parse results with metadata.</returns>
+    public static async Task<List<ListParseResult>> ParseUrlListsWithAngleSharpDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client);
+    }
+
+    /// <summary>
+    /// Extracts list items from HTML markup using HtmlAgilityPack with metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing lists.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List parse results with metadata.</returns>
+    public static List<ListParseResult> ParseListsWithHtmlAgilityPackDetailed(string html, string tagPlaceholder = " ") {
+        return HtmlListParser.ParseListsWithHtmlAgilityPackDetailed(html, tagPlaceholder);
+    }
+
+    /// <summary>
+    /// Extracts list items from a web page using HtmlAgilityPack with metadata.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <returns>List parse results with metadata.</returns>
+    public static async Task<List<ListParseResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+        return await HtmlListParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client);
     }
 
 

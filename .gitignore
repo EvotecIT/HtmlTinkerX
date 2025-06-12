@@ -1,0 +1,15 @@
+﻿Artefacts/*
+Ignore/*
+.vs/*
+.vscode/*
+Releases/*
+Artefacts/*
+Sources/.vs
+Sources/*/.vs
+Sources/*/obj
+Sources/*/bin
+Sources/*/*/obj
+Sources/*/*/bin
+Sources/packages/*
+Examples/Output/*
+Lib/*

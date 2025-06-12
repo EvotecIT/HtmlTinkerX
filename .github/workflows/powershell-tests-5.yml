@@ -1,0 +1,53 @@
+# PowerShell Testing Workflow (Disabled)
+name: Test PowerShell (PowerShell 5.1)
+
+# This workflow is disabled but ready for use
+# To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
+on:
+  workflow_dispatch:  # Manual trigger only
+# on:
+#   push:
+#     branches:
+#       - v1-legacy
+#       - v2-speedygonzales
+#     paths-ignore:
+#       - 'README.md'
+#       - 'CHANGELOG.md'
+#       - 'Docs/**'
+#   pull_request:
+#     branches:
+#       - v1-legacy
+#       - v2-speedygonzales
+
+env:
+  DOTNET_VERSION: '8.x'
+  BUILD_CONFIGURATION: 'Debug'
+
+jobs:
+  test-windows-ps5:
+    name: 'Windows PowerShell 5.1'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell modules
+        shell: powershell
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build .NET solution
+        run: |
+          dotnet restore Sources/PSParseHTML.sln
+          dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Run PowerShell tests
+        shell: powershell
+        run: .\PSParseHTML.Tests.ps1

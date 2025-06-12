@@ -27,17 +27,17 @@ public static class HtmlParserExtensions {
         var document = HtmlParser.ParseWithAngleSharp(html);
 
         if (!string.IsNullOrEmpty(tag)) {
-            return document.GetElementsByTagName(tag);
+            return document.GetElementsByTagName(tag!);
         }
         if (!string.IsNullOrEmpty(className)) {
-            return document.GetElementsByClassName(className);
+            return document.GetElementsByClassName(className!);
         }
         if (!string.IsNullOrEmpty(id)) {
-            var element = document.GetElementById(id);
+            var element = document.GetElementById(id!);
             return element != null ? new[] { element } : Array.Empty<IElement>();
         }
         if (!string.IsNullOrEmpty(name)) {
-            return document.GetElementsByName(name);
+            return document.GetElementsByName(name!);
         }
 
         return Array.Empty<IElement>();

@@ -10,32 +10,32 @@ public class InternalLogger {
     /// <summary>
     /// Define Verbose message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnVerboseMessage;
+    public event EventHandler<LogEventArgs>? OnVerboseMessage;
 
     /// <summary>
     /// Define Warning message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnWarningMessage;
+    public event EventHandler<LogEventArgs>? OnWarningMessage;
 
     /// <summary>
     /// Define Error message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnErrorMessage;
+    public event EventHandler<LogEventArgs>? OnErrorMessage;
 
     /// <summary>
     /// Define Debug message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnDebugMessage;
+    public event EventHandler<LogEventArgs>? OnDebugMessage;
 
     /// <summary>
     /// Define Progress message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnProgressMessage;
+    public event EventHandler<LogEventArgs>? OnProgressMessage;
 
     /// <summary>
     /// Define Information message event
     /// </summary>
-    public event EventHandler<LogEventArgs> OnInformationMessage;
+    public event EventHandler<LogEventArgs>? OnInformationMessage;
 
     /// <summary>
     /// If true, will write verbose messages to console
@@ -77,7 +77,7 @@ public class InternalLogger {
 
     public void WriteProgress(string activity, string currentOperation, int percentCompleted, int? currentSteps = null, int? totalSteps = null) {
         lock (_lock) {
-            OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, totalSteps));
+            OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, percentCompleted));
             if (IsProgress) {
                 if (currentSteps.HasValue && totalSteps.HasValue) {
                     Console.WriteLine("[progress] activity: {0} / operation: {1} / percent completed: {2}% ({3} out of {4})", activity, currentOperation, percentCompleted, currentSteps, totalSteps);
@@ -180,24 +180,24 @@ public class LogEventArgs : EventArgs {
     /// <summary>
     /// Progress current operation
     /// </summary>
-    public string ProgressCurrentOperation { get; set; }
+    public string? ProgressCurrentOperation { get; set; }
 
     /// <summary>
     /// Progress activity
     /// </summary>
-    public string ProgressActivity { get; set; }
+    public string? ProgressActivity { get; set; }
 
     /// <summary>
     /// Message to be written including arguments substitution
     /// </summary>
-    public string FullMessage { get; set; }
+    public string? FullMessage { get; set; }
 
     /// <summary>
     /// Message to be written
     /// </summary>
-    public string Message { get; set; }
+    public string? Message { get; set; }
 
-    public object[] Args { get; set; }
+    public object[] Args { get; set; } = Array.Empty<object>();
 
     public LogEventArgs(string message, object[] args) {
         Message = message;

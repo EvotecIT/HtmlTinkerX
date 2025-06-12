@@ -12,6 +12,7 @@ namespace PSParseHTML;
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
 public static class HtmlTableParser {
+    private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
     /// </summary>
@@ -56,8 +57,9 @@ public static class HtmlTableParser {
 
             // Check visibility (simple check for display:none)
             var style = table.GetAttribute("style") ?? string.Empty;
-            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
-                                !style.ToLowerInvariant().Contains("display: none");
+            var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
+            var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
+            metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
             var rows = skipFooter ?
                 table.QuerySelectorAll("tr:not(tfoot tr)") :
@@ -114,7 +116,7 @@ public static class HtmlTableParser {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     if (i < cells.Length) {
-                        string value = cells[i].TextContent.Trim();
+                    string? value = cells![i].TextContent.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
@@ -149,6 +151,7 @@ public static class HtmlTableParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
@@ -205,7 +208,7 @@ public static class HtmlTableParser {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     if (i < cells.Length) {
-                        string value = cells[i].TextContent.Trim();
+                        string value = cells![i].TextContent.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
@@ -235,20 +238,38 @@ public static class HtmlTableParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        HttpClient http = client ?? new HttpClient();
-        string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
-        return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
+        bool disposeClient = false;
+        HttpClient http;
+        if (client != null) {
+            http = client;
+        } else if (clientFactory != null) {
+            http = clientFactory();
+            disposeClient = true;
+        } else {
+            http = _sharedClient;
+        }
+
+        try {
+            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
+        } finally {
+            if (disposeClient) {
+                http.Dispose();
+            }
+        }
     }
 
     /// <summary>
@@ -301,8 +322,9 @@ public static class HtmlTableParser {
 
             // Check visibility (simple check for display:none)
             var style = table.GetAttributeValue("style", string.Empty);
-            metadata.IsVisible = !style.ToLowerInvariant().Contains("display:none") &&
-                                !style.ToLowerInvariant().Contains("display: none");
+            var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
+            var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
+            metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
             var rows = skipFooter ?
                 table.SelectNodes(".//tr[not(ancestor::tfoot)]") :
@@ -314,14 +336,14 @@ public static class HtmlTableParser {
             }
 
             if (reverseTable) {
-                Dictionary<string, string> obj = new();
+                Dictionary<string, string?> obj = new();
                 int index = 0;
                 foreach (var row in rows) {
                     var cells = row.SelectNodes("th|td");
                     if (cells == null || cells.Count == 0) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cells[0].InnerText).Trim();
+                    string header = HtmlEntity.DeEntitize(cells![0].InnerText).Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
@@ -397,7 +419,7 @@ public static class HtmlTableParser {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     if (i < cells.Count) {
-                        string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
+                        string value = HtmlEntity.DeEntitize(cells![i].InnerText).Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
@@ -458,20 +480,20 @@ public static class HtmlTableParser {
             }
 
             if (reverseTable) {
-                Dictionary<string, string> obj = new();
+                Dictionary<string, string?> obj = new();
                 int index = 0;
                 foreach (var row in rows) {
                     var cells = row.SelectNodes("th|td");
                     if (cells == null || cells.Count == 0) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cells[0].InnerText).Trim();
+                    string header = HtmlEntity.DeEntitize(cells![0].InnerText).Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
-                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText).Trim() : string.Empty;
+                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells![1].InnerText).Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
                             value = value.Replace(kv.Key, kv.Value);
@@ -531,7 +553,7 @@ public static class HtmlTableParser {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     if (i < cells.Count) {
-                        string value = HtmlEntity.DeEntitize(cells[i].InnerText).Trim();
+                        string value = HtmlEntity.DeEntitize(cells![i].InnerText).Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
@@ -569,13 +591,30 @@ public static class HtmlTableParser {
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
-        HttpClient? client = null) {
+        HttpClient? client = null,
+        Func<HttpClient>? clientFactory = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
 
-        HttpClient http = client ?? new HttpClient();
-        string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
-        return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+        bool disposeClient = false;
+        HttpClient http;
+        if (client != null) {
+            http = client;
+        } else if (clientFactory != null) {
+            http = clientFactory();
+            disposeClient = true;
+        } else {
+            http = _sharedClient;
+        }
+
+        try {
+            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
+        } finally {
+            if (disposeClient) {
+                http.Dispose();
+            }
+        }
     }
 }
