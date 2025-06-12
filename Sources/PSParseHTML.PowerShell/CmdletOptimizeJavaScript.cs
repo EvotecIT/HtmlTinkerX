@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -31,11 +32,12 @@ public sealed class CmdletOptimizeJavaScript : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string optimized = ParameterSetName == ParameterSetFile
-            ? HtmlOptimizer.OptimizeJavaScriptFile(Path)
+            ? HtmlOptimizer.OptimizeJavaScriptFile(FileUtilities.ResolvePath(Path))
             : HtmlOptimizer.OptimizeJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            File.WriteAllText(OutputFile, optimized);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            File.WriteAllText(outPath, optimized);
         } else {
             WriteObject(optimized);
         }

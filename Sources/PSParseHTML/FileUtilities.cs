@@ -5,7 +5,7 @@ namespace PSParseHTML {
     /// <summary>
     /// Helper methods for working with file paths.
     /// </summary>
-    internal static class FileUtilities {
+    public static class FileUtilities {
         /// <summary>
         /// Resolves the provided path to an absolute file system path.
         /// Environment variables are expanded and relative paths are

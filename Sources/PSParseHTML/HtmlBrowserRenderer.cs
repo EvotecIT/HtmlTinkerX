@@ -150,8 +150,9 @@ public static class HtmlBrowserRenderer {
         string? username = null,
         string? password = null,
         FormLoginOptions? formLogin = null) {
+        string fullPath = FileUtilities.ResolvePath(path);
         string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin).ConfigureAwait(false);
-        File.WriteAllText(path, content);
+        File.WriteAllText(fullPath, content);
     }
 
     /// <summary>
@@ -191,9 +192,10 @@ public static async Task CaptureScreenshotAsync(
             password,
             formLogin).ConfigureAwait(false);
 
+        string fullPath = FileUtilities.ResolvePath(path);
         await CaptureScreenshotAsync(
             session.Page,
-            path,
+            fullPath,
             fullPage,
             delayMs,
             selector,
@@ -223,7 +225,8 @@ public static async Task CaptureScreenshotAsync(
             await page.WaitForTimeoutAsync(delayMs);
         }
 
-        var options = new PageScreenshotOptions { Path = path, FullPage = fullPage };
+        string fullPath = FileUtilities.ResolvePath(path);
+        var options = new PageScreenshotOptions { Path = fullPath, FullPage = fullPage };
         if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
             options.Clip = new Clip {
                 X = clipX.Value,
@@ -259,7 +262,8 @@ public static async Task CaptureScreenshotAsync(
             null,
             null).ConfigureAwait(false);
         var page = session.Page;
-        return await SavePageDownloadsAsync(page, directory, filter).ConfigureAwait(false);
+        string dir = FileUtilities.ResolvePath(directory);
+        return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -270,14 +274,15 @@ public static async Task CaptureScreenshotAsync(
         string directory,
         string? filter = null) {
 
-        Directory.CreateDirectory(directory);
+        string dir = FileUtilities.ResolvePath(directory);
+        Directory.CreateDirectory(dir);
         List<string> downloads = new();
         page.Download += async (_, dl) => {
             bool match = string.IsNullOrEmpty(filter) ||
                          dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
                          dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
             if (match) {
-                string filePath = Path.Combine(directory, dl.SuggestedFilename);
+                string filePath = Path.Combine(dir, dl.SuggestedFilename);
                 await dl.SaveAsAsync(filePath);
                 downloads.Add(filePath);
             }
@@ -294,7 +299,7 @@ public static async Task CaptureScreenshotAsync(
         var anchors = await page.QuerySelectorAllAsync(selector);
         foreach (var anchor in anchors) {
             var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
-            string filePath = Path.Combine(directory, download.SuggestedFilename);
+            string filePath = Path.Combine(dir, download.SuggestedFilename);
             await download.SaveAsAsync(filePath);
             if (!downloads.Contains(filePath)) {
                 downloads.Add(filePath);
