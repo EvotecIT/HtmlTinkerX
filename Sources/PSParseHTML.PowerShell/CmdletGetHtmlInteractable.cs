@@ -26,15 +26,15 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
 
     /// <summary>Path to a local HTML file.</summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string? File { get; set; }
+    [Alias("File")]
+    public string? Path { get; set; }
 
-    /// <summary>Browser engine to use when loading <see cref="Url"/> or <see cref="File"/>.</summary>
+    /// <summary>Browser engine to use when loading <see cref="Url"/> or <see cref="Path"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
-    /// <summary>Reinstall browser runtimes when using <see cref="Url"/> or <see cref="File"/>.</summary>
+    /// <summary>Reinstall browser runtimes when using <see cref="Url"/> or <see cref="Path"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
@@ -111,7 +111,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new Uri(Path.GetFullPath(File!)).AbsoluteUri;
+                string fileUrl = new Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri;
                 await using (BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
                     fileUrl,
                     Browser,

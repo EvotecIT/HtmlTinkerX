@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace PSParseHTML.PowerShell;
 
@@ -14,6 +15,8 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetClip = "Clip";
+    private const string ParameterSetFileDefault = "FileDefault";
+    private const string ParameterSetFileClip = "FileClip";
     private const string ParameterSetSessionDefault = "SessionDefault";
     private const string ParameterSetSessionClip = "SessionClip";
 
@@ -21,6 +24,12 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetDefault)]
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetClip)]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Path to a local HTML file.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetFileClip)]
+    [Alias("File")]
+    public string? Path { get; set; }
 
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ParameterSetName = ParameterSetSessionDefault, ValueFromPipeline = true)]
@@ -34,11 +43,15 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     public SwitchParameter Clean { get; set; }
 
     /// <summary>Open the screenshot after saving.</summary>
@@ -48,6 +61,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <summary>Capture the entire page.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetSessionDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
     public SwitchParameter Full { get; set; }
 
     /// <summary>Milliseconds to wait after the page loads.</summary>
@@ -62,21 +76,25 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFileClip)]
     public int X { get; set; }
 
     /// <summary>Y coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFileClip)]
     public int Y { get; set; }
 
     /// <summary>Width of the clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFileClip)]
     public int Width { get; set; }
 
     /// <summary>Height of the clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFileClip)]
     public int Height { get; set; }
 
     /// <inheritdoc />
@@ -87,6 +105,20 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             case ParameterSetClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
                     Url,
+                    OutFile,
+                    Browser,
+                    Clean.IsPresent,
+                    false,
+                    Delay,
+                    Selector,
+                    X,
+                    Y,
+                    Width,
+                    Height).ConfigureAwait(false);
+                break;
+            case ParameterSetFileClip:
+                await HtmlBrowserRenderer.CaptureScreenshotAsync(
+                    new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri,
                     OutFile,
                     Browser,
                     Clean.IsPresent,
@@ -119,8 +151,11 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Selector).ConfigureAwait(false);
                 break;
             default:
+                string target = ParameterSetName == ParameterSetFileDefault
+                    ? new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri
+                    : Url;
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                    Url,
+                    target,
                     OutFile,
                     Browser,
                     Clean.IsPresent,

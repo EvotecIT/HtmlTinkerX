@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.IO;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -15,21 +16,29 @@ namespace PSParseHTML.PowerShell;
 [OutputType(typeof(string), typeof(BrowserSession))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
+    private const string ParameterSetFile = "File";
 
     /// <summary>URL of the web page.</summary>
-    [Parameter(Mandatory = true, Position = 0)]
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetDefault)]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Path to a local HTML file.</summary>
+    [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetFile)]
+    [Alias("File")]
+    public string? Path { get; set; }
 
     /// <summary>Optional file path to save the rendered HTML.</summary>
     [Parameter]
     public string? OutFile { get; set; }
 
     /// <summary>Browser engine to use for rendering.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
     public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
     /// <summary>Credentials used when accessing authenticated pages.</summary>
@@ -82,9 +91,13 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             };
         }
 
+        string target = ParameterSetName == ParameterSetFile
+            ? new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri
+            : Url;
+
         if (Session.IsPresent) {
             BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
-                Url,
+                target,
                 Browser,
                 Clean.IsPresent,
                 user,
@@ -95,9 +108,9 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
-            await HtmlBrowserRenderer.SavePageContentAsync(Url, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
+            await HtmlBrowserRenderer.SavePageContentAsync(target, OutFile, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(Url, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
+            string html = await HtmlBrowserRenderer.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
             WriteObject(html);
         }
     }
