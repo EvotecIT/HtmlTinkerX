@@ -529,9 +529,9 @@ public static async Task CaptureScreenshotAsync(
     /// </summary>
     public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
         if (waitForNavigation) {
-            await session.Page.RunAndWaitForNavigationAsync(
-                () => session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }),
-                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+            Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
+            await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
+            await waitTask.ConfigureAwait(false);
         } else {
             await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
         }
@@ -554,9 +554,9 @@ public static async Task CaptureScreenshotAsync(
                 : session.Page.GetByText(text);
 
         if (waitForNavigation) {
-            await session.Page.RunAndWaitForNavigationAsync(
-                () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
-                new PageRunAndWaitForNavigationOptions { Timeout = timeout }).ConfigureAwait(false);
+            Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
+            await waitTask.ConfigureAwait(false);
         } else {
             await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
         }
