@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -36,8 +37,8 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     /// Path to a HTML file.
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string File { get; set; } = string.Empty;
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>
     /// URL of a HTML page to download and convert.
@@ -68,7 +69,7 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string text = ParameterSetName switch {
-            ParameterSetFile => HtmlUtilities.ConvertFileToText(File),
+            ParameterSetFile => HtmlUtilities.ConvertFileToText(FileUtilities.ResolvePath(Path)),
             ParameterSetUrl => HtmlUtilities.ConvertToText(
                 HttpContentHelper.GetStringWithProperEncodingAsync(
                     HttpClientHelper.Create(Proxy, ProxyCredential),
@@ -77,7 +78,8 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
         };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            System.IO.File.WriteAllText(OutputFile, text);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            System.IO.File.WriteAllText(outPath, text);
         } else {
             WriteObject(text);
         }

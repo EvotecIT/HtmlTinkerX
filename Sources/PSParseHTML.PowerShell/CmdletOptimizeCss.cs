@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -31,11 +32,12 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetPath
-            ? HtmlOptimizer.OptimizeCssFile(Path)
+            ? HtmlOptimizer.OptimizeCssFile(FileUtilities.ResolvePath(Path))
             : HtmlOptimizer.OptimizeCss(Css);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            File.WriteAllText(OutputFile, result);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);
         }

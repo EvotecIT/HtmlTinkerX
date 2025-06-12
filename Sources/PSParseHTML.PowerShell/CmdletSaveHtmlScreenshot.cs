@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.IO;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -105,7 +106,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             case ParameterSetClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
                     Url,
-                    OutFile,
+                    FileUtilities.ResolvePath(OutFile),
                     Browser,
                     Clean.IsPresent,
                     false,
@@ -118,8 +119,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                 break;
             case ParameterSetFileClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
-                    new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri,
-                    OutFile,
+                    new System.Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri,
+                    FileUtilities.ResolvePath(OutFile),
                     Browser,
                     Clean.IsPresent,
                     false,
@@ -133,7 +134,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             case ParameterSetSessionClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                    OutFile,
+                    FileUtilities.ResolvePath(OutFile),
                     false,
                     Delay,
                     Selector,
@@ -145,18 +146,18 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             case ParameterSetSessionDefault:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                    OutFile,
+                    FileUtilities.ResolvePath(OutFile),
                     Full.IsPresent,
                     Delay,
                     Selector).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
-                    ? new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri
+                    ? new System.Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri
                     : Url;
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
                     target,
-                    OutFile,
+                    FileUtilities.ResolvePath(OutFile),
                     Browser,
                     Clean.IsPresent,
                     Full.IsPresent,
@@ -167,7 +168,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
         if (Open.IsPresent) {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
-                FileName = OutFile,
+                FileName = FileUtilities.ResolvePath(OutFile),
                 UseShellExecute = true,
             });
         }

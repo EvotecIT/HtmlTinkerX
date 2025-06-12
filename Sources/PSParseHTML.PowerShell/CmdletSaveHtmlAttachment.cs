@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -28,6 +29,7 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
 
     /// <summary>Directory where downloads will be saved.</summary>
     [Parameter(Mandatory = true)]
+    [Alias("File")]
     public string Path { get; set; } = string.Empty;
 
     /// <summary>Browser engine to use for rendering.</summary>
@@ -49,11 +51,11 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
         List<string> files = ParameterSetName switch {
             ParameterSetSession => await HtmlBrowserRenderer.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                Path,
+                FileUtilities.ResolvePath(Path),
                 Filter).ConfigureAwait(false),
             _ => await HtmlBrowserRenderer.SavePageDownloadsAsync(
                 Url,
-                Path,
+                FileUtilities.ResolvePath(Path),
                 Browser,
                 Clean.IsPresent,
                 Filter).ConfigureAwait(false)

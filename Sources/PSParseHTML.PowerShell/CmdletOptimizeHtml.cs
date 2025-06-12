@@ -1,5 +1,6 @@
 using System;
 using System.Management.Automation;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -21,8 +22,8 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
 
     /// <summary>Path to a HTML file.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
-    [Alias("Path")]
-    public string File { get; set; } = string.Empty;
+    [Alias("File")]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>Optional path to write the optimized HTML.</summary>
     [Parameter]
@@ -35,10 +36,11 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetFile
-            ? HtmlOptimizer.OptimizeHtmlFile(File, CSSDecodeEscapes.IsPresent)
+            ? HtmlOptimizer.OptimizeHtmlFile(FileUtilities.ResolvePath(Path), CSSDecodeEscapes.IsPresent)
             : HtmlOptimizer.OptimizeHtml(Content, CSSDecodeEscapes.IsPresent);
         if (!string.IsNullOrEmpty(OutputFile)) {
-            System.IO.File.WriteAllText(OutputFile, result);
+            string outPath = FileUtilities.ResolvePath(OutputFile);
+            System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);
         }

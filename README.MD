@@ -183,6 +183,8 @@ This module utilizes several external dependencies to do its work. The authors o
 - [NUglify](https://github.com/trullock/NUglify) - BSD-Clause 2 license
 - [Html Agility Pack](https://github.com/zzzprojects/html-agility-pack) - MIT License
 - [PreMailer.Net](https://github.com/milkshakesoftware/PreMailer.Net) - Apache 2.0 License
+- [Microsoft.Playwright](https://github.com/microsoft/playwright-dotnet) - Apache 2.0 License
+- [System.Net.Http](https://learn.microsoft.com/dotnet/api/system.net.http) - MIT License
 
 Refer to each project's repository for complete license information.
 
