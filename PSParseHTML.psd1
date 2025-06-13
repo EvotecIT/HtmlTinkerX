@@ -15,7 +15,7 @@
         PSData = @{
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
-            Prerelease                 = 'Preview1'
+            Prerelease                 = 'Preview2'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
