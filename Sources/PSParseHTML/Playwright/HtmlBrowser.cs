@@ -1,21 +1,20 @@
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public static partial class HtmlBrowserRenderer {
+public static partial class HtmlBrowser {
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
     /// </summary>
-    private static async Task<BrowserSession> CreatePageAsync(string url, BrowserEngine browser, bool clean, string? username, string? password, FormLoginOptions? formLogin, bool headless = true, int slowMo = 0) {
+    private static async Task<HtmlBrowserSession> CreatePageAsync(string url, HtmlBrowserEngine browser, bool clean, string? username, string? password, HtmlFormLogin? formLogin, bool headless = true, int slowMo = 0) {
         if (clean) {
             CleanInstallDir();
         }
@@ -27,8 +26,8 @@ public static partial class HtmlBrowserRenderer {
 
         var playwright = await Playwright.CreateAsync();
         IBrowserType type = browser switch {
-            BrowserEngine.Firefox => playwright.Firefox,
-            BrowserEngine.Webkit => playwright.Webkit,
+            HtmlBrowserEngine.Firefox => playwright.Firefox,
+            HtmlBrowserEngine.Webkit => playwright.Webkit,
             _ => playwright.Chromium,
         };
 
@@ -67,19 +66,19 @@ public static partial class HtmlBrowserRenderer {
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        return new BrowserSession(playwright, browserInstance, context, page);
+        return new HtmlBrowserSession(playwright, browserInstance, context, page);
     }
 
     /// <summary>
-    /// Creates a new <see cref="BrowserSession"/> and navigates to the specified URL.
+    /// Creates a new <see cref="HtmlBrowserSession"/> and navigates to the specified URL.
     /// </summary>
-    public static Task<BrowserSession> OpenSessionAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, FormLoginOptions? formLogin = null, bool headless = true, int slowMo = 0)
+    public static Task<HtmlBrowserSession> OpenSessionAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0)
         => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo);
 
     /// <summary>
     /// Disposes the specified browser session.
     /// </summary>
-    public static async Task CloseSessionAsync(BrowserSession session) {
+    public static async Task CloseSessionAsync(HtmlBrowserSession session) {
         if (session != null) {
             await session.DisposeAsync().ConfigureAwait(false);
         }
@@ -89,8 +88,8 @@ public static partial class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, FormLoginOptions? formLogin = null, bool headless = true, int slowMo = 0) {
-        await using BrowserSession session = await OpenSessionAsync(
+    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0) {
+        await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
@@ -108,8 +107,8 @@ public static partial class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, FormLoginOptions? formLogin = null, bool headless = true, int slowMo = 0) {
-        string fullPath = FileUtilities.ResolvePath(path);
+    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0) {
+        string fullPath = HtmlUtilities.ResolvePath(path);
         string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
@@ -202,7 +201,7 @@ public static partial class HtmlBrowserRenderer {
     /// <summary>
     /// Navigates the specified session to a new URL and waits for the network to be idle.
     /// </summary>
-    public static async Task NavigateAsync(BrowserSession session, string url, int timeout = 30000) {
+    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 30000) {
         await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
         await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
     }
@@ -210,7 +209,7 @@ public static partial class HtmlBrowserRenderer {
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(BrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
         if (waitForNavigation) {
             Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
             await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
@@ -223,7 +222,7 @@ public static partial class HtmlBrowserRenderer {
     /// <summary>
     /// Clicks an element specified by text content.
     /// </summary>
-    public static async Task ClickTextAsync(BrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 30000) {
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 30000) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact

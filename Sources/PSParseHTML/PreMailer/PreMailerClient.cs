@@ -22,7 +22,7 @@ public class PreMailerClient {
     /// </summary>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static PreMailerClient FromFile(string htmlFilePath, PreMailerOptions? options = null) {
-        string path = FileUtilities.ResolvePath(htmlFilePath);
+        string path = HtmlUtilities.ResolvePath(htmlFilePath);
         if (!File.Exists(path)) {
             throw new FileNotFoundException($"HTML file not found: {htmlFilePath}", path);
         }
@@ -44,7 +44,7 @@ public class PreMailerClient {
         try {
             string cssContent = Options.Css ?? string.Empty;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                string cssPath = FileUtilities.ResolvePath(Options.CssFilePath);
+                string cssPath = HtmlUtilities.ResolvePath(Options.CssFilePath);
                 if (!File.Exists(cssPath)) {
                     throw new FileNotFoundException($"CSS file not found: {Options.CssFilePath}", cssPath);
                 }

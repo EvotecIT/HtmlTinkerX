@@ -3,7 +3,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Options controlling form based authentication.
 /// </summary>
-public sealed class FormLoginOptions {
+public sealed class HtmlFormLogin {
     /// <summary>URL of the login page.</summary>
     public string LoginUrl { get; set; } = string.Empty;
 

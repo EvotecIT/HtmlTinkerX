@@ -36,10 +36,10 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetFile
-            ? HtmlOptimizer.OptimizeHtmlFile(FileUtilities.ResolvePath(Path), CSSDecodeEscapes.IsPresent)
+            ? HtmlOptimizer.OptimizeHtmlFile(HtmlUtilities.ResolvePath(Path), CSSDecodeEscapes.IsPresent)
             : HtmlOptimizer.OptimizeHtml(Content, CSSDecodeEscapes.IsPresent);
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

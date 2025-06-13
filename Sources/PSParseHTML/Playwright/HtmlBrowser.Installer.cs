@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public static partial class HtmlBrowserRenderer {
+public static partial class HtmlBrowser {
     /// <summary>
     /// Gets the version of the Playwright driver.
     /// </summary>
@@ -70,7 +70,7 @@ public static partial class HtmlBrowserRenderer {
 
         string? browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (browsersPath == "0") {
-            string baseDir = Path.GetDirectoryName(typeof(HtmlBrowserRenderer).Assembly.Location) ?? AppContext.BaseDirectory;
+            string baseDir = Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location) ?? AppContext.BaseDirectory;
             return Path.Combine(baseDir, "ms-playwright-driver");
         }
 
@@ -230,7 +230,7 @@ public static partial class HtmlBrowserRenderer {
     private static string GetBrowserInstallPath() {
         string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (envDefined == "0") {
-            return Path.Combine(Path.GetDirectoryName(typeof(HtmlBrowserRenderer).Assembly.Location) ?? AppContext.BaseDirectory, ".local-browsers");
+            return Path.Combine(Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location) ?? AppContext.BaseDirectory, ".local-browsers");
         }
         if (!string.IsNullOrEmpty(envDefined)) {
             return Path.GetFullPath(envDefined);

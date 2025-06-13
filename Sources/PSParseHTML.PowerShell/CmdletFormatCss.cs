@@ -33,11 +33,11 @@ public sealed class CmdletFormatCss : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatCssFile(FileUtilities.ResolvePath(Path))
+            ? HtmlFormatter.FormatCssFile(HtmlUtilities.ResolvePath(Path))
             : HtmlFormatter.FormatCss(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);

@@ -11,14 +11,14 @@ namespace PSParseHTML;
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public static partial class HtmlBrowserRenderer {
+public static partial class HtmlBrowser {
     /// <summary>
     /// Saves a PDF of the specified page URL to disk.
     /// </summary>
     public static async Task SavePagePdfAsync(
             string url,
             string path,
-            BrowserEngine browser = BrowserEngine.Chromium,
+            HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
             bool clean = false,
             int delayMs = 0,
             string? selector = null,
@@ -41,10 +41,10 @@ public static partial class HtmlBrowserRenderer {
             bool tagged = false,
             string? username = null,
             string? password = null,
-            FormLoginOptions? formLogin = null,
+            HtmlFormLogin? formLogin = null,
             bool headless = true,
             int slowMo = 0) {
-        await using BrowserSession session = await OpenSessionAsync(
+        await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,

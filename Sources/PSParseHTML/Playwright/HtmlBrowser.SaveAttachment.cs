@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public static partial class HtmlBrowserRenderer {
+public static partial class HtmlBrowser {
     /// <summary>
     /// Saves any files downloaded while loading the specified URL.
     /// </summary>
@@ -21,8 +21,8 @@ public static partial class HtmlBrowserRenderer {
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
     /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, BrowserEngine browser = BrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0) {
-        await using BrowserSession session = await OpenSessionAsync(
+    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0) {
+        await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
@@ -32,7 +32,7 @@ public static partial class HtmlBrowserRenderer {
             headless,
             slowMo).ConfigureAwait(false);
         var page = session.Page;
-        string dir = FileUtilities.ResolvePath(directory);
+        string dir = HtmlUtilities.ResolvePath(directory);
         return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);
     }
 
@@ -41,7 +41,7 @@ public static partial class HtmlBrowserRenderer {
     /// </summary>
     public static async Task<List<string>> SavePageDownloadsAsync(IPage page, string directory, string? filter = null) {
 
-        string dir = FileUtilities.ResolvePath(directory);
+        string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
         List<string> downloads = new();
         page.Download += async (_, dl) => {

@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Result of table parsing with metadata.
 /// </summary>
-public class TableParseResult {
-    public TableMetadata Metadata { get; set; } = new();
+public class HtmlTableResult {
+    public HtmlTableMetadata Metadata { get; set; } = new();
     public List<Dictionary<string, string?>> Data { get; set; } = new();
 }

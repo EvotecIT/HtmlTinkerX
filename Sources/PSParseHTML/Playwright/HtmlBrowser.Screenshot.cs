@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
-public static partial class HtmlBrowserRenderer {
+public static partial class HtmlBrowser {
     /// <summary>
     /// Captures a screenshot of the specified page.
     /// </summary>
@@ -29,7 +29,7 @@ public static partial class HtmlBrowserRenderer {
     public static async Task CaptureScreenshotAsync(
         string url,
         string path,
-        BrowserEngine browser = BrowserEngine.Chromium,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
         bool clean = false,
         bool fullPage = false,
         int delayMs = 0,
@@ -40,10 +40,10 @@ public static partial class HtmlBrowserRenderer {
         int? clipHeight = null,
         string? username = null,
         string? password = null,
-        FormLoginOptions? formLogin = null,
+        HtmlFormLogin? formLogin = null,
         bool headless = true,
         int slowMo = 0) {
-        await using BrowserSession session = await OpenSessionAsync(
+        await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
@@ -53,7 +53,7 @@ public static partial class HtmlBrowserRenderer {
             headless,
             slowMo).ConfigureAwait(false);
 
-        string fullPath = FileUtilities.ResolvePath(path);
+        string fullPath = HtmlUtilities.ResolvePath(path);
         await CaptureScreenshotAsync(
             session.Page,
             fullPath,
@@ -86,7 +86,7 @@ public static partial class HtmlBrowserRenderer {
             await page.WaitForTimeoutAsync(delayMs);
         }
 
-        string fullPath = FileUtilities.ResolvePath(path);
+        string fullPath = HtmlUtilities.ResolvePath(path);
         var options = new PageScreenshotOptions { Path = fullPath, FullPage = fullPage };
         if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
             options.Clip = new Clip {

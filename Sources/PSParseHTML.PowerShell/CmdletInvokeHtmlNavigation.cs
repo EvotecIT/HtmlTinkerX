@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that navigates an existing browser session to a new URL.
 /// </summary>
 [Cmdlet(VerbsLifecycle.Invoke, "HTMLNavigation", DefaultParameterSetName = ParameterSetUrl)]
-[OutputType(typeof(BrowserSession))]
+[OutputType(typeof(HtmlBrowserSession))]
 public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     private const string ParameterSetUrl = "ByUrl";
     private const string ParameterSetText = "ByText";
@@ -17,7 +17,7 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
 
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
-    public BrowserSession? Session { get; set; }
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>Destination URL.</summary>
     [Parameter(Mandatory = true, Position = 1, ParameterSetName = ParameterSetUrl)]
@@ -54,19 +54,19 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        BrowserSession session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
+        HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
         try {
             switch (ParameterSetName) {
                 case ParameterSetUrl:
-                    await HtmlBrowserRenderer.NavigateAsync(session, Url!, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.NavigateAsync(session, Url!, Timeout).ConfigureAwait(false);
                     break;
                 case ParameterSetSelector:
-                    await HtmlBrowserRenderer.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
                     break;
                 case ParameterSetText:
-                    await HtmlBrowserRenderer.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
                     break;
             }
         } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
@@ -74,7 +74,7 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
                 ParameterSetSelector => Selector!,
                 _ => Text!
             };
-            string message = HtmlBrowserRenderer.FormatStrictModeMessage(query, ex);
+            string message = HtmlBrowser.FormatStrictModeMessage(query, ex);
             WriteError(new ErrorRecord(new InvalidOperationException(message), "StrictModeViolation", ErrorCategory.InvalidOperation, query));
             return;
         }

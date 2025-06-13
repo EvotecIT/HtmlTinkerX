@@ -54,7 +54,7 @@ public static class HtmlParserExtensions {
     /// <returns>Enumeration of matching elements.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static IEnumerable<IElement> GetElementsFromFile(string filePath, string? tag = null, string? className = null, string? id = null, string? name = null) {
-        string html = FileUtilities.ReadFileChecked(filePath);
+        string html = HtmlUtilities.ReadFileChecked(filePath);
         return GetElements(html, tag, className, id, name);
     }
 }

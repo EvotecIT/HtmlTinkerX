@@ -19,7 +19,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     private const string ParameterSetFile = "File";
     /// <summary>Browser session containing the page.</summary>
     [Parameter(Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
-    public BrowserSession? Session { get; set; }
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>URL of the page to inspect.</summary>
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = ParameterSetUrl)]
@@ -33,7 +33,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     /// <summary>Browser engine to use when loading <see cref="Url"/> or <see cref="Path"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
-    public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
+    public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
     /// <summary>Reinstall browser runtimes when using <see cref="Url"/> or <see cref="Path"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
@@ -98,12 +98,12 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
             case ParameterSetUrl:
                 string? user = Credential?.UserName ?? Username;
                 string? pass = Credential?.GetNetworkCredential().Password ?? Password;
-                FormLoginOptions? form = null;
+                HtmlFormLogin? form = null;
                 if (!string.IsNullOrEmpty(LoginUrl) &&
                     !string.IsNullOrEmpty(UsernameSelector) &&
                     !string.IsNullOrEmpty(PasswordSelector) &&
                     !string.IsNullOrEmpty(SubmitSelector)) {
-                    form = new FormLoginOptions {
+                    form = new HtmlFormLogin {
                         LoginUrl = LoginUrl!,
                         UsernameSelector = UsernameSelector!,
                         PasswordSelector = PasswordSelector!,
@@ -111,7 +111,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     };
                 }
 
-                await using (BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
                     Url!,
                     Browser,
                     Clean.IsPresent,
@@ -120,12 +120,12 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     form,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo).ConfigureAwait(false)) {
-                    list = await HtmlBrowserRenderer.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
+                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri;
-                await using (BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
+                string fileUrl = new Uri(HtmlUtilities.ResolvePath(Path!)).AbsoluteUri;
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
                     fileUrl,
                     Browser,
                     Clean.IsPresent,
@@ -134,13 +134,13 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     null,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo).ConfigureAwait(false)) {
-                    list = await HtmlBrowserRenderer.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
+                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
             default:
-                BrowserSession session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
+                HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                     ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-                list = await HtmlBrowserRenderer.GetInteractablesAsync(session.Page).ConfigureAwait(false);
+                list = await HtmlBrowser.GetInteractablesAsync(session.Page).ConfigureAwait(false);
                 break;
         }
 

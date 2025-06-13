@@ -11,13 +11,13 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletCloseHtmlSession : AsyncPSCmdlet {
     /// <summary>Browser session to dispose.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
-    public BrowserSession Session { get; set; } = null!;
+    public HtmlBrowserSession Session { get; set; } = null!;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        await HtmlBrowserRenderer.CloseSessionAsync(Session).ConfigureAwait(false);
+        await HtmlBrowser.CloseSessionAsync(Session).ConfigureAwait(false);
         object? defaultSession = GetVariableValue("PSParseHTML_DefaultSession");
-        if (defaultSession is BrowserSession sess && ReferenceEquals(sess, Session)) {
+        if (defaultSession is HtmlBrowserSession sess && ReferenceEquals(sess, Session)) {
             SessionState.PSVariable.Remove("PSParseHTML_DefaultSession");
         }
     }

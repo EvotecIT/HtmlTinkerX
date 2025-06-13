@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
-public static class HtmlTableParser {
+public static class HtmlParserFromTable {
     private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
@@ -24,7 +24,7 @@ public static class HtmlTableParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
-    public static List<TableParseResult> ParseTablesWithAngleSharpDetailed(
+    public static List<HtmlTableResult> ParseTablesWithAngleSharpDetailed(
         string html,
         IDictionary<string, string>? replaceContent = null,
         IDictionary<string, string>? replaceHeaders = null,
@@ -38,11 +38,11 @@ public static class HtmlTableParser {
 
         var document = HtmlParser.ParseWithAngleSharp(html);
         var tables = document.QuerySelectorAll("table");
-        List<TableParseResult> results = new();
+        List<HtmlTableResult> results = new();
 
         for (int tableIndex = 0; tableIndex < tables.Length; tableIndex++) {
             var table = tables[tableIndex];
-            var result = new TableParseResult();
+            var result = new HtmlTableResult();
             var metadata = result.Metadata;
 
             // Extract metadata
@@ -263,7 +263,7 @@ public static class HtmlTableParser {
         }
 
         try {
-            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
             return ParseTablesWithAngleSharp(content, replaceContent, replaceHeaders, allProperties);
         } finally {
             if (disposeClient) {
@@ -284,7 +284,7 @@ public static class HtmlTableParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
-    public static List<TableParseResult> ParseTablesWithHtmlAgilityPackDetailed(
+    public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
@@ -299,7 +299,7 @@ public static class HtmlTableParser {
 
         HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
-        List<TableParseResult> results = new();
+        List<HtmlTableResult> results = new();
 
         if (tables == null) {
             return results;
@@ -307,7 +307,7 @@ public static class HtmlTableParser {
 
         for (int tableIndex = 0; tableIndex < tables.Count; tableIndex++) {
             var table = tables[tableIndex];
-            var result = new TableParseResult();
+            var result = new HtmlTableResult();
             var metadata = result.Metadata;
 
             // Extract metadata
@@ -609,7 +609,7 @@ public static class HtmlTableParser {
         }
 
         try {
-            string content = await HttpContentHelper.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+            string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
             return ParseTablesWithHtmlAgilityPack(content, reverseTable, replaceContent, replaceHeaders, allProperties);
         } finally {
             if (disposeClient) {

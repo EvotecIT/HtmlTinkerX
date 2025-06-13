@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
     /// <summary>Browser session in use.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
-    public BrowserSession? Session { get; set; }
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>CSS selector for the target element.</summary>
     [Parameter]
@@ -31,7 +31,7 @@ public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        BrowserSession session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
+        HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
         int flags = (InnerHtml.IsPresent ? 1 : 0) + (OuterHtml.IsPresent ? 1 : 0) + (AsText.IsPresent ? 1 : 0);
@@ -42,7 +42,7 @@ public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
             return;
         }
 
-        string result = await HtmlBrowserRenderer.GetContentAsync(
+        string result = await HtmlBrowser.GetContentAsync(
             session.Page,
             Selector,
             InnerHtml.IsPresent,

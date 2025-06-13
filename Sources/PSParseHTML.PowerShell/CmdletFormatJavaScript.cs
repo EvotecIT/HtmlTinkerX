@@ -36,11 +36,11 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatJavaScriptFile(FileUtilities.ResolvePath(Path))
+            ? HtmlFormatter.FormatJavaScriptFile(HtmlUtilities.ResolvePath(Path))
             : HtmlFormatter.FormatJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);

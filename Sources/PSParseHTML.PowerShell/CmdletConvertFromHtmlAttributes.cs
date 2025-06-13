@@ -83,7 +83,7 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
                 Id,
                 Name),
             ParameterSetFile => HtmlParserExtensions.GetElementsFromFile(
-                FileUtilities.ResolvePath(Path),
+                HtmlUtilities.ResolvePath(Path),
                 Tag,
                 Class,
                 Id,
@@ -104,6 +104,6 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
 
     private string DownloadHtml() {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return HttpContentHelper.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
-        }
+        return HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
+    }
 }

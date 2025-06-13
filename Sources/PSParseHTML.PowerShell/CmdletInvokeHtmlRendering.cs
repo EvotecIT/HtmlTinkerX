@@ -13,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HTMLRendering", DefaultParameterSetName = ParameterSetDefault)]
 [Alias("Start-HTMLSession", "Open-HTMLSession")]
-[OutputType(typeof(string), typeof(BrowserSession))]
+[OutputType(typeof(string), typeof(HtmlBrowserSession))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetFile = "File";
@@ -34,7 +34,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetFile)]
-    public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
+    public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
@@ -90,9 +90,9 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
-        FormLoginOptions? form = null;
+        HtmlFormLogin? form = null;
         if (!string.IsNullOrEmpty(LoginUrl) && !string.IsNullOrEmpty(UsernameSelector) && !string.IsNullOrEmpty(PasswordSelector) && !string.IsNullOrEmpty(SubmitSelector)) {
-            form = new FormLoginOptions {
+            form = new HtmlFormLogin {
                 LoginUrl = LoginUrl!,
                 UsernameSelector = UsernameSelector!,
                 PasswordSelector = PasswordSelector!,
@@ -101,11 +101,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(FileUtilities.ResolvePath(Path!)).AbsoluteUri
+            ? new System.Uri(HtmlUtilities.ResolvePath(Path!)).AbsoluteUri
             : Url;
 
         if (Session.IsPresent) {
-            BrowserSession sess = await HtmlBrowserRenderer.OpenSessionAsync(
+            HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
                 target,
                 Browser,
                 Clean.IsPresent,
@@ -119,10 +119,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
-            string outPath = FileUtilities.ResolvePath(OutFile);
-            await HtmlBrowserRenderer.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            string outPath = HtmlUtilities.ResolvePath(OutFile);
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
             WriteObject(html);
         }
     }

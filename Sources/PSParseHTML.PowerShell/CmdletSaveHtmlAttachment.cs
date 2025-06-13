@@ -25,7 +25,7 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
 
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
-    public BrowserSession? Session { get; set; }
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>Directory where downloads will be saved.</summary>
     [Parameter(Mandatory = true)]
@@ -34,7 +34,7 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
 
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
-    public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
+    public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
@@ -55,16 +55,16 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        BrowserSession? session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
 
         List<string> files = ParameterSetName switch {
-            ParameterSetSession => await HtmlBrowserRenderer.SavePageDownloadsAsync(
+            ParameterSetSession => await HtmlBrowser.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                FileUtilities.ResolvePath(Path),
+                HtmlUtilities.ResolvePath(Path),
                 Filter).ConfigureAwait(false),
-            _ => await HtmlBrowserRenderer.SavePageDownloadsAsync(
+            _ => await HtmlBrowser.SavePageDownloadsAsync(
                 Url,
-                FileUtilities.ResolvePath(Path),
+                HtmlUtilities.ResolvePath(Path),
                 Browser,
                 Clean.IsPresent,
                 Filter,

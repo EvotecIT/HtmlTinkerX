@@ -3,7 +3,7 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
-public class HeadlessTableTests {
+public class HtmlBrowserTableTests {
     private static string GetHtml() {
         var baseDir = AppContext.BaseDirectory;
         var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "headless_table.html"));

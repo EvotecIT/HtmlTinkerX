@@ -46,7 +46,7 @@ public static class HtmlFormatter {
     /// <returns>Formatted JavaScript string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string FormatJavaScriptFile(string filePath) {
-        string js = FileUtilities.ReadFileChecked(filePath);
+        string js = HtmlUtilities.ReadFileChecked(filePath);
         return FormatJavaScript(js);
     }
 
@@ -75,7 +75,7 @@ public static class HtmlFormatter {
     /// <returns>Formatted CSS string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string FormatCssFile(string filePath) {
-        string css = FileUtilities.ReadFileChecked(filePath);
+        string css = HtmlUtilities.ReadFileChecked(filePath);
         return FormatCss(css);
     }
 
@@ -177,7 +177,7 @@ public static class HtmlFormatter {
         bool removeEmptyBlocks = false,
         bool isFragment = false) {
 
-        string html = FileUtilities.ReadFileChecked(filePath);
+        string html = HtmlUtilities.ReadFileChecked(filePath);
         return FormatHtml(html, indent, blockStartLine, removeComments, removeOptionalTags, outputTextNodesOnNewLine, removeEmptyAttributes, alphabeticallyOrderAttributes, removeEmptyBlocks, isFragment);
     }
 }
