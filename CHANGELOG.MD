@@ -1,9 +1,5 @@
 ﻿## ChangeLog
 
-#### 1.0.3 - 2025.06.13
-- `Stop-HTMLVideoRecording` now respects the default session when `-Session` is not specified.
-- Added test coverage for default video recording workflow.
-
 #### 1.0.2 - 2024.02.19
 - Better detection of net framework
 
