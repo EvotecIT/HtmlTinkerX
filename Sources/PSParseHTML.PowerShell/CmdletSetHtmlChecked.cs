@@ -24,7 +24,7 @@ public sealed class CmdletSetHtmlChecked : AsyncPSCmdlet {
     /// <summary>Timeout in milliseconds.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
-    public int Timeout { get; set; } = 30000;
+    public int Timeout { get; set; } = 10000;
 
     /// <summary>Return the session object.</summary>
     [Parameter]
