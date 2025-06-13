@@ -234,7 +234,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Navigates the specified session to a new URL and waits for the network to be idle.
     /// </summary>
-    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 30000) {
+    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 10000) {
         await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
         await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
     }
@@ -242,7 +242,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 30000) {
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000) {
         if (waitForNavigation) {
             Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
             await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
@@ -255,7 +255,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element specified by text content.
     /// </summary>
-    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 30000) {
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact
