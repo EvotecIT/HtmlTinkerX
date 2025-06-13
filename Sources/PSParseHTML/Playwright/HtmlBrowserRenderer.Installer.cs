@@ -8,15 +8,12 @@ using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
-internal static class PlaywrightInstaller
-{
+public static partial class HtmlBrowserRenderer {
     private static string DriverVersion => typeof(Microsoft.Playwright.Playwright)
         .Assembly.GetName().Version?.ToString(3) ?? "1.52.0";
 
-    private static string PlatformId
-    {
-        get
-        {
+    private static string PlatformId {
+        get {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return "win32_x64";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -29,10 +26,8 @@ internal static class PlaywrightInstaller
         }
     }
 
-    private static string DownloadPlatformId
-    {
-        get
-        {
+    private static string DownloadPlatformId {
+        get {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return "win32_x64";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -47,53 +42,44 @@ internal static class PlaywrightInstaller
 
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
 
-    private static string GetDriverRoot()
-    {
+    private static string GetDriverRoot() {
         string? envRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        if (!string.IsNullOrEmpty(envRoot))
-        {
-            if (envRoot.EndsWith(".playwright"))
-            {
+        if (!string.IsNullOrEmpty(envRoot)) {
+            if (envRoot.EndsWith(".playwright")) {
                 envRoot = Path.GetDirectoryName(envRoot) ?? envRoot;
             }
             return Path.GetFullPath(envRoot);
         }
 
         string? browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        if (browsersPath == "0")
-        {
-            string baseDir = Path.GetDirectoryName(typeof(PlaywrightInstaller).Assembly.Location) ?? AppContext.BaseDirectory;
+        if (browsersPath == "0") {
+            string baseDir = Path.GetDirectoryName(typeof(HtmlBrowserRenderer).Assembly.Location) ?? AppContext.BaseDirectory;
             return Path.Combine(baseDir, "ms-playwright-driver");
         }
 
-        if (!string.IsNullOrEmpty(browsersPath))
-        {
+        if (!string.IsNullOrEmpty(browsersPath)) {
             string parent = Path.GetDirectoryName(Path.GetFullPath(browsersPath)) ?? Path.GetFullPath(browsersPath);
             return Path.Combine(parent, "ms-playwright-driver");
         }
 
         string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             return Path.Combine(localAppData, "ms-playwright-driver");
         }
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return Path.Combine(user, "Library", "Caches", "ms-playwright-driver");
         }
         return Path.Combine(user, ".cache", "ms-playwright-driver");
     }
 
-    private static string GetDriverPath()
-    {
+    private static string GetDriverPath() {
         return Path.Combine(GetDriverRoot(), ".playwright");
     }
 
     private static string VersionFile => Path.Combine(GetDriverPath(), ".version");
 
-    private static bool IsDriverPresent()
-    {
+    private static bool IsDriverPresent() {
         string baseDir = GetDriverPath();
         string nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
         string packageDir = Path.Combine(baseDir, "package");
@@ -105,26 +91,19 @@ internal static class PlaywrightInstaller
         return version == DriverVersion;
     }
 
-    internal static void CleanDriver()
-    {
+    internal static void CleanDriver() {
         string root = GetDriverRoot();
-        if (Directory.Exists(root))
-        {
-            try
-            {
+        if (Directory.Exists(root)) {
+            try {
                 Directory.Delete(root, true);
-            }
-            catch
-            {
+            } catch {
                 // ignore
             }
         }
     }
 
-    internal static async Task EnsureInstalledAsync()
-    {
-        if (IsDriverPresent())
-        {
+    internal static async Task EnsureInstalledAsync() {
+        if (IsDriverPresent()) {
             // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
             // the '.playwright' folder, not to the folder itself.
             Environment.SetEnvironmentVariable(
@@ -151,18 +130,15 @@ internal static class PlaywrightInstaller
         long read = 0;
         int lastProgress = 0;
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (true)
-        {
+        while (true) {
             int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
             if (n == 0)
                 break;
             await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
-            if (total > 0)
-            {
+            if (total > 0) {
                 read += n;
                 int progress = (int)(read * 100 / total);
-                if (progress != lastProgress)
-                {
+                if (progress != lastProgress) {
                     double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
                     Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
                     lastProgress = progress;
@@ -179,8 +155,7 @@ internal static class PlaywrightInstaller
         string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
 
-        using (var archive = new ZipArchive(mem))
-        {
+        using (var archive = new ZipArchive(mem)) {
             archive.ExtractToDirectory(tempDir);
         }
 
@@ -188,15 +163,11 @@ internal static class PlaywrightInstaller
 
         string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
         File.Move(Path.Combine(tempDir, NodeExecutable), nodeDest);
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            try
-            {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            try {
                 var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
                 chmod?.WaitForExit();
-            }
-            catch
-            {
+            } catch {
                 // ignore
             }
         }
@@ -211,5 +182,32 @@ internal static class PlaywrightInstaller
 
         File.WriteAllText(VersionFile, DriverVersion);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+    }
+
+    private static string GetBrowserInstallPath() {
+        string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        if (envDefined == "0") {
+            return Path.Combine(Path.GetDirectoryName(typeof(HtmlBrowserRenderer).Assembly.Location) ?? AppContext.BaseDirectory, ".local-browsers");
+        }
+        if (!string.IsNullOrEmpty(envDefined)) {
+            return Path.GetFullPath(envDefined);
+        }
+        string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(localAppData, "ms-playwright");
+        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            return Path.Combine(user, "Library", "Caches", "ms-playwright");
+        }
+        return Path.Combine(user, ".cache", "ms-playwright");
+    }
+
+    private static void CleanInstallDir() {
+        string path = GetBrowserInstallPath();
+        if (Directory.Exists(path)) {
+            Directory.Delete(path, recursive: true);
+        }
+        CleanDriver();
     }
 }
