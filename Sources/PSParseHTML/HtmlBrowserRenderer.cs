@@ -49,6 +49,8 @@ public static class HtmlBrowserRenderer {
             CleanInstallDir();
         }
 
+        await PlaywrightInstaller.EnsureInstalledAsync().ConfigureAwait(false);
+
         string engine = browser.ToString().ToLowerInvariant();
         Microsoft.Playwright.Program.Main(new[] { "install", engine });
 
