@@ -12,4 +12,4 @@ Save-HTMLScreenshot -Session $session -OutFile "$PSScriptRoot\Output\secure.png"
 # navigate to downloads using the same session
 $session.Page.GotoAsync('https://example.com/downloads') | Out-Null
 Save-HTMLAttachment -Session $session -Path "$PSScriptRoot\Output" -Filter '.pdf'
-[PSParseHTML.HtmlBrowserRenderer]::CloseSessionAsync($session).GetAwaiter().GetResult()
+[PSParseHTML.HtmlBrowser]::CloseSessionAsync($session).GetAwaiter().GetResult()
