@@ -38,8 +38,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     public BrowserSession? Session { get; set; }
 
     /// <summary>File path for the screenshot.</summary>
-    [Parameter(Mandatory = true, Position = 1)]
-    public string OutFile { get; set; } = string.Empty;
+    [Parameter(Position = 1)]
+    public string? OutFile { get; set; }
 
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
@@ -101,6 +101,19 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         BrowserSession? session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+
+        if (string.IsNullOrWhiteSpace(OutFile)) {
+            if (Open.IsPresent) {
+                OutFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName() + ".png");
+            } else {
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSInvalidOperationException("OutFile is required unless -Open is specified."),
+                    "MissingOutFile",
+                    ErrorCategory.InvalidArgument,
+                    null));
+                return;
+            }
+        }
 
         switch (ParameterSetName) {
             case ParameterSetClip:
@@ -167,10 +180,14 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
         }
 
         if (Open.IsPresent) {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
-                FileName = FileUtilities.ResolvePath(OutFile),
-                UseShellExecute = true,
-            });
+            try {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
+                    FileName = FileUtilities.ResolvePath(OutFile),
+                    UseShellExecute = true,
+                });
+            } catch (System.Exception ex) {
+                WriteVerbose($"Failed to open file '{OutFile}': {ex.Message}");
+            }
         }
     }
 }
