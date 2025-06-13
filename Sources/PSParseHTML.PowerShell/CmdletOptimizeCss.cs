@@ -32,11 +32,11 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetPath
-            ? HtmlOptimizer.OptimizeCssFile(FileUtilities.ResolvePath(Path))
+            ? HtmlOptimizer.OptimizeCssFile(HtmlUtilities.ResolvePath(Path))
             : HtmlOptimizer.OptimizeCss(Css);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

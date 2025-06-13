@@ -69,16 +69,16 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string text = ParameterSetName switch {
-            ParameterSetFile => HtmlUtilities.ConvertFileToText(FileUtilities.ResolvePath(Path)),
-            ParameterSetUrl => HtmlUtilities.ConvertToText(
-                HttpContentHelper.GetStringWithProperEncodingAsync(
+            ParameterSetFile => HtmlParserToText.ConvertFileToText(HtmlUtilities.ResolvePath(Path)),
+            ParameterSetUrl => HtmlParserToText.ConvertToText(
+                HtmlUtilities.GetStringWithProperEncodingAsync(
                     HttpClientHelper.Create(Proxy, ProxyCredential),
                     Url.ToString()).GetAwaiter().GetResult()),
-            _ => HtmlUtilities.ConvertToText(Content)
+            _ => HtmlParserToText.ConvertToText(Content)
         };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             System.IO.File.WriteAllText(outPath, text);
         } else {
             WriteObject(text);

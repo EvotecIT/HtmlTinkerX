@@ -23,10 +23,10 @@ Build-Module -ModuleName 'PSParseHTML' {
         Tags                 = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         # A URL to the main website for this project.
         ProjectUri           = 'https://github.com/EvotecIT/PSParseHTML'
-
+        # A URL to an icon representing this module.
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
-
-        PreReleaseTag        = 'Preview1'
+        # Pre-release tag for this module.
+        PreReleaseTag        = 'Preview2'
     }
     New-ConfigurationManifest @Manifest
     # Add external module dependencies, using loop for simplicity
@@ -89,18 +89,12 @@ Build-Module -ModuleName 'PSParseHTML' {
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
-        #DotSourceLibraries                = $true
-        #DotSourceClasses                  = $false
-        #SeparateFileLibraries             = $true
-        #DeleteTargetModuleBeforeBuild     = $true
-
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
-        #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
@@ -117,9 +111,6 @@ Build-Module -ModuleName 'PSParseHTML' {
         ModulesPath         = "$PSScriptRoot\..\Artefacts\Unpacked\Modules"
         RequiredModulesPath = "$PSScriptRoot\..\Artefacts\Unpacked\Modules"
         AddRequiredModules  = $true
-        CopyFiles           = @{
-            #"Examples\PublishingExample\Example-ExchangeEssentials.ps1" = "RunMe.ps1"
-        }
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat -CopyFilesRelative
     $newConfigurationArtefactSplat = @{
@@ -129,9 +120,6 @@ Build-Module -ModuleName 'PSParseHTML' {
         ModulesPath         = "$PSScriptRoot\..\Artefacts\Packed\Modules"
         RequiredModulesPath = "$PSScriptRoot\..\Artefacts\Packed\Modules"
         AddRequiredModules  = $true
-        CopyFiles           = @{
-            #"Examples\PublishingExample\Example-ExchangeEssentials.ps1" = "RunMe.ps1"
-        }
         ArtefactName        = '<ModuleName>.<TagModuleVersionWithPreRelease>.zip'
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat

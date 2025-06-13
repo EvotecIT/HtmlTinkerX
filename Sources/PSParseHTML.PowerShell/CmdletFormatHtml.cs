@@ -64,7 +64,7 @@ public sealed class CmdletFormatHtml : PSCmdlet {
     protected override void ProcessRecord() {
         string result = ParameterSetName == ParameterSetFile
             ? HtmlFormatter.FormatHtmlFile(
-                FileUtilities.ResolvePath(Path),
+                HtmlUtilities.ResolvePath(Path),
                 Indent,
                 BlockStartLine,
                 RemoveHTMLComments.IsPresent,
@@ -85,7 +85,7 @@ public sealed class CmdletFormatHtml : PSCmdlet {
             RemoveEmptyBlocks.IsPresent);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = FileUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile);
             System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

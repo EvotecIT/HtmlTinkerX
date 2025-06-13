@@ -55,7 +55,7 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        List<ListParseResult> results;
+        List<HtmlListResult> results;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
@@ -105,7 +105,7 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
         return list.ToArray();
     }
 
-    private PSObject CreateListObject(ListParseResult result, bool returnObjects) {
+    private PSObject CreateListObject(HtmlListResult result, bool returnObjects) {
         PSObject listObject = new();
         if (returnObjects) {
             listObject.Properties.Add(new PSNoteProperty("Data", ConvertItems(result.Items)));

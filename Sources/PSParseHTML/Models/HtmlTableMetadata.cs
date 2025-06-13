@@ -11,7 +11,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Metadata about a parsed table.
 /// </summary>
-public class TableMetadata {
+public class HtmlTableMetadata {
     public int TableIndex { get; set; }
     public bool IsVisible { get; set; } = true;
     public string? Id { get; set; }

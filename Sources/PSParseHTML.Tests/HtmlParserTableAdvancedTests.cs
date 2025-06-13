@@ -6,7 +6,7 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
-public class ConvertFromHtmlTableTests {
+public class HtmlParserTableAdvancedTests {
     private static string GetAzureStatusHtmlFromSources() {
         var baseDir = AppContext.BaseDirectory;
         var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "azure_status.html"));

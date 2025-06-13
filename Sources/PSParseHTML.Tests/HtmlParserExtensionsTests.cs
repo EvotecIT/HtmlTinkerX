@@ -27,7 +27,7 @@ public class HtmlParserExtensionsTests {
     [Fact]
     public async Task GetElements_FromUrl_ByTag() {
         using var client = new HttpClient();
-        string html = await HttpContentHelper.GetStringWithProperEncodingAsync(
+        string html = await HtmlUtilities.GetStringWithProperEncodingAsync(
             client,
             "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/em");
 

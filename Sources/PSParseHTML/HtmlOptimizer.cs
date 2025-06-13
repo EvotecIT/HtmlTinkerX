@@ -36,7 +36,7 @@ public static class HtmlOptimizer {
     /// <returns>Minified CSS string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string OptimizeCssFile(string filePath) {
-        string css = FileUtilities.ReadFileChecked(filePath);
+        string css = HtmlUtilities.ReadFileChecked(filePath);
         return OptimizeCss(css);
     }
 
@@ -75,7 +75,7 @@ public static class HtmlOptimizer {
     /// <returns>Optimized HTML output.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string OptimizeHtmlFile(string filePath, bool cssDecodeEscapes) {
-        string html = FileUtilities.ReadFileChecked(filePath);
+        string html = HtmlUtilities.ReadFileChecked(filePath);
         return OptimizeHtml(html, cssDecodeEscapes);
     }
 
@@ -106,7 +106,7 @@ public static class HtmlOptimizer {
     /// <returns>Minified JavaScript.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string OptimizeJavaScriptFile(string filePath) {
-        string js = FileUtilities.ReadFileChecked(filePath);
+        string js = HtmlUtilities.ReadFileChecked(filePath);
         return OptimizeJavaScript(js);
     }
 }

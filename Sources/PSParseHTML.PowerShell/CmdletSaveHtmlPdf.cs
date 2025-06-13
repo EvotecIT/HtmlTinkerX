@@ -27,7 +27,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
 
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
-    public BrowserSession? Session { get; set; }
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>File path for the PDF.</summary>
     [Parameter(Mandatory = true, Position = 1)]
@@ -36,7 +36,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
     /// <summary>Browser engine to use for rendering.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetFile)]
-    public BrowserEngine Browser { get; set; } = BrowserEngine.Chromium;
+    public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
     /// <summary>Force re-download of browser runtimes.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
@@ -129,10 +129,10 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        BrowserSession? session = Session ?? (BrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
         switch (ParameterSetName) {
             case ParameterSetSession:
-                await HtmlBrowserRenderer.SavePagePdfAsync(
+                await HtmlBrowser.SavePagePdfAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     OutFile,
                     Delay,
@@ -156,7 +156,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
                     tagged: false).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
-                await HtmlBrowserRenderer.SavePagePdfAsync(
+                await HtmlBrowser.SavePagePdfAsync(
                     new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri,
                     OutFile,
                     Browser,
@@ -184,7 +184,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
                     slowMo: SlowMo).ConfigureAwait(false);
                 break;
             default:
-                await HtmlBrowserRenderer.SavePagePdfAsync(
+                await HtmlBrowser.SavePagePdfAsync(
                     Url,
                     OutFile,
                     Browser,

@@ -5,7 +5,7 @@ namespace PSParseHTML;
 /// <summary>
 /// Metadata about a parsed HTML list.
 /// </summary>
-public class ListMetadata {
+public class HtmlListMetadata {
     public int ListIndex { get; set; }
     public string? Id { get; set; }
     public bool IsVisible { get; set; } = true;
