@@ -1,14 +1,14 @@
 ﻿<p align="center">
   <a href="https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml"><img src="https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml/badge.svg"></a>
-  <a href="https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml"><img src="https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml/badge.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/v/PSParseHTML.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/vpre/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
-</p>
-
-<p align="center">
   <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/p/PSParseHTML.svg"></a>
   <a href="https://github.com/EvotecIT/PSParseHTML"><img src="https://img.shields.io/github/languages/top/evotecit/PSParseHTML.svg"></a>
   <a href="https://github.com/EvotecIT/PSParseHTML"><img src="https://img.shields.io/github/languages/code-size/evotecit/PSParseHTML.svg"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml"><img src="https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml/badge.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/v/PSParseHTML.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/vpre/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
   <a href="https://www.powershellgallery.com/packages/PSParseHTML"><img src="https://img.shields.io/powershellgallery/dt/PSParseHTML.svg"></a>
 </p>
 
