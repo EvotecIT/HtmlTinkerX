@@ -133,7 +133,15 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             foreach (var tableResult in detailedTables) {
                 tableArrays.Add(ConvertRows(tableResult.Data));
             }
-            WriteObject(tableArrays.ToArray(), false);
+
+            if (tableArrays.Count == 1) {
+                WriteObject(tableArrays[0], false);
+            } else {
+                if (tableArrays.Count > 1) {
+                    WriteWarning($"{tableArrays.Count} tables found. Returning array of tables.");
+                }
+                WriteObject(tableArrays.ToArray(), false);
+            }
         }
     }
 

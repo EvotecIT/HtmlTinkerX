@@ -10,10 +10,7 @@
         $Path = Join-Path $PSScriptRoot 'Documents/polish_table.html'
         $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
 
-        $Tables = ConvertFrom-HtmlTable -Content $Content -Engine AgilityPack
-        $Tables.Count | Should -Be 1
-
-        $Table = $Tables[0]
+        $Table = ConvertFrom-HtmlTable -Content $Content -Engine AgilityPack
         $Table.Count | Should -Be 2
 
         # Check that Polish characters are preserved correctly
@@ -27,10 +24,7 @@
         $Path = Join-Path $PSScriptRoot 'Documents/polish_table.html'
         $Content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
 
-        $Tables = ConvertFrom-HtmlTable -Content $Content -Engine AngleSharp
-        $Tables.Count | Should -Be 1
-
-        $Table = $Tables[0]
+        $Table = ConvertFrom-HtmlTable -Content $Content -Engine AngleSharp
         $Table.Count | Should -Be 2
 
         # Check that Polish characters are preserved correctly
