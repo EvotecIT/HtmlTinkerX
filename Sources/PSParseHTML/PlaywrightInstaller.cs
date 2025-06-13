@@ -80,6 +80,7 @@ internal static class PlaywrightInstaller
         var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
         long read = 0;
         int lastProgress = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         while (true)
         {
             int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
@@ -92,7 +93,8 @@ internal static class PlaywrightInstaller
                 int progress = (int)(read * 100 / total);
                 if (progress != lastProgress)
                 {
-                    Console.Write($"\rDownloading Playwright driver... {progress}%   ");
+                    double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
+                    Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
                     lastProgress = progress;
                 }
             }
