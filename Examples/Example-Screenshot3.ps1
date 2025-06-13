@@ -15,4 +15,4 @@ $Session = Invoke-HTMLRendering @invokeHTMLRenderingSplat
 Save-HTMLScreenshot -Session $Session -OutFile "$PSScriptRoot\Output\EvotecPageAdmin1.png" -Open
 $null = $Session.Page.GotoAsync('https://evotec.xyz/wp-admin/edit.php')
 Save-HTMLScreenshot -Session $Session -OutFile "$PSScriptRoot\Output\EvotecPageAdmin2.png" -Open
-$null = [PSParseHTML.HtmlBrowserRenderer]::CloseSessionAsync($Session).GetAwaiter().GetResult()
+$null = Close-HTMLSession -Session $Session
