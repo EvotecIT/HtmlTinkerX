@@ -21,6 +21,12 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     public HtmlBrowserSession? Session { get; set; }
 
     [Parameter(Mandatory = true)]
+    [ValidateScript({
+        if ([System.IO.Path]::GetExtension($_) -ne '.webm') {
+            throw [System.ArgumentException] 'Only .webm files are supported.'
+        }
+        $true
+    })]
     public string OutFile { get; set; } = string.Empty;
 
     [Parameter(ParameterSetName = ParameterSetUrl)]

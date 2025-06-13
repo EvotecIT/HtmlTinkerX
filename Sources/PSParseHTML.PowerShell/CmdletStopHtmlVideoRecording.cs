@@ -10,6 +10,12 @@ public sealed class CmdletStopHtmlVideoRecording : AsyncPSCmdlet {
     public HtmlBrowserSession? Session { get; set; }
 
     [Parameter]
+    [ValidateScript({
+        if ($_ -and [System.IO.Path]::GetExtension($_) -ne '.webm') {
+            throw [System.ArgumentException] 'Only .webm files are supported.'
+        }
+        $true
+    })]
     public string? OutFile { get; set; }
 
     protected override async Task ProcessRecordAsync() {
