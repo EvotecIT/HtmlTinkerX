@@ -45,6 +45,7 @@
 - `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
 - `Save-HTMLPdf` - generate a PDF of a rendered page
 - `Start-HTMLVideoRecording`/`Stop-HTMLVideoRecording` - record browser sessions to a `.webm` video file
+  - supports the same authentication options as `Invoke-HTMLRendering` so you can capture the login process
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file

@@ -20,6 +20,34 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     [Parameter(Position = 0, ParameterSetName = ParameterSetSession, ValueFromPipeline = true)]
     public HtmlBrowserSession? Session { get; set; }
 
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public PSCredential? Credential { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Username { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Password { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? LoginUrl { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? UsernameSelector { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? PasswordSelector { get; set; }
+
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? SubmitSelector { get; set; }
+
     [Parameter(Mandatory = true)]
     [ValidateScript({
         if ([System.IO.Path]::GetExtension($_) -ne '.webm') {
@@ -60,6 +88,9 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
         HtmlBrowserEngine engine = Browser;
         bool clean = Clean.IsPresent;
         bool headless = !Visible.IsPresent;
+        string? user = null;
+        string? pass = null;
+        HtmlFormLogin? form = null;
 
         switch (ParameterSetName) {
             case ParameterSetSession:
@@ -80,14 +111,30 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 break;
         }
 
+        if (ParameterSetName != ParameterSetSession) {
+            user = Credential?.UserName ?? Username;
+            pass = Credential?.GetNetworkCredential().Password ?? Password;
+            if (!string.IsNullOrEmpty(LoginUrl) &&
+                !string.IsNullOrEmpty(UsernameSelector) &&
+                !string.IsNullOrEmpty(PasswordSelector) &&
+                !string.IsNullOrEmpty(SubmitSelector)) {
+                form = new HtmlFormLogin {
+                    LoginUrl = LoginUrl!,
+                    UsernameSelector = UsernameSelector!,
+                    PasswordSelector = PasswordSelector!,
+                    SubmitSelector = SubmitSelector!
+                };
+            }
+        }
+
         HtmlBrowserSession sess = await HtmlBrowser.StartVideoRecordingAsync(
             target,
             OutFile,
             engine,
             clean,
-            null,
-            null,
-            null,
+            user,
+            pass,
+            form,
             headless,
             SlowMo,
             Width,
