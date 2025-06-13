@@ -132,7 +132,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         CopyFiles           = @{
             #"Examples\PublishingExample\Example-ExchangeEssentials.ps1" = "RunMe.ps1"
         }
-        ArtefactName        = '<ModuleName>.v<ModuleVersion>.zip'
+        ArtefactName        = '<ModuleName>.<TagModuleVersionWithPreRelease>.zip'
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat
 
