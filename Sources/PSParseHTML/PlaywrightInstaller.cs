@@ -67,19 +67,54 @@ internal static class PlaywrightInstaller
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
 
-        using var response = await client.GetAsync(url).ConfigureAwait(false);
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
+
+        var total = response.Content.Headers.ContentLength ?? -1L;
+        var mem = new MemoryStream();
+        var buffer = new byte[81920];
+        var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        long read = 0;
+        int lastProgress = 0;
+        while (true)
+        {
+            int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            if (n == 0)
+                break;
+            await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
+            if (total > 0)
+            {
+                read += n;
+                int progress = (int)(read * 100 / total);
+                if (progress != lastProgress)
+                {
+                    Console.Write($"\rDownloading Playwright driver... {progress}%   ");
+                    lastProgress = progress;
+                }
+            }
+        }
+        Console.WriteLine();
+        mem.Position = 0;
 
         string baseDir = GetDriverPath();
         if (Directory.Exists(baseDir))
             Directory.Delete(baseDir, true);
-        Directory.CreateDirectory(baseDir);
 
-        using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-        using (var archive = new ZipArchive(stream))
+        string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        using (var archive = new ZipArchive(mem))
         {
-            archive.ExtractToDirectory(baseDir);
+            archive.ExtractToDirectory(tempDir);
         }
+
+        Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
+        Directory.CreateDirectory(Path.Combine(baseDir, "package"));
+
+        File.Move(Path.Combine(tempDir, NodeExecutable), Path.Combine(baseDir, "node", PlatformId, NodeExecutable));
+        File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
+        Directory.Move(Path.Combine(tempDir, "package"), Path.Combine(baseDir, "package"));
+        Directory.Delete(tempDir, true);
 
         File.WriteAllText(VersionFile, DriverVersion);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", baseDir);
