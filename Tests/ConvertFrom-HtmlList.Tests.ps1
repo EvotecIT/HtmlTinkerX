@@ -33,4 +33,12 @@ Describe 'ConvertFrom-HtmlList' {
         $lists[0].Data[0].Column1 | Should -Be 'Item1'
         $lists[0].ListIndex | Should -Be 0
     }
+
+    It 'Returns single list when only one list is found' {
+        $path = Join-Path $PSScriptRoot 'Documents/single_list.html'
+        $content = Get-Content -LiteralPath $path -Raw
+        $list = ConvertFrom-HtmlList -Content $content -Engine AgilityPack
+        $list.Count | Should -Be 2
+        $list[0].Column1 | Should -Be 'Item1'
+    }
 }
