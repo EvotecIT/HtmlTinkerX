@@ -14,7 +14,18 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
     /// </summary>
-    private static async Task<HtmlBrowserSession> CreatePageAsync(string url, HtmlBrowserEngine browser, bool clean, string? username, string? password, HtmlFormLogin? formLogin, bool headless = true, int slowMo = 0) {
+    private static async Task<HtmlBrowserSession> CreatePageAsync(
+        string url,
+        HtmlBrowserEngine browser,
+        bool clean,
+        string? username,
+        string? password,
+        HtmlFormLogin? formLogin,
+        bool headless = true,
+        int slowMo = 0,
+        string? videoPath = null,
+        int videoWidth = 800,
+        int videoHeight = 600) {
         if (clean) {
             CleanInstallDir();
         }
@@ -46,6 +57,12 @@ public static partial class HtmlBrowser {
         }
         contextOptions ??= new BrowserNewContextOptions();
         contextOptions.IgnoreHTTPSErrors = true;
+        if (!string.IsNullOrEmpty(videoPath)) {
+            string dir = Path.GetDirectoryName(HtmlUtilities.ResolvePath(videoPath))!;
+            Directory.CreateDirectory(dir);
+            contextOptions.RecordVideoDir = dir;
+            contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
+        }
 
         var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
@@ -66,14 +83,30 @@ public static partial class HtmlBrowser {
         await page.GotoAsync(url);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        return new HtmlBrowserSession(playwright, browserInstance, context, page);
+        IVideo? video = null;
+        if (!string.IsNullOrEmpty(videoPath)) {
+            video = page.Video;
+        }
+
+        return new HtmlBrowserSession(playwright, browserInstance, context, page, video, videoPath);
     }
 
     /// <summary>
     /// Creates a new <see cref="HtmlBrowserSession"/> and navigates to the specified URL.
     /// </summary>
-    public static Task<HtmlBrowserSession> OpenSessionAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo);
+    public static Task<HtmlBrowserSession> OpenSessionAsync(
+        string url,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        HtmlFormLogin? formLogin = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? videoPath = null,
+        int videoWidth = 800,
+        int videoHeight = 600)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight);
 
     /// <summary>
     /// Disposes the specified browser session.
