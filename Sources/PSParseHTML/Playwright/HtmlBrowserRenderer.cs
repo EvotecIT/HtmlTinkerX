@@ -12,6 +12,9 @@ namespace PSParseHTML;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowserRenderer {
+    /// <summary>
+    /// Creates a new Playwright browser session and navigates to the specified URL.
+    /// </summary>
     private static async Task<BrowserSession> CreatePageAsync(string url, BrowserEngine browser, bool clean, string? username, string? password, FormLoginOptions? formLogin, bool headless = true, int slowMo = 0) {
         if (clean) {
             CleanInstallDir();

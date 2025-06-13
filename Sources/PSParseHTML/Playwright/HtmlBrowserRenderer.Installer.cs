@@ -8,10 +8,19 @@ using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
+/// <summary>
+/// Helper methods for retrieving HTML content using a headless browser.
+/// </summary>
 public static partial class HtmlBrowserRenderer {
+    /// <summary>
+    /// Gets the version of the Playwright driver.
+    /// </summary>
     private static string DriverVersion => typeof(Microsoft.Playwright.Playwright)
         .Assembly.GetName().Version?.ToString(3) ?? "1.52.0";
 
+    /// <summary>
+    /// Gets the platform identifier for the Playwright driver.
+    /// </summary>
     private static string PlatformId {
         get {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -26,6 +35,9 @@ public static partial class HtmlBrowserRenderer {
         }
     }
 
+    /// <summary>
+    /// Gets the platform identifier for downloading the Playwright driver.
+    /// </summary>
     private static string DownloadPlatformId {
         get {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -42,6 +54,11 @@ public static partial class HtmlBrowserRenderer {
 
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
 
+    /// <summary>
+    /// Gets the root directory for the Playwright driver installation.
+    /// This directory is determined based on environment variables and platform-specific paths.
+    /// It is used to store the Playwright driver executable and other related files.
+    /// </summary>
     private static string GetDriverRoot() {
         string? envRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         if (!string.IsNullOrEmpty(envRoot)) {
@@ -73,12 +90,24 @@ public static partial class HtmlBrowserRenderer {
         return Path.Combine(user, ".cache", "ms-playwright-driver");
     }
 
+    /// <summary>
+    /// Gets the path to the Playwright driver installation directory.
+    /// This directory contains the Playwright driver executable and other related files.
+    /// </summary>
     private static string GetDriverPath() {
         return Path.Combine(GetDriverRoot(), ".playwright");
     }
 
+    /// <summary>
+    /// Gets the path to the Playwright driver version file.
+    /// This file contains the version of the Playwright driver that is currently installed.
+    /// </summary>
     private static string VersionFile => Path.Combine(GetDriverPath(), ".version");
 
+    /// <summary>
+    /// Checks if the Playwright driver is already installed.
+    /// </summary>
+    /// <returns></returns>
     private static bool IsDriverPresent() {
         string baseDir = GetDriverPath();
         string nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
@@ -91,6 +120,12 @@ public static partial class HtmlBrowserRenderer {
         return version == DriverVersion;
     }
 
+
+    /// <summary>
+    /// Removes the Playwright driver installation directory.
+    /// This is typically called when the application is being uninstalled or when
+    /// the driver is no longer needed.
+    /// </summary>
     internal static void CleanDriver() {
         string root = GetDriverRoot();
         if (Directory.Exists(root)) {
@@ -102,6 +137,10 @@ public static partial class HtmlBrowserRenderer {
         }
     }
 
+    /// <summary>
+    /// Ensures that the Playwright driver is installed.
+    /// </summary>
+    /// <returns></returns>
     internal static async Task EnsureInstalledAsync() {
         if (IsDriverPresent()) {
             // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
@@ -184,6 +223,10 @@ public static partial class HtmlBrowserRenderer {
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
     }
 
+    /// <summary>
+    /// Gets the path where Playwright browsers are installed.
+    /// </summary>
+    /// <returns></returns>
     private static string GetBrowserInstallPath() {
         string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (envDefined == "0") {
@@ -203,6 +246,9 @@ public static partial class HtmlBrowserRenderer {
         return Path.Combine(user, ".cache", "ms-playwright");
     }
 
+    /// <summary>
+    /// Cleans the browser installation directory and removes the Playwright driver.
+    /// </summary>
     private static void CleanInstallDir() {
         string path = GetBrowserInstallPath();
         if (Directory.Exists(path)) {

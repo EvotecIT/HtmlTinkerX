@@ -13,6 +13,9 @@ public sealed class BrowserSession : IAsyncDisposable {
     public IBrowserContext Context { get; }
     public IPage Page { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BrowserSession"/> class.
+    /// /// </summary>
     public BrowserSession(IPlaywright playwright, IBrowser browser, IBrowserContext context, IPage page) {
         Playwright = playwright;
         Browser = browser;
@@ -20,6 +23,9 @@ public sealed class BrowserSession : IAsyncDisposable {
         Page = page;
     }
 
+    /// <summary>
+    /// Asynchronously disposes of the browser session, closing the page, context, and browser.
+    /// /// </summary>
     public async ValueTask DisposeAsync() {
         await Context.CloseAsync();
         await Browser.CloseAsync();
