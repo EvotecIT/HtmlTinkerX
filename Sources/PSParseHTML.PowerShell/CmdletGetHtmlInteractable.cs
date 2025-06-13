@@ -40,6 +40,16 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Show the browser instead of running headless.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public SwitchParameter Visible { get; set; }
+
+    /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int SlowMo { get; set; } = 0;
+
     /// <summary>Include elements hidden from view.</summary>
     [Parameter]
     public SwitchParameter IncludeHidden { get; set; }
@@ -107,7 +117,9 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     Clean.IsPresent,
                     user,
                     pass,
-                    form).ConfigureAwait(false)) {
+                    form,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false)) {
                     list = await HtmlBrowserRenderer.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
@@ -119,7 +131,9 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     Clean.IsPresent,
                     null,
                     null,
-                    null).ConfigureAwait(false)) {
+                    null,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false)) {
                     list = await HtmlBrowserRenderer.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;

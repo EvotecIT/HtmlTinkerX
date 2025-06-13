@@ -44,7 +44,9 @@ public static class HtmlBrowserRenderer {
         bool clean,
         string? username,
         string? password,
-        FormLoginOptions? formLogin) {
+        FormLoginOptions? formLogin,
+        bool headless = true,
+        int slowMo = 0) {
         if (clean) {
             CleanInstallDir();
         }
@@ -59,7 +61,10 @@ public static class HtmlBrowserRenderer {
             _ => playwright.Chromium,
         };
 
-        var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions {
+            Headless = headless,
+            SlowMo = slowMo
+        });
         BrowserNewContextOptions? contextOptions = null;
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -103,8 +108,10 @@ public static class HtmlBrowserRenderer {
         bool clean = false,
         string? username = null,
         string? password = null,
-        FormLoginOptions? formLogin = null)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin);
+        FormLoginOptions? formLogin = null,
+        bool headless = true,
+        int slowMo = 0)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -125,14 +132,18 @@ public static class HtmlBrowserRenderer {
         bool clean = false,
         string? username = null,
         string? password = null,
-        FormLoginOptions? formLogin = null) {
+        FormLoginOptions? formLogin = null,
+        bool headless = true,
+        int slowMo = 0) {
         await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
             username,
             password,
-            formLogin).ConfigureAwait(false);
+            formLogin,
+            headless,
+            slowMo).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
@@ -142,16 +153,18 @@ public static class HtmlBrowserRenderer {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(
+public static async Task SavePageContentAsync(
         string url,
         string path,
         BrowserEngine browser = BrowserEngine.Chromium,
         bool clean = false,
         string? username = null,
         string? password = null,
-        FormLoginOptions? formLogin = null) {
+        FormLoginOptions? formLogin = null,
+        bool headless = true,
+        int slowMo = 0) {
         string fullPath = FileUtilities.ResolvePath(path);
-        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin).ConfigureAwait(false);
+        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
 
@@ -183,14 +196,18 @@ public static async Task CaptureScreenshotAsync(
     int? clipHeight = null,
     string? username = null,
     string? password = null,
-    FormLoginOptions? formLogin = null) {
+    FormLoginOptions? formLogin = null,
+    bool headless = true,
+    int slowMo = 0) {
         await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
             username,
             password,
-            formLogin).ConfigureAwait(false);
+            formLogin,
+            headless,
+            slowMo).ConfigureAwait(false);
 
         string fullPath = FileUtilities.ResolvePath(path);
         await CaptureScreenshotAsync(
@@ -242,7 +259,7 @@ public static async Task CaptureScreenshotAsync(
     /// <summary>
     /// Saves a PDF of the specified page URL to disk.
     /// </summary>
-    public static async Task SavePagePdfAsync(
+public static async Task SavePagePdfAsync(
         string url,
         string path,
         BrowserEngine browser = BrowserEngine.Chromium,
@@ -268,14 +285,18 @@ public static async Task CaptureScreenshotAsync(
         bool tagged = false,
         string? username = null,
         string? password = null,
-        FormLoginOptions? formLogin = null) {
+        FormLoginOptions? formLogin = null,
+        bool headless = true,
+        int slowMo = 0) {
         await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
             username,
             password,
-            formLogin).ConfigureAwait(false);
+            formLogin,
+            headless,
+            slowMo).ConfigureAwait(false);
 
         await SavePagePdfAsync(
             session.Page,
@@ -370,19 +391,23 @@ public static async Task CaptureScreenshotAsync(
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
     /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(
+public static async Task<List<string>> SavePageDownloadsAsync(
         string url,
         string directory,
         BrowserEngine browser = BrowserEngine.Chromium,
         bool clean = false,
-        string? filter = null) {
+        string? filter = null,
+        bool headless = true,
+        int slowMo = 0) {
         await using BrowserSession session = await OpenSessionAsync(
             url,
             browser,
             clean,
             null,
             null,
-            null).ConfigureAwait(false);
+            null,
+            headless,
+            slowMo).ConfigureAwait(false);
         var page = session.Page;
         string dir = FileUtilities.ResolvePath(directory);
         return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);

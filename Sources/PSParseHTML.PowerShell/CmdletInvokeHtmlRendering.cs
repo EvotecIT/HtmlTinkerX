@@ -77,6 +77,15 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter NoDefault { get; set; }
 
+    /// <summary>Show the browser instead of running headless.</summary>
+    [Parameter]
+    public SwitchParameter Visible { get; set; }
+
+    /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int SlowMo { get; set; } = 0;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -102,16 +111,18 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 Clean.IsPresent,
                 user,
                 pass,
-                form).ConfigureAwait(false);
+                form,
+                headless: !Visible.IsPresent,
+                slowMo: SlowMo).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = FileUtilities.ResolvePath(OutFile);
-            await HtmlBrowserRenderer.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
+            await HtmlBrowserRenderer.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowserRenderer.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form).ConfigureAwait(false);
+            string html = await HtmlBrowserRenderer.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
             WriteObject(html);
         }
     }

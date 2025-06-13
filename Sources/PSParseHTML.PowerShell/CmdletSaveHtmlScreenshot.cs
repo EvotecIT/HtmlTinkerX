@@ -55,6 +55,15 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFileClip)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Show the browser instead of running headless.</summary>
+    [Parameter]
+    public SwitchParameter Visible { get; set; }
+
+    /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int SlowMo { get; set; } = 0;
+
     /// <summary>Open the screenshot after saving.</summary>
     [Parameter]
     public SwitchParameter Open { get; set; }
@@ -128,7 +137,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     X,
                     Y,
                     Width,
-                    Height).ConfigureAwait(false);
+                    Height,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false);
                 break;
             case ParameterSetFileClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
@@ -142,7 +153,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     X,
                     Y,
                     Width,
-                    Height).ConfigureAwait(false);
+                    Height,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false);
                 break;
             case ParameterSetSessionClip:
                 await HtmlBrowserRenderer.CaptureScreenshotAsync(
@@ -175,7 +188,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Clean.IsPresent,
                     Full.IsPresent,
                     Delay,
-                    Selector).ConfigureAwait(false);
+                    Selector,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false);
                 break;
         }
 
