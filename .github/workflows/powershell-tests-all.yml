@@ -10,9 +10,10 @@ on:
 #       - v1-legacy
 #       - v2-speedygonzales
 #     paths-ignore:
-#       - 'README.md'
-#       - 'CHANGELOG.md'
+#       - '*.md'
 #       - 'Docs/**'
+#       - 'Examples/**'
+#       - '.gitignore'
 #   pull_request:
 #     branches:
 #       - v1-legacy
