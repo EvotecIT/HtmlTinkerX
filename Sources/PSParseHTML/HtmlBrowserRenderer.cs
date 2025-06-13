@@ -36,6 +36,7 @@ public static class HtmlBrowserRenderer {
         if (Directory.Exists(path)) {
             Directory.Delete(path, recursive: true);
         }
+        PlaywrightInstaller.CleanDriver();
     }
 
     private static async Task<BrowserSession> CreatePageAsync(
@@ -48,6 +49,8 @@ public static class HtmlBrowserRenderer {
         if (clean) {
             CleanInstallDir();
         }
+
+        await PlaywrightInstaller.EnsureInstalledAsync().ConfigureAwait(false);
 
         string engine = browser.ToString().ToLowerInvariant();
         Microsoft.Playwright.Program.Main(new[] { "install", engine });
