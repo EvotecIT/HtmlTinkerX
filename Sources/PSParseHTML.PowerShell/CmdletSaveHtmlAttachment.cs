@@ -40,6 +40,15 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetDefault)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Show the browser instead of running headless.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    public SwitchParameter Visible { get; set; }
+
+    /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int SlowMo { get; set; } = 0;
+
     /// <summary>Optional filter applied to download URLs or file names.</summary>
     [Parameter]
     public string? Filter { get; set; }
@@ -58,7 +67,9 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
                 FileUtilities.ResolvePath(Path),
                 Browser,
                 Clean.IsPresent,
-                Filter).ConfigureAwait(false)
+                Filter,
+                headless: !Visible.IsPresent,
+                slowMo: SlowMo).ConfigureAwait(false)
         };
 
         WriteObject(files.ToArray(), true);

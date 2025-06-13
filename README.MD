@@ -42,6 +42,7 @@
   - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
 - `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
 - `Save-HTMLPdf` - generate a PDF of a rendered page
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
@@ -124,6 +125,7 @@ Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppD
 
 Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
 Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` or `-Selector` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
+Use `-Visible` to see the browser window and `-SlowMo` to slow down actions for easier debugging.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 

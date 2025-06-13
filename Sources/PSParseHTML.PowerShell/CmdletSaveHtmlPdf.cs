@@ -43,6 +43,16 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Show the browser instead of running headless.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public SwitchParameter Visible { get; set; }
+
+    /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int SlowMo { get; set; } = 0;
+
     /// <summary>Open the PDF after saving.</summary>
     [Parameter]
     public SwitchParameter Open { get; set; }
@@ -169,7 +179,9 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
                     FooterTemplate,
                     PreferCssPageSize.IsPresent,
                     outline: false,
-                    tagged: false).ConfigureAwait(false);
+                    tagged: false,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false);
                 break;
             default:
                 await HtmlBrowserRenderer.SavePagePdfAsync(
@@ -195,7 +207,9 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
                     FooterTemplate,
                     PreferCssPageSize.IsPresent,
                     outline: false,
-                    tagged: false).ConfigureAwait(false);
+                    tagged: false,
+                    headless: !Visible.IsPresent,
+                    slowMo: SlowMo).ConfigureAwait(false);
                 break;
         }
 
