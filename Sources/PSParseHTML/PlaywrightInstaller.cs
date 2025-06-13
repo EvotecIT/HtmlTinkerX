@@ -55,7 +55,11 @@ internal static class PlaywrightInstaller
     {
         if (IsDriverPresent())
         {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverPath());
+            // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
+            // the '.playwright' folder, not to the folder itself.
+            Environment.SetEnvironmentVariable(
+                "PLAYWRIGHT_DRIVER_SEARCH_PATH",
+                Path.GetDirectoryName(GetDriverPath()) ?? GetDriverPath());
             return;
         }
 
@@ -121,6 +125,7 @@ internal static class PlaywrightInstaller
         Directory.Delete(tempDir, true);
 
         File.WriteAllText(VersionFile, DriverVersion);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", baseDir);
+        string driversRoot = Path.GetDirectoryName(baseDir) ?? baseDir;
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driversRoot);
     }
 }
