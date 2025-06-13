@@ -15,6 +15,8 @@ $invokeHTMLRenderingSplat = @{
 # Default session is always used unless you specify NoSession
 $null = Open-HTMLSession @invokeHTMLRenderingSplat
 
+Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\WP1.png" -Open
+
 Start-HTMLVideoRecording -OutFile "$PSScriptRoot\Output\WP1.webm"
 
 Get-HTMLInteractable -Filter "Media" -IncludeHidden | Format-Table
