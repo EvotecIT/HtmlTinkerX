@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -169,7 +170,20 @@ internal static class PlaywrightInstaller
 
         Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
 
-        File.Move(Path.Combine(tempDir, NodeExecutable), Path.Combine(baseDir, "node", PlatformId, NodeExecutable));
+        string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
+        File.Move(Path.Combine(tempDir, NodeExecutable), nodeDest);
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
+                chmod?.WaitForExit();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
         File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
 
         string packageSrc = Path.Combine(tempDir, "package");
