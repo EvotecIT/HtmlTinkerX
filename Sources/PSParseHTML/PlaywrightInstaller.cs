@@ -20,11 +20,11 @@ internal static class PlaywrightInstaller
                 return "win32_x64";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                    ? "darwin-arm64"
-                    : "darwin-x64";
+                    ? "mac-arm64"
+                    : "mac";
             if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
                 return "linux-arm64";
-            return "linux-x64";
+            return "linux";
         }
     }
 
