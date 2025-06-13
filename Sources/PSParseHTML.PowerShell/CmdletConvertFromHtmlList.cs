@@ -74,8 +74,18 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
         bool returnObjects = !AsString.IsPresent;
 
         if (IncludeMetadata.IsPresent) {
+            var listObjects = new List<PSObject>();
             foreach (var result in results) {
-                WriteObject(CreateListObject(result, returnObjects));
+                listObjects.Add(CreateListObject(result, returnObjects));
+            }
+
+            if (listObjects.Count == 1) {
+                WriteObject(listObjects[0], false);
+            } else {
+                if (listObjects.Count > 1) {
+                    WriteWarning($"{listObjects.Count} lists found. Returning array of lists.");
+                }
+                WriteObject(listObjects.ToArray(), false);
             }
         } else {
             var output = new List<object>();
@@ -86,7 +96,14 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
                     output.Add(result.Items.Select(i => string.Join(TagPlaceholder, i)).ToArray());
                 }
             }
-            WriteObject(output.ToArray(), false);
+            if (output.Count == 1) {
+                WriteObject(output[0], false);
+            } else {
+                if (output.Count > 1) {
+                    WriteWarning($"{output.Count} lists found. Returning array of lists.");
+                }
+                WriteObject(output.ToArray(), false);
+            }
         }
     }
 
