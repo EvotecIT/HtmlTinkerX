@@ -109,11 +109,15 @@ internal static class PlaywrightInstaller
         }
 
         Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
-        Directory.CreateDirectory(Path.Combine(baseDir, "package"));
 
         File.Move(Path.Combine(tempDir, NodeExecutable), Path.Combine(baseDir, "node", PlatformId, NodeExecutable));
         File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
-        Directory.Move(Path.Combine(tempDir, "package"), Path.Combine(baseDir, "package"));
+
+        string packageSrc = Path.Combine(tempDir, "package");
+        string packageDest = Path.Combine(baseDir, "package");
+        if (Directory.Exists(packageDest))
+            Directory.Delete(packageDest, true);
+        Directory.Move(packageSrc, packageDest);
         Directory.Delete(tempDir, true);
 
         File.WriteAllText(VersionFile, DriverVersion);
