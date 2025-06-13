@@ -88,6 +88,22 @@ internal static class PlaywrightInstaller
         return version == DriverVersion;
     }
 
+    internal static void CleanDriver()
+    {
+        string root = GetDriverRoot();
+        if (Directory.Exists(root))
+        {
+            try
+            {
+                Directory.Delete(root, true);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
     internal static async Task EnsureInstalledAsync()
     {
         if (IsDriverPresent())

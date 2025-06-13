@@ -36,6 +36,7 @@ public static class HtmlBrowserRenderer {
         if (Directory.Exists(path)) {
             Directory.Delete(path, recursive: true);
         }
+        PlaywrightInstaller.CleanDriver();
     }
 
     private static async Task<BrowserSession> CreatePageAsync(
