@@ -28,7 +28,7 @@ Describe 'Save-HTMLScreenshot' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $before = Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $beforeTime = if ($before) { $before.LastWriteTime } else { [datetime]::MinValue }
-        Save-HTMLScreenshot -Url $uri -Selector '#loaded'
+        Save-HTMLScreenshot -Url $uri -Selector '#loaded' -Open
         $after = Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $after.LastWriteTime | Should -BeGreaterThan $beforeTime
     }
