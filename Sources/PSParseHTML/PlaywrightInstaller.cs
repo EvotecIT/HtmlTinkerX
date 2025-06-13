@@ -29,6 +29,22 @@ internal static class PlaywrightInstaller
         }
     }
 
+    private static string DownloadPlatformId
+    {
+        get
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return "win32_x64";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return RuntimeInformation.OSArchitecture == Architecture.Arm64
+                    ? "mac-arm64"
+                    : "mac";
+            if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
+                return "linux-arm64";
+            return "linux";
+        }
+    }
+
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
 
     private static string GetDriverRoot()
@@ -120,7 +136,7 @@ internal static class PlaywrightInstaller
         string urlBase = "https://playwright.azureedge.net/builds/driver";
         if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
             urlBase += "/next";
-        string url = $"{urlBase}/playwright-{DriverVersion}-{PlatformId}.zip";
+        string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
 
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
