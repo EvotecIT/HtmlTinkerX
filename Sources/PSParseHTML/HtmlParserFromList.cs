@@ -147,7 +147,7 @@ public static class HtmlParserFromList {
             var metadata = result.Metadata;
             metadata.ListIndex = index++;
             metadata.Id = list.Id;
-            metadata.Classes = list.GetAttributeValue("class", null);
+            metadata.Classes = list.GetAttributeValue("class", string.Empty);
             metadata.IsOrdered = list.Name.Equals("ol", StringComparison.OrdinalIgnoreCase);
             foreach (var attr in list.Attributes) {
                 metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
