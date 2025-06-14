@@ -49,12 +49,6 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     public string? SubmitSelector { get; set; }
 
     [Parameter(Mandatory = true)]
-    [ValidateScript({
-        if ([System.IO.Path]::GetExtension($_) -ne '.webm') {
-            throw [System.ArgumentException] 'Only .webm files are supported.'
-        }
-        $true
-    })]
     public string OutFile { get; set; } = string.Empty;
 
     [Parameter(ParameterSetName = ParameterSetUrl)]
@@ -84,6 +78,9 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     public SwitchParameter NoDefault { get; set; }
 
     protected override async Task ProcessRecordAsync() {
+        if (System.IO.Path.GetExtension(OutFile) != ".webm") {
+            throw new PSArgumentException("Only .webm files are supported.", nameof(OutFile));
+        }
         string target;
         HtmlBrowserEngine engine = Browser;
         bool clean = Clean.IsPresent;
