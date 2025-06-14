@@ -85,7 +85,7 @@ public sealed class CmdletFormatHtml : PSCmdlet {
             RemoveEmptyBlocks.IsPresent);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

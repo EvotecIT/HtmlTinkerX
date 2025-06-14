@@ -40,7 +40,7 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
             : HtmlFormatter.FormatJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);

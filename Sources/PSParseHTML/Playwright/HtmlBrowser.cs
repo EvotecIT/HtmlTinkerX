@@ -55,8 +55,8 @@ public static partial class HtmlBrowser {
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
                 HttpCredentials = new HttpCredentials {
-                    Username = username,
-                    Password = password
+                    Username = username!,
+                    Password = password!
                 }
             };
         }
@@ -66,7 +66,8 @@ public static partial class HtmlBrowser {
             contextOptions.StorageStatePath = storageStatePath;
         }
         if (!string.IsNullOrEmpty(videoPath)) {
-            string dir = Path.GetDirectoryName(HtmlUtilities.ResolvePath(videoPath))!;
+            string resolved = HtmlUtilities.ResolvePath(videoPath!);
+            string dir = Path.GetDirectoryName(resolved) ?? resolved;
             Directory.CreateDirectory(dir);
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
@@ -192,7 +193,7 @@ public static partial class HtmlBrowser {
             return await page.ContentAsync().ConfigureAwait(false);
         }
 
-        var locator = page.Locator(selector);
+        var locator = page.Locator(selector!);
         await locator.WaitForAsync();
 
         if (asText) {

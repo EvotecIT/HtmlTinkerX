@@ -108,7 +108,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
 
         errorAction = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
         if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string errorActionString = MyInvocation.BoundParameters["ErrorAction"].ToString();
+            string errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString() ?? string.Empty;
             if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
             }
