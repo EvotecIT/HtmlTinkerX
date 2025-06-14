@@ -12,4 +12,17 @@ Describe 'Invoke-HTMLRendering' {
         $html = Invoke-HTMLRendering -Url $uri -Browser Firefox
         $html | Should -Match 'Dynamic Content'
     }
+
+    It 'Applies custom browser context options' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $session = Invoke-HTMLRendering -Url $uri -Session -UserAgent 'MyAgent' -ViewportWidth 123 -ViewportHeight 77 -DeviceScaleFactor 1.5
+        $ua = $session.Page.EvaluateAsync('navigator.userAgent',$null).GetAwaiter().GetResult()
+        $w = [int]($session.Page.EvaluateAsync('window.innerWidth',$null).GetAwaiter().GetResult().ToString())
+        $d = [double]($session.Page.EvaluateAsync('window.devicePixelRatio',$null).GetAwaiter().GetResult().ToString())
+        Close-HTMLSession -Session $session
+        $ua | Should -Be 'MyAgent'
+        $w | Should -Be 123
+        [double]$d | Should -Be 1.5
+    }
 }
