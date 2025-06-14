@@ -105,7 +105,7 @@ public static partial class HtmlBrowser {
         bool outline = false,
         bool tagged = false) {
         if (!string.IsNullOrEmpty(selector)) {
-            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+            await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
         if (delayMs > 0) {
             await page.WaitForTimeoutAsync(delayMs);

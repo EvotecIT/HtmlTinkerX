@@ -37,7 +37,7 @@ public sealed class CmdletFormatCss : PSCmdlet {
             : HtmlFormatter.FormatCss(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             System.IO.File.WriteAllText(outPath, formatted);
         } else {
             WriteObject(formatted);

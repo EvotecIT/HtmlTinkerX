@@ -53,6 +53,8 @@
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
+- `Get-HTMLCookie` - retrieve cookies from the active session
+- `Set-HTMLCookie` - add cookies to the active session
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.

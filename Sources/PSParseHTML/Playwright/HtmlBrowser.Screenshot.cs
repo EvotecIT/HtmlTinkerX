@@ -81,7 +81,7 @@ public static partial class HtmlBrowser {
         int? clipWidth = null,
         int? clipHeight = null) {
         if (!string.IsNullOrEmpty(selector)) {
-            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
+            await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
         if (delayMs > 0) {
             await page.WaitForTimeoutAsync(delayMs);
