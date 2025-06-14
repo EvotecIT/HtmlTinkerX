@@ -52,6 +52,7 @@
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
+- `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
@@ -117,6 +118,13 @@ Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#conten
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
     Save-HTMLScreenshot -OutFile '.\downloads.png'
 Save-HTMLAttachment -Session $session -Path '.\Downloads'
+# Mock an API response
+$handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBlock {
+    param($route)
+    $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{ Status = 200; ContentType = 'application/json'; Body = '{"ok":true}' }) | Out-Null
+}
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
+Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 Close-HTMLSession -Session $session
 ```
 

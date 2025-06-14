@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<script>
+async function load(){
+  try {
+    const r = await fetch('data.json');
+    const j = await r.json();
+    document.getElementById('result').textContent = j.message;
+  } catch(e){
+    document.getElementById('result').textContent = 'error';
+  }
+}
+window.addEventListener('DOMContentLoaded', load);
+</script>
+</head>
+<body>
+<div id="result">loading</div>
+</body>
+</html>
