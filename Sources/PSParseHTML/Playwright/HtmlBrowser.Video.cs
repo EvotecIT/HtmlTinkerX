@@ -19,8 +19,12 @@ public static partial class HtmlBrowser {
         bool headless = true,
         int slowMo = 0,
         int width = 800,
-        int height = 600)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null);
+        int height = 600,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null)
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -31,7 +35,11 @@ public static partial class HtmlBrowser {
         bool headless = true,
         int slowMo = 0,
         int width = 800,
-        int height = 600) {
+        int height = 600,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null) {
         string temp = Path.GetTempFileName();
         await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
         string url = session.Page.Url;
@@ -53,7 +61,11 @@ public static partial class HtmlBrowser {
             videoPath: videoPath,
             videoWidth: width,
             videoHeight: height,
-            storageStatePath: temp).ConfigureAwait(false);
+            storageStatePath: temp,
+            userAgent: userAgent,
+            viewportWidth: viewportWidth,
+            viewportHeight: viewportHeight,
+            deviceScaleFactor: deviceScaleFactor).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;

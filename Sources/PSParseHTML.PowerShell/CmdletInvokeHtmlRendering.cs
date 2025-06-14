@@ -86,6 +86,20 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    [Parameter]
+    public string? UserAgent { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportWidth { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportHeight { get; set; }
+
+    [Parameter]
+    public double? DeviceScaleFactor { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -114,16 +128,20 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 form,
                 headless: !Visible.IsPresent,
                 slowMo: SlowMo,
-                storageStatePath: null).ConfigureAwait(false);
+                storageStatePath: null,
+                userAgent: UserAgent,
+                viewportWidth: ViewportWidth,
+                viewportHeight: ViewportHeight,
+                deviceScaleFactor: (float?)DeviceScaleFactor).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutFile);
-            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor).ConfigureAwait(false);
             WriteObject(html);
         }
     }
