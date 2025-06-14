@@ -26,7 +26,10 @@ public static partial class HtmlBrowser {
         string? videoPath = null,
         int videoWidth = 800,
         int videoHeight = 600,
-        string? storageStatePath = null) {
+        string? storageStatePath = null,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -43,10 +46,19 @@ public static partial class HtmlBrowser {
             _ => playwright.Chromium,
         };
 
-        var browserInstance = await type.LaunchAsync(new BrowserTypeLaunchOptions {
+        var launchOptions = new BrowserTypeLaunchOptions {
             Headless = headless,
             SlowMo = slowMo
-        });
+        };
+        if (!string.IsNullOrEmpty(proxy)) {
+            launchOptions.Proxy = new Proxy {
+                Server = proxy,
+                Username = proxyUsername,
+                Password = proxyPassword
+            };
+        }
+
+        var browserInstance = await type.LaunchAsync(launchOptions);
         BrowserNewContextOptions? contextOptions = null;
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -110,8 +122,11 @@ public static partial class HtmlBrowser {
         string? videoPath = null,
         int videoWidth = 800,
         int videoHeight = 600,
-        string? storageStatePath = null)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath);
+        string? storageStatePath = null,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, proxy, proxyUsername, proxyPassword);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -126,7 +141,18 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0) {
+    public static async Task<string> GetPageContentAsync(
+        string url,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        HtmlFormLogin? formLogin = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -136,7 +162,10 @@ public static partial class HtmlBrowser {
             formLogin,
             headless,
             slowMo,
-            null).ConfigureAwait(false);
+            videoPath: null,
+            proxy: proxy,
+            proxyUsername: proxyUsername,
+            proxyPassword: proxyPassword).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
@@ -146,9 +175,32 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0) {
+    public static async Task SavePageContentAsync(
+        string url,
+        string path,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        HtmlFormLogin? formLogin = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null) {
         string fullPath = HtmlUtilities.ResolvePath(path);
-        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo).ConfigureAwait(false);
+        string content = await GetPageContentAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin,
+            headless,
+            slowMo,
+            proxy,
+            proxyUsername,
+            proxyPassword).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
 

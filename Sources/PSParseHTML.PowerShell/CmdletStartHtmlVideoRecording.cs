@@ -66,6 +66,21 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     [ValidateRange(0,int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>
+    /// Proxy server address used for browser traffic.
+    /// Include protocol and port if required.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Proxy { get; set; }
+
+    /// <summary>
+    /// Credentials used for the specified <see cref="Proxy"/> server.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public PSCredential? ProxyCredential { get; set; }
+
     [Parameter]
     [ValidateRange(1,int.MaxValue)]
     public int Width { get; set; } = 800;
@@ -87,6 +102,8 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
         bool headless = !Visible.IsPresent;
         string? user = null;
         string? pass = null;
+        string? proxyUser = ProxyCredential?.UserName;
+        string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
         HtmlFormLogin? form = null;
 
         switch (ParameterSetName) {
@@ -143,7 +160,10 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 headless,
                 SlowMo,
                 Width,
-                Height).ConfigureAwait(false);
+                Height,
+                proxy: Proxy,
+                proxyUsername: proxyUser,
+                proxyPassword: proxyPass).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);

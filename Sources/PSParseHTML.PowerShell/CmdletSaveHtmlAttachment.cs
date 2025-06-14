@@ -49,6 +49,19 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>
+    /// Proxy server address used for browser traffic.
+    /// Include protocol and port if required.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    public string? Proxy { get; set; }
+
+    /// <summary>
+    /// Credentials used for the specified <see cref="Proxy"/> server.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Optional filter applied to download URLs or file names.</summary>
     [Parameter]
     public string? Filter { get; set; }
@@ -56,6 +69,8 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        string? proxyUser = ProxyCredential?.UserName;
+        string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
 
         List<string> files = ParameterSetName switch {
             ParameterSetSession => await HtmlBrowser.SavePageDownloadsAsync(
@@ -69,7 +84,10 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
                 Clean.IsPresent,
                 Filter,
                 headless: !Visible.IsPresent,
-                slowMo: SlowMo).ConfigureAwait(false)
+                slowMo: SlowMo,
+                proxy: Proxy,
+                proxyUsername: proxyUser,
+                proxyPassword: proxyPass).ConfigureAwait(false)
         };
 
         WriteObject(files.ToArray(), true);

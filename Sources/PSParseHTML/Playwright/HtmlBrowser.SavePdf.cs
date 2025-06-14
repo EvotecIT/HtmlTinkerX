@@ -43,7 +43,10 @@ public static partial class HtmlBrowser {
             string? password = null,
             HtmlFormLogin? formLogin = null,
             bool headless = true,
-            int slowMo = 0) {
+            int slowMo = 0,
+            string? proxy = null,
+            string? proxyUsername = null,
+            string? proxyPassword = null) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -53,7 +56,10 @@ public static partial class HtmlBrowser {
             formLogin,
             headless,
             slowMo,
-            null).ConfigureAwait(false);
+            videoPath: null,
+            proxy: proxy,
+            proxyUsername: proxyUsername,
+            proxyPassword: proxyPassword).ConfigureAwait(false);
 
         await SavePagePdfAsync(
             session.Page,

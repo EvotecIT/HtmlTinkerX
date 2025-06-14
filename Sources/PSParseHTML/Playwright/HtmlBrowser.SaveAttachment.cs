@@ -21,7 +21,17 @@ public static partial class HtmlBrowser {
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
     /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0) {
+    public static async Task<List<string>> SavePageDownloadsAsync(
+        string url,
+        string directory,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        string? filter = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -31,7 +41,10 @@ public static partial class HtmlBrowser {
             null,
             headless,
             slowMo,
-            null).ConfigureAwait(false);
+            videoPath: null,
+            proxy: proxy,
+            proxyUsername: proxyUsername,
+            proxyPassword: proxyPassword).ConfigureAwait(false);
         var page = session.Page;
         string dir = HtmlUtilities.ResolvePath(directory);
         return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);

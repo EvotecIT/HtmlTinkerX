@@ -86,10 +86,25 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>
+    /// Proxy server address used for browser traffic.
+    /// Include protocol and port if required.
+    /// </summary>
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    /// <summary>
+    /// Credentials used for authenticating with the specified <see cref="Proxy"/> server.
+    /// </summary>
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+        string? proxyUser = ProxyCredential?.UserName;
+        string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
         HtmlFormLogin? form = null;
         if (!string.IsNullOrEmpty(LoginUrl) && !string.IsNullOrEmpty(UsernameSelector) && !string.IsNullOrEmpty(PasswordSelector) && !string.IsNullOrEmpty(SubmitSelector)) {
             form = new HtmlFormLogin {
@@ -114,16 +129,42 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 form,
                 headless: !Visible.IsPresent,
                 slowMo: SlowMo,
-                storageStatePath: null).ConfigureAwait(false);
+                storageStatePath: null,
+                proxy: Proxy,
+                proxyUsername: proxyUser,
+                proxyPassword: proxyPass).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutFile);
-            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            await HtmlBrowser.SavePageContentAsync(
+                target,
+                outPath,
+                Browser,
+                Clean.IsPresent,
+                user,
+                pass,
+                form,
+                !Visible.IsPresent,
+                SlowMo,
+                Proxy,
+                proxyUser,
+                proxyPass).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(
+                target,
+                Browser,
+                Clean.IsPresent,
+                user,
+                pass,
+                form,
+                !Visible.IsPresent,
+                SlowMo,
+                Proxy,
+                proxyUser,
+                proxyPass).ConfigureAwait(false);
             WriteObject(html);
         }
     }

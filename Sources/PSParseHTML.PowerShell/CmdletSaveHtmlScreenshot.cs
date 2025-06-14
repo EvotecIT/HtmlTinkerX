@@ -64,6 +64,19 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>
+    /// Proxy server address used for browser traffic.
+    /// Include protocol and port if required.
+    /// </summary>
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    /// <summary>
+    /// Credentials used for the specified <see cref="Proxy"/> server.
+    /// </summary>
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Open the screenshot after saving.</summary>
     [Parameter]
     public SwitchParameter Open { get; set; }
@@ -110,6 +123,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        string? proxyUser = ProxyCredential?.UserName;
+        string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
 
         if (string.IsNullOrWhiteSpace(OutFile)) {
             if (Open.IsPresent) {
@@ -139,7 +154,10 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Width,
                     Height,
                     headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false);
+                    slowMo: SlowMo,
+                    proxy: Proxy,
+                    proxyUsername: proxyUser,
+                    proxyPassword: proxyPass).ConfigureAwait(false);
                 break;
             case ParameterSetFileClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
@@ -155,7 +173,10 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Width,
                     Height,
                     headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false);
+                    slowMo: SlowMo,
+                    proxy: Proxy,
+                    proxyUsername: proxyUser,
+                    proxyPassword: proxyPass).ConfigureAwait(false);
                 break;
             case ParameterSetSessionClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
@@ -190,7 +211,10 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Delay,
                     Selector,
                     headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false);
+                    slowMo: SlowMo,
+                    proxy: Proxy,
+                    proxyUsername: proxyUser,
+                    proxyPassword: proxyPass).ConfigureAwait(false);
                 break;
         }
 

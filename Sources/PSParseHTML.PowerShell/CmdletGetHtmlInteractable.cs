@@ -50,6 +50,21 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>
+    /// Proxy server address used for browser traffic.
+    /// Include protocol and port if required.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Proxy { get; set; }
+
+    /// <summary>
+    /// Credentials used for the specified <see cref="Proxy"/> server.
+    /// </summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Include elements hidden from view.</summary>
     [Parameter]
     public SwitchParameter IncludeHidden { get; set; }
@@ -98,6 +113,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
             case ParameterSetUrl:
                 string? user = Credential?.UserName ?? Username;
                 string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+                string? proxyUser = ProxyCredential?.UserName;
+                string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
                 HtmlFormLogin? form = null;
                 if (!string.IsNullOrEmpty(LoginUrl) &&
                     !string.IsNullOrEmpty(UsernameSelector) &&
@@ -120,7 +137,10 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     form,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
-                    storageStatePath: null).ConfigureAwait(false)) {
+                    storageStatePath: null,
+                    proxy: Proxy,
+                    proxyUsername: proxyUser,
+                    proxyPassword: proxyPass).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
@@ -135,7 +155,10 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     null,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
-                    storageStatePath: null).ConfigureAwait(false)) {
+                    storageStatePath: null,
+                    proxy: Proxy,
+                    proxyUsername: null,
+                    proxyPassword: null).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;

@@ -19,8 +19,11 @@ public static partial class HtmlBrowser {
         bool headless = true,
         int slowMo = 0,
         int width = 800,
-        int height = 600)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null);
+        int height = 600,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null)
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, proxy, proxyUsername, proxyPassword);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -53,7 +56,10 @@ public static partial class HtmlBrowser {
             videoPath: videoPath,
             videoWidth: width,
             videoHeight: height,
-            storageStatePath: temp).ConfigureAwait(false);
+            storageStatePath: temp,
+            proxy: null,
+            proxyUsername: null,
+            proxyPassword: null).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;
