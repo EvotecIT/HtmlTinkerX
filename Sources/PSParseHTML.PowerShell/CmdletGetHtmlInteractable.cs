@@ -119,7 +119,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     pass,
                     form,
                     headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false)) {
+                    slowMo: SlowMo,
+                    storageStatePath: null).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
@@ -133,7 +134,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     null,
                     null,
                     headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false)) {
+                    slowMo: SlowMo,
+                    storageStatePath: null).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;

@@ -10,15 +10,13 @@ public sealed class CmdletStopHtmlVideoRecording : AsyncPSCmdlet {
     public HtmlBrowserSession? Session { get; set; }
 
     [Parameter]
-    [ValidateScript({
-        if ($_ -and [System.IO.Path]::GetExtension($_) -ne '.webm') {
-            throw [System.ArgumentException] 'Only .webm files are supported.'
-        }
-        $true
-    })]
     public string? OutFile { get; set; }
 
     protected override async Task ProcessRecordAsync() {
+        if (!string.IsNullOrEmpty(OutFile) && System.IO.Path.GetExtension(OutFile) != ".webm") {
+            throw new PSArgumentException("Only .webm files are supported.", nameof(OutFile));
+        }
+
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 

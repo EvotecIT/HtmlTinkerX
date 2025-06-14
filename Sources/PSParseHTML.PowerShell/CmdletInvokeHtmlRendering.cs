@@ -113,7 +113,8 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 pass,
                 form,
                 headless: !Visible.IsPresent,
-                slowMo: SlowMo).ConfigureAwait(false);
+                slowMo: SlowMo,
+                storageStatePath: null).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }

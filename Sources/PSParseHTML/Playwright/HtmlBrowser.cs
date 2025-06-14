@@ -25,7 +25,8 @@ public static partial class HtmlBrowser {
         int slowMo = 0,
         string? videoPath = null,
         int videoWidth = 800,
-        int videoHeight = 600) {
+        int videoHeight = 600,
+        string? storageStatePath = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -57,6 +58,9 @@ public static partial class HtmlBrowser {
         }
         contextOptions ??= new BrowserNewContextOptions();
         contextOptions.IgnoreHTTPSErrors = true;
+        if (!string.IsNullOrEmpty(storageStatePath)) {
+            contextOptions.StorageStatePath = storageStatePath;
+        }
         if (!string.IsNullOrEmpty(videoPath)) {
             string dir = Path.GetDirectoryName(HtmlUtilities.ResolvePath(videoPath))!;
             Directory.CreateDirectory(dir);
@@ -105,8 +109,9 @@ public static partial class HtmlBrowser {
         int slowMo = 0,
         string? videoPath = null,
         int videoWidth = 800,
-        int videoHeight = 600)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight);
+        int videoHeight = 600,
+        string? storageStatePath = null)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -130,7 +135,8 @@ public static partial class HtmlBrowser {
             password,
             formLogin,
             headless,
-            slowMo).ConfigureAwait(false);
+            slowMo,
+            null).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
