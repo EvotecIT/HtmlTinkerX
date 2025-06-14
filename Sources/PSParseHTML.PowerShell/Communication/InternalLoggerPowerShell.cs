@@ -62,16 +62,16 @@ public class InternalLoggerPowerShell {
     /// <param name="e"></param>
     private void Logger_OnVerboseMessage(object? sender, LogEventArgs e) {
         if (e.Args != null && e.Args.Length > 0) {
-            WriteVerbose(e.Message, e.Args);
+            WriteVerbose(e.Message ?? string.Empty, e.Args);
         } else {
-            WriteVerbose(e.Message);
+            WriteVerbose(e.Message ?? string.Empty);
         }
     }
     private void Logger_OnDebugMessage(object? sender, LogEventArgs e) {
-        WriteDebug(e.Message);
+        WriteDebug(e.Message ?? string.Empty);
     }
     private void Logger_OnWarningMessage(object? sender, LogEventArgs e) {
-        WriteWarning(e.Message);
+        WriteWarning(e.Message ?? string.Empty);
     }
     private void Logger_OnErrorMessage(object? sender, LogEventArgs e) {
         ErrorRecord errorRecord = new ErrorRecord(new Exception(e.Message), "1", ErrorCategory.NotSpecified, null);
@@ -108,7 +108,7 @@ public class InternalLoggerPowerShell {
         WriteProgress(progressRecord);
     }
     private void Logger_OnInformationMessage(object? sender, LogEventArgs e) {
-        WriteInformation(e.Message);
+        WriteInformation(e.Message ?? string.Empty);
     }
 
     private void WriteVerbose(string message) {

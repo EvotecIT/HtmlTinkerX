@@ -36,7 +36,7 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
             : HtmlOptimizer.OptimizeCss(Css);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

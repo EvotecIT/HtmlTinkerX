@@ -36,7 +36,7 @@ public sealed class CmdletOptimizeJavaScript : PSCmdlet {
             : HtmlOptimizer.OptimizeJavaScript(Content);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             File.WriteAllText(outPath, optimized);
         } else {
             WriteObject(optimized);
