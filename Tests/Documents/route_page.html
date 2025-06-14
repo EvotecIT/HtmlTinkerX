@@ -5,7 +5,7 @@
 <script>
 async function load(){
   try {
-    const r = await fetch('data.json');
+    const r = await fetch('https://example.com/data.json');
     const j = await r.json();
     document.getElementById('result').textContent = j.message;
   } catch(e){

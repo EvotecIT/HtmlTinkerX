@@ -3,7 +3,7 @@ Describe 'Register-HTMLRoute' {
         $pagePath = Join-Path $PSScriptRoot 'Documents/route_page.html'
         $uri = [System.Uri]::new($pagePath).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
-        Register-HTMLRoute -Session $session -Pattern '*data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
+        Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
         Invoke-HTMLNavigation -Session $session -Url $uri
         $text = Get-HTMLContent -Session $session -Selector '#result' -AsText
         $text | Should -Be 'error'
@@ -14,7 +14,7 @@ Describe 'Register-HTMLRoute' {
         $pagePath = Join-Path $PSScriptRoot 'Documents/route_page.html'
         $uri = [System.Uri]::new($pagePath).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
-        Register-HTMLRoute -Session $session -Pattern '*data.json' -ScriptBlock {
+        Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
             param($route)
             $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
                 Status = 200

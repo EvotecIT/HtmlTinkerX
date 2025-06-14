@@ -94,8 +94,8 @@ Optimize-HTML -Path '.\page.html'
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
-Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
-
+$handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
+Unregister-HTMLRoute -Session $session -Pattern '**/api/data' -Handler $handler
 # Render a protected page using credentials
 $cred = Get-Credential
 Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred

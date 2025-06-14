@@ -14,7 +14,7 @@ $uri = [System.Uri]::new($page).AbsoluteUri
 $session = Start-HTMLSession -Url $uri
 
 # Return custom JSON instead of the real file
-$handler = Register-HTMLRoute -Session $session -Pattern '*data.json' -ScriptBlock {
+$handler = Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
     param($route)
     $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
         Status = 200
@@ -27,12 +27,12 @@ Invoke-HTMLNavigation -Session $session -Url $uri
 Get-HTMLContent -Session $session -Selector '#result' -AsText
 # -> 'mock'
 
-Unregister-HTMLRoute -Session $session -Pattern '*data.json' -Handler $handler
+Unregister-HTMLRoute -Session $session -Pattern '**/data.json' -Handler $handler
 Close-HTMLSession -Session $session
 ```
 
 To simply block a request:
 
 ```powershell
-Register-HTMLRoute -Session $session -Pattern '*data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
+Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
 ```
