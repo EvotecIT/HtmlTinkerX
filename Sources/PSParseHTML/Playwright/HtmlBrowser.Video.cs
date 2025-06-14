@@ -69,6 +69,16 @@ public static partial class HtmlBrowser {
             await session.Context.CloseAsync().ConfigureAwait(false);
             string fullPath = HtmlUtilities.ResolvePath(outFile);
             await video.SaveAsAsync(fullPath).ConfigureAwait(false);
+            try {
+                string tempPath = await video.PathAsync().ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(tempPath) &&
+                    !string.Equals(tempPath, fullPath, System.StringComparison.OrdinalIgnoreCase) &&
+                    System.IO.File.Exists(tempPath)) {
+                    System.IO.File.Delete(tempPath);
+                }
+            } catch {
+                // Ignore cleanup errors
+            }
             await session.Browser.CloseAsync().ConfigureAwait(false);
             session.Playwright.Dispose();
         } else {

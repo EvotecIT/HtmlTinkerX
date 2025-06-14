@@ -47,6 +47,7 @@
 - `Start-HTMLVideoRecording`/`Stop-HTMLVideoRecording` - record browser sessions to a `.webm` video file
   - supports the same authentication options as `Invoke-HTMLRendering` so you can capture the login process
   - can start recording from an existing session to capture later steps
+  - the temporary Playwright video file is cleaned up automatically when stopping
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
