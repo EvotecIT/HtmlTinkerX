@@ -5,7 +5,7 @@ $uri = [System.Uri]::new($path).AbsoluteUri
 $session = Invoke-HTMLRendering -Url $uri -Session
 
 # Add a new paragraph element
-$addScript = 'document.body.insertAdjacentHTML("beforeend","<p id=""demo"">Hello</p>");'
+$addScript = 'document.body.insertAdjacentHTML("beforeend", "<p id=\"demo\">Hello</p>");'
 Invoke-HTMLScript -Session $session -Script $addScript | Out-Null
 
 # Retrieve the text we just added

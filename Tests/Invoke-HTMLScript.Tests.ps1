@@ -3,7 +3,7 @@ describe 'Invoke-HTMLScript' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
-        $add = 'document.body.insertAdjacentHTML("beforeend","<p id=""new"">Hi</p>");'
+        $add = 'document.body.insertAdjacentHTML("beforeend", "<p id=\"new\">Hi</p>");'
         Invoke-HTMLScript -Session $session -Script $add | Out-Null
         $get = 'document.getElementById("new").textContent'
         $text = Invoke-HTMLScript -Session $session -Script $get
