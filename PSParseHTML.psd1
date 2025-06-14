@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport        = @('Stop-HTMLSession', 'ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS', 'Start-HTMLSession', 'Open-HTMLSession', 'Save-HTMLDownload')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @('Close-HTMLSession', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLContent', 'Get-HTMLInteractable', 'Invoke-HTMLClick', 'Invoke-HTMLNavigation', 'Invoke-HTMLScript', 'Invoke-HTMLRendering', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Save-HTMLAttachment', 'Save-HTMLPdf', 'Save-HTMLScreenshot', 'Set-HTMLChecked', 'Set-HTMLInput', 'Set-HTMLSelectOption', 'Start-HTMLVideoRecording', 'Stop-HTMLVideoRecording')
+    CmdletsToExport        = @('Close-HTMLSession', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLContent', 'Get-HTMLInteractable', 'Invoke-HTMLClick', 'Invoke-HTMLNavigation', 'Invoke-HTMLRendering', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Save-HTMLAttachment', 'Save-HTMLPdf', 'Save-HTMLScreenshot', 'Set-HTMLChecked', 'Set-HTMLInput', 'Set-HTMLSelectOption', 'Start-HTMLVideoRecording', 'Stop-HTMLVideoRecording', 'Get-HTMLCookie', 'Set-HTMLCookie')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'

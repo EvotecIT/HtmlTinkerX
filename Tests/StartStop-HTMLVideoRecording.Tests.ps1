@@ -29,4 +29,18 @@ describe 'HTML Video Recording' {
         Stop-HTMLVideoRecording -Session $record
         (Test-Path $out) | Should -BeTrue
     }
+
+    it 'Applies custom options' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $out = Join-Path $TestDrive 'opts.webm'
+        $session = Start-HTMLVideoRecording -Url $uri -OutFile $out -Width 320 -Height 240 -UserAgent 'VideoUA' -ViewportWidth 200 -ViewportHeight 150 -DeviceScaleFactor 2
+        $ua = $session.Page.EvaluateAsync('navigator.userAgent',$null).GetAwaiter().GetResult()
+        $w = [int]($session.Page.EvaluateAsync('window.innerWidth',$null).GetAwaiter().GetResult().ToString())
+        $d = [double]($session.Page.EvaluateAsync('window.devicePixelRatio',$null).GetAwaiter().GetResult().ToString())
+        Stop-HTMLVideoRecording -Session $session
+        $ua | Should -Be 'VideoUA'
+        $w | Should -Be 200
+        [double]$d | Should -Be 2
+    }
 }
