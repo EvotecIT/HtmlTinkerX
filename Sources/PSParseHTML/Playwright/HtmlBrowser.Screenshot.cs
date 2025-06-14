@@ -51,7 +51,8 @@ public static partial class HtmlBrowser {
             password,
             formLogin,
             headless,
-            slowMo).ConfigureAwait(false);
+            slowMo,
+            null).ConfigureAwait(false);
 
         string fullPath = HtmlUtilities.ResolvePath(path);
         await CaptureScreenshotAsync(

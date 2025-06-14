@@ -127,18 +127,26 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
             }
         }
 
-        HtmlBrowserSession sess = await HtmlBrowser.StartVideoRecordingAsync(
-            target,
-            OutFile,
-            engine,
-            clean,
-            user,
-            pass,
-            form,
-            headless,
-            SlowMo,
-            Width,
-            Height).ConfigureAwait(false);
+        HtmlBrowserSession sess = ParameterSetName == ParameterSetSession
+            ? await HtmlBrowser.StartVideoRecordingAsync(
+                Session!,
+                OutFile,
+                headless,
+                SlowMo,
+                Width,
+                Height).ConfigureAwait(false)
+            : await HtmlBrowser.StartVideoRecordingAsync(
+                target,
+                OutFile,
+                engine,
+                clean,
+                user,
+                pass,
+                form,
+                headless,
+                SlowMo,
+                Width,
+                Height).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);

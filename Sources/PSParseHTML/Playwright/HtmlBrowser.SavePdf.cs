@@ -52,7 +52,8 @@ public static partial class HtmlBrowser {
             password,
             formLogin,
             headless,
-            slowMo).ConfigureAwait(false);
+            slowMo,
+            null).ConfigureAwait(false);
 
         await SavePagePdfAsync(
             session.Page,

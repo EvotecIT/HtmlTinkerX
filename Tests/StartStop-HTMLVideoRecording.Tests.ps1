@@ -18,4 +18,15 @@ describe 'HTML Video Recording' {
         Stop-HTMLVideoRecording
         (Test-Path $out) | Should -BeTrue
     }
+
+    it 'Starts recording from existing session' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $session = Invoke-HTMLRendering -Url $uri -Session
+        $out = Join-Path $TestDrive 'existing.webm'
+        $record = Start-HTMLVideoRecording -Session $session -OutFile $out -Width 320 -Height 240
+        Invoke-HTMLNavigation -Session $record -Url $uri
+        Stop-HTMLVideoRecording -Session $record
+        (Test-Path $out) | Should -BeTrue
+    }
 }

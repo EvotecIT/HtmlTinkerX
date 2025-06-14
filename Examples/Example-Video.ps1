@@ -2,19 +2,21 @@ Import-Module .\PSParseHTML.psd1 -Force
 
 $Credentials = [PSCredential]::new('TestUser', (ConvertTo-SecureString -String $Env:WordpressPassword -AsPlainText -Force))
 
-$videoParams = @{
+$sessionParams = @{
     Url              = 'https://evotec.xyz/wp-admin'
     LoginUrl         = 'https://evotec.xyz/wp-login.php'
     UsernameSelector = '#user_login'
     PasswordSelector = '#user_pass'
     SubmitSelector   = '#wp-submit'
     Credential       = $Credentials
-    OutFile          = "$PSScriptRoot\Output\WP1.webm"
+    Session          = $true
 }
 
-$session = Start-HTMLVideoRecording @videoParams
+$session = Open-HTMLSession @sessionParams
 
 Save-HTMLScreenshot -Session $session -OutFile "$PSScriptRoot\Output\WP1.png" -Open
+
+$session = Start-HTMLVideoRecording -Session $session -OutFile "$PSScriptRoot\Output\WP1.webm"
 
 Get-HTMLInteractable -Session $session -Filter "Media" -IncludeHidden | Format-Table
 

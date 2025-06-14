@@ -30,7 +30,8 @@ public static partial class HtmlBrowser {
             null,
             null,
             headless,
-            slowMo).ConfigureAwait(false);
+            slowMo,
+            null).ConfigureAwait(false);
         var page = session.Page;
         string dir = HtmlUtilities.ResolvePath(directory);
         return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);
