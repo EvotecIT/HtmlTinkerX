@@ -53,6 +53,7 @@
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
+- `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Set-HTMLCookie` - add cookies to the active session
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
@@ -93,8 +94,8 @@ Optimize-HTML -Path '.\page.html'
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
-Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
-
+$handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
+Unregister-HTMLRoute -Session $session -Pattern '**/api/data' -Handler $handler
 # Render a protected page using credentials
 $cred = Get-Credential
 Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
@@ -120,6 +121,13 @@ Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#conten
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
     Save-HTMLScreenshot -OutFile '.\downloads.png'
 Save-HTMLAttachment -Session $session -Path '.\Downloads'
+# Mock an API response
+$handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBlock {
+    param($route)
+    $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{ Status = 200; ContentType = 'application/json'; Body = '{"ok":true}' }) | Out-Null
+}
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
+Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 Close-HTMLSession -Session $session
 ```
 
