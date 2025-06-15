@@ -7,6 +7,14 @@ Describe 'Save-HTMLScreenshot' {
         (Test-Path $outfile) | Should -BeTrue
     }
 
+    It 'Supports proxy parameters' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'proxy.png'
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Proxy 'http://localhost:8080'
+        (Test-Path $outfile) | Should -BeTrue
+    }
+
     It 'Creates a full page screenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri

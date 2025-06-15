@@ -24,7 +24,7 @@ public static partial class HtmlBrowser {
         int? viewportWidth = null,
         int? viewportHeight = null,
         float? deviceScaleFactor = null)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor);
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy: null, proxyUsername: null, proxyPassword: null);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -65,7 +65,10 @@ public static partial class HtmlBrowser {
             userAgent: userAgent,
             viewportWidth: viewportWidth,
             viewportHeight: viewportHeight,
-            deviceScaleFactor: deviceScaleFactor).ConfigureAwait(false);
+            deviceScaleFactor: deviceScaleFactor,
+            proxy: null,
+            proxyUsername: null,
+            proxyPassword: null).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;
