@@ -44,6 +44,7 @@
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
 - `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
 - `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
+- `UserAgent`, `-ViewportWidth`, `-ViewportHeight` and `-DeviceScaleFactor` allow customizing the browser context
 - `Save-HTMLPdf` - generate a PDF of a rendered page
 - `Start-HTMLVideoRecording`/`Stop-HTMLVideoRecording` - record browser sessions to a `.webm` video file
   - supports the same authentication options as `Invoke-HTMLRendering` so you can capture the login process
@@ -51,7 +52,11 @@
   - the temporary Playwright video file is cleaned up automatically when stopping
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
+- `Invoke-HTMLScript` - run custom JavaScript against a session
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
+- `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
+- `Get-HTMLCookie` - retrieve cookies from the active session
+- `Set-HTMLCookie` - add cookies to the active session
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
@@ -90,8 +95,8 @@ Optimize-HTML -Path '.\page.html'
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
 
 # Render a page after executing JavaScript
-Invoke-HTMLRendering -Url 'https://example.com' -Browser Chromium -Clean
-
+$handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
+Unregister-HTMLRoute -Session $session -Pattern '**/api/data' -Handler $handler
 # Render a protected page using credentials
 $cred = Get-Credential
 Invoke-HTMLRendering -Url 'https://example.com' -Credential $cred
@@ -117,6 +122,13 @@ Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#conten
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
     Save-HTMLScreenshot -OutFile '.\downloads.png'
 Save-HTMLAttachment -Session $session -Path '.\Downloads'
+# Mock an API response
+$handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBlock {
+    param($route)
+    $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{ Status = 200; ContentType = 'application/json'; Body = '{"ok":true}' }) | Out-Null
+}
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
+Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 Close-HTMLSession -Session $session
 ```
 
@@ -131,6 +143,7 @@ Chromium 136.0.7103.25 (playwright build v1169) downloaded to C:\Users\USER\AppD
 Use `-Clean` to clear the `ms-playwright` cache and re-download the runtime if needed.
 Use `-Full` to capture the entire document, `-Open` to automatically view the image, specify `-Delay` or `-Selector` to wait for dynamic content, or supply `-X`, `-Y`, `-Width` and `-Height` to grab a specific region.
 Use `-Visible` to see the browser window and `-SlowMo` to slow down actions for easier debugging.
+Supply `-UserAgent`, `-ViewportWidth`, `-ViewportHeight` or `-DeviceScaleFactor` to emulate different devices.
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 

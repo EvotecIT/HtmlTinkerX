@@ -39,7 +39,7 @@ public sealed class CmdletOptimizeHtml : PSCmdlet {
             ? HtmlOptimizer.OptimizeHtmlFile(HtmlUtilities.ResolvePath(Path), CSSDecodeEscapes.IsPresent)
             : HtmlOptimizer.OptimizeHtml(Content, CSSDecodeEscapes.IsPresent);
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile);
+            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
             System.IO.File.WriteAllText(outPath, result);
         } else {
             WriteObject(result);

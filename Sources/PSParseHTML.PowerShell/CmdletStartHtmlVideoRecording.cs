@@ -90,6 +90,20 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     public int Height { get; set; } = 600;
 
     [Parameter]
+    public string? UserAgent { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportWidth { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportHeight { get; set; }
+
+    [Parameter]
+    public double? DeviceScaleFactor { get; set; }
+
+    [Parameter]
     public SwitchParameter NoDefault { get; set; }
 
     protected override async Task ProcessRecordAsync() {
@@ -148,7 +162,11 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 headless,
                 SlowMo,
                 Width,
-                Height).ConfigureAwait(false)
+                Height,
+                UserAgent,
+                ViewportWidth,
+                ViewportHeight,
+                (float?)DeviceScaleFactor).ConfigureAwait(false)
             : await HtmlBrowser.StartVideoRecordingAsync(
                 target,
                 OutFile,
@@ -163,7 +181,11 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 Height,
                 proxy: Proxy,
                 proxyUsername: proxyUser,
-                proxyPassword: proxyPass).ConfigureAwait(false);
+                proxyPassword: proxyPass,
+                userAgent: UserAgent,
+                viewportWidth: ViewportWidth,
+                viewportHeight: ViewportHeight,
+                deviceScaleFactor: (float?)DeviceScaleFactor).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);

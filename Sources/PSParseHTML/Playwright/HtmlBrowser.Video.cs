@@ -22,8 +22,12 @@ public static partial class HtmlBrowser {
         int height = 600,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, proxy, proxyUsername, proxyPassword);
+        string? proxyPassword = null,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null)
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, proxy, proxyUsername, proxyPassword, userAgent, viewportWidth, viewportHeight, deviceScaleFactor);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -34,7 +38,11 @@ public static partial class HtmlBrowser {
         bool headless = true,
         int slowMo = 0,
         int width = 800,
-        int height = 600) {
+        int height = 600,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null) {
         string temp = Path.GetTempFileName();
         await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
         string url = session.Page.Url;
@@ -59,7 +67,11 @@ public static partial class HtmlBrowser {
             storageStatePath: temp,
             proxy: null,
             proxyUsername: null,
-            proxyPassword: null).ConfigureAwait(false);
+            proxyPassword: null,
+            userAgent: userAgent,
+            viewportWidth: viewportWidth,
+            viewportHeight: viewportHeight,
+            deviceScaleFactor: deviceScaleFactor).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;

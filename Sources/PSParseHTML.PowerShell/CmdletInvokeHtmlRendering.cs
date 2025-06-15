@@ -99,6 +99,20 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 
+    [Parameter]
+    public string? UserAgent { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportWidth { get; set; }
+
+    [Parameter]
+    [ValidateRange(1,int.MaxValue)]
+    public int? ViewportHeight { get; set; }
+
+    [Parameter]
+    public double? DeviceScaleFactor { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -132,13 +146,17 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 storageStatePath: null,
                 proxy: Proxy,
                 proxyUsername: proxyUser,
-                proxyPassword: proxyPass).ConfigureAwait(false);
+                proxyPassword: proxyPass,
+                userAgent: UserAgent,
+                viewportWidth: ViewportWidth,
+                viewportHeight: ViewportHeight,
+                deviceScaleFactor: (float?)DeviceScaleFactor).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutFile);
+            string outPath = HtmlUtilities.ResolvePath(OutFile!);
             await HtmlBrowser.SavePageContentAsync(
                 target,
                 outPath,
@@ -151,7 +169,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 SlowMo,
                 Proxy,
                 proxyUser,
-                proxyPass).ConfigureAwait(false);
+                proxyPass,
+                UserAgent,
+                ViewportWidth,
+                ViewportHeight,
+                (float?)DeviceScaleFactor).ConfigureAwait(false);
         } else {
             string html = await HtmlBrowser.GetPageContentAsync(
                 target,
@@ -164,7 +186,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 SlowMo,
                 Proxy,
                 proxyUser,
-                proxyPass).ConfigureAwait(false);
+                proxyPass,
+                UserAgent,
+                ViewportWidth,
+                ViewportHeight,
+                (float?)DeviceScaleFactor).ConfigureAwait(false);
             WriteObject(html);
         }
     }

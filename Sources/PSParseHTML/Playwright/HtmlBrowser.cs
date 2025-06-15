@@ -29,7 +29,11 @@ public static partial class HtmlBrowser {
         string? storageStatePath = null,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null) {
+        string? proxyPassword = null,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null) {
         if (clean) {
             CleanInstallDir();
         }
@@ -57,14 +61,13 @@ public static partial class HtmlBrowser {
                 Password = proxyPassword
             };
         }
-
         var browserInstance = await type.LaunchAsync(launchOptions);
         BrowserNewContextOptions? contextOptions = null;
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
             contextOptions = new BrowserNewContextOptions {
                 HttpCredentials = new HttpCredentials {
-                    Username = username,
-                    Password = password
+                    Username = username!,
+                    Password = password!
                 }
             };
         }
@@ -74,10 +77,20 @@ public static partial class HtmlBrowser {
             contextOptions.StorageStatePath = storageStatePath;
         }
         if (!string.IsNullOrEmpty(videoPath)) {
-            string dir = Path.GetDirectoryName(HtmlUtilities.ResolvePath(videoPath))!;
+            string resolved = HtmlUtilities.ResolvePath(videoPath!);
+            string dir = Path.GetDirectoryName(resolved) ?? resolved;
             Directory.CreateDirectory(dir);
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
+        }
+        if (!string.IsNullOrEmpty(userAgent)) {
+            contextOptions.UserAgent = userAgent;
+        }
+        if (viewportWidth.HasValue && viewportHeight.HasValue) {
+            contextOptions.ViewportSize = new ViewportSize { Width = viewportWidth.Value, Height = viewportHeight.Value };
+        }
+        if (deviceScaleFactor.HasValue) {
+            contextOptions.DeviceScaleFactor = deviceScaleFactor.Value;
         }
 
         var context = await browserInstance.NewContextAsync(contextOptions);
@@ -125,8 +138,12 @@ public static partial class HtmlBrowser {
         string? storageStatePath = null,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, proxy, proxyUsername, proxyPassword);
+        string? proxyPassword = null,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, proxy, proxyUsername, proxyPassword, userAgent, viewportWidth, viewportHeight, deviceScaleFactor);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -141,18 +158,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(
-        string url,
-        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
-        bool clean = false,
-        string? username = null,
-        string? password = null,
-        HtmlFormLogin? formLogin = null,
-        bool headless = true,
-        int slowMo = 0,
-        string? proxy = null,
-        string? proxyUsername = null,
-        string? proxyPassword = null) {
+    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -163,9 +169,16 @@ public static partial class HtmlBrowser {
             headless,
             slowMo,
             videoPath: null,
+            videoWidth: 800,
+            videoHeight: 600,
+            storageStatePath: null,
             proxy: proxy,
             proxyUsername: proxyUsername,
-            proxyPassword: proxyPassword).ConfigureAwait(false);
+            proxyPassword: proxyPassword,
+            userAgent: userAgent,
+            viewportWidth: viewportWidth,
+            viewportHeight: viewportHeight,
+            deviceScaleFactor: deviceScaleFactor).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
@@ -175,32 +188,9 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(
-        string url,
-        string path,
-        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
-        bool clean = false,
-        string? username = null,
-        string? password = null,
-        HtmlFormLogin? formLogin = null,
-        bool headless = true,
-        int slowMo = 0,
-        string? proxy = null,
-        string? proxyUsername = null,
-        string? proxyPassword = null) {
+    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null) {
         string fullPath = HtmlUtilities.ResolvePath(path);
-        string content = await GetPageContentAsync(
-            url,
-            browser,
-            clean,
-            username,
-            password,
-            formLogin,
-            headless,
-            slowMo,
-            proxy,
-            proxyUsername,
-            proxyPassword).ConfigureAwait(false);
+        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, proxy, proxyUsername, proxyPassword, userAgent, viewportWidth, viewportHeight, deviceScaleFactor).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
 
@@ -220,7 +210,7 @@ public static partial class HtmlBrowser {
             return await page.ContentAsync().ConfigureAwait(false);
         }
 
-        var locator = page.Locator(selector);
+        var locator = page.Locator(selector!);
         await locator.WaitForAsync();
 
         if (asText) {

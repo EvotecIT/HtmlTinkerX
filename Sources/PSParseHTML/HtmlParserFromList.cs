@@ -3,6 +3,7 @@ using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -11,6 +12,7 @@ namespace PSParseHTML;
 /// Provides functionality for parsing HTML lists.
 /// </summary>
 public static class HtmlParserFromList {
+    private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts list items from HTML using AngleSharp with metadata.
     /// </summary>
@@ -97,7 +99,7 @@ public static class HtmlParserFromList {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? new HttpClient();
+        HttpClient http = client ?? _sharedClient;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseListsWithAngleSharpDetailed(content, tagPlaceholder);
     }
@@ -147,7 +149,7 @@ public static class HtmlParserFromList {
             var metadata = result.Metadata;
             metadata.ListIndex = index++;
             metadata.Id = list.Id;
-            metadata.Classes = list.GetAttributeValue("class", null);
+            metadata.Classes = list.GetAttributeValue("class", string.Empty);
             metadata.IsOrdered = list.Name.Equals("ol", StringComparison.OrdinalIgnoreCase);
             foreach (var attr in list.Attributes) {
                 metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
@@ -211,7 +213,7 @@ public static class HtmlParserFromList {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? new HttpClient();
+        HttpClient http = client ?? _sharedClient;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseListsWithHtmlAgilityPackDetailed(content, tagPlaceholder);
     }

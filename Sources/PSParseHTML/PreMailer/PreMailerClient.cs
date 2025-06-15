@@ -44,7 +44,7 @@ public class PreMailerClient {
         try {
             string cssContent = Options.Css ?? string.Empty;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                string cssPath = HtmlUtilities.ResolvePath(Options.CssFilePath);
+                string cssPath = HtmlUtilities.ResolvePath(Options.CssFilePath!);
                 if (!File.Exists(cssPath)) {
                     throw new FileNotFoundException($"CSS file not found: {Options.CssFilePath}", cssPath);
                 }
