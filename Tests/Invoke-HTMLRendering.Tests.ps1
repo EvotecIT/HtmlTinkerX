@@ -25,4 +25,11 @@ Describe 'Invoke-HTMLRendering' {
         $w | Should -Be 123
         [double]$d | Should -Be 1.5
     }
+
+    It 'Supports proxy parameters' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $html = Invoke-HTMLRendering -Url $uri -Proxy 'http://localhost:8080'
+        $html | Should -Match 'Dynamic Content'
+    }
 }

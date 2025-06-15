@@ -41,6 +41,14 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Proxy server address used when launching the browser.</summary>
+    [Parameter]
+    public string? Proxy { get; set; }
+
+    /// <summary>Credentials used for the <see cref="Proxy"/> server.</summary>
+    [Parameter]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Credentials used when accessing authenticated pages.</summary>
     [Parameter]
     public PSCredential? Credential { get; set; }
@@ -104,6 +112,8 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+        string? pUser = ProxyCredential?.UserName;
+        string? pPass = ProxyCredential?.GetNetworkCredential().Password;
         HtmlFormLogin? form = null;
         if (!string.IsNullOrEmpty(LoginUrl) && !string.IsNullOrEmpty(UsernameSelector) && !string.IsNullOrEmpty(PasswordSelector) && !string.IsNullOrEmpty(SubmitSelector)) {
             form = new HtmlFormLogin {
@@ -132,16 +142,19 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 userAgent: UserAgent,
                 viewportWidth: ViewportWidth,
                 viewportHeight: ViewportHeight,
-                deviceScaleFactor: (float?)DeviceScaleFactor).ConfigureAwait(false);
+                deviceScaleFactor: (float?)DeviceScaleFactor,
+                proxy: Proxy,
+                proxyUsername: pUser,
+                proxyPassword: pPass).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutFile!);
-            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor).ConfigureAwait(false);
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass).ConfigureAwait(false);
             WriteObject(html);
         }
     }

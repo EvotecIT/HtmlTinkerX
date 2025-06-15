@@ -40,6 +40,16 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Proxy server address used when launching the browser.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Proxy { get; set; }
+
+    /// <summary>Credentials used for the <see cref="Proxy"/> server.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Show the browser instead of running headless.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
@@ -94,6 +104,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         List<HtmlInteractableInfo> list;
+        string? pUser = ProxyCredential?.UserName;
+        string? pPass = ProxyCredential?.GetNetworkCredential().Password;
         switch (ParameterSetName) {
             case ParameterSetUrl:
                 string? user = Credential?.UserName ?? Username;
@@ -120,7 +132,10 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     form,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
-                    storageStatePath: null).ConfigureAwait(false)) {
+                    storageStatePath: null,
+                    proxy: Proxy,
+                    proxyUsername: pUser,
+                    proxyPassword: pPass).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
@@ -135,7 +150,10 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     null,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
-                    storageStatePath: null).ConfigureAwait(false)) {
+                    storageStatePath: null,
+                    proxy: Proxy,
+                    proxyUsername: pUser,
+                    proxyPassword: pPass).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
