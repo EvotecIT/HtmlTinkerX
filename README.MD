@@ -52,6 +52,7 @@
   - the temporary Playwright video file is cleaned up automatically when stopping
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
+- `Invoke-HTMLScript` - run custom JavaScript against a session
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
