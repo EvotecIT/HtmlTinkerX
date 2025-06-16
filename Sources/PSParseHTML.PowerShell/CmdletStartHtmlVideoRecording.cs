@@ -89,6 +89,15 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
     public double? DeviceScaleFactor { get; set; }
 
     [Parameter]
+    public double? GeoLatitude { get; set; }
+
+    [Parameter]
+    public double? GeoLongitude { get; set; }
+
+    [Parameter]
+    public string? Timezone { get; set; }
+
+    [Parameter]
     public SwitchParameter NoDefault { get; set; }
 
     protected override async Task ProcessRecordAsync() {
@@ -149,7 +158,10 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 UserAgent,
                 ViewportWidth,
                 ViewportHeight,
-                (float?)DeviceScaleFactor).ConfigureAwait(false)
+                (float?)DeviceScaleFactor,
+                GeoLatitude,
+                GeoLongitude,
+                Timezone).ConfigureAwait(false)
             : await HtmlBrowser.StartVideoRecordingAsync(
                 target,
                 OutFile,
@@ -165,7 +177,10 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 UserAgent,
                 ViewportWidth,
                 ViewportHeight,
-                (float?)DeviceScaleFactor).ConfigureAwait(false);
+                (float?)DeviceScaleFactor,
+                GeoLatitude,
+                GeoLongitude,
+                Timezone).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);

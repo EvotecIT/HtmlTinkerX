@@ -23,8 +23,11 @@ public static partial class HtmlBrowser {
         string? userAgent = null,
         int? viewportWidth = null,
         int? viewportHeight = null,
-        float? deviceScaleFactor = null)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy: null, proxyUsername: null, proxyPassword: null);
+        float? deviceScaleFactor = null,
+        double? geoLatitude = null,
+        double? geoLongitude = null,
+        string? timezone = null)
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy: null, proxyUsername: null, proxyPassword: null, geoLatitude: geoLatitude, geoLongitude: geoLongitude, timezone: timezone);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -39,7 +42,10 @@ public static partial class HtmlBrowser {
         string? userAgent = null,
         int? viewportWidth = null,
         int? viewportHeight = null,
-        float? deviceScaleFactor = null) {
+        float? deviceScaleFactor = null,
+        double? geoLatitude = null,
+        double? geoLongitude = null,
+        string? timezone = null) {
         string temp = Path.GetTempFileName();
         await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
         string url = session.Page.Url;
@@ -68,7 +74,10 @@ public static partial class HtmlBrowser {
             deviceScaleFactor: deviceScaleFactor,
             proxy: null,
             proxyUsername: null,
-            proxyPassword: null).ConfigureAwait(false);
+            proxyPassword: null,
+            geoLatitude: geoLatitude,
+            geoLongitude: geoLongitude,
+            timezone: timezone).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;
