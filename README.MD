@@ -58,6 +58,7 @@
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Set-HTMLCookie` - add cookies to the active session
+- `Export-HTMLSession`/`Import-HTMLSession` - save and restore cookies and storage state
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
@@ -137,6 +138,8 @@ Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
 Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 $log = Get-HTMLNetworkLog -Session $session
 $log | Format-Table Url, Status
+Export-HTMLSession -Session $session -Path 'state.json'
+$session = Import-HTMLSession -Path 'state.json' -Url 'https://example.com/protected'
 Close-HTMLSession -Session $session
 ```
 
