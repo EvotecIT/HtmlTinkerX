@@ -26,7 +26,7 @@
 **PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
 
 ## Processing of HTML/CSS/JS
-- `Convert-HTMLToText` - convert markup to plain text
+-  - run JavaScript with AngleSharp without a browser
 - `ConvertFrom-HtmlTable` - turn table elements into objects (supports rowspan/colspan)
 - `ConvertFrom-HTMLAttributes` - extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
 - `ConvertFrom-HTML` - parse full documents or fragments
@@ -53,6 +53,7 @@
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Invoke-HTMLScript` - run custom JavaScript against a session
+- `Invoke-HTMLDomScript` - run JavaScript with AngleSharp without a browser
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
@@ -97,6 +98,8 @@ Optimize-HTML -Path '.\page.html'
 
 # Minify JavaScript and save to a new file
 Optimize-JavaScript -Path '.\app.js' -OutputFile '.\app.min.js'
+# Run JavaScript on markup without a browser
+Invoke-HTMLDomScript -Content '<div id="demo">Hi</div>' -Script 'document.getElementById("demo").textContent'
 
 # Render a page after executing JavaScript
 $handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
