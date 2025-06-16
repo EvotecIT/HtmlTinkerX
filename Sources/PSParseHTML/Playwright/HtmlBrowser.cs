@@ -96,6 +96,25 @@ public static partial class HtmlBrowser {
         var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
 
+        var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
+        page.Request += (_, req) => {
+            HtmlNetworkEntry entry = new() {
+                Url = req.Url,
+                Method = req.Method,
+                RequestHeaders = new System.Collections.Generic.Dictionary<string, string>(req.Headers)
+            };
+            network[req] = entry;
+        };
+        page.Response += (_, res) => {
+            HtmlNetworkEntry entry = network.GetOrAdd(res.Request, r => new HtmlNetworkEntry {
+                Url = r.Url,
+                Method = r.Method,
+                RequestHeaders = new System.Collections.Generic.Dictionary<string, string>(r.Headers)
+            });
+            entry.Status = res.Status;
+            entry.ResponseHeaders = new System.Collections.Generic.Dictionary<string, string>(res.Headers);
+        };
+
         if (formLogin != null) {
             await page.GotoAsync(formLogin.LoginUrl);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -117,7 +136,7 @@ public static partial class HtmlBrowser {
             video = page.Video;
         }
 
-        return new HtmlBrowserSession(playwright, browserInstance, context, page, video, videoPath);
+        return new HtmlBrowserSession(playwright, browserInstance, context, page, video, videoPath, network);
     }
 
     /// <summary>
