@@ -25,12 +25,44 @@ env:
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:
+  refresh-psd1:
+    name: 'Refresh PSD1'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell modules
+        shell: pwsh
+        run: |
+          Install-Module PSPublishModule -Force -Scope CurrentUser -AllowClobber
+
+      - name: Refresh module manifest
+        shell: pwsh
+        env:
+          RefreshPSD1Only: 'true'
+        run: |
+          .\Build\Build-Module.ps1
+
+      - name: Upload refreshed manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: psd1
+          path: PSParseHTML.psd1
+
   test-windows-ps7:
+    needs: refresh-psd1
     name: 'Windows PowerShell 7'
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -54,11 +86,18 @@ jobs:
         run: .\PSParseHTML.Tests.ps1
 
   test-ubuntu:
+    needs: refresh-psd1
     name: 'Ubuntu PowerShell 7'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -89,11 +128,18 @@ jobs:
         run: ./PSParseHTML.Tests.ps1
 
   test-macos:
+    needs: refresh-psd1
     name: 'macOS PowerShell 7'
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

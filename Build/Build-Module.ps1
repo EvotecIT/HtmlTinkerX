@@ -1,3 +1,5 @@
+$RefreshPSD1Only = [bool]$Env:RefreshPSD1Only
+
 Clear-Host
 
 Build-Module -ModuleName 'PSParseHTML' {
@@ -98,7 +100,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $false
+        RefreshPSD1Only                   = $RefreshPSD1Only
         NETBinaryModuleDocumenation       = $true
     }
 
