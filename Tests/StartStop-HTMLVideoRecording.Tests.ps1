@@ -43,4 +43,16 @@ describe 'HTML Video Recording' {
         $w | Should -Be 200
         [double]$d | Should -Be 2
     }
+
+    it 'Applies geolocation and timezone options' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $out = Join-Path $TestDrive 'geo.webm'
+        $session = Start-HTMLVideoRecording -Url $uri -OutFile $out -Width 320 -Height 240 -GeoLatitude 40.0 -GeoLongitude -74.0 -Timezone 'America/New_York'
+        $lat = [double]($session.Page.EvaluateAsync('new Promise(r=>navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))',$null).GetAwaiter().GetResult())
+        $tz = $session.Page.EvaluateAsync('Intl.DateTimeFormat().resolvedOptions().timeZone',$null).GetAwaiter().GetResult()
+        Stop-HTMLVideoRecording -Session $session
+        [math]::Round($lat,0) | Should -Be 40
+        $tz | Should -Be 'America/New_York'
+    }
 }

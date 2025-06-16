@@ -108,6 +108,15 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public double? DeviceScaleFactor { get; set; }
 
+    [Parameter]
+    public double? GeoLatitude { get; set; }
+
+    [Parameter]
+    public double? GeoLongitude { get; set; }
+
+    [Parameter]
+    public string? Timezone { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? user = Credential?.UserName ?? Username;
@@ -145,16 +154,19 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 deviceScaleFactor: (float?)DeviceScaleFactor,
                 proxy: Proxy,
                 proxyUsername: pUser,
-                proxyPassword: pPass).ConfigureAwait(false);
+                proxyPassword: pPass,
+                geoLatitude: GeoLatitude,
+                geoLongitude: GeoLongitude,
+                timezone: Timezone).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutFile!);
-            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass).ConfigureAwait(false);
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone).ConfigureAwait(false);
             WriteObject(html);
         }
     }
