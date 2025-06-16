@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using PSParseHTML;
+using Jsbeautifier;
 
 namespace PSParseHTML.PowerShell;
 
@@ -33,11 +34,74 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     [Parameter]
     public string? OutputFile { get; set; }
 
+    /// <summary>Number of spaces for indentation.</summary>
+    [Parameter]
+    public uint IndentSize { get; set; } = 4;
+
+    /// <summary>Indentation character.</summary>
+    [Parameter]
+    public char IndentChar { get; set; } = ' ';
+
+    /// <summary>Use tabs for indentation.</summary>
+    [Parameter]
+    public bool IndentWithTabs { get; set; }
+
+    /// <summary>Preserve existing newlines.</summary>
+    [Parameter]
+    public bool PreserveNewlines { get; set; } = true;
+
+    /// <summary>Maximum number of consecutive newlines to preserve.</summary>
+    [Parameter]
+    public float MaxPreserveNewlines { get; set; } = 10f;
+
+    /// <summary>Enable jslint-happy formatting.</summary>
+    [Parameter]
+    public bool JslintHappy { get; set; }
+
+    /// <summary>Brace formatting style.</summary>
+    [Parameter]
+    public BraceStyle BraceStyle { get; set; } = BraceStyle.Collapse;
+
+    /// <summary>Keep array indentation.</summary>
+    [Parameter]
+    public bool KeepArrayIndentation { get; set; }
+
+    /// <summary>Keep function indentation.</summary>
+    [Parameter]
+    public bool KeepFunctionIndentation { get; set; }
+
+    /// <summary>Preserve eval code.</summary>
+    [Parameter]
+    public bool EvalCode { get; set; }
+
+    /// <summary>Wrap line length.</summary>
+    [Parameter]
+    public int WrapLineLength { get; set; }
+
+    /// <summary>Break chained methods.</summary>
+    [Parameter]
+    public bool BreakChainedMethods { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
+        BeautifierOptions opts = new() {
+            IndentSize = IndentSize,
+            IndentChar = IndentChar,
+            IndentWithTabs = IndentWithTabs,
+            PreserveNewlines = PreserveNewlines,
+            MaxPreserveNewlines = MaxPreserveNewlines,
+            JslintHappy = JslintHappy,
+            BraceStyle = BraceStyle,
+            KeepArrayIndentation = KeepArrayIndentation,
+            KeepFunctionIndentation = KeepFunctionIndentation,
+            EvalCode = EvalCode,
+            WrapLineLength = WrapLineLength,
+            BreakChainedMethods = BreakChainedMethods
+        };
+
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatJavaScriptFile(HtmlUtilities.ResolvePath(Path))
-            : HtmlFormatter.FormatJavaScript(Content);
+            ? HtmlFormatter.FormatJavaScriptFile(HtmlUtilities.ResolvePath(Path), opts)
+            : HtmlFormatter.FormatJavaScript(Content, opts);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
