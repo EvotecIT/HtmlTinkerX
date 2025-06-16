@@ -1,4 +1,5 @@
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -9,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Format, "JavaScript", DefaultParameterSetName = ParameterSetContent)]
 [Alias("Format-JS")]
 [OutputType(typeof(string))]
-public sealed class CmdletFormatJavaScript : PSCmdlet {
+public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
 
@@ -34,14 +35,18 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     public string? OutputFile { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatJavaScriptFile(HtmlUtilities.ResolvePath(Path))
-            : HtmlFormatter.FormatJavaScript(Content);
+            ? await HtmlFormatter.FormatJavaScriptFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            : await HtmlFormatter.FormatJavaScriptAsync(Content).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || FRAMEWORK
             System.IO.File.WriteAllText(outPath, formatted);
+#else
+            await System.IO.File.WriteAllTextAsync(outPath, formatted, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(formatted);
         }

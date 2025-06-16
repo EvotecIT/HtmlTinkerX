@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -12,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Optimize, "JavaScript", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
-public sealed class CmdletOptimizeJavaScript : PSCmdlet {
+public sealed class CmdletOptimizeJavaScript : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
 
@@ -30,14 +31,18 @@ public sealed class CmdletOptimizeJavaScript : PSCmdlet {
     public string? OutputFile { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         string optimized = ParameterSetName == ParameterSetFile
-            ? HtmlOptimizer.OptimizeJavaScriptFile(HtmlUtilities.ResolvePath(Path))
-            : HtmlOptimizer.OptimizeJavaScript(Content);
+            ? await HtmlOptimizer.OptimizeJavaScriptFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            : await HtmlOptimizer.OptimizeJavaScriptAsync(Content).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || FRAMEWORK
             File.WriteAllText(outPath, optimized);
+#else
+            await File.WriteAllTextAsync(outPath, optimized, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(optimized);
         }
