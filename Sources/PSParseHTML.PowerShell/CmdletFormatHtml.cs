@@ -1,4 +1,5 @@
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -11,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Format, "HTML", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
-public sealed class CmdletFormatHtml : PSCmdlet {
+public sealed class CmdletFormatHtml : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
 
@@ -61,9 +62,9 @@ public sealed class CmdletFormatHtml : PSCmdlet {
     public SwitchParameter RemoveEmptyBlocks { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatHtmlFile(
+            ? await HtmlFormatter.FormatHtmlFileAsync(
                 HtmlUtilities.ResolvePath(Path),
                 Indent,
                 BlockStartLine,
@@ -72,21 +73,25 @@ public sealed class CmdletFormatHtml : PSCmdlet {
                 OutputTextNodesOnNewLine.IsPresent,
                 RemoveEmptyAttributes.IsPresent,
                 AlphabeticallyOrderAttributes.IsPresent,
-                RemoveEmptyBlocks.IsPresent)
-            : HtmlFormatter.FormatHtml(
+                RemoveEmptyBlocks.IsPresent).ConfigureAwait(false)
+            : await HtmlFormatter.FormatHtmlAsync(
                 Content,
-            Indent,
-            BlockStartLine,
-            RemoveHTMLComments.IsPresent,
-            RemoveOptionalTags.IsPresent,
-            OutputTextNodesOnNewLine.IsPresent,
-            RemoveEmptyAttributes.IsPresent,
-            AlphabeticallyOrderAttributes.IsPresent,
-            RemoveEmptyBlocks.IsPresent);
+                Indent,
+                BlockStartLine,
+                RemoveHTMLComments.IsPresent,
+                RemoveOptionalTags.IsPresent,
+                OutputTextNodesOnNewLine.IsPresent,
+                RemoveEmptyAttributes.IsPresent,
+                AlphabeticallyOrderAttributes.IsPresent,
+                RemoveEmptyBlocks.IsPresent).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, result);
+#else
+            await System.IO.File.WriteAllTextAsync(outPath, result, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(result);
         }

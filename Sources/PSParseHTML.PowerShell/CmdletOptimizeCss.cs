@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -12,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Optimize, "CSS", DefaultParameterSetName = ParameterSetCss)]
 [OutputType(typeof(string))]
-public sealed class CmdletOptimizeCss : PSCmdlet {
+public sealed class CmdletOptimizeCss : AsyncPSCmdlet {
     private const string ParameterSetCss = "Css";
     private const string ParameterSetPath = "Path";
 
@@ -30,14 +31,18 @@ public sealed class CmdletOptimizeCss : PSCmdlet {
     public string? OutputFile { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetPath
-            ? HtmlOptimizer.OptimizeCssFile(HtmlUtilities.ResolvePath(Path))
-            : HtmlOptimizer.OptimizeCss(Css);
+            ? await HtmlOptimizer.OptimizeCssFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            : await HtmlOptimizer.OptimizeCssAsync(Css).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(outPath, result);
+#else
+            await File.WriteAllTextAsync(outPath, result, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(result);
         }

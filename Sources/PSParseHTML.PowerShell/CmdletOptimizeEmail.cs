@@ -149,7 +149,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
         WriteObject(result.Html);
 
         foreach (var warning in result.Warnings) {
-            LoggingMessages.Logger.WriteWarning(warning);
+            LoggingMessages.Logger.WriteWarning(warning.Message);
         }
     }
 }

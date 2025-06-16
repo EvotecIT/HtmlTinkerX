@@ -97,12 +97,16 @@ public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
         };
 
         string formatted = ParameterSetName == ParameterSetFile
-            ? HtmlFormatter.FormatJavaScriptFile(HtmlUtilities.ResolvePath(Path), opts)
-            : HtmlFormatter.FormatJavaScript(Content, opts);
+            ? await HtmlFormatter.FormatJavaScriptFileAsync(HtmlUtilities.ResolvePath(Path), opts).ConfigureAwait(false)
+            : await HtmlFormatter.FormatJavaScriptAsync(Content, opts).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, formatted);
+#else
+            await System.IO.File.WriteAllTextAsync(outPath, formatted, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(formatted);
         }

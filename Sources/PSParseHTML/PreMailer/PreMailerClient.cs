@@ -120,13 +120,16 @@ public class PreMailerClient {
                 Options.CustomFormatter,
                 Options.PreserveMediaQueries);
 
+            List<PreMailerWarning> warnings = new();
             if (result.Warnings != null) {
                 foreach (string warning in result.Warnings) {
-                    LoggingMessages.Logger.WriteWarning(warning);
+                    var w = new PreMailerWarning(warning);
+                    warnings.Add(w);
+                    LoggingMessages.Logger.WriteWarning(w.Message);
                 }
             }
 
-            return new PreMailerResult(result.Html, result.Warnings ?? new List<string>());
+            return new PreMailerResult(result.Html, warnings);
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("MoveCssInline failed with error: {0}", ex.Message);
             throw;
