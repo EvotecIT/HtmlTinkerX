@@ -50,6 +50,8 @@
   - supports the same authentication options as `Invoke-HTMLRendering` so you can capture the login process
   - can start recording from an existing session to capture later steps
   - the temporary Playwright video file is cleaned up automatically when stopping
+- `Start-HTMLTracing`/`Stop-HTMLTracing` - record Playwright traces for debugging
+- `Save-HTMLHar` - export captured network traffic to a HAR file
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Invoke-HTMLScript` - run custom JavaScript against a session
@@ -59,6 +61,7 @@
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Set-HTMLCookie` - add cookies to the active session
+- `Export-HTMLSession`/`Import-HTMLSession` - save and restore cookies and storage state
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
 All cmdlets that work with files accept a `-Path` parameter (or alias) in addition to `-File`. Relative, absolute and UNC paths are resolved to full paths automatically.
@@ -120,6 +123,11 @@ Save-HTMLScreenshot -Url 'https://example.com/login' -OutFile .\login.png -Highl
 Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
+# Record a trace and export HAR
+Start-HTMLTracing -Session $session
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/profile'
+Stop-HTMLTracing -Session $session -OutFile '.\trace.zip'
+Save-HTMLHar -Session $session -OutFile '.\traffic.har'
 # Keep a logged in browser session and reuse it
 $session = Start-HTMLSession -Url 'https://example.com/protected' `
     -Credential $cred `
@@ -140,6 +148,8 @@ Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
 Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 $log = Get-HTMLNetworkLog -Session $session
 $log | Format-Table Url, Status
+Export-HTMLSession -Session $session -Path 'state.json'
+$session = Import-HTMLSession -Path 'state.json' -Url 'https://example.com/protected'
 Close-HTMLSession -Session $session
 ```
 
