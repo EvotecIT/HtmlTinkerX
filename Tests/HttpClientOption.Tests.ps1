@@ -1,3 +1,5 @@
+Import-Module "$PSScriptRoot/../PSParseHTML.psd1"
+
 Describe 'Set-HTMLHttpClientOption' {
     It 'Updates factory timeout' {
         Set-HTMLHttpClientOption -TimeoutSeconds 5
@@ -7,7 +9,7 @@ Describe 'Set-HTMLHttpClientOption' {
     It 'Applies headers for created clients' {
         Set-HTMLHttpClientOption -Header @{ Test = 'Yes' } -ClearHeader
         $client = [PSParseHTML.HtmlHttpClientFactory]::Create()
-        $client.DefaultRequestHeaders['Test'].ToString() | Should -Be 'Yes'
+        $client.DefaultRequestHeaders.GetValues('Test') | Should -Contain 'Yes'
         $client.Dispose()
     }
 }
