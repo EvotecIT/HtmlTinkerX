@@ -158,7 +158,15 @@ It may not seem like much, but those thirteen cmdlets are powerful enough to ena
 ```powershell
 # Parse tables from a web page
 $tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
-$tables[0] | Format-Table -AutoSize
+$tables[1] | Format-Table -AutoSize
+# Sample output
+# Sequence Meaning
+# -------- -------
+# `0       Null
+# `a       Alert
+# `b       Backspace
+# `e       Escape (since PowerShell 6)
+# `f       Form feed
 
 # Inline CSS in an e-mail body and pretty print the result
 $html = Optimize-Email -Body $body -RemoveComments
