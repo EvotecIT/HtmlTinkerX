@@ -169,4 +169,17 @@
         $Result[0].Name | Should -Be 'John'
         $Result[0].Age | Should -Be '30'
     }
+
+    It 'Parses Wikipedia escape sequence table with correct columns' {
+        $Tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
+        $Tables.Count | Should -BeGreaterOrEqual 2
+
+        $Table = $Tables[1]
+        $Columns = $Table[0].PSObject.Properties.Name
+        $Columns[0] | Should -Be 'Sequence'
+        $Columns[1] | Should -Be 'Meaning'
+
+        ($Table | Where-Object Sequence -eq '`n').Meaning | Should -Be 'Newline'
+        $Table.Count | Should -BeGreaterOrEqual 10
+    }
 }

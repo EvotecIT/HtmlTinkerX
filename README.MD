@@ -32,7 +32,7 @@
 - `ConvertFrom-HTML` - parse full documents or fragments
 - `Format-CSS` - pretty‑print style sheets
 - `Format-HTML` - tidy up HTML markup
-- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
+- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias, supports jsbeautifier options like `-IndentSize` and `-BraceStyle`)
 - `Optimize-CSS` - minify style sheets
 - `Optimize-Email` - inline CSS for email bodies (can download linked stylesheets)
 - `Optimize-HTML` - minify HTML
@@ -56,6 +56,7 @@
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
+- `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Set-HTMLCookie` - add cookies to the active session
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
@@ -81,6 +82,9 @@ Format-HTML -Content $html
 
 # Format a JavaScript file
 Format-JavaScript -Path '.\script.js'
+
+# Format JavaScript with custom options
+Format-JavaScript -Content $js -IndentSize 2 -BraceStyle Expand
 
 # Minify a CSS file
 Optimize-CSS -Path '.\style.css'
@@ -130,6 +134,8 @@ $handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBloc
 }
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
 Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
+$log = Get-HTMLNetworkLog -Session $session
+$log | Format-Table Url, Status
 Close-HTMLSession -Session $session
 ```
 
@@ -155,7 +161,15 @@ It may not seem like much, but those thirteen cmdlets are powerful enough to ena
 ```powershell
 # Parse tables from a web page (rowspan and colspan handled automatically)
 $tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
-$tables[0] | Format-Table -AutoSize
+$tables[1] | Format-Table -AutoSize
+# Sample output
+# Sequence Meaning
+# -------- -------
+# `0       Null
+# `a       Alert
+# `b       Backspace
+# `e       Escape (since PowerShell 6)
+# `f       Form feed
 
 # Inline CSS in an e-mail body and pretty print the result
 $html = Optimize-Email -Body $body -RemoveComments
@@ -226,6 +240,11 @@ These methods can be consumed from C# or directly from PowerShell. For example:
 string html = File.ReadAllText("example.html");
 var tables = HtmlParser.ParseTablesWithHtmlAgilityPack(html);
 string pretty = HtmlFormatter.FormatHtml(html);
+
+// Customize JavaScript formatting
+string script = File.ReadAllText("script.js");
+BeautifierOptions jsOpts = new BeautifierOptions { IndentSize = 2, BraceStyle = BraceStyle.Expand };
+string prettyJs = HtmlFormatter.FormatJavaScript(script, jsOpts);
 ```
 
 ```powershell

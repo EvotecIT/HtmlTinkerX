@@ -4,6 +4,7 @@ using System.IO;
 using AngleSharp.Css.Parser;
 using AngleSharp.Css;
 using System.Threading.Tasks;
+
 using NUglify;
 using NUglify.Html;
 using System.Linq;
@@ -15,28 +16,31 @@ namespace PSParseHTML;
 /// </summary>
 public static class HtmlFormatter {
     /// <summary>
-    /// Formats JavaScript code using default JsBeautifier options.
+    /// Formats JavaScript code using JsBeautifier.
     /// </summary>
     /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
     /// <returns>Formatted JavaScript string.</returns>
-    public static string FormatJavaScript(string js) {
+    public static string FormatJavaScript(string js, BeautifierOptions? options = null) {
         if (js == null) {
             throw new ArgumentNullException(nameof(js));
         }
 
-        var beautifier = new Beautifier();
-        beautifier.Opts.IndentSize = 4;
-        beautifier.Opts.IndentChar = ' ';
-        beautifier.Opts.IndentWithTabs = false;
-        beautifier.Opts.PreserveNewlines = true;
-        beautifier.Opts.MaxPreserveNewlines = 10;
-        beautifier.Opts.JslintHappy = false;
-        beautifier.Opts.BraceStyle = BraceStyle.Collapse;
-        beautifier.Opts.KeepArrayIndentation = false;
-        beautifier.Opts.KeepFunctionIndentation = false;
-        beautifier.Opts.EvalCode = false;
-        beautifier.Opts.BreakChainedMethods = false;
+        BeautifierOptions opts = options ?? new BeautifierOptions {
+            IndentSize = 4,
+            IndentChar = ' ',
+            IndentWithTabs = false,
+            PreserveNewlines = true,
+            MaxPreserveNewlines = 10,
+            JslintHappy = false,
+            BraceStyle = BraceStyle.Collapse,
+            KeepArrayIndentation = false,
+            KeepFunctionIndentation = false,
+            EvalCode = false,
+            BreakChainedMethods = false
+        };
 
+        Beautifier beautifier = new Beautifier(opts);
         return beautifier.Beautify(js);
     }
 
@@ -54,9 +58,30 @@ public static class HtmlFormatter {
     /// <param name="filePath">Path to the JavaScript file.</param>
     /// <returns>Formatted JavaScript string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static string FormatJavaScriptFile(string filePath) {
+    public static string FormatJavaScriptFile(string filePath, BeautifierOptions? options = null) {
         string js = HtmlUtilities.ReadFileChecked(filePath);
-        return FormatJavaScript(js);
+        return FormatJavaScript(js, options);
+    }
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using JsBeautifier.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options = null)
+        => Task.Run(() => FormatJavaScript(js, options));
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code from a file using JsBeautifier.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null) {
+        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatJavaScriptAsync(js, options).ConfigureAwait(false);
     }
 
     /// <summary>
