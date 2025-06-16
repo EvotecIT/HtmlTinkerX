@@ -14,9 +14,9 @@ public class PreMailerResult {
     /// <summary>
     /// Any warnings returned by PreMailer.
     /// </summary>
-    public List<string> Warnings { get; }
+    public List<PreMailerWarning> Warnings { get; }
 
-    public PreMailerResult(string html, List<string> warnings) {
+    public PreMailerResult(string html, List<PreMailerWarning> warnings) {
         Html = html;
         Warnings = warnings;
     }
