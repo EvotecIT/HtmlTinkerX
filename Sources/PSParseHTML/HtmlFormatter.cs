@@ -24,10 +24,21 @@ public static class HtmlFormatter {
             throw new ArgumentNullException(nameof(js));
         }
 
-        Beautifier beautifier = options == null
-            ? new Beautifier()
-            : new Beautifier(options);
+        BeautifierOptions opts = options ?? new BeautifierOptions {
+            IndentSize = 4,
+            IndentChar = ' ',
+            IndentWithTabs = false,
+            PreserveNewlines = true,
+            MaxPreserveNewlines = 10,
+            JslintHappy = false,
+            BraceStyle = BraceStyle.Collapse,
+            KeepArrayIndentation = false,
+            KeepFunctionIndentation = false,
+            EvalCode = false,
+            BreakChainedMethods = false
+        };
 
+        Beautifier beautifier = new Beautifier(opts);
         return beautifier.Beautify(js);
     }
 

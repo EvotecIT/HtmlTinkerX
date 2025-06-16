@@ -229,6 +229,11 @@ These methods can be consumed from C# or directly from PowerShell. For example:
 string html = File.ReadAllText("example.html");
 var tables = HtmlParser.ParseTablesWithHtmlAgilityPack(html);
 string pretty = HtmlFormatter.FormatHtml(html);
+
+// Customize JavaScript formatting
+string script = File.ReadAllText("script.js");
+BeautifierOptions jsOpts = new BeautifierOptions { IndentSize = 2, BraceStyle = BraceStyle.Expand };
+string prettyJs = HtmlFormatter.FormatJavaScript(script, jsOpts);
 ```
 
 ```powershell
