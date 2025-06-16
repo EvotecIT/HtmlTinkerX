@@ -162,7 +162,11 @@ public static partial class HtmlBrowser {
             }
 
             if (!string.IsNullOrEmpty(overlayText)) {
-                var fontFamily = SixLabors.Fonts.SystemFonts.Collection.Families.First();
+                SixLabors.Fonts.FontFamily fontFamily;
+                if (!SixLabors.Fonts.SystemFonts.TryGet("DejaVu Sans", out fontFamily) &&
+                    !SixLabors.Fonts.SystemFonts.TryGet("Arial", out fontFamily)) {
+                    fontFamily = SixLabors.Fonts.SystemFonts.Collection.Families.First();
+                }
                 var font = fontFamily.CreateFont(20);
                 image.Mutate(c => c.DrawText(overlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
             }
