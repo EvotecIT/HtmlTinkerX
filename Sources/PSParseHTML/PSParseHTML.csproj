@@ -24,9 +24,9 @@
         <PackageReference Include="System.IO.Compression" Version="4.3.0" />
         <PackageReference Include="System.Net.Http" Version="4.3.4" />
         <PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
-        <PackageReference Include="SixLabors.ImageSharp" Version="2.1.5" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="2.1.10" />
         <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
-        <PackageReference Include="SixLabors.Fonts" Version="1.0.0" />
+        <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
     </ItemGroup>
 
     <ItemGroup>
