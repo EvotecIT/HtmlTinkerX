@@ -42,7 +42,7 @@
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
   - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
-- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, `-ElementSelector`, clipping parameters, `-Delay` and `-Selector`)
 - `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
 - `UserAgent`, `-ViewportWidth`, `-ViewportHeight` and `-DeviceScaleFactor` allow customizing the browser context
 - `Save-HTMLPdf` - generate a PDF of a rendered page
@@ -108,6 +108,7 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\page.png -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\header.png -ElementSelector 'header'
 Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'

@@ -22,6 +22,7 @@ public static partial class HtmlBrowser {
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
     /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
+    /// <param name="elementSelector">CSS selector of an element to capture.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
@@ -34,6 +35,7 @@ public static partial class HtmlBrowser {
         bool fullPage = false,
         int delayMs = 0,
         string? selector = null,
+        string? elementSelector = null,
         int? clipX = null,
         int? clipY = null,
         int? clipWidth = null,
@@ -67,6 +69,7 @@ public static partial class HtmlBrowser {
             fullPage,
             delayMs,
             selector,
+            elementSelector,
             clipX,
             clipY,
             clipWidth,
@@ -76,12 +79,23 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Captures a screenshot of an already loaded page.
     /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="path">File path for the screenshot.</param>
+    /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
+    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
+    /// <param name="elementSelector">CSS selector of an element to capture.</param>
+    /// <param name="clipX">Optional clip region X coordinate.</param>
+    /// <param name="clipY">Optional clip region Y coordinate.</param>
+    /// <param name="clipWidth">Optional clip region width.</param>
+    /// <param name="clipHeight">Optional clip region height.</param>
     public static async Task CaptureScreenshotAsync(
         IPage page,
         string path,
         bool fullPage = false,
         int delayMs = 0,
         string? selector = null,
+        string? elementSelector = null,
         int? clipX = null,
         int? clipY = null,
         int? clipWidth = null,
@@ -91,6 +105,17 @@ public static partial class HtmlBrowser {
         }
         if (delayMs > 0) {
             await page.WaitForTimeoutAsync(delayMs);
+        }
+
+        if (!string.IsNullOrEmpty(elementSelector)) {
+            var locator = page.Locator(elementSelector);
+            var box = await locator.BoundingBoxAsync();
+            if (box != null) {
+                clipX = (int)Math.Floor(box.X);
+                clipY = (int)Math.Floor(box.Y);
+                clipWidth = (int)Math.Ceiling(box.Width);
+                clipHeight = (int)Math.Ceiling(box.Height);
+            }
         }
 
         string fullPath = HtmlUtilities.ResolvePath(path);

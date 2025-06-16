@@ -31,6 +31,14 @@ Describe 'Save-HTMLScreenshot' {
         (Test-Path $outfile) | Should -BeTrue
     }
 
+    It 'Captures a single element screenshot' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'element.png'
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -ElementSelector '#loaded'
+        (Test-Path $outfile) | Should -BeTrue
+    }
+
     It 'Defaults to temp file when using -Open without OutFile' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
