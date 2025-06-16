@@ -30,7 +30,7 @@ Describe 'Invoke-HTMLRendering' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session -GeoLatitude 50.1 -GeoLongitude 19.9 -Timezone 'Europe/Warsaw'
-        $lat = [double]($session.Page.EvaluateAsync('new Promise(r=>navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))',$null).GetAwaiter().GetResult())
+        $lat = [double]($session.Page.EvaluateAsync('new Promise(r=>navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))',$null).GetAwaiter().GetResult().ToString())
         $tz = $session.Page.EvaluateAsync('Intl.DateTimeFormat().resolvedOptions().timeZone',$null).GetAwaiter().GetResult()
         Close-HTMLSession -Session $session
         [math]::Round($lat,1) | Should -Be 50.1

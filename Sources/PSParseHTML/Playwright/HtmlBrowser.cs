@@ -96,7 +96,11 @@ public static partial class HtmlBrowser {
             contextOptions.DeviceScaleFactor = deviceScaleFactor.Value;
         }
         if (geoLatitude.HasValue && geoLongitude.HasValue) {
-            contextOptions.Geolocation = new Geolocation { Latitude = geoLatitude.Value, Longitude = geoLongitude.Value, Accuracy = 0 };
+            contextOptions.Geolocation = new Geolocation {
+                Latitude = (float)geoLatitude.Value,
+                Longitude = (float)geoLongitude.Value,
+                Accuracy = 0
+            };
             contextOptions.Permissions = new[] { "geolocation" };
         }
         if (!string.IsNullOrEmpty(timezone)) {
