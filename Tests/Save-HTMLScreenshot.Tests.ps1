@@ -39,6 +39,14 @@ Describe 'Save-HTMLScreenshot' {
         (Test-Path $outfile) | Should -BeTrue
     }
 
+    It 'Highlights elements and overlays text' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'highlight.png'
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -HighlightSelector '#loaded' -OverlayText 'demo'
+        (Test-Path $outfile) | Should -BeTrue
+    }
+
     It 'Defaults to temp file when using -Open without OutFile' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri

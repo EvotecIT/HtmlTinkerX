@@ -95,6 +95,14 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter]
     public string? ElementSelector { get; set; }
 
+    /// <summary>CSS selectors of elements to highlight.</summary>
+    [Parameter]
+    public string[]? HighlightSelector { get; set; }
+
+    /// <summary>Text to overlay on the screenshot.</summary>
+    [Parameter]
+    public string? OverlayText { get; set; }
+
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
@@ -153,6 +161,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Y,
                     Width,
                     Height,
+                    highlightSelectors: HighlightSelector,
+                    overlayText: OverlayText,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
@@ -173,6 +183,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Y,
                     Width,
                     Height,
+                    highlightSelectors: HighlightSelector,
+                    overlayText: OverlayText,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
@@ -190,7 +202,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     X,
                     Y,
                     Width,
-                    Height).ConfigureAwait(false);
+                    Height,
+                    highlightSelectors: HighlightSelector,
+                    overlayText: OverlayText).ConfigureAwait(false);
                 break;
             case ParameterSetSessionDefault:
                 await HtmlBrowser.CaptureScreenshotAsync(
@@ -199,7 +213,9 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Full.IsPresent,
                     Delay,
                     Selector,
-                    ElementSelector).ConfigureAwait(false);
+                    ElementSelector,
+                    highlightSelectors: HighlightSelector,
+                    overlayText: OverlayText).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
@@ -214,6 +230,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Delay,
                     Selector,
                     ElementSelector,
+                    highlightSelectors: HighlightSelector,
+                    overlayText: OverlayText,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
