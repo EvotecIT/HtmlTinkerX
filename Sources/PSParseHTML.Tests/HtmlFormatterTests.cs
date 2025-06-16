@@ -1,4 +1,5 @@
 using PSParseHTML;
+using Jsbeautifier;
 using Xunit;
 
 namespace PSParseHTML.Tests;
@@ -12,6 +13,16 @@ public class HtmlFormatterTests {
             "(function() {\n    function main() {\n        var tabButtons = [].slice.call(document.querySelectorAll(\"ul.tab-nav li a.buttonTab\"));\n        tabButtons.map(function(button) {\n            button.addEventListener(\"click\", function() {\n                document.querySelector(\"li a.active.buttonTab\").classList.remove(\"active\");\n                button.classList.add(\"active\");\n                document.querySelector(\".tab-pane.active\").classList.remove(\"active\");\n                document.querySelector(button.getAttribute(\"href\")).classList.add(\"active\")\n            })\n        })\n    }\n    if (document.readyState !== \"loading\") {\n        main()\n    } else {\n        document.addEventListener(\"DOMContentLoaded\", main)\n    }\n})();";
 
         string result = HtmlFormatter.FormatJavaScript(js);
+        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void FormatJavaScript_RespectsOptions() {
+        const string js = "function x(){return 1;};";
+        BeautifierOptions opts = new() { IndentSize = 2, BraceStyle = BraceStyle.Expand };
+        string expected = "function x()\n{\n  return 1;\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
         Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
     }
 

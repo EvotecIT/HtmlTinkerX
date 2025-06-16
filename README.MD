@@ -32,7 +32,7 @@
 - `ConvertFrom-HTML` - parse full documents or fragments
 - `Format-CSS` - pretty‑print style sheets
 - `Format-HTML` - tidy up HTML markup
-- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
+- `Format-JavaScript` - beautify JavaScript (`Format-JS` alias, supports jsbeautifier options like `-IndentSize` and `-BraceStyle`)
 - `Optimize-CSS` - minify style sheets
 - `Optimize-Email` - inline CSS for email bodies (can download linked stylesheets)
 - `Optimize-HTML` - minify HTML
@@ -82,6 +82,9 @@ Format-HTML -Content $html
 
 # Format a JavaScript file
 Format-JavaScript -Path '.\script.js'
+
+# Format JavaScript with custom options
+Format-JavaScript -Content $js -IndentSize 2 -BraceStyle Expand
 
 # Minify a CSS file
 Optimize-CSS -Path '.\style.css'
@@ -237,6 +240,11 @@ These methods can be consumed from C# or directly from PowerShell. For example:
 string html = File.ReadAllText("example.html");
 var tables = HtmlParser.ParseTablesWithHtmlAgilityPack(html);
 string pretty = HtmlFormatter.FormatHtml(html);
+
+// Customize JavaScript formatting
+string script = File.ReadAllText("script.js");
+BeautifierOptions jsOpts = new BeautifierOptions { IndentSize = 2, BraceStyle = BraceStyle.Expand };
+string prettyJs = HtmlFormatter.FormatJavaScript(script, jsOpts);
 ```
 
 ```powershell

@@ -26,4 +26,16 @@
         $Output = Format-JavaScript -Content $JSContent
         $Output | Should -Be $CompareTo
     }
+
+    It 'Supports custom options' {
+        $Content = 'function x(){return 1;};'
+        $Expected = @"
+function x()
+{
+  return 1;
+};
+"@
+        $Output = Format-JavaScript -Content $Content -IndentSize 2 -BraceStyle Expand
+        $Output.Replace("`r`n", "`n") | Should -Be $Expected.Replace("`r`n", "`n").TrimEnd()
+    }
 }

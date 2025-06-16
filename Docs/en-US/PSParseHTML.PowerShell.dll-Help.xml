@@ -1557,7 +1557,7 @@
       <command:verb>Format</command:verb>
       <command:noun>JavaScript</command:noun>
       <maml:description>
-        <maml:para>Cmdlet that formats JavaScript code using JsBeautifier.</maml:para>
+        <maml:para>Cmdlet that formats JavaScript code using JsBeautifier. Additional options such as <code>IndentSize</code> and <code>BraceStyle</code> can be provided.</maml:para>
       </maml:description>
     </command:details>
     <command:syntax>
