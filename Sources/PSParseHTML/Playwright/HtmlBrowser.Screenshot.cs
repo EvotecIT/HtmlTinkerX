@@ -3,8 +3,13 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.Fonts;
 
 namespace PSParseHTML;
 
@@ -40,6 +45,8 @@ public static partial class HtmlBrowser {
         int? clipY = null,
         int? clipWidth = null,
         int? clipHeight = null,
+        IEnumerable<string>? highlightSelectors = null,
+        string? overlayText = null,
         string? username = null,
         string? password = null,
         HtmlFormLogin? formLogin = null,
@@ -73,7 +80,9 @@ public static partial class HtmlBrowser {
             clipX,
             clipY,
             clipWidth,
-            clipHeight).ConfigureAwait(false);
+            clipHeight,
+            highlightSelectors,
+            overlayText).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -99,7 +108,9 @@ public static partial class HtmlBrowser {
         int? clipX = null,
         int? clipY = null,
         int? clipWidth = null,
-        int? clipHeight = null) {
+        int? clipHeight = null,
+        IEnumerable<string>? highlightSelectors = null,
+        string? overlayText = null) {
         if (!string.IsNullOrEmpty(selector)) {
             await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
@@ -119,7 +130,7 @@ public static partial class HtmlBrowser {
         }
 
         string fullPath = HtmlUtilities.ResolvePath(path);
-        var options = new PageScreenshotOptions { Path = fullPath, FullPage = fullPage };
+        var options = new PageScreenshotOptions { FullPage = fullPage };
         if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
             options.Clip = new Clip {
                 X = clipX.Value,
@@ -128,7 +139,37 @@ public static partial class HtmlBrowser {
                 Height = clipHeight.Value,
             };
         }
+        byte[] data = await page.ScreenshotAsync(options);
 
-        await page.ScreenshotAsync(options);
+        if ((highlightSelectors != null && System.Linq.Enumerable.Any(highlightSelectors)) || !string.IsNullOrEmpty(overlayText)) {
+            using var image = SixLabors.ImageSharp.Image.Load(data);
+            var pen = SixLabors.ImageSharp.Drawing.Processing.Pens.Solid(SixLabors.ImageSharp.Color.Red, 3);
+            if (highlightSelectors != null) {
+                foreach (string sel in highlightSelectors) {
+                    try {
+                        var elements = await page.QuerySelectorAllAsync(sel);
+                        foreach (var element in elements) {
+                            var box = await element.BoundingBoxAsync();
+                            if (box != null) {
+                                var rect = new SixLabors.ImageSharp.RectangleF((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height);
+                                image.Mutate(c => c.Draw(pen, rect));
+                            }
+                        }
+                    } catch {
+                        // ignore selector failures
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(overlayText)) {
+                var fontFamily = SixLabors.Fonts.SystemFonts.Collection.Families.First();
+                var font = fontFamily.CreateFont(20);
+                image.Mutate(c => c.DrawText(overlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
+            }
+
+            await image.SaveAsync(fullPath);
+        } else {
+            File.WriteAllBytes(fullPath, data);
+        }
     }
 }
