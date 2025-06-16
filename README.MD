@@ -26,7 +26,7 @@
 **PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
 
 ## Processing of HTML/CSS/JS
--  - run JavaScript with AngleSharp without a browser
+- `Convert-HTMLToText` - convert markup to plain text
 - `ConvertFrom-HtmlTable` - turn table elements into objects (supports rowspan/colspan)
 - `ConvertFrom-HTMLAttributes` - extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
 - `ConvertFrom-HTML` - parse full documents or fragments
