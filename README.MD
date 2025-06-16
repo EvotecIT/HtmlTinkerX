@@ -27,7 +27,7 @@
 
 ## Processing of HTML/CSS/JS
 - `Convert-HTMLToText` - convert markup to plain text
-- `ConvertFrom-HtmlTable` - turn table elements into objects
+- `ConvertFrom-HtmlTable` - turn table elements into objects (supports rowspan/colspan)
 - `ConvertFrom-HTMLAttributes` - extract elements by tag, class, id or name (aliases: `ConvertFrom-HTMLTag`, `ConvertFrom-HTMLClass`)
 - `ConvertFrom-HTML` - parse full documents or fragments
 - `Format-CSS` - pretty‑print style sheets
@@ -159,7 +159,7 @@ It may not seem like much, but those thirteen cmdlets are powerful enough to ena
 ## Examples
 
 ```powershell
-# Parse tables from a web page
+# Parse tables from a web page (rowspan and colspan handled automatically)
 $tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
 $tables[1] | Format-Table -AutoSize
 # Sample output

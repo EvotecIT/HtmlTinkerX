@@ -98,7 +98,7 @@
         $First = $DataTables[0]
         $First.Headers | Should -Contain 'NonRegional'
         $First.Headers | Should -Not -Contain '*Non-Regional'
-        $First.Data[0].NonRegional | Should -Be '--'
+        $First.Data[1].NonRegional | Should -Be 'Not available'
     }
 
     It 'Parses azure_status.html with AngleSharp and metadata' {
@@ -118,7 +118,7 @@
         $First = $DataTables[0]
         $First.Headers | Should -Contain 'NonRegional'
         $First.Headers | Should -Not -Contain '*Non-Regional'
-        $First.Data[0].NonRegional | Should -Be '--'
+        $First.Data[1].NonRegional | Should -Be 'Not available'
     }
     It 'Parses headless_table.html and detects four tables' {
         $Path = Join-Path $PSScriptRoot 'Documents/headless_table.html'
