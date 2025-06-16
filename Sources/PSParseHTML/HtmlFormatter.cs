@@ -4,28 +4,7 @@ using System.IO;
 using AngleSharp.Css.Parser;
 using AngleSharp.Css;
 using System.Threading.Tasks;
-    /// <summary>
-    /// Asynchronously formats JavaScript code using JsBeautifier.
-    /// </summary>
-    /// <param name="js">JavaScript code to format.</param>
-    /// <param name="options">Optional Beautifier options object.</param>
-    /// <returns>A task returning the formatted JavaScript string.</returns>
-    public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options = null)
-        => Task.Run(() => FormatJavaScript(js, options));
 
-    /// <summary>
-    /// Asynchronously formats JavaScript code from a file using JsBeautifier.
-    /// </summary>
-    /// <param name="filePath">Path to the JavaScript file.</param>
-    /// <param name="options">Optional Beautifier options object.</param>
-    /// <returns>A task returning the formatted JavaScript string.</returns>
-    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null) {
-        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
-        return await FormatJavaScriptAsync(js, options).ConfigureAwait(false);
-    }
-
-using System.Threading.Tasks;
 using NUglify;
 using NUglify.Html;
 using System.Linq;
@@ -82,6 +61,27 @@ public static class HtmlFormatter {
     public static string FormatJavaScriptFile(string filePath, BeautifierOptions? options = null) {
         string js = HtmlUtilities.ReadFileChecked(filePath);
         return FormatJavaScript(js, options);
+    }
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using JsBeautifier.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options = null)
+        => Task.Run(() => FormatJavaScript(js, options));
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code from a file using JsBeautifier.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null) {
+        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatJavaScriptAsync(js, options).ConfigureAwait(false);
     }
 
     /// <summary>
