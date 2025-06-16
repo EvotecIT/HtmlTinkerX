@@ -36,6 +36,6 @@ function x()
 };
 "@
         $Output = Format-JavaScript -Content $Content -IndentSize 2 -BraceStyle Expand
-        $Output | Should -Be $Expected.TrimEnd()
+        $Output.Replace("`r`n", "`n") | Should -Be $Expected.Replace("`r`n", "`n").TrimEnd()
     }
 }
