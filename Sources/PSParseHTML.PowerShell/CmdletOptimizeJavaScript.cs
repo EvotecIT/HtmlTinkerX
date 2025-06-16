@@ -38,7 +38,7 @@ public sealed class CmdletOptimizeJavaScript : AsyncPSCmdlet {
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(outPath, optimized);
 #else
             await File.WriteAllTextAsync(outPath, optimized, CancelToken).ConfigureAwait(false);

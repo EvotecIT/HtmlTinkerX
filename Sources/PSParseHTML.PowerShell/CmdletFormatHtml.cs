@@ -87,7 +87,7 @@ public sealed class CmdletFormatHtml : AsyncPSCmdlet {
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, result);
 #else
             await System.IO.File.WriteAllTextAsync(outPath, result, CancelToken).ConfigureAwait(false);

@@ -38,7 +38,7 @@ public sealed class CmdletOptimizeCss : AsyncPSCmdlet {
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(outPath, result);
 #else
             await File.WriteAllTextAsync(outPath, result, CancelToken).ConfigureAwait(false);

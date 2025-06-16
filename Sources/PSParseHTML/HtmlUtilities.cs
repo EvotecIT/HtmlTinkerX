@@ -49,7 +49,7 @@ public static class HtmlUtilities {
         if (!File.Exists(fullPath)) {
             throw new FileNotFoundException($"File not found: {path}", fullPath);
         }
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
         return await Task.Run(() => File.ReadAllText(fullPath)).ConfigureAwait(false);
 #else
         return await File.ReadAllTextAsync(fullPath).ConfigureAwait(false);
