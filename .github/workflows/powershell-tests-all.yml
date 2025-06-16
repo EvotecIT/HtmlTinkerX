@@ -1,4 +1,4 @@
-name: Test PowerShell Module (All)
+name: Test PowerShell (All)
 
 # This workflow is disabled but ready for use
 # To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers

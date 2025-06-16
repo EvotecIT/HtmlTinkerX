@@ -1,5 +1,4 @@
-# PowerShell Testing Workflow (Disabled)
-name: Test PowerShell (PowerShell 7)
+name: Test PowerShell (7)
 
 # This workflow is disabled but ready for use
 # To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers

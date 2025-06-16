@@ -1,5 +1,5 @@
 # .NET Testing Workflow
-name: Test .NET Libraries
+name: Test .NET
 
 on:
   push:
