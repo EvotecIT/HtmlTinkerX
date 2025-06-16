@@ -37,6 +37,11 @@ public class PreMailerOptions {
     /// <summary>Use email formatter when generating HTML.</summary>
     public bool UseEmailFormatter { get; set; }
 
+    /// <summary>
+    /// When enabled, CSS from <link> tags will be downloaded and inlined.
+    /// </summary>
+    public bool DownloadRemoteCss { get; set; }
+
     // Analytics configuration
     /// <summary>Add Google Analytics tags.</summary>
     public bool AddAnalyticsTags { get; set; }

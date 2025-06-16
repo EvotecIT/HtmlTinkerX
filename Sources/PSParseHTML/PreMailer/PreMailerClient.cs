@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Net.Http;
+using AngleSharp.Dom;
 using PreMailer.Net;
 
 namespace PSParseHTML;
@@ -43,6 +45,51 @@ public class PreMailerClient {
     public PreMailerResult MoveCssInline() {
         try {
             string cssContent = Options.Css ?? string.Empty;
+            string htmlToProcess = _html;
+
+            var document = HtmlParser.ParseWithAngleSharp(_html);
+                foreach (var link in document.QuerySelectorAll("link")) {
+                    string? href = link.GetAttribute("href");
+                    string? rel = link.GetAttribute("rel");
+                    bool isCss = !string.IsNullOrEmpty(href) &&
+                        (href.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+                         (rel != null && rel.Equals("stylesheet", StringComparison.OrdinalIgnoreCase)));
+                    if (!isCss) {
+                        continue;
+                    }
+
+                    if (Options.DownloadRemoteCss && href != null) {
+                        try {
+                            Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
+                            if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
+                                uri = new Uri(Options.BaseUri, uri);
+                            }
+
+                            if (uri.IsFile)
+                            {
+                                string localPath = uri.LocalPath;
+                                if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
+                                {
+                                    localPath = "/" + localPath.TrimStart('\\');
+                                }
+                                cssContent += File.ReadAllText(localPath);
+                            }
+                            else if (uri.IsAbsoluteUri)
+                            {
+                                using HttpClient client = new();
+                                cssContent += HtmlUtilities
+                                    .GetStringWithProperEncodingAsync(client, uri.ToString())
+                                    .GetAwaiter().GetResult();
+                            }
+                        } catch (Exception ex) {
+                            LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
+                        }
+                    }
+
+                    link.Remove();
+                }
+
+            htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
                 string cssPath = HtmlUtilities.ResolvePath(Options.CssFilePath!);
                 if (!File.Exists(cssPath)) {
@@ -52,8 +99,8 @@ public class PreMailerClient {
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
-                ? new PreMailer.Net.PreMailer(_html, Options.BaseUri)
-                : new PreMailer.Net.PreMailer(_html);
+                ? new PreMailer.Net.PreMailer(htmlToProcess, Options.BaseUri)
+                : new PreMailer.Net.PreMailer(htmlToProcess);
 
             if (Options.AddAnalyticsTags && !string.IsNullOrEmpty(Options.AnalyticsSource)) {
                 preMailer.AddAnalyticsTags(
@@ -115,6 +162,7 @@ public class PreMailerClient {
         global::AngleSharp.IMarkupFormatter? customFormatter = null,
         bool preserveMediaQueries = false,
         bool useEmailFormatter = false,
+        bool downloadRemoteCss = false,
         bool addAnalyticsTags = false,
         string? analyticsSource = null,
         string? analyticsMedium = null,
@@ -133,6 +181,7 @@ public class PreMailerClient {
             CustomFormatter = customFormatter,
             PreserveMediaQueries = preserveMediaQueries,
             UseEmailFormatter = useEmailFormatter,
+            DownloadRemoteCss = downloadRemoteCss,
             AddAnalyticsTags = addAnalyticsTags,
             AnalyticsSource = analyticsSource,
             AnalyticsMedium = analyticsMedium,
@@ -159,6 +208,7 @@ public class PreMailerClient {
         global::AngleSharp.IMarkupFormatter? customFormatter = null,
         bool preserveMediaQueries = false,
         bool useEmailFormatter = false,
+        bool downloadRemoteCss = false,
         bool addAnalyticsTags = false,
         string? analyticsSource = null,
         string? analyticsMedium = null,
@@ -177,6 +227,7 @@ public class PreMailerClient {
             CustomFormatter = customFormatter,
             PreserveMediaQueries = preserveMediaQueries,
             UseEmailFormatter = useEmailFormatter,
+            DownloadRemoteCss = downloadRemoteCss,
             AddAnalyticsTags = addAnalyticsTags,
             AnalyticsSource = analyticsSource,
             AnalyticsMedium = analyticsMedium,
