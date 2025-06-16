@@ -1,4 +1,5 @@
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 using Jsbeautifier;
 
@@ -10,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Format, "JavaScript", DefaultParameterSetName = ParameterSetContent)]
 [Alias("Format-JS")]
 [OutputType(typeof(string))]
-public sealed class CmdletFormatJavaScript : PSCmdlet {
+public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
 
@@ -74,16 +75,13 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
     [Parameter]
     public bool EvalCode { get; set; }
 
-    /// <summary>Wrap line length.</summary>
-    [Parameter]
-    public int WrapLineLength { get; set; }
 
     /// <summary>Break chained methods.</summary>
     [Parameter]
     public bool BreakChainedMethods { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         BeautifierOptions opts = new() {
             IndentSize = IndentSize,
             IndentChar = IndentChar,
@@ -95,7 +93,6 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
             KeepArrayIndentation = KeepArrayIndentation,
             KeepFunctionIndentation = KeepFunctionIndentation,
             EvalCode = EvalCode,
-            WrapLineLength = WrapLineLength,
             BreakChainedMethods = BreakChainedMethods
         };
 
@@ -109,5 +106,6 @@ public sealed class CmdletFormatJavaScript : PSCmdlet {
         } else {
             WriteObject(formatted);
         }
+        await Task.CompletedTask;
     }
 }
