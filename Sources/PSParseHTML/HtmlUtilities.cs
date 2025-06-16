@@ -39,6 +39,24 @@ public static class HtmlUtilities {
     }
 
     /// <summary>
+    /// Asynchronously reads the contents of a file after verifying that it exists.
+    /// </summary>
+    /// <param name="path">Path to the file.</param>
+    /// <returns>File contents.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> ReadFileCheckedAsync(string path) {
+        string fullPath = ResolvePath(path);
+        if (!File.Exists(fullPath)) {
+            throw new FileNotFoundException($"File not found: {path}", fullPath);
+        }
+#if NETSTANDARD2_0 || NETFRAMEWORK
+        return await Task.Run(() => File.ReadAllText(fullPath)).ConfigureAwait(false);
+#else
+        return await File.ReadAllTextAsync(fullPath).ConfigureAwait(false);
+#endif
+    }
+
+    /// <summary>
     /// Downloads content from a URL with proper encoding detection.
     /// </summary>
     /// <param name="client">HttpClient to use for the request.</param>
