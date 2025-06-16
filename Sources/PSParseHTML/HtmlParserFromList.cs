@@ -12,7 +12,6 @@ namespace PSParseHTML;
 /// Provides functionality for parsing HTML lists.
 /// </summary>
 public static class HtmlParserFromList {
-    private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts list items from HTML using AngleSharp with metadata.
     /// </summary>
@@ -99,7 +98,7 @@ public static class HtmlParserFromList {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _sharedClient;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseListsWithAngleSharpDetailed(content, tagPlaceholder);
     }
@@ -213,7 +212,7 @@ public static class HtmlParserFromList {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _sharedClient;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseListsWithHtmlAgilityPackDetailed(content, tagPlaceholder);
     }

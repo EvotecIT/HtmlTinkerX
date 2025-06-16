@@ -13,7 +13,6 @@ namespace PSParseHTML;
 /// Provides helpers for parsing HTML content using either AngleSharp or HtmlAgilityPack.
 /// </summary>
 public static class HtmlParser {
-    private static readonly HttpClient _client = new();
 
     /// <summary>
     /// Parses HTML markup from a string using AngleSharp.
@@ -37,7 +36,7 @@ public static class HtmlParser {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _client;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseWithAngleSharp(content);
     }
@@ -65,7 +64,7 @@ public static class HtmlParser {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _client;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
     }
