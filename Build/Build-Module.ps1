@@ -1,6 +1,10 @@
+<<<<<<< implement-psd1-rebuild-for-cross-platform-github-actions -- Incoming Change
 $RefreshPSD1Only = [bool]$Env:RefreshPSD1Only
 
 Clear-Host
+=======
+Import-Module PSPublishModule -Force -ErrorAction Stop
+>>>>>>> v2-speedygonzales -- Current Change
 
 Build-Module -ModuleName 'PSParseHTML' {
     # Usual defaults as per standard module
@@ -100,7 +104,11 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
+<<<<<<< implement-psd1-rebuild-for-cross-platform-github-actions -- Incoming Change
         RefreshPSD1Only                   = $RefreshPSD1Only
+=======
+        RefreshPSD1Only                   = $true
+>>>>>>> v2-speedygonzales -- Current Change
         NETBinaryModuleDocumenation       = $true
     }
 
