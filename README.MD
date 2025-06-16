@@ -34,7 +34,7 @@
 - `Format-HTML` - tidy up HTML markup
 - `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
 - `Optimize-CSS` - minify style sheets
-- `Optimize-Email` - inline CSS for email bodies
+- `Optimize-Email` - inline CSS for email bodies (can download linked stylesheets)
 - `Optimize-HTML` - minify HTML
 - `Optimize-JavaScript` - minify JavaScript
 
@@ -85,8 +85,8 @@ Format-JavaScript -Path '.\script.js'
 # Minify a CSS file
 Optimize-CSS -Path '.\style.css'
 
-# Inline CSS in an email body
-Optimize-Email -Body $html -UseEmailFormatter
+# Inline CSS in an email body (fetch linked stylesheets)
+Optimize-Email -Body $html -UseEmailFormatter -DownloadRemoteCss
 
 # Minify an HTML file
 Optimize-HTML -Path '.\page.html'

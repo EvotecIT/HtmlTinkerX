@@ -409,6 +409,16 @@
           </dev:type>
           <dev:defaultValue>False</dev:defaultValue>
         </command:parameter>
+        <!-- Parameter: DownloadRemoteCss -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>DownloadRemoteCss</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
       </command:syntaxItem>
       <!-- Parameter set: File -->
       <command:syntaxItem>
@@ -564,6 +574,16 @@
           </dev:type>
           <dev:defaultValue>False</dev:defaultValue>
         </command:parameter>
+        <!-- Parameter: DownloadRemoteCss -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>DownloadRemoteCss</maml:name>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
@@ -698,6 +718,19 @@
         <maml:name>UseEmailFormatter</maml:name>
         <maml:description>
           <maml:para>Use the email formatter when generating HTML.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: DownloadRemoteCss -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>DownloadRemoteCss</maml:name>
+        <maml:description>
+          <maml:para>Download CSS from &lt;link&gt; elements.</maml:para>
         </maml:description>
         <command:parameterValue required="true">SwitchParameter</command:parameterValue>
         <dev:type>

@@ -67,7 +67,12 @@ public class PreMailerClient {
 
                             if (uri.IsFile)
                             {
-                                cssContent += File.ReadAllText(uri.LocalPath);
+                                string localPath = uri.LocalPath;
+                                if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
+                                {
+                                    localPath = "/" + localPath.TrimStart('\\');
+                                }
+                                cssContent += File.ReadAllText(localPath);
                             }
                             else if (uri.IsAbsoluteUri)
                             {
