@@ -136,4 +136,37 @@
 
         $Tables[3].Data[1].Column3 | Should -Match 'PrepareCopying failed'
     }
+
+    It 'Parses easy_table_with_footer.html and detects footer row' {
+        $Path = Join-Path $PSScriptRoot 'Documents/easy_table_with_footer.html'
+        $Content = Get-Content -LiteralPath $Path -Raw
+
+        $Table = ConvertFrom-HtmlTable -Content $Content
+        $Table.Count | Should -Be 3
+        $Table[2].Items | Should -Be 'Totals'
+        $Table[2].Expenditure | Should -Be '21,000'
+    }
+
+    It 'Skips footer rows when using -SkipFooter' {
+        $Path = Join-Path $PSScriptRoot 'Documents/easy_table_with_footer.html'
+        $Content = Get-Content -LiteralPath $Path -Raw
+
+        $Table = ConvertFrom-HtmlTable -Content $Content -SkipFooter
+        $Table.Count | Should -Be 2
+        $Table | Should -Not -Contain @{ Items = 'Totals'; Expenditure = '21,000' }
+    }
+
+    It 'Supports ReverseTable parsing for key/value rows' {
+        $Html = @"
+<table>
+    <tr><th>Name</th><td>John</td></tr>
+    <tr><th>Age</th><td>30</td></tr>
+</table>
+"@
+
+        $Result = ConvertFrom-HtmlTable -Content $Html -ReverseTable
+        $Result.Count | Should -Be 1
+        $Result[0].Name | Should -Be 'John'
+        $Result[0].Age | Should -Be '30'
+    }
 }
