@@ -13,7 +13,6 @@ namespace PSParseHTML;
 /// Provides helpers for parsing HTML content using either AngleSharp or HtmlAgilityPack.
 /// </summary>
 public static class HtmlParser {
-    private static readonly HttpClient _client = new();
 
     /// <summary>
     /// Parses HTML markup from a string using AngleSharp.
@@ -37,7 +36,7 @@ public static class HtmlParser {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _client;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseWithAngleSharp(content);
     }
@@ -65,7 +64,7 @@ public static class HtmlParser {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
-        HttpClient http = client ?? _client;
+        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
     }
@@ -264,6 +263,25 @@ public static class HtmlParser {
     /// <returns>List parse results with metadata.</returns>
     public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
         return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client);
+    }
+
+    /// <summary>
+    /// Extracts form definitions from HTML markup using AngleSharp.
+    /// </summary>
+    /// <param name="html">HTML content containing forms.</param>
+    /// <returns>List of form parse results.</returns>
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html) {
+        return HtmlParserFromForm.ParseFormsWithAngleSharp(html);
+    }
+
+    /// <summary>
+    /// Extracts form definitions from a web page using AngleSharp.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of form parse results.</returns>
+    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client);
     }
 
 

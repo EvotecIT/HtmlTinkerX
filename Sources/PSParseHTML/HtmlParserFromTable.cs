@@ -12,7 +12,6 @@ namespace PSParseHTML;
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
 public static class HtmlParserFromTable {
-    private static readonly HttpClient _sharedClient = new();
     /// <summary>
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
     /// </summary>
@@ -259,7 +258,7 @@ public static class HtmlParserFromTable {
             http = clientFactory();
             disposeClient = true;
         } else {
-            http = _sharedClient;
+            http = HtmlHttpClientFactory.Shared;
         }
 
         try {
@@ -605,7 +604,7 @@ public static class HtmlParserFromTable {
             http = clientFactory();
             disposeClient = true;
         } else {
-            http = _sharedClient;
+            http = HtmlHttpClientFactory.Shared;
         }
 
         try {

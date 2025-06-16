@@ -91,6 +91,10 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter]
     public string? Selector { get; set; }
 
+    /// <summary>CSS selector of an element to capture.</summary>
+    [Parameter]
+    public string? ElementSelector { get; set; }
+
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
@@ -144,6 +148,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     false,
                     Delay,
                     Selector,
+                    ElementSelector,
                     X,
                     Y,
                     Width,
@@ -163,6 +168,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     false,
                     Delay,
                     Selector,
+                    ElementSelector,
                     X,
                     Y,
                     Width,
@@ -180,6 +186,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     false,
                     Delay,
                     Selector,
+                    ElementSelector,
                     X,
                     Y,
                     Width,
@@ -191,7 +198,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     Full.IsPresent,
                     Delay,
-                    Selector).ConfigureAwait(false);
+                    Selector,
+                    ElementSelector).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
@@ -205,6 +213,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Full.IsPresent,
                     Delay,
                     Selector,
+                    ElementSelector,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,

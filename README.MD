@@ -34,7 +34,7 @@
 - `Format-HTML` - tidy up HTML markup
 - `Format-JavaScript` - beautify JavaScript (`Format-JS` alias)
 - `Optimize-CSS` - minify style sheets
-- `Optimize-Email` - inline CSS for email bodies
+- `Optimize-Email` - inline CSS for email bodies (can download linked stylesheets)
 - `Optimize-HTML` - minify HTML
 - `Optimize-JavaScript` - minify JavaScript
 
@@ -42,7 +42,7 @@
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
   - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
-- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, clipping parameters, `-Delay` and `-Selector`)
+- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, `-ElementSelector`, clipping parameters, `-Delay` and `-Selector`)
 - `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
 - `UserAgent`, `-ViewportWidth`, `-ViewportHeight` and `-DeviceScaleFactor` allow customizing the browser context
 - `Save-HTMLPdf` - generate a PDF of a rendered page
@@ -85,8 +85,8 @@ Format-JavaScript -Path '.\script.js'
 # Minify a CSS file
 Optimize-CSS -Path '.\style.css'
 
-# Inline CSS in an email body
-Optimize-Email -Body $html -UseEmailFormatter
+# Inline CSS in an email body (fetch linked stylesheets)
+Optimize-Email -Body $html -UseEmailFormatter -DownloadRemoteCss
 
 # Minify an HTML file
 Optimize-HTML -Path '.\page.html'
@@ -108,6 +108,7 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
 Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\page.png -Full -Open -Delay 1000 -Selector '#content'
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\header.png -ElementSelector 'header'
 Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'

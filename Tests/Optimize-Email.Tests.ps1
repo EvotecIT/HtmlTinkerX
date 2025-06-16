@@ -27,4 +27,16 @@ Describe 'Optimize-Email' {    It 'Given HTML content - Should inline CSS and re
         $normalizedExpected = $expected -replace '\r\n', "`n" -replace '\r', "`n"
         Should -Actual $normalizedResult -Be $normalizedExpected
     }
+
+    It 'Given linked stylesheet - Should inline when DownloadRemoteCss is enabled' {
+        $cssPath = Join-Path $TestDrive 'styles.css'
+        'p{color:green}' | Set-Content -Path $cssPath
+        $uri = [System.Uri]::new([System.IO.Path]::GetFullPath($cssPath)).AbsoluteUri
+        $html = "<html><head><link rel='stylesheet' href='$uri'></head><body><p>Link</p></body></html>"
+        $expected = '<html><head></head><body><p style="color: green">Link</p></body></html>'
+        $result = Optimize-Email -Body $html -RemoveStyleElements -DownloadRemoteCss
+        $normalizedResult = $result -replace '\r\n', "`n" -replace '\r', "`n"
+        $normalizedExpected = $expected -replace '\r\n', "`n" -replace '\r', "`n"
+        $normalizedResult | Should -Be $normalizedExpected
+    }
 }
