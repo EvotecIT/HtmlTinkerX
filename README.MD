@@ -56,6 +56,7 @@
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
+- `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Set-HTMLCookie` - add cookies to the active session
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
@@ -130,6 +131,8 @@ $handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBloc
 }
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
 Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
+$log = Get-HTMLNetworkLog -Session $session
+$log | Format-Table Url, Status
 Close-HTMLSession -Session $session
 ```
 
