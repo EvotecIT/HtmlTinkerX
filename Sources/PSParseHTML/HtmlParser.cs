@@ -265,6 +265,25 @@ public static class HtmlParser {
         return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client);
     }
 
+    /// <summary>
+    /// Extracts form definitions from HTML markup using AngleSharp.
+    /// </summary>
+    /// <param name="html">HTML content containing forms.</param>
+    /// <returns>List of form parse results.</returns>
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html) {
+        return HtmlParserFromForm.ParseFormsWithAngleSharp(html);
+    }
+
+    /// <summary>
+    /// Extracts form definitions from a web page using AngleSharp.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of form parse results.</returns>
+    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client);
+    }
+
 
 
     /// <summary>

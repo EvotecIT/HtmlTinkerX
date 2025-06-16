@@ -65,6 +65,10 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
     [Parameter]
     public SwitchParameter UseEmailFormatter { get; set; }
 
+    /// <summary>Download CSS from &lt;link&gt; elements.</summary>
+    [Parameter]
+    public SwitchParameter DownloadRemoteCss { get; set; }
+
     /// <summary>Add Google Analytics tags.</summary>
     [Parameter]
     public SwitchParameter AddAnalyticsTags { get; set; }
@@ -129,6 +133,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
             RemoveComments = RemoveComments,
             PreserveMediaQueries = PreserveMediaQueries,
             UseEmailFormatter = UseEmailFormatter,
+            DownloadRemoteCss = DownloadRemoteCss,
             AddAnalyticsTags = AddAnalyticsTags,
             AnalyticsSource = AnalyticsSource,
             AnalyticsMedium = AnalyticsMedium,
