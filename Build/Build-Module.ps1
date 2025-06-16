@@ -1,4 +1,4 @@
-Clear-Host
+Import-Module PSPublishModule -Force -ErrorAction Stop
 
 Build-Module -ModuleName 'PSParseHTML' {
     # Usual defaults as per standard module
@@ -98,7 +98,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $false
+        RefreshPSD1Only                   = $true
         NETBinaryModuleDocumenation       = $true
     }
 
