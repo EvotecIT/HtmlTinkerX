@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -22,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]))]
-public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
+public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -85,16 +86,16 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         if (IncludeMetadata.IsPresent) {
             List<HtmlTableResult> tables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult().DocumentElement.OuterHtml;
+                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).GetAwaiter().GetResult();
+                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
                     tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
@@ -108,16 +109,18 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
             foreach (var tableResult in tables) {
                 WriteObject(CreateTableObject(tableResult));
             }
+
+            return Task.CompletedTask;
         } else {
             // Use the detailed parsing methods but extract only the Data part
             List<HtmlTableResult> detailedTables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
                 if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
-                    string content = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult().DocumentElement.OuterHtml;
+                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    var doc = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).GetAwaiter().GetResult();
+                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
                     detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
@@ -142,6 +145,8 @@ public sealed class CmdletConvertFromHtmlTable : PSCmdlet {
                 }
                 WriteObject(tableArrays.ToArray(), false);
             }
+
+            return Task.CompletedTask;
         }
     }
 

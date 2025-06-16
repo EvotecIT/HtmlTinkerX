@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -10,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlForm", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
-public sealed class CmdletConvertFromHtmlForm : PSCmdlet {
+public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -36,11 +37,11 @@ public sealed class CmdletConvertFromHtmlForm : PSCmdlet {
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         List<HtmlFormResult> forms;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            forms = HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult();
+            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
         } else {
             forms = HtmlParser.ParseFormsWithAngleSharp(Content);
         }
@@ -58,6 +59,8 @@ public sealed class CmdletConvertFromHtmlForm : PSCmdlet {
             }
             WriteObject(output.ToArray(), false);
         }
+
+        await Task.CompletedTask;
     }
 
     private PSObject CreateFormObject(HtmlFormResult result) {
