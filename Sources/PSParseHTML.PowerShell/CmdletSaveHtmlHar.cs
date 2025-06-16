@@ -1,0 +1,19 @@
+using System.Management.Automation;
+using System.Threading.Tasks;
+
+namespace PSParseHTML.PowerShell;
+
+[Cmdlet(VerbsData.Save, "HTMLHar")]
+public sealed class CmdletSaveHtmlHar : AsyncPSCmdlet {
+    [Parameter(ValueFromPipeline = true, Position = 0)]
+    public HtmlBrowserSession? Session { get; set; }
+
+    [Parameter(Mandatory = true)]
+    public string OutFile { get; set; } = string.Empty;
+
+    protected override async Task ProcessRecordAsync() {
+        HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
+            ?? throw new PSInvalidOperationException("No session provided and no default session found.");
+        await HtmlBrowser.ExportHarAsync(session, OutFile).ConfigureAwait(false);
+    }
+}

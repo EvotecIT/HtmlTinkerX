@@ -50,6 +50,8 @@
   - supports the same authentication options as `Invoke-HTMLRendering` so you can capture the login process
   - can start recording from an existing session to capture later steps
   - the temporary Playwright video file is cleaned up automatically when stopping
+- `Start-HTMLTracing`/`Stop-HTMLTracing` - record Playwright traces for debugging
+- `Save-HTMLHar` - export captured network traffic to a HAR file
 - `Save-HTMLAttachment` - download files discovered on a rendered page (optionally filter with `-Filter`, alias: `Save-HTMLDownload`)
 - `Invoke-HTMLNavigation` - navigate an existing session to another URL
 - `Invoke-HTMLScript` - run custom JavaScript against a session
@@ -118,6 +120,11 @@ Save-HTMLScreenshot -Url 'https://example.com/login' -OutFile .\login.png -Highl
 Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
+# Record a trace and export HAR
+Start-HTMLTracing -Session $session
+Invoke-HTMLNavigation -Session $session -Url 'https://example.com/profile'
+Stop-HTMLTracing -Session $session -OutFile '.\trace.zip'
+Save-HTMLHar -Session $session -OutFile '.\traffic.har'
 # Keep a logged in browser session and reuse it
 $session = Start-HTMLSession -Url 'https://example.com/protected' `
     -Credential $cred `
