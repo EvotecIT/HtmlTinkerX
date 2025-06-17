@@ -110,7 +110,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
                 WriteObject(CreateTableObject(tableResult));
             }
 
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         } else {
             // Use the detailed parsing methods but extract only the Data part
             List<HtmlTableResult> detailedTables;
@@ -146,7 +146,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
                 WriteObject(tableArrays.ToArray(), false);
             }
 
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
     }
 
