@@ -72,7 +72,8 @@ $BinaryDev = @(
 )
 
 if ($Development) {
-    $Assembly = Get-ChildItem -Path "$($DevelopmentAssemblyFolder.Path)\*.dll" -ErrorAction SilentlyContinue -File
+    $Assembly = Get-ChildItem -Path "$($DevelopmentAssemblyFolder.Path)\*.dll" -ErrorAction SilentlyContinue -File |
+        Where-Object { $_.Name -notlike 'lib*' }
 } else {
     $Assembly = @(
         if ($Framework -and $PSEdition -eq 'Core') {
