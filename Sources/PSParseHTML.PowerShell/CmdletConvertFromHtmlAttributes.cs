@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -21,7 +22,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.ConvertFrom, "HtmlAttributes", DefaultParameterSetName = ParameterSetContent)]
 [Alias("ConvertFrom-HTMLTag", "ConvertFrom-HTMLClass")]
 [OutputType(typeof(string), typeof(IElement))]
-public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
+public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetFile = "File";
@@ -74,10 +75,10 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
     public SwitchParameter ReturnObject { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         IEnumerable<IElement> elements = ParameterSetName switch {
             ParameterSetUrl => HtmlParserExtensions.GetElements(
-                DownloadHtml(),
+                await DownloadHtmlAsync().ConfigureAwait(false),
                 Tag,
                 Class,
                 Id,
@@ -100,10 +101,12 @@ public sealed class CmdletConvertFromHtmlAttributes : PSCmdlet {
                 WriteObject(e.TextContent);
             }
         }
+
+        await Task.CompletedTask;
     }
 
-    private string DownloadHtml() {
+    private async Task<string> DownloadHtmlAsync() {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).GetAwaiter().GetResult();
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
     }
 }

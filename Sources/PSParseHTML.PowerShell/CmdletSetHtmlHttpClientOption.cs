@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Management.Automation;
 using System.Net;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -9,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that configures default <see cref="HttpClient"/> options used by the module.
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HTMLHttpClientOption")]
-public sealed class CmdletSetHtmlHttpClientOption : PSCmdlet {
+public sealed class CmdletSetHtmlHttpClientOption : AsyncPSCmdlet {
     /// <summary>Timeout in seconds for created clients.</summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = -1;
@@ -31,7 +32,7 @@ public sealed class CmdletSetHtmlHttpClientOption : PSCmdlet {
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override Task ProcessRecordAsync() {
         if (TimeoutSeconds >= 0) {
             HtmlHttpClientFactory.DefaultTimeout = TimeSpan.FromSeconds(TimeoutSeconds);
             HtmlHttpClientFactory.ResetShared();
@@ -57,5 +58,7 @@ public sealed class CmdletSetHtmlHttpClientOption : PSCmdlet {
             HtmlHttpClientFactory.DefaultProxyCredential = ProxyCredential.GetNetworkCredential();
             HtmlHttpClientFactory.ResetShared();
         }
+
+        return Task.CompletedTask;
     }
 }

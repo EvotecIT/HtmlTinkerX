@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -14,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Optimize, "Email", DefaultParameterSetName = "Body")]
 [OutputType(typeof(string))]
-public sealed class CmdletOptimizeEmail : PSCmdlet {
+public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     /// <summary>
     /// HTML content to process.
     /// </summary>
@@ -122,7 +123,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
     /// <summary>
     /// Processes the input HTML or file and outputs optimized HTML.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override Task ProcessRecordAsync() {
         PreMailerOptions options = new() {
             BaseUri = BaseUri,
             RemoveStyleElements = RemoveStyleElements,
@@ -151,5 +152,7 @@ public sealed class CmdletOptimizeEmail : PSCmdlet {
         foreach (var warning in result.Warnings) {
             LoggingMessages.Logger.WriteWarning(warning.Message);
         }
+
+        return Task.CompletedTask;
     }
 }

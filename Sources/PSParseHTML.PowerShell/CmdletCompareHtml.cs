@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 using AngleSharp.Diffing.Core;
 
 namespace PSParseHTML.PowerShell;
@@ -11,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.Compare, "HTML")]
 [OutputType(typeof(IDiff))]
-public sealed class CmdletCompareHtml : PSCmdlet {
+public sealed class CmdletCompareHtml : AsyncPSCmdlet {
     /// <summary>Reference HTML markup, file path or URL.</summary>
     [Parameter(Mandatory = true, Position = 0)]
     public string Reference { get; set; } = string.Empty;
@@ -21,24 +22,26 @@ public sealed class CmdletCompareHtml : PSCmdlet {
     public string Difference { get; set; } = string.Empty;
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
-        string referenceContent = GetContent(Reference);
-        string differenceContent = GetContent(Difference);
+    protected override async Task ProcessRecordAsync() {
+        string referenceContent = await GetContentAsync(Reference).ConfigureAwait(false);
+        string differenceContent = await GetContentAsync(Difference).ConfigureAwait(false);
 
         foreach (var diff in HtmlDiffer.Compare(referenceContent, differenceContent)) {
             WriteObject(diff);
         }
+
+        await Task.CompletedTask;
     }
 
-    private static string GetContent(string input) {
+    private static async Task<string> GetContentAsync(string input) {
         if (TryReadFile(input, out string fileContent)) {
             return fileContent;
         }
 
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)) {
-            return HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input)
-                .GetAwaiter().GetResult();
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input)
+                .ConfigureAwait(false);
         }
 
         return input;

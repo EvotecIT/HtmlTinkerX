@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -10,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlList", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]))]
-public sealed class CmdletConvertFromHtmlList : PSCmdlet {
+public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -54,14 +55,14 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         List<HtmlListResult> results;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
-                results = HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).GetAwaiter().GetResult();
+                results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
             } else {
-                results = HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).GetAwaiter().GetResult();
+                results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
             }
         } else {
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
@@ -105,6 +106,8 @@ public sealed class CmdletConvertFromHtmlList : PSCmdlet {
                 WriteObject(output.ToArray(), false);
             }
         }
+
+        await Task.CompletedTask;
     }
 
     private PSObject[] ConvertItems(List<List<string>> items) {

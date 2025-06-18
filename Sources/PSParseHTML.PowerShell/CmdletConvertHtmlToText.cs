@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Management.Automation;
+using System.Threading.Tasks;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -22,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.Convert, "HTMLToText", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
-public sealed class CmdletConvertHtmlToText : PSCmdlet {
+public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -67,21 +68,27 @@ public sealed class CmdletConvertHtmlToText : PSCmdlet {
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         string text = ParameterSetName switch {
             ParameterSetFile => HtmlParserToText.ConvertFileToText(HtmlUtilities.ResolvePath(Path)),
             ParameterSetUrl => HtmlParserToText.ConvertToText(
-                HtmlUtilities.GetStringWithProperEncodingAsync(
+                await HtmlUtilities.GetStringWithProperEncodingAsync(
                     HttpClientHelper.Create(Proxy, ProxyCredential),
-                    Url.ToString()).GetAwaiter().GetResult()),
+                    Url.ToString()).ConfigureAwait(false)),
             _ => HtmlParserToText.ConvertToText(Content)
         };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+#if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, text);
+#else
+            await System.IO.File.WriteAllTextAsync(outPath, text, CancelToken).ConfigureAwait(false);
+#endif
         } else {
             WriteObject(text);
         }
+
+        await Task.CompletedTask;
     }
 }
