@@ -142,7 +142,7 @@ public static class HtmlParserFromTable {
                             }
                         }
                         if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
-                            value = emptyValuePlaceholder;
+                            value = emptyValuePlaceholder ?? string.Empty;
                         }
                         int colspan = 1;
                         int rowspan = 1;
@@ -528,7 +528,7 @@ public static class HtmlParserFromTable {
                             }
                         }
                         if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
-                            value = emptyValuePlaceholder;
+                            value = emptyValuePlaceholder ?? string.Empty;
                         }
                         int colspan = 1;
                         int rowspan = 1;

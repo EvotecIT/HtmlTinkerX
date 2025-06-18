@@ -48,15 +48,18 @@ public class PreMailerClient {
             string htmlToProcess = _html;
 
             var document = HtmlParser.ParseWithAngleSharp(_html);
-                foreach (var link in document.QuerySelectorAll("link")) {
-                    string? href = link.GetAttribute("href");
-                    string? rel = link.GetAttribute("rel");
-                    bool isCss = !string.IsNullOrEmpty(href) &&
-                        (href.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
-                         (rel != null && rel.Equals("stylesheet", StringComparison.OrdinalIgnoreCase)));
-                    if (!isCss) {
-                        continue;
-                    }
+            foreach (var link in document.QuerySelectorAll("link")) {
+                string? href = link.GetAttribute("href");
+                string? rel = link.GetAttribute("rel");
+
+                bool isCss = false;
+                if (!string.IsNullOrEmpty(href)) {
+                    isCss = href!.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+                        (rel != null && rel.Equals("stylesheet", StringComparison.OrdinalIgnoreCase));
+                }
+                if (!isCss) {
+                    continue;
+                }
 
                     if (Options.DownloadRemoteCss && href != null) {
                         try {

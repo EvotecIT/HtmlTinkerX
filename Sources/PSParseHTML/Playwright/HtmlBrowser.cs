@@ -59,7 +59,7 @@ public static partial class HtmlBrowser {
         };
         if (!string.IsNullOrEmpty(proxy)) {
             launchOptions.Proxy = new Proxy {
-                Server = proxy,
+                Server = proxy!,
                 Username = proxyUsername,
                 Password = proxyPassword
             };
