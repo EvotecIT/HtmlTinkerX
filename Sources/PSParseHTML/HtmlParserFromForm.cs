@@ -46,8 +46,8 @@ public static class HtmlParserFromForm {
                     type = field.NodeName.ToLowerInvariant();
                 }
                 result.Fields.Add(new HtmlFormField {
-                    Name = name,
-                    Type = type!
+                    Name = name!,
+                    Type = type ?? string.Empty
                 });
             }
             results.Add(result);

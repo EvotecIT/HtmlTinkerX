@@ -119,7 +119,7 @@ public static partial class HtmlBrowser {
         }
 
         if (!string.IsNullOrEmpty(elementSelector)) {
-            var locator = page.Locator(elementSelector);
+            var locator = page.Locator(elementSelector!);
             var box = await locator.BoundingBoxAsync();
             if (box != null) {
                 clipX = (int)Math.Floor(box.X);

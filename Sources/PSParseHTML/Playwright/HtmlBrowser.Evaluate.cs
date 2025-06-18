@@ -14,5 +14,5 @@ public static partial class HtmlBrowser {
     /// <param name="script">JavaScript code to execute.</param>
     /// <returns>Value returned by the script.</returns>
     public static Task<T?> EvaluateAsync<T>(HtmlBrowserSession session, string script)
-        => session.Page.EvaluateAsync<T>(script);
+        => session.Page.EvaluateAsync<T?>(script);
 }
