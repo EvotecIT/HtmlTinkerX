@@ -1,6 +1,7 @@
 using System;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading.Tasks;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
 
@@ -22,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HTML", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(object))]
-public sealed class CmdletConvertFromHtml : PSCmdlet {
+public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -58,15 +59,15 @@ public sealed class CmdletConvertFromHtml : PSCmdlet {
     public SwitchParameter Raw { get; set; }
 
     /// <inheritdoc />
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
-                IDocument doc = HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).GetAwaiter().GetResult();
+                IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
                 return;
             }
-            HtmlDocument doc2 = HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).GetAwaiter().GetResult();
+            HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
             WriteObject(Raw.IsPresent ? doc2 : doc2.DocumentNode);
             return;
         }
@@ -78,5 +79,7 @@ public sealed class CmdletConvertFromHtml : PSCmdlet {
             HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(Content);
             WriteObject(Raw.IsPresent ? doc : doc.DocumentNode);
         }
+
+        await Task.CompletedTask;
     }
 }
