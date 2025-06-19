@@ -42,7 +42,7 @@
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
   - `Open-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
   - `Start-HTMLSession` is an alias to allow for nicer cmdlet naming alignment under different conditons
-- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, `-ElementSelector`, clipping parameters, `-Delay`, `-Selector`, `-HighlightSelector` and `-OverlayText`)
+- `Save-HTMLScreenshot` - capture page screenshots (supports `-Full`, `-Open`, `-ElementSelector`, clipping parameters, `-Delay`, `-Selector`, `-HighlightSelector`, `-Format`, `-Quality` and `-OverlayText`)
 - `Visible` and `-SlowMo` parameters let you see the browser or slow down execution
 - `UserAgent`, `-ViewportWidth`, `-ViewportHeight` and `-DeviceScaleFactor` allow customizing the browser context
 - `Save-HTMLPdf` - generate a PDF of a rendered page
@@ -117,9 +117,9 @@ Invoke-HTMLRendering -Url 'https://example.com/protected' `
     -UsernameSelector 'input[name=log]' `
     -PasswordSelector 'input[name=pwd]' `
     -SubmitSelector '#wp-submit'
-Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\page.png -Full -Open -Delay 1000 -Selector '#content'
-Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\header.png -ElementSelector 'header'
-Save-HTMLScreenshot -Url 'https://example.com/login' -OutFile .\login.png -HighlightSelector 'form#login' -OverlayText 'Login Form'
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\page.jpg -Full -Open -Delay 1000 -Selector '#content' -Format Jpeg -Quality 80
+Save-HTMLScreenshot -Url 'https://example.com' -OutFile .\header.gif -ElementSelector 'header' -Format Gif
+Save-HTMLScreenshot -Url 'https://example.com/login' -OutFile .\login.jpg -HighlightSelector 'form#login' -OverlayText 'Login Form' -Format Jpeg -Quality 90
 Save-HTMLPdf -Url 'https://example.com' -OutFile .\page.pdf -PrintBackground
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads'
 Save-HTMLAttachment -Url 'https://github.com/user/repo/releases/tag/v1.0' -Path '.\Downloads' -Filter '.zip'
@@ -135,9 +135,9 @@ $session = Start-HTMLSession -Url 'https://example.com/protected' `
     -UsernameSelector 'input[name=user]' `
     -PasswordSelector 'input[name=pass]' `
     -SubmitSelector 'button[type=submit]'
-Save-HTMLScreenshot -Session $session -OutFile '.\secure.png' -Selector '#content'
+Save-HTMLScreenshot -Session $session -OutFile '.\secure.bmp' -Selector '#content' -Format Bmp
 Invoke-HTMLNavigation -Session $session -Url 'https://example.com/downloads' |
-    Save-HTMLScreenshot -OutFile '.\downloads.png'
+    Save-HTMLScreenshot -OutFile '.\downloads.gif' -Format Gif
 Save-HTMLAttachment -Session $session -Path '.\Downloads'
 # Mock an API response
 $handler = Register-HTMLRoute -Session $session -Pattern '*api/data' -ScriptBlock {

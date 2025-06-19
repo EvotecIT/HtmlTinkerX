@@ -10,6 +10,11 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.Fonts;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Gif;
 
 namespace PSParseHTML;
 
@@ -26,6 +31,10 @@ public static partial class HtmlBrowser {
     /// <param name="clean">Force re-download of browser runtimes.</param>
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="format">Image file format.</param>
+    /// <param name="quality">Encoder quality for JPEG output.</param>
+    /// <param name="format">Image file format.</param>
+    /// <param name="quality">Encoder quality for JPEG output.</param>
     /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
     /// <param name="elementSelector">CSS selector of an element to capture.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
@@ -39,6 +48,8 @@ public static partial class HtmlBrowser {
         bool clean = false,
         bool fullPage = false,
         int delayMs = 0,
+        ImageFormat format = ImageFormat.Png,
+        int quality = 100,
         string? selector = null,
         string? elementSelector = null,
         int? clipX = null,
@@ -75,6 +86,8 @@ public static partial class HtmlBrowser {
             fullPath,
             fullPage,
             delayMs,
+            format,
+            quality,
             selector,
             elementSelector,
             clipX,
@@ -92,6 +105,8 @@ public static partial class HtmlBrowser {
     /// <param name="path">File path for the screenshot.</param>
     /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
+    /// <param name="format">Image file format.</param>
+    /// <param name="quality">Encoder quality for JPEG output.</param>
     /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
     /// <param name="elementSelector">CSS selector of an element to capture.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
@@ -103,6 +118,8 @@ public static partial class HtmlBrowser {
         string path,
         bool fullPage = false,
         int delayMs = 0,
+        ImageFormat format = ImageFormat.Png,
+        int quality = 100,
         string? selector = null,
         string? elementSelector = null,
         int? clipX = null,
@@ -131,6 +148,10 @@ public static partial class HtmlBrowser {
 
         string fullPath = HtmlUtilities.ResolvePath(path);
         var options = new PageScreenshotOptions { FullPage = fullPage };
+        options.Type = format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
+        if (options.Type == ScreenshotType.Jpeg) {
+            options.Quality = quality;
+        }
         if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
             options.Clip = new Clip {
                 X = clipX.Value,
@@ -141,7 +162,8 @@ public static partial class HtmlBrowser {
         }
         byte[] data = await page.ScreenshotAsync(options);
 
-        if ((highlightSelectors != null && System.Linq.Enumerable.Any(highlightSelectors)) || !string.IsNullOrEmpty(overlayText)) {
+        bool needsProcessing = (highlightSelectors != null && System.Linq.Enumerable.Any(highlightSelectors)) || !string.IsNullOrEmpty(overlayText) || (format != ImageFormat.Png && format != ImageFormat.Jpeg);
+        if (needsProcessing) {
             using var image = SixLabors.ImageSharp.Image.Load(data);
             var pen = SixLabors.ImageSharp.Drawing.Processing.Pens.Solid(SixLabors.ImageSharp.Color.Red, 3);
             if (highlightSelectors != null) {
@@ -171,9 +193,16 @@ public static partial class HtmlBrowser {
                 image.Mutate(c => c.DrawText(overlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
             }
 
-            await image.SaveAsync(fullPath);
+            await image.SaveAsync(fullPath, GetEncoder(format, quality));
         } else {
             File.WriteAllBytes(fullPath, data);
         }
     }
+
+    private static IImageEncoder GetEncoder(ImageFormat format, int quality) => format switch {
+        ImageFormat.Jpeg => new JpegEncoder { Quality = quality },
+        ImageFormat.Bmp => new BmpEncoder(),
+        ImageFormat.Gif => new GifEncoder(),
+        _ => new PngEncoder()
+    };
 }
