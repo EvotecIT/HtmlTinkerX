@@ -201,6 +201,10 @@ $markup = Get-Content './catalog.html' -Raw
 ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
 ```
 
+More sample scripts are in the [Examples](Examples) folder, including
+[Example-FormatJavaScriptAdvanced.ps1](Examples/Example-FormatJavaScriptAdvanced.ps1)
+which demonstrates custom `BeautifierOptions`.
+
 ## Installation
 
 ### Install from PSGallery
