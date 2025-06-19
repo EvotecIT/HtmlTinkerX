@@ -75,6 +75,14 @@ public class InternalLogger {
         IsVerbose = isVerbose;
     }
 
+    /// <summary>
+    /// Writes a progress message and triggers the <see cref="OnProgressMessage"/> event.
+    /// </summary>
+    /// <param name="activity">Activity name being reported.</param>
+    /// <param name="currentOperation">Current operation description.</param>
+    /// <param name="percentCompleted">Percentage value.</param>
+    /// <param name="currentSteps">Optional current progress step.</param>
+    /// <param name="totalSteps">Optional total progress steps.</param>
     public void WriteProgress(string activity, string currentOperation, int percentCompleted, int? currentSteps = null, int? totalSteps = null) {
         lock (_lock) {
             OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, percentCompleted));
@@ -88,6 +96,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes an error message and raises the <see cref="OnErrorMessage"/> event.
+    /// </summary>
+    /// <param name="message">Message text to write.</param>
     public void WriteError(string message) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(message));
@@ -97,6 +109,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Formats and writes an error message.
+    /// </summary>
+    /// <param name="message">Message format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteError(string message, params object[] args) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -106,6 +123,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a warning message and triggers the <see cref="OnWarningMessage"/> event.
+    /// </summary>
+    /// <param name="message">Message text to write.</param>
     public void WriteWarning(string message) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(message));
@@ -115,6 +136,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Formats and writes a warning message.
+    /// </summary>
+    /// <param name="message">Message format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteWarning(string message, params object[] args) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -124,6 +150,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a verbose message and triggers the <see cref="OnVerboseMessage"/> event.
+    /// </summary>
+    /// <param name="message">Message text to write.</param>
     public void WriteVerbose(string message) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message));
@@ -133,6 +163,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Formats and writes a verbose message.
+    /// </summary>
+    /// <param name="message">Message format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteVerbose(string message, params object[] args) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -142,6 +177,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a debug message.
+    /// </summary>
+    /// <param name="message">Message format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteDebug(string message, params object[] args) {
         lock (_lock) {
             OnDebugMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -151,6 +191,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes an informational message.
+    /// </summary>
+    /// <param name="message">Message format string.</param>
+    /// <param name="args">Format arguments.</param>
     public void WriteInformation(string message, params object[] args) {
         lock (_lock) {
             OnInformationMessage?.Invoke(this, new LogEventArgs(message, args));

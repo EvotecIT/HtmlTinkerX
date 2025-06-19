@@ -46,9 +46,14 @@ public class PreMailerOptions {
     /// <summary>Add Google Analytics tags.</summary>
     public bool AddAnalyticsTags { get; set; }
 
+    /// <summary>UTM source parameter value.</summary>
     public string? AnalyticsSource { get; set; }
+    /// <summary>UTM medium parameter value.</summary>
     public string? AnalyticsMedium { get; set; }
+    /// <summary>UTM campaign parameter value.</summary>
     public string? AnalyticsCampaign { get; set; }
+    /// <summary>UTM content parameter value.</summary>
     public string? AnalyticsContent { get; set; }
+    /// <summary>Domain used when constructing analytics links.</summary>
     public string? AnalyticsDomain { get; set; }
 }
