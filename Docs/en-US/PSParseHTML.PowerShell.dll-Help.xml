@@ -91,9 +91,21 @@
         <maml:description>
           <maml:para>Optional path to write the formatted CSS.</maml:para>
         </maml:description>
-        <command:parameterValue required="true">string</command:parameterValue>
+      <command:parameterValue required="true">string</command:parameterValue>
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri />
+      </dev:type>
+      </command:parameter>
+      <!-- Parameter: CancellationToken -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CancellationToken</maml:name>
+        <maml:description>
+          <maml:para>Cancellation token to stop the operation.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">CancellationToken</command:parameterValue>
         <dev:type>
-          <maml:name>System.String</maml:name>
+          <maml:name>System.Threading.CancellationToken</maml:name>
           <maml:uri />
         </dev:type>
       </command:parameter>
@@ -414,12 +426,21 @@
           <maml:name>UseEmailFormatter</maml:name>
           <command:parameterValue required="true">SwitchParameter</command:parameterValue>
           <dev:type>
-            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>False</dev:defaultValue>
-        </command:parameter>
-      </command:syntaxItem>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: CancellationToken -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CancellationToken</maml:name>
+        <command:parameterValue required="true">CancellationToken</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Threading.CancellationToken</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:syntaxItem>
       <!-- Parameter set: File -->
       <command:syntaxItem>
         <maml:name>Optimize-Email</maml:name>
@@ -1822,6 +1843,15 @@
           </dev:type>
           <dev:defaultValue>0</dev:defaultValue>
         </command:parameter>
+        <!-- Parameter: CancellationToken -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CancellationToken</maml:name>
+          <command:parameterValue required="true">CancellationToken</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Threading.CancellationToken</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
@@ -2796,6 +2826,15 @@
             <maml:uri />
           </dev:type>
         </command:parameter>
+        <!-- Parameter: CancellationToken -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CancellationToken</maml:name>
+          <command:parameterValue required="true">CancellationToken</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Threading.CancellationToken</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
@@ -2861,6 +2900,18 @@
           <maml:uri />
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: CancellationToken -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CancellationToken</maml:name>
+        <maml:description>
+          <maml:para>Cancellation token to stop the operation.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">CancellationToken</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Threading.CancellationToken</maml:name>
+          <maml:uri />
+        </dev:type>
       </command:parameter>
     </command:parameters>
     <command:inputTypes>

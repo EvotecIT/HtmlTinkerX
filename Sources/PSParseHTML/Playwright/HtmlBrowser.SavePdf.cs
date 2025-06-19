@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
@@ -46,7 +47,8 @@ public static partial class HtmlBrowser {
         int slowMo = 0,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null) {
+        string? proxyPassword = null,
+        CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -59,7 +61,8 @@ public static partial class HtmlBrowser {
             null,
             proxy: proxy,
             proxyUsername: proxyUsername,
-            proxyPassword: proxyPassword).ConfigureAwait(false);
+            proxyPassword: proxyPassword,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         await SavePagePdfAsync(
             session.Page,
@@ -82,7 +85,8 @@ public static partial class HtmlBrowser {
             footerTemplate,
             preferCssPageSize,
             outline,
-            tagged).ConfigureAwait(false);
+            tagged,
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -109,11 +113,14 @@ public static partial class HtmlBrowser {
         string? footerTemplate = null,
         bool preferCssPageSize = false,
         bool outline = false,
-        bool tagged = false) {
+        bool tagged = false,
+        CancellationToken cancellationToken = default) {
         if (!string.IsNullOrEmpty(selector)) {
+            cancellationToken.ThrowIfCancellationRequested();
             await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
         if (delayMs > 0) {
+            cancellationToken.ThrowIfCancellationRequested();
             await page.WaitForTimeoutAsync(delayMs);
         }
 
@@ -142,6 +149,7 @@ public static partial class HtmlBrowser {
             };
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         await page.PdfAsync(options).ConfigureAwait(false);
     }
 }

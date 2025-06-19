@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -8,7 +9,8 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Retrieves cookies from the browser context.
     /// </summary>
-    public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session) {
+    public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<BrowserContextCookiesResult> cookies = await session.Context.CookiesAsync();
         List<HtmlCookie> result = new();
         foreach (BrowserContextCookiesResult c in cookies) {
@@ -29,7 +31,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Adds cookies to the browser context.
     /// </summary>
-    public static Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies) {
+    public static Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
         List<Cookie> list = new();
         foreach (HtmlCookie c in cookies) {
             Cookie nc = new() {
@@ -45,6 +47,7 @@ public static partial class HtmlBrowser {
             };
             list.Add(nc);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return session.Context.AddCookiesAsync(list);
     }
 }

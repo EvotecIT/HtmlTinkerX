@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 
@@ -26,8 +27,9 @@ public static partial class HtmlBrowser {
         float? deviceScaleFactor = null,
         double? geoLatitude = null,
         double? geoLongitude = null,
-        string? timezone = null)
-        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy: null, proxyUsername: null, proxyPassword: null, geoLatitude: geoLatitude, geoLongitude: geoLongitude, timezone: timezone);
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+        => OpenSessionAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, width, height, null, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy: null, proxyUsername: null, proxyPassword: null, geoLatitude: geoLatitude, geoLongitude: geoLongitude, timezone: timezone, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Starts a video recording session based on an existing <see cref="HtmlBrowserSession"/>.
@@ -45,7 +47,8 @@ public static partial class HtmlBrowser {
         float? deviceScaleFactor = null,
         double? geoLatitude = null,
         double? geoLongitude = null,
-        string? timezone = null) {
+        string? timezone = null,
+        CancellationToken cancellationToken = default) {
         string temp = Path.GetTempFileName();
         await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
         string url = session.Page.Url;
@@ -77,7 +80,8 @@ public static partial class HtmlBrowser {
             proxyPassword: null,
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
-            timezone: timezone).ConfigureAwait(false);
+            timezone: timezone,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         File.Delete(temp);
         return newSession;
@@ -86,10 +90,11 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Stops the specified video recording session and saves the file.
     /// </summary>
-    public static async Task StopVideoRecordingAsync(HtmlBrowserSession session, string? path = null) {
+    public static async Task StopVideoRecordingAsync(HtmlBrowserSession session, string? path = null, CancellationToken cancellationToken = default) {
         string outFile = path ?? session.VideoPath ?? throw new System.ArgumentException("Output path required.");
         IVideo? video = session.Video;
         if (video != null) {
+            cancellationToken.ThrowIfCancellationRequested();
             await session.Context.CloseAsync().ConfigureAwait(false);
             string fullPath = HtmlUtilities.ResolvePath(outFile);
             await video.SaveAsAsync(fullPath).ConfigureAwait(false);
