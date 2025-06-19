@@ -31,6 +31,10 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
     public int SlowMo { get; set; } = 0;
 
     [Parameter]
+    [ValidateRange(0,int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
+    [Parameter]
     public string? UserAgent { get; set; }
 
     [Parameter]
@@ -74,7 +78,8 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
             proxyPassword: null,
             geoLatitude: GeoLatitude,
             geoLongitude: GeoLongitude,
-            timezone: Timezone).ConfigureAwait(false);
+            timezone: Timezone,
+            timeout: Timeout).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", session);

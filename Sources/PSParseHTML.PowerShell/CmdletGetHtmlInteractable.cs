@@ -60,6 +60,10 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    [Parameter]
+    [ValidateRange(0,int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
     /// <summary>Include elements hidden from view.</summary>
     [Parameter]
     public SwitchParameter IncludeHidden { get; set; }
@@ -135,7 +139,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     storageStatePath: null,
                     proxy: Proxy,
                     proxyUsername: pUser,
-                    proxyPassword: pPass).ConfigureAwait(false)) {
+                    proxyPassword: pPass,
+                    timeout: Timeout).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
@@ -153,7 +158,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     storageStatePath: null,
                     proxy: Proxy,
                     proxyUsername: pUser,
-                    proxyPassword: pPass).ConfigureAwait(false)) {
+                    proxyPassword: pPass,
+                    timeout: Timeout).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
                 }
                 break;
