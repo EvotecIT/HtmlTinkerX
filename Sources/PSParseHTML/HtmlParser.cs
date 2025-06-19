@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using AngleSharp.Html.Parser;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
@@ -297,39 +298,9 @@ public static class HtmlParser {
             return headerName;
         }
 
-        // Remove or replace problematic characters that can cause PowerShell formatting issues
-        return headerName
-            .Replace("*", "")           // Remove asterisks
-            .Replace("‡", "")           // Remove double dagger symbols
-            .Replace("†", "")           // Remove dagger symbols
-            .Replace("#", "")           // Remove hash symbols
-            .Replace("$", "")           // Remove dollar signs
-            .Replace("@", "")           // Remove at symbols
-            .Replace("!", "")           // Remove exclamation marks
-            .Replace("?", "")           // Remove question marks
-            .Replace("%", "")           // Remove percent symbols
-            .Replace("&", "and")        // Replace ampersand with "and"
-            .Replace("(", "")           // Remove opening parenthesis
-            .Replace(")", "")           // Remove closing parenthesis
-            .Replace("[", "")           // Remove opening bracket
-            .Replace("]", "")           // Remove closing bracket
-            .Replace("{", "")           // Remove opening brace
-            .Replace("}", "")           // Remove closing brace
-            .Replace("|", "")           // Remove pipe symbols
-            .Replace("\\", "")          // Remove backslashes
-            .Replace("/", "")           // Remove forward slashes
-            .Replace(":", "")           // Remove colons
-            .Replace(";", "")           // Remove semicolons
-            .Replace("\"", "")          // Remove quotes
-            .Replace("'", "")           // Remove apostrophes
-            .Replace("`", "")           // Remove backticks
-            .Replace("~", "")           // Remove tildes
-            .Replace("^", "")           // Remove carets
-            .Replace("<", "")           // Remove less than
-            .Replace(">", "")           // Remove greater than
-            .Replace("=", "")           // Remove equals
-            .Replace("+", "")           // Remove plus
-            .Replace("-", "")           // Remove hyphens
-            .Trim();                    // Remove leading/trailing whitespace
+        // Normalize hyphens and remove all non-alphanumeric characters using a regular expression
+        string normalized = headerName.Replace('-', '_');
+        normalized = Regex.Replace(normalized, "[^a-zA-Z0-9_]+", string.Empty);
+        return normalized.Trim();
     }
 }

@@ -33,9 +33,9 @@ public class HtmlParserTableAdvancedTests {
         }
 
         var first = dataTables[0];
-        Assert.Contains("NonRegional", first.Metadata.Headers);
+        Assert.Contains("Non_Regional", first.Metadata.Headers);
         Assert.DoesNotContain("*Non-Regional", first.Metadata.Headers);
-        Assert.Equal("Not available", first.Data[1]["NonRegional"]);
+        Assert.Equal("Not available", first.Data[1]["Non_Regional"]);
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public class HtmlParserTableAdvancedTests {
         }
 
         var first = dataTables[0];
-        Assert.Contains("NonRegional", first.Metadata.Headers);
+        Assert.Contains("Non_Regional", first.Metadata.Headers);
         Assert.DoesNotContain("*Non-Regional", first.Metadata.Headers);
-        Assert.Equal("Not available", first.Data[1]["NonRegional"]);
+        Assert.Equal("Not available", first.Data[1]["Non_Regional"]);
     }
 
     private static string GetPolishTableHtml() {
