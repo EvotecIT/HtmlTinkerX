@@ -103,6 +103,15 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
     [Parameter]
     public string? OverlayText { get; set; }
 
+    /// <summary>Image format for the screenshot.</summary>
+    [Parameter]
+    public ImageFormat Format { get; set; } = ImageFormat.Png;
+
+    /// <summary>Encoder quality for JPEG output.</summary>
+    [Parameter]
+    [ValidateRange(1,100)]
+    public int Quality { get; set; } = 100;
+
     /// <summary>X coordinate for a clip region.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetClip)]
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSessionClip)]
@@ -155,6 +164,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Clean.IsPresent,
                     false,
                     Delay,
+                    Format,
+                    Quality,
                     Selector,
                     ElementSelector,
                     X,
@@ -177,6 +188,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Clean.IsPresent,
                     false,
                     Delay,
+                    Format,
+                    Quality,
                     Selector,
                     ElementSelector,
                     X,
@@ -197,6 +210,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     false,
                     Delay,
+                    Format,
+                    Quality,
                     Selector,
                     ElementSelector,
                     X,
@@ -212,6 +227,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     Full.IsPresent,
                     Delay,
+                    Format,
+                    Quality,
                     Selector,
                     ElementSelector,
                     highlightSelectors: HighlightSelector,
@@ -228,6 +245,8 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     Clean.IsPresent,
                     Full.IsPresent,
                     Delay,
+                    Format,
+                    Quality,
                     Selector,
                     ElementSelector,
                     highlightSelectors: HighlightSelector,
