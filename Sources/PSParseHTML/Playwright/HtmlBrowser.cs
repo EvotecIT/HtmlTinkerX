@@ -36,7 +36,8 @@ public static partial class HtmlBrowser {
         string? proxyPassword = null,
         double? geoLatitude = null,
         double? geoLongitude = null,
-        string? timezone = null) {
+        string? timezone = null,
+        int timeout = 10000) {
         if (clean) {
             CleanInstallDir();
         }
@@ -130,20 +131,20 @@ public static partial class HtmlBrowser {
         };
 
         if (formLogin != null) {
-            await page.GotoAsync(formLogin.LoginUrl);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
             if (username != null) {
-                await page.FillAsync(formLogin.UsernameSelector, username);
+                await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
             }
             if (password != null) {
-                await page.FillAsync(formLogin.PasswordSelector, password);
+                await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
             }
-            await page.ClickAsync(formLogin.SubmitSelector);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
         }
 
-        await page.GotoAsync(url);
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
 
         IVideo? video = null;
         if (!string.IsNullOrEmpty(videoPath)) {
@@ -178,8 +179,9 @@ public static partial class HtmlBrowser {
         string? proxyPassword = null,
         double? geoLatitude = null,
         double? geoLongitude = null,
-        string? timezone = null)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone);
+        string? timezone = null,
+        int timeout = 10000)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -194,7 +196,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null) {
+    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -217,7 +219,8 @@ public static partial class HtmlBrowser {
             proxyPassword: proxyPassword,
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
-            timezone: timezone).ConfigureAwait(false);
+            timezone: timezone,
+            timeout: timeout).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
@@ -227,9 +230,9 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null) {
+    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000) {
         string fullPath = HtmlUtilities.ResolvePath(path);
-        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone).ConfigureAwait(false);
+        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
 

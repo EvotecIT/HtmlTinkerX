@@ -95,6 +95,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     public int SlowMo { get; set; } = 0;
 
     [Parameter]
+    [ValidateRange(0,int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
+    [Parameter]
     public string? UserAgent { get; set; }
 
     [Parameter]
@@ -157,16 +161,17 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 proxyPassword: pPass,
                 geoLatitude: GeoLatitude,
                 geoLongitude: GeoLongitude,
-                timezone: Timezone).ConfigureAwait(false);
+                timezone: Timezone,
+                timeout: Timeout).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
             string outPath = HtmlUtilities.ResolvePath(OutFile!);
-            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone).ConfigureAwait(false);
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout).ConfigureAwait(false);
         } else {
-            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout).ConfigureAwait(false);
             WriteObject(html);
         }
     }

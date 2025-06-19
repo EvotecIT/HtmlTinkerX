@@ -43,7 +43,8 @@ public static partial class HtmlBrowser {
         string? proxyPassword = null,
         double? geoLatitude = null,
         double? geoLongitude = null,
-        string? timezone = null)
+        string? timezone = null,
+        int timeout = 10000)
         => OpenSessionAsync(
             url,
             browser,
@@ -66,5 +67,6 @@ public static partial class HtmlBrowser {
             proxyPassword: proxyPassword,
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
-            timezone: timezone);
+            timezone: timezone,
+            timeout: timeout);
 }
