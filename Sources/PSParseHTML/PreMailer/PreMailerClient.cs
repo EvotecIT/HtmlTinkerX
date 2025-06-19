@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading.Tasks;
 using AngleSharp.Dom;
 using PreMailer.Net;
 
@@ -140,6 +141,102 @@ public class PreMailerClient {
     }
 
     /// <summary>
+    /// Asynchronously processes the HTML and returns the result.
+    /// </summary>
+    public async Task<PreMailerResult> MoveCssInlineAsync() {
+        try {
+            string cssContent = Options.Css ?? string.Empty;
+            string htmlToProcess = _html;
+
+            var document = HtmlParser.ParseWithAngleSharp(_html);
+            foreach (var link in document.QuerySelectorAll("link")) {
+                string? href = link.GetAttribute("href");
+                string? rel = link.GetAttribute("rel");
+
+                bool isCss = false;
+                if (!string.IsNullOrEmpty(href)) {
+                    isCss = href.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+                        (rel != null && rel.Equals("stylesheet", StringComparison.OrdinalIgnoreCase));
+                }
+                if (!isCss) {
+                    continue;
+                }
+
+                if (Options.DownloadRemoteCss && href != null) {
+                    try {
+                        Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
+                        if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
+                            uri = new Uri(Options.BaseUri, uri);
+                        }
+
+                        if (uri.IsFile) {
+                            string localPath = uri.LocalPath;
+                            if (uri.IsUnc && Path.DirectorySeparatorChar == '/') {
+                                localPath = "/" + localPath.TrimStart('\\');
+                            }
+#if NETSTANDARD2_0 || NETFRAMEWORK
+                            cssContent += await Task.Run(() => File.ReadAllText(localPath)).ConfigureAwait(false);
+#else
+                            cssContent += await File.ReadAllTextAsync(localPath).ConfigureAwait(false);
+#endif
+                        } else if (uri.IsAbsoluteUri) {
+                            using HttpClient client = new();
+                            cssContent += await HtmlUtilities
+                                .GetStringWithProperEncodingAsync(client, uri.ToString())
+                                .ConfigureAwait(false);
+                        }
+                    } catch (Exception ex) {
+                        LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
+                    }
+                }
+
+                link.Remove();
+            }
+
+            htmlToProcess = document.DocumentElement.OuterHtml;
+            if (!string.IsNullOrEmpty(Options.CssFilePath)) {
+                cssContent += await HtmlUtilities.ReadFileCheckedAsync(Options.CssFilePath!).ConfigureAwait(false);
+            }
+
+            PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
+                ? new PreMailer.Net.PreMailer(htmlToProcess, Options.BaseUri)
+                : new PreMailer.Net.PreMailer(htmlToProcess);
+
+            if (Options.AddAnalyticsTags && !string.IsNullOrEmpty(Options.AnalyticsSource)) {
+                preMailer.AddAnalyticsTags(
+                    Options.AnalyticsSource,
+                    Options.AnalyticsMedium,
+                    Options.AnalyticsCampaign,
+                    Options.AnalyticsContent,
+                    Options.AnalyticsDomain);
+            }
+
+            InlineResult result = preMailer.MoveCssInline(
+                Options.RemoveStyleElements,
+                Options.IgnoreElements,
+                cssContent,
+                Options.StripIdAndClassAttributes,
+                Options.RemoveComments,
+                Options.CustomFormatter,
+                Options.PreserveMediaQueries);
+
+            List<PreMailerWarning> warnings = new();
+            if (result.Warnings != null) {
+                foreach (string warning in result.Warnings) {
+                    var w = new PreMailerWarning(warning);
+                    warnings.Add(w);
+                    LoggingMessages.Logger.WriteWarning(w.Message);
+                }
+            }
+
+            return new PreMailerResult(result.Html, warnings);
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteError("MoveCssInlineAsync failed with error: {0}", ex.Message);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Convenience method for processing a HTML string directly using options.
     /// </summary>
     public static PreMailerResult MoveCssInline(string html, PreMailerOptions? options = null) {
@@ -151,6 +248,20 @@ public class PreMailerClient {
     /// </summary>
     public static PreMailerResult MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
         return FromFile(htmlFilePath, options).MoveCssInline();
+    }
+
+    /// <summary>
+    /// Asynchronously processes a HTML string using the provided options.
+    /// </summary>
+    public static Task<PreMailerResult> MoveCssInlineAsync(string html, PreMailerOptions? options = null)
+        => FromHtml(html, options).MoveCssInlineAsync();
+
+    /// <summary>
+    /// Asynchronously processes a HTML file using the provided options.
+    /// </summary>
+    public static async Task<PreMailerResult> MoveCssInlineFromFileAsync(string htmlFilePath, PreMailerOptions? options = null) {
+        string html = await HtmlUtilities.ReadFileCheckedAsync(htmlFilePath).ConfigureAwait(false);
+        return await MoveCssInlineAsync(html, options).ConfigureAwait(false);
     }
 
     /// <summary>
