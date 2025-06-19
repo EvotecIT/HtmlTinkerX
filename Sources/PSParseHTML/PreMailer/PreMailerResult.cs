@@ -16,6 +16,11 @@ public class PreMailerResult {
     /// </summary>
     public List<PreMailerWarning> Warnings { get; }
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="PreMailerResult"/>.
+    /// </summary>
+    /// <param name="html">Processed HTML markup.</param>
+    /// <param name="warnings">List of warnings returned by PreMailer.</param>
     public PreMailerResult(string html, List<PreMailerWarning> warnings) {
         Html = html;
         Warnings = warnings;
