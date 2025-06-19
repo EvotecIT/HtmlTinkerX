@@ -200,9 +200,9 @@ $markup = Get-Content './catalog.html' -Raw
 ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
 ```
 
-Additional sample scripts can be found in the [Examples](Examples) folder. See
+More sample scripts are in the [Examples](Examples) folder, including
 [Example-FormatJavaScriptAdvanced.ps1](Examples/Example-FormatJavaScriptAdvanced.ps1)
-for customizing JavaScript formatting options with `BeautifierOptions`.
+which demonstrates custom `BeautifierOptions`.
 
 ## Installation
 
