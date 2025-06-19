@@ -10,6 +10,10 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <code>Save-HTMLPdf -Url https://example.com -OutFile page.pdf</code>
 /// </example>
+/// <example>
+///   <code>Invoke-HTMLRendering -Url https://example.com -Session |
+///   Save-HTMLPdf -OutFile page.pdf</code>
+/// </example>
 [Cmdlet(VerbsData.Save, "HTMLPdf", DefaultParameterSetName = ParameterSetSession)]
 public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
