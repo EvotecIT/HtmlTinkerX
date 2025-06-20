@@ -6187,6 +6187,10 @@
         <maml:title>----------  Example 1  ----------</maml:title>
         <dev:code>Save-HTMLPdf -Url https://example.com -OutFile page.pdf</dev:code>
       </command:example>
+      <command:example>
+        <maml:title>----------  Example 2  ----------</maml:title>
+        <dev:code>Invoke-HTMLRendering -Url https://example.com -Session | Save-HTMLPdf -OutFile page.pdf</dev:code>
+      </command:example>
     </command:examples>
   </command:command>
   <!-- Cmdlet: Invoke-HTMLRendering -->

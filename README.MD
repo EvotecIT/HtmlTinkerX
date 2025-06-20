@@ -171,6 +171,7 @@ The expected input is a string literal or data read from a file.  The output can
 It may not seem like much, but those thirteen cmdlets are powerful enough to enable robust HTML processing in shell.
 
 ## Examples
+Additional sample scripts are available in the `Examples` directory. See `Example-PlaywrightNetwork.ps1` for tracing and HAR capture.
 
 ```powershell
 # Parse tables from a web page (rowspan and colspan handled automatically)
@@ -199,6 +200,10 @@ Get-Content './report.html' -Raw | Convert-HTMLToText
 $markup = Get-Content './catalog.html' -Raw
 ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
 ```
+
+More sample scripts are in the [Examples](Examples) folder, including
+[Example-FormatJavaScriptAdvanced.ps1](Examples/Example-FormatJavaScriptAdvanced.ps1)
+which demonstrates custom `BeautifierOptions`.
 
 ## Installation
 
