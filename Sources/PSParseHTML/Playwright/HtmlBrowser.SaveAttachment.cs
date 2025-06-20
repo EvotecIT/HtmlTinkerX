@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
@@ -21,7 +22,7 @@ public static partial class HtmlBrowser {
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
     /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0) {
+    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0, CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -31,16 +32,17 @@ public static partial class HtmlBrowser {
             null,
             headless,
             slowMo,
-            null).ConfigureAwait(false);
+            null,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
         var page = session.Page;
         string dir = HtmlUtilities.ResolvePath(directory);
-        return await SavePageDownloadsAsync(page, dir, filter).ConfigureAwait(false);
+        return await SavePageDownloadsAsync(page, dir, filter, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Saves files downloaded from an already loaded page.
     /// </summary>
-    public static async Task<List<string>> SavePageDownloadsAsync(IPage page, string directory, string? filter = null) {
+    public static async Task<List<string>> SavePageDownloadsAsync(IPage page, string directory, string? filter = null, CancellationToken cancellationToken = default) {
 
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
@@ -56,6 +58,7 @@ public static partial class HtmlBrowser {
             }
         };
 
+        cancellationToken.ThrowIfCancellationRequested();
         await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
@@ -63,9 +66,11 @@ public static partial class HtmlBrowser {
             ? "a[download],a[href*='/download/'],a[href*='/archive/']"
             : $"a[href*=\"{filter}\"]";
 
+        cancellationToken.ThrowIfCancellationRequested();
         await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
         var anchors = await page.QuerySelectorAllAsync(selector);
         foreach (var anchor in anchors) {
+            cancellationToken.ThrowIfCancellationRequested();
             var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
             string filePath = Path.Combine(dir, download.SuggestedFilename);
             await download.SaveAsAsync(filePath);
@@ -73,7 +78,6 @@ public static partial class HtmlBrowser {
                 downloads.Add(filePath);
             }
         }
-
         await page.WaitForTimeoutAsync(500);
         return downloads;
     }

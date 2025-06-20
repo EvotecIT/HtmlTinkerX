@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -17,9 +18,14 @@ public sealed class CmdletStartHtmlTracing : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Sources { get; set; } = true;
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-        await HtmlBrowser.StartTracingAsync(session, Screenshots.IsPresent, Snapshots.IsPresent, Sources.IsPresent).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+        await HtmlBrowser.StartTracingAsync(session, Screenshots.IsPresent, Snapshots.IsPresent, Sources.IsPresent, token).ConfigureAwait(false);
     }
 }

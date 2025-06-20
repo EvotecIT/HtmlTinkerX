@@ -1,6 +1,7 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Playwright;
 
 namespace PSParseHTML.PowerShell;
@@ -52,21 +53,26 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     [ValidateRange(0,int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
 
         try {
             switch (ParameterSetName) {
                 case ParameterSetUrl:
-                    await HtmlBrowser.NavigateAsync(session, Url!, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.NavigateAsync(session, Url!, Timeout, token).ConfigureAwait(false);
                     break;
                 case ParameterSetSelector:
-                    await HtmlBrowser.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout, token).ConfigureAwait(false);
                     break;
                 case ParameterSetText:
-                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout).ConfigureAwait(false);
+                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout, token).ConfigureAwait(false);
                     break;
             }
         } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {

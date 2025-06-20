@@ -2,6 +2,7 @@ namespace PSParseHTML;
 
 using Microsoft.Playwright;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -13,12 +14,13 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="session">Browser session to export.</param>
     /// <param name="path">File path where the session state should be stored.</param>
-    public static Task ExportSessionAsync(HtmlBrowserSession session, string path) {
+    public static Task ExportSessionAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         string fullPath = HtmlUtilities.ResolvePath(path);
         string? dir = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(dir)) {
             Directory.CreateDirectory(dir);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = fullPath });
     }
 
@@ -44,7 +46,8 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
-        int timeout = 10000)
+        int timeout = 10000,
+        CancellationToken cancellationToken = default)
         => OpenSessionAsync(
             url,
             browser,
@@ -68,5 +71,6 @@ public static partial class HtmlBrowser {
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
             timezone: timezone,
-            timeout: timeout);
+            timeout: timeout,
+            cancellationToken: cancellationToken);
 }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Management.Automation;
 using PSParseHTML;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -64,6 +65,9 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [ValidateRange(0,int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <summary>Include elements hidden from view.</summary>
     [Parameter]
     public SwitchParameter IncludeHidden { get; set; }
@@ -110,6 +114,8 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
         List<HtmlInteractableInfo> list;
         string? pUser = ProxyCredential?.UserName;
         string? pPass = ProxyCredential?.GetNetworkCredential().Password;
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
         switch (ParameterSetName) {
             case ParameterSetUrl:
                 string? user = Credential?.UserName ?? Username;
@@ -140,8 +146,9 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     proxy: Proxy,
                     proxyUsername: pUser,
                     proxyPassword: pPass,
-                    timeout: Timeout).ConfigureAwait(false)) {
-                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
+                    timeout: Timeout,
+                    cancellationToken: token).ConfigureAwait(false)) {
+                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
             case ParameterSetFile:
@@ -159,14 +166,15 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
                     proxy: Proxy,
                     proxyUsername: pUser,
                     proxyPassword: pPass,
-                    timeout: Timeout).ConfigureAwait(false)) {
-                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page).ConfigureAwait(false);
+                    timeout: Timeout,
+                    cancellationToken: token).ConfigureAwait(false)) {
+                    list = await HtmlBrowser.GetInteractablesAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
             default:
                 HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                     ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-                list = await HtmlBrowser.GetInteractablesAsync(session.Page).ConfigureAwait(false);
+                list = await HtmlBrowser.GetInteractablesAsync(session.Page, token).ConfigureAwait(false);
                 break;
         }
 

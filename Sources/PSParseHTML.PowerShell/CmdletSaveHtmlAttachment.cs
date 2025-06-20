@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
@@ -53,15 +54,21 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     [Parameter]
     public string? Filter { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
 
         List<string> files = ParameterSetName switch {
             ParameterSetSession => await HtmlBrowser.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                 HtmlUtilities.ResolvePath(Path),
-                Filter).ConfigureAwait(false),
+                Filter,
+                token).ConfigureAwait(false),
             _ => await HtmlBrowser.SavePageDownloadsAsync(
                 Url,
                 HtmlUtilities.ResolvePath(Path),
@@ -69,7 +76,8 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
                 Clean.IsPresent,
                 Filter,
                 headless: !Visible.IsPresent,
-                slowMo: SlowMo).ConfigureAwait(false)
+                slowMo: SlowMo,
+                cancellationToken: token).ConfigureAwait(false)
         };
 
         WriteObject(files.ToArray(), true);

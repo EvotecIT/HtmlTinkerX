@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -37,7 +38,9 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
-        int timeout = 10000) {
+        int timeout = 10000,
+        CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         if (clean) {
             CleanInstallDir();
         }
@@ -47,6 +50,7 @@ public static partial class HtmlBrowser {
         string engine = browser.ToString().ToLowerInvariant();
         Microsoft.Playwright.Program.Main(new[] { "install", engine });
 
+        cancellationToken.ThrowIfCancellationRequested();
         var playwright = await Playwright.CreateAsync();
         IBrowserType type = browser switch {
             HtmlBrowserEngine.Firefox => playwright.Firefox,
@@ -65,6 +69,7 @@ public static partial class HtmlBrowser {
                 Password = proxyPassword
             };
         }
+        cancellationToken.ThrowIfCancellationRequested();
         var browserInstance = await type.LaunchAsync(launchOptions);
         BrowserNewContextOptions? contextOptions = null;
         if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
@@ -108,6 +113,7 @@ public static partial class HtmlBrowser {
             contextOptions.TimezoneId = timezone;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var context = await browserInstance.NewContextAsync(contextOptions);
         var page = await context.NewPageAsync();
 
@@ -131,6 +137,7 @@ public static partial class HtmlBrowser {
         };
 
         if (formLogin != null) {
+            cancellationToken.ThrowIfCancellationRequested();
             await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
             if (username != null) {
@@ -143,6 +150,7 @@ public static partial class HtmlBrowser {
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
 
@@ -180,14 +188,16 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
-        int timeout = 10000)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout);
+        int timeout = 10000,
+        CancellationToken cancellationToken = default)
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout, cancellationToken);
 
     /// <summary>
     /// Disposes the specified browser session.
     /// </summary>
-    public static async Task CloseSessionAsync(HtmlBrowserSession session) {
+    public static async Task CloseSessionAsync(HtmlBrowserSession session, CancellationToken cancellationToken = default) {
         if (session != null) {
+            cancellationToken.ThrowIfCancellationRequested();
             await session.DisposeAsync().ConfigureAwait(false);
         }
     }
@@ -196,7 +206,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">The URL to load.</param>
     /// <returns>The rendered HTML markup.</returns>
-    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000) {
+    public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -220,7 +230,8 @@ public static partial class HtmlBrowser {
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
             timezone: timezone,
-            timeout: timeout).ConfigureAwait(false);
+            timeout: timeout,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         return await session.Page.ContentAsync().ConfigureAwait(false);
     }
@@ -230,9 +241,9 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
-    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000) {
+    public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
         string fullPath = HtmlUtilities.ResolvePath(path);
-        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout).ConfigureAwait(false);
+        string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout, cancellationToken).ConfigureAwait(false);
         File.WriteAllText(fullPath, content);
     }
 
@@ -244,15 +255,18 @@ public static partial class HtmlBrowser {
     /// <param name="innerHtml">Return inner HTML instead of outer HTML.</param>
     /// <param name="asText">Return text content instead of markup.</param>
     /// <returns>Extracted markup or text.</returns>
-    public static async Task<string> GetContentAsync(IPage page, string? selector = null, bool innerHtml = false, bool asText = false) {
+    public static async Task<string> GetContentAsync(IPage page, string? selector = null, bool innerHtml = false, bool asText = false, CancellationToken cancellationToken = default) {
         if (string.IsNullOrEmpty(selector)) {
             if (asText) {
+                cancellationToken.ThrowIfCancellationRequested();
                 return await page.InnerTextAsync("html").ConfigureAwait(false);
             }
+            cancellationToken.ThrowIfCancellationRequested();
             return await page.ContentAsync().ConfigureAwait(false);
         }
 
         var locator = page.Locator(selector!);
+        cancellationToken.ThrowIfCancellationRequested();
         await locator.WaitForAsync();
 
         if (asText) {
@@ -269,11 +283,13 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="page">Playwright page instance.</param>
     /// <returns>List of interactable element descriptions.</returns>
-    public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page) {
+    public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page, CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]");
         List<HtmlInteractableInfo> list = new();
         int index = 0;
         foreach (var el in elements) {
+            cancellationToken.ThrowIfCancellationRequested();
             string rawText = await el.InnerTextAsync();
             string text = Regex.Replace(rawText, "\\s+", " ").Trim();
             string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
@@ -296,6 +312,7 @@ public static partial class HtmlBrowser {
                 }
                 return false;
             }");
+            cancellationToken.ThrowIfCancellationRequested();
             string selector = await el.EvaluateAsync<string>(@"el => {
                 const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
                 let sel = el.tagName.toLowerCase();
@@ -324,7 +341,8 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Navigates the specified session to a new URL and waits for the network to be idle.
     /// </summary>
-    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 10000) {
+    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 10000, CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
         await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
     }
@@ -332,7 +350,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000) {
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) {
         if (waitForNavigation) {
             Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
             await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
@@ -345,7 +363,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element specified by text content.
     /// </summary>
-    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000) {
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact

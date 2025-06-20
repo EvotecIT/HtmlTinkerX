@@ -1,6 +1,7 @@
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Playwright;
 
 namespace PSParseHTML.PowerShell;
@@ -22,11 +23,17 @@ public sealed class CmdletUnregisterHtmlRoute : AsyncPSCmdlet {
     [Parameter(Position = 2)]
     public Delegate? Handler { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
-        await HtmlBrowser.UnregisterRouteAsync(session, Pattern, Handler as Func<IRoute, Task>).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+
+        await HtmlBrowser.UnregisterRouteAsync(session, Pattern, Handler as Func<IRoute, Task>, token).ConfigureAwait(false);
     }
 }

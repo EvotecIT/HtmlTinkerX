@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -29,10 +30,15 @@ public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter AsText { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
 
         int flags = (InnerHtml.IsPresent ? 1 : 0) + (OuterHtml.IsPresent ? 1 : 0) + (AsText.IsPresent ? 1 : 0);
         if (flags > 1) {
@@ -46,7 +52,8 @@ public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
             session.Page,
             Selector,
             InnerHtml.IsPresent,
-            AsText.IsPresent).ConfigureAwait(false);
+            AsText.IsPresent,
+            token).ConfigureAwait(false);
 
         WriteObject(result);
     }
