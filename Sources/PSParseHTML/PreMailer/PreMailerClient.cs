@@ -71,11 +71,7 @@ public class PreMailerClient {
 
                             if (uri.IsFile)
                             {
-                                string localPath = uri.LocalPath;
-                                if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
-                                {
-                                    localPath = "/" + localPath.TrimStart('\\');
-                                }
+                                string localPath = NormalizeFileUriPath(uri);
                                 cssContent += File.ReadAllText(localPath);
                             }
                             else if (uri.IsAbsoluteUri)
@@ -170,10 +166,7 @@ public class PreMailerClient {
                         }
 
                         if (uri.IsFile) {
-                            string localPath = uri.LocalPath;
-                            if (uri.IsUnc && Path.DirectorySeparatorChar == '/') {
-                                localPath = "/" + localPath.TrimStart('\\');
-                            }
+                            string localPath = NormalizeFileUriPath(uri);
 #if NETSTANDARD2_0 || NETFRAMEWORK
                             cssContent += await Task.Run(() => File.ReadAllText(localPath)).ConfigureAwait(false);
 #else
@@ -354,5 +347,15 @@ public class PreMailerClient {
         };
 
         return MoveCssInlineFromFile(htmlFilePath, opts);
+    }
+
+    private static string NormalizeFileUriPath(Uri uri)
+    {
+        string localPath = uri.LocalPath;
+        if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
+        {
+            localPath = "/" + localPath.TrimStart('\\').Replace('\\', '/');
+        }
+        return localPath;
     }
 }
