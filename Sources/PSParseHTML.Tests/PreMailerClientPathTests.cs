@@ -24,7 +24,7 @@ public class PreMailerClientPathTests
         }
         else
         {
-            Assert.Equal(@"\\server\\share\\test.css", normalized);
+            Assert.Equal(@"\\server\share\test.css", normalized);
         }
     }
 
@@ -39,7 +39,7 @@ public class PreMailerClientPathTests
         }
         else
         {
-            Assert.Equal(@"\\tmp\\test.css", normalized);
+            Assert.Equal(@"\\tmp\test.css", normalized);
         }
     }
 }
