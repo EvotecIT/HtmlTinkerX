@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -14,11 +15,16 @@ public sealed class CmdletGetHtmlCookie : AsyncPSCmdlet {
     [Parameter(Position = 0, ValueFromPipeline = true)]
     public HtmlBrowserSession? Session { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session, token).ConfigureAwait(false);
         WriteObject(cookies, true);
     }
 }

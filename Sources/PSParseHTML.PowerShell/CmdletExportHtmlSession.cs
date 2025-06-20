@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -16,10 +17,15 @@ public sealed class CmdletExportHtmlSession : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 1)]
     public string Path { get; set; } = string.Empty;
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         Session ??= (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-        await HtmlBrowser.ExportSessionAsync(Session, Path).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+        await HtmlBrowser.ExportSessionAsync(Session, Path, token).ConfigureAwait(false);
     }
 }

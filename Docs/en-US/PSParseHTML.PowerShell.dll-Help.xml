@@ -107,6 +107,16 @@
         <dev:type>
           <maml:name>System.Threading.CancellationToken</maml:name>
           <maml:uri />
+        </dev:type>      <!-- Parameter: CancellationToken -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CancellationToken</maml:name>
+        <maml:description>
+          <maml:para>Cancellation token to stop the operation.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">CancellationToken</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Threading.CancellationToken</maml:name>
+          <maml:uri />
         </dev:type>
       </command:parameter>
     </command:parameters>

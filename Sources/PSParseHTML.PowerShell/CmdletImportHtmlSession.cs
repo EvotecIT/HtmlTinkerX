@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -60,8 +61,13 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter NoDefault { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
         HtmlBrowserSession session = await HtmlBrowser.ImportSessionAsync(
             Url,
             Path,
@@ -79,7 +85,8 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
             geoLatitude: GeoLatitude,
             geoLongitude: GeoLongitude,
             timezone: Timezone,
-            timeout: Timeout).ConfigureAwait(false);
+            timeout: Timeout,
+            cancellationToken: token).ConfigureAwait(false);
 
         if (!NoDefault.IsPresent) {
             SessionState.PSVariable.Set("PSParseHTML_DefaultSession", session);

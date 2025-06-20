@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -13,9 +14,14 @@ public sealed class CmdletCloseHtmlSession : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public HtmlBrowserSession Session { get; set; } = null!;
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        await HtmlBrowser.CloseSessionAsync(Session).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+        await HtmlBrowser.CloseSessionAsync(Session, token).ConfigureAwait(false);
         object? defaultSession = GetVariableValue("PSParseHTML_DefaultSession");
         if (defaultSession is HtmlBrowserSession sess && ReferenceEquals(sess, Session)) {
             SessionState.PSVariable.Remove("PSParseHTML_DefaultSession");

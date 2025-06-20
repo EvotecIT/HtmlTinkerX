@@ -1,6 +1,7 @@
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Playwright;
 
 namespace PSParseHTML.PowerShell;
@@ -22,10 +23,15 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 2)]
     public ScriptBlock? ScriptBlock { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
 
         ScriptBlock block = ScriptBlock ?? throw new PSArgumentNullException(nameof(ScriptBlock));
         Func<IRoute, Task> handler = route => {
@@ -33,7 +39,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
             return result is Task t ? t : Task.CompletedTask;
         };
 
-        await HtmlBrowser.RegisterRouteAsync(session, Pattern, handler).ConfigureAwait(false);
+        await HtmlBrowser.RegisterRouteAsync(session, Pattern, handler, token).ConfigureAwait(false);
         WriteObject(handler);
     }
 }

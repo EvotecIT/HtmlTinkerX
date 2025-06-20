@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace PSParseHTML.PowerShell;
 
@@ -30,12 +31,18 @@ public sealed class CmdletSetHtmlChecked : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PassThru { get; set; }
 
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
-        await HtmlBrowser.SetCheckedAsync(session, Selector, !Uncheck.IsPresent, Timeout).ConfigureAwait(false);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
+
+        await HtmlBrowser.SetCheckedAsync(session, Selector, !Uncheck.IsPresent, Timeout, token).ConfigureAwait(false);
 
         if (PassThru.IsPresent) {
             WriteObject(session);
