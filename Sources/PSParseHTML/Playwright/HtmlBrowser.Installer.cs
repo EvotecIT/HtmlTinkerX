@@ -141,86 +141,92 @@ public static partial class HtmlBrowser {
     /// Ensures that the Playwright driver is installed.
     /// </summary>
     /// <returns></returns>
-    internal static async Task EnsureInstalledAsync() {
+    internal static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
+        bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
+
         if (IsDriverPresent()) {
             // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
             // the '.playwright' folder, not to the folder itself.
             Environment.SetEnvironmentVariable(
                 "PLAYWRIGHT_DRIVER_SEARCH_PATH",
                 GetDriverRoot());
-            return;
-        }
+        } else {
+            string urlBase = "https://playwright.azureedge.net/builds/driver";
+            if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
+                urlBase += "/next";
+            string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
 
-        string urlBase = "https://playwright.azureedge.net/builds/driver";
-        if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
-            urlBase += "/next";
-        string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
 
-        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
 
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var total = response.Content.Headers.ContentLength ?? -1L;
-        var mem = new MemoryStream();
-        var buffer = new byte[81920];
-        var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        long read = 0;
-        int lastProgress = 0;
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (true) {
-            int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-            if (n == 0)
-                break;
-            await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
-            if (total > 0) {
-                read += n;
-                int progress = (int)(read * 100 / total);
-                if (progress != lastProgress) {
-                    double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
-                    Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
-                    lastProgress = progress;
+            var total = response.Content.Headers.ContentLength ?? -1L;
+            var mem = new MemoryStream();
+            var buffer = new byte[81920];
+            var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            long read = 0;
+            int lastProgress = 0;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (true) {
+                int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                if (n == 0)
+                    break;
+                await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
+                if (total > 0) {
+                    read += n;
+                    int progress = (int)(read * 100 / total);
+                    if (progress != lastProgress) {
+                        double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
+                        Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
+                        lastProgress = progress;
+                    }
                 }
             }
-        }
-        Console.WriteLine();
-        mem.Position = 0;
+            Console.WriteLine();
+            mem.Position = 0;
 
-        string baseDir = GetDriverPath();
-        if (Directory.Exists(baseDir))
-            Directory.Delete(baseDir, true);
+            string baseDir = GetDriverPath();
+            if (Directory.Exists(baseDir))
+                Directory.Delete(baseDir, true);
 
-        string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
+            string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
 
-        using (var archive = new ZipArchive(mem)) {
-            archive.ExtractToDirectory(tempDir);
-        }
-
-        Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
-
-        string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-        File.Move(Path.Combine(tempDir, NodeExecutable), nodeDest);
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-            try {
-                var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
-                chmod?.WaitForExit();
-            } catch {
-                // ignore
+            using (var archive = new ZipArchive(mem)) {
+                archive.ExtractToDirectory(tempDir);
             }
+
+            Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
+
+            string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
+            File.Move(Path.Combine(tempDir, NodeExecutable), nodeDest);
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+                try {
+                    var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
+                    chmod?.WaitForExit();
+                } catch {
+                    // ignore
+                }
+            }
+            File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
+
+            string packageSrc = Path.Combine(tempDir, "package");
+            string packageDest = Path.Combine(baseDir, "package");
+            if (Directory.Exists(packageDest))
+                Directory.Delete(packageDest, true);
+            Directory.Move(packageSrc, packageDest);
+            Directory.Delete(tempDir, true);
+
+            File.WriteAllText(VersionFile, DriverVersion);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
         }
-        File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
 
-        string packageSrc = Path.Combine(tempDir, "package");
-        string packageDest = Path.Combine(baseDir, "package");
-        if (Directory.Exists(packageDest))
-            Directory.Delete(packageDest, true);
-        Directory.Move(packageSrc, packageDest);
-        Directory.Delete(tempDir, true);
-
-        File.WriteAllText(VersionFile, DriverVersion);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+        if (!runtimeInstalled) {
+            string runtime = engine.ToString().ToLowerInvariant();
+            Microsoft.Playwright.Program.Main(new[] { "install", runtime });
+        }
     }
 
     /// <summary>
@@ -244,6 +250,18 @@ public static partial class HtmlBrowser {
             return Path.Combine(user, "Library", "Caches", "ms-playwright");
         }
         return Path.Combine(user, ".cache", "ms-playwright");
+    }
+
+    private static bool IsBrowserRuntimeInstalled(HtmlBrowserEngine engine) {
+        string path = GetBrowserInstallPath();
+        if (!Directory.Exists(path))
+            return false;
+        string prefix = engine.ToString().ToLowerInvariant() + "-";
+        foreach (string dir in Directory.GetDirectories(path)) {
+            if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
