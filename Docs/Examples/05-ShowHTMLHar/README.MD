@@ -2,17 +2,18 @@
 
 ## 📖 Summary
 
-`Show-HTMLHar` converts a HAR file into a small HTML viewer. It reads the HAR and
-creates an `.html` page with a simple table listing the captured requests.
-Pass `-Open` to automatically view the generated file.
+`Show-HTMLHar` parses a HAR file and returns a PowerShell object. It can also
+generate a small HTML viewer showing the captured requests. Use `-Open` to
+launch the HTML file after creation.
 
 ---
 
 ## 💡 Example
 
 ```powershell
-Show-HTMLHar -Path './traffic.har' -Open
+$har = Show-HTMLHar -Path './traffic.har' -Open
+$har.Log.Entries | Format-Table
 ```
 
-This command creates `traffic.html` next to the original HAR file and opens it in
-your default browser.
+This command creates `traffic.html` next to the original HAR file, opens it in
+your default browser, and returns the parsed HAR object for further processing.
