@@ -25,4 +25,10 @@ Describe 'HTML Cookie cmdlets' {
 
         ($after | Where-Object Name -eq 'mycookie').Value | Should -Be 'choco'
     }
+
+    It 'Accepts an empty cookie list' {
+        $session = Invoke-HTMLRendering -Url 'about:blank' -Session
+        { Set-HTMLCookie -Session $session -Cookie @() } | Should -Not -Throw
+        Close-HTMLSession -Session $session
+    }
 }

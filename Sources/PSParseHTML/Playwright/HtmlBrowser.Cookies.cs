@@ -48,6 +48,8 @@ public static partial class HtmlBrowser {
             list.Add(nc);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return session.Context.AddCookiesAsync(list);
+        return list.Count == 0
+            ? Task.CompletedTask
+            : session.Context.AddCookiesAsync(list);
     }
 }

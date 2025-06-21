@@ -16,6 +16,7 @@ public sealed class CmdletSetHtmlCookie : AsyncPSCmdlet {
 
     /// <summary>Cookies to add.</summary>
     [Parameter(Mandatory = true)]
+    [AllowEmptyCollection]
     public HtmlCookie[]? Cookie { get; set; }
 
     [Parameter]
