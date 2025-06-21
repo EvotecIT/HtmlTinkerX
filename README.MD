@@ -180,6 +180,9 @@ It may not seem like much, but those thirteen cmdlets are powerful enough to ena
 ## Examples
 Additional sample scripts are available in the `Examples` directory. See `Example-PlaywrightNetwork.ps1` for tracing and HAR capture.
 
+For login form detection, see
+[Example-GetHTMLLoginFormSimple.ps1](Examples/Example-GetHTMLLoginFormSimple.ps1)
+and [Example-GetHTMLLoginFormAdvanced.ps1](Examples/Example-GetHTMLLoginFormAdvanced.ps1).
 ```powershell
 # Parse tables from a web page (rowspan and colspan handled automatically)
 $tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
