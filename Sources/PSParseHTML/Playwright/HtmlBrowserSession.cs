@@ -17,8 +17,11 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     public IVideo? Video { get; }
     public string? VideoPath { get; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
+    private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
     /// <summary>Captured network log entries.</summary>
     public IEnumerable<HtmlNetworkEntry> NetworkLog => _network.Values;
+    /// <summary>Captured console log entries.</summary>
+    public IEnumerable<HtmlConsoleEntry> ConsoleLog => _console;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HtmlBrowserSession"/> class.
@@ -31,6 +34,15 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         Video = video;
         VideoPath = videoPath;
         _network = network ?? new ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
+
+        Page.Console += (_, msg) => {
+            HtmlConsoleEntry entry = new() {
+                Text = msg.Text,
+                Type = msg.Type,
+                Location = msg.Location?.ToString()
+            };
+            _console.Enqueue(entry);
+        };
 
         Page.Request += (_, req) => {
             HtmlNetworkEntry entry = new() {

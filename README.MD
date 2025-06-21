@@ -61,6 +61,7 @@
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
+- `Get-HTMLConsoleLog` - retrieve messages printed to the browser console
 - `Set-HTMLCookie` - add cookies to the active session
 - `Export-HTMLSession`/`Import-HTMLSession` - save and restore cookies and storage state
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
@@ -151,6 +152,11 @@ $log = Get-HTMLNetworkLog -Session $session
 $log | Format-Table Url, Status
 Export-HTMLSession -Session $session -Path 'state.json'
 $session = Import-HTMLSession -Path 'state.json' -Url 'https://example.com/protected'
+Close-HTMLSession -Session $session
+
+# View console messages
+$session = Start-HTMLSession -Url 'https://example.com'
+Get-HTMLConsoleLog -Session $session
 Close-HTMLSession -Session $session
 ```
 
