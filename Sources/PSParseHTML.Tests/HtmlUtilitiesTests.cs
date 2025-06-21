@@ -78,4 +78,18 @@ public class HtmlUtilitiesTests {
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
         Assert.Equal("Hello", result);
     }
+
+    [Fact]
+    public async Task GetStringWithProperEncodingAsync_TrimsQuotedCharset() {
+        var builder = new WebHostBuilder()
+            .Configure(app => app.Run(async ctx => {
+                ctx.Response.ContentType = "text/plain; charset=\"utf-8\"";
+                var bytes = System.Text.Encoding.UTF8.GetBytes("Hello");
+                await ctx.Response.Body.WriteAsync(bytes);
+            }));
+        using var server = new TestServer(builder);
+        using HttpClient client = server.CreateClient();
+        string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
+        Assert.Equal("Hello", result);
+    }
 }
