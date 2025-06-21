@@ -47,16 +47,6 @@ public static partial class HtmlBrowser {
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
         List<string> downloads = new();
-        page.Download += async (_, dl) => {
-            bool match = string.IsNullOrEmpty(filter) ||
-                         dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
-            if (match) {
-                string filePath = Path.Combine(dir, dl.SuggestedFilename);
-                await dl.SaveAsAsync(filePath);
-                downloads.Add(filePath);
-            }
-        };
 
         cancellationToken.ThrowIfCancellationRequested();
         await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
