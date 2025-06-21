@@ -142,6 +142,8 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <returns></returns>
     internal static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
+        bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
+
         if (IsDriverPresent()) {
             // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
             // the '.playwright' folder, not to the folder itself.
@@ -221,7 +223,7 @@ public static partial class HtmlBrowser {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
         }
 
-        if (!IsBrowserRuntimeInstalled(engine)) {
+        if (!runtimeInstalled) {
             string runtime = engine.ToString().ToLowerInvariant();
             Microsoft.Playwright.Program.Main(new[] { "install", runtime });
         }
