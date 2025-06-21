@@ -13,7 +13,7 @@ public sealed class HtmlConsoleEntry {
     public string Type { get; set; } = string.Empty;
 
     /// <summary>Location of the message if available.</summary>
-    public string? Location { get; set; };
+    public string? Location { get; set; }
 }
 
 
