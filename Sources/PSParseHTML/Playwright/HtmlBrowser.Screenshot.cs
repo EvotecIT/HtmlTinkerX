@@ -154,6 +154,7 @@ public static partial class HtmlBrowser {
         }
 
         string fullPath = HtmlUtilities.ResolvePath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         var options = new PageScreenshotOptions { FullPage = fullPage };
         options.Type = format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
         if (options.Type == ScreenshotType.Jpeg) {
