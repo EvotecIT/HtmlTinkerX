@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 public class Program {
     private static readonly Dictionary<string, Func<Task>> Examples = new() {
         ["GetHTMLLoginFormSimple"] = ExampleGetHTMLLoginFormSimple.RunAsync,
-        ["GetHTMLLoginFormAdvanced"] = ExampleGetHTMLLoginFormAdvanced.RunAsync
+        ["GetHTMLLoginFormAdvanced"] = ExampleGetHTMLLoginFormAdvanced.RunAsync,
+        ["ShowHtmlHarExample"] = ShowHtmlHarExample.RunAsync
     };
 
     public static async Task Main(string[] args) {
