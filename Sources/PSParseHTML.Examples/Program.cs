@@ -5,5 +5,6 @@ namespace PSParseHTML.Examples;
 public static class Program
 {
     public static Task Main()
-        => ShowHtmlHarExample.RunAsync();
+        => ConsoleLogExample.RunAsync();
 }
+
