@@ -22,16 +22,17 @@ public sealed class CmdletShowHtmlHar : AsyncPSCmdlet {
         string outPath = OutFile is null
             ? System.IO.Path.ChangeExtension(resolved, ".html")
             : HtmlUtilities.ResolvePath(OutFile);
-        string html = $@"<!DOCTYPE html>
+        string html = $$"""
+<!DOCTYPE html>
 <html>
 <head>
-<meta charset=\"utf-8\" />
+<meta charset='utf-8' />
 <title>HAR Viewer</title>
 <style>
-body {{ font-family: Arial, sans-serif; }}
-table {{ border-collapse: collapse; width: 100%; }}
-th, td {{ border: 1px solid #ccc; padding: 4px; text-align: left; }}
-thead {{ background: #eee; }}
+body { font-family: Arial, sans-serif; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
+thead { background: #eee; }
 </style>
 </head>
 <body>
@@ -39,20 +40,21 @@ thead {{ background: #eee; }}
 <thead>
 <tr><th>Method</th><th>URL</th><th>Status</th></tr>
 </thead>
-<tbody id=\"entries\"></tbody>
+<tbody id='entries'></tbody>
 </table>
 <script>
-const har = {harContent};
+const har = {{harContent}};
 const entries = har.log.entries || [];
 const tbody = document.getElementById('entries');
-for (const e of entries) {{
+for (const e of entries) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${{e.request.method}}</td><td>${{e.request.url}}</td><td>${{e.response.status}}</td>`;
+    tr.innerHTML = `<td>${e.request.method}</td><td>${e.request.url}</td><td>${e.response.status}</td>`;
     tbody.appendChild(tr);
-}}
+}
 </script>
 </body>
-</html>";
+</html>
+""";
 #if NETSTANDARD2_0 || NETFRAMEWORK
         System.IO.File.WriteAllText(outPath, html);
 #else
