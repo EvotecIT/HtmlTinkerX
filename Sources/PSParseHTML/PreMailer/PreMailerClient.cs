@@ -43,7 +43,7 @@ public class PreMailerClient {
     /// <summary>
     /// Processes the HTML and returns the result.
     /// </summary>
-    public PreMailerResult MoveCssInline() {
+    public async Task<PreMailerResult> MoveCssInline() {
         try {
             string cssContent = Options.Css ?? string.Empty;
             string htmlToProcess = _html;
@@ -72,7 +72,9 @@ public class PreMailerClient {
                             if (uri.IsFile)
                             {
                                 string localPath = NormalizeFileUriPath(uri);
-                                cssContent += File.ReadAllText(localPath);
+                                cssContent += await HtmlUtilities
+                                    .ReadFileCheckedAsync(localPath)
+                                    .ConfigureAwait(false);
                             }
                             else if (uri.IsAbsoluteUri)
                             {
@@ -91,11 +93,9 @@ public class PreMailerClient {
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                string cssPath = HtmlUtilities.ResolvePath(Options.CssFilePath!);
-                if (!File.Exists(cssPath)) {
-                    throw new FileNotFoundException($"CSS file not found: {Options.CssFilePath}", cssPath);
-                }
-                cssContent += File.ReadAllText(cssPath);
+                cssContent += await HtmlUtilities
+                    .ReadFileCheckedAsync(Options.CssFilePath!)
+                    .ConfigureAwait(false);
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
@@ -232,14 +232,14 @@ public class PreMailerClient {
     /// <summary>
     /// Convenience method for processing a HTML string directly using options.
     /// </summary>
-    public static PreMailerResult MoveCssInline(string html, PreMailerOptions? options = null) {
+    public static Task<PreMailerResult> MoveCssInline(string html, PreMailerOptions? options = null) {
         return FromHtml(html, options).MoveCssInline();
     }
 
     /// <summary>
     /// Convenience method for processing a HTML file directly using options.
     /// </summary>
-    public static PreMailerResult MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
+    public static Task<PreMailerResult> MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
         return FromFile(htmlFilePath, options).MoveCssInline();
     }
 
@@ -260,7 +260,7 @@ public class PreMailerClient {
     /// <summary>
     /// Parameter-based helper constructing an options object internally.
     /// </summary>
-    public static PreMailerResult MoveCssInline(
+    public static Task<PreMailerResult> MoveCssInline(
         string html,
         Uri? baseUri = null,
         bool removeStyleElements = false,
@@ -306,7 +306,7 @@ public class PreMailerClient {
     /// <summary>
     /// Parameter-based helper for processing a HTML file directly.
     /// </summary>
-    public static PreMailerResult MoveCssInlineFromFile(
+    public static Task<PreMailerResult> MoveCssInlineFromFile(
         string htmlFilePath,
         Uri? baseUri = null,
         bool removeStyleElements = false,
