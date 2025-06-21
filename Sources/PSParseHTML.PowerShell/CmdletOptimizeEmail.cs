@@ -123,7 +123,7 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     /// <summary>
     /// Processes the input HTML or file and outputs optimized HTML.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         PreMailerOptions options = new() {
             BaseUri = BaseUri,
             RemoveStyleElements = RemoveStyleElements,
@@ -144,8 +144,12 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
         };
 
         PreMailerResult result = ParameterSetName == "File"
-            ? PreMailerClient.MoveCssInlineFromFile(Path, options)
-            : PreMailerClient.MoveCssInline(Body, options);
+            ? await PreMailerClient
+                .MoveCssInlineFromFile(Path, options)
+                .ConfigureAwait(false)
+            : await PreMailerClient
+                .MoveCssInline(Body, options)
+                .ConfigureAwait(false);
 
         WriteObject(result.Html);
 
@@ -153,6 +157,6 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
             LoggingMessages.Logger.WriteWarning(warning.Message);
         }
 
-        return Task.CompletedTask;
+        return;
     }
 }
