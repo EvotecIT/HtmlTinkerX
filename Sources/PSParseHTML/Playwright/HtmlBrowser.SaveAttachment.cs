@@ -45,8 +45,9 @@ public static partial class HtmlBrowser {
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
         List<string> downloads = new();
+        List<Task> saves = new();
         object sync = new();
-        page.Download += async (_, dl) => {
+        page.Download += (_, dl) => {
             bool match = string.IsNullOrEmpty(filter) ||
                          dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
                          dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
@@ -59,10 +60,8 @@ public static partial class HtmlBrowser {
                 save = !downloads.Contains(filePath);
                 if (save) {
                     downloads.Add(filePath);
+                    saves.Add(dl.SaveAsAsync(filePath));
                 }
-            }
-            if (save) {
-                await dl.SaveAsAsync(filePath).ConfigureAwait(false);
             }
         };
 
@@ -81,7 +80,7 @@ public static partial class HtmlBrowser {
             cancellationToken.ThrowIfCancellationRequested();
             await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
         }
-        await page.WaitForTimeoutAsync(500);
+        await Task.WhenAll(saves).ConfigureAwait(false);
         return downloads;
     }
 }
