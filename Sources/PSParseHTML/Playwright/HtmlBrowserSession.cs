@@ -56,8 +56,14 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// Asynchronously disposes of the browser session, closing the page, context, and browser.
     /// /// </summary>
     public async ValueTask DisposeAsync() {
-        await Context.CloseAsync();
-        await Browser.CloseAsync();
-        Playwright.Dispose();
+        if (Context != null) {
+            await Context.CloseAsync();
+        }
+        if (Browser != null) {
+            await Browser.CloseAsync();
+        }
+        if (Playwright != null) {
+            Playwright.Dispose();
+        }
     }
 }
