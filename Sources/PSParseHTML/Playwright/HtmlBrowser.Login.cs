@@ -16,16 +16,20 @@ public static partial class HtmlBrowser {
     /// <returns>Selectors for the username, password and submit elements or <c>null</c> if none found.</returns>
     public static async Task<HtmlFormLogin?> DetectLoginFormAsync(IPage page, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        const string selectorScript = @"(el) => {
-            const esc = CSS && CSS.escape ? CSS.escape : (s) => s;
-            let sel = el.tagName.toLowerCase();
-            if (el.id) return sel + '#' + esc(el.id);
-            const name = el.getAttribute('name');
-            if (name) return `${sel}[name='${name.replace(/'/g, '\\'')}']`;
-            const cls = el.className;
-            if (cls) return sel + '.' + cls.trim().split(/\\s+/).map(esc).join('.');
-            return sel;
-        }";
+            const string selectorScript = """
+            (el) => {
+                const esc = CSS && CSS.escape ? CSS.escape : (s) => s;
+                let sel = el.tagName.toLowerCase();
+                if (el.id) return sel + '#' + esc(el.id);
+                const name = el.getAttribute('name');
+                if (name) return `${sel}[name='${name.replace(/'/g, "\\'")}']`;
+                const type = el.getAttribute('type');
+                if (type) return `${sel}[type='${type.replace(/'/g, "\\'")}']`;
+                const cls = el.className;
+                if (cls) return sel + '.' + cls.trim().split(/\\s+/).map(esc).join('.');
+                return sel;
+            }
+            """;
 
         foreach (var form in await page.QuerySelectorAllAsync("form")) {
             cancellationToken.ThrowIfCancellationRequested();
