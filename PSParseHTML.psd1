@@ -1,50 +1,7 @@
 ﻿@{
     AliasesToExport        = @('Stop-HTMLSession', 'ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS', 'Start-HTMLSession', 'Open-HTMLSession', 'Save-HTMLDownload')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @(
-        'Close-HTMLSession',
-        'Compare-HTML',
-        'ConvertFrom-HTML',
-        'ConvertFrom-HtmlAttributes',
-        'ConvertFrom-HtmlForm',
-        'ConvertFrom-HtmlList',
-        'ConvertFrom-HtmlTable',
-        'Convert-HTMLToText',
-        'Export-HTMLSession',
-        'Format-CSS',
-        'Format-HTML',
-        'Format-JavaScript',
-        'Get-HTMLContent',
-        'Get-HTMLCookie',
-        'Get-HTMLInteractable',
-        'Get-HTMLNetworkLog',
-        'Import-HTMLSession',
-        'Invoke-HTMLClick',
-        'Invoke-HTMLNavigation',
-        'Invoke-HTMLRendering',
-        'Invoke-HTMLScript',
-        'Invoke-HTMLDomScript',
-        'Optimize-CSS',
-        'Optimize-Email',
-        'Optimize-HTML',
-        'Optimize-JavaScript',
-        'Register-HTMLRoute',
-        'Save-HTMLAttachment',
-        'Save-HTMLHar',
-        'Save-HTMLPdf',
-        'Save-HTMLScreenshot',
-        'Set-HTMLChecked',
-        'Set-HTMLCookie',
-        'Set-HTMLHttpClientOption',
-        'Set-HTMLInput',
-        'Set-HTMLSelectOption',
-        'Start-HTMLTracing',
-        'Stop-HTMLTracing',
-        'Start-HTMLVideoRecording',
-        'Stop-HTMLVideoRecording',
-        'Submit-HTMLForm',
-        'Unregister-HTMLRoute'
-    )
+    CmdletsToExport        = @('Close-HTMLSession', 'Compare-HTML', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlForm', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLContent', 'Get-HTMLCookie', 'Get-HTMLInteractable', 'Get-HTMLNetworkLog', 'Invoke-HTMLClick', 'Invoke-HTMLNavigation', 'Invoke-HTMLRendering', 'Invoke-HTMLScript', 'Invoke-HTMLDomScript', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Register-HTMLRoute', 'Save-HTMLAttachment', 'Save-HTMLPdf', 'Save-HTMLScreenshot', 'Set-HTMLChecked', 'Set-HTMLCookie', 'Set-HTMLHttpClientOption', 'Set-HTMLInput', 'Set-HTMLSelectOption', 'Start-HTMLVideoRecording', 'Stop-HTMLVideoRecording', 'Submit-HTMLForm', 'Unregister-HTMLRoute', 'Show-HTMLHar')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
