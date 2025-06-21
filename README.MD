@@ -57,6 +57,7 @@
 - `Invoke-HTMLScript` - run custom JavaScript against a session
 - `Invoke-HTMLDomScript` - run JavaScript with AngleSharp without a browser
 - `Get-HTMLInteractable` - list clickable elements from a session, URL or file
+- `Get-HTMLLoginForm` - detect login forms and return field selectors
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
