@@ -72,7 +72,8 @@ public static class HtmlUtilities {
         var contentType = response.Content.Headers.ContentType;
         if (contentType?.CharSet != null) {
             try {
-                var encoding = System.Text.Encoding.GetEncoding(contentType.CharSet);
+                string charset = contentType.CharSet.Trim().Trim('"').Trim('\'');
+                var encoding = System.Text.Encoding.GetEncoding(charset);
                 return encoding.GetString(bytes);
             } catch {
                 // If the specified encoding is not supported, fall through to detection
