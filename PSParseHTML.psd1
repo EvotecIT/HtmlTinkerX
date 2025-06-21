@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport        = @('Stop-HTMLSession', 'ConvertFrom-HTMLTag', 'ConvertFrom-HTMLClass', 'Format-JS', 'Start-HTMLSession', 'Open-HTMLSession', 'Save-HTMLDownload')
     Author                 = 'Przemyslaw Klys'
-    CmdletsToExport        = @('Close-HTMLSession', 'Compare-HTML', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlForm', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLContent', 'Get-HTMLCookie', 'Get-HTMLInteractable', 'Get-HTMLNetworkLog', 'Get-HTMLConsoleLog', 'Invoke-HTMLClick', 'Invoke-HTMLNavigation', 'Invoke-HTMLRendering', 'Invoke-HTMLScript', 'Invoke-HTMLDomScript', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Register-HTMLRoute', 'Save-HTMLAttachment', 'Save-HTMLPdf', 'Save-HTMLScreenshot', 'Set-HTMLChecked', 'Set-HTMLCookie', 'Set-HTMLHttpClientOption', 'Set-HTMLInput', 'Set-HTMLSelectOption', 'Start-HTMLVideoRecording', 'Stop-HTMLVideoRecording', 'Submit-HTMLForm', 'Unregister-HTMLRoute', 'Show-HTMLHar')
+    CmdletsToExport        = @('Close-HTMLSession', 'Compare-HTML', 'ConvertFrom-HTML', 'ConvertFrom-HtmlAttributes', 'ConvertFrom-HtmlForm', 'ConvertFrom-HtmlList', 'ConvertFrom-HtmlTable', 'Convert-HTMLToText', 'Export-HTMLSession', 'Format-CSS', 'Format-HTML', 'Format-JavaScript', 'Get-HTMLConsoleLog', 'Get-HTMLContent', 'Get-HTMLCookie', 'Get-HTMLInteractable', 'Get-HTMLNetworkLog', 'Import-HTMLSession', 'Invoke-HTMLClick', 'Invoke-HTMLDomScript', 'Invoke-HTMLNavigation', 'Invoke-HTMLRendering', 'Invoke-HTMLScript', 'Optimize-CSS', 'Optimize-Email', 'Optimize-HTML', 'Optimize-JavaScript', 'Register-HTMLRoute', 'Save-HTMLAttachment', 'Save-HTMLHar', 'Save-HTMLPdf', 'Save-HTMLScreenshot', 'Set-HTMLChecked', 'Set-HTMLCookie', 'Set-HTMLHttpClientOption', 'Set-HTMLInput', 'Set-HTMLSelectOption', 'Show-HTMLHar', 'Start-HTMLTracing', 'Start-HTMLVideoRecording', 'Stop-HTMLTracing', 'Stop-HTMLVideoRecording', 'Submit-HTMLForm', 'Unregister-HTMLRoute')
     CompanyName            = 'Evotec'
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
@@ -15,7 +15,7 @@
         PSData = @{
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
-            Prerelease                 = 'Preview2'
+            Prerelease                 = 'Preview3'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
