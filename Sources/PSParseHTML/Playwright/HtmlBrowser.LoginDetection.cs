@@ -46,15 +46,20 @@ public static partial class HtmlBrowser {
         """;
         System.Collections.Generic.Dictionary<string, string?>? selectors = await page.EvaluateAsync<System.Collections.Generic.Dictionary<string, string?>>(script).ConfigureAwait(false);
 
-        if (selectors == null || string.IsNullOrEmpty(selectors["password"])) {
+        if (selectors == null ||
+            !selectors.TryGetValue("password", out string? pwd) ||
+            string.IsNullOrEmpty(pwd)) {
             return null;
         }
 
+        selectors.TryGetValue("username", out string? user);
+        selectors.TryGetValue("submit", out string? submit);
+
         return new HtmlFormLogin {
             LoginUrl = page.Url,
-            UsernameSelector = selectors["username"] ?? string.Empty,
-            PasswordSelector = selectors["password"] ?? string.Empty,
-            SubmitSelector = selectors["submit"] ?? string.Empty
+            UsernameSelector = user ?? string.Empty,
+            PasswordSelector = pwd,
+            SubmitSelector = submit ?? string.Empty
         };
     }
 
