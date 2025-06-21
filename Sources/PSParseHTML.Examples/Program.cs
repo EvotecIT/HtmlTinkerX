@@ -7,7 +7,7 @@ public class Program {
     private static readonly Dictionary<string, Func<Task>> Examples = new() {
         ["GetHTMLLoginFormSimple"] = ExampleGetHTMLLoginFormSimple.RunAsync,
         ["GetHTMLLoginFormAdvanced"] = ExampleGetHTMLLoginFormAdvanced.RunAsync,
-        ["ShowHtmlHarExample"] = ShowHtmlHarExample.RunAsync
+        ["ShowHtmlHarExample"] = PSParseHTML.Examples.ExampleShowHTMLHar.RunAsync
     };
 
     public static async Task Main(string[] args) {
