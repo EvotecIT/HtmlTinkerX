@@ -124,8 +124,10 @@ public static partial class HtmlBrowser {
             await page.WaitForTimeoutAsync(delayMs);
         }
 
+        string fullPath = HtmlUtilities.ResolvePath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         var options = new PagePdfOptions {
-            Path = path,
+            Path = fullPath,
             Landscape = landscape,
             PrintBackground = printBackground,
             Format = format,
