@@ -1,9 +1,21 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Http;
 using Xunit;
 
 namespace PSParseHTML.Tests;
 
 public class HtmlParserTests {
+    private static TestServer CreateServer() {
+        var builder = new WebHostBuilder()
+            .Configure(app => app.Run(async ctx => {
+                const string html = "<!DOCTYPE html><html><head><title>Example Domain</title></head><body></body></html>";
+                await ctx.Response.WriteAsync(html);
+            }));
+        return new TestServer(builder);
+    }
     [Fact]
     public void ParseWithAngleSharp_FromString() {
         const string html = "<html><body><p>Test</p></body></html>";
@@ -20,13 +32,19 @@ public class HtmlParserTests {
 
     [Fact]
     public async Task ParseUrlWithAngleSharpAsync_FromExample() {
-        var doc = await HtmlParser.ParseUrlWithAngleSharpAsync("https://example.com");
+        using var server = CreateServer();
+        using var client = server.CreateClient();
+
+        var doc = await HtmlParser.ParseUrlWithAngleSharpAsync(server.BaseAddress.ToString(), client);
         Assert.Contains("Example Domain", doc.Title);
     }
 
     [Fact]
     public async Task ParseUrlWithHtmlAgilityPackAsync_FromExample() {
-        var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync("https://example.com");
+        using var server = CreateServer();
+        using var client = server.CreateClient();
+
+        var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(server.BaseAddress.ToString(), client);
         Assert.NotNull(doc.DocumentNode);
     }
 }
