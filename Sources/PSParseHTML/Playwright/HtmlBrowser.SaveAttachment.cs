@@ -1,10 +1,8 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace PSParseHTML;
@@ -47,14 +45,23 @@ public static partial class HtmlBrowser {
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
         List<string> downloads = new();
-        page.Download += async (_, dl) => {
+        List<Task> saves = new();
+        object sync = new();
+        page.Download += (_, dl) => {
             bool match = string.IsNullOrEmpty(filter) ||
                          dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
                          dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
-            if (match) {
-                string filePath = Path.Combine(dir, dl.SuggestedFilename);
-                await dl.SaveAsAsync(filePath);
-                downloads.Add(filePath);
+            if (!match) {
+                return;
+            }
+            string filePath = Path.Combine(dir, dl.SuggestedFilename);
+            bool save;
+            lock (sync) {
+                save = !downloads.Contains(filePath);
+                if (save) {
+                    downloads.Add(filePath);
+                    saves.Add(dl.SaveAsAsync(filePath));
+                }
             }
         };
 
@@ -71,14 +78,9 @@ public static partial class HtmlBrowser {
         var anchors = await page.QuerySelectorAllAsync(selector);
         foreach (var anchor in anchors) {
             cancellationToken.ThrowIfCancellationRequested();
-            var download = await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
-            string filePath = Path.Combine(dir, download.SuggestedFilename);
-            await download.SaveAsAsync(filePath);
-            if (!downloads.Contains(filePath)) {
-                downloads.Add(filePath);
-            }
+            await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
         }
-        await page.WaitForTimeoutAsync(500);
+        await Task.WhenAll(saves).ConfigureAwait(false);
         return downloads;
     }
 }
