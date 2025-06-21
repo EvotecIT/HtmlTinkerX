@@ -38,7 +38,8 @@ public static partial class HtmlBrowser {
                 continue;
             }
 
-            var username = await form.QuerySelectorAsync("input[type=email],input[type=text],input:not([type])");
+            var username = await form.QuerySelectorAsync(
+                "input[type=email],input[type=username],input[type=text],input:not([type])");
             var submit = await form.QuerySelectorAsync("input[type=submit],button[type=submit],button:not([type])");
 
             string userSel = string.Empty;
