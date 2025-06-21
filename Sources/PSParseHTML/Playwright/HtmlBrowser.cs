@@ -115,23 +115,14 @@ public static partial class HtmlBrowser {
         var page = await context.NewPageAsync();
 
         var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
-        page.Request += (_, req) => {
-            HtmlNetworkEntry entry = new() {
-                Url = req.Url,
-                Method = req.Method,
-                RequestHeaders = new System.Collections.Generic.Dictionary<string, string>(req.Headers)
-            };
-            network[req] = entry;
-        };
-        page.Response += (_, res) => {
-            HtmlNetworkEntry entry = network.GetOrAdd(res.Request, r => new HtmlNetworkEntry {
-                Url = r.Url,
-                Method = r.Method,
-                RequestHeaders = new System.Collections.Generic.Dictionary<string, string>(r.Headers)
-            });
-            entry.Status = res.Status;
-            entry.ResponseHeaders = new System.Collections.Generic.Dictionary<string, string>(res.Headers);
-        };
+        HtmlBrowserSession session = new(
+            playwright,
+            browserInstance,
+            context,
+            page,
+            !string.IsNullOrEmpty(videoPath) ? page.Video : null,
+            videoPath,
+            network);
 
         if (formLogin != null) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -151,12 +142,7 @@ public static partial class HtmlBrowser {
         await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
 
-        IVideo? video = null;
-        if (!string.IsNullOrEmpty(videoPath)) {
-            video = page.Video;
-        }
-
-        return new HtmlBrowserSession(playwright, browserInstance, context, page, video, videoPath, network);
+        return session;
     }
 
     /// <summary>
