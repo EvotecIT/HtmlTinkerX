@@ -11718,4 +11718,55 @@
       </command:example>
     </command:examples>
   </command:command>
+  <!-- Cmdlet: Get-HTMLLoginForm -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>Get-HTMLLoginForm</command:name>
+      <command:verb>Get</command:verb>
+      <command:noun>HTMLLoginForm</command:noun>
+      <maml:description>
+        <maml:para>Detects login forms and returns CSS selectors for username, password and submit elements.</maml:para>
+      </maml:description>
+    </command:details>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Get-HTMLLoginForm</maml:name>
+        <command:parameter required="false" globbing="false" pipelineInput="true (ByValue)" position="0">
+          <maml:name>Session</maml:name>
+          <command:parameterValue required="true">HtmlBrowserSession</command:parameterValue>
+          <dev:type>
+            <maml:name>PSParseHTML.HtmlBrowserSession</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" globbing="false" pipelineInput="true (ByValue)" position="0">
+        <maml:name>Session</maml:name>
+        <maml:description>
+          <maml:para>Existing browser session.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">HtmlBrowserSession</command:parameterValue>
+        <dev:type>
+          <maml:name>PSParseHTML.HtmlBrowserSession</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>PSParseHTML.HtmlFormLogin</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:examples>
+      <command:example>
+        <maml:title>----------  Example 1  ----------</maml:title>
+        <dev:code>$form = Get-HTMLLoginForm -Url 'https://example.com/login'</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
 </helpItems>
