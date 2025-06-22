@@ -1,6 +1,10 @@
 ﻿# to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
-$DevelopmentPath = "$PSScriptRoot\Sources\PSParseHTML.PowerShell\bin\Debug"
+$DevelopmentPath = "$PSScriptRoot\Sources\PSParseHTML.PowerShell\bin"
+$DevelopmentConfiguration = 'Debug'
+if (-not (Test-Path "$DevelopmentPath\$DevelopmentConfiguration")) {
+    $DevelopmentConfiguration = 'Release'
+}
 $DevelopmentFolderCore = "net8.0"
 $DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
@@ -60,11 +64,11 @@ if ($Development) {
 $BinaryDev = @(
     foreach ($BinaryModule in $BinaryModules) {
         if ($PSEdition -eq 'Core') {
-            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentFolderCore\$BinaryModule"
-            $DevelopmentAssemblyFolder = Resolve-Path "$DevelopmentPath\$DevelopmentFolderCore"
+            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentConfiguration\$DevelopmentFolderCore\$BinaryModule"
+            $DevelopmentAssemblyFolder = Resolve-Path "$DevelopmentPath\$DevelopmentConfiguration\$DevelopmentFolderCore"
         } else {
-            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentFolderDefault\$BinaryModule"
-            $DevelopmentAssemblyFolder = Resolve-Path "$DevelopmentPath\$DevelopmentFolderDefault"
+            $Variable = Resolve-Path "$DevelopmentPath\$DevelopmentConfiguration\$DevelopmentFolderDefault\$BinaryModule"
+            $DevelopmentAssemblyFolder = Resolve-Path "$DevelopmentPath\$DevelopmentConfiguration\$DevelopmentFolderDefault"
         }
         $Variable
         Write-Warning "Development mode: Using binaries from $Variable"

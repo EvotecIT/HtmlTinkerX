@@ -30,7 +30,7 @@ public static partial class HtmlBrowser {
                     let sel = el.tagName.toLowerCase();
                     if (el.id) return sel + '#' + esc(el.id);
                     const name = el.getAttribute('name');
-                    if (name) return `${sel}[name='${name.replace(/'/g, "\\'")}]`;
+                    if (name) return `${sel}[name='${name.replace(/'/g, "\\'")}']`;
                     const cls = el.className;
                     if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
                     return sel;
