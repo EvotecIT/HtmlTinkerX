@@ -22,45 +22,8 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        string script = """
-            () => {
-                const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
-                const toSelector = el => {
-                    if (!el) return '';
-                    let sel = el.tagName.toLowerCase();
-                    if (el.id) return sel + '#' + esc(el.id);
-                    const name = el.getAttribute('name');
-                    if (name) return `${sel}[name='${name.replace(/'/g, "\\'")}']`;
-                    const cls = el.className;
-                    if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
-                    return sel;
-                };
-                const pwd = document.querySelector('input[type="password"]');
-                if (!pwd) return null;
-                const form = pwd.closest('form');
-                if (!form) return null;
-                const user = form.querySelector('input[type="text"],input[type="email"],input[name*="user" i],input[name*="login" i]');
-                const submit = form.querySelector('input[type="submit"],button[type="submit"],button:not([type])');
-                return { username: toSelector(user), password: toSelector(pwd), submit: toSelector(submit) };
-            }
-        """;
-        System.Collections.Generic.Dictionary<string, string?>? selectors = await page.EvaluateAsync<System.Collections.Generic.Dictionary<string, string?>>(script).ConfigureAwait(false);
-
-        if (selectors == null ||
-            !selectors.TryGetValue("password", out string? pwd) ||
-            string.IsNullOrEmpty(pwd)) {
-            return null;
-        }
-
-        selectors.TryGetValue("username", out string? user);
-        selectors.TryGetValue("submit", out string? submit);
-
-        return new HtmlFormLogin {
-            LoginUrl = page.Url,
-            UsernameSelector = user ?? string.Empty,
-            PasswordSelector = pwd,
-            SubmitSelector = submit ?? string.Empty
-        };
+        string html = await page.ContentAsync().ConfigureAwait(false);
+        return HtmlLoginParser.Detect(html, page.Url);
     }
 
     /// <summary>

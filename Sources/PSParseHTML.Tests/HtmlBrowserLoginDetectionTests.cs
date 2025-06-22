@@ -9,14 +9,10 @@ public class HtmlBrowserLoginDetectionTests {
 
     [Fact]
     public async Task DetectLoginFormAsync_ReturnsSelectors() {
+        string markup = "<form><input type='text' id='user'/><input type='password' id='pass'/><button id='login'></button></form>";
         var page = new Mock<IPage>();
         page.SetupGet(p => p.Url).Returns("https://example.com/login");
-        page.Setup(p => p.EvaluateAsync<System.Collections.Generic.Dictionary<string, string?>>(It.IsAny<string>(), null))
-            .ReturnsAsync(new System.Collections.Generic.Dictionary<string, string?> {
-                ["username"] = "input#user",
-                ["password"] = "input#pass",
-                ["submit"] = "button#login"
-            });
+        page.Setup(p => p.ContentAsync()).ReturnsAsync(markup);
 
         HtmlFormLogin? form = await HtmlBrowser.DetectLoginFormAsync(page.Object);
 
@@ -30,11 +26,22 @@ public class HtmlBrowserLoginDetectionTests {
     [Fact]
     public async Task DetectLoginFormAsync_ReturnsNullWhenMissing() {
         var page = new Mock<IPage>();
-        page.Setup(p => p.EvaluateAsync<System.Collections.Generic.Dictionary<string, string?>>(It.IsAny<string>(), null))
-            .ReturnsAsync((System.Collections.Generic.Dictionary<string, string?>?)null);
+        page.Setup(p => p.ContentAsync()).ReturnsAsync("<div></div>");
 
         HtmlFormLogin? form = await HtmlBrowser.DetectLoginFormAsync(page.Object);
 
         Assert.Null(form);
+    }
+
+    [Fact]
+    public void DetectLoginForm_FromHtml() {
+        string html = "<form><input type='text' id='u'/><input type='password' id='p'/><button id='s'></button></form>";
+        HtmlFormLogin? form = HtmlLoginParser.Detect(html, "https://example.com/login");
+
+        Assert.NotNull(form);
+        Assert.Equal("https://example.com/login", form!.LoginUrl);
+        Assert.Equal("input#u", form.UsernameSelector);
+        Assert.Equal("input#p", form.PasswordSelector);
+        Assert.Equal("button#s", form.SubmitSelector);
     }
 }
