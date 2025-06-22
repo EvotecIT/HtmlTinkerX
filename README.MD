@@ -62,6 +62,7 @@
 - `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Get-HTMLConsoleLog` - retrieve messages printed to the browser console
 - `Set-HTMLCookie` - add cookies to the active session
+- `Export-BrowserState`/`Import-BrowserState` - save and restore cookies and storage state
 - `Export-HTMLSession`/`Import-HTMLSession` - save and restore cookies and storage state
 - `Close-HTMLSession` - dispose an active browser session (`Stop-HTMLSession` alias)
 
@@ -149,8 +150,8 @@ Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
 Unregister-HTMLRoute -Session $session -Pattern '*api/data' -Handler $handler
 $log = Get-HTMLNetworkLog -Session $session
 $log | Format-Table Url, Status
-Export-HTMLSession -Session $session -Path 'state.json'
-$session = Import-HTMLSession -Path 'state.json' -Url 'https://example.com/protected'
+Export-BrowserState -Session $session -Path 'state.json'
+$session = Import-BrowserState -Path 'state.json' -Url 'https://example.com/protected'
 Close-HTMLSession -Session $session
 
 # View console messages
