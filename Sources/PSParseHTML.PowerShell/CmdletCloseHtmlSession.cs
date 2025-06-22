@@ -14,6 +14,7 @@ public sealed class CmdletCloseHtmlSession : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public HtmlBrowserSession Session { get; set; } = null!;
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 
