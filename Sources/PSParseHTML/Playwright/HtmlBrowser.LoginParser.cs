@@ -61,7 +61,7 @@ public static class HtmlLoginParser {
 
         string cls = el.ClassName ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(cls)) {
-            string escaped = string.Join('.', cls.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(s => CssEscape(s.Trim())));
+            string escaped = string.Join(".", cls.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(s => CssEscape(s.Trim())));
             return sel + "." + escaped;
         }
 
