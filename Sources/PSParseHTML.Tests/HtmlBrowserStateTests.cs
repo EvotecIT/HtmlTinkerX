@@ -16,7 +16,9 @@ public class HtmlBrowserStateTests {
         context.Setup(c => c.StorageStateAsync(It.Is<BrowserContextStorageStateOptions>(o => o.Path == file)))
             .ReturnsAsync("{}").Verifiable();
         var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
-        typeof(HtmlBrowserSession).GetProperty("Context")!.SetValue(session, context.Object);
+        typeof(HtmlBrowserSession)
+            .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(session, context.Object);
 
         await HtmlBrowser.ExportBrowserStateAsync(session, file);
 
