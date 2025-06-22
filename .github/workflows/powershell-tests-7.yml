@@ -67,6 +67,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+      - name: Cache PowerShell modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.local/share/powershell/Modules
+            ~/Documents/PowerShell/Modules
+            ~/Documents/WindowsPowerShell/Modules
+          key: ${{ runner.os }}-psmodules-${{ hashFiles('PSParseHTML.Tests.ps1') }}
+          restore-keys: ${{ runner.os }}-psmodules-
 
       - name: Install PowerShell modules
         shell: pwsh
@@ -102,6 +112,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+      - name: Cache PowerShell modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.local/share/powershell/Modules
+            ~/Documents/PowerShell/Modules
+            ~/Documents/WindowsPowerShell/Modules
+          key: ${{ runner.os }}-psmodules-${{ hashFiles('PSParseHTML.Tests.ps1') }}
+          restore-keys: ${{ runner.os }}-psmodules-
 
       - name: Install PowerShell
         run: |
@@ -144,6 +164,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+      - name: Cache PowerShell modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.local/share/powershell/Modules
+            ~/Documents/PowerShell/Modules
+            ~/Documents/WindowsPowerShell/Modules
+          key: ${{ runner.os }}-psmodules-${{ hashFiles('PSParseHTML.Tests.ps1') }}
+          restore-keys: ${{ runner.os }}-psmodules-
 
       - name: Install PowerShell
         run: brew install --cask powershell
