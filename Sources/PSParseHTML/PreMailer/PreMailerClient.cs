@@ -13,6 +13,9 @@ namespace PSParseHTML;
 /// </summary>
 public class PreMailerClient {
     private readonly string _html;
+    /// <summary>
+    /// Options controlling how CSS is inlined.
+    /// </summary>
     public PreMailerOptions Options { get; }
 
     private PreMailerClient(string html, PreMailerOptions? options) {
