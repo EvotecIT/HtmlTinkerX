@@ -62,6 +62,7 @@ public sealed class CmdletGetHtmlLoginForm : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

@@ -17,6 +17,7 @@ public sealed class CmdletExportBrowserState : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 1)]
     public string Path { get; set; } = string.Empty;
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

@@ -54,6 +54,7 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     [Parameter]
     public string? Filter { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

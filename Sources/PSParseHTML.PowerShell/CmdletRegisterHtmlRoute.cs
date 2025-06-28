@@ -23,6 +23,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 2)]
     public ScriptBlock? ScriptBlock { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

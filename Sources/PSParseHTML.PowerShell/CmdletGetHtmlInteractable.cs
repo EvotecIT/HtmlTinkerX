@@ -61,10 +61,12 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>Timeout in milliseconds for browser operations.</summary>
     [Parameter]
     [ValidateRange(0,int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

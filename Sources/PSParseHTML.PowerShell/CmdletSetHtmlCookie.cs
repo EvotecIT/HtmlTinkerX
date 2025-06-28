@@ -19,6 +19,7 @@ public sealed class CmdletSetHtmlCookie : AsyncPSCmdlet {
     [AllowEmptyCollection]
     public HtmlCookie[]? Cookie { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

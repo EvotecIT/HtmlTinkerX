@@ -31,6 +31,7 @@ public sealed class CmdletSetHtmlInput : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PassThru { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 
