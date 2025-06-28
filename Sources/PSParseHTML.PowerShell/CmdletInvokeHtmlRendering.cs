@@ -95,33 +95,42 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
+    /// <summary>Timeout in milliseconds for browser operations.</summary>
     [Parameter]
     [ValidateRange(0,int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 
+    /// <summary>User agent string used when launching the browser.</summary>
     [Parameter]
     public string? UserAgent { get; set; }
 
+    /// <summary>Viewport width in pixels.</summary>
     [Parameter]
     [ValidateRange(1,int.MaxValue)]
     public int? ViewportWidth { get; set; }
 
+    /// <summary>Viewport height in pixels.</summary>
     [Parameter]
     [ValidateRange(1,int.MaxValue)]
     public int? ViewportHeight { get; set; }
 
+    /// <summary>Scaling factor for high DPI devices.</summary>
     [Parameter]
     public double? DeviceScaleFactor { get; set; }
 
+    /// <summary>Latitude used for geolocation.</summary>
     [Parameter]
     public double? GeoLatitude { get; set; }
 
+    /// <summary>Longitude used for geolocation.</summary>
     [Parameter]
     public double? GeoLongitude { get; set; }
 
+    /// <summary>Timezone identifier.</summary>
     [Parameter]
     public string? Timezone { get; set; }
 

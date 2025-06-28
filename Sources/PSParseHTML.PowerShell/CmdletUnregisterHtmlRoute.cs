@@ -23,6 +23,7 @@ public sealed class CmdletUnregisterHtmlRoute : AsyncPSCmdlet {
     [Parameter(Position = 2)]
     public Delegate? Handler { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

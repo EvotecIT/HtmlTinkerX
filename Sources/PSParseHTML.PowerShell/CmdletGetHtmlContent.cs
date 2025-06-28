@@ -30,6 +30,7 @@ public sealed class CmdletGetHtmlContent : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter AsText { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 

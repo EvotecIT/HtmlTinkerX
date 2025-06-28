@@ -15,6 +15,7 @@ public sealed class CmdletGetHtmlCookie : AsyncPSCmdlet {
     [Parameter(Position = 0, ValueFromPipeline = true)]
     public HtmlBrowserSession? Session { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
 
