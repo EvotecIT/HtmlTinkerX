@@ -49,6 +49,9 @@ public static partial class HtmlBrowser {
         string? proxyUsername = null,
         string? proxyPassword = null,
         CancellationToken cancellationToken = default) {
+        if (delayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        }
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -115,6 +118,9 @@ public static partial class HtmlBrowser {
         bool outline = false,
         bool tagged = false,
         CancellationToken cancellationToken = default) {
+        if (delayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        }
         if (!string.IsNullOrEmpty(selector)) {
             cancellationToken.ThrowIfCancellationRequested();
             await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
