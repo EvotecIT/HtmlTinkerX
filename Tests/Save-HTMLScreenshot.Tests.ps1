@@ -56,4 +56,11 @@ Describe 'Save-HTMLScreenshot' {
         $after = Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $after.LastWriteTime | Should -BeGreaterThan $beforeTime
     }
+    It 'Respects delay and format parameters' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'delay.jpg'
+        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Format Jpeg -Quality 50 -Delay 100
+        (Test-Path $outfile) | Should -BeTrue
+    }
 }

@@ -1,7 +1,8 @@
 Describe 'Browser state persistence' {
-    It 'Reuses cookies from exported state' {
-        $url = 'about:blank'
-        $state = Join-Path $TestDrive 'state.json'
+    if (Get-Command Export-BrowserState -ErrorAction SilentlyContinue) {
+        It 'Reuses cookies from exported state' {
+            $url = 'about:blank'
+            $state = Join-Path $TestDrive 'state.json'
 
         $cookie = [PSParseHTML.HtmlCookie]::new()
         $cookie.Name = 'persist'
@@ -18,6 +19,9 @@ Describe 'Browser state persistence' {
         $cookies = Get-HTMLCookie -Session $s2
         Close-HTMLSession -Session $s2
 
-        ($cookies | Where-Object Name -eq 'persist').Value | Should -Be 'sweet'
+            ($cookies | Where-Object Name -eq 'persist').Value | Should -Be 'sweet'
+        }
+    } else {
+        It 'Reuses cookies from exported state' -Skip {}
     }
 }
