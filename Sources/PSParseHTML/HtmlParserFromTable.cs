@@ -1,10 +1,10 @@
+using AngleSharp.Dom;
+using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
-using HtmlAgilityPack;
 
 namespace PSParseHTML;
 
@@ -102,10 +102,11 @@ public static class HtmlParserFromTable {
                 }
             } else {
                 for (int i = 0; i < headerCells.Length; i++) {
-                    headers.Add($"Column{ i + 1 }");
+                    headers.Add($"Column{i + 1}");
                 }
             }
 
+            HtmlParser.EnsureUniqueNames(headers);
             metadata.Headers = headers;
             metadata.ColumnCount = headers.Count;
 
@@ -242,7 +243,7 @@ public static class HtmlParserFromTable {
                 }
             } else {
                 for (int i = 0; i < headerCells.Length; i++) {
-                    headers.Add($"Column{ i + 1 }");
+                    headers.Add($"Column{i + 1}");
                 }
             }
 
@@ -489,9 +490,10 @@ public static class HtmlParserFromTable {
                 }
             } else {
                 for (int i = 0; i < headerCells.Count; i++) {
-                    headers.Add($"Column{ i + 1 }");
+                    headers.Add($"Column{i + 1}");
                 }
             }
+            HtmlParser.EnsureUniqueNames(headers);
 
             metadata.Headers = headers;
             metadata.ColumnCount = headers.Count;
@@ -667,7 +669,7 @@ public static class HtmlParserFromTable {
                 }
             } else {
                 for (int i = 0; i < headerCells.Count; i++) {
-                    headers.Add($"Column{ i + 1 }");
+                    headers.Add($"Column{i + 1}");
                 }
             }
 

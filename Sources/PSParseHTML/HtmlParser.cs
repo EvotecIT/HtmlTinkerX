@@ -1,11 +1,11 @@
+using AngleSharp.Dom;
+using AngleSharp.Html.Parser;
+using HtmlAgilityPack;
 using System;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
-using AngleSharp.Html.Parser;
-using AngleSharp.Dom;
-using HtmlAgilityPack;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
@@ -331,5 +331,34 @@ public static class HtmlParser {
             .Replace("+", "")           // Remove plus
             .Replace("-", "")           // Remove hyphens
             .Trim();                    // Remove leading/trailing whitespace
+    }
+
+    /// <summary>
+    /// Ensure all names are unique by appending an index when duplicates are detected.
+    /// </summary>
+    /// <param name="names">Collection of names to sanitize.</param>
+    public static void EnsureUniqueNames(IList<string> names) {
+        if (names == null) {
+            throw new ArgumentNullException(nameof(names));
+        }
+
+        Dictionary<string, int> counters = new(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < names.Count; i++) {
+            string name = names[i];
+            if (string.IsNullOrEmpty(name)) {
+                continue;
+            }
+
+            if (counters.TryGetValue(name, out int count)) {
+                count++;
+                counters[name] = count;
+                string unique = name + count;
+                LoggingMessages.Logger.WriteWarning($"Duplicate header '{name}' detected. Renaming to '{unique}'.");
+                names[i] = unique;
+            } else {
+                counters[name] = 0;
+            }
+        }
     }
 }
