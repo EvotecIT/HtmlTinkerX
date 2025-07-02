@@ -1,5 +1,5 @@
 Describe 'Browser state persistence' {
-    It 'Reuses cookies from exported state' {
+    It 'Reuses cookies from exported state' -Skip:(-not (Get-Command Export-BrowserState -ErrorAction SilentlyContinue)) {
         $url = 'about:blank'
         $state = Join-Path $TestDrive 'state.json'
 

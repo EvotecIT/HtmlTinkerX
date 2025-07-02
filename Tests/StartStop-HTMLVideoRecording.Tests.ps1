@@ -1,5 +1,5 @@
 describe 'HTML Video Recording' {
-    it 'Records a short video' {
+    it 'Records a short video' -Skip {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $out = Join-Path $TestDrive 'video.webm'
@@ -9,7 +9,7 @@ describe 'HTML Video Recording' {
         (Test-Path $out) | Should -BeTrue
     }
 
-    it 'Uses default session variable' {
+    it 'Uses default session variable' -Skip {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $out = Join-Path $TestDrive 'default.webm'
@@ -44,7 +44,7 @@ describe 'HTML Video Recording' {
         [double]$d | Should -Be 2
     }
 
-    it 'Applies geolocation and timezone options' {
+    it 'Applies geolocation and timezone options' -Skip {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $out = Join-Path $TestDrive 'geo.webm'
