@@ -154,7 +154,10 @@ public static partial class HtmlBrowser {
         }
 
         string fullPath = HtmlUtilities.ResolvePath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        string? dir = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
         var options = new PageScreenshotOptions { FullPage = fullPage };
         options.Type = format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
         if (options.Type == ScreenshotType.Jpeg) {
