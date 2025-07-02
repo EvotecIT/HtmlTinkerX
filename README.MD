@@ -23,7 +23,7 @@
 
 **PSParseHTML** started as a suite of data processing Cmdlets to help [PSWriteHTML](https://github.com/EvotecIT/PSWriteHTML), but it has gained functionality enough to be its own module. Basic usage instructions are described [on this blog post](https://evotec.xyz/formatting-and-minifying-resources-html-css-javascript-with-powershell/).
 
-**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with thirteen cmdlets:
+**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with fourteen cmdlets:
 
 ## Processing of HTML/CSS/JS
 - `Convert-HTMLToText` - convert markup to plain text
@@ -37,6 +37,7 @@
 - `Optimize-Email` - inline CSS for email bodies (can download linked stylesheets)
 - `Optimize-HTML` - minify HTML
 - `Optimize-JavaScript` - minify JavaScript
+- `ConvertFrom-HtmlMeta` - extract name/content pairs from `<meta>` tags
 
 ## Browsing
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
