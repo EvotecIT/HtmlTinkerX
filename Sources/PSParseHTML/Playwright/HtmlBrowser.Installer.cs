@@ -219,7 +219,11 @@ public static partial class HtmlBrowser {
             Directory.Move(packageSrc, packageDest);
             Directory.Delete(tempDir, true);
 
+#if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(VersionFile, DriverVersion);
+#else
+            await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
+#endif
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
         }
 
