@@ -304,6 +304,26 @@ public static class HtmlParser {
     }
 
 
+    /// <summary>
+    /// Extracts schema.org microdata items from HTML markup.
+    /// </summary>
+    /// <param name="html">HTML content containing microdata.</param>
+    /// <returns>List of microdata items.</returns>
+    public static List<HtmlMicrodataItem> ParseMicrodata(string html) {
+        return HtmlParserFromMicrodata.ParseMicrodata(html);
+    }
+
+    /// <summary>
+    /// Extracts schema.org microdata items from a web page.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of microdata items.</returns>
+    public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromMicrodata.ParseUrlMicrodataAsync(url, client).ConfigureAwait(false);
+    }
+
+
 
     /// <summary>
     /// Clean the header name to remove problematic characters that can cause PowerShell formatting issues.

@@ -23,7 +23,7 @@
 
 **PSParseHTML** started as a suite of data processing Cmdlets to help [PSWriteHTML](https://github.com/EvotecIT/PSWriteHTML), but it has gained functionality enough to be its own module. Basic usage instructions are described [on this blog post](https://evotec.xyz/formatting-and-minifying-resources-html-css-javascript-with-powershell/).
 
-**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with fourteen cmdlets:
+**PSParseHTML** exposes a suite of PowerShell cmdlets that let you parse, format and optimise web resources right from the shell.  The module currently ships with fifteen cmdlets:
 
 ## Processing of HTML/CSS/JS
 - `Convert-HTMLToText` - convert markup to plain text
@@ -38,6 +38,7 @@
 - `Optimize-HTML` - minify HTML
 - `Optimize-JavaScript` - minify JavaScript
 - `ConvertFrom-HtmlMeta` - extract name/content pairs from `<meta>` tags
+- `ConvertFrom-HtmlMicrodata` - extract [schema.org](https://schema.org) microdata items
 
 ## Browsing
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
@@ -176,7 +177,7 @@ Supply `-UserAgent`, `-ViewportWidth`, `-ViewportHeight` or `-DeviceScaleFactor`
 
 The expected input is a string literal or data read from a file.  The output can be PowerShell objects (classes are `HtmlNode` or `AngleSharp.Html.Dom.HtmlElement` depending on the selected engine) or strings written to `stdout`.
 
-It may not seem like much, but those thirteen cmdlets are powerful enough to enable robust HTML processing in shell.
+It may not seem like much, but these cmdlets are powerful enough to enable robust HTML processing in shell.
 
 ## Examples
 Additional sample scripts are available in the `Examples` directory. See `Example-PlaywrightNetwork.ps1` for tracing and HAR capture.
@@ -207,6 +208,10 @@ Get-Content './report.html' -Raw | Convert-HTMLToText
 # Extract all product entries
 $markup = Get-Content './catalog.html' -Raw
 ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
+
+# Parse schema.org microdata
+$micro = ConvertFrom-HtmlMicrodata -Content $markup
+$micro[0].Properties.name
 ```
 
 More sample scripts are in the [Examples](Examples) folder, including
