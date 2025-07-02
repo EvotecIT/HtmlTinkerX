@@ -38,6 +38,9 @@
 - `Optimize-HTML` - minify HTML
 - `Optimize-JavaScript` - minify JavaScript
 - `ConvertFrom-HtmlMeta` - extract name/content pairs from `<meta>` tags
+- `ConvertFrom-HtmlMicrodata` - extract structured data items (schema.org types)
+Microdata parsing recognizes common schema.org item types so you can easily
+process structured data embedded in pages.
 
 ## Browsing
 - `Invoke-HTMLRendering` - render pages with a headless browser (supports basic and form authentication)
@@ -208,6 +211,9 @@ Get-Content './report.html' -Raw | Convert-HTMLToText
 # Extract all product entries
 $markup = Get-Content './catalog.html' -Raw
 ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
+
+# Extract schema.org microdata
+ConvertFrom-HtmlMicrodata -Content '<div itemscope itemtype="https://schema.org/Product"><span itemprop="name">Paper</span></div>'
 ```
 
 More sample scripts are in the [Examples](Examples) folder, including

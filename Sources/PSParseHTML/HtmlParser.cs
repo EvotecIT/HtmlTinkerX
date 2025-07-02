@@ -303,6 +303,25 @@ public static class HtmlParser {
         return await HtmlParserFromMeta.ParseUrlMetaTagsAsync(url, client).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Extracts microdata items from HTML markup.
+    /// </summary>
+    /// <param name="html">HTML content containing microdata.</param>
+    /// <returns>List of microdata items.</returns>
+    public static List<HtmlMicrodataItem> ParseMicrodataItems(string html) {
+        return HtmlParserFromMicrodata.ParseMicrodataItems(html);
+    }
+
+    /// <summary>
+    /// Extracts microdata items from a web page.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of microdata items.</returns>
+    public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
+    }
+
 
 
     /// <summary>
