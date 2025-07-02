@@ -61,6 +61,7 @@
 - `Register-HTMLRoute`/`Unregister-HTMLRoute` - intercept requests to block or mock responses
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
+ - `Get-HTMLResource` - extract script and CSS resources with comments, optionally returning content or saving files
 - `Get-HTMLConsoleLog` - retrieve messages printed to the browser console
 - `Set-HTMLCookie` - add cookies to the active session
 - `Export-BrowserState`/`Import-BrowserState` - save and restore cookies and storage state
