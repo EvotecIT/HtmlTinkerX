@@ -33,7 +33,7 @@ Build-Module -ModuleName 'PSParseHTML' {
     New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility'
 
     # Add approved modules, that can be used as a dependency, but only when specific function from those modules is used
-    # And on that time only that function and dependant functions will be copied over
+    # And on that time only that function and dependent functions will be copied over
     # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
     New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
 
@@ -99,7 +99,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         RefreshPSD1Only                   = $true
-        NETBinaryModuleDocumenation       = $true
+        NETBinaryModuleDocumentation      = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
