@@ -26,6 +26,8 @@ public class PreMailerClient {
     /// <summary>
     /// Creates a client from a HTML file path.
     /// </summary>
+    /// <param name="htmlFilePath">Path to the HTML file.</param>
+    /// <param name="options">Optional processing options.</param>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static PreMailerClient FromFile(string htmlFilePath, PreMailerOptions? options = null) {
         string path = HtmlUtilities.ResolvePath(htmlFilePath);
@@ -39,6 +41,8 @@ public class PreMailerClient {
     /// <summary>
     /// Creates a client from a HTML string.
     /// </summary>
+    /// <param name="html">HTML markup to process.</param>
+    /// <param name="options">Optional processing options.</param>
     public static PreMailerClient FromHtml(string html, PreMailerOptions? options = null) {
         return new PreMailerClient(html, options);
     }
@@ -235,6 +239,8 @@ public class PreMailerClient {
     /// <summary>
     /// Convenience method for processing a HTML string directly using options.
     /// </summary>
+    /// <param name="html">HTML markup to process.</param>
+    /// <param name="options">Optional processing options.</param>
     public static Task<PreMailerResult> MoveCssInline(string html, PreMailerOptions? options = null) {
         return FromHtml(html, options).MoveCssInline();
     }
@@ -242,6 +248,8 @@ public class PreMailerClient {
     /// <summary>
     /// Convenience method for processing a HTML file directly using options.
     /// </summary>
+    /// <param name="htmlFilePath">Path to the HTML file.</param>
+    /// <param name="options">Optional processing options.</param>
     public static Task<PreMailerResult> MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
         return FromFile(htmlFilePath, options).MoveCssInline();
     }
@@ -249,12 +257,16 @@ public class PreMailerClient {
     /// <summary>
     /// Asynchronously processes a HTML string using the provided options.
     /// </summary>
+    /// <param name="html">HTML markup to process.</param>
+    /// <param name="options">Optional processing options.</param>
     public static Task<PreMailerResult> MoveCssInlineAsync(string html, PreMailerOptions? options = null)
         => FromHtml(html, options).MoveCssInlineAsync();
 
     /// <summary>
     /// Asynchronously processes a HTML file using the provided options.
     /// </summary>
+    /// <param name="htmlFilePath">Path to the HTML file.</param>
+    /// <param name="options">Optional processing options.</param>
     public static async Task<PreMailerResult> MoveCssInlineFromFileAsync(string htmlFilePath, PreMailerOptions? options = null) {
         string html = await HtmlUtilities.ReadFileCheckedAsync(htmlFilePath).ConfigureAwait(false);
         return await MoveCssInlineAsync(html, options).ConfigureAwait(false);
@@ -263,6 +275,24 @@ public class PreMailerClient {
     /// <summary>
     /// Parameter-based helper constructing an options object internally.
     /// </summary>
+    /// <param name="html">HTML markup to process.</param>
+    /// <param name="baseUri">Base URI used for resolving relative links.</param>
+    /// <param name="removeStyleElements">Remove &lt;style&gt; elements after inlining.</param>
+    /// <param name="ignoreElements">CSS selector of elements to ignore.</param>
+    /// <param name="css">CSS content to inline.</param>
+    /// <param name="cssFilePath">Path to a CSS file to inline.</param>
+    /// <param name="stripIdAndClassAttributes">Strip id and class attributes from the output.</param>
+    /// <param name="removeComments">Remove HTML and CSS comments.</param>
+    /// <param name="customFormatter">Custom formatter used when generating HTML.</param>
+    /// <param name="preserveMediaQueries">Preserve media queries from style nodes.</param>
+    /// <param name="useEmailFormatter">Use the built in email formatter.</param>
+    /// <param name="downloadRemoteCss">Download remote CSS referenced by link tags.</param>
+    /// <param name="addAnalyticsTags">Add Google Analytics tags.</param>
+    /// <param name="analyticsSource">UTM source parameter.</param>
+    /// <param name="analyticsMedium">UTM medium parameter.</param>
+    /// <param name="analyticsCampaign">UTM campaign parameter.</param>
+    /// <param name="analyticsContent">UTM content parameter.</param>
+    /// <param name="analyticsDomain">Domain used when constructing analytics links.</param>
     public static Task<PreMailerResult> MoveCssInline(
         string html,
         Uri? baseUri = null,
@@ -309,6 +339,24 @@ public class PreMailerClient {
     /// <summary>
     /// Parameter-based helper for processing a HTML file directly.
     /// </summary>
+    /// <param name="htmlFilePath">Path to the HTML file.</param>
+    /// <param name="baseUri">Base URI used for resolving relative links.</param>
+    /// <param name="removeStyleElements">Remove &lt;style&gt; elements after inlining.</param>
+    /// <param name="ignoreElements">CSS selector of elements to ignore.</param>
+    /// <param name="css">CSS content to inline.</param>
+    /// <param name="cssFilePath">Path to a CSS file to inline.</param>
+    /// <param name="stripIdAndClassAttributes">Strip id and class attributes from the output.</param>
+    /// <param name="removeComments">Remove HTML and CSS comments.</param>
+    /// <param name="customFormatter">Custom formatter used when generating HTML.</param>
+    /// <param name="preserveMediaQueries">Preserve media queries from style nodes.</param>
+    /// <param name="useEmailFormatter">Use the built in email formatter.</param>
+    /// <param name="downloadRemoteCss">Download remote CSS referenced by link tags.</param>
+    /// <param name="addAnalyticsTags">Add Google Analytics tags.</param>
+    /// <param name="analyticsSource">UTM source parameter.</param>
+    /// <param name="analyticsMedium">UTM medium parameter.</param>
+    /// <param name="analyticsCampaign">UTM campaign parameter.</param>
+    /// <param name="analyticsContent">UTM content parameter.</param>
+    /// <param name="analyticsDomain">Domain used when constructing analytics links.</param>
     public static Task<PreMailerResult> MoveCssInlineFromFile(
         string htmlFilePath,
         Uri? baseUri = null,

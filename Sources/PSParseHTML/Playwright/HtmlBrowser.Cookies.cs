@@ -5,10 +5,15 @@ using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
+/// <summary>
+/// Helper methods for retrieving HTML content using a headless browser.
+/// </summary>
 public static partial class HtmlBrowser {
     /// <summary>
     /// Retrieves cookies from the browser context.
     /// </summary>
+    /// <param name="session">Session from which cookies will be read.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<BrowserContextCookiesResult> cookies = await session.Context.CookiesAsync();
@@ -31,6 +36,9 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Adds cookies to the browser context.
     /// </summary>
+    /// <param name="session">Session to which cookies will be added.</param>
+    /// <param name="cookies">Collection of cookies to add.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
         List<Cookie> list = new();
         foreach (HtmlCookie c in cookies) {

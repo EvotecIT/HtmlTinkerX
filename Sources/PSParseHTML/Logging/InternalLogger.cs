@@ -206,6 +206,9 @@ public class InternalLogger {
     }
 }
 
+/// <summary>
+/// Provides information about a logging event raised by <see cref="InternalLogger"/>.
+/// </summary>
 public class LogEventArgs : EventArgs {
     /// <summary>
     /// Progress percentage
@@ -242,19 +245,39 @@ public class LogEventArgs : EventArgs {
     /// </summary>
     public string? Message { get; set; }
 
+    /// <summary>
+    /// Parameters that were supplied with the formatted message.
+    /// </summary>
     public object[] Args { get; set; } = Array.Empty<object>();
 
+    /// <summary>
+    /// Creates a new instance using the provided formatted message.
+    /// </summary>
+    /// <param name="message">Message template.</param>
+    /// <param name="args">Arguments used when formatting the message.</param>
     public LogEventArgs(string message, object[] args) {
         Message = message;
         Args = args;
         FullMessage = string.Format(message, args);
     }
 
+    /// <summary>
+    /// Creates a new instance with a simple message.
+    /// </summary>
+    /// <param name="message">Message text.</param>
     public LogEventArgs(string message) {
         Message = message;
         FullMessage = message;
     }
 
+    /// <summary>
+    /// Creates a new instance representing progress information.
+    /// </summary>
+    /// <param name="activity">Overall activity name.</param>
+    /// <param name="currentOperation">Current operation description.</param>
+    /// <param name="currentSteps">Current progress step number.</param>
+    /// <param name="totalSteps">Total number of steps expected.</param>
+    /// <param name="percentage">Progress percentage value.</param>
     public LogEventArgs(string activity, string currentOperation, int? currentSteps, int? totalSteps, int? percentage) {
         ProgressActivity = activity;
         ProgressCurrentOperation = currentOperation;
