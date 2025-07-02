@@ -125,7 +125,10 @@ public static partial class HtmlBrowser {
         }
 
         string fullPath = HtmlUtilities.ResolvePath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        string? dir = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
         var options = new PagePdfOptions {
             Path = fullPath,
             Landscape = landscape,
