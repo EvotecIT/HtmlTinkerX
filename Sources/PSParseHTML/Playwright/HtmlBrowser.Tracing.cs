@@ -33,7 +33,10 @@ public static partial class HtmlBrowser {
     public static Task StopTracingAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         string full = HtmlUtilities.ResolvePath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        string? dir = Path.GetDirectoryName(full);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
         return session.Context.Tracing.StopAsync(new Microsoft.Playwright.TracingStopOptions { Path = full });
     }
 
@@ -47,7 +50,10 @@ public static partial class HtmlBrowser {
     public static Task ExportHarAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         string full = HtmlUtilities.ResolvePath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        string? dir = Path.GetDirectoryName(full);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
         var log = new {
             log = new {
                 version = "1.2",
