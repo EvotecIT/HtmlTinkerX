@@ -15,4 +15,11 @@ Describe 'Save-HTMLPdf' {
             Save-HTMLPdf -OutFile $outfile -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
+    It 'Generates PDF with custom layout options' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'layout.pdf'
+        Save-HTMLPdf -Url $uri -OutFile $outfile -Selector '#loaded' -Landscape -PrintBackground -Format A4 -MarginTop "0.5in" -MarginBottom "0.5in"
+        (Test-Path $outfile) | Should -BeTrue
+    }
 }
