@@ -284,6 +284,44 @@ public static class HtmlParser {
         return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client);
     }
 
+    /// <summary>
+    /// Extracts &lt;meta&gt; tags from HTML markup using AngleSharp.
+    /// </summary>
+    /// <param name="html">HTML content containing meta tags.</param>
+    /// <returns>List of meta tag objects.</returns>
+    public static List<HtmlMetaTag> ParseMetaTagsWithAngleSharp(string html) {
+        return HtmlParserFromMeta.ParseMetaTagsWithAngleSharp(html);
+    }
+
+    /// <summary>
+    /// Extracts &lt;meta&gt; tags from a web page using AngleSharp.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of meta tag objects.</returns>
+    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsWithAngleSharpAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromMeta.ParseUrlMetaTagsWithAngleSharpAsync(url, client).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Extracts &lt;meta&gt; tags from HTML markup using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="html">HTML content containing meta tags.</param>
+    /// <returns>List of meta tag objects.</returns>
+    public static List<HtmlMetaTag> ParseMetaTagsWithHtmlAgilityPack(string html) {
+        return HtmlParserFromMeta.ParseMetaTagsWithHtmlAgilityPack(html);
+    }
+
+    /// <summary>
+    /// Extracts &lt;meta&gt; tags from a web page using HtmlAgilityPack.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of meta tag objects.</returns>
+    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsWithHtmlAgilityPackAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromMeta.ParseUrlMetaTagsWithHtmlAgilityPackAsync(url, client).ConfigureAwait(false);
+    }
+
 
 
     /// <summary>

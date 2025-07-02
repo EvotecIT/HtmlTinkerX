@@ -61,6 +61,7 @@
 - `Get-HTMLCookie` - retrieve cookies from the active session
 - `Get-HTMLNetworkLog` - view captured network requests and responses
 - `Get-HTMLConsoleLog` - retrieve messages printed to the browser console
+- `Get-HTMLMeta` - return `<meta>` tag name/content pairs
 - `Set-HTMLCookie` - add cookies to the active session
 - `Export-BrowserState`/`Import-BrowserState` - save and restore cookies and storage state
 - `Export-HTMLSession`/`Import-HTMLSession` - save and restore cookies and storage state
