@@ -69,10 +69,10 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// /// </summary>
     public async ValueTask DisposeAsync() {
         if (Context != null) {
-            await Context.CloseAsync();
+            await Context.CloseAsync().ConfigureAwait(false);
         }
         if (Browser != null) {
-            await Browser.CloseAsync();
+            await Browser.CloseAsync().ConfigureAwait(false);
         }
         if (Playwright != null) {
             Playwright.Dispose();
