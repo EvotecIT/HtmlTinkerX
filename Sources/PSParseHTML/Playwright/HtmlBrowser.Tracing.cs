@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace PSParseHTML;
 
+/// <summary>
+/// Helper methods for retrieving HTML content using a headless browser.
+/// </summary>
 public static partial class HtmlBrowser {
     /// <summary>
     /// Starts Playwright tracing for the given session.
