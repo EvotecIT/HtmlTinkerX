@@ -333,16 +333,12 @@ public static class HtmlParserFromTable {
             throw new ArgumentNullException(nameof(url));
         }
 
-        bool disposeClient = false;
-        HttpClient http;
-        if (client != null) {
-            http = client;
-        } else if (clientFactory != null) {
-            http = clientFactory();
-            disposeClient = true;
-        } else {
-            http = HtmlHttpClientFactory.Shared;
+        if (clientFactory == null) {
+            throw new ArgumentNullException(nameof(clientFactory));
         }
+
+        bool disposeClient = client == null;
+        HttpClient http = client ?? clientFactory();
 
         try {
             string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
@@ -762,16 +758,12 @@ public static class HtmlParserFromTable {
             throw new ArgumentNullException(nameof(url));
         }
 
-        bool disposeClient = false;
-        HttpClient http;
-        if (client != null) {
-            http = client;
-        } else if (clientFactory != null) {
-            http = clientFactory();
-            disposeClient = true;
-        } else {
-            http = HtmlHttpClientFactory.Shared;
+        if (clientFactory == null) {
+            throw new ArgumentNullException(nameof(clientFactory));
         }
+
+        bool disposeClient = client == null;
+        HttpClient http = client ?? clientFactory();
 
         try {
             string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
