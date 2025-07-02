@@ -75,8 +75,12 @@ public static partial class HtmlBrowser {
         };
         var opts = new JsonSerializerOptions { WriteIndented = true };
         string json = JsonSerializer.Serialize(log, opts);
+#if NETSTANDARD2_0 || NETFRAMEWORK
         File.WriteAllText(full, json);
         return Task.CompletedTask;
+#else
+        return File.WriteAllTextAsync(full, json, cancellationToken);
+#endif
     }
 }
 
