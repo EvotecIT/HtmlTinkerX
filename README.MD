@@ -212,6 +212,9 @@ ConvertFrom-HTMLAttributes -Content $markup -Class 'product'
 # Parse schema.org microdata
 $micro = ConvertFrom-HtmlMicrodata -Content $markup
 $micro[0].Properties.name
+
+# Or parse directly from a URL
+$micro = ConvertFrom-HtmlMicrodata -Url 'https://example.com/catalog'
 ```
 
 More sample scripts are in the [Examples](Examples) folder, including
