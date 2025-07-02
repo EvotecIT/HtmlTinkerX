@@ -284,6 +284,25 @@ public static class HtmlParser {
         return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client);
     }
 
+    /// <summary>
+    /// Extracts <meta> tag information from HTML markup.
+    /// </summary>
+    /// <param name="html">HTML content containing meta tags.</param>
+    /// <returns>List of meta tag name/content pairs.</returns>
+    public static List<HtmlMetaTag> ParseMetaTags(string html) {
+        return HtmlParserFromMeta.ParseMetaTags(html);
+    }
+
+    /// <summary>
+    /// Extracts <meta> tag information from a web page.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>List of meta tag name/content pairs.</returns>
+    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromMeta.ParseUrlMetaTagsAsync(url, client).ConfigureAwait(false);
+    }
+
 
 
     /// <summary>
