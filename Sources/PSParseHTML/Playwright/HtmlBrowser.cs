@@ -12,6 +12,7 @@ namespace PSParseHTML;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    internal static Func<Task<IPlaywright>>? PlaywrightFactory { get; set; }
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
     /// </summary>
@@ -48,7 +49,9 @@ public static partial class HtmlBrowser {
         await EnsureInstalledAsync(browser).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var playwright = await Playwright.CreateAsync();
+        var playwright = PlaywrightFactory != null
+            ? await PlaywrightFactory().ConfigureAwait(false)
+            : await Playwright.CreateAsync();
         IBrowserType type = browser switch {
             HtmlBrowserEngine.Firefox => playwright.Firefox,
             HtmlBrowserEngine.Webkit => playwright.Webkit,
