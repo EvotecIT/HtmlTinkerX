@@ -31,7 +31,7 @@ public class PreMailerClientPathTests
     [Fact]
     public void NormalizeFileUriPath_LocalPaths()
     {
-        Uri uri = new("file:////tmp/test.css");
+        Uri uri = new("file:///tmp/test.css");
         string normalized = InvokeNormalize(uri);
         if (Path.DirectorySeparatorChar == '/')
         {
