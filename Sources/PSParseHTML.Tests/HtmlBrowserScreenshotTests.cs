@@ -103,12 +103,14 @@ public class HtmlBrowserScreenshotTests
             format: ImageFormat.Bmp);
 
         Assert.True(File.Exists(file));
-        using var stream = File.OpenRead(file);
-        byte b1 = (byte)stream.ReadByte();
-        byte b2 = (byte)stream.ReadByte();
-        // BMP header starts with 'B' 'M'
-        Assert.Equal((byte)'B', b1);
-        Assert.Equal((byte)'M', b2);
+        using (var stream = File.OpenRead(file))
+        {
+            byte b1 = (byte)stream.ReadByte();
+            byte b2 = (byte)stream.ReadByte();
+            // BMP header starts with 'B' 'M'
+            Assert.Equal((byte)'B', b1);
+            Assert.Equal((byte)'M', b2);
+        }
 
         File.Delete(file);
         Directory.Delete(dir);
