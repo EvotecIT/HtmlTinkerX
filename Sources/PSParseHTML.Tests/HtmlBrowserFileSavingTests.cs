@@ -46,4 +46,40 @@ public class HtmlBrowserFileSavingTests {
         File.Delete(file);
         Directory.Delete(dir);
     }
+
+    [Fact]
+    public async Task SavePagePdfAsync_PassesOptionsToPlaywright() {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "test.pdf");
+        PagePdfOptions? options = null;
+        var page = new Mock<IPage>();
+        page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>()))
+            .Callback<PagePdfOptions>(o => options = o)
+            .ReturnsAsync(Array.Empty<byte>());
+
+        await HtmlBrowser.SavePagePdfAsync(
+            page.Object,
+            file,
+            landscape: true,
+            marginTop: "1cm",
+            marginRight: "2cm",
+            marginBottom: "3cm",
+            marginLeft: "4cm");
+
+        Assert.NotNull(options);
+        Assert.Equal(file, options!.Path);
+        Assert.True(options.Landscape);
+        Assert.NotNull(options.Margin);
+        Assert.Equal("1cm", options.Margin!.Top);
+        Assert.Equal("2cm", options.Margin!.Right);
+        Assert.Equal("3cm", options.Margin!.Bottom);
+        Assert.Equal("4cm", options.Margin!.Left);
+    }
+
+    [Fact]
+    public async Task SavePagePdfAsync_NegativeDelayThrows() {
+        var page = new Mock<IPage>();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await HtmlBrowser.SavePagePdfAsync(page.Object, "file.pdf", delayMs: -1));
+    }
 }
