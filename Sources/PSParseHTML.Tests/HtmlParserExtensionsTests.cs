@@ -34,4 +34,28 @@ public class HtmlParserExtensionsTests {
         var elements = HtmlParserExtensions.GetElements(html, tag: "em");
         Assert.NotEmpty(elements);
     }
+
+    [Fact]
+    public void GetElements_ById_ReturnsMatchingElement() {
+        const string html = "<div><span id='special'>A</span><span>B</span></div>";
+        var elements = HtmlParserExtensions.GetElements(html, id: "special").ToArray();
+        Assert.Single(elements);
+        Assert.Equal("A", elements[0].TextContent);
+    }
+
+    [Fact]
+    public void GetElements_ByName_ReturnsMatchingElement() {
+        const string html = "<form><input name='field1'/><input name='field2'/></form>";
+        var elements = HtmlParserExtensions.GetElements(html, name: "field1").ToArray();
+        Assert.Single(elements);
+    }
+
+    [Fact]
+    public void GetElements_ByClassTagIdName_CombinedCounts() {
+        const string html = "<div id='box' class='wrapper'><span class='wrapper' name='x'>T</span></div>";
+        Assert.Single(HtmlParserExtensions.GetElements(html, tag: "span"));
+        Assert.Equal(2, HtmlParserExtensions.GetElements(html, className: "wrapper").Count());
+        Assert.Single(HtmlParserExtensions.GetElements(html, id: "box"));
+        Assert.Single(HtmlParserExtensions.GetElements(html, name: "x"));
+    }
 }
