@@ -13,7 +13,7 @@ public class HtmlFormatterTests {
             "(function() {\n    function main() {\n        var tabButtons = [].slice.call(document.querySelectorAll(\"ul.tab-nav li a.buttonTab\"));\n        tabButtons.map(function(button) {\n            button.addEventListener(\"click\", function() {\n                document.querySelector(\"li a.active.buttonTab\").classList.remove(\"active\");\n                button.classList.add(\"active\");\n                document.querySelector(\".tab-pane.active\").classList.remove(\"active\");\n                document.querySelector(button.getAttribute(\"href\")).classList.add(\"active\")\n            })\n        })\n    }\n    if (document.readyState !== \"loading\") {\n        main()\n    } else {\n        document.addEventListener(\"DOMContentLoaded\", main)\n    }\n})();";
 
         string result = HtmlFormatter.FormatJavaScript(js);
-        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 
     [Fact]
@@ -23,7 +23,7 @@ public class HtmlFormatterTests {
         string expected = "function x()\n{\n  return 1;\n};";
 
         string result = HtmlFormatter.FormatJavaScript(js, opts);
-        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 
     public void FormatCss_FormatsMinifiedCss() {
@@ -50,6 +50,6 @@ public class HtmlFormatterTests {
         const string expected = "<html>\n    <body>\n        <div>\n            <p>Test</p>\n        </div>\n    </body>\n</html>";
 
         string result = HtmlFormatter.FormatHtml(input);
-        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 }

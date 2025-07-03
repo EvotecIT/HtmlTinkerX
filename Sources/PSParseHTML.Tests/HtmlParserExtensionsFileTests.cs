@@ -6,10 +6,7 @@ using Xunit;
 namespace PSParseHTML.Tests;
 
 public class HtmlParserExtensionsFileTests {
-    private static string GetPath(string name) {
-        var baseDir = AppContext.BaseDirectory;
-        return Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", name));
-    }
+    private static string GetPath(string name) => TestHelpers.GetDocumentPath(name);
 
     [Fact]
     public void GetElements_EmptyHtml_ReturnsEmpty() {
