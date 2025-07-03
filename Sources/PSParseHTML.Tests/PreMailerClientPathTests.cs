@@ -39,7 +39,7 @@ public class PreMailerClientPathTests
         }
         else
         {
-            Assert.Equal(@"\\tmp\test.css", normalized);
+            Assert.Equal(@"\tmp\test.css", normalized);
         }
     }
 }
