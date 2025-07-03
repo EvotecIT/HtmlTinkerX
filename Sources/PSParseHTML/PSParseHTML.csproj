@@ -29,9 +29,15 @@
         <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Using Include="System.Net.Http" />
-    </ItemGroup>
+  <ItemGroup>
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PSParseHTML.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
 
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
