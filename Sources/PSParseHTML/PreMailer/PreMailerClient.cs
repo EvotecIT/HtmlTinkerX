@@ -405,7 +405,20 @@ public class PreMailerClient {
         string localPath = uri.LocalPath;
         if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
         {
+            // Convert UNC paths to POSIX style when running on Unix-like systems
             localPath = "/" + localPath.TrimStart('\\').Replace('\\', '/');
+        }
+        else if (!uri.IsUnc && Path.DirectorySeparatorChar == '\\')
+        {
+            // Normalize local file paths for Windows
+            if (localPath.Length >= 2 && localPath[1] == ':')
+            {
+                localPath = localPath.Replace('/', '\\');
+            }
+            else
+            {
+                localPath = "\\" + localPath.TrimStart('/').Replace('/', '\\');
+            }
         }
         return localPath;
     }
