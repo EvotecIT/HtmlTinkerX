@@ -26,7 +26,7 @@ public class HtmlFormatterFileTests
         string path = GetPath("sample_style.css");
         string expected = ".foo { color: rgba(255, 0, 0, 1) }\n.bar { margin: 0; padding: 0 }";
         string result = HtmlFormatter.FormatCssFile(path);
-        Assert.Equal(expected, result);
+        Assert.Equal(expected.Replace("\r\n", "\n"), result.Replace("\r\n", "\n"));
     }
 
     [Fact]
