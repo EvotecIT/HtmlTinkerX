@@ -10,11 +10,34 @@ namespace PSParseHTML;
 /// Represents a headless browser session consisting of Playwright objects.
 /// </summary>
 public sealed class HtmlBrowserSession : IAsyncDisposable {
+    /// <summary>
+    /// Gets the <see cref="IPlaywright"/> instance used by the session.
+    /// </summary>
     public IPlaywright Playwright { get; }
+
+    /// <summary>
+    /// Gets the browser instance opened for this session.
+    /// </summary>
     public IBrowser Browser { get; }
+
+    /// <summary>
+    /// Gets the browser context used to create pages.
+    /// </summary>
     public IBrowserContext Context { get; }
+
+    /// <summary>
+    /// Gets the page associated with the session.
+    /// </summary>
     public IPage Page { get; }
+
+    /// <summary>
+    /// Gets the video recording object when video capture is enabled.
+    /// </summary>
     public IVideo? Video { get; }
+
+    /// <summary>
+    /// Gets the path where the recorded video is stored.
+    /// </summary>
     public string? VideoPath { get; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
@@ -25,7 +48,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HtmlBrowserSession"/> class.
-    /// /// </summary>
+    /// </summary>
     public HtmlBrowserSession(IPlaywright playwright, IBrowser browser, IBrowserContext context, IPage page, IVideo? video = null, string? videoPath = null, ConcurrentDictionary<IRequest, HtmlNetworkEntry>? network = null) {
         Playwright = playwright;
         Browser = browser;
@@ -66,7 +89,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
 
     /// <summary>
     /// Asynchronously disposes of the browser session, closing the page, context, and browser.
-    /// /// </summary>
+    /// </summary>
     public async ValueTask DisposeAsync() {
         if (Context != null) {
             await Context.CloseAsync().ConfigureAwait(false);
