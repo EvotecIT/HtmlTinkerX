@@ -8,6 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Extracts microdata items from HTML content or a URL.
 /// </summary>
+/// <example>
+/// <code>ConvertFrom-HtmlMicrodata -Content $html</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMicrodata", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {

@@ -8,6 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that formats JavaScript code using JsBeautifier.
 /// </summary>
+/// <example>
+/// <code>Format-JavaScript -Path script.js</code>
+/// </example>
 [Cmdlet(VerbsCommon.Format, "JavaScript", DefaultParameterSetName = ParameterSetContent)]
 [Alias("Format-JS")]
 [OutputType(typeof(string))]

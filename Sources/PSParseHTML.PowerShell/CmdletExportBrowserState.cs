@@ -7,6 +7,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that saves cookies and storage state of a browser session to disk.
 /// </summary>
+/// <example>
+/// <code>Export-BrowserState -Session $session -Path state.json</code>
+/// </example>
 [Cmdlet(VerbsData.Export, "BrowserState")]
 public sealed class CmdletExportBrowserState : AsyncPSCmdlet {
     /// <summary>Browser session to export.</summary>

@@ -9,6 +9,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Converts HTML lists into PowerShell objects by default.
 /// </summary>
+/// <example>
+/// <code>ConvertFrom-HtmlList -Content $html</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlList", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]))]
 public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {

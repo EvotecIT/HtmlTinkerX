@@ -7,6 +7,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that retrieves captured console log entries from a session.
 /// </summary>
+/// <example>
+/// <code>Get-HTMLConsoleLog -Session $session</code>
+/// </example>
 [Cmdlet(VerbsCommon.Get, "HTMLConsoleLog")]
 [OutputType(typeof(HtmlConsoleEntry))]
 public sealed class CmdletGetHtmlConsoleLog : AsyncPSCmdlet {

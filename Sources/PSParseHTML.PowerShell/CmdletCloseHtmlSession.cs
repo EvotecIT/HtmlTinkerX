@@ -7,6 +7,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that disposes an existing browser session.
 /// </summary>
+/// <example>
+/// <code>Close-HTMLSession -Session $session</code>
+/// </example>
 [Cmdlet(VerbsCommon.Close, "HTMLSession")]
 [Alias("Stop-HTMLSession")]
 public sealed class CmdletCloseHtmlSession : AsyncPSCmdlet {
