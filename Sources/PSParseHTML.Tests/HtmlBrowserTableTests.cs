@@ -3,6 +3,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests parsing of tables without header rows using <see cref="HtmlParser"/>.
+/// </summary>
 public class HtmlBrowserTableTests {
     private static string GetHtml() {
         var baseDir = AppContext.BaseDirectory;
@@ -11,6 +14,9 @@ public class HtmlBrowserTableTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Ensures tables without headers get default column names.
+    /// </summary>
     public void ParseHeadlessTable_AddsDefaultHeaders() {
         string html = GetHtml();
         var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, true);
@@ -20,6 +26,9 @@ public class HtmlBrowserTableTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Verifies detection of multiple tables on a page.
+    /// </summary>
     public void ParseHeadlessTable_DetectsAllTables() {
         string html = GetHtml();
         var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, true);

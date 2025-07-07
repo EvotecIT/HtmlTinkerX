@@ -3,6 +3,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests parsing of HTML forms using <see cref="HtmlParser"/>.
+/// </summary>
 public class HtmlParserFormTests {
     private static string GetSampleFormHtml() {
         var baseDir = AppContext.BaseDirectory;
@@ -11,6 +14,9 @@ public class HtmlParserFormTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Validates that form parsing returns expected metadata.
+    /// </summary>
     public void ParseFormsWithAngleSharp_ReturnsForms() {
         string html = GetSampleFormHtml();
         var forms = HtmlParser.ParseFormsWithAngleSharp(html);
