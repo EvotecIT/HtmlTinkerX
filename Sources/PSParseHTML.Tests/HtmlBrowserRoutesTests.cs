@@ -8,6 +8,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests for <see cref="HtmlBrowser.RegisterRouteAsync"/> and related methods.
+/// </summary>
 public class HtmlBrowserRoutesTests {
     [Fact]
     public async Task RegisterRouteAsync_PageInvokesRouteAsync() {

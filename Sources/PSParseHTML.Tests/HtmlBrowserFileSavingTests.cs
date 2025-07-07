@@ -7,6 +7,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests file saving operations performed by <see cref="HtmlBrowser"/>.
+/// </summary>
 public class HtmlBrowserFileSavingTests {
     [Fact]
     public async Task CaptureScreenshotAsync_CreatesDirectoryAndFile() {

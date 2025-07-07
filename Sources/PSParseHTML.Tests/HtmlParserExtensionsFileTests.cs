@@ -5,6 +5,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests extension methods of <see cref="HtmlParser"/> that work with files.
+/// </summary>
 public class HtmlParserExtensionsFileTests {
     private static string GetPath(string name) => TestHelpers.GetDocumentPath(name);
 

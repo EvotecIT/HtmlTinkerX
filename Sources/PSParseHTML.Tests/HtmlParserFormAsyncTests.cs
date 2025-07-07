@@ -9,6 +9,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests asynchronous form parsing using <see cref="HtmlParser"/>.
+/// </summary>
 public class HtmlParserFormAsyncTests {
     private static TestServer CreateServer() {
         var builder = new WebHostBuilder()

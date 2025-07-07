@@ -5,6 +5,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests capturing network log entries with <see cref="HtmlBrowser"/>.
+/// </summary>
 public class HtmlBrowserNetworkLogTests
 {
     [Fact]

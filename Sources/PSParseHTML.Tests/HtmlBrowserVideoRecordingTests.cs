@@ -8,6 +8,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests video recording capabilities of <see cref="HtmlBrowser"/>.
+/// </summary>
 public class HtmlBrowserVideoRecordingTests {
     [Theory]
     [InlineData(false)]
