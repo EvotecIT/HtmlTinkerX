@@ -8,6 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Parses &lt;meta&gt; tags from HTML content or a URL.
 /// </summary>
+/// <example>
+/// <code>ConvertFrom-HtmlMeta -Url https://example.com</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {

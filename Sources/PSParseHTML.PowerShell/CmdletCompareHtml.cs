@@ -10,6 +10,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that compares HTML content and returns differences.
 /// </summary>
+/// <example>
+/// <code>Compare-HTML -Reference $file1 -Difference $file2</code>
+/// </example>
 [Cmdlet(VerbsData.Compare, "HTML")]
 [OutputType(typeof(IDiff))]
 public sealed class CmdletCompareHtml : AsyncPSCmdlet {

@@ -9,6 +9,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Extracts HTML form information into PowerShell objects.
 /// </summary>
+/// <example>
+/// <code>ConvertFrom-HtmlForm -Url https://example.com</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlForm", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
