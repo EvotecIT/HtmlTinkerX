@@ -3,6 +3,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests list parsing functionality in <see cref="HtmlParser"/>.
+/// </summary>
 public class HtmlParserListTests {
     private static string GetSampleListHtml() {
         var baseDir = AppContext.BaseDirectory;
@@ -11,6 +14,9 @@ public class HtmlParserListTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Parses simple lists using AngleSharp.
+    /// </summary>
     public void ParseListsWithAngleSharp_ReturnsItems() {
         string html = GetSampleListHtml();
         var lists = HtmlParser.ParseListsWithAngleSharp(html, " ");
@@ -20,6 +26,9 @@ public class HtmlParserListTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Parses lists using HtmlAgilityPack.
+    /// </summary>
     public void ParseListsWithHtmlAgilityPack_ReturnsItems() {
         string html = GetSampleListHtml();
         var lists = HtmlParser.ParseListsWithHtmlAgilityPack(html, " ");
@@ -29,6 +38,9 @@ public class HtmlParserListTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Parses lists with AngleSharp and returns metadata.
+    /// </summary>
     public void ParseListsWithAngleSharpDetailed_ReturnsMetadata() {
         string html = GetSampleListHtml();
         var lists = HtmlParser.ParseListsWithAngleSharpDetailed(html, " ");
@@ -38,6 +50,9 @@ public class HtmlParserListTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Parses lists with HtmlAgilityPack and returns metadata.
+    /// </summary>
     public void ParseListsWithHtmlAgilityPackDetailed_ReturnsMetadata() {
         string html = GetSampleListHtml();
         var lists = HtmlParser.ParseListsWithHtmlAgilityPackDetailed(html, " ");

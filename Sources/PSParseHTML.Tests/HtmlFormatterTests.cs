@@ -4,8 +4,14 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests for in-memory formatting methods in <see cref="HtmlFormatter"/>.
+/// </summary>
 public class HtmlFormatterTests {
     [Fact]
+    /// <summary>
+    /// Formats JavaScript text using default options.
+    /// </summary>
     public void FormatJavaScript_ReturnsFormattedScript() {
         const string js =
             "(function(){function main(){var tabButtons = [].slice.call(document.querySelectorAll(\"ul.tab-nav li a.buttonTab\"));tabButtons.map(function(button){button.addEventListener(\"click\",function(){document .querySelector(\"li a.active.buttonTab\") .classList.remove(\"active\");button.classList.add(\"active\");document .querySelector(\".tab-pane.active\") .classList.remove(\"active\");document .querySelector(button.getAttribute(\"href\")) .classList.add(\"active\")})})}if(document.readyState!== \"loading\"){main()}else{document.addEventListener(\"DOMContentLoaded\",main)}})();";
@@ -17,6 +23,9 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Formats JavaScript using custom <see cref="BeautifierOptions"/>.
+    /// </summary>
     public void FormatJavaScript_RespectsOptions() {
         const string js = "function x(){return 1;};";
         BeautifierOptions opts = new() { IndentSize = 2, BraceStyle = BraceStyle.Expand };
@@ -26,6 +35,10 @@ public class HtmlFormatterTests {
         TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 
+    [Fact]
+    /// <summary>
+    /// Formats minified CSS text.
+    /// </summary>
     public void FormatCss_FormatsMinifiedCss() {
         const string content = ".tabsWrapper{text-align:center;margin:10px auto;font-family:\"Roboto\", sans-serif!important}.tabs{margin-top:10px;font-size:15px;padding:0;list-style:none;background:rgba(255, 255, 255, 1);box-shadow:0 5px 20px rgba(0, 0, 0, 0.1);border-radius:4px;position:relative}.tabs .round{border-radius:4px}.tabs a{text-decoration:none;color:rgba(119, 119, 119, 1);text-transform:uppercase;padding:10px 20px;display:inline-block;position:relative;z-index:1;transition-duration:0.6s}.tabs a.active{color:rgba(255, 255, 255, 1)}.tabs a i{margin-right:5px}.tabs .selector{display:none;height:100%;position:absolute;left:0;top:0;right:0;bottom:0;z-index:1;border-radius:4px}.tabs-content{display:none}.tabs-content.active{display:block}";
         string expected = string.Join("\n", new[] {
@@ -45,6 +58,9 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Formats minified HTML markup.
+    /// </summary>
     public void FormatHtml_FormatsMinifiedHtml() {
         const string input = "<html><body><div><p>Test</p></div></body></html>";
         const string expected = "<html>\n    <body>\n        <div>\n            <p>Test</p>\n        </div>\n    </body>\n</html>";
