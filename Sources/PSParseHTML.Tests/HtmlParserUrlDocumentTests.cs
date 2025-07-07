@@ -7,6 +7,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests for parsing HTML documents retrieved from a URL.
+/// </summary>
 public class HtmlParserUrlDocumentTests {
     private static TestServer CreateServer() {
         var builder = new WebHostBuilder()

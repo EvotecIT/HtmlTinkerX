@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests asynchronous methods of <see cref="HtmlOptimizer"/>.
+/// </summary>
 public class HtmlOptimizerAsyncTests {
     [Fact]
     public async Task OptimizeHtmlAsync_MinifiesContent() {

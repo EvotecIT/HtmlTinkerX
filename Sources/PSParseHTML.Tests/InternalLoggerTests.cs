@@ -5,6 +5,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests the <see cref="InternalLogger"/> utility.
+/// </summary>
 public class InternalLoggerTests {
     [Fact]
     public void Events_AreRaisedAndMessagesWritten() {

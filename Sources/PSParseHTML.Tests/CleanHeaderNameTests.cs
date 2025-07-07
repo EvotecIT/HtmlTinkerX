@@ -2,6 +2,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Unit tests for <see cref="HtmlUtilities.CleanHeaderName"/>.
+/// </summary>
 public class CleanHeaderNameTests {
     [Theory]
     [InlineData("Header-Name", "HeaderName")]
