@@ -54,7 +54,7 @@ public class HtmlFormatterTests {
         });
 
         string result = HtmlFormatter.FormatCss(content);
-        Assert.Equal(expected, result);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 
     [Fact]
