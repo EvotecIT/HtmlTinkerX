@@ -7,8 +7,14 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests extension methods for <see cref="HtmlParser"/>.
+/// </summary>
 public class HtmlParserExtensionsTests {
     [Fact]
+    /// <summary>
+    /// Retrieves elements filtered by tag name.
+    /// </summary>
     public void GetElements_ByTag_ReturnsMatchingElements() {
         const string html = "<html><body><p>First</p><p>Second</p></body></html>";
         var elements = HtmlParserExtensions.GetElements(html, tag: "p").ToArray();
@@ -17,6 +23,9 @@ public class HtmlParserExtensionsTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Retrieves elements filtered by CSS class.
+    /// </summary>
     public void GetElements_ByClass_ReturnsMatchingElements() {
         const string html = "<div><span class='info'>A</span><span>B</span></div>";
         var elements = HtmlParserExtensions.GetElements(html, className: "info").ToArray();
@@ -25,6 +34,9 @@ public class HtmlParserExtensionsTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Downloads a page and selects elements by tag.
+    /// </summary>
     public async Task GetElements_FromUrl_ByTag() {
         using var client = new HttpClient();
         string html = await HtmlUtilities.GetStringWithProperEncodingAsync(
@@ -36,6 +48,9 @@ public class HtmlParserExtensionsTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Retrieves an element using its id attribute.
+    /// </summary>
     public void GetElements_ById_ReturnsMatchingElement() {
         const string html = "<div><span id='special'>A</span><span>B</span></div>";
         var elements = HtmlParserExtensions.GetElements(html, id: "special").ToArray();
@@ -44,6 +59,9 @@ public class HtmlParserExtensionsTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Retrieves an element using its name attribute.
+    /// </summary>
     public void GetElements_ByName_ReturnsMatchingElement() {
         const string html = "<form><input name='field1'/><input name='field2'/></form>";
         var elements = HtmlParserExtensions.GetElements(html, name: "field1").ToArray();
@@ -51,6 +69,9 @@ public class HtmlParserExtensionsTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Validates combined selection filters produce correct counts.
+    /// </summary>
     public void GetElements_ByClassTagIdName_CombinedCounts() {
         const string html = "<div id='box' class='wrapper'><span class='wrapper' name='x'>T</span></div>";
         Assert.Single(HtmlParserExtensions.GetElements(html, tag: "span"));

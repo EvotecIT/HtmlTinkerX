@@ -11,9 +11,15 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Unit tests for exporting HAR files from <see cref="HtmlBrowser"/>.
+/// </summary>
 public class HtmlBrowserHarExportTests
 {
     [Fact]
+    /// <summary>
+    /// Ensures exported HAR data is correctly written to disk.
+    /// </summary>
     public async Task ExportHarAsync_WritesEntriesToFile()
     {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

@@ -4,6 +4,9 @@ using Xunit;
 
 namespace PSParseHTML.Tests;
 
+/// <summary>
+/// Tests for <see cref="HtmlHarViewer"/> helper methods.
+/// </summary>
 public class HtmlHarViewerTests {
     private static string GetHarPath() {
         var baseDir = AppContext.BaseDirectory;
@@ -16,6 +19,9 @@ public class HtmlHarViewerTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Generates HTML viewer content from a HAR file.
+    /// </summary>
     public async Task BuildViewerHtml_ReturnsHtml() {
         Har har = await HtmlHarViewer.ReadHarAsync(GetHarPath());
         string html = HtmlHarViewer.BuildViewerHtml(har);
@@ -23,6 +29,9 @@ public class HtmlHarViewerTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Reads a minimal HAR file and populates entries.
+    /// </summary>
     public async Task ReadHarAsync_PopulatesEntries() {
         Har har = await HtmlHarViewer.ReadHarAsync(GetMinimalHarPath());
         Assert.NotNull(har.Log);
@@ -31,6 +40,9 @@ public class HtmlHarViewerTests {
     }
 
     [Fact]
+    /// <summary>
+    /// Verifies invalid JSON causes <see cref="InvalidDataException"/>.
+    /// </summary>
     public async Task ReadHarAsync_InvalidJsonThrows() {
         string path = Path.GetTempFileName();
         try {
