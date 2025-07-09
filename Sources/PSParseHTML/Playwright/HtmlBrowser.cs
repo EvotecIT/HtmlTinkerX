@@ -54,7 +54,7 @@ public static partial class HtmlBrowser {
             : await Playwright.CreateAsync();
         IBrowserType type = browser switch {
             HtmlBrowserEngine.Firefox => playwright.Firefox,
-            HtmlBrowserEngine.Webkit => playwright.Webkit,
+            HtmlBrowserEngine.WebKit => playwright.Webkit,
             _ => playwright.Chromium,
         };
 

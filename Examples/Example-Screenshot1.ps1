@@ -8,7 +8,7 @@ if ($internetAvailable) {
     Save-HTMLScreenshot -Url 'https://evotec.xyz' -OutFile "$PSScriptRoot\Output\EvotecPageFull.png" -Full -Open -Browser Chromium
     Save-HTMLScreenshot -Url 'https://evotec.xyz/hub' -OutFile "$PSScriptRoot\Output\EvotecPageHub.png" -Full -Open -Browser Chromium
     Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser Firefox
-    Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser Webkit
+    Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Full -Open -Browser WebKit
     Save-HTMLScreenshot -Url 'https://evotec.xyz/powershell-modules/' -OutFile "$PSScriptRoot\Output\EvotecPageModules.png" -Open -Browser Chromium -X 100 -Y 100 -Width 500 -Height 500
 } else {
     $localPath = Join-Path $PSScriptRoot 'Input\Screenshot1.html'
