@@ -38,7 +38,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// <summary>
     /// Gets the path where the recorded video is stored.
     /// </summary>
-    public string? VideoPath { get; }
+    public string? VideoPath { get; internal set; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
     /// <summary>Captured network log entries.</summary>
@@ -94,6 +94,22 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         if (Context != null) {
             await Context.CloseAsync().ConfigureAwait(false);
         }
+
+        if (Video != null && !string.IsNullOrEmpty(VideoPath)) {
+            string fullPath = HtmlUtilities.ResolvePath(VideoPath);
+            await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
+            try {
+                string tempPath = await Video.PathAsync().ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(tempPath) &&
+                    !string.Equals(tempPath, fullPath, System.StringComparison.OrdinalIgnoreCase) &&
+                    System.IO.File.Exists(tempPath)) {
+                    System.IO.File.Delete(tempPath);
+                }
+            } catch {
+                // Ignore cleanup errors
+            }
+        }
+
         if (Browser != null) {
             await Browser.CloseAsync().ConfigureAwait(false);
         }
