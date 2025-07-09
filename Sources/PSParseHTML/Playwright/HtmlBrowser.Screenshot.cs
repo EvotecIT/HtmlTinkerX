@@ -34,8 +34,6 @@ public static partial class HtmlBrowser {
     /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
     /// <param name="format">Image file format.</param>
     /// <param name="quality">Encoder quality for JPEG output.</param>
-    /// <param name="format">Image file format.</param>
-    /// <param name="quality">Encoder quality for JPEG output.</param>
     /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
     /// <param name="elementSelector">CSS selector of an element to capture.</param>
     /// <param name="clipX">Optional clip region X coordinate.</param>
