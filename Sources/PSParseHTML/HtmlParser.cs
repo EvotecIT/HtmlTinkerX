@@ -304,6 +304,25 @@ public static class HtmlParser {
     }
 
     /// <summary>
+    /// Extracts Open Graph metadata from HTML markup.
+    /// </summary>
+    /// <param name="html">HTML content containing Open Graph meta tags.</param>
+    /// <returns>Parsed Open Graph metadata.</returns>
+    public static HtmlOpenGraph ParseOpenGraph(string html) {
+        return HtmlParserFromOpenGraph.ParseOpenGraph(html);
+    }
+
+    /// <summary>
+    /// Extracts Open Graph metadata from a web page.
+    /// </summary>
+    /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <returns>Parsed Open Graph metadata.</returns>
+    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string url, HttpClient? client = null) {
+        return await HtmlParserFromOpenGraph.ParseUrlOpenGraphAsync(url, client).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Extracts microdata items from HTML markup.
     /// </summary>
     /// <param name="html">HTML content containing microdata.</param>
