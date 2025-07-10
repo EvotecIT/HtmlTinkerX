@@ -1,3 +1,5 @@
+Import-Module (Resolve-Path "$PSScriptRoot/../Sources/PSParseHTML.PowerShell/bin/Release/net8.0/PSParseHTML.PowerShell.dll") -Force
+
 Describe 'Measure-HTMLDocument' {
     It 'Should return counts for html string' {
         $html = '<html><body><p>Hello world</p><a href="#">link</a><img src="i.png" /></body></html>'

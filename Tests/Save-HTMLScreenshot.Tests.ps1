@@ -63,4 +63,12 @@ Describe 'Save-HTMLScreenshot' {
         Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Format Jpeg -Quality 50 -Delay 100
         (Test-Path $outfile) | Should -BeTrue
     }
+
+    It 'Validates clip parameter range' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $outfile = Join-Path $TestDrive 'invalid.png'
+        { Save-HTMLScreenshot -Url $uri -OutFile $outfile -X -1 -Y 0 -Width 10 -Height 10 -Selector '#loaded' } | Should -Throw
+        { Save-HTMLScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 0 -Height 10 -Selector '#loaded' } | Should -Throw
+    }
 }

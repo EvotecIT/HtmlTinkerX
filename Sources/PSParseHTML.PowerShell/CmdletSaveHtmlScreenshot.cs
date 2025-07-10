@@ -155,6 +155,25 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             }
         }
 
+        if (ParameterSetName.EndsWith("Clip", System.StringComparison.OrdinalIgnoreCase)) {
+            if (X < 0 || Y < 0) {
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSArgumentOutOfRangeException(null, null, "Clip coordinates must be zero or positive."),
+                    "ClipCoordinateOutOfRange",
+                    ErrorCategory.InvalidArgument,
+                    null));
+                return;
+            }
+            if (Width <= 0 || Height <= 0) {
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSArgumentOutOfRangeException(null, null, "Clip dimensions must be greater than zero."),
+                    "ClipSizeOutOfRange",
+                    ErrorCategory.InvalidArgument,
+                    null));
+                return;
+            }
+        }
+
         switch (ParameterSetName) {
             case ParameterSetClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
