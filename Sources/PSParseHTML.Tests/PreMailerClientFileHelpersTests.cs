@@ -10,14 +10,14 @@ public class PreMailerClientFileHelpersTests
     private const string HtmlContent = "<html><head><style>p{color:red}</style></head><body><p>Hello</p></body></html>";
 
     [Fact]
-    public async Task MoveCssInlineFromFile_RemovesStyleElements()
+    public void MoveCssInlineFromFile_RemovesStyleElements()
     {
         var options = new PreMailerOptions { RemoveStyleElements = true };
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
         File.WriteAllText(path, HtmlContent);
         try
         {
-            PreMailerResult result = await PreMailerClient.MoveCssInlineFromFile(path, options);
+            PreMailerResult result = PreMailerClient.MoveCssInlineFromFile(path, options);
             Assert.DoesNotContain("<style", result.Html, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -34,7 +34,7 @@ public class PreMailerClientFileHelpersTests
         File.WriteAllText(path, HtmlContent);
         try
         {
-            PreMailerResult syncResult = await PreMailerClient.MoveCssInlineFromFile(path, options);
+            PreMailerResult syncResult = PreMailerClient.MoveCssInlineFromFile(path, options);
             PreMailerResult asyncResult = await PreMailerClient.MoveCssInlineFromFileAsync(path, options);
             Assert.Equal(syncResult.Html, asyncResult.Html);
             Assert.DoesNotContain("<style", asyncResult.Html, StringComparison.OrdinalIgnoreCase);

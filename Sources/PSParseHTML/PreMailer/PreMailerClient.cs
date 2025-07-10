@@ -48,9 +48,9 @@ public class PreMailerClient {
     }
 
     /// <summary>
-    /// Processes the HTML and returns the result.
+    /// Processes the HTML synchronously and returns the result.
     /// </summary>
-    public async Task<PreMailerResult> MoveCssInline() {
+    public PreMailerResult MoveCssInline() {
         try {
             string cssContent = Options.Css ?? string.Empty;
             string htmlToProcess = _html;
@@ -69,40 +69,33 @@ public class PreMailerClient {
                     continue;
                 }
 
-                    if (Options.DownloadRemoteCss && href != null) {
-                        try {
-                            Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
-                            if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
-                                uri = new Uri(Options.BaseUri, uri);
-                            }
-
-                            if (uri.IsFile)
-                            {
-                                string localPath = NormalizeFileUriPath(uri);
-                                cssContent += await HtmlUtilities
-                                    .ReadFileCheckedAsync(localPath)
-                                    .ConfigureAwait(false);
-                            }
-                            else if (uri.IsAbsoluteUri)
-                            {
-                                using HttpClient client = new();
-                                cssContent += HtmlUtilities
-                                    .GetStringWithProperEncodingAsync(client, uri.ToString())
-                                    .GetAwaiter().GetResult();
-                            }
-                        } catch (Exception ex) {
-                            LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
+                if (Options.DownloadRemoteCss && href != null) {
+                    try {
+                        Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
+                        if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
+                            uri = new Uri(Options.BaseUri, uri);
                         }
+
+                        if (uri.IsFile) {
+                            string localPath = NormalizeFileUriPath(uri);
+                            cssContent += HtmlUtilities.ReadFileChecked(localPath);
+                        } else if (uri.IsAbsoluteUri) {
+                            using HttpClient client = new();
+                            cssContent += HtmlUtilities
+                                .GetStringWithProperEncodingAsync(client, uri.ToString())
+                                .GetAwaiter().GetResult();
+                        }
+                    } catch (Exception ex) {
+                        LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
                     }
+                }
 
                     link.Remove();
                 }
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                cssContent += await HtmlUtilities
-                    .ReadFileCheckedAsync(Options.CssFilePath!)
-                    .ConfigureAwait(false);
+                cssContent += HtmlUtilities.ReadFileChecked(Options.CssFilePath!);
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
@@ -241,7 +234,7 @@ public class PreMailerClient {
     /// </summary>
     /// <param name="html">HTML markup to process.</param>
     /// <param name="options">Optional processing options.</param>
-    public static Task<PreMailerResult> MoveCssInline(string html, PreMailerOptions? options = null) {
+    public static PreMailerResult MoveCssInline(string html, PreMailerOptions? options = null) {
         return FromHtml(html, options).MoveCssInline();
     }
 
@@ -250,7 +243,7 @@ public class PreMailerClient {
     /// </summary>
     /// <param name="htmlFilePath">Path to the HTML file.</param>
     /// <param name="options">Optional processing options.</param>
-    public static Task<PreMailerResult> MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
+    public static PreMailerResult MoveCssInlineFromFile(string htmlFilePath, PreMailerOptions? options = null) {
         return FromFile(htmlFilePath, options).MoveCssInline();
     }
 
@@ -293,7 +286,7 @@ public class PreMailerClient {
     /// <param name="analyticsCampaign">UTM campaign parameter.</param>
     /// <param name="analyticsContent">UTM content parameter.</param>
     /// <param name="analyticsDomain">Domain used when constructing analytics links.</param>
-    public static Task<PreMailerResult> MoveCssInline(
+    public static PreMailerResult MoveCssInline(
         string html,
         Uri? baseUri = null,
         bool removeStyleElements = false,
@@ -357,7 +350,7 @@ public class PreMailerClient {
     /// <param name="analyticsCampaign">UTM campaign parameter.</param>
     /// <param name="analyticsContent">UTM content parameter.</param>
     /// <param name="analyticsDomain">Domain used when constructing analytics links.</param>
-    public static Task<PreMailerResult> MoveCssInlineFromFile(
+    public static PreMailerResult MoveCssInlineFromFile(
         string htmlFilePath,
         Uri? baseUri = null,
         bool removeStyleElements = false,
