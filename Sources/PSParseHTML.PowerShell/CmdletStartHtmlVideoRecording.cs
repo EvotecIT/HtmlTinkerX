@@ -148,7 +148,7 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 target = Session.Page.Url;
                 engine = Session.Browser.BrowserType.Name switch {
                     "firefox" => HtmlBrowserEngine.Firefox,
-                    "webkit" => HtmlBrowserEngine.Webkit,
+                    "webkit" => HtmlBrowserEngine.WebKit,
                     _ => HtmlBrowserEngine.Chromium
                 };
                 break;

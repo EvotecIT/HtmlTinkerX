@@ -90,7 +90,7 @@ public static partial class HtmlBrowser {
         string url = session.Page.Url;
         HtmlBrowserEngine engine = session.Browser.BrowserType.Name switch {
             "firefox" => HtmlBrowserEngine.Firefox,
-            "webkit" => HtmlBrowserEngine.Webkit,
+            "webkit" => HtmlBrowserEngine.WebKit,
             _ => HtmlBrowserEngine.Chromium
         };
 
