@@ -41,6 +41,14 @@ public sealed class CmdletInvokeHtmlClick : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        if (ClickCount < 1) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentOutOfRangeException(nameof(ClickCount), ClickCount, "ClickCount must be positive."),
+                "ClickCountOutOfRange",
+                ErrorCategory.InvalidArgument,
+                ClickCount));
+            return;
+        }
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 

@@ -12,4 +12,8 @@ Describe 'Set-HTMLHttpClientOption' {
         $client.DefaultRequestHeaders.GetValues('Test') | Should -Contain 'Yes'
         $client.Dispose()
     }
+
+    It 'Validates TimeoutSeconds range' {
+        { Set-HTMLHttpClientOption -TimeoutSeconds -2 } | Should -Throw
+    }
 }

@@ -33,6 +33,14 @@ public sealed class CmdletSetHtmlHttpClientOption : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
+        if (TimeoutSeconds < -1) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentOutOfRangeException(nameof(TimeoutSeconds), TimeoutSeconds, "TimeoutSeconds cannot be less than -1."),
+                "TimeoutSecondsOutOfRange",
+                ErrorCategory.InvalidArgument,
+                TimeoutSeconds));
+            return Task.CompletedTask;
+        }
         if (TimeoutSeconds >= 0) {
             HtmlHttpClientFactory.DefaultTimeout = TimeSpan.FromSeconds(TimeoutSeconds);
             HtmlHttpClientFactory.ResetShared();
