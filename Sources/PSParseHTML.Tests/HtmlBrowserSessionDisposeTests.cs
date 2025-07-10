@@ -32,4 +32,31 @@ public class HtmlBrowserSessionDisposeTests {
         browser.Verify();
         context.Verify();
     }
+
+    [Fact]
+    public async Task DisposeAsync_SavesAndCleansVideo() {
+        string outFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString(), "video.webm");
+        string tempVideo = System.IO.Path.GetTempFileName();
+        System.IO.File.WriteAllText(tempVideo, "tmp");
+
+        var video = new Moq.Mock<IVideo>();
+        video.Setup(v => v.SaveAsAsync(It.IsAny<string>())).Returns(Task.CompletedTask).Verifiable();
+        video.Setup(v => v.PathAsync()).ReturnsAsync(tempVideo);
+
+        var playwright = new Moq.Mock<IPlaywright>();
+        var browser = new Moq.Mock<IBrowser>();
+        browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
+        var context = new Moq.Mock<IBrowserContext>();
+        context.Setup(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
+        var page = new Moq.Mock<IPage>();
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object, video.Object, outFile);
+
+        await session.DisposeAsync();
+
+        video.Verify(v => v.SaveAsAsync(HtmlUtilities.ResolvePath(outFile)), Moq.Times.Once);
+        Assert.False(System.IO.File.Exists(tempVideo));
+        browser.Verify();
+        context.Verify();
+    }
 }

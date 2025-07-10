@@ -11,7 +11,7 @@ public class PreMailerClientTests
     public async Task MoveCssInline_RemovesStyleElements_WhenEnabled()
     {
         var options = new PreMailerOptions { RemoveStyleElements = true };
-        PreMailerResult result = await PreMailerClient.MoveCssInline(HtmlWithMediaQuery, options);
+        PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, options);
         Assert.DoesNotContain("<style", result.Html, System.StringComparison.OrdinalIgnoreCase);
     }
 
@@ -19,7 +19,7 @@ public class PreMailerClientTests
     public async Task MoveCssInline_PreservesStyleElements_WhenDisabled()
     {
         var options = new PreMailerOptions { RemoveStyleElements = false };
-        PreMailerResult result = await PreMailerClient.MoveCssInline(HtmlWithMediaQuery, options);
+        PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, options);
         Assert.Contains("<style", result.Html, System.StringComparison.OrdinalIgnoreCase);
     }
 
@@ -31,7 +31,7 @@ public class PreMailerClientTests
             RemoveStyleElements = true,
             PreserveMediaQueries = true
         };
-        PreMailerResult result = await PreMailerClient.MoveCssInline(HtmlWithMediaQuery, options);
+        PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, options);
         Assert.Contains("@media", result.Html, System.StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<style", result.Html, System.StringComparison.OrdinalIgnoreCase);
     }
