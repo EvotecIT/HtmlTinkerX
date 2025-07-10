@@ -130,27 +130,15 @@ public static partial class HtmlBrowser {
     /// <param name="path">Optional path where the video should be saved.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static async Task StopVideoRecordingAsync(HtmlBrowserSession session, string? path = null, CancellationToken cancellationToken = default) {
-        string outFile = path ?? session.VideoPath ?? throw new System.ArgumentException("Output path required.");
-        IVideo? video = session.Video;
-        if (video != null) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await session.Context.CloseAsync().ConfigureAwait(false);
-            string fullPath = HtmlUtilities.ResolvePath(outFile);
-            await video.SaveAsAsync(fullPath).ConfigureAwait(false);
-            try {
-                string tempPath = await video.PathAsync().ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(tempPath) &&
-                    !string.Equals(tempPath, fullPath, System.StringComparison.OrdinalIgnoreCase) &&
-                    System.IO.File.Exists(tempPath)) {
-                    System.IO.File.Delete(tempPath);
-                }
-            } catch {
-                // Ignore cleanup errors
-            }
-            await session.Browser.CloseAsync().ConfigureAwait(false);
-            session.Playwright.Dispose();
-        } else {
-            await session.DisposeAsync().ConfigureAwait(false);
+        if (path != null) {
+            session.VideoPath = path;
         }
+
+        if (session.Video != null && string.IsNullOrEmpty(session.VideoPath)) {
+            throw new System.ArgumentException("Output path required.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await session.DisposeAsync().ConfigureAwait(false);
     }
 }
