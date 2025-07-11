@@ -399,7 +399,7 @@ public class PreMailerClient {
         {
             string[] segments = uri.AbsolutePath
                 .TrimStart('/')
-                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             string path = Path.Combine(segments);
             return Path.Combine(Path.DirectorySeparatorChar + uri.Host, path);
         }
