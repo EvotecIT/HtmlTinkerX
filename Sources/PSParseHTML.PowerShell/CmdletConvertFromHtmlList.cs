@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Net.Http;
 using System.Threading.Tasks;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -29,8 +30,7 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
 
     /// <summary>Selects parsing engine.</summary>
     [Parameter]
-    [ValidateSet("AngleSharp", "AgilityPack")]
-    public string Engine { get; set; } = "AgilityPack";
+    public HtmlParserEngine Engine { get; set; } = HtmlParserEngine.AgilityPack;
 
     /// <summary>Include list metadata information.</summary>
     [Parameter]
@@ -62,13 +62,13 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
         List<HtmlListResult> results;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
+            if (Engine == HtmlParserEngine.AngleSharp) {
                 results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
             } else {
                 results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
             }
         } else {
-            if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
+            if (Engine == HtmlParserEngine.AngleSharp) {
                 results = HtmlParser.ParseListsWithAngleSharpDetailed(Content, TagPlaceholder);
             } else {
                 results = HtmlParser.ParseListsWithHtmlAgilityPackDetailed(Content, TagPlaceholder);

@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -38,8 +39,7 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
 
     /// <summary>Selects parsing engine.</summary>
     [Parameter]
-    [ValidateSet("AngleSharp", "AgilityPack")]
-    public string Engine { get; set; } = "AgilityPack";
+    public HtmlParserEngine Engine { get; set; } = HtmlParserEngine.AgilityPack;
 
     /// <summary>
     /// Optional proxy server address used when fetching content from <see cref="Url"/>.
@@ -62,7 +62,7 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
+            if (Engine == HtmlParserEngine.AngleSharp) {
                 IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
                 return;
@@ -72,7 +72,7 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
             return;
         }
 
-        if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase)) {
+        if (Engine == HtmlParserEngine.AngleSharp) {
             IDocument doc = HtmlParser.ParseWithAngleSharp(Content);
             WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
         } else {
