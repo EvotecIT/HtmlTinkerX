@@ -401,9 +401,22 @@ public class PreMailerClient {
                 .TrimStart('/')
                 .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             string path = Path.Combine(segments);
-            return Path.Combine(Path.DirectorySeparatorChar + uri.Host, path);
+
+            string prefix = Path.DirectorySeparatorChar == '\\'
+                ? new string(Path.DirectorySeparatorChar, 2) + uri.Host
+                : Path.DirectorySeparatorChar + uri.Host;
+
+            return Path.Combine(prefix, path);
         }
 
-        return uri.LocalPath;
+        string localPath = uri.LocalPath;
+        if (Path.DirectorySeparatorChar == '\\')
+        {
+            localPath = localPath.Length >= 2 && localPath[1] == ':'
+                ? localPath.Replace('/', '\\')
+                : "\\" + localPath.TrimStart('/').Replace('/', '\\');
+        }
+
+        return localPath;
     }
 }
