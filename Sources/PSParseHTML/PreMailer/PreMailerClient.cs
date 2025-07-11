@@ -395,24 +395,15 @@ public class PreMailerClient {
 
     private static string NormalizeFileUriPath(Uri uri)
     {
-        string localPath = uri.LocalPath;
-        if (uri.IsUnc && Path.DirectorySeparatorChar == '/')
+        if (uri.IsUnc)
         {
-            // Convert UNC paths to POSIX style when running on Unix-like systems
-            localPath = "/" + localPath.TrimStart('\\').Replace('\\', '/');
+            string[] segments = uri.AbsolutePath
+                .TrimStart('/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            string path = Path.Combine(segments);
+            return Path.Combine(Path.DirectorySeparatorChar + uri.Host, path);
         }
-        else if (!uri.IsUnc && Path.DirectorySeparatorChar == '\\')
-        {
-            // Normalize local file paths for Windows
-            if (localPath.Length >= 2 && localPath[1] == ':')
-            {
-                localPath = localPath.Replace('/', '\\');
-            }
-            else
-            {
-                localPath = "\\" + localPath.TrimStart('/').Replace('/', '\\');
-            }
-        }
-        return localPath;
+
+        return uri.LocalPath;
     }
 }
