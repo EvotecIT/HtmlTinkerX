@@ -47,45 +47,71 @@ public static partial class HtmlBrowser {
 
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
-        List<string> downloads = new();
-        List<Task<string>> saves = new();
+        HashSet<string> downloads = new();
+        List<Task> saveTasks = new();
         object sync = new();
-        page.Download += (_, dl) => {
+        System.Threading.Channels.Channel<string> channel = System.Threading.Channels.Channel.CreateUnbounded<string>();
+
+        void Handler(object? _, IDownload dl) {
             bool match = string.IsNullOrEmpty(filter) ||
                          dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
                          dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
             if (!match) {
                 return;
             }
+
             string filePath = Path.Combine(dir, dl.SuggestedFilename);
             bool save;
             lock (sync) {
-                save = !downloads.Contains(filePath);
-                if (save) {
-                    downloads.Add(filePath);
-                    saves.Add(dl.SaveAsAsync(filePath).ContinueWith(_ => filePath, TaskScheduler.Default));
+                save = downloads.Add(filePath);
+            }
+            if (!save) {
+                return;
+            }
+
+            Task saveTask = Task.Run(async () => {
+                await dl.SaveAsAsync(filePath).ConfigureAwait(false);
+                await channel.Writer.WriteAsync(filePath, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken);
+
+            lock (sync) {
+                saveTasks.Add(saveTask);
+            }
+        }
+
+        page.Download += Handler;
+
+        Task producer = Task.Run(async () => {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
+
+            string selector = string.IsNullOrEmpty(filter)
+                ? "a[download],a[href*='/download/'],a[href*='/archive/']"
+                : $"a[href*=\"{filter}\"]";
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 }).ConfigureAwait(false);
+            var anchors = await page.QuerySelectorAllAsync(selector).ConfigureAwait(false);
+            foreach (var anchor in anchors) {
+                cancellationToken.ThrowIfCancellationRequested();
+                await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync()).ConfigureAwait(false);
+            }
+
+            await Task.WhenAll(saveTasks).ConfigureAwait(false);
+            channel.Writer.Complete();
+        }, cancellationToken);
+
+        try {
+            while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)) {
+                while (channel.Reader.TryRead(out string? path)) {
+                    yield return path;
                 }
             }
-        };
 
-        cancellationToken.ThrowIfCancellationRequested();
-        await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        string selector = string.IsNullOrEmpty(filter)
-            ? "a[download],a[href*='/download/'],a[href*='/archive/']"
-            : $"a[href*=\"{filter}\"]";
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
-        var anchors = await page.QuerySelectorAllAsync(selector);
-        foreach (var anchor in anchors) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
-        }
-        foreach (Task<string> save in saves) {
-            string path = await save.ConfigureAwait(false);
-            yield return path;
+            await producer.ConfigureAwait(false);
+        } finally {
+            page.Download -= Handler;
         }
     }
 }
