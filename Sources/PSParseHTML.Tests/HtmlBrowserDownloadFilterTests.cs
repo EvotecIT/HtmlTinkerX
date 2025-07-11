@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Moq;
@@ -40,7 +41,10 @@ public class HtmlBrowserDownloadFilterTests {
         page.Setup(p => p.WaitForLoadStateAsync(It.IsAny<LoadState>(), It.IsAny<PageWaitForLoadStateOptions?>()))
             .Returns(Task.CompletedTask);
 
-        var files = await HtmlBrowser.SavePageDownloadsAsync(page.Object, dir, "file1");
+        var files = new List<string>();
+        await foreach (string f in HtmlBrowser.SavePageDownloadsAsync(page.Object, dir, "file1")) {
+            files.Add(f);
+        }
 
         string path1 = Path.Combine(dir, "file1.txt");
         string path2 = Path.Combine(dir, "other.bin");

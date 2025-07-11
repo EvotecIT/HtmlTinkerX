@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Microsoft.Playwright;
 
 namespace PSParseHTML;
@@ -20,7 +21,7 @@ public static partial class HtmlBrowser {
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
     /// <returns>Paths of downloaded files.</returns>
-    public static async Task<List<string>> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0, CancellationToken cancellationToken = default) {
+    public static async IAsyncEnumerable<string> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
             browser,
@@ -34,18 +35,20 @@ public static partial class HtmlBrowser {
             cancellationToken: cancellationToken).ConfigureAwait(false);
         var page = session.Page;
         string dir = HtmlUtilities.ResolvePath(directory);
-        return await SavePageDownloadsAsync(page, dir, filter, cancellationToken).ConfigureAwait(false);
+        await foreach (string file in SavePageDownloadsAsync(page, dir, filter, cancellationToken).ConfigureAwait(false)) {
+            yield return file;
+        }
     }
 
     /// <summary>
     /// Saves files downloaded from an already loaded page.
     /// </summary>
-    public static async Task<List<string>> SavePageDownloadsAsync(IPage page, string directory, string? filter = null, CancellationToken cancellationToken = default) {
+    public static async IAsyncEnumerable<string> SavePageDownloadsAsync(IPage page, string directory, string? filter = null, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
         string dir = HtmlUtilities.ResolvePath(directory);
         Directory.CreateDirectory(dir);
         List<string> downloads = new();
-        List<Task> saves = new();
+        List<Task<string>> saves = new();
         object sync = new();
         page.Download += (_, dl) => {
             bool match = string.IsNullOrEmpty(filter) ||
@@ -60,7 +63,7 @@ public static partial class HtmlBrowser {
                 save = !downloads.Contains(filePath);
                 if (save) {
                     downloads.Add(filePath);
-                    saves.Add(dl.SaveAsAsync(filePath));
+                    saves.Add(dl.SaveAsAsync(filePath).ContinueWith(_ => filePath, TaskScheduler.Default));
                 }
             }
         };
@@ -80,7 +83,9 @@ public static partial class HtmlBrowser {
             cancellationToken.ThrowIfCancellationRequested();
             await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync());
         }
-        await Task.WhenAll(saves).ConfigureAwait(false);
-        return downloads;
+        foreach (Task<string> save in saves) {
+            string path = await save.ConfigureAwait(false);
+            yield return path;
+        }
     }
 }
