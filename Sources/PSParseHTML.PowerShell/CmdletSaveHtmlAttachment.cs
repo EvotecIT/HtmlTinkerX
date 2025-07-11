@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.Save, "HTMLAttachment", DefaultParameterSetName = ParameterSetDefault)]
 [Alias("Save-HTMLDownload")]
-[OutputType(typeof(string[]))]
+[OutputType(typeof(string))]
 public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetSession = "Session";
@@ -64,13 +64,13 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
 
-        List<string> files = ParameterSetName switch {
-            ParameterSetSession => await HtmlBrowser.SavePageDownloadsAsync(
+        IAsyncEnumerable<string> files = ParameterSetName switch {
+            ParameterSetSession => HtmlBrowser.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                 HtmlUtilities.ResolvePath(Path),
                 Filter,
-                token).ConfigureAwait(false),
-            _ => await HtmlBrowser.SavePageDownloadsAsync(
+                token),
+            _ => HtmlBrowser.SavePageDownloadsAsync(
                 Url,
                 HtmlUtilities.ResolvePath(Path),
                 Browser,
@@ -78,9 +78,11 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
                 Filter,
                 headless: !Visible.IsPresent,
                 slowMo: SlowMo,
-                cancellationToken: token).ConfigureAwait(false)
+                cancellationToken: token)
         };
 
-        WriteObject(files.ToArray(), true);
+        await foreach (string file in files.WithCancellation(token).ConfigureAwait(false)) {
+            WriteObject(file);
+        }
     }
 }
