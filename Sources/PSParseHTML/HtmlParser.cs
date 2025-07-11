@@ -341,6 +341,14 @@ public static class HtmlParser {
         return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Compares microdata items with built-in schema definitions and returns mismatches.
+    /// </summary>
+    /// <param name="items">Microdata items to validate.</param>
+    /// <returns>List of mismatches found.</returns>
+    public static List<MicrodataSchemaMismatch> ValidateMicrodataItems(List<HtmlMicrodataItem> items) {
+        return MicrodataSchemaValidator.Validate(items);
+    }
 
 
     /// <summary>
