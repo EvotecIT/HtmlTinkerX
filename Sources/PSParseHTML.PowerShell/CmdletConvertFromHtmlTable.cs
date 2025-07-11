@@ -5,6 +5,7 @@ using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
 using System.Threading.Tasks;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -46,8 +47,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
 
     /// <summary>Selects parsing engine.</summary>
     [Parameter]
-    [ValidateSet("AngleSharp", "AgilityPack")]
-    public string Engine { get; set; } = "AgilityPack";
+    public HtmlParserEngine Engine { get; set; } = HtmlParserEngine.AgilityPack;
 
     /// <summary>Interpret table rows as key/value pairs.</summary>
     [Parameter]
@@ -91,7 +91,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             List<HtmlTableResult> tables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
                     string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
@@ -99,7 +99,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
                     tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
-                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
                     tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
                     tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
@@ -116,7 +116,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             List<HtmlTableResult> detailedTables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
                     string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
@@ -124,7 +124,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
                     detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
-                if (Engine.Equals("AngleSharp", StringComparison.OrdinalIgnoreCase) && !ReverseTable.IsPresent) {
+                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
                     detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
                     detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
