@@ -44,4 +44,39 @@ public class PreMailerClientFileHelpersTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void MoveCssInlineFromFile_RelativePath()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+        File.WriteAllText(file, HtmlContent);
+        string relative = Path.GetRelativePath(Directory.GetCurrentDirectory(), file);
+        try
+        {
+            PreMailerResult result = PreMailerClient.MoveCssInlineFromFile(relative, null);
+            Assert.Contains("Hello", result.Html, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void MoveCssInlineFromFile_EnvironmentVariablePath()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+        File.WriteAllText(file, HtmlContent);
+        Environment.SetEnvironmentVariable("HTML_FILE_TEST", file);
+        try
+        {
+            PreMailerResult result = PreMailerClient.MoveCssInlineFromFile("%HTML_FILE_TEST%", null);
+            Assert.Contains("Hello", result.Html, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(file);
+            Environment.SetEnvironmentVariable("HTML_FILE_TEST", null);
+        }
+    }
 }
