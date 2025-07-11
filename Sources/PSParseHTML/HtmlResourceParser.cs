@@ -136,13 +136,25 @@ public static class HtmlResourceParser
         foreach (var link in links.Where(l => !string.IsNullOrEmpty(l.Source)))
         {
             Uri srcUri = Uri.TryCreate(link.Source, UriKind.Absolute, out var abs) ? abs : new Uri(baseUri, link.Source);
-            byte[] bytes = await http.GetByteArrayAsync(srcUri).ConfigureAwait(false);
 #if NETSTANDARD2_0 || NETFRAMEWORK
-            await Task.Run(() => File.WriteAllBytes(Path.Combine(dir, Path.GetFileName(srcUri.LocalPath)), bytes)).ConfigureAwait(false);
+            using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+            {
+                response.EnsureSuccessStatusCode();
+                using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                string filePath = Path.Combine(dir, Path.GetFileName(srcUri.LocalPath));
+                using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
+                paths.Add(filePath);
+            }
 #else
-            await File.WriteAllBytesAsync(Path.Combine(dir, Path.GetFileName(srcUri.LocalPath)), bytes).ConfigureAwait(false);
+            using HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            string filePath = Path.Combine(dir, Path.GetFileName(srcUri.LocalPath));
+            await using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
+            paths.Add(filePath);
 #endif
-            paths.Add(Path.Combine(dir, Path.GetFileName(srcUri.LocalPath)));
         }
 
         return paths;

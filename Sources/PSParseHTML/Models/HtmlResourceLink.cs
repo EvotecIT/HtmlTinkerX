@@ -93,11 +93,20 @@ public sealed class HtmlResourceLink
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        byte[] bytes = await http.GetByteArrayAsync(srcUri).ConfigureAwait(false);
 #if NETSTANDARD2_0 || NETFRAMEWORK
-        await Task.Run(() => File.WriteAllBytes(resolved, bytes)).ConfigureAwait(false);
+        using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+        {
+            response.EnsureSuccessStatusCode();
+            using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using FileStream fileStream = new(resolved, FileMode.Create, FileAccess.Write, FileShare.None);
+            await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
+        }
 #else
-        await File.WriteAllBytesAsync(resolved, bytes).ConfigureAwait(false);
+        using HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        await using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        await using FileStream fileStream = new(resolved, FileMode.Create, FileAccess.Write, FileShare.None);
+        await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
 #endif
         return resolved;
     }
