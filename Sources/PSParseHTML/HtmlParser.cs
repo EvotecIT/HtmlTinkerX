@@ -19,6 +19,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="html">HTML content to parse.</param>
     /// <returns>The parsed <see cref="IDocument"/>.</returns>
+    /// <example>
+    /// <code>
+    /// IDocument doc = HtmlParser.ParseWithAngleSharp("<p>Hello</p>");
+    /// </code>
+    /// </example>
     public static IDocument ParseWithAngleSharp(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
@@ -32,6 +37,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <returns>The parsed <see cref="IDocument"/>.</returns>
+    /// <example>
+    /// <code>
+    /// IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync("https://example.com");
+    /// </code>
+    /// </example>
     public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));

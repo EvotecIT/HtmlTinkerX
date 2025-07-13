@@ -21,6 +21,11 @@ public static class HtmlFormatter {
     /// <param name="js">JavaScript code to format.</param>
     /// <param name="options">Optional Beautifier options object.</param>
     /// <returns>Formatted JavaScript string.</returns>
+    /// <example>
+    /// <code>
+    /// string pretty = HtmlFormatter.FormatJavaScript("function x(){return 1;}");
+    /// </code>
+    /// </example>
     public static string FormatJavaScript(string js, BeautifierOptions? options = null) {
         if (js == null) {
             throw new ArgumentNullException(nameof(js));

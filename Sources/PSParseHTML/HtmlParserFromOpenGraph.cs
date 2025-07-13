@@ -15,6 +15,12 @@ public static class HtmlParserFromOpenGraph {
     /// </summary>
     /// <param name="html">HTML content containing Open Graph meta tags.</param>
     /// <returns>The parsed Open Graph metadata.</returns>
+    /// <example>
+    /// <code>
+    /// var og = HtmlParserFromOpenGraph.ParseOpenGraph(html);
+    /// string title = og.Properties["title"].First();
+    /// </code>
+    /// </example>
     public static HtmlOpenGraph ParseOpenGraph(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

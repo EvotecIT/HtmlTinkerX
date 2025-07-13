@@ -18,6 +18,11 @@ public static class HtmlParserFromForm {
     /// </summary>
     /// <param name="html">HTML content containing forms.</param>
     /// <returns>List of form parse results.</returns>
+    /// <example>
+    /// <code>
+    /// var forms = HtmlParserFromForm.ParseFormsWithAngleSharp(html);
+    /// </code>
+    /// </example>
     public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
@@ -61,6 +66,11 @@ public static class HtmlParserFromForm {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
     /// <returns>List of form parse results.</returns>
+    /// <example>
+    /// <code>
+    /// var forms = await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url);
+    /// </code>
+    /// </example>
     public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));

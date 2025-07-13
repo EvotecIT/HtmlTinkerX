@@ -17,6 +17,12 @@ public static class HtmlScriptRunner {
     /// <param name="html">HTML markup to load.</param>
     /// <param name="script">JavaScript code to execute.</param>
     /// <returns>Value returned by the script.</returns>
+    /// <example>
+    /// <code>
+    /// var result = await HtmlScriptRunner.RunAsync<int>("<div id='a'></div>",
+    ///     "document.getElementById('a').textContent = '1'; return 1;");
+    /// </code>
+    /// </example>
     public static async Task<T?> RunAsync<T>(string html, string script) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

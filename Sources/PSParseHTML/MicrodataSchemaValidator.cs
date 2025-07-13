@@ -16,6 +16,13 @@ public static class MicrodataSchemaValidator {
     /// </summary>
     /// <param name="items">Microdata items to validate.</param>
     /// <returns>List of mismatches found.</returns>
+    /// <example>
+    /// <code>
+    /// var mismatches = MicrodataSchemaValidator.Validate(items);
+    /// foreach (var mismatch in mismatches)
+    ///     Console.WriteLine($"{mismatch.Type}: {string.Join(", ", mismatch.Properties)}");
+    /// </code>
+    /// </example>
     public static List<MicrodataSchemaMismatch> Validate(List<HtmlMicrodataItem> items) {
         List<MicrodataSchemaMismatch> mismatches = new();
         foreach (var item in items) {
@@ -41,11 +48,23 @@ public static class MicrodataSchemaValidator {
 /// Represents mismatched properties for a particular microdata item type.
 /// </summary>
 public sealed class MicrodataSchemaMismatch {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MicrodataSchemaMismatch"/> class.
+    /// </summary>
+    /// <param name="type">Microdata item type that contained unknown properties.</param>
+    /// <param name="properties">The properties that were not defined in the schema.</param>
     public MicrodataSchemaMismatch(string type, List<string> properties) {
         Type = type;
         Properties = properties;
     }
 
+    /// <summary>
+    /// Gets the microdata item type that caused the mismatch.
+    /// </summary>
     public string Type { get; }
+
+    /// <summary>
+    /// Gets the list of properties that did not match the known schema.
+    /// </summary>
     public List<string> Properties { get; }
 }

@@ -19,6 +19,11 @@ public static class HtmlParserExtensions {
     /// <param name="name">Name attribute to search for.</param>
     /// <returns>Enumeration of matching elements.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="html"/> is null.</exception>
+    /// <example>
+    /// <code>
+    /// var divs = HtmlParserExtensions.GetElements(html, tag: "div");
+    /// </code>
+    /// </example>
     public static IEnumerable<IElement> GetElements(string html, string? tag = null, string? className = null, string? id = null, string? name = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
