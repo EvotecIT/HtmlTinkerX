@@ -77,6 +77,11 @@ public static class HtmlHarViewer
     /// </summary>
     /// <param name="path">Path to the HAR file.</param>
     /// <returns>Parsed <see cref="Har"/> instance.</returns>
+    /// <example>
+    /// <code>
+    /// Har har = await HtmlHarViewer.ReadHarAsync("session.har");
+    /// </code>
+    /// </example>
     public static async Task<Har> ReadHarAsync(string path)
     {
         string json = await HtmlUtilities.ReadFileCheckedAsync(path).ConfigureAwait(false);

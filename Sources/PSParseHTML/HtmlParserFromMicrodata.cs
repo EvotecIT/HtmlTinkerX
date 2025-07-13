@@ -15,6 +15,11 @@ public static class HtmlParserFromMicrodata {
     /// </summary>
     /// <param name="html">HTML markup containing microdata.</param>
     /// <returns>List of microdata items.</returns>
+    /// <example>
+    /// <code>
+    /// var items = HtmlParserFromMicrodata.ParseMicrodataItems(html);
+    /// </code>
+    /// </example>
     public static List<HtmlMicrodataItem> ParseMicrodataItems(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

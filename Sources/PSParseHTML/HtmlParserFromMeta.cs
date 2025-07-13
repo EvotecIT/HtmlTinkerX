@@ -15,6 +15,11 @@ public static class HtmlParserFromMeta {
     /// </summary>
     /// <param name="html">HTML markup to parse.</param>
     /// <returns>List of meta tags.</returns>
+    /// <example>
+    /// <code>
+    /// var tags = HtmlParserFromMeta.ParseMetaTags("<meta name='a' content='b'>");
+    /// </code>
+    /// </example>
     public static List<HtmlMetaTag> ParseMetaTags(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

@@ -13,6 +13,11 @@ public static class HtmlParserToText {
     /// </summary>
     /// <param name="html">HTML string to convert.</param>
     /// <returns>Plain text extracted from the provided HTML.</returns>
+    /// <example>
+    /// <code>
+    /// string text = HtmlParserToText.ConvertToText("<p>Hello</p>");
+    /// </code>
+    /// </example>
     public static string ConvertToText(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

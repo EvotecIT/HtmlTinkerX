@@ -23,6 +23,11 @@ public static class HtmlParserFromTable {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
+    /// <example>
+    /// <code>
+    /// var tables = HtmlParserFromTable.ParseTablesWithAngleSharpDetailed(html);
+    /// </code>
+    /// </example>
     public static List<HtmlTableResult> ParseTablesWithAngleSharpDetailed(
         string html,
         IDictionary<string, string>? replaceContent = null,
