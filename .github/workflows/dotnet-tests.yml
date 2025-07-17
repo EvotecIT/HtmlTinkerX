@@ -15,6 +15,7 @@ on:
     branches:
       - v1-legacy
       - v2-speedygonzales
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '8.x'
