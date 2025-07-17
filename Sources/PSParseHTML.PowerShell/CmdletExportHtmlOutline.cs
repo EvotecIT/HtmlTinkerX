@@ -57,7 +57,6 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
         string outPath = HtmlUtilities.ResolvePath(Path);
 #if NETSTANDARD2_0 || NETFRAMEWORK
         System.IO.File.WriteAllText(outPath, json);
-        await Task.CompletedTask;
 #else
         await System.IO.File.WriteAllTextAsync(outPath, json, CancelToken).ConfigureAwait(false);
 #endif

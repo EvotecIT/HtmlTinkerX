@@ -55,6 +55,5 @@ public sealed class CmdletMeasureHtmlDocument : AsyncPSCmdlet {
         };
 
         WriteObject(stats);
-        await Task.CompletedTask;
     }
 }

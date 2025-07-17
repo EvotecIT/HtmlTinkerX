@@ -88,7 +88,5 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
         } else {
             WriteObject(text);
         }
-
-        await Task.CompletedTask;
     }
 }
