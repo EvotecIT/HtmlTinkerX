@@ -31,13 +31,13 @@ public static class HtmlFormSubmitter {
         }
 
         var form = page.Locator(formSelector);
-        await form.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
+        await form.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }).ConfigureAwait(false);
         foreach (var kv in fields) {
             var input = form.Locator($":scope [name=\"{kv.Key}\"]");
-            await input.FillAsync(kv.Value, new LocatorFillOptions { Timeout = timeout });
+            await input.FillAsync(kv.Value, new LocatorFillOptions { Timeout = timeout }).ConfigureAwait(false);
         }
-        await form.EvaluateAsync("form => form.submit()");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await form.EvaluateAsync("form => form.submit()").ConfigureAwait(false);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
     }
 
     /// <summary>
