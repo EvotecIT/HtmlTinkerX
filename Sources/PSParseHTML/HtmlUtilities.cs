@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -62,8 +63,8 @@ public static class HtmlUtilities {
     /// <param name="client">HttpClient to use for the request.</param>
     /// <param name="url">URL to download from.</param>
     /// <returns>Content as a string with proper encoding.</returns>
-    public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url) {
-        using var response = await client.GetAsync(url).ConfigureAwait(false);
+    public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
+        using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
