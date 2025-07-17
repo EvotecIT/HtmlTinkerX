@@ -22,4 +22,14 @@ Describe 'Save-HTMLPdf' {
         Save-HTMLPdf -Url $uri -OutFile $outfile -Selector '#loaded' -Landscape -PrintBackground -Format A4 -MarginTop "0.5in" -MarginBottom "0.5in"
         (Test-Path $outfile) | Should -BeTrue
     }
+
+    It 'Creates a PDF file in a new directory' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $folder = Join-Path $TestDrive 'newdir'
+        $outfile = Join-Path $folder 'nested.pdf'
+        Save-HTMLPdf -Url $uri -OutFile $outfile -Selector '#loaded'
+        (Test-Path $outfile) | Should -BeTrue
+        (Test-Path $folder) | Should -BeTrue
+    }
 }
