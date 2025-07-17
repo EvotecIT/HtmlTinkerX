@@ -64,6 +64,14 @@ Describe 'Save-HTMLScreenshot' {
         (Test-Path $outfile) | Should -BeTrue
     }
 
+    It 'Adds extension when OutFile has none' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $base = Join-Path $TestDrive 'noext'
+        Save-HTMLScreenshot -Url $uri -OutFile $base -Selector '#loaded' -Format Jpeg
+        (Test-Path "$base.jpg") | Should -BeTrue
+    }
+
     It 'Validates clip parameter range' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
