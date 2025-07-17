@@ -52,3 +52,4 @@ jobs:
       - name: Run PowerShell tests
         shell: powershell
         run: .\PSParseHTML.Tests.ps1
+        timeout-minutes: 10

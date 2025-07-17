@@ -96,6 +96,7 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: .\PSParseHTML.Tests.ps1
+        timeout-minutes: 10
 
   test-ubuntu:
     needs: refresh-psd1
@@ -138,6 +139,7 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: ./PSParseHTML.Tests.ps1
+        timeout-minutes: 10
 
   test-macos:
     needs: refresh-psd1
@@ -176,3 +178,4 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: ./PSParseHTML.Tests.ps1
+        timeout-minutes: 10
