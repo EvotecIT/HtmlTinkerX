@@ -58,7 +58,7 @@ public static class HtmlLoginParser {
 
         string? name = el.GetAttribute("name");
         if (!string.IsNullOrEmpty(name)) {
-            return $"{sel}[name='{name.Replace("'", "\\'")}']";
+            return $"{sel}[name='{CssStringEscape(name)}']";
         }
 
         string cls = el.ClassName ?? string.Empty;
@@ -102,4 +102,10 @@ public static class HtmlLoginParser {
         }
         return sb.ToString();
     }
+
+    private static string CssStringEscape(string value) =>
+        value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("'", "\\'");
 }

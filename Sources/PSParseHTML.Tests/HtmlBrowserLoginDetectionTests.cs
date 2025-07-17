@@ -59,4 +59,19 @@ public class HtmlBrowserLoginDetectionTests {
         Assert.NotNull(form);
         Assert.Equal("input#p", form!.PasswordSelector);
     }
+
+    [Fact]
+    public void DetectLoginForm_EscapesQuotesInAttributes() {
+        string html = "<form>" +
+            "<input type='text' name=\"user'name\"/>" +
+            "<input type='password' id='p\"ass'/>" +
+            "<button id='login'></button>" +
+            "</form>";
+
+        HtmlFormLogin? form = HtmlLoginParser.Detect(html, "https://example.com/login");
+
+        Assert.NotNull(form);
+        Assert.Equal("input[name='user\\'name']", form!.UsernameSelector);
+        Assert.Equal("input#p\\\"ass", form.PasswordSelector);
+    }
 }
