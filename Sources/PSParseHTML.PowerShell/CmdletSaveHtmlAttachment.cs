@@ -64,15 +64,18 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
 
+        string dir = HtmlUtilities.ResolvePath(Path);
+        Directory.CreateDirectory(dir);
+
         IAsyncEnumerable<string> files = ParameterSetName switch {
             ParameterSetSession => HtmlBrowser.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                HtmlUtilities.ResolvePath(Path),
+                dir,
                 Filter,
                 token),
             _ => HtmlBrowser.SavePageDownloadsAsync(
                 Url,
-                HtmlUtilities.ResolvePath(Path),
+                dir,
                 Browser,
                 Clean.IsPresent,
                 Filter,
