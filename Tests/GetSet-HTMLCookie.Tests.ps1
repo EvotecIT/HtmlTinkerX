@@ -2,11 +2,7 @@ Describe 'HTML Cookie cmdlets' {
     It 'Persists cookies between sessions' {
         $url = 'about:blank'
 
-        $cookie = [PSParseHTML.HtmlCookie]::new()
-        $cookie.Name = 'mycookie'
-        $cookie.Value = 'choco'
-        $cookie.Domain = 'example.com'
-        $cookie.Path = '/'
+        $cookie = New-HTMLCookie -Name 'mycookie' -Value 'choco' -Domain 'example.com' -Path '/'
 
         $session1 = Invoke-HTMLRendering -Url $url -Session
         Set-HTMLCookie -Session $session1 -Cookie ([PSParseHTML.HtmlCookie[]]@($cookie))
@@ -35,17 +31,9 @@ Describe 'HTML Cookie cmdlets' {
     It 'Filters cookies by domain' {
         $url = 'about:blank'
 
-        $c1 = [PSParseHTML.HtmlCookie]::new()
-        $c1.Name = 'c1'
-        $c1.Value = 'val1'
-        $c1.Domain = 'example.com'
-        $c1.Path = '/'
+        $c1 = New-HTMLCookie -Name 'c1' -Value 'val1' -Domain 'example.com' -Path '/'
 
-        $c2 = [PSParseHTML.HtmlCookie]::new()
-        $c2.Name = 'c2'
-        $c2.Value = 'val2'
-        $c2.Domain = 'other.com'
-        $c2.Path = '/'
+        $c2 = New-HTMLCookie -Name 'c2' -Value 'val2' -Domain 'other.com' -Path '/'
 
         $session = Invoke-HTMLRendering -Url $url -Session
         Set-HTMLCookie -Session $session -Cookie ([PSParseHTML.HtmlCookie[]]@($c1, $c2))
