@@ -46,8 +46,8 @@ jobs:
 
       - name: Build .NET solution
         run: |
-          dotnet restore Sources/PSParseHTML.sln
-          dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+          dotnet restore Sources/HtmlTinkerX.sln
+          dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run PowerShell tests
         shell: powershell

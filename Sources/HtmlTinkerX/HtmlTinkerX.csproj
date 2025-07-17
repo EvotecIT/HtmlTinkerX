@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Company>Evotec</Company>
+        <Authors>Przemyslaw Klys</Authors>
+        <VersionPrefix>2.0.0</VersionPrefix>
+        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+        <AssemblyName>HtmlTinkerX</AssemblyName>
+        <AssemblyTitle>HtmlTinkerX</AssemblyTitle>
+        <Copyright>(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+  <ItemGroup>
+      <PackageReference Include="AngleSharp" Version="1.3.0" />
+      <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.154" />
+      <PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
+      <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.43" />
+        <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
+        <PackageReference Include="Jsbeautifier" Version="0.0.1" />
+        <PackageReference Include="NUglify" Version="1.21.15" />
+        <PackageReference Include="PreMailer.Net" Version="2.7.0" />
+        <PackageReference Include="System.IO.Compression" Version="4.3.0" />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
+        <PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="2.1.10" />
+      <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
+      <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
+      <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+      <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
+          <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>HtmlTinkerX.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
+        <DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
+    </PropertyGroup>
+
+</Project>

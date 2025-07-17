@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
-using PSParseHTML;
+using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 

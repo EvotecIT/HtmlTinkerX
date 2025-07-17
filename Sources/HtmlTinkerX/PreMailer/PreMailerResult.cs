@@ -1,0 +1,28 @@
+using System.Collections.Generic;
+
+namespace HtmlTinkerX;
+
+/// <summary>
+/// Result returned after processing HTML with PreMailer.
+/// </summary>
+public class PreMailerResult {
+    /// <summary>
+    /// HTML output with CSS inlined.
+    /// </summary>
+    public string Html { get; }
+
+    /// <summary>
+    /// Any warnings returned by PreMailer.
+    /// </summary>
+    public List<PreMailerWarning> Warnings { get; }
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="PreMailerResult"/>.
+    /// </summary>
+    /// <param name="html">Processed HTML markup.</param>
+    /// <param name="warnings">List of warnings returned by PreMailer.</param>
+    public PreMailerResult(string html, List<PreMailerWarning> warnings) {
+        Html = html;
+        Warnings = warnings;
+    }
+}

@@ -1,0 +1,310 @@
+using System;
+using Jsbeautifier;
+using System.IO;
+using AngleSharp.Css.Parser;
+using AngleSharp.Css;
+using System.Threading.Tasks;
+
+using NUglify;
+using NUglify.Html;
+using System.Linq;
+
+namespace HtmlTinkerX;
+
+/// <summary>
+/// Provides helpers for formatting markup and script content.
+/// </summary>
+public static class HtmlFormatter {
+    /// <summary>
+    /// Formats JavaScript code using JsBeautifier.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    /// <example>
+    /// <code>
+    /// string pretty = HtmlFormatter.FormatJavaScript("function x(){return 1;}");
+    /// </code>
+    /// </example>
+    public static string FormatJavaScript(string js, BeautifierOptions? options = null) {
+        if (js == null) {
+            throw new ArgumentNullException(nameof(js));
+        }
+
+        BeautifierOptions opts = options ?? new BeautifierOptions {
+            IndentSize = 4,
+            IndentChar = ' ',
+            IndentWithTabs = false,
+            PreserveNewlines = true,
+            MaxPreserveNewlines = 10,
+            JslintHappy = false,
+            BraceStyle = BraceStyle.Collapse,
+            KeepArrayIndentation = false,
+            KeepFunctionIndentation = false,
+            EvalCode = false,
+            BreakChainedMethods = false
+        };
+
+        Beautifier beautifier = new Beautifier(opts);
+        return beautifier.Beautify(js);
+    }
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using default JsBeautifier options.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js)
+        => Task.Run(() => FormatJavaScript(js));
+
+    /// <summary>
+    /// Formats JavaScript code from a file using default JsBeautifier options.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatJavaScriptFile(string filePath, BeautifierOptions? options = null) {
+        string js = HtmlUtilities.ReadFileChecked(filePath);
+        return FormatJavaScript(js, options);
+    }
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using JsBeautifier.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options = null)
+        => Task.Run(() => FormatJavaScript(js, options));
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code from a file using JsBeautifier.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null) {
+        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatJavaScriptAsync(js, options).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code from a file using default JsBeautifier options.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatJavaScriptFileAsync(string filePath) {
+        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatJavaScriptAsync(js).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Formats CSS using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
+    /// </summary>
+    /// <param name="css">CSS content to format.</param>
+    /// <returns>Formatted CSS string.</returns>
+    public static string FormatCss(string css) {
+        if (css == null) {
+            throw new ArgumentNullException(nameof(css));
+        }
+
+        var parser = new CssParser();
+        var sheet = parser.ParseStyleSheet(css);
+        using var writer = new StringWriter();
+        var formatter = new CssStyleFormatter();
+        sheet.ToCss(writer, formatter);
+        return writer.ToString();
+    }
+
+    /// <summary>
+    /// Asynchronously formats CSS content using AngleSharp.
+    /// </summary>
+    /// <param name="css">CSS content to format.</param>
+    /// <returns>Formatted CSS string.</returns>
+    public static Task<string> FormatCssAsync(string css)
+        => Task.Run(() => FormatCss(css));
+
+    /// <summary>
+    /// Formats a CSS file using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the CSS file.</param>
+    /// <returns>Formatted CSS string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatCssFile(string filePath) {
+        string css = HtmlUtilities.ReadFileChecked(filePath);
+        return FormatCss(css);
+    }
+
+    /// <summary>
+    /// Asynchronously formats a CSS file using AngleSharp.
+    /// </summary>
+    /// <param name="filePath">Path to the CSS file.</param>
+    /// <returns>Formatted CSS string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatCssFileAsync(string filePath) {
+        string css = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatCssAsync(css).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Formats HTML markup using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <param name="html">HTML content to format.</param>
+    /// <param name="indent">Indentation string to use.</param>
+    /// <param name="blockStartLine">How blocks should start.</param>
+    /// <param name="removeComments">Whether to remove HTML comments.</param>
+    /// <param name="removeOptionalTags">Whether to remove optional tags.</param>
+    /// <param name="outputTextNodesOnNewLine">Whether to output text nodes on a new line.</param>
+    /// <param name="removeEmptyAttributes">Whether to remove empty attributes.</param>
+    /// <param name="alphabeticallyOrderAttributes">Whether to order attributes alphabetically.</param>
+    /// <param name="removeEmptyBlocks">Whether to remove empty CSS blocks.</param>
+    /// <param name="isFragment">Treat input as HTML fragment.</param>
+    /// <returns>Formatted HTML string.</returns>
+    public static string FormatHtml(
+        string html,
+        string indent = "    ",
+        BlockStart blockStartLine = BlockStart.SameLine,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool outputTextNodesOnNewLine = false,
+        bool removeEmptyAttributes = false,
+        bool alphabeticallyOrderAttributes = false,
+        bool removeEmptyBlocks = false,
+        bool isFragment = false) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        HtmlSettings settings = new();
+
+        if (isFragment) {
+            settings.IsFragmentOnly = true;
+        }
+
+        settings.RemoveOptionalTags = removeOptionalTags;
+        settings.PrettyPrint = true;
+        settings.Indent = indent;
+        settings.OutputTextNodesOnNewLine = outputTextNodesOnNewLine;
+        settings.RemoveEmptyAttributes = removeEmptyAttributes;
+        settings.AlphabeticallyOrderAttributes = alphabeticallyOrderAttributes;
+        settings.RemoveComments = removeComments;
+        settings.RemoveAttributeQuotes = false;
+
+        settings.JsSettings.MinifyCode = true;
+        settings.JsSettings.OutputMode = OutputMode.MultipleLines;
+        settings.JsSettings.Indent = indent;
+        settings.JsSettings.BlocksStartOnSameLine = blockStartLine;
+        settings.JsSettings.PreserveFunctionNames = true;
+        settings.JsSettings.LocalRenaming = NUglify.JavaScript.LocalRenaming.KeepAll;
+        settings.JsSettings.NoAutoRenameList = true.ToString();
+        settings.JsSettings.ReorderScopeDeclarations = false;
+        settings.JsSettings.TermSemicolons = true;
+        settings.JsSettings.RemoveUnneededCode = false;
+        settings.JsSettings.RemoveFunctionExpressionNames = false;
+
+        settings.CssSettings.OutputMode = OutputMode.MultipleLines;
+        settings.CssSettings.Indent = indent;
+        settings.CssSettings.BlocksStartOnSameLine = blockStartLine;
+        settings.CssSettings.RemoveEmptyBlocks = removeEmptyBlocks;
+        settings.CssSettings.DecodeEscapes = false;
+
+        var result = Uglify.Html(html, settings);
+        if (result.HasErrors) {
+            string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
+            LoggingMessages.Logger.WriteWarning($"FormatHtml -Errors: {errors}");
+        }
+
+        return result.Code ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Asynchronously formats HTML markup using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <inheritdoc cref="FormatHtml(string,string,BlockStart,bool,bool,bool,bool,bool,bool,bool)"/>
+    public static Task<string> FormatHtmlAsync(
+        string html,
+        string indent = "    ",
+        BlockStart blockStartLine = BlockStart.SameLine,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool outputTextNodesOnNewLine = false,
+        bool removeEmptyAttributes = false,
+        bool alphabeticallyOrderAttributes = false,
+        bool removeEmptyBlocks = false,
+        bool isFragment = false)
+        => Task.Run(() =>
+            FormatHtml(
+                html,
+                indent,
+                blockStartLine,
+                removeComments,
+                removeOptionalTags,
+                outputTextNodesOnNewLine,
+                removeEmptyAttributes,
+                alphabeticallyOrderAttributes,
+                removeEmptyBlocks,
+                isFragment));
+
+    /// <summary>
+    /// Formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="indent">Indentation string to use.</param>
+    /// <param name="blockStartLine">How blocks should start.</param>
+    /// <param name="removeComments">Whether to remove HTML comments.</param>
+    /// <param name="removeOptionalTags">Whether to remove optional tags.</param>
+    /// <param name="outputTextNodesOnNewLine">Whether to output text nodes on a new line.</param>
+    /// <param name="removeEmptyAttributes">Whether to remove empty attributes.</param>
+    /// <param name="alphabeticallyOrderAttributes">Whether to order attributes alphabetically.</param>
+    /// <param name="removeEmptyBlocks">Whether to remove empty CSS blocks.</param>
+    /// <param name="isFragment">Treat input as HTML fragment.</param>
+    /// <returns>Formatted HTML string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static string FormatHtmlFile(
+        string filePath,
+        string indent = "    ",
+        BlockStart blockStartLine = BlockStart.SameLine,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool outputTextNodesOnNewLine = false,
+        bool removeEmptyAttributes = false,
+        bool alphabeticallyOrderAttributes = false,
+        bool removeEmptyBlocks = false,
+        bool isFragment = false) {
+
+        string html = HtmlUtilities.ReadFileChecked(filePath);
+        return FormatHtml(html, indent, blockStartLine, removeComments, removeOptionalTags, outputTextNodesOnNewLine, removeEmptyAttributes, alphabeticallyOrderAttributes, removeEmptyBlocks, isFragment);
+    }
+
+    /// <summary>
+    /// Asynchronously formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <inheritdoc cref="FormatHtmlFile(string,string,BlockStart,bool,bool,bool,bool,bool,bool,bool)"/>
+    public static async Task<string> FormatHtmlFileAsync(
+        string filePath,
+        string indent = "    ",
+        BlockStart blockStartLine = BlockStart.SameLine,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool outputTextNodesOnNewLine = false,
+        bool removeEmptyAttributes = false,
+        bool alphabeticallyOrderAttributes = false,
+        bool removeEmptyBlocks = false,
+        bool isFragment = false) {
+
+        string html = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+        return await FormatHtmlAsync(
+            html,
+            indent,
+            blockStartLine,
+            removeComments,
+            removeOptionalTags,
+            outputTextNodesOnNewLine,
+            removeEmptyAttributes,
+            alphabeticallyOrderAttributes,
+            removeEmptyBlocks,
+            isFragment).ConfigureAwait(false);
+    }
+}

@@ -2,7 +2,7 @@ Describe 'Rowspan only table parsing' {
     It 'Parses table with rowspan correctly - AgilityPack' {
         $Path = Join-Path $PSScriptRoot 'Documents/rowspan_only.html'
         $Content = Get-Content -LiteralPath $Path -Raw
-        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content, $false, $null, $null, $true)
+        $Tables = [HtmlTinkerX.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content, $false, $null, $null, $true)
         $Table = $Tables[0]
         $Table.Data.Count | Should -Be 2
         $Table.Data[0].Item | Should -Be 'Bananas'
@@ -15,7 +15,7 @@ Describe 'Rowspan only table parsing' {
     It 'Parses table with rowspan correctly - AngleSharp' {
         $Path = Join-Path $PSScriptRoot 'Documents/rowspan_only.html'
         $Content = Get-Content -LiteralPath $Path -Raw
-        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithAngleSharpDetailed($Content, $null, $null, $true)
+        $Tables = [HtmlTinkerX.HtmlParser]::ParseTablesWithAngleSharpDetailed($Content, $null, $null, $true)
         $Table = $Tables[0]
         $Table.Data.Count | Should -Be 2
         $Table.Data[0].Item | Should -Be 'Bananas'

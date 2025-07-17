@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using PSParseHTML;
+using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 

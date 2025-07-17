@@ -43,20 +43,20 @@ stages:
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
 
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
 
       - task: DotNetCoreCLI@2
         displayName: 'Run .NET Tests'
         inputs:
           command: 'test'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage"'
         timeoutInMinutes: 10
 
@@ -83,20 +83,20 @@ stages:
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
 
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
 
       - task: DotNetCoreCLI@2
         displayName: 'Run .NET Tests'
         inputs:
           command: 'test'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
         timeoutInMinutes: 10
 
@@ -115,20 +115,20 @@ stages:
         displayName: 'Restore .NET Dependencies'
         inputs:
           command: 'restore'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
 
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-restore'
 
       - task: DotNetCoreCLI@2
         displayName: 'Run .NET Tests'
         inputs:
           command: 'test'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
 
 # PowerShell Testing Stage - Module integration testing (independent of .NET stage)
@@ -152,7 +152,7 @@ stages:
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration)'
 
       - powershell: |
@@ -181,7 +181,7 @@ stages:
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration)'
 
       - pwsh: |
@@ -216,7 +216,7 @@ stages:
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration)'
 
       - task: PowerShell@2
@@ -254,7 +254,7 @@ stages:
         displayName: 'Build .NET Solution'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration)'
 
       - task: PowerShell@2
@@ -293,7 +293,7 @@ stages:
         displayName: 'Build Release'
         inputs:
           command: 'build'
-          projects: 'Sources/PSParseHTML.sln'
+          projects: 'Sources/HtmlTinkerX.sln'
           arguments: '--configuration $(buildConfiguration)'
 
       - powershell: |
