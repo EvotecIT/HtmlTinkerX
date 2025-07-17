@@ -30,11 +30,7 @@ public sealed class CmdletGetHtmlCookie : AsyncPSCmdlet {
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
-        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session, token).ConfigureAwait(false);
-        if (Domain is { Length: > 0 }) {
-            var domainSet = new HashSet<string>(Domain, System.StringComparer.OrdinalIgnoreCase);
-            cookies = cookies.Where(c => c.Domain is not null && domainSet.Contains(c.Domain)).ToList();
-        }
+        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session, Domain, token).ConfigureAwait(false);
         WriteObject(cookies, true);
     }
 }
