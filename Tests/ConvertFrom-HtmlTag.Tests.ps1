@@ -1,13 +1,18 @@
 Describe -Name 'ConvertFrom-HTMLTag' {
     It -Name 'Given a valid URL - Should return the content of the tag' {
-        $Content = ConvertFrom-HTMLTag -Tag 'em' -Url "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/em"
-        $Content | Should -Contain '<em>'
-        $Content = ConvertFrom-HTMLTag -Tag 'em' -Url "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/em"
-        $Content | Should -Match '<em>'
+        $Path = Join-Path $PSScriptRoot 'Documents/em_sample.html'
+        $Html = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+
+        $Content = ConvertFrom-HTMLTag -Content $Html -Tag 'em'
+        $Content | Should -Be 'awesome'
+        $Content = ConvertFrom-HTMLTag -Content $Html -Tag 'em'
+        $Content | Should -Be 'awesome'
     }
 
     It 'ConvertFrom-HTML cmdlet works' {
-        $doc = ConvertFrom-HTML -Url 'https://example.com'
+        $Path = Join-Path $PSScriptRoot 'Documents/em_sample.html'
+        $Html = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        $doc = ConvertFrom-HTML -Content $Html
         $doc | Should -Not -BeNullOrEmpty
     }
 }
