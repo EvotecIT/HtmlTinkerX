@@ -44,4 +44,19 @@ public class HtmlBrowserLoginDetectionTests {
         Assert.Equal("input#p", form.PasswordSelector);
         Assert.Equal("button#s", form.SubmitSelector);
     }
+
+    [Fact]
+    public void DetectLoginForm_IgnoresHiddenPassword() {
+        string html = "<form>" +
+            "<input type='text' id='u'/>" +
+            "<input type='password' id='hidden' style='display:none'/>" +
+            "<input type='password' id='p'/>" +
+            "<button id='s'></button>" +
+            "</form>";
+
+        HtmlFormLogin? form = HtmlLoginParser.Detect(html, "https://example.com/login");
+
+        Assert.NotNull(form);
+        Assert.Equal("input#p", form!.PasswordSelector);
+    }
 }
