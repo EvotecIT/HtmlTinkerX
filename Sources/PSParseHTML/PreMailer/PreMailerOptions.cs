@@ -10,7 +10,7 @@ public class PreMailerOptions {
     /// <summary>Base URL for resolving relative CSS links.</summary>
     public Uri? BaseUri { get; set; }
 
-    /// <summary>Removes <style> elements after inlining.</summary>
+    /// <summary>Removes <c>&lt;style&gt;</c> elements after inlining.</summary>
     public bool RemoveStyleElements { get; set; }
 
     /// <summary>CSS selector of elements to ignore when inlining.</summary>
@@ -38,7 +38,7 @@ public class PreMailerOptions {
     public bool UseEmailFormatter { get; set; }
 
     /// <summary>
-    /// When enabled, CSS from <link> tags will be downloaded and inlined.
+    /// When enabled, CSS from <c>&lt;link&gt;</c> tags will be downloaded and inlined.
     /// </summary>
     public bool DownloadRemoteCss { get; set; }
 

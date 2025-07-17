@@ -19,7 +19,7 @@ public static class HtmlScriptRunner {
     /// <returns>Value returned by the script.</returns>
     /// <example>
     /// <code>
-    /// var result = await HtmlScriptRunner.RunAsync<int>("<div id='a'></div>",
+    /// var result = await HtmlScriptRunner.RunAsync&lt;int&gt;("&lt;div id='a'&gt;&lt;/div&gt;",
     ///     "document.getElementById('a').textContent = '1'; return 1;");
     /// </code>
     /// </example>

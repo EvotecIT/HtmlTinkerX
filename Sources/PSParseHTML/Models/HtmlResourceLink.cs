@@ -10,9 +10,24 @@ namespace PSParseHTML;
 /// </summary>
 public enum HtmlResourceType
 {
+    /// <summary>
+    /// JavaScript code referenced via a <c>&lt;script&gt;</c> element.
+    /// </summary>
     Script,
+
+    /// <summary>
+    /// JavaScript code defined directly within the HTML document.
+    /// </summary>
     InlineScript,
+
+    /// <summary>
+    /// Cascading Style Sheet referenced via a <c>&lt;link&gt;</c> element.
+    /// </summary>
     Css,
+
+    /// <summary>
+    /// Cascading Style Sheet defined directly within the HTML document.
+    /// </summary>
     InlineCss
 }
 
