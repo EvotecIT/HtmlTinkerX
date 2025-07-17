@@ -146,7 +146,8 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
                 Session ??= (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                     ?? throw new PSInvalidOperationException("No session provided and no default session found.");
                 target = Session.Page.Url;
-                engine = Session.Browser.BrowserType.Name switch {
+                string browserType = Session.Browser.BrowserType.Name;
+                engine = browserType switch {
                     "firefox" => HtmlBrowserEngine.Firefox,
                     "webkit" => HtmlBrowserEngine.WebKit,
                     _ => HtmlBrowserEngine.Chromium
