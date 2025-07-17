@@ -416,7 +416,7 @@ public class PreMailerClient {
 
         // Preserve trailing slash if present in the original URI
         bool endsWithSlash = uri.AbsolutePath.EndsWith("/", StringComparison.Ordinal);
-        if (endsWithSlash && !path.EndsWith(desired))
+        if (endsWithSlash && !path.EndsWith(desired.ToString()))
         {
             path += desired;
         }
