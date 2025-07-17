@@ -92,4 +92,23 @@ public class HtmlUtilitiesTests {
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
         Assert.Equal("Hello", result);
     }
+
+    [Fact]
+    public async Task GetStringWithProperEncodingAsync_DetectsMetaCharset() {
+        var builder = new WebHostBuilder()
+            .Configure(app => app.Run(async ctx => {
+                ctx.Response.ContentType = "text/html";
+                const string html = "<meta charset=\"UTF-16\">Hello";
+                byte[] preamble = System.Text.Encoding.Unicode.GetPreamble();
+                byte[] data = System.Text.Encoding.Unicode.GetBytes(html);
+                byte[] bytes = new byte[preamble.Length + data.Length];
+                preamble.CopyTo(bytes, 0);
+                data.CopyTo(bytes, preamble.Length);
+                await ctx.Response.Body.WriteAsync(bytes);
+            }));
+        using var server = new TestServer(builder);
+        using HttpClient client = server.CreateClient();
+        string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
+        Assert.Equal("<meta charset=\"UTF-16\">Hello", result);
+    }
 }

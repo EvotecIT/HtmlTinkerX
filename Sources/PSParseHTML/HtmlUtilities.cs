@@ -95,12 +95,12 @@ public static class HtmlUtilities {
         var asciiContent = System.Text.Encoding.ASCII.GetString(bytes);
         var metaMatch = System.Text.RegularExpressions.Regex.Match(
             asciiContent,
-            @"<meta[^>]+charset\s*=\s*[""']?([^""'>\s]+)",
+            @"<meta[^>]+charset\s*=\s*[""']?(?<charset>[^""'>\s]+)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         if (metaMatch.Success) {
             try {
-                var encoding = System.Text.Encoding.GetEncoding(metaMatch.Groups[1].Value);
+                var encoding = System.Text.Encoding.GetEncoding(metaMatch.Groups["charset"].Value);
                 return encoding.GetString(bytes);
             } catch {
                 // If the detected encoding is not supported, fall through to UTF-8
