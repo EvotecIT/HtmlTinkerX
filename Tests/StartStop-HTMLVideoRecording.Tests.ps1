@@ -55,4 +55,24 @@ describe 'HTML Video Recording' {
         [math]::Round($lat,0) | Should -Be 40
         $tz | Should -Be 'America/New_York'
     }
+
+    it 'Supports .WebM extension' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $out = Join-Path $TestDrive 'caps.WebM'
+        $session = Start-HTMLVideoRecording -Url $uri -OutFile $out -Width 320 -Height 240
+        Invoke-HTMLNavigation -Session $session -Url $uri
+        Stop-HTMLVideoRecording -Session $session -OutFile $out
+        (Test-Path $out) | Should -BeTrue
+    }
+
+    it 'Supports .webm extension when stopping' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $out = Join-Path $TestDrive 'lower.webm'
+        $session = Start-HTMLVideoRecording -Url $uri -OutFile $out -Width 320 -Height 240
+        Invoke-HTMLNavigation -Session $session -Url $uri
+        Stop-HTMLVideoRecording -Session $session -OutFile $out
+        (Test-Path $out) | Should -BeTrue
+    }
 }
