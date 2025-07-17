@@ -113,6 +113,7 @@ public sealed class CmdletGetHtmlInteractable : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         List<HtmlInteractableInfo> list;
         string? pUser = ProxyCredential?.UserName;
         string? pPass = ProxyCredential?.GetNetworkCredential().Password;

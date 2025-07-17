@@ -33,6 +33,7 @@ public sealed class CmdletSetHtmlHttpClientOption : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         if (TimeoutSeconds < -1) {
             ThrowTerminatingError(new ErrorRecord(
                 new PSArgumentOutOfRangeException(nameof(TimeoutSeconds), TimeoutSeconds, "TimeoutSeconds cannot be less than -1."),

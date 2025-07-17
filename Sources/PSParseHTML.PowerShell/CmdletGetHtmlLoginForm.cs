@@ -68,6 +68,7 @@ public sealed class CmdletGetHtmlLoginForm : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         HtmlFormLogin? result;
         string? pUser = ProxyCredential?.UserName;
         string? pPass = ProxyCredential?.GetNetworkCredential().Password;

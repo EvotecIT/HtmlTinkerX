@@ -138,6 +138,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
         string? pUser = ProxyCredential?.UserName;
         string? pPass = ProxyCredential?.GetNetworkCredential().Password;

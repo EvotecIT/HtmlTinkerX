@@ -136,6 +136,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
         string? pUser = ProxyCredential?.UserName;

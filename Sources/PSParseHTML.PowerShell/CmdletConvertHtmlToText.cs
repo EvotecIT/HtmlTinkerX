@@ -69,6 +69,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         string text = ParameterSetName switch {
             ParameterSetFile => HtmlParserToText.ConvertFileToText(HtmlUtilities.ResolvePath(Path)),
             ParameterSetUrl => HtmlParserToText.ConvertToText(

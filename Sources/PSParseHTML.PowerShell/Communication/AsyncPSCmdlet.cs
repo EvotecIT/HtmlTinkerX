@@ -226,6 +226,23 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     }
 
     /// <summary>
+    /// Validates proxy parameters.
+    /// Throws a terminating error if <paramref name="proxyCredential"/> is provided
+    /// without specifying <paramref name="proxy"/>.
+    /// </summary>
+    /// <param name="proxy">Proxy server address.</param>
+    /// <param name="proxyCredential">Credential for the proxy.</param>
+    protected void ValidateProxy(string? proxy, PSCredential? proxyCredential) {
+        if (proxyCredential != null && string.IsNullOrWhiteSpace(proxy)) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentException("ProxyCredential requires Proxy to be specified."),
+                "ProxyCredentialWithoutProxy",
+                ErrorCategory.InvalidArgument,
+                proxyCredential));
+        }
+    }
+
+    /// <summary>
     /// Throws a <see cref="PipelineStoppedException"/> if the cmdlet has been stopped.
     /// </summary>
     internal void ThrowIfStopped() {
