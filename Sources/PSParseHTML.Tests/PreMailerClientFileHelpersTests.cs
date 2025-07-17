@@ -79,4 +79,13 @@ public class PreMailerClientFileHelpersTests
             Environment.SetEnvironmentVariable("HTML_FILE_TEST", null);
         }
     }
+
+    [Fact]
+    public void FromFile_MissingFile_ContainsAbsolutePathInMessage()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+        string resolved = Path.GetFullPath(path);
+        FileNotFoundException ex = Assert.Throws<FileNotFoundException>(() => PreMailerClient.FromFile(path, null));
+        Assert.Contains(resolved, ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
