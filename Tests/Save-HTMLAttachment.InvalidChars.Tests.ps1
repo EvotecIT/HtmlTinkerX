@@ -17,7 +17,7 @@ Describe 'Save-HTMLAttachment invalid chars' {
     </script>
 </head>
 <body>
-    <a id='c1' href='bad:name1.txt' download>1</a>
+    <a id='c1' href='bad%3Aname1.txt' download>1</a>
     <a id='c2' href='bad*name2.txt' download>2</a>
 </body>
 </html>
@@ -31,10 +31,10 @@ Describe 'Save-HTMLAttachment invalid chars' {
             $dest = Join-Path $TestDrive 'out'
             [array]$files = Save-HTMLAttachment -Url $uri -Path $dest
             $files.Count | Should -Be 2
-            $files | Should -Contain (Join-Path $dest 'badname1.txt')
-            $files | Should -Contain (Join-Path $dest 'badname2.txt')
-            Test-Path (Join-Path $dest 'badname1.txt') | Should -BeTrue
-            Test-Path (Join-Path $dest 'badname2.txt') | Should -BeTrue
+            $files | Should -Contain (Join-Path $dest 'bad_name1.txt')
+            $files | Should -Contain (Join-Path $dest 'bad_name2.txt')
+            Test-Path (Join-Path $dest 'bad_name1.txt') | Should -BeTrue
+            Test-Path (Join-Path $dest 'bad_name2.txt') | Should -BeTrue
         }
         finally {
             $server | Stop-Process
