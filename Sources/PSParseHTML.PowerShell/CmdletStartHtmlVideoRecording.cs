@@ -1,3 +1,4 @@
+using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -130,7 +131,7 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        if (System.IO.Path.GetExtension(OutFile) != ".webm") {
+        if (!OutFile.EndsWith(".webm", StringComparison.OrdinalIgnoreCase)) {
             throw new PSArgumentException("Only .webm files are supported.", nameof(OutFile));
         }
         string target;
