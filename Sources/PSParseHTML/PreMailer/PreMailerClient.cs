@@ -395,28 +395,32 @@ public class PreMailerClient {
 
     private static string NormalizeFileUriPath(Uri uri)
     {
-        if (uri.IsUnc)
+        if (!uri.IsFile)
         {
-            string[] segments = uri.AbsolutePath
-                .TrimStart('/')
-                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            string path = Path.Combine(segments);
-
-            string prefix = Path.DirectorySeparatorChar == '\\'
-                ? new string(Path.DirectorySeparatorChar, 2) + uri.Host
-                : Path.DirectorySeparatorChar + uri.Host;
-
-            return Path.Combine(prefix, path);
+            throw new ArgumentException("URI must be a file path", nameof(uri));
         }
 
-        string localPath = uri.LocalPath;
-        if (Path.DirectorySeparatorChar == '\\')
+        string path = uri.LocalPath;
+
+        // Normalize directory separators
+        char desired = Path.DirectorySeparatorChar;
+        char alt = desired == '/' ? '\\' : '/';
+        path = path.Replace(alt, desired);
+
+        // UNC paths need special handling on Unix where LocalPath starts with
+        // double separators
+        if (uri.IsUnc && desired == '/')
         {
-            localPath = localPath.Length >= 2 && localPath[1] == ':'
-                ? localPath.Replace('/', '\\')
-                : "\\" + localPath.TrimStart('/').Replace('/', '\\');
+            path = "/" + path.TrimStart(desired);
         }
 
-        return localPath;
+        // Preserve trailing slash if present in the original URI
+        bool endsWithSlash = uri.AbsolutePath.EndsWith("/", StringComparison.Ordinal);
+        if (endsWithSlash && !path.EndsWith(desired))
+        {
+            path += desired;
+        }
+
+        return path;
     }
 }

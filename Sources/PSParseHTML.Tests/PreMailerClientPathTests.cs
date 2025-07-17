@@ -42,4 +42,34 @@ public class PreMailerClientPathTests
             Assert.Equal(@"\tmp\test.css", normalized);
         }
     }
+
+    [Fact]
+    public void NormalizeFileUriPath_UncPaths_TrailingSlash()
+    {
+        Uri uri = new("file:////server/share/folder/");
+        string normalized = InvokeNormalize(uri);
+        if (Path.DirectorySeparatorChar == '/')
+        {
+            Assert.Equal("/server/share/folder/", normalized);
+        }
+        else
+        {
+            Assert.Equal(@"\\server\share\folder\", normalized);
+        }
+    }
+
+    [Fact]
+    public void NormalizeFileUriPath_LocalPaths_TrailingSlash()
+    {
+        Uri uri = new("file:///tmp/folder/");
+        string normalized = InvokeNormalize(uri);
+        if (Path.DirectorySeparatorChar == '/')
+        {
+            Assert.Equal("/tmp/folder/", normalized);
+        }
+        else
+        {
+            Assert.Equal(@"\tmp\folder\", normalized);
+        }
+    }
 }
