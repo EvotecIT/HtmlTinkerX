@@ -51,6 +51,7 @@ jobs:
       - name: Run PowerShell tests
         shell: powershell
         run: .\PSParseHTML.Tests.ps1
+        timeout-minutes: 10
 
   test-windows-ps7:
     name: 'Windows PowerShell 7'
@@ -79,6 +80,7 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: .\PSParseHTML.Tests.ps1
+        timeout-minutes: 10
 
   test-ubuntu:
     name: 'Ubuntu PowerShell 7'
@@ -114,6 +116,7 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: ./PSParseHTML.Tests.ps1
+        timeout-minutes: 10
 
   test-macos:
     name: 'macOS PowerShell 7'
