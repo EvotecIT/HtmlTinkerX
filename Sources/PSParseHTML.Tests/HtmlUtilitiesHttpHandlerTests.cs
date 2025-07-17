@@ -46,4 +46,13 @@ public class HtmlUtilitiesHttpHandlerTests
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, "http://localhost/");
         Assert.Equal("Hello", result);
     }
+
+    [Fact]
+    public async Task GetStringWithProperEncodingAsync_CanBeCancelled()
+    {
+        using HttpClient client = new(new StaticResponseHandler("Hello", "text/plain", "utf-8"), false);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        await Assert.ThrowsAsync<TaskCanceledException>(() => HtmlUtilities.GetStringWithProperEncodingAsync(client, "http://localhost/", cts.Token));
+    }
 }

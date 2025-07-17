@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -47,7 +48,7 @@ public static class HtmlFormSubmitter {
     /// <param name="fields">Field values keyed by name.</param>
     /// <param name="client">Optional HttpClient instance.</param>
     /// <returns>Response body as string.</returns>
-    public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null) {
+    public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (actionUrl == null) {
             throw new ArgumentNullException(nameof(actionUrl));
         }
@@ -60,12 +61,12 @@ public static class HtmlFormSubmitter {
         if (method.Equals("GET", StringComparison.OrdinalIgnoreCase)) {
             string query = string.Join("&", fields.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
             string url = actionUrl.Contains("?") ? $"{actionUrl}&{query}" : $"{actionUrl}?{query}";
-            using HttpResponseMessage response = await http.GetAsync(url).ConfigureAwait(false);
+            using HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         } else {
             using var content = new FormUrlEncodedContent(fields);
-            using HttpResponseMessage response = await http.PostAsync(actionUrl, content).ConfigureAwait(false);
+            using HttpResponseMessage response = await http.PostAsync(actionUrl, content, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
