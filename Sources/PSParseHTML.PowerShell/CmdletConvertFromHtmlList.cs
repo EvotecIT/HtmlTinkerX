@@ -110,7 +110,6 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
             }
         }
 
-        await Task.CompletedTask;
     }
 
     private PSObject[] ConvertItems(List<List<string>> items) {

@@ -79,7 +79,5 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
             HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(Content);
             WriteObject(Raw.IsPresent ? doc : doc.DocumentNode);
         }
-
-        await Task.CompletedTask;
     }
 }

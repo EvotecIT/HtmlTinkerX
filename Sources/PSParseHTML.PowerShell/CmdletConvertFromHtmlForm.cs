@@ -62,8 +62,6 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
             }
             WriteObject(output.ToArray(), false);
         }
-
-        await Task.CompletedTask;
     }
 
     private PSObject CreateFormObject(HtmlFormResult result) {

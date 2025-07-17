@@ -32,8 +32,6 @@ public sealed class CmdletCompareHtml : AsyncPSCmdlet {
         foreach (var diff in HtmlDiffer.Compare(referenceContent, differenceContent)) {
             WriteObject(diff);
         }
-
-        await Task.CompletedTask;
     }
 
     private static async Task<string> GetContentAsync(string input) {

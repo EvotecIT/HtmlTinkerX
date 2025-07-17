@@ -101,8 +101,6 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
                 WriteObject(e.TextContent);
             }
         }
-
-        await Task.CompletedTask;
     }
 
     private async Task<string> DownloadHtmlAsync() {
