@@ -61,6 +61,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         List<HtmlResourceLink> links;
         HttpClient? client = null;
         switch (ParameterSetName) {
