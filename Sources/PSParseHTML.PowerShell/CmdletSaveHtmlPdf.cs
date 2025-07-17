@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Management.Automation;
 using System.Threading.Tasks;
+using System.IO;
+using PSParseHTML;
 
 namespace PSParseHTML.PowerShell;
 
@@ -134,11 +136,16 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
+        string outPath = HtmlUtilities.ResolvePath(OutFile);
+        string? dir = System.IO.Path.GetDirectoryName(outPath);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
         switch (ParameterSetName) {
             case ParameterSetSession:
                 await HtmlBrowser.SavePagePdfAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                    OutFile,
+                    outPath,
                     Delay,
                     Selector,
                     Landscape.IsPresent,
@@ -162,7 +169,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
             case ParameterSetFile:
                 await HtmlBrowser.SavePagePdfAsync(
                     new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri,
-                    OutFile,
+                    outPath,
                     Browser,
                     Clean.IsPresent,
                     Delay,
@@ -190,7 +197,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
             default:
                 await HtmlBrowser.SavePagePdfAsync(
                     Url,
-                    OutFile,
+                    outPath,
                     Browser,
                     Clean.IsPresent,
                     Delay,
@@ -219,7 +226,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
 
         if (Open.IsPresent) {
             Process.Start(new ProcessStartInfo {
-                FileName = OutFile,
+                FileName = outPath,
                 UseShellExecute = true,
             });
         }
