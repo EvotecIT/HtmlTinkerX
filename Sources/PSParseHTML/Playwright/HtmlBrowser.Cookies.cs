@@ -39,7 +39,7 @@ public static partial class HtmlBrowser {
     /// <param name="session">Session to which cookies will be added.</param>
     /// <param name="cookies">Collection of cookies to add.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    public static Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
+    public static async Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
         List<Cookie> list = new();
         foreach (HtmlCookie c in cookies) {
             Cookie nc = new() {
@@ -56,8 +56,7 @@ public static partial class HtmlBrowser {
             list.Add(nc);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return list.Count == 0
-            ? Task.CompletedTask
-            : session.Context.AddCookiesAsync(list);
+        if (list.Count > 0)
+            await session.Context.AddCookiesAsync(list).ConfigureAwait(false);
     }
 }
