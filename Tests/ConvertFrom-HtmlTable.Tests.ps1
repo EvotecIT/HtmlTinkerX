@@ -77,7 +77,9 @@
     }
 
     It 'ConvertFrom-HTML cmdlet parses example.com' {
-        $doc = ConvertFrom-HTML -Url 'https://example.com'
+        $Path = Join-Path $PSScriptRoot 'Documents/em_sample.html'
+        $Html = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        $doc = ConvertFrom-HTML -Content $Html
         $doc | Should -Not -BeNullOrEmpty
     }
 
