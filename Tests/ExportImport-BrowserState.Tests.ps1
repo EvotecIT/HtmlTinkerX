@@ -4,11 +4,7 @@ Describe 'Browser state persistence' {
             $url = 'about:blank'
             $state = Join-Path $TestDrive 'state.json'
 
-        $cookie = [PSParseHTML.HtmlCookie]::new()
-        $cookie.Name = 'persist'
-        $cookie.Value = 'sweet'
-        $cookie.Domain = 'example.com'
-        $cookie.Path = '/'
+        $cookie = New-HTMLCookie -Name 'persist' -Value 'sweet' -Domain 'example.com' -Path '/'
 
         $s1 = Invoke-HTMLRendering -Url $url -Session
         Set-HTMLCookie -Session $s1 -Cookie ([PSParseHTML.HtmlCookie[]]@($cookie))
