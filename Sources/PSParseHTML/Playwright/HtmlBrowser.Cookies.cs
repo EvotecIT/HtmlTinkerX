@@ -13,8 +13,9 @@ public static partial class HtmlBrowser {
     /// Retrieves cookies from the browser context.
     /// </summary>
     /// <param name="session">Session from which cookies will be read.</param>
+    /// <param name="domains">Optional domain filter.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, CancellationToken cancellationToken = default) {
+    public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, IEnumerable<string>? domains = null, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<BrowserContextCookiesResult> cookies = await session.Context.CookiesAsync();
         List<HtmlCookie> result = new();
@@ -30,8 +31,20 @@ public static partial class HtmlBrowser {
                 SameSite = c.SameSite
             });
         }
+        if (domains is { }) {
+            HashSet<string> filter = new(domains, System.StringComparer.OrdinalIgnoreCase);
+            result.RemoveAll(c => c.Domain is null || !filter.Contains(c.Domain));
+        }
         return result;
     }
+
+    /// <summary>
+    /// Retrieves cookies from the browser context.
+    /// </summary>
+    /// <param name="session">Session from which cookies will be read.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public static Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, CancellationToken cancellationToken) =>
+        GetCookiesAsync(session, null, cancellationToken);
 
     /// <summary>
     /// Adds cookies to the browser context.
@@ -39,7 +52,7 @@ public static partial class HtmlBrowser {
     /// <param name="session">Session to which cookies will be added.</param>
     /// <param name="cookies">Collection of cookies to add.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    public static Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
+    public static async Task SetCookiesAsync(HtmlBrowserSession session, IEnumerable<HtmlCookie> cookies, CancellationToken cancellationToken = default) {
         List<Cookie> list = new();
         foreach (HtmlCookie c in cookies) {
             Cookie nc = new() {
@@ -56,8 +69,7 @@ public static partial class HtmlBrowser {
             list.Add(nc);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return list.Count == 0
-            ? Task.CompletedTask
-            : session.Context.AddCookiesAsync(list);
+        if (list.Count > 0)
+            await session.Context.AddCookiesAsync(list).ConfigureAwait(false);
     }
 }

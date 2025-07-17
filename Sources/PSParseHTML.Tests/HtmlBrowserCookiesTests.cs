@@ -91,4 +91,38 @@ public class HtmlBrowserCookiesTests
 
         context.Verify();
     }
+
+    [Fact]
+    public async Task GetCookiesAsync_FiltersByDomain()
+    {
+        var context = new Mock<IBrowserContext>();
+        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        typeof(HtmlBrowserSession)
+            .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(session, context.Object);
+
+        var cookies = new List<BrowserContextCookiesResult>
+        {
+            new BrowserContextCookiesResult
+            {
+                Name = "a",
+                Value = "1",
+                Domain = "match.com",
+                Path = "/"
+            },
+            new BrowserContextCookiesResult
+            {
+                Name = "b",
+                Value = "2",
+                Domain = "other.com",
+                Path = "/"
+            }
+        };
+        context.Setup(c => c.CookiesAsync()).ReturnsAsync(cookies);
+
+        List<HtmlCookie> result = await HtmlBrowser.GetCookiesAsync(session, new[] { "match.com" });
+
+        Assert.Single(result);
+        Assert.Equal("a", result[0].Name);
+    }
 }

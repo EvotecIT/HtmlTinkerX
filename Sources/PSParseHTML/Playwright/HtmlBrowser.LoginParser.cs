@@ -22,7 +22,9 @@ public static class HtmlLoginParser {
 
         var parser = new global::AngleSharp.Html.Parser.HtmlParser();
         IDocument doc = parser.ParseDocument(html);
-        IElement? pwd = doc.QuerySelector("input[type='password']");
+        IElement? pwd = doc
+            .QuerySelectorAll("input[type='password']")
+            .FirstOrDefault(p => !IsHidden(p));
         if (pwd is null) {
             return null;
         }
@@ -56,7 +58,7 @@ public static class HtmlLoginParser {
 
         string? name = el.GetAttribute("name");
         if (!string.IsNullOrEmpty(name)) {
-            return $"{sel}[name='{name.Replace("'", "\\'")}']";
+            return $"{sel}[name='{CssStringEscape(name)}']";
         }
 
         string cls = el.ClassName ?? string.Empty;
@@ -66,6 +68,27 @@ public static class HtmlLoginParser {
         }
 
         return sel;
+    }
+
+    private static bool IsHidden(IElement el) {
+        if (el.HasAttribute("hidden")) {
+            return true;
+        }
+
+        string? aria = el.GetAttribute("aria-hidden");
+        if (string.Equals(aria, "true", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        string? style = el.GetAttribute("style");
+        if (!string.IsNullOrEmpty(style)) {
+            style = style.ToLowerInvariant();
+            if (style.Contains("display:none") || style.Contains("visibility:hidden") || style.Contains("opacity:0")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string CssEscape(string value) {
@@ -79,4 +102,10 @@ public static class HtmlLoginParser {
         }
         return sb.ToString();
     }
+
+    private static string CssStringEscape(string value) =>
+        value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("'", "\\'");
 }

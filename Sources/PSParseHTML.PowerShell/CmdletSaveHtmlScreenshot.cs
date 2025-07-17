@@ -7,7 +7,7 @@ using PSParseHTML;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>
-/// Cmdlet that captures a screenshot of a web page using a headless browser.
+/// Cmdlet that captures a screenshot of a web page using a headless browser. If <c>OutFile</c> has no extension, one is added based on <see cref="Format"/>.
 /// </summary>
 /// <example>
 /// <code>Save-HTMLScreenshot -Url https://example.com -OutFile page.png</code>
@@ -153,6 +153,16 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     null));
                 return;
             }
+        }
+
+        if (!System.IO.Path.HasExtension(OutFile)) {
+            string ext = Format switch {
+                ImageFormat.Jpeg => ".jpg",
+                ImageFormat.Bmp => ".bmp",
+                ImageFormat.Gif => ".gif",
+                _ => ".png"
+            };
+            OutFile += ext;
         }
 
         if (ParameterSetName.EndsWith("Clip", System.StringComparison.OrdinalIgnoreCase)) {

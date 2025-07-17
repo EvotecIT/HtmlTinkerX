@@ -1,7 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Management.Automation;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -15,6 +16,10 @@ public sealed class CmdletGetHtmlCookie : AsyncPSCmdlet {
     [Parameter(Position = 0, ValueFromPipeline = true)]
     public HtmlBrowserSession? Session { get; set; }
 
+    /// <summary>Cookie domain filter.</summary>
+    [Parameter]
+    public string[]? Domain { get; set; }
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -25,7 +30,7 @@ public sealed class CmdletGetHtmlCookie : AsyncPSCmdlet {
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
-        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session, token).ConfigureAwait(false);
+        List<HtmlCookie> cookies = await HtmlBrowser.GetCookiesAsync(session, Domain, token).ConfigureAwait(false);
         WriteObject(cookies, true);
     }
 }
