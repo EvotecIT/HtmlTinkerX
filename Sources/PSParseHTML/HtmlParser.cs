@@ -295,7 +295,7 @@ public static class HtmlParser {
     }
 
     /// <summary>
-    /// Extracts <meta> tag information from HTML markup.
+    /// Extracts <c>&lt;meta&gt;</c> tag information from HTML markup.
     /// </summary>
     /// <param name="html">HTML content containing meta tags.</param>
     /// <returns>List of meta tag name/content pairs.</returns>
@@ -304,7 +304,7 @@ public static class HtmlParser {
     }
 
     /// <summary>
-    /// Extracts <meta> tag information from a web page.
+    /// Extracts <c>&lt;meta&gt;</c> tag information from a web page.
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>

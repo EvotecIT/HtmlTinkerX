@@ -10,13 +10,14 @@
         <Copyright>(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.3.0" />
-        <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.154" />
-        <PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
-        <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.43" />
+  <ItemGroup>
+      <PackageReference Include="AngleSharp" Version="1.3.0" />
+      <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.154" />
+      <PackageReference Include="AngleSharp.Diffing" Version="1.0.0" />
+      <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.43" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
         <PackageReference Include="Jsbeautifier" Version="0.0.1" />
         <PackageReference Include="NUglify" Version="1.21.15" />
@@ -25,10 +26,13 @@
         <PackageReference Include="System.Net.Http" Version="4.3.4" />
         <PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
         <PackageReference Include="SixLabors.ImageSharp" Version="2.1.10" />
-        <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
-        <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
-        <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
-    </ItemGroup>
+      <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
+      <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
+      <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+      <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
+          <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+  </ItemGroup>
 
   <ItemGroup>
     <Using Include="System.Net.Http" />

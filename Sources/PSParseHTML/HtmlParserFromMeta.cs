@@ -17,7 +17,7 @@ public static class HtmlParserFromMeta {
     /// <returns>List of meta tags.</returns>
     /// <example>
     /// <code>
-    /// var tags = HtmlParserFromMeta.ParseMetaTags("<meta name='a' content='b'>");
+    /// var tags = HtmlParserFromMeta.ParseMetaTags("&lt;meta name='a' content='b'&gt;");
     /// </code>
     /// </example>
     public static List<HtmlMetaTag> ParseMetaTags(string html) {
