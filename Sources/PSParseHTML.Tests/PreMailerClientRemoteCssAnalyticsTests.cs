@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -61,7 +62,7 @@ public class PreMailerClientRemoteCssAnalyticsTests
 
         try
         {
-            PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(html, options);
+            PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(html, options, CancellationToken.None);
             Assert.Contains("style=\"font-size: 42px\"", result.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("style=\"color: red\"", result.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("utm_source=newsletter", result.Html);

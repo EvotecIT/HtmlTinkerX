@@ -145,10 +145,10 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
 
         PreMailerResult result = ParameterSetName == "File"
             ? await PreMailerClient
-                .MoveCssInlineFromFileAsync(Path, options)
+                .MoveCssInlineFromFileAsync(Path, options, CancelToken)
                 .ConfigureAwait(false)
             : await PreMailerClient
-                .MoveCssInlineAsync(Body, options)
+                .MoveCssInlineAsync(Body, options, CancelToken)
                 .ConfigureAwait(false);
 
         WriteObject(result.Html);

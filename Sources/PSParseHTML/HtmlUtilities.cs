@@ -45,15 +45,15 @@ public static class HtmlUtilities {
     /// <param name="path">Path to the file.</param>
     /// <returns>File contents.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> ReadFileCheckedAsync(string path) {
+    public static async Task<string> ReadFileCheckedAsync(string path, CancellationToken cancellationToken = default) {
         string fullPath = ResolvePath(path);
         if (!File.Exists(fullPath)) {
             throw new FileNotFoundException($"File not found: {path}", fullPath);
         }
 #if NETSTANDARD2_0 || NETFRAMEWORK
-        return await Task.Run(() => File.ReadAllText(fullPath)).ConfigureAwait(false);
+        return await Task.Run(() => File.ReadAllText(fullPath), cancellationToken).ConfigureAwait(false);
 #else
-        return await File.ReadAllTextAsync(fullPath).ConfigureAwait(false);
+        return await File.ReadAllTextAsync(fullPath, cancellationToken).ConfigureAwait(false);
 #endif
     }
 
@@ -68,6 +68,7 @@ public static class HtmlUtilities {
         response.EnsureSuccessStatusCode();
 
         var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Try to get encoding from Content-Type header
         var contentType = response.Content.Headers.ContentType;
