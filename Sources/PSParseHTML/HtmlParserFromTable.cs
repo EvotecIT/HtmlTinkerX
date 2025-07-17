@@ -65,9 +65,10 @@ public static class HtmlParserFromTable {
             var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
             metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
-            var rows = skipFooter ?
-                table.QuerySelectorAll("tr:not(tfoot tr)") :
-                table.QuerySelectorAll("tr");
+            IElement[] rows = table.QuerySelectorAll("tr").ToArray();
+            if (skipFooter) {
+                rows = rows.Where(row => row.Closest("tfoot") is null).ToArray();
+            }
             metadata.RowCount = rows.Length;
 
             if (rows.Length == 0) {
