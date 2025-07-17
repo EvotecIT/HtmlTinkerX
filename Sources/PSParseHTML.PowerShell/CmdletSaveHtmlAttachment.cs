@@ -82,7 +82,32 @@ public sealed class CmdletSaveHtmlAttachment : AsyncPSCmdlet {
         };
 
         await foreach (string file in files.WithCancellation(token).ConfigureAwait(false)) {
-            WriteObject(file);
+            string directory = System.IO.Path.GetDirectoryName(file)!;
+            string name = System.IO.Path.GetFileName(file);
+            string sanitized = RemoveInvalidChars(name);
+            string path = System.IO.Path.Combine(directory, sanitized);
+            if (!string.Equals(file, path, System.StringComparison.Ordinal)) {
+#if NET6_0_OR_GREATER
+                System.IO.File.Move(file, path, true);
+#else
+                if (System.IO.File.Exists(path)) {
+                    System.IO.File.Delete(path);
+                }
+                System.IO.File.Move(file, path);
+#endif
+            }
+            WriteObject(path);
         }
+    }
+
+    private static string RemoveInvalidChars(string name) {
+        char[] invalid = System.IO.Path.GetInvalidFileNameChars();
+        var builder = new System.Text.StringBuilder(name.Length);
+        foreach (char c in name) {
+            if (System.Array.IndexOf(invalid, c) < 0) {
+                builder.Append(c);
+            }
+        }
+        return builder.ToString();
     }
 }
