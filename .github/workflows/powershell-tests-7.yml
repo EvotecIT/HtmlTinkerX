@@ -6,9 +6,6 @@ name: Test PowerShell (7)
 #   workflow_dispatch:  # Manual trigger only
 on:
   push:
-    branches:
-      - v1-legacy
-      - v2-speedygonzales
     paths-ignore:
       - '*.md'
       - 'Docs/**'
@@ -16,8 +13,10 @@ on:
       - '.gitignore'
   pull_request:
     branches:
-      - v1-legacy
       - v2-speedygonzales
+
+permissions:
+  contents: write
 
 env:
   DOTNET_VERSION: '8.x'
