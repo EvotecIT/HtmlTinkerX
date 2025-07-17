@@ -15,4 +15,5 @@ public enum HtmlBrowserEngine {
     /// <summary>
     /// WebKit browser engine, used by Safari and others.
     /// </summary>
-    WebKit,}
+    WebKit
+}
