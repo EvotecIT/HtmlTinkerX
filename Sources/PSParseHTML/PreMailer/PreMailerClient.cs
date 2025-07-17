@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using AngleSharp.Dom;
 using PreMailer.Net;
@@ -139,7 +140,7 @@ public class PreMailerClient {
     /// <summary>
     /// Asynchronously processes the HTML and returns the result.
     /// </summary>
-    public async Task<PreMailerResult> MoveCssInlineAsync() {
+    public async Task<PreMailerResult> MoveCssInlineAsync(CancellationToken cancellationToken = default) {
         try {
             string cssContent = Options.Css ?? string.Empty;
             string htmlToProcess = _html;
@@ -168,14 +169,14 @@ public class PreMailerClient {
                         if (uri.IsFile) {
                             string localPath = NormalizeFileUriPath(uri);
 #if NETSTANDARD2_0 || NETFRAMEWORK
-                            cssContent += await Task.Run(() => File.ReadAllText(localPath)).ConfigureAwait(false);
+                            cssContent += await Task.Run(() => File.ReadAllText(localPath), cancellationToken).ConfigureAwait(false);
 #else
-                            cssContent += await File.ReadAllTextAsync(localPath).ConfigureAwait(false);
+                            cssContent += await File.ReadAllTextAsync(localPath, cancellationToken).ConfigureAwait(false);
 #endif
                         } else if (uri.IsAbsoluteUri) {
                             using HttpClient client = new();
                             cssContent += await HtmlUtilities
-                                .GetStringWithProperEncodingAsync(client, uri.ToString())
+                                .GetStringWithProperEncodingAsync(client, uri.ToString(), cancellationToken)
                                 .ConfigureAwait(false);
                         }
                     } catch (Exception ex) {
@@ -188,7 +189,7 @@ public class PreMailerClient {
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                cssContent += await HtmlUtilities.ReadFileCheckedAsync(Options.CssFilePath!).ConfigureAwait(false);
+                cssContent += await HtmlUtilities.ReadFileCheckedAsync(Options.CssFilePath!, cancellationToken).ConfigureAwait(false);
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
@@ -252,17 +253,17 @@ public class PreMailerClient {
     /// </summary>
     /// <param name="html">HTML markup to process.</param>
     /// <param name="options">Optional processing options.</param>
-    public static Task<PreMailerResult> MoveCssInlineAsync(string html, PreMailerOptions? options = null)
-        => FromHtml(html, options).MoveCssInlineAsync();
+    public static Task<PreMailerResult> MoveCssInlineAsync(string html, PreMailerOptions? options = null, CancellationToken cancellationToken = default)
+        => FromHtml(html, options).MoveCssInlineAsync(cancellationToken);
 
     /// <summary>
     /// Asynchronously processes a HTML file using the provided options.
     /// </summary>
     /// <param name="htmlFilePath">Path to the HTML file.</param>
     /// <param name="options">Optional processing options.</param>
-    public static async Task<PreMailerResult> MoveCssInlineFromFileAsync(string htmlFilePath, PreMailerOptions? options = null) {
-        string html = await HtmlUtilities.ReadFileCheckedAsync(htmlFilePath).ConfigureAwait(false);
-        return await MoveCssInlineAsync(html, options).ConfigureAwait(false);
+    public static async Task<PreMailerResult> MoveCssInlineFromFileAsync(string htmlFilePath, PreMailerOptions? options = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlUtilities.ReadFileCheckedAsync(htmlFilePath, cancellationToken).ConfigureAwait(false);
+        return await MoveCssInlineAsync(html, options, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
