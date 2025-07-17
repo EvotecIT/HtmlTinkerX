@@ -141,7 +141,9 @@ public class PreMailerClient {
     /// Asynchronously processes the HTML and returns the result.
     /// </summary>
     public async Task<PreMailerResult> MoveCssInlineAsync(CancellationToken cancellationToken = default) {
-        cancellationToken.ThrowIfCancellationRequested();
+        if (cancellationToken.IsCancellationRequested) {
+            return await Task.FromCanceled<PreMailerResult>(cancellationToken).ConfigureAwait(false);
+        }
         try {
             string cssContent = Options.Css ?? string.Empty;
             string htmlToProcess = _html;
