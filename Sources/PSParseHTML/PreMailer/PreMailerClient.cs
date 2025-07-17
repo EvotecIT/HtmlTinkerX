@@ -32,7 +32,7 @@ public class PreMailerClient {
     public static PreMailerClient FromFile(string htmlFilePath, PreMailerOptions? options = null) {
         string path = HtmlUtilities.ResolvePath(htmlFilePath);
         if (!File.Exists(path)) {
-            throw new FileNotFoundException($"HTML file not found: {htmlFilePath}", path);
+            throw new FileNotFoundException($"HTML file not found: {path}", path);
         }
         string html = File.ReadAllText(path);
         return new PreMailerClient(html, options);
