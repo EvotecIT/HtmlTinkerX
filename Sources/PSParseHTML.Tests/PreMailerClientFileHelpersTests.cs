@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -35,7 +36,7 @@ public class PreMailerClientFileHelpersTests
         try
         {
             PreMailerResult syncResult = PreMailerClient.MoveCssInlineFromFile(path, options);
-            PreMailerResult asyncResult = await PreMailerClient.MoveCssInlineFromFileAsync(path, options);
+            PreMailerResult asyncResult = await PreMailerClient.MoveCssInlineFromFileAsync(path, options, CancellationToken.None);
             Assert.Equal(syncResult.Html, asyncResult.Html);
             Assert.DoesNotContain("<style", asyncResult.Html, StringComparison.OrdinalIgnoreCase);
         }

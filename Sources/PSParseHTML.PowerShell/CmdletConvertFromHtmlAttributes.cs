@@ -76,6 +76,7 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         IEnumerable<IElement> elements = ParameterSetName switch {
             ParameterSetUrl => HtmlParserExtensions.GetElements(
                 await DownloadHtmlAsync().ConfigureAwait(false),

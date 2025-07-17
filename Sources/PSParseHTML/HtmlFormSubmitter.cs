@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -30,13 +31,13 @@ public static class HtmlFormSubmitter {
         }
 
         var form = page.Locator(formSelector);
-        await form.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
+        await form.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }).ConfigureAwait(false);
         foreach (var kv in fields) {
             var input = form.Locator($":scope [name=\"{kv.Key}\"]");
-            await input.FillAsync(kv.Value, new LocatorFillOptions { Timeout = timeout });
+            await input.FillAsync(kv.Value, new LocatorFillOptions { Timeout = timeout }).ConfigureAwait(false);
         }
-        await form.EvaluateAsync("form => form.submit()");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await form.EvaluateAsync("form => form.submit()").ConfigureAwait(false);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -47,7 +48,7 @@ public static class HtmlFormSubmitter {
     /// <param name="fields">Field values keyed by name.</param>
     /// <param name="client">Optional HttpClient instance.</param>
     /// <returns>Response body as string.</returns>
-    public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null) {
+    public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (actionUrl == null) {
             throw new ArgumentNullException(nameof(actionUrl));
         }
@@ -60,12 +61,12 @@ public static class HtmlFormSubmitter {
         if (method.Equals("GET", StringComparison.OrdinalIgnoreCase)) {
             string query = string.Join("&", fields.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
             string url = actionUrl.Contains("?") ? $"{actionUrl}&{query}" : $"{actionUrl}?{query}";
-            using HttpResponseMessage response = await http.GetAsync(url).ConfigureAwait(false);
+            using HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         } else {
             using var content = new FormUrlEncodedContent(fields);
-            using HttpResponseMessage response = await http.PostAsync(actionUrl, content).ConfigureAwait(false);
+            using HttpResponseMessage response = await http.PostAsync(actionUrl, content, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }

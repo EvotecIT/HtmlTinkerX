@@ -87,6 +87,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         if (IncludeMetadata.IsPresent) {
             List<HtmlTableResult> tables;
             if (ParameterSetName == ParameterSetUrl) {

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -42,12 +43,12 @@ public static class HtmlParser {
     /// IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync("https://example.com");
     /// </code>
     /// </example>
-    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null) {
+    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, cancellationToken).ConfigureAwait(false);
         return ParseWithAngleSharp(content);
     }
 
@@ -70,12 +71,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <returns>The parsed <see cref="HtmlDocument"/>.</returns>
-    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null) {
+    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, cancellationToken).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
     }
 

@@ -48,6 +48,7 @@ public sealed class CmdletSubmitHtmlForm : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
         string action = Form.Properties["Action"]?.Value as string ?? string.Empty;
         string? method = Form.Properties["Method"]?.Value as string;
 

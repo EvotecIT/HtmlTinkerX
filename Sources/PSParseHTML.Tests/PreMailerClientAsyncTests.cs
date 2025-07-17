@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using PSParseHTML;
 using Xunit;
@@ -14,7 +15,7 @@ public class PreMailerClientAsyncTests
     public async Task MoveCssInlineAsync_RemovesStyleElements_WhenEnabled()
     {
         var options = new PreMailerOptions { RemoveStyleElements = true };
-        PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, options);
+        PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, options, CancellationToken.None);
         Assert.DoesNotContain("<style", result.Html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -26,8 +27,35 @@ public class PreMailerClientAsyncTests
         await File.WriteAllTextAsync(path, HtmlWithMediaQuery);
         try
         {
-            PreMailerResult result = await PreMailerClient.MoveCssInlineFromFileAsync(path, options);
+            PreMailerResult result = await PreMailerClient.MoveCssInlineFromFileAsync(path, options, CancellationToken.None);
             Assert.DoesNotContain("<style", result.Html, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task MoveCssInlineAsync_CanceledToken_Throws()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        await Assert.ThrowsAsync<TaskCanceledException>(
+            () => PreMailerClient.MoveCssInlineAsync(HtmlWithMediaQuery, null, cts.Token));
+    }
+
+    [Fact]
+    public async Task MoveCssInlineFromFileAsync_CanceledToken_Throws()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+        await File.WriteAllTextAsync(path, HtmlWithMediaQuery);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        try
+        {
+            await Assert.ThrowsAsync<TaskCanceledException>(
+                () => PreMailerClient.MoveCssInlineFromFileAsync(path, null, cts.Token));
         }
         finally
         {

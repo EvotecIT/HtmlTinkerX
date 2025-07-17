@@ -7,5 +7,12 @@ Describe 'Proxy parameters' {
             $params | Should -Contain 'ProxyCredential'
         }
     }
+
+    It 'Throws when ProxyCredential used without Proxy' {
+        $cred = New-Object PSCredential('u',(ConvertTo-SecureString 'p' -AsPlainText -Force))
+        { Invoke-HTMLRendering -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        { Get-HTMLInteractable -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        { Set-HTMLHttpClientOption -ProxyCredential $cred } | Should -Throw
+    }
 }
 

@@ -58,6 +58,7 @@ stages:
           command: 'test'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage"'
+        timeoutInMinutes: 10
 
       - task: PublishTestResults@2
         displayName: 'Publish .NET Test Results'
@@ -97,6 +98,7 @@ stages:
           command: 'test'
           projects: 'Sources/PSParseHTML.sln'
           arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
+        timeoutInMinutes: 10
 
   - job: DotNet_MacOS
     displayName: '.NET Tests - macOS'
@@ -162,6 +164,7 @@ stages:
       - powershell: |
           .\PSParseHTML.Tests.ps1
         displayName: "Run PowerShell Tests (PS 5.1)"
+        timeoutInMinutes: 10
 
   - job: PowerShell_Windows_PS7
     displayName: 'PowerShell 7 - Windows'
@@ -190,6 +193,7 @@ stages:
       - pwsh: |
           .\PSParseHTML.Tests.ps1
         displayName: "Run PowerShell Tests (PS 7)"
+        timeoutInMinutes: 10
   - job: PowerShell_Ubuntu
     displayName: 'PowerShell 7 - Ubuntu'
     pool:
@@ -229,6 +233,7 @@ stages:
         inputs:
           targetType: 'filePath'
           filePath: './PSParseHTML.Tests.ps1'
+        timeoutInMinutes: 10
 
   - job: PowerShell_MacOS
     displayName: 'PowerShell 7 - macOS'

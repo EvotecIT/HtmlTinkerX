@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML;
@@ -44,15 +45,15 @@ public static class HtmlUtilities {
     /// <param name="path">Path to the file.</param>
     /// <returns>File contents.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> ReadFileCheckedAsync(string path) {
+    public static async Task<string> ReadFileCheckedAsync(string path, CancellationToken cancellationToken = default) {
         string fullPath = ResolvePath(path);
         if (!File.Exists(fullPath)) {
             throw new FileNotFoundException($"File not found: {path}", fullPath);
         }
 #if NETSTANDARD2_0 || NETFRAMEWORK
-        return await Task.Run(() => File.ReadAllText(fullPath)).ConfigureAwait(false);
+        return await Task.Run(() => File.ReadAllText(fullPath), cancellationToken).ConfigureAwait(false);
 #else
-        return await File.ReadAllTextAsync(fullPath).ConfigureAwait(false);
+        return await File.ReadAllTextAsync(fullPath, cancellationToken).ConfigureAwait(false);
 #endif
     }
 
@@ -62,11 +63,12 @@ public static class HtmlUtilities {
     /// <param name="client">HttpClient to use for the request.</param>
     /// <param name="url">URL to download from.</param>
     /// <returns>Content as a string with proper encoding.</returns>
-    public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url) {
-        using var response = await client.GetAsync(url).ConfigureAwait(false);
+    public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
+        using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Try to get encoding from Content-Type header
         var contentType = response.Content.Headers.ContentType;
