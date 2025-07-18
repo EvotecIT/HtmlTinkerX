@@ -1,5 +1,5 @@
 using HtmlTinkerX;
-using Jsbeautifier;
+using HtmlTinkerX.JavaScriptBeautifier;
 using Xunit;
 
 namespace PSParseHTML.Tests;

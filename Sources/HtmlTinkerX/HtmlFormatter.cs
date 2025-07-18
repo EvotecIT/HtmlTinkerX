@@ -1,6 +1,6 @@
 using AngleSharp.Css;
 using AngleSharp.Css.Parser;
-using Jsbeautifier;
+using HtmlTinkerX.JavaScriptBeautifier;
 using NUglify;
 using NUglify.Html;
 using System;

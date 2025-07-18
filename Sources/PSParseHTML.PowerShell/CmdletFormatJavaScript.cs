@@ -1,5 +1,5 @@
 using HtmlTinkerX;
-using Jsbeautifier;
+using HtmlTinkerX.JavaScriptBeautifier;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
