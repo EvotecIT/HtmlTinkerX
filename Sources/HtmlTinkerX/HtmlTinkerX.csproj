@@ -21,10 +21,10 @@
         <PackageReference Include="HtmlAgilityPack" Version="1.12.1" />
         <PackageReference Include="Jsbeautifier" Version="0.0.1" />
         <PackageReference Include="NUglify" Version="1.21.15" />
-        <PackageReference Include="PreMailer.Net" Version="2.7.0" />
+        <PackageReference Include="PreMailer.Net" Version="2.7.2" />
         <PackageReference Include="System.IO.Compression" Version="4.3.0" />
         <PackageReference Include="System.Net.Http" Version="4.3.4" />
-        <PackageReference Include="Microsoft.Playwright" Version="1.52.0" />
+        <PackageReference Include="Microsoft.Playwright" Version="1.53.0" />
         <PackageReference Include="SixLabors.ImageSharp" Version="2.1.10" />
       <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
       <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />

@@ -284,7 +284,7 @@ string prettyJs = HtmlFormatter.FormatJavaScript(script, jsOpts);
 
 ```powershell
 # PowerShell using the same API
-[PSParseHTML.HtmlFormatter]::FormatHtml($html)
+[HtmlTinkerX.HtmlFormatter]::FormatHtml($html)
 ```
 
 Both approaches yield identical results, so you can choose the most convenient tool for your workflow.

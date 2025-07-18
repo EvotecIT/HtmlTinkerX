@@ -98,7 +98,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = $false
         NETBinaryModuleDocumentation      = $true
     }
 
