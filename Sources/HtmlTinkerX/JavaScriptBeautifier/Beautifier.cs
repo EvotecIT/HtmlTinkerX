@@ -29,18 +29,34 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
     using System.Linq;
     using System.Text.RegularExpressions;
 
+    /// <summary>
+    /// Provides functionality for beautifying JavaScript code.
+    /// </summary>
     public class Beautifier {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Beautifier"/> class using default options.
+        /// </summary>
         public Beautifier()
             : this(new BeautifierOptions()) {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Beautifier"/> class using custom options.
+        /// </summary>
+        /// <param name="opts">Options controlling the beautification process.</param>
         public Beautifier(BeautifierOptions opts) {
             Opts = opts;
             BlankState();
         }
 
+        /// <summary>
+        /// Gets or sets the options used by the beautifier.
+        /// </summary>
         public BeautifierOptions Opts { get; set; }
 
+        /// <summary>
+        /// Gets or sets the current flag state used during processing.
+        /// </summary>
         public BeautifierFlags Flags { get; set; }
 
         private List<BeautifierFlags> FlagStore { get; set; }
@@ -136,6 +152,12 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             Flags.PreviousMode = prev.Mode;
         }
 
+        /// <summary>
+        /// Beautifies the provided JavaScript code using the configured options.
+        /// </summary>
+        /// <param name="s">JavaScript source code to beautify.</param>
+        /// <param name="opts">Optional overrides for beautifier options.</param>
+        /// <returns>The beautified JavaScript code.</returns>
         public string Beautify(string s, BeautifierOptions opts = null) {
             if (opts != null) {
                 Opts = opts;
