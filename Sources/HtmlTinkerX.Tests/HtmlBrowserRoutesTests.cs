@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
@@ -31,7 +32,7 @@ public class HtmlBrowserRoutesTests {
         Func<IRoute, Task> handler = _ => Task.CompletedTask;
         const string pattern = "**/data.json";
         page.Setup(p => p.RouteAsync(pattern, handler, null)).Returns(Task.CompletedTask).Verifiable();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Page>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(session, page.Object);
@@ -78,7 +79,7 @@ public class HtmlBrowserRoutesTests {
             .Callback<string, Action<IRoute>>((_, h) => captured = h)
             .Returns(Task.CompletedTask)
             .Verifiable();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Page>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(session, page.Object);
@@ -95,7 +96,7 @@ public class HtmlBrowserRoutesTests {
         Func<IRoute, Task> handler = _ => Task.CompletedTask;
         const string pattern = "**/data.json";
         page.Setup(p => p.UnrouteAsync(pattern, handler)).Returns(Task.CompletedTask).Verifiable();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Page>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(session, page.Object);

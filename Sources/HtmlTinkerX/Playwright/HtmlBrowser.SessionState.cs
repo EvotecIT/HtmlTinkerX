@@ -14,6 +14,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="session">Browser session to export.</param>
     /// <param name="path">File path where the session state should be stored.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static Task ExportSessionAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         string fullPath = HtmlUtilities.ResolvePath(path);
         string? dir = Path.GetDirectoryName(fullPath);
@@ -36,6 +37,22 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to navigate to.</param>
     /// <param name="statePath">Path to the previously exported session state.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    /// <param name="headless">Run browser in headless mode.</param>
+    /// <param name="slowMo">Slow motion delay in milliseconds.</param>
+    /// <param name="userAgent">Custom user agent string.</param>
+    /// <param name="viewportWidth">Viewport width in pixels.</param>
+    /// <param name="viewportHeight">Viewport height in pixels.</param>
+    /// <param name="deviceScaleFactor">Device scale factor.</param>
+    /// <param name="proxy">Proxy server URL.</param>
+    /// <param name="proxyUsername">Proxy username.</param>
+    /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="geoLatitude">Latitude for geolocation.</param>
+    /// <param name="geoLongitude">Longitude for geolocation.</param>
+    /// <param name="timezone">Timezone identifier.</param>
+    /// <param name="timeout">Navigation timeout in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static Task<HtmlBrowserSession> ImportSessionAsync(
         string url,
         string statePath,

@@ -256,6 +256,7 @@ public class PreMailerClient {
     /// </summary>
     /// <param name="html">HTML markup to process.</param>
     /// <param name="options">Optional processing options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static Task<PreMailerResult> MoveCssInlineAsync(string html, PreMailerOptions? options = null, CancellationToken cancellationToken = default)
         => FromHtml(html, options).MoveCssInlineAsync(cancellationToken);
 
@@ -264,6 +265,7 @@ public class PreMailerClient {
     /// </summary>
     /// <param name="htmlFilePath">Path to the HTML file.</param>
     /// <param name="options">Optional processing options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task<PreMailerResult> MoveCssInlineFromFileAsync(string htmlFilePath, PreMailerOptions? options = null, CancellationToken cancellationToken = default) {
         string html = await HtmlUtilities.ReadFileCheckedAsync(htmlFilePath, cancellationToken).ConfigureAwait(false);
         return await MoveCssInlineAsync(html, options, cancellationToken).ConfigureAwait(false);

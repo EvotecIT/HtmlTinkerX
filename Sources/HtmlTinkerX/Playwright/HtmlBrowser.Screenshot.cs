@@ -40,6 +40,17 @@ public static partial class HtmlBrowser {
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
     /// <param name="clipHeight">Optional clip region height.</param>
+    /// <param name="highlightSelectors">Selectors to highlight in the screenshot.</param>
+    /// <param name="overlayText">Text to overlay on the image.</param>
+    /// <param name="username">Username for authentication.</param>
+    /// <param name="password">Password for authentication.</param>
+    /// <param name="formLogin">Form based login parameters.</param>
+    /// <param name="headless">Run browser in headless mode.</param>
+    /// <param name="slowMo">Slow motion delay in milliseconds.</param>
+    /// <param name="proxy">Proxy server URL.</param>
+    /// <param name="proxyUsername">Proxy username.</param>
+    /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task CaptureScreenshotAsync(
         string url,
         string path,
@@ -118,6 +129,9 @@ public static partial class HtmlBrowser {
     /// <param name="clipY">Optional clip region Y coordinate.</param>
     /// <param name="clipWidth">Optional clip region width.</param>
     /// <param name="clipHeight">Optional clip region height.</param>
+    /// <param name="highlightSelectors">Selectors to highlight in the screenshot.</param>
+    /// <param name="overlayText">Text to overlay on the image.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task CaptureScreenshotAsync(
         IPage page,
         string path,

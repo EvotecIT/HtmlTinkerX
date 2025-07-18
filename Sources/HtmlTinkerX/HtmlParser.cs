@@ -43,6 +43,8 @@ public static class HtmlParser {
     /// IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync("https://example.com");
     /// </code>
     /// </example>
+    /// <param name="client">Optional HTTP client used for downloading the page.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
@@ -70,6 +72,8 @@ public static class HtmlParser {
     /// Downloads and parses HTML markup from a URL using HtmlAgilityPack.
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
+    /// <param name="client">Optional HTTP client used for downloading the page.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The parsed <see cref="HtmlDocument"/>.</returns>
     public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (url == null) {

@@ -47,6 +47,7 @@ public static class HtmlFormSubmitter {
     /// <param name="method">Submission method (GET or POST).</param>
     /// <param name="fields">Field values keyed by name.</param>
     /// <param name="client">Optional HttpClient instance.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Response body as string.</returns>
     public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (actionUrl == null) {
