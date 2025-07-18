@@ -155,7 +155,7 @@ public class PreMailerClient {
 
                 bool isCss = false;
                 if (!string.IsNullOrEmpty(href)) {
-                    isCss = href.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+                    isCss = href!.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
                         (rel != null && rel.Equals("stylesheet", StringComparison.OrdinalIgnoreCase));
                 }
                 if (!isCss) {

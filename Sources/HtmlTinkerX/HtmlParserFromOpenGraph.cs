@@ -34,7 +34,7 @@ public static class HtmlParserFromOpenGraph {
             if (string.IsNullOrEmpty(property)) {
                 continue;
             }
-            string key = property.Substring(3); // remove "og:" prefix
+            string key = property!.Substring(3); // remove "og:" prefix
             string content = node.GetAttribute("content") ?? string.Empty;
             if (!result.Properties.TryGetValue(key, out var list)) {
                 list = new List<string>();

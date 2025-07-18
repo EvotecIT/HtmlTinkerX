@@ -37,7 +37,7 @@ public sealed class CmdletMeasureHtmlDocument : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         string html = ParameterSetName == ParameterSetFile
 #if NETSTANDARD2_0 || NETFRAMEWORK
-            ? File.ReadAllText(HtmlUtilities.ResolvePath(Path))
+            ? await Task.Run(() => File.ReadAllText(HtmlUtilities.ResolvePath(Path)), CancelToken).ConfigureAwait(false)
 #else
             ? await File.ReadAllTextAsync(HtmlUtilities.ResolvePath(Path), CancelToken).ConfigureAwait(false)
 #endif
