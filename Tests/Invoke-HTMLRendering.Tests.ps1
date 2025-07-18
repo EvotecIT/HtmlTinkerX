@@ -16,7 +16,8 @@ Describe 'Invoke-HTMLRendering' {
     It 'Applies custom browser context options' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
-        $session = Invoke-HTMLRendering -Url $uri -Session -UserAgent 'MyAgent' -ViewportWidth 123 -ViewportHeight 77 -DeviceScaleFactor 1.5
+        $scale = [double]::Parse('1.5', [System.Globalization.CultureInfo]::InvariantCulture)
+        $session = Invoke-HTMLRendering -Url $uri -Session -UserAgent 'MyAgent' -ViewportWidth 123 -ViewportHeight 77 -DeviceScaleFactor $scale
         $ua = $session.Page.EvaluateAsync('navigator.userAgent',$null).GetAwaiter().GetResult()
         $w = [int]($session.Page.EvaluateAsync('window.innerWidth',$null).GetAwaiter().GetResult().ToString())
         $d = [double]($session.Page.EvaluateAsync('window.devicePixelRatio',$null).GetAwaiter().GetResult().ToString())
@@ -29,7 +30,9 @@ Describe 'Invoke-HTMLRendering' {
     It 'Applies geolocation and timezone settings' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
-        $session = Invoke-HTMLRendering -Url $uri -Session -GeoLatitude 50.1 -GeoLongitude 19.9 -Timezone 'Europe/Warsaw'
+        $latVal = [double]::Parse('50.1', [System.Globalization.CultureInfo]::InvariantCulture)
+        $lngVal = [double]::Parse('19.9', [System.Globalization.CultureInfo]::InvariantCulture)
+        $session = Invoke-HTMLRendering -Url $uri -Session -GeoLatitude $latVal -GeoLongitude $lngVal -Timezone 'Europe/Warsaw'
         $lat = [double]($session.Page.EvaluateAsync('new Promise(r=>navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))',$null).GetAwaiter().GetResult().ToString())
         $tz = $session.Page.EvaluateAsync('Intl.DateTimeFormat().resolvedOptions().timeZone',$null).GetAwaiter().GetResult()
         Close-HTMLSession -Session $session

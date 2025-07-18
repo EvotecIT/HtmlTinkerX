@@ -1,5 +1,5 @@
 Describe 'Save-HTMLAttachment streaming' {
-    It 'Outputs file paths as downloads complete' {
+    It 'Outputs file paths as downloads complete' -Skip:(-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
         $server = Start-Process -FilePath python3 -ArgumentList '-u', '-m', 'http.server', '8010' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
         Start-Sleep -Seconds 1
         $timeout = [System.Diagnostics.Stopwatch]::StartNew()
