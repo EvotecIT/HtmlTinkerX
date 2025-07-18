@@ -20,8 +20,8 @@ public class HtmlFormSubmitterTests {
                 app.UseEndpoints(endpoints => {
                     endpoints.MapPost("/login", async context => {
                         var form = await context.Request.ReadFormAsync();
-                        string user = form["user"];
-                        string pass = form["pass"];
+                        string user = form["user"].ToString();
+                        string pass = form["pass"].ToString();
                         await context.Response.WriteAsync($"{user}:{pass}");
                     });
                 });

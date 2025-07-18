@@ -41,7 +41,7 @@ public class HtmlHttpClientFactoryTests {
         var cred = new NetworkCredential("u", "p");
         using HttpClient client = HtmlHttpClientFactory.Create("http://localhost:1234", cred);
         HttpClientHandler handler = GetHandler(client);
-        Assert.Equal("http://localhost:1234/", handler.Proxy?.GetProxy(new System.Uri("http://localhost")).ToString());
+        Assert.Equal("http://localhost:1234/", handler.Proxy?.GetProxy(new System.Uri("http://localhost"))?.ToString());
         Assert.Same(cred, handler.Proxy?.Credentials);
     }
 }

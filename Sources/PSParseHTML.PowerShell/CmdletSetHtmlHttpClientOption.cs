@@ -54,7 +54,9 @@ public sealed class CmdletSetHtmlHttpClientOption : AsyncPSCmdlet {
 
         if (Header != null) {
             foreach (DictionaryEntry entry in Header) {
-                HtmlHttpClientFactory.DefaultHeaders[entry.Key.ToString()!] = entry.Value.ToString()!;
+                if (entry.Key != null && entry.Value != null) {
+                    HtmlHttpClientFactory.DefaultHeaders[entry.Key.ToString()!] = entry.Value.ToString()!;
+                }
             }
             HtmlHttpClientFactory.ResetShared();
         }
