@@ -112,7 +112,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
-    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
         string html,
@@ -128,6 +128,8 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
@@ -171,6 +173,7 @@ public static class HtmlParser {
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithHtmlAgilityPack(
         string html,
@@ -188,6 +191,9 @@ public static class HtmlParser {
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
     /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
     /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="client">Optional HTTP client used for downloading the page.</param>
+    /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithHtmlAgilityPackAsync(
         string url,
@@ -216,6 +222,7 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with item texts.</returns>
+    /// <param name="client">Optional HTTP client.</param>
     public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
         return await HtmlParserFromList.ParseUrlListsWithAngleSharpAsync(url, tagPlaceholder, client);
     }
@@ -236,6 +243,7 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with item texts.</returns>
+    /// <param name="client">Optional HTTP client.</param>
     public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
         return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackAsync(url, tagPlaceholder, client);
     }
@@ -256,6 +264,7 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
+    /// <param name="client">Optional HTTP client.</param>
     public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
         return await HtmlParserFromList.ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client);
     }
@@ -276,6 +285,7 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
+    /// <param name="client">Optional HTTP client.</param>
     public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
         return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client);
     }

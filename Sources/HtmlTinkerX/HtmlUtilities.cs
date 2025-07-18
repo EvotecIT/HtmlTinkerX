@@ -43,6 +43,7 @@ public static class HtmlUtilities {
     /// Asynchronously reads the contents of a file after verifying that it exists.
     /// </summary>
     /// <param name="path">Path to the file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>File contents.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static async Task<string> ReadFileCheckedAsync(string path, CancellationToken cancellationToken = default) {
@@ -62,6 +63,7 @@ public static class HtmlUtilities {
     /// </summary>
     /// <param name="client">HttpClient to use for the request.</param>
     /// <param name="url">URL to download from.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
     public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
         using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
