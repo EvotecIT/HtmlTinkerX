@@ -26,7 +26,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         # A URL to an icon representing this module.
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
         # Pre-release tag for this module.
-        PreReleaseTag        = 'Preview3'
+        PreReleaseTag        = 'Preview4'
     }
     New-ConfigurationManifest @Manifest
     # Add external module dependencies, using loop for simplicity
