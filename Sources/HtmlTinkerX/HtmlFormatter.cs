@@ -61,6 +61,7 @@ public static class HtmlFormatter {
     /// Formats JavaScript code from a file using default JsBeautifier options.
     /// </summary>
     /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
     /// <returns>Formatted JavaScript string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static string FormatJavaScriptFile(string filePath, BeautifierOptions? options = null) {

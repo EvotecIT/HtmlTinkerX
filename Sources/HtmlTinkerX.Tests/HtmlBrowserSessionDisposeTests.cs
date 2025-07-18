@@ -1,4 +1,5 @@
 using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
@@ -10,7 +11,7 @@ namespace PSParseHTML.Tests;
 public class HtmlBrowserSessionDisposeTests {
     [Fact]
     public async Task DisposeAsync_AllowsNullProperties() {
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         await session.DisposeAsync();
     }
 

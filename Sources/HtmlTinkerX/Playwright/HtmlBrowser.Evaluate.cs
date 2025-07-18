@@ -13,6 +13,7 @@ public static partial class HtmlBrowser {
     /// <typeparam name="T">Expected return type.</typeparam>
     /// <param name="session">Browser session.</param>
     /// <param name="script">JavaScript code to execute.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Value returned by the script.</returns>
     public static Task<T?> EvaluateAsync<T>(HtmlBrowserSession session, string script, CancellationToken cancellationToken = default)
     {

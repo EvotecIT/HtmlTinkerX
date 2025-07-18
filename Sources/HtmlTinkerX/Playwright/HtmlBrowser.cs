@@ -191,6 +191,25 @@ public static partial class HtmlBrowser {
     /// Retrieves the fully rendered HTML from the specified URL after executing JavaScript.
     /// </summary>
     /// <param name="url">The URL to load.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    /// <param name="username">Username for authentication.</param>
+    /// <param name="password">Password for authentication.</param>
+    /// <param name="formLogin">Form based login parameters.</param>
+    /// <param name="headless">Run browser in headless mode.</param>
+    /// <param name="slowMo">Slow motion delay in milliseconds.</param>
+    /// <param name="userAgent">Custom user agent string.</param>
+    /// <param name="viewportWidth">Viewport width in pixels.</param>
+    /// <param name="viewportHeight">Viewport height in pixels.</param>
+    /// <param name="deviceScaleFactor">Device scale factor.</param>
+    /// <param name="proxy">Proxy server URL.</param>
+    /// <param name="proxyUsername">Proxy username.</param>
+    /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="geoLatitude">Latitude for geolocation.</param>
+    /// <param name="geoLongitude">Longitude for geolocation.</param>
+    /// <param name="timezone">Timezone identifier.</param>
+    /// <param name="timeout">Navigation timeout in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The rendered HTML markup.</returns>
     public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
@@ -227,6 +246,25 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="url">URL to load.</param>
     /// <param name="path">File path to write.</param>
+    /// <param name="browser">Browser engine to use.</param>
+    /// <param name="clean">Force re-download of browser runtimes.</param>
+    /// <param name="username">Username for authentication.</param>
+    /// <param name="password">Password for authentication.</param>
+    /// <param name="formLogin">Form based login parameters.</param>
+    /// <param name="headless">Run browser in headless mode.</param>
+    /// <param name="slowMo">Slow motion delay in milliseconds.</param>
+    /// <param name="userAgent">Custom user agent string.</param>
+    /// <param name="viewportWidth">Viewport width in pixels.</param>
+    /// <param name="viewportHeight">Viewport height in pixels.</param>
+    /// <param name="deviceScaleFactor">Device scale factor.</param>
+    /// <param name="proxy">Proxy server URL.</param>
+    /// <param name="proxyUsername">Proxy username.</param>
+    /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="geoLatitude">Latitude for geolocation.</param>
+    /// <param name="geoLongitude">Longitude for geolocation.</param>
+    /// <param name="timezone">Timezone identifier.</param>
+    /// <param name="timeout">Navigation timeout in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
         string fullPath = HtmlUtilities.ResolvePath(path);
         string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout, cancellationToken).ConfigureAwait(false);
@@ -244,6 +282,7 @@ public static partial class HtmlBrowser {
     /// <param name="selector">Optional CSS selector for the element.</param>
     /// <param name="innerHtml">Return inner HTML instead of outer HTML.</param>
     /// <param name="asText">Return text content instead of markup.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Extracted markup or text.</returns>
     public static async Task<string> GetContentAsync(IPage page, string? selector = null, bool innerHtml = false, bool asText = false, CancellationToken cancellationToken = default) {
         if (string.IsNullOrEmpty(selector)) {
@@ -272,6 +311,7 @@ public static partial class HtmlBrowser {
     /// Retrieves a list of elements that can be interacted with (links, buttons, etc.).
     /// </summary>
     /// <param name="page">Playwright page instance.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of interactable element descriptions.</returns>
     public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();

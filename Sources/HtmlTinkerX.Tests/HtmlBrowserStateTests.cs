@@ -1,6 +1,7 @@
 using HtmlTinkerX;
 using System.IO;
 using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
@@ -16,7 +17,7 @@ public class HtmlBrowserStateTests {
         var context = new Mock<IBrowserContext>();
         context.Setup(c => c.StorageStateAsync(It.Is<BrowserContextStorageStateOptions>(o => o.Path == file)))
             .ReturnsAsync("{}").Verifiable();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .SetValue(session, context.Object);

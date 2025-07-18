@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
@@ -15,7 +16,7 @@ public class HtmlBrowserCookiesTests
     public async Task GetCookiesAsync_ReturnsMappedCookies()
     {
         var context = new Mock<IBrowserContext>();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .SetValue(session, context.Object);
@@ -54,7 +55,7 @@ public class HtmlBrowserCookiesTests
     public async Task SetCookiesAsync_ForwardsCookiesToAddCookiesAsync()
     {
         var context = new Mock<IBrowserContext>();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .SetValue(session, context.Object);
@@ -97,7 +98,7 @@ public class HtmlBrowserCookiesTests
     public async Task GetCookiesAsync_FiltersByDomain()
     {
         var context = new Mock<IBrowserContext>();
-        var session = (HtmlBrowserSession)FormatterServices.GetUninitializedObject(typeof(HtmlBrowserSession));
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .SetValue(session, context.Object);

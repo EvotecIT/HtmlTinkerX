@@ -20,6 +20,9 @@ public static partial class HtmlBrowser {
     /// <param name="browser">Browser engine to use.</param>
     /// <param name="clean">Reinstall the browser runtime.</param>
     /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
+    /// <param name="headless">Run browser in headless mode.</param>
+    /// <param name="slowMo">Slow motion delay in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Paths of downloaded files.</returns>
     public static async IAsyncEnumerable<string> SavePageDownloadsAsync(string url, string directory, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? filter = null, bool headless = true, int slowMo = 0, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         await using HtmlBrowserSession session = await OpenSessionAsync(
@@ -43,6 +46,10 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Saves files downloaded from an already loaded page.
     /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="directory">Directory where downloads should be saved.</param>
+    /// <param name="filter">Optional substring filter applied to download URLs or file names.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async IAsyncEnumerable<string> SavePageDownloadsAsync(IPage page, string directory, string? filter = null, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
         string dir = HtmlUtilities.ResolvePath(directory);
