@@ -1,7 +1,7 @@
 using HtmlTinkerX;
-using System.Collections.Generic;
 using Microsoft.Playwright;
 using Moq;
+using System.Collections.Generic;
 using Xunit;
 
 namespace PSParseHTML.Tests;
@@ -9,11 +9,9 @@ namespace PSParseHTML.Tests;
 /// <summary>
 /// Tests capturing network log entries with <see cref="HtmlBrowser"/>.
 /// </summary>
-public class HtmlBrowserNetworkLogTests
-{
+public class HtmlBrowserNetworkLogTests {
     [Fact]
-    public async Task GetNetworkLog_ReturnsCapturedEntries()
-    {
+    public async Task GetNetworkLog_ReturnsCapturedEntries() {
         var playwright = new Mock<IPlaywright>();
         var browser = new Mock<IBrowser>();
         var context = new Mock<IBrowserContext>();
@@ -22,12 +20,12 @@ public class HtmlBrowserNetworkLogTests
         var request = new Mock<IRequest>();
         request.SetupGet(r => r.Url).Returns("https://example.com/");
         request.SetupGet(r => r.Method).Returns("GET");
-        request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>{{"h1","v1"}});
+        request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string> { { "h1", "v1" } });
 
         var response = new Mock<IResponse>();
         response.SetupGet(r => r.Request).Returns(request.Object);
         response.SetupGet(r => r.Status).Returns(200);
-        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>{{"h2","v2"}});
+        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string> { { "h2", "v2" } });
 
         var session = new HtmlBrowserSession(playwright.Object, browser.Object, context.Object, page.Object);
 

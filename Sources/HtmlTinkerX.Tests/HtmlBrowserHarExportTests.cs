@@ -1,14 +1,14 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
+using Moq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.Serialization;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Playwright;
-using Moq;
 using Xunit;
 
 namespace PSParseHTML.Tests;
@@ -16,20 +16,17 @@ namespace PSParseHTML.Tests;
 /// <summary>
 /// Unit tests for exporting HAR files from <see cref="HtmlBrowser"/>.
 /// </summary>
-public class HtmlBrowserHarExportTests
-{
+public class HtmlBrowserHarExportTests {
     [Fact]
     /// <summary>
     /// Ensures exported HAR data is correctly written to disk.
     /// </summary>
-    public async Task ExportHarAsync_WritesEntriesToFile()
-    {
+    public async Task ExportHarAsync_WritesEntriesToFile() {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string file = Path.Combine(dir, "out.har");
         var network = new ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
         var req1 = new Mock<IRequest>();
-        network[req1.Object] = new HtmlNetworkEntry
-        {
+        network[req1.Object] = new HtmlNetworkEntry {
             Url = "https://example.com/1",
             Method = "GET",
             RequestHeaders = new Dictionary<string, string> { ["A"] = "1" },
@@ -37,8 +34,7 @@ public class HtmlBrowserHarExportTests
             ResponseHeaders = new Dictionary<string, string> { ["B"] = "2" }
         };
         var req2 = new Mock<IRequest>();
-        network[req2.Object] = new HtmlNetworkEntry
-        {
+        network[req2.Object] = new HtmlNetworkEntry {
             Url = "https://example.com/2",
             Method = "POST",
             RequestHeaders = new Dictionary<string, string> { ["C"] = "3" },
@@ -60,8 +56,7 @@ public class HtmlBrowserHarExportTests
         var methods = new List<string>();
         var urls = new List<string>();
         var statuses = new List<int>();
-        foreach (JsonElement entry in entries.EnumerateArray())
-        {
+        foreach (JsonElement entry in entries.EnumerateArray()) {
             methods.Add(entry.GetProperty("request").GetProperty("method").GetString()!);
             urls.Add(entry.GetProperty("request").GetProperty("url").GetString()!);
             statuses.Add(entry.GetProperty("response").GetProperty("status").GetInt32());

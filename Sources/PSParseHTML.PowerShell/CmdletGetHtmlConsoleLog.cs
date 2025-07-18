@@ -26,4 +26,3 @@ public sealed class CmdletGetHtmlConsoleLog : AsyncPSCmdlet {
         return Task.CompletedTask;
     }
 }
-

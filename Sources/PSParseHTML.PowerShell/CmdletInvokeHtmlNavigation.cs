@@ -1,9 +1,9 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
 using System.Management.Automation;
-using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Threading;
-using Microsoft.Playwright;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -51,7 +51,7 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     public SwitchParameter PassThru { get; set; }
     /// <summary>Timeout in milliseconds for navigation and clicks.</summary>
     [Parameter]
-    [ValidateRange(0,int.MaxValue)]
+    [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
     /// <summary>Token used to cancel the operation.</summary>
@@ -93,4 +93,3 @@ public sealed class CmdletInvokeHtmlNavigation : AsyncPSCmdlet {
     }
 
 }
-

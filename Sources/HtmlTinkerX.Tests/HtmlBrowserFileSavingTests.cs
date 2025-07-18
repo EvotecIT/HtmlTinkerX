@@ -1,9 +1,9 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
+using Moq;
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Moq;
-using Microsoft.Playwright;
 using Xunit;
 
 namespace PSParseHTML.Tests;
@@ -18,14 +18,14 @@ public class HtmlBrowserFileSavingTests {
         string file = Path.Combine(dir, "test.png");
         var page = new Mock<IPage>();
         page.Setup(p => p.ScreenshotAsync(It.IsAny<PageScreenshotOptions>()))
-            .ReturnsAsync(new byte[] {1,2,3});
+            .ReturnsAsync(new byte[] { 1, 2, 3 });
 
         await HtmlBrowser.CaptureScreenshotAsync(page.Object, file);
 
         Assert.True(Directory.Exists(dir));
         Assert.True(File.Exists(file));
         byte[] data = File.ReadAllBytes(file);
-        Assert.Equal(new byte[] {1,2,3}, data);
+        Assert.Equal(new byte[] { 1, 2, 3 }, data);
 
         File.Delete(file);
         Directory.Delete(dir);

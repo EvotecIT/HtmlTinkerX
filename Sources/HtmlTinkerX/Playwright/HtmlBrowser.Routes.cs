@@ -1,7 +1,7 @@
+using Microsoft.Playwright;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Playwright;
 
 namespace HtmlTinkerX;
 
@@ -16,8 +16,7 @@ public static partial class HtmlBrowser {
     /// <param name="pattern">Matching pattern for the route.</param>
     /// <param name="handler">Handler invoked for matching requests.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    public static Task RegisterRouteAsync(IPage page, string pattern, Func<IRoute, Task> handler, CancellationToken cancellationToken = default)
-    {
+    public static Task RegisterRouteAsync(IPage page, string pattern, Func<IRoute, Task> handler, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         return page.RouteAsync(pattern, handler);
     }
@@ -39,8 +38,7 @@ public static partial class HtmlBrowser {
     /// <param name="pattern">Pattern used when registering the route.</param>
     /// <param name="handler">Optional handler instance.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
-    public static Task UnregisterRouteAsync(IPage page, string pattern, Func<IRoute, Task>? handler = null, CancellationToken cancellationToken = default)
-    {
+    public static Task UnregisterRouteAsync(IPage page, string pattern, Func<IRoute, Task>? handler = null, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         return handler is null ? page.UnrouteAsync(pattern) : page.UnrouteAsync(pattern, handler);
     }
@@ -48,6 +46,6 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Removes a previously registered route handler from the session page.
     /// </summary>
-public static Task UnregisterRouteAsync(HtmlBrowserSession session, string pattern, Func<IRoute, Task>? handler = null, CancellationToken cancellationToken = default)
-    => UnregisterRouteAsync(session.Page, pattern, handler, cancellationToken);
+    public static Task UnregisterRouteAsync(HtmlBrowserSession session, string pattern, Func<IRoute, Task>? handler = null, CancellationToken cancellationToken = default)
+        => UnregisterRouteAsync(session.Page, pattern, handler, cancellationToken);
 }

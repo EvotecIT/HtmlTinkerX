@@ -1,11 +1,11 @@
+using AngleSharp.Dom;
+using PreMailer.Net;
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
-using PreMailer.Net;
 
 namespace HtmlTinkerX;
 
@@ -91,8 +91,8 @@ public class PreMailerClient {
                     }
                 }
 
-                    link.Remove();
-                }
+                link.Remove();
+            }
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
@@ -399,10 +399,8 @@ public class PreMailerClient {
         return MoveCssInlineFromFile(htmlFilePath, opts);
     }
 
-    private static string NormalizeFileUriPath(Uri uri)
-    {
-        if (!uri.IsFile)
-        {
+    private static string NormalizeFileUriPath(Uri uri) {
+        if (!uri.IsFile) {
             throw new ArgumentException("URI must be a file path", nameof(uri));
         }
 
@@ -415,15 +413,13 @@ public class PreMailerClient {
 
         // UNC paths need special handling on Unix where LocalPath starts with
         // double separators
-        if (uri.IsUnc && desired == '/')
-        {
+        if (uri.IsUnc && desired == '/') {
             path = "/" + path.TrimStart(desired);
         }
 
         // Preserve trailing slash if present in the original URI
         bool endsWithSlash = uri.AbsolutePath.EndsWith("/", StringComparison.Ordinal);
-        if (endsWithSlash && !path.EndsWith(desired.ToString()))
-        {
+        if (endsWithSlash && !path.EndsWith(desired.ToString())) {
             path += desired;
         }
 

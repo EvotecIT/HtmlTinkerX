@@ -8,15 +8,13 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Represents a HAR (HTTP Archive) document.
 /// </summary>
-public sealed class Har
-{
+public sealed class Har {
     /// <summary>Top-level log data.</summary>
     public HarLog? Log { get; set; }
 }
 
 /// <summary>HAR log root.</summary>
-public sealed class HarLog
-{
+public sealed class HarLog {
     /// <summary>Log version.</summary>
     public string? Version { get; set; }
 
@@ -28,8 +26,7 @@ public sealed class HarLog
 }
 
 /// <summary>Creator metadata.</summary>
-public sealed class HarCreator
-{
+public sealed class HarCreator {
     /// <summary>Name of the tool.</summary>
     public string? Name { get; set; }
 
@@ -38,8 +35,7 @@ public sealed class HarCreator
 }
 
 /// <summary>HAR network entry.</summary>
-public sealed class HarEntry
-{
+public sealed class HarEntry {
     /// <summary>Request timestamp.</summary>
     public DateTime StartedDateTime { get; set; }
 
@@ -51,8 +47,7 @@ public sealed class HarEntry
 }
 
 /// <summary>Request information.</summary>
-public sealed class HarRequest
-{
+public sealed class HarRequest {
     /// <summary>HTTP method.</summary>
     public string? Method { get; set; }
 
@@ -61,8 +56,7 @@ public sealed class HarRequest
 }
 
 /// <summary>Response information.</summary>
-public sealed class HarResponse
-{
+public sealed class HarResponse {
     /// <summary>Status code.</summary>
     public int Status { get; set; }
 }
@@ -70,8 +64,7 @@ public sealed class HarResponse
 /// <summary>
 /// Utility methods for working with HAR files.
 /// </summary>
-public static class HtmlHarViewer
-{
+public static class HtmlHarViewer {
     /// <summary>
     /// Reads a HAR file from disk.
     /// </summary>
@@ -82,8 +75,7 @@ public static class HtmlHarViewer
     /// Har har = await HtmlHarViewer.ReadHarAsync("session.har");
     /// </code>
     /// </example>
-    public static async Task<Har> ReadHarAsync(string path)
-    {
+    public static async Task<Har> ReadHarAsync(string path) {
         string json = await HtmlUtilities.ReadFileCheckedAsync(path).ConfigureAwait(false);
         var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         try {
@@ -99,8 +91,7 @@ public static class HtmlHarViewer
     /// </summary>
     /// <param name="har">HAR data.</param>
     /// <returns>HTML string.</returns>
-    public static string BuildViewerHtml(Har har)
-    {
+    public static string BuildViewerHtml(Har har) {
         var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
         string json = JsonSerializer.Serialize(har, opts);
         return $$"""
@@ -141,4 +132,3 @@ for (const e of entries) {
 """;
     }
 }
-

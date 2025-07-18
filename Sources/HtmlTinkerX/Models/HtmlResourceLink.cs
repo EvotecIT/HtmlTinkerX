@@ -8,8 +8,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Type of HTML resource that can be extracted.
 /// </summary>
-public enum HtmlResourceType
-{
+public enum HtmlResourceType {
     /// <summary>
     /// JavaScript code referenced via a <c>&lt;script&gt;</c> element.
     /// </summary>
@@ -34,8 +33,7 @@ public enum HtmlResourceType
 /// <summary>
 /// Represents a script or stylesheet resource found in HTML.
 /// </summary>
-public sealed class HtmlResourceLink
-{
+public sealed class HtmlResourceLink {
     /// <summary>Index of the element within the document.</summary>
     public int Index { get; set; }
 
@@ -55,29 +53,23 @@ public sealed class HtmlResourceLink
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Saves the resource to the specified path and returns the created path.</summary>
-    public async Task<string> SaveAsync(string path, Uri? baseUri = null, HttpClient? client = null)
-    {
-        if (path == null)
-        {
+    public async Task<string> SaveAsync(string path, Uri? baseUri = null, HttpClient? client = null) {
+        if (path == null) {
             throw new ArgumentNullException(nameof(path));
         }
 
         string resolved = HtmlUtilities.ResolvePath(path);
-        if (Directory.Exists(resolved) || !Path.HasExtension(resolved))
-        {
+        if (Directory.Exists(resolved) || !Path.HasExtension(resolved)) {
             Directory.CreateDirectory(resolved);
             string fileName = string.IsNullOrEmpty(Name)
                 ? (!string.IsNullOrEmpty(Source) ? Path.GetFileName(Source) : $"resource_{Index}")
                 : Name;
             resolved = Path.Combine(resolved, fileName);
-        }
-        else
-        {
+        } else {
             Directory.CreateDirectory(Path.GetDirectoryName(resolved)!);
         }
 
-        if (!string.IsNullOrEmpty(Content))
-        {
+        if (!string.IsNullOrEmpty(Content)) {
 #if NETSTANDARD2_0 || NETFRAMEWORK
             await Task.Run(() => File.WriteAllText(resolved, Content)).ConfigureAwait(false);
 #else
@@ -86,8 +78,7 @@ public sealed class HtmlResourceLink
             return resolved;
         }
 
-        if (string.IsNullOrEmpty(Source))
-        {
+        if (string.IsNullOrEmpty(Source)) {
             throw new InvalidOperationException("No Source or Content available to save.");
         }
 
@@ -97,8 +88,7 @@ public sealed class HtmlResourceLink
                 ? new Uri(baseUri, Source)
                 : new Uri(Source, UriKind.RelativeOrAbsolute);
 
-        if (srcUri.IsFile)
-        {
+        if (srcUri.IsFile) {
 #if NETSTANDARD2_0 || NETFRAMEWORK
             await Task.Run(() => File.Copy(srcUri.LocalPath, resolved, overwrite: true)).ConfigureAwait(false);
 #else
@@ -109,8 +99,7 @@ public sealed class HtmlResourceLink
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
 #if NETSTANDARD2_0 || NETFRAMEWORK
-        using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
-        {
+        using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false)) {
             response.EnsureSuccessStatusCode();
             using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             using FileStream fileStream = new(resolved, FileMode.Create, FileAccess.Write, FileShare.None);

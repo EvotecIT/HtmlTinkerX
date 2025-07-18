@@ -1,10 +1,10 @@
 using AngleSharp.Html.Parser;
-using HtmlParserExtensions = HtmlTinkerX.HtmlParserExtensions;
 using HtmlTinkerX;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
+using HtmlParserExtensions = HtmlTinkerX.HtmlParserExtensions;
 
 namespace PSParseHTML.Tests;
 

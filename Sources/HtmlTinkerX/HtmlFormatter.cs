@@ -1,13 +1,12 @@
-using System;
-using Jsbeautifier;
-using System.IO;
-using AngleSharp.Css.Parser;
 using AngleSharp.Css;
-using System.Threading.Tasks;
-
+using AngleSharp.Css.Parser;
+using Jsbeautifier;
 using NUglify;
 using NUglify.Html;
+using System;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
 

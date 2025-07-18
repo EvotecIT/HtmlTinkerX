@@ -1,11 +1,11 @@
 using HtmlTinkerX;
-using System;
-using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
+using System;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace PSParseHTML.Tests;

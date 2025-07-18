@@ -15,5 +15,3 @@ public sealed class HtmlConsoleEntry {
     /// <summary>Location of the message if available.</summary>
     public string? Location { get; set; }
 }
-
-

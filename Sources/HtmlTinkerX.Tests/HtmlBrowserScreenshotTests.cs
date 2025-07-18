@@ -1,25 +1,21 @@
 using HtmlTinkerX;
-using System;
-using System.IO;
-using System.Threading.Tasks;
-using Moq;
 using Microsoft.Playwright;
-using Xunit;
+using Moq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace PSParseHTML.Tests;
 
-public class HtmlBrowserScreenshotTests
-{
-    private static byte[] CreatePngImage()
-    {
+public class HtmlBrowserScreenshotTests {
+    private static byte[] CreatePngImage() {
         using var image = new Image<Rgba32>(20, 20);
-        for (int y = 0; y < 20; y++)
-        {
-            for (int x = 0; x < 20; x++)
-            {
+        for (int y = 0; y < 20; y++) {
+            for (int x = 0; x < 20; x++) {
                 image[x, y] = Color.Blue;
             }
         }
@@ -29,8 +25,7 @@ public class HtmlBrowserScreenshotTests
     }
 
     [Fact]
-    public async Task CaptureScreenshotAsync_ClipOptionsPassedToPlaywright()
-    {
+    public async Task CaptureScreenshotAsync_ClipOptionsPassedToPlaywright() {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string file = Path.Combine(dir, "clip.png");
         var page = new Mock<IPage>();
@@ -60,8 +55,7 @@ public class HtmlBrowserScreenshotTests
     }
 
     [Fact]
-    public async Task CaptureScreenshotAsync_WithHighlightsAndOverlay_SavesModifiedImage()
-    {
+    public async Task CaptureScreenshotAsync_WithHighlightsAndOverlay_SavesModifiedImage() {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string file = Path.Combine(dir, "highlight.png");
         var page = new Mock<IPage>();
@@ -90,8 +84,7 @@ public class HtmlBrowserScreenshotTests
     }
 
     [Fact]
-    public async Task CaptureScreenshotAsync_SavesRequestedFormat()
-    {
+    public async Task CaptureScreenshotAsync_SavesRequestedFormat() {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string file = Path.Combine(dir, "test.bmp");
         var page = new Mock<IPage>();
@@ -104,8 +97,7 @@ public class HtmlBrowserScreenshotTests
             format: ImageFormat.Bmp);
 
         Assert.True(File.Exists(file));
-        using (var stream = File.OpenRead(file))
-        {
+        using (var stream = File.OpenRead(file)) {
             byte b1 = (byte)stream.ReadByte();
             byte b2 = (byte)stream.ReadByte();
             // BMP header starts with 'B' 'M'

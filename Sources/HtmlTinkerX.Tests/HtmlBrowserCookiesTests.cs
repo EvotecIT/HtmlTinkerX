@@ -1,20 +1,18 @@
 using HtmlTinkerX;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace PSParseHTML.Tests;
 
-public class HtmlBrowserCookiesTests
-{
+public class HtmlBrowserCookiesTests {
     [Fact]
-    public async Task GetCookiesAsync_ReturnsMappedCookies()
-    {
+    public async Task GetCookiesAsync_ReturnsMappedCookies() {
         var context = new Mock<IBrowserContext>();
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
@@ -52,8 +50,7 @@ public class HtmlBrowserCookiesTests
     }
 
     [Fact]
-    public async Task SetCookiesAsync_ForwardsCookiesToAddCookiesAsync()
-    {
+    public async Task SetCookiesAsync_ForwardsCookiesToAddCookiesAsync() {
         var context = new Mock<IBrowserContext>();
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
@@ -95,8 +92,7 @@ public class HtmlBrowserCookiesTests
     }
 
     [Fact]
-    public async Task GetCookiesAsync_FiltersByDomain()
-    {
+    public async Task GetCookiesAsync_FiltersByDomain() {
         var context = new Mock<IBrowserContext>();
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)

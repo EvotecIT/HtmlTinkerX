@@ -15,8 +15,7 @@ public static partial class HtmlBrowser {
     /// <param name="script">JavaScript code to execute.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Value returned by the script.</returns>
-    public static Task<T?> EvaluateAsync<T>(HtmlBrowserSession session, string script, CancellationToken cancellationToken = default)
-    {
+    public static Task<T?> EvaluateAsync<T>(HtmlBrowserSession session, string script, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         return session.Page.EvaluateAsync<T?>(script);
     }

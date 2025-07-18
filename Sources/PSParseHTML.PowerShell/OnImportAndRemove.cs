@@ -1,9 +1,9 @@
 using HtmlTinkerX;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Reflection;
-using System.Collections.Generic;
 
 /// <summary>
 /// OnModuleImportAndRemove is a class that implements the IModuleAssemblyInitializer and IModuleAssemblyCleanup interfaces.

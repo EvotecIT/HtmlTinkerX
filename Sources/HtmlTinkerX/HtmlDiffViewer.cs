@@ -1,24 +1,21 @@
+using AngleSharp.Diffing.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using AngleSharp.Diffing.Core;
 
 namespace HtmlTinkerX;
 
 /// <summary>
 /// Utility methods for creating an HTML representation of <see cref="IDiff"/> objects.
 /// </summary>
-public static class HtmlDiffViewer
-{
+public static class HtmlDiffViewer {
     /// <summary>
     /// Builds HTML table markup for the provided differences.
     /// </summary>
     /// <param name="diffs">Collection of diff objects.</param>
     /// <returns>HTML string.</returns>
-    public static string BuildViewerHtml(IEnumerable<IDiff> diffs)
-    {
-        if (diffs is null)
-        {
+    public static string BuildViewerHtml(IEnumerable<IDiff> diffs) {
+        if (diffs is null) {
             throw new ArgumentNullException(nameof(diffs));
         }
 

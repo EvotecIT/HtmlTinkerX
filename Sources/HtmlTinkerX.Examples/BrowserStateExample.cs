@@ -7,11 +7,9 @@ namespace HtmlTinkerX.Examples;
 /// <summary>
 /// Demonstrates exporting and importing browser storage state.
 /// </summary>
-public static class BrowserStateExample
-{
+public static class BrowserStateExample {
     /// <summary>Executes the example logic.</summary>
-    public static async Task RunAsync()
-    {
+    public static async Task RunAsync() {
         string stateFile = Path.Combine(Path.GetTempPath(), "state.json");
         await using HtmlBrowserSession session1 = await HtmlBrowser.OpenSessionAsync("about:blank").ConfigureAwait(false);
         await HtmlBrowser.ExportBrowserStateAsync(session1, stateFile).ConfigureAwait(false);

@@ -1,9 +1,9 @@
+using HtmlTinkerX;
 using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
-using System.Threading.Tasks;
 using System.Threading;
-using HtmlTinkerX;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 

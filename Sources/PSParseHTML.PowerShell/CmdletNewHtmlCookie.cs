@@ -1,6 +1,6 @@
 using HtmlTinkerX;
-using System.Management.Automation;
 using Microsoft.Playwright;
+using System.Management.Automation;
 
 namespace PSParseHTML.PowerShell;
 

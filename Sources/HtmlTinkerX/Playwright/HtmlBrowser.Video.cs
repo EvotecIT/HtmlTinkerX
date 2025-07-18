@@ -1,7 +1,7 @@
+using Microsoft.Playwright;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Playwright;
 
 namespace HtmlTinkerX;
 

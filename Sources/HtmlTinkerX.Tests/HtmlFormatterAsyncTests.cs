@@ -1,6 +1,6 @@
 using HtmlTinkerX;
-using Xunit;
 using System.Threading.Tasks;
+using Xunit;
 
 namespace PSParseHTML.Tests;
 

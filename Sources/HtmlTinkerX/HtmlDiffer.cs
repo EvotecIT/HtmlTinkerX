@@ -1,7 +1,7 @@
-using System;
-using System.Collections.Generic;
 using AngleSharp.Diffing;
 using AngleSharp.Diffing.Core;
+using System;
+using System.Collections.Generic;
 
 namespace HtmlTinkerX;
 

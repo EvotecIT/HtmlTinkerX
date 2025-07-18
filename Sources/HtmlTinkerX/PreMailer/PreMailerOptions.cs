@@ -1,5 +1,5 @@
-using System;
 using global::AngleSharp;
+using System;
 
 namespace HtmlTinkerX;
 

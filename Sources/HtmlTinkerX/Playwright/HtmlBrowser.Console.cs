@@ -13,4 +13,3 @@ public static partial class HtmlBrowser {
     public static IEnumerable<HtmlConsoleEntry> GetConsoleLog(HtmlBrowserSession session)
         => session.ConsoleLog;
 }
-

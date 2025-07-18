@@ -1,10 +1,10 @@
+using HtmlTinkerX;
 using System;
 using System.IO;
+using System.Management.Automation;
 using System.Net;
 using System.Net.Http;
-using System.Management.Automation;
 using System.Threading.Tasks;
-using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 

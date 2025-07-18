@@ -1,7 +1,7 @@
 using HtmlTinkerX;
 using System.Management.Automation;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -33,12 +33,12 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
 
     /// <summary>Delay in milliseconds between actions.</summary>
     [Parameter]
-    [ValidateRange(0,int.MaxValue)]
+    [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
     /// <summary>Timeout in milliseconds for browser operations.</summary>
     [Parameter]
-    [ValidateRange(0,int.MaxValue)]
+    [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
     /// <summary>User agent string used when launching the browser.</summary>
@@ -47,12 +47,12 @@ public sealed class CmdletImportHtmlSession : AsyncPSCmdlet {
 
     /// <summary>Viewport width in pixels.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportWidth { get; set; }
 
     /// <summary>Viewport height in pixels.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportHeight { get; set; }
 
     /// <summary>Scaling factor for high DPI devices.</summary>

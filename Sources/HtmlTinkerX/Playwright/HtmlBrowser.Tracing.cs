@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,8 +20,7 @@ public static partial class HtmlBrowser {
     /// <param name="sources">Include source code in the trace.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>A running task for the tracing start operation.</returns>
-    public static Task StartTracingAsync(HtmlBrowserSession session, bool screenshots = true, bool snapshots = true, bool sources = true, CancellationToken cancellationToken = default)
-    {
+    public static Task StartTracingAsync(HtmlBrowserSession session, bool screenshots = true, bool snapshots = true, bool sources = true, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         return session.Context.Tracing.StartAsync(new Microsoft.Playwright.TracingStartOptions { Screenshots = screenshots, Snapshots = snapshots, Sources = sources });
     }
@@ -70,7 +69,7 @@ public static partial class HtmlBrowser {
                     },
                     response = new {
                         status = e.Status ?? 0,
-                        headers = (e.ResponseHeaders ?? new Dictionary<string,string>()).Select(h => new { name = h.Key, value = h.Value })
+                        headers = (e.ResponseHeaders ?? new Dictionary<string, string>()).Select(h => new { name = h.Key, value = h.Value })
                     },
                     timings = new { wait = 0 }
                 })
@@ -86,4 +85,3 @@ public static partial class HtmlBrowser {
 #endif
     }
 }
-

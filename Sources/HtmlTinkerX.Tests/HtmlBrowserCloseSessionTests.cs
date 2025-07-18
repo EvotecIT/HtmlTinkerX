@@ -1,17 +1,15 @@
 using HtmlTinkerX;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Playwright;
 using Moq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace PSParseHTML.Tests;
 
-public class HtmlBrowserCloseSessionTests
-{
+public class HtmlBrowserCloseSessionTests {
     [Fact]
-    public async Task CloseSessionAsync_DisposesBrowserObjects()
-    {
+    public async Task CloseSessionAsync_DisposesBrowserObjects() {
         var playwright = new Mock<IPlaywright>();
         playwright.Setup(p => p.Dispose()).Verifiable();
         var browser = new Mock<IBrowser>();

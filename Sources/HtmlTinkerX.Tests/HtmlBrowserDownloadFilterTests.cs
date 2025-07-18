@@ -1,11 +1,11 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
+using Moq;
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Moq;
-using Microsoft.Playwright;
 using Xunit;
 
 namespace PSParseHTML.Tests;

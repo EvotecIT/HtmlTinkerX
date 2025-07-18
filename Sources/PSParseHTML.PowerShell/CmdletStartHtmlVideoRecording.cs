@@ -83,17 +83,17 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
 
     /// <summary>Delay between Playwright actions in milliseconds.</summary>
     [Parameter]
-    [ValidateRange(0,int.MaxValue)]
+    [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
 
     /// <summary>Browser window width.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int Width { get; set; } = 800;
 
     /// <summary>Browser window height.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int Height { get; set; } = 600;
 
     /// <summary>Custom User-Agent header.</summary>
@@ -102,12 +102,12 @@ public sealed class CmdletStartHtmlVideoRecording : AsyncPSCmdlet {
 
     /// <summary>Viewport width override.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportWidth { get; set; }
 
     /// <summary>Viewport height override.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportHeight { get; set; }
 
     /// <summary>Device scale factor for emulation.</summary>

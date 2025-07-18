@@ -1,6 +1,6 @@
+using AngleSharp.Dom;
 using HtmlTinkerX;
 using System.Linq;
-using AngleSharp.Dom;
 using Xunit;
 
 namespace PSParseHTML.Tests;

@@ -1,7 +1,7 @@
-using System;
-using System.IO;
 using NUglify;
 using NUglify.Html;
+using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 

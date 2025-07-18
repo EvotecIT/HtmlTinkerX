@@ -1,8 +1,8 @@
+using HtmlTinkerX;
 using System.Diagnostics;
+using System.IO;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using System.IO;
-using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 
@@ -109,7 +109,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
 
     /// <summary>Encoder quality for JPEG output.</summary>
     [Parameter]
-    [ValidateRange(1,100)]
+    [ValidateRange(1, 100)]
     public int Quality { get; set; } = 100;
 
     /// <summary>X coordinate for a clip region.</summary>

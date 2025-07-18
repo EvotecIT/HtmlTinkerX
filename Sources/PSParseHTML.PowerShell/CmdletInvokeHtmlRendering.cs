@@ -1,8 +1,8 @@
-using System.Management.Automation;
-using System.Threading.Tasks;
-using System.IO;
-using System.Threading;
 using HtmlTinkerX;
+using System.IO;
+using System.Management.Automation;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
@@ -97,7 +97,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
 
     /// <summary>Timeout in milliseconds for browser operations.</summary>
     [Parameter]
-    [ValidateRange(0,int.MaxValue)]
+    [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
     /// <summary>Token used to cancel the operation.</summary>
@@ -110,12 +110,12 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
 
     /// <summary>Viewport width in pixels.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportWidth { get; set; }
 
     /// <summary>Viewport height in pixels.</summary>
     [Parameter]
-    [ValidateRange(1,int.MaxValue)]
+    [ValidateRange(1, int.MaxValue)]
     public int? ViewportHeight { get; set; }
 
     /// <summary>Scaling factor for high DPI devices.</summary>

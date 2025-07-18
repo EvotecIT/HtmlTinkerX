@@ -3,8 +3,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Represents a warning returned from PreMailer processing.
 /// </summary>
-public class PreMailerWarning
-{
+public class PreMailerWarning {
     /// <summary>Warning message.</summary>
     public string Message { get; }
 
@@ -16,8 +15,7 @@ public class PreMailerWarning
     /// </summary>
     /// <param name="message">Warning message text.</param>
     /// <param name="severity">Warning severity or type.</param>
-    public PreMailerWarning(string message, string severity = "Warning")
-    {
+    public PreMailerWarning(string message, string severity = "Warning") {
         Message = message;
         Severity = severity;
     }

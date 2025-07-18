@@ -1,10 +1,10 @@
+using AngleSharp.Dom;
+using HtmlAgilityPack;
+using HtmlTinkerX;
 using System;
 using System.Management.Automation;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
-using HtmlAgilityPack;
-using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 

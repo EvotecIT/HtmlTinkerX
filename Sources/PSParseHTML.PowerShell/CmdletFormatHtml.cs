@@ -1,6 +1,6 @@
+using HtmlTinkerX;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 
@@ -97,4 +97,3 @@ public sealed class CmdletFormatHtml : AsyncPSCmdlet {
         }
     }
 }
-

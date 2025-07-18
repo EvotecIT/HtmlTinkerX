@@ -1,10 +1,10 @@
+using AngleSharp.Diffing.Core;
 using HtmlTinkerX;
 using System;
 using System.IO;
 using System.Management.Automation;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AngleSharp.Diffing.Core;
 
 namespace PSParseHTML.PowerShell;
 

@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Microsoft.Playwright;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using Microsoft.Playwright;
 
 namespace HtmlTinkerX;
 
