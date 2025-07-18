@@ -175,7 +175,7 @@ public static class HtmlParserFromList {
 
         static void CollectSegments(HtmlNode node, List<string> list) {
             if (node.NodeType == HtmlNodeType.Text) {
-                string text = HtmlEntity.DeEntitize(node.InnerText).Trim();
+                string text = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty).Trim();
                 if (!string.IsNullOrWhiteSpace(text)) {
                     list.Add(text);
                 }

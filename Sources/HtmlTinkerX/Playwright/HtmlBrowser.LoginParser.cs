@@ -51,7 +51,7 @@ public static class HtmlLoginParser {
         }
 
         string sel = el.TagName.ToLowerInvariant();
-        string id = el.Id;
+        string? id = el.Id;
         if (!string.IsNullOrEmpty(id)) {
             return sel + "#" + CssEscape(id);
         }
@@ -82,7 +82,7 @@ public static class HtmlLoginParser {
 
         string? style = el.GetAttribute("style");
         if (!string.IsNullOrEmpty(style)) {
-            style = style.ToLowerInvariant();
+            style = style!.ToLowerInvariant();
             if (style.Contains("display:none") || style.Contains("visibility:hidden") || style.Contains("opacity:0")) {
                 return true;
             }
