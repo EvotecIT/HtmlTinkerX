@@ -2,7 +2,7 @@ Describe 'Colspan only table parsing' {
     It 'Parses table with colspan correctly - AgilityPack' {
         $Path = Join-Path $PSScriptRoot 'Documents/colspan_only.html'
         $Content = Get-Content -LiteralPath $Path -Raw
-        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content, $false, $null, $null, $true)
+        $Tables = [HtmlTinkerX.HtmlParser]::ParseTablesWithHtmlAgilityPackDetailed($Content, $false, $null, $null, $true)
         $Table = $Tables[0]
         $Table.Data.Count | Should -Be 2
         $Table.Data[0].Name | Should -Be 'Foo'
@@ -15,7 +15,7 @@ Describe 'Colspan only table parsing' {
     It 'Parses table with colspan correctly - AngleSharp' {
         $Path = Join-Path $PSScriptRoot 'Documents/colspan_only.html'
         $Content = Get-Content -LiteralPath $Path -Raw
-        $Tables = [PSParseHTML.HtmlParser]::ParseTablesWithAngleSharpDetailed($Content, $null, $null, $true)
+        $Tables = [HtmlTinkerX.HtmlParser]::ParseTablesWithAngleSharpDetailed($Content, $null, $null, $true)
         $Table = $Tables[0]
         $Table.Data.Count | Should -Be 2
         $Table.Data[0].Name | Should -Be 'Foo'

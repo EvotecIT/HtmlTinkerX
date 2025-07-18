@@ -1,3 +1,4 @@
+using HtmlTinkerX;
 ﻿namespace PSParseHTML.PowerShell;
 /// <summary>
 /// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams

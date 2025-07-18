@@ -24,10 +24,10 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore Sources/PSParseHTML.sln
+        run: dotnet restore Sources/HtmlTinkerX.sln
 
       - name: Build release
-        run: dotnet build Sources/PSParseHTML.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+        run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Create libraries package
         shell: pwsh

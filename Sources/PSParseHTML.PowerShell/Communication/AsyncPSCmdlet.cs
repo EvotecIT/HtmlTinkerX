@@ -1,3 +1,4 @@
+using HtmlTinkerX;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>

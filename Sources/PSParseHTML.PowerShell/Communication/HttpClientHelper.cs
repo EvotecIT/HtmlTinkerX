@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Management.Automation;
-using PSParseHTML;
+using HtmlTinkerX;
 
 namespace PSParseHTML.PowerShell;
 

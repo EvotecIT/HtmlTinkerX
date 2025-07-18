@@ -5,7 +5,7 @@ Describe 'HTML Cookie cmdlets' {
         $cookie = New-HTMLCookie -Name 'mycookie' -Value 'choco' -Domain 'example.com' -Path '/'
 
         $session1 = Invoke-HTMLRendering -Url $url -Session
-        Set-HTMLCookie -Session $session1 -Cookie ([PSParseHTML.HtmlCookie[]]@($cookie))
+        Set-HTMLCookie -Session $session1 -Cookie ([HtmlTinkerX.HtmlCookie[]]@($cookie))
         $cookies1 = Get-HTMLCookie -Session $session1
         Close-HTMLSession -Session $session1
 
@@ -36,7 +36,7 @@ Describe 'HTML Cookie cmdlets' {
         $c2 = New-HTMLCookie -Name 'c2' -Value 'val2' -Domain 'other.com' -Path '/'
 
         $session = Invoke-HTMLRendering -Url $url -Session
-        Set-HTMLCookie -Session $session -Cookie ([PSParseHTML.HtmlCookie[]]@($c1, $c2))
+        Set-HTMLCookie -Session $session -Cookie ([HtmlTinkerX.HtmlCookie[]]@($c1, $c2))
         $filtered = Get-HTMLCookie -Session $session -Domain 'example.com'
         Close-HTMLSession -Session $session
 

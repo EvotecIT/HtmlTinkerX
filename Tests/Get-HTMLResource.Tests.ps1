@@ -5,7 +5,7 @@ Describe 'Get-HTMLResource' {
         $path = Join-Path $PSScriptRoot 'Documents/sample_resources.html'
         $links = Get-HTMLResource -Path $path -IncludeCss
         $links.Count | Should -Be 2
-        $links[0] | Should -BeOfType PSParseHTML.HtmlResourceLink
+        $links[0] | Should -BeOfType HtmlTinkerX.HtmlResourceLink
         $links[0].Comment | Should -Be 'jQuery library'
         $links[0].Name | Should -Be 'sample.js'
         $links[1].Comment | Should -Be 'custom styles'
