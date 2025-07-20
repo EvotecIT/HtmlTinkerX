@@ -16,6 +16,6 @@ public class HtmlFormMetadata {
     /// <summary>Form action URL.</summary>
     public string Action { get; set; } = string.Empty;
 
-    /// <summary>Submission method (GET/POST).</summary>
-    public string Method { get; set; } = "GET";
+    /// <summary>Submission method.</summary>
+    public FormMethod Method { get; set; } = FormMethod.Get;
 }

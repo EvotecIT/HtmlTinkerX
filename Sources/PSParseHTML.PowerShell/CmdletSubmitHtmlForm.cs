@@ -51,7 +51,13 @@ public sealed class CmdletSubmitHtmlForm : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         string action = Form.Properties["Action"]?.Value as string ?? string.Empty;
-        string? method = Form.Properties["Method"]?.Value as string;
+        FormMethod method = FormMethod.Get;
+        object? methodValue = Form.Properties["Method"]?.Value;
+        if (methodValue is FormMethod m) {
+            method = m;
+        } else if (methodValue is string ms && ms.Equals("POST", StringComparison.OrdinalIgnoreCase)) {
+            method = FormMethod.Post;
+        }
 
         Dictionary<string, string> fields = FieldValue.Cast<DictionaryEntry>()
             .ToDictionary(d => (string)d.Key, d => d.Value?.ToString() ?? string.Empty);

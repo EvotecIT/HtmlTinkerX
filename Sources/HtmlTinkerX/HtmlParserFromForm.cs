@@ -39,20 +39,18 @@ public static class HtmlParserFromForm {
             metadata.Id = form.Id;
             metadata.Classes = form.ClassName;
             metadata.Action = form.GetAttribute("action") ?? string.Empty;
-            metadata.Method = form.GetAttribute("method")?.ToUpperInvariant() ?? "GET";
+            string m = form.GetAttribute("method")?.ToUpperInvariant() ?? "GET";
+            metadata.Method = m == "POST" ? FormMethod.Post : FormMethod.Get;
 
             foreach (var field in form.QuerySelectorAll("input,select,textarea,button")) {
                 string? name = field.GetAttribute("name");
                 if (string.IsNullOrEmpty(name)) {
                     continue;
                 }
-                string? type = field.GetAttribute("type");
-                if (string.IsNullOrEmpty(type)) {
-                    type = field.NodeName.ToLowerInvariant();
-                }
+                string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
                 result.Fields.Add(new HtmlFormField {
                     Name = name!,
-                    Type = type ?? string.Empty
+                    Type = MapType(type)
                 });
             }
             results.Add(result);
@@ -78,5 +76,20 @@ public static class HtmlParserFromForm {
         HttpClient http = client ?? _sharedClient;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseFormsWithAngleSharp(content);
+    }
+
+    private static HtmlFormFieldType MapType(string? type) {
+        return type?.ToLowerInvariant() switch {
+            "text" => HtmlFormFieldType.Text,
+            "password" => HtmlFormFieldType.Password,
+            "hidden" => HtmlFormFieldType.Hidden,
+            "checkbox" => HtmlFormFieldType.Checkbox,
+            "radio" => HtmlFormFieldType.Radio,
+            "submit" => HtmlFormFieldType.Submit,
+            "select" => HtmlFormFieldType.Select,
+            "textarea" => HtmlFormFieldType.Textarea,
+            "button" => HtmlFormFieldType.Button,
+            _ => HtmlFormFieldType.Other,
+        };
     }
 }

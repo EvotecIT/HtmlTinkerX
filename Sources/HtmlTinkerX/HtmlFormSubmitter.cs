@@ -44,12 +44,12 @@ public static class HtmlFormSubmitter {
     /// Submits a form via HTTP request using the provided action and method.
     /// </summary>
     /// <param name="actionUrl">Form action URL.</param>
-    /// <param name="method">Submission method (GET or POST).</param>
+    /// <param name="method">Submission method.</param>
     /// <param name="fields">Field values keyed by name.</param>
     /// <param name="client">Optional HttpClient instance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Response body as string.</returns>
-    public static async Task<string> SubmitAsync(string actionUrl, string? method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
+    public static async Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
         if (actionUrl == null) {
             throw new ArgumentNullException(nameof(actionUrl));
         }
@@ -57,9 +57,8 @@ public static class HtmlFormSubmitter {
             throw new ArgumentNullException(nameof(fields));
         }
 
-        method ??= "GET";
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        if (method.Equals("GET", StringComparison.OrdinalIgnoreCase)) {
+        if (method == FormMethod.Get) {
             string query = string.Join("&", fields.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
             string url = actionUrl.Contains("?") ? $"{actionUrl}&{query}" : $"{actionUrl}?{query}";
             using HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);

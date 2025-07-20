@@ -28,18 +28,22 @@ public class HtmlBrowserHarExportTests {
         var req1 = new Mock<IRequest>();
         network[req1.Object] = new HtmlNetworkEntry {
             Url = "https://example.com/1",
-            Method = "GET",
+            Method = HtmlHttpMethod.Get,
             RequestHeaders = new Dictionary<string, string> { ["A"] = "1" },
-            Status = 200,
-            ResponseHeaders = new Dictionary<string, string> { ["B"] = "2" }
+            Status = System.Net.HttpStatusCode.OK,
+            ResponseHeaders = new Dictionary<string, string> { ["B"] = "2" },
+            Started = System.DateTimeOffset.UtcNow,
+            Finished = System.DateTimeOffset.UtcNow
         };
         var req2 = new Mock<IRequest>();
         network[req2.Object] = new HtmlNetworkEntry {
             Url = "https://example.com/2",
-            Method = "POST",
+            Method = HtmlHttpMethod.Post,
             RequestHeaders = new Dictionary<string, string> { ["C"] = "3" },
-            Status = 201,
-            ResponseHeaders = new Dictionary<string, string> { ["D"] = "4" }
+            Status = System.Net.HttpStatusCode.Created,
+            ResponseHeaders = new Dictionary<string, string> { ["D"] = "4" },
+            Started = System.DateTimeOffset.UtcNow,
+            Finished = System.DateTimeOffset.UtcNow
         };
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)

@@ -39,7 +39,7 @@ public class HtmlFormSubmitterTests {
             ["pass"] = "secret"
         };
 
-        string result = await HtmlFormSubmitter.SubmitAsync(server.BaseAddress + "login", "POST", fields, client);
+        string result = await HtmlFormSubmitter.SubmitAsync(server.BaseAddress + "login", FormMethod.Post, fields, client);
         Assert.Equal("admin:secret", result);
     }
 }

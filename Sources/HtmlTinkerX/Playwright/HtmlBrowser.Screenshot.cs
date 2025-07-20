@@ -30,18 +30,7 @@ public static partial class HtmlBrowser {
     /// <param name="path">File path for the screenshot.</param>
     /// <param name="browser">Browser engine to use.</param>
     /// <param name="clean">Force re-download of browser runtimes.</param>
-    /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
-    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
-    /// <param name="format">Image file format.</param>
-    /// <param name="quality">Encoder quality for JPEG output.</param>
-    /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
-    /// <param name="elementSelector">CSS selector of an element to capture.</param>
-    /// <param name="clipX">Optional clip region X coordinate.</param>
-    /// <param name="clipY">Optional clip region Y coordinate.</param>
-    /// <param name="clipWidth">Optional clip region width.</param>
-    /// <param name="clipHeight">Optional clip region height.</param>
-    /// <param name="highlightSelectors">Selectors to highlight in the screenshot.</param>
-    /// <param name="overlayText">Text to overlay on the image.</param>
+    /// <param name="options">Screenshot capture options.</param>
     /// <param name="username">Username for authentication.</param>
     /// <param name="password">Password for authentication.</param>
     /// <param name="formLogin">Form based login parameters.</param>
@@ -56,18 +45,7 @@ public static partial class HtmlBrowser {
         string path,
         HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
         bool clean = false,
-        bool fullPage = false,
-        int delayMs = 0,
-        ImageFormat format = ImageFormat.Png,
-        int quality = 100,
-        string? selector = null,
-        string? elementSelector = null,
-        int? clipX = null,
-        int? clipY = null,
-        int? clipWidth = null,
-        int? clipHeight = null,
-        IEnumerable<string>? highlightSelectors = null,
-        string? overlayText = null,
+        ScreenshotOptions? options = null,
         string? username = null,
         string? password = null,
         HtmlFormLogin? formLogin = null,
@@ -77,8 +55,9 @@ public static partial class HtmlBrowser {
         string? proxyUsername = null,
         string? proxyPassword = null,
         CancellationToken cancellationToken = default) {
-        if (delayMs < 0) {
-            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        options ??= new ScreenshotOptions();
+        if (options.DelayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.DelayMs), "Delay must be zero or positive.");
         }
         await using HtmlBrowserSession session = await OpenSessionAsync(
             url,
@@ -99,18 +78,7 @@ public static partial class HtmlBrowser {
         await CaptureScreenshotAsync(
             session.Page,
             fullPath,
-            fullPage,
-            delayMs,
-            format,
-            quality,
-            selector,
-            elementSelector,
-            clipX,
-            clipY,
-            clipWidth,
-            clipHeight,
-            highlightSelectors,
-            overlayText,
+            options,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -119,55 +87,34 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="page">Playwright page instance.</param>
     /// <param name="path">File path for the screenshot.</param>
-    /// <param name="fullPage">Capture the entire document instead of just the viewport.</param>
-    /// <param name="delayMs">Additional wait time in milliseconds after the page is loaded.</param>
-    /// <param name="format">Image file format.</param>
-    /// <param name="quality">Encoder quality for JPEG output.</param>
-    /// <param name="selector">Optional CSS selector to wait for before capturing.</param>
-    /// <param name="elementSelector">CSS selector of an element to capture.</param>
-    /// <param name="clipX">Optional clip region X coordinate.</param>
-    /// <param name="clipY">Optional clip region Y coordinate.</param>
-    /// <param name="clipWidth">Optional clip region width.</param>
-    /// <param name="clipHeight">Optional clip region height.</param>
-    /// <param name="highlightSelectors">Selectors to highlight in the screenshot.</param>
-    /// <param name="overlayText">Text to overlay on the image.</param>
+    /// <param name="options">Screenshot capture options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task CaptureScreenshotAsync(
         IPage page,
         string path,
-        bool fullPage = false,
-        int delayMs = 0,
-        ImageFormat format = ImageFormat.Png,
-        int quality = 100,
-        string? selector = null,
-        string? elementSelector = null,
-        int? clipX = null,
-        int? clipY = null,
-        int? clipWidth = null,
-        int? clipHeight = null,
-        IEnumerable<string>? highlightSelectors = null,
-        string? overlayText = null,
+        ScreenshotOptions? options = null,
         CancellationToken cancellationToken = default) {
-        if (delayMs < 0) {
-            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        options ??= new ScreenshotOptions();
+        if (options.DelayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.DelayMs), "Delay must be zero or positive.");
         }
-        if (!string.IsNullOrEmpty(selector)) {
+        if (!string.IsNullOrEmpty(options.Selector)) {
             cancellationToken.ThrowIfCancellationRequested();
-            await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
+            await page.WaitForSelectorAsync(options.Selector!, new PageWaitForSelectorOptions { Timeout = 10000 });
         }
-        if (delayMs > 0) {
+        if (options.DelayMs > 0) {
             cancellationToken.ThrowIfCancellationRequested();
-            await page.WaitForTimeoutAsync(delayMs);
+            await page.WaitForTimeoutAsync(options.DelayMs);
         }
 
-        if (!string.IsNullOrEmpty(elementSelector)) {
-            var locator = page.Locator(elementSelector!);
+        if (!string.IsNullOrEmpty(options.ElementSelector)) {
+            var locator = page.Locator(options.ElementSelector!);
             var box = await locator.BoundingBoxAsync();
             if (box != null) {
-                clipX = (int)Math.Floor(box.X);
-                clipY = (int)Math.Floor(box.Y);
-                clipWidth = (int)Math.Ceiling(box.Width);
-                clipHeight = (int)Math.Ceiling(box.Height);
+                options.ClipX = (int)Math.Floor(box.X);
+                options.ClipY = (int)Math.Floor(box.Y);
+                options.ClipWidth = (int)Math.Ceiling(box.Width);
+                options.ClipHeight = (int)Math.Ceiling(box.Height);
             }
         }
 
@@ -176,28 +123,28 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrEmpty(dir)) {
             Directory.CreateDirectory(dir);
         }
-        var options = new PageScreenshotOptions { FullPage = fullPage };
-        options.Type = format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
-        if (options.Type == ScreenshotType.Jpeg) {
-            options.Quality = quality;
+        var pwOptions = new PageScreenshotOptions { FullPage = options.FullPage };
+        pwOptions.Type = options.Format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
+        if (pwOptions.Type == ScreenshotType.Jpeg) {
+            pwOptions.Quality = options.Quality;
         }
-        if (clipX.HasValue && clipY.HasValue && clipWidth.HasValue && clipHeight.HasValue) {
-            options.Clip = new Clip {
-                X = clipX.Value,
-                Y = clipY.Value,
-                Width = clipWidth.Value,
-                Height = clipHeight.Value,
+        if (options.ClipX.HasValue && options.ClipY.HasValue && options.ClipWidth.HasValue && options.ClipHeight.HasValue) {
+            pwOptions.Clip = new Clip {
+                X = options.ClipX.Value,
+                Y = options.ClipY.Value,
+                Width = options.ClipWidth.Value,
+                Height = options.ClipHeight.Value,
             };
         }
         cancellationToken.ThrowIfCancellationRequested();
-        byte[] data = await page.ScreenshotAsync(options);
+        byte[] data = await page.ScreenshotAsync(pwOptions);
 
-        bool needsProcessing = (highlightSelectors != null && System.Linq.Enumerable.Any(highlightSelectors)) || !string.IsNullOrEmpty(overlayText) || (format != ImageFormat.Png && format != ImageFormat.Jpeg);
+        bool needsProcessing = (options.HighlightSelectors != null && System.Linq.Enumerable.Any(options.HighlightSelectors)) || !string.IsNullOrEmpty(options.OverlayText) || (options.Format != ImageFormat.Png && options.Format != ImageFormat.Jpeg);
         if (needsProcessing) {
             using var image = SixLabors.ImageSharp.Image.Load(data);
             var pen = SixLabors.ImageSharp.Drawing.Processing.Pens.Solid(SixLabors.ImageSharp.Color.Red, 3);
-            if (highlightSelectors != null) {
-                foreach (string sel in highlightSelectors) {
+            if (options.HighlightSelectors != null) {
+                foreach (string sel in options.HighlightSelectors) {
                     try {
                         var elements = await page.QuerySelectorAllAsync(sel);
                         foreach (var element in elements) {
@@ -213,17 +160,16 @@ public static partial class HtmlBrowser {
                 }
             }
 
-            if (!string.IsNullOrEmpty(overlayText)) {
+            if (!string.IsNullOrEmpty(options.OverlayText)) {
                 SixLabors.Fonts.FontFamily fontFamily;
                 if (!SixLabors.Fonts.SystemFonts.TryGet("DejaVu Sans", out fontFamily) &&
                     !SixLabors.Fonts.SystemFonts.TryGet("Arial", out fontFamily)) {
                     fontFamily = SixLabors.Fonts.SystemFonts.Collection.Families.First();
                 }
                 var font = fontFamily.CreateFont(20);
-                image.Mutate(c => c.DrawText(overlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
+                image.Mutate(c => c.DrawText(options.OverlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
             }
-
-            await image.SaveAsync(fullPath, GetEncoder(format, quality));
+            await image.SaveAsync(fullPath, GetEncoder(options.Format, options.Quality));
         } else {
             File.WriteAllBytes(fullPath, data);
         }

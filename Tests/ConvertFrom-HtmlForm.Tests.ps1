@@ -7,6 +7,6 @@ Describe 'ConvertFrom-HtmlForm' {
         $forms[0].Action | Should -Be '/login'
         $forms[0].Method | Should -Be 'POST'
         $forms[0].Fields[0].Name | Should -Be 'user'
-        $forms[0].Fields[1].Type | Should -Be 'password'
+        $forms[0].Fields[1].Type | Should -Be ([HtmlTinkerX.HtmlFormFieldType]::Password)
     }
 }

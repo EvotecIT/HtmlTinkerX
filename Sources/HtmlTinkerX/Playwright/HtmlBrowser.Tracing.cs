@@ -61,17 +61,17 @@ public static partial class HtmlBrowser {
                 version = "1.2",
                 creator = new { name = "HtmlTinkerX" },
                 entries = session.NetworkLog.Select(e => new {
-                    startedDateTime = System.DateTime.UtcNow.ToString("o"),
+                    startedDateTime = e.Started.ToString("o"),
                     request = new {
-                        method = e.Method,
+                        method = e.Method.ToString().ToUpperInvariant(),
                         url = e.Url,
                         headers = e.RequestHeaders.Select(h => new { name = h.Key, value = h.Value })
                     },
                     response = new {
-                        status = e.Status ?? 0,
+                        status = e.Status.HasValue ? (int)e.Status.Value : 0,
                         headers = (e.ResponseHeaders ?? new Dictionary<string, string>()).Select(h => new { name = h.Key, value = h.Value })
                     },
-                    timings = new { wait = 0 }
+                    timings = new { wait = e.Duration?.TotalMilliseconds ?? 0 }
                 })
             }
         };

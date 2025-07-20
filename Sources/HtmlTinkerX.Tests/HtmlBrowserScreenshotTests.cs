@@ -37,10 +37,12 @@ public class HtmlBrowserScreenshotTests {
         await HtmlBrowser.CaptureScreenshotAsync(
             page.Object,
             file,
-            clipX: 5,
-            clipY: 10,
-            clipWidth: 50,
-            clipHeight: 20);
+            new ScreenshotOptions {
+                ClipX = 5,
+                ClipY = 10,
+                ClipWidth = 50,
+                ClipHeight = 20
+            });
 
         Assert.NotNull(options);
         Assert.NotNull(options!.Clip);
@@ -70,8 +72,10 @@ public class HtmlBrowserScreenshotTests {
         await HtmlBrowser.CaptureScreenshotAsync(
             page.Object,
             file,
-            highlightSelectors: new[] { "div" },
-            overlayText: "test");
+            new ScreenshotOptions {
+                HighlightSelectors = new[] { "div" },
+                OverlayText = "test"
+            });
 
         Assert.True(File.Exists(file));
         byte[] original = CreatePngImage();
@@ -94,7 +98,7 @@ public class HtmlBrowserScreenshotTests {
         await HtmlBrowser.CaptureScreenshotAsync(
             page.Object,
             file,
-            format: ImageFormat.Bmp);
+            new ScreenshotOptions { Format = ImageFormat.Bmp });
 
         Assert.True(File.Exists(file));
         using (var stream = File.OpenRead(file)) {
