@@ -168,13 +168,21 @@ public static class HtmlBrowserTester {
                     
                     // Navigate and measure
                     var startTime = DateTimeOffset.UtcNow;
-                    var response = await page.GotoAsync(url, new PageGotoOptions {
-            WaitUntil = WaitUntilState.NetworkIdle,
-            Timeout = timeout
-                    });
-                    
-                    result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
-                    
+                    try {
+                        await page.GotoAsync(url, new PageGotoOptions {
+                            WaitUntil = WaitUntilState.NetworkIdle,
+                            Timeout = timeout
+                        });
+                    } catch (Exception ex) {
+                        result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
+                            Text = ex.Message,
+                            Type = HtmlConsoleMessageType.Error,
+                            Timestamp = DateTimeOffset.UtcNow
+                        });
+                    } finally {
+                        result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
+                    }
+
                     // Wait a bit for any delayed console messages or network requests
                     await page.WaitForTimeoutAsync(1000);
                 } finally {

@@ -21,6 +21,12 @@ Describe "Test-HtmlBrowser" {
             $result.PageLoadTime | Should -Not -BeNullOrEmpty
             $result.PageLoadTime.TotalMilliseconds | Should -BeGreaterThan 0
         }
+
+        It "Should capture timing information on timeout" {
+            $result = Test-HtmlBrowser -Url "http://10.255.255.1" -Timeout 1000
+
+            $result.PageLoadTime | Should -Not -BeNullOrEmpty
+        }
     }
 
     Context "Error Detection" {
