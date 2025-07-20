@@ -61,7 +61,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         Page.Console += (_, msg) => {
             HtmlConsoleEntry entry = new() {
                 Text = msg.Text,
-                Type = msg.Type,
+                Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
                 Location = msg.Location?.ToString()
             };
             _console.Enqueue(entry);
@@ -70,8 +70,9 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         Page.Request += (_, req) => {
             HtmlNetworkEntry entry = new() {
                 Url = req.Url,
-                Method = req.Method,
-                RequestHeaders = new Dictionary<string, string>(req.Headers)
+                Method = HtmlEnumParser.ParseHttpMethod(req.Method),
+                RequestHeaders = new Dictionary<string, string>(req.Headers),
+                Started = System.DateTimeOffset.UtcNow
             };
             _network[req] = entry;
         };
@@ -79,11 +80,25 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         Page.Response += (_, res) => {
             HtmlNetworkEntry entry = _network.GetOrAdd(res.Request, r => new HtmlNetworkEntry {
                 Url = r.Url,
-                Method = r.Method,
-                RequestHeaders = new Dictionary<string, string>(r.Headers)
+                Method = HtmlEnumParser.ParseHttpMethod(r.Method),
+                RequestHeaders = new Dictionary<string, string>(r.Headers),
+                Started = System.DateTimeOffset.UtcNow
             });
-            entry.Status = res.Status;
+            entry.Status = (System.Net.HttpStatusCode)res.Status;
             entry.ResponseHeaders = new Dictionary<string, string>(res.Headers);
+            entry.ResponseReceived = System.DateTimeOffset.UtcNow;
+        };
+
+        Page.RequestFinished += (_, req) => {
+            if (_network.TryGetValue(req, out HtmlNetworkEntry? entry)) {
+                entry.Finished = System.DateTimeOffset.UtcNow;
+            }
+        };
+
+        Page.RequestFailed += (_, req) => {
+            if (_network.TryGetValue(req, out HtmlNetworkEntry? entry)) {
+                entry.Finished = System.DateTimeOffset.UtcNow;
+            }
         };
     }
 

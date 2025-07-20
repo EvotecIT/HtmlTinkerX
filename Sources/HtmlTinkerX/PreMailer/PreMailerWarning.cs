@@ -8,14 +8,14 @@ public class PreMailerWarning {
     public string Message { get; }
 
     /// <summary>Warning severity or type.</summary>
-    public string Severity { get; }
+    public PreMailerSeverity Severity { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PreMailerWarning"/> class.
     /// </summary>
     /// <param name="message">Warning message text.</param>
     /// <param name="severity">Warning severity or type.</param>
-    public PreMailerWarning(string message, string severity = "Warning") {
+    public PreMailerWarning(string message, PreMailerSeverity severity = PreMailerSeverity.Warning) {
         Message = message;
         Severity = severity;
     }
