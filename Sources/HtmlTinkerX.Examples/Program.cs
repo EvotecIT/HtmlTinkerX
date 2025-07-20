@@ -7,7 +7,7 @@ namespace HtmlTinkerX.Examples;
 /// </summary>
 public static class Program {
     /// <summary>
-    /// Executes the <see cref="ConsoleLogExample"/>.
+    /// Executes the <see cref="NetworkLogTimingExample"/>.
     /// </summary>
-    public static Task Main() => ConsoleLogExample.RunAsync();
+    public static Task Main() => NetworkLogTimingExample.RunAsync();
 }
