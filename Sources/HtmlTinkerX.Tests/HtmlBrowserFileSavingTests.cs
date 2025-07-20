@@ -86,4 +86,19 @@ public class HtmlBrowserFileSavingTests {
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
             await HtmlBrowser.SavePagePdfAsync(page.Object, "file.pdf", delayMs: -1));
     }
+
+    [Fact]
+    public async Task SavePagePdfAsync_SavesRequestedFormat() {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "test.pdf");
+        PagePdfOptions? options = null;
+        var page = new Mock<IPage>();
+        page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>()))
+            .Callback<PagePdfOptions>(o => options = o)
+            .ReturnsAsync(Array.Empty<byte>());
+
+        await HtmlBrowser.SavePagePdfAsync(page.Object, file, format: PdfPageFormat.A4);
+
+        Assert.NotNull(options);
+        Assert.Equal("A4", options!.Format);
+    }
 }
