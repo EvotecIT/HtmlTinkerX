@@ -75,7 +75,10 @@ public static class HtmlOutlineBuilder {
         var nodes = document.DocumentNode.SelectNodes("//h1|//h2|//h3|//h4|//h5|//h6");
         if (nodes != null) {
             foreach (var node in nodes) {
-                int level = int.Parse(node.Name.Substring(1));
+                if (node == null) {
+                    continue;
+                }
+                int level = int.Parse(node.Name!.Substring(1));
                 string title = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty).Trim();
                 string? id = node.Id;
                 headings.Add((level, title, id));
