@@ -185,6 +185,24 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
             }
         }
 
+        bool clip = ParameterSetName.EndsWith("Clip", System.StringComparison.OrdinalIgnoreCase);
+        ScreenshotOptions options = new() {
+            FullPage = !clip && Full.IsPresent,
+            DelayMs = Delay,
+            Format = Format,
+            Quality = Quality,
+            Selector = Selector,
+            ElementSelector = ElementSelector,
+            HighlightSelectors = HighlightSelector,
+            OverlayText = OverlayText
+        };
+        if (clip) {
+            options.ClipX = X;
+            options.ClipY = Y;
+            options.ClipWidth = Width;
+            options.ClipHeight = Height;
+        }
+
         switch (ParameterSetName) {
             case ParameterSetClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
@@ -192,18 +210,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     Browser,
                     Clean.IsPresent,
-                    false,
-                    Delay,
-                    Format,
-                    Quality,
-                    Selector,
-                    ElementSelector,
-                    X,
-                    Y,
-                    Width,
-                    Height,
-                    highlightSelectors: HighlightSelector,
-                    overlayText: OverlayText,
+                    options,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
@@ -216,18 +223,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     Browser,
                     Clean.IsPresent,
-                    false,
-                    Delay,
-                    Format,
-                    Quality,
-                    Selector,
-                    ElementSelector,
-                    X,
-                    Y,
-                    Width,
-                    Height,
-                    highlightSelectors: HighlightSelector,
-                    overlayText: OverlayText,
+                    options,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
@@ -238,31 +234,13 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     HtmlUtilities.ResolvePath(OutFile!),
-                    false,
-                    Delay,
-                    Format,
-                    Quality,
-                    Selector,
-                    ElementSelector,
-                    X,
-                    Y,
-                    Width,
-                    Height,
-                    highlightSelectors: HighlightSelector,
-                    overlayText: OverlayText).ConfigureAwait(false);
+                    options).ConfigureAwait(false);
                 break;
             case ParameterSetSessionDefault:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     HtmlUtilities.ResolvePath(OutFile!),
-                    Full.IsPresent,
-                    Delay,
-                    Format,
-                    Quality,
-                    Selector,
-                    ElementSelector,
-                    highlightSelectors: HighlightSelector,
-                    overlayText: OverlayText).ConfigureAwait(false);
+                    options).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
@@ -273,14 +251,7 @@ public sealed class CmdletSaveHtmlScreenshot : AsyncPSCmdlet {
                     HtmlUtilities.ResolvePath(OutFile!),
                     Browser,
                     Clean.IsPresent,
-                    Full.IsPresent,
-                    Delay,
-                    Format,
-                    Quality,
-                    Selector,
-                    ElementSelector,
-                    highlightSelectors: HighlightSelector,
-                    overlayText: OverlayText,
+                    options,
                     headless: !Visible.IsPresent,
                     slowMo: SlowMo,
                     proxy: Proxy,
