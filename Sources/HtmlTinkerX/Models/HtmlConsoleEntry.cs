@@ -10,7 +10,7 @@ public sealed class HtmlConsoleEntry {
     public string Text { get; set; } = string.Empty;
 
     /// <summary>Message type like log, error, warning.</summary>
-    public string Type { get; set; } = string.Empty;
+    public HtmlConsoleMessageType Type { get; set; }
 
     /// <summary>Location of the message if available.</summary>
     public string? Location { get; set; }

@@ -31,13 +31,15 @@ public class HtmlBrowserNetworkLogTests {
 
         page.Raise(p => p.Request += null!, page.Object, request.Object);
         page.Raise(p => p.Response += null!, page.Object, response.Object);
+        page.Raise(p => p.RequestFinished += null!, page.Object, request.Object);
 
         HtmlNetworkEntry entry = Assert.Single(HtmlBrowser.GetNetworkLog(session));
         Assert.Equal("https://example.com/", entry.Url);
-        Assert.Equal("GET", entry.Method);
-        Assert.Equal(200, entry.Status);
+        Assert.Equal(HtmlHttpMethod.Get, entry.Method);
+        Assert.Equal(System.Net.HttpStatusCode.OK, entry.Status);
         Assert.Equal("v1", entry.RequestHeaders["h1"]);
         Assert.Equal("v2", entry.ResponseHeaders!["h2"]);
+        Assert.NotNull(entry.Duration);
         await session.DisposeAsync();
     }
 }

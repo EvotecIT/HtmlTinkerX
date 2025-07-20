@@ -24,7 +24,7 @@ public class HtmlBrowserConsoleLogTests {
 
         HtmlConsoleEntry entry = Assert.Single(HtmlBrowser.GetConsoleLog(session));
         Assert.Equal("hello", entry.Text);
-        Assert.Equal("log", entry.Type);
+        Assert.Equal(HtmlConsoleMessageType.Log, entry.Type);
         Assert.Equal("file.js:1:2", entry.Location);
         await session.DisposeAsync();
     }
