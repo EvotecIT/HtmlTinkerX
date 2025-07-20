@@ -21,36 +21,17 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Gets the platform identifier for the Playwright driver.
     /// </summary>
-    private static string PlatformId {
-        get {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "win32_x64";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                    ? "darwin-arm64"
-                    : "darwin-x64";
-            if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
-                return "linux-arm64";
-            return "linux-x64";
-        }
-    }
+    private static string PlatformId => CurrentPlatform.ToPlatformId();
+
+    /// <summary>
+    /// Gets the current platform value.
+    /// </summary>
+    private static HtmlPlatform CurrentPlatform => PlatformExtensions.GetCurrentPlatform();
 
     /// <summary>
     /// Gets the platform identifier for downloading the Playwright driver.
     /// </summary>
-    private static string DownloadPlatformId {
-        get {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "win32_x64";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                    ? "mac-arm64"
-                    : "mac";
-            if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
-                return "linux-arm64";
-            return "linux";
-        }
-    }
+    private static string DownloadPlatformId => CurrentPlatform.ToDownloadPlatformId();
 
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
 
