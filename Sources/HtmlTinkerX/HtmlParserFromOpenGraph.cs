@@ -34,14 +34,17 @@ public static class HtmlParserFromOpenGraph {
             if (string.IsNullOrEmpty(property)) {
                 continue;
             }
-            string key = property!.Substring(3); // remove "og:" prefix
+            string key = property.Substring(3); // remove "og:" prefix
             string content = node.GetAttribute("content") ?? string.Empty;
-            if (!result.Properties.TryGetValue(key, out var list)) {
-                list = new List<string>();
-                result.Properties[key] = list;
+
+            OpenGraphProperty? existing = result.Properties.Find(p => p.Name == key);
+            if (existing == null) {
+                existing = new OpenGraphProperty { Name = key };
+                result.Properties.Add(existing);
             }
+
             if (!string.IsNullOrEmpty(content)) {
-                list.Add(content);
+                existing.Values.Add(content);
             }
         }
         return result;

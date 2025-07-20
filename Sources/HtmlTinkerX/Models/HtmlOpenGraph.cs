@@ -7,5 +7,5 @@ namespace HtmlTinkerX;
 /// </summary>
 public sealed class HtmlOpenGraph {
     /// <summary>Collection of Open Graph properties.</summary>
-    public Dictionary<string, List<string>> Properties { get; set; } = new();
+    public List<OpenGraphProperty> Properties { get; set; } = new();
 }

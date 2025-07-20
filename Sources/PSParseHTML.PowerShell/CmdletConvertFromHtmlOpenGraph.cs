@@ -47,9 +47,9 @@ public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
         }
 
         PSObject obj = new();
-        foreach (KeyValuePair<string, List<string>> pair in graph.Properties) {
-            object value = pair.Value.Count == 1 ? pair.Value[0] : pair.Value.ToArray();
-            obj.Properties.Add(new PSNoteProperty(pair.Key, value));
+        foreach (OpenGraphProperty prop in graph.Properties) {
+            object value = prop.Values.Count == 1 ? prop.Values[0] : prop.Values.ToArray();
+            obj.Properties.Add(new PSNoteProperty(prop.Name, value));
         }
         WriteObject(obj);
     }
