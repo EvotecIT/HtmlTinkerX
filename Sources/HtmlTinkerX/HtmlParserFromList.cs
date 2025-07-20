@@ -59,7 +59,11 @@ public static class HtmlParserFromList {
         }
         return results;
 
-        static void CollectSegments(INode node, List<string> list) {
+        static void CollectSegments(INode? node, List<string> list) {
+            if (node == null) {
+                return;
+            }
+
             if (node.NodeType == NodeType.Text) {
                 string text = node.TextContent.Trim();
                 if (!string.IsNullOrWhiteSpace(text)) {
@@ -67,6 +71,9 @@ public static class HtmlParserFromList {
                 }
             } else {
                 foreach (var child in node.ChildNodes) {
+                    if (child == null) {
+                        continue;
+                    }
                     CollectSegments(child, list);
                 }
             }
@@ -175,7 +182,10 @@ public static class HtmlParserFromList {
         }
         return results;
 
-        static void CollectSegments(HtmlNode node, List<string> list) {
+        static void CollectSegments(HtmlNode? node, List<string> list) {
+            if (node == null) {
+                return;
+            }
             if (node.NodeType == HtmlNodeType.Text) {
                 string text = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty).Trim();
                 if (!string.IsNullOrWhiteSpace(text)) {
@@ -183,6 +193,9 @@ public static class HtmlParserFromList {
                 }
             } else {
                 foreach (var child in node.ChildNodes) {
+                    if (child == null) {
+                        continue;
+                    }
                     CollectSegments(child, list);
                 }
             }

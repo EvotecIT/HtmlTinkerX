@@ -89,6 +89,9 @@ public static class HtmlParserFromTable {
             List<string> headers = new();
             if (hasHeader) {
                 foreach (var cell in headerCells) {
+                    if (cell == null) {
+                        continue;
+                    }
                     string header = cell.TextContent.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
@@ -124,6 +127,9 @@ public static class HtmlParserFromTable {
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
+                if (row == null) {
+                    continue;
+                }
                 var cells = row.QuerySelectorAll("th,td");
                 string?[] rowValues = new string?[headers.Count];
                 int col = 0;
@@ -233,6 +239,9 @@ public static class HtmlParserFromTable {
             List<string> headers = new();
             if (hasHeader) {
                 foreach (var cell in headerCells) {
+                    if (cell == null) {
+                        continue;
+                    }
                     string header = cell.TextContent.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
@@ -257,6 +266,9 @@ public static class HtmlParserFromTable {
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
+                if (row == null) {
+                    continue;
+                }
                 var cells = row.QuerySelectorAll("th,td");
                 string?[] rowValues = new string?[headers.Count];
                 int col = 0;
@@ -430,6 +442,9 @@ public static class HtmlParserFromTable {
                 Dictionary<string, string?> obj = new();
                 int index = 0;
                 foreach (var row in rows) {
+                    if (row == null) {
+                        continue;
+                    }
                     var cells = row.SelectNodes("th|td");
                     if (cells == null || cells.Count == 0) {
                         continue;
@@ -440,7 +455,7 @@ public static class HtmlParserFromTable {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
-                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText ?? string.Empty).Trim() : string.Empty;
+                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells![1].InnerText ?? string.Empty).Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
                             value = value.Replace(kv.Key, kv.Value);
@@ -479,6 +494,9 @@ public static class HtmlParserFromTable {
             List<string> headers = new();
             if (hasHeader) {
                 foreach (var cell in headerCells) {
+                    if (cell == null) {
+                        continue;
+                    }
                     string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
@@ -510,6 +528,9 @@ public static class HtmlParserFromTable {
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
+                if (row == null) {
+                    continue;
+                }
                 var cells = row.SelectNodes("th|td");
                 if (cells == null) {
                     continue;
@@ -617,6 +638,9 @@ public static class HtmlParserFromTable {
                 Dictionary<string, string?> obj = new();
                 int index = 0;
                 foreach (var row in rows) {
+                    if (row == null) {
+                        continue;
+                    }
                     var cells = row.SelectNodes("th|td");
                     if (cells == null || cells.Count == 0) {
                         continue;
@@ -662,6 +686,9 @@ public static class HtmlParserFromTable {
             List<string> headers = new();
             if (hasHeader) {
                 foreach (var cell in headerCells) {
+                    if (cell == null) {
+                        continue;
+                    }
                     string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
@@ -686,6 +713,9 @@ public static class HtmlParserFromTable {
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
+                if (row == null) {
+                    continue;
+                }
                 var cells = row.SelectNodes("th|td");
                 if (cells == null) {
                     continue;
