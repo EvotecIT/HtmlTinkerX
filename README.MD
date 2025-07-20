@@ -114,6 +114,16 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | `Unregister-HTMLRoute` | `HtmlBrowser.UnregisterRouteAsync()` | Remove route handler            |
 | `Show-HTMLHar`         | `HtmlHarViewer.ShowHar()`            | Visualize HAR files             |
 
+### Browser Testing
+| PowerShell Cmdlet       | C# Method                                        | Description                            |
+| ----------------------- | ------------------------------------------------ | -------------------------------------- |
+| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestUrlAsync()`              | Comprehensive browser testing          |
+| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestFileAsync()`             | Test local HTML file (with -Path)     |
+| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestCssResourceAsync()`      | Test specific CSS resource (with -CssResource) |
+| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestConsoleErrorsAsync()`    | Get console errors (with -ErrorsOnly)  |
+| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestPerformanceAsync()`      | Get performance metrics (with -PerformanceOnly) |
+| `Clear-HtmlBrowserCache`| `HtmlBrowserCacheCleaner.CleanAllCache()`       | Clean Playwright browser downloads     |
+
 ### Cookies & State
 | PowerShell Cmdlet | C# Method                       | Description              |
 | ----------------- | ------------------------------- | ------------------------ |
@@ -226,6 +236,8 @@ Close-HTMLSession -Session $session
 - **Save-HTMLHar** - Export network traffic to HAR files
 - **Start-HTMLTracing** / **Stop-HTMLTracing** - Record Playwright traces
 - **Register-HTMLRoute** / **Unregister-HTMLRoute** - Intercept and mock requests
+- **Test-HtmlBrowser** - Comprehensive browser testing for errors, performance, and resources
+- **Clear-HtmlBrowserCache** - Clean Playwright browser downloads
 
 ### Cookies & State Management
 - **Get-HTMLCookie** - Retrieve cookies from sessions
@@ -493,6 +505,391 @@ foreach (var message in consoleMessages)
 // Download files
 var downloads = await HtmlBrowser.SaveAttachmentsAsync(session, "./downloads", ".pdf");
 Console.WriteLine($"Downloaded {downloads.Count} files");
+```
+
+## 🧪 Browser Testing & Network Monitoring
+
+PSParseHTML now includes comprehensive browser testing capabilities for checking network requests, CSS resources, console errors, and performance metrics. This feature uses strongly-typed classes instead of dictionaries for better IntelliSense and type safety.
+
+### PowerShell Browser Testing
+
+#### Basic Testing
+```powershell
+# Run a comprehensive test on a URL
+$result = Test-HtmlBrowser -Url 'https://example.com'
+
+# Test a local HTML file
+$result = Test-HtmlBrowser -Path 'C:\MyProject\index.html'
+
+# Check if test passed (no errors or failed requests)
+if ($result.Passed) {
+    Write-Host "✅ All tests passed!"
+} else {
+    Write-Host "❌ Issues found: $($result.Summary)"
+}
+
+# View detailed results
+Write-Host "Total Requests: $($result.TotalRequests)"
+Write-Host "Failed Requests: $($result.FailedRequestCount)"
+Write-Host "Console Errors: $($result.ErrorCount)"
+Write-Host "Console Warnings: $($result.WarningCount)"
+```
+
+#### Testing Local HTML Files
+```powershell
+# Test local HTML files created by HTMLForgeX or other tools
+$htmlFile = "C:\Projects\MyReport\report.html"
+$result = Test-HtmlBrowser -Path $htmlFile
+
+# Check for JavaScript errors in local file
+$errors = Test-HtmlBrowser -Path $htmlFile -ErrorsOnly
+if ($errors.Count -gt 0) {
+    Write-Host "Found $($errors.Count) JavaScript errors:"
+    $errors | ForEach-Object {
+        Write-Host "  - $($_.Text) at $($_.FullLocation)"
+    }
+}
+
+# Test CSS loading in local file
+$cssCheck = Test-HtmlBrowser -Path $htmlFile -CssResource 'styles.css'
+if ($cssCheck) {
+    Write-Host "CSS loaded successfully in $($cssCheck.Duration.TotalMilliseconds)ms"
+}
+
+# Test with visible browser (not headless) for debugging
+$result = Test-HtmlBrowser -Path $htmlFile -Headless:$false
+```
+
+#### Testing for Console Errors
+```powershell
+# Get only console errors
+$errors = Test-HtmlBrowser -Url 'https://example.com' -ErrorsOnly
+
+foreach ($error in $errors) {
+    Write-Host "Error: $($error.Text)"
+    Write-Host "  Location: $($error.FullLocation)"
+    Write-Host "  Severity: $($error.SeverityLevel)"
+    
+    if ($error.StackTrace) {
+        Write-Host "  Stack: $($error.StackTrace)"
+    }
+}
+```
+
+#### CSS Resource Testing
+```powershell
+# Check if a specific CSS file is loaded
+$cssResource = Test-HtmlBrowser -Url 'https://example.com' -CssResource 'styles.css'
+
+if ($cssResource) {
+    Write-Host "CSS found: $($cssResource.Url)"
+    Write-Host "Load time: $($cssResource.Duration.TotalMilliseconds)ms"
+    Write-Host "Size: $($cssResource.TransferSize) bytes"
+    Write-Host "From cache: $($cssResource.ServedFromCache)"
+}
+```
+
+#### Performance Testing
+```powershell
+# Get performance metrics only
+$metrics = Test-HtmlBrowser -Url 'https://example.com' -PerformanceOnly
+
+# Display performance report
+Write-Host $metrics.GetReport()
+
+# Access specific metrics
+Write-Host "Page Load Time: $($metrics.TotalLoadTime.TotalSeconds)s"
+Write-Host "Average Request Duration: $($metrics.AverageRequestDuration.TotalMilliseconds)ms"
+Write-Host "Total Bytes: $($metrics.TotalBytesTransferred / 1KB)KB"
+
+# Resource breakdown
+$metrics.ResourceBreakdown | ForEach-Object {
+    Write-Host "$($_.Key): $($_.Value) requests"
+}
+```
+
+#### Advanced Testing with Proxy
+```powershell
+# Test through a proxy with authentication
+$cred = Get-Credential
+$result = Test-HtmlBrowser -Url 'https://example.com' `
+    -Proxy 'http://proxy:8080' `
+    -ProxyCredential $cred `
+    -Timeout 60000
+```
+
+### C# Browser Testing
+
+#### Basic Testing
+```csharp
+using HtmlTinkerX;
+
+// Run comprehensive test on URL
+var result = await HtmlBrowserTester.TestUrlAsync("https://example.com");
+
+// Test a local HTML file
+var fileResult = await HtmlBrowserTester.TestFileAsync(@"C:\MyProject\index.html");
+
+if (result.Passed)
+{
+    Console.WriteLine("✅ All tests passed!");
+}
+else
+{
+    Console.WriteLine($"❌ {result.Summary}");
+}
+
+// Analyze results
+Console.WriteLine($"Total Requests: {result.TotalRequests}");
+Console.WriteLine($"Failed: {result.FailedRequestCount}");
+Console.WriteLine($"Errors: {result.ErrorCount}");
+Console.WriteLine($"Warnings: {result.WarningCount}");
+```
+
+#### Testing Local HTML Files
+```csharp
+// Test local HTML file with full analysis
+var testResult = await HtmlBrowserTester.TestFileAsync(
+    @"C:\Projects\MyReport\report.html",
+    HtmlBrowserEngine.Chromium,
+    headless: true,
+    timeout: 30000);
+
+// Check specific issues
+if (testResult.ConsoleErrors.Any())
+{
+    Console.WriteLine($"Found {testResult.ErrorCount} JavaScript errors:");
+    foreach (var error in testResult.ConsoleErrors)
+    {
+        Console.WriteLine($"  - {error.Text}");
+        Console.WriteLine($"    Location: {error.FullLocation}");
+        if (!string.IsNullOrEmpty(error.StackTrace))
+        {
+            Console.WriteLine($"    Stack: {error.StackTrace}");
+        }
+    }
+}
+
+// Analyze resource loading
+var slowResources = testResult.NetworkEntries
+    .Where(r => r.Duration > TimeSpan.FromSeconds(1))
+    .OrderByDescending(r => r.Duration);
+
+foreach (var resource in slowResources)
+{
+    Console.WriteLine($"Slow resource: {resource.Url} took {resource.Duration?.TotalSeconds}s");
+}
+```
+
+#### Network Request Analysis
+```csharp
+// Test and analyze network requests
+var result = await HtmlBrowserTester.TestUrlAsync("https://example.com");
+
+// Check CSS resources
+foreach (var css in result.CssResources)
+{
+    Console.WriteLine($"CSS: {css.Url}");
+    Console.WriteLine($"  Duration: {css.Duration?.TotalMilliseconds}ms");
+    Console.WriteLine($"  Size: {css.TransferSize} bytes");
+    Console.WriteLine($"  Cached: {css.ServedFromCache}");
+}
+
+// Check failed requests
+foreach (var failed in result.FailedRequests)
+{
+    Console.WriteLine($"Failed: {failed.Url}");
+    Console.WriteLine($"  Error: {failed.ErrorType} - {failed.ErrorMessage}");
+}
+
+// Check JavaScript resources
+var jsFiles = result.JavaScriptResources;
+var totalJsSize = jsFiles.Sum(js => js.TransferSize ?? 0);
+Console.WriteLine($"Total JS size: {totalJsSize / 1024}KB");
+```
+
+#### Console Error Detection
+```csharp
+// Get only console errors
+var errors = await HtmlBrowserTester.TestConsoleErrorsAsync("https://example.com");
+
+foreach (var error in errors)
+{
+    Console.WriteLine($"Error: {error.Text}");
+    Console.WriteLine($"  Type: {error.Type}");
+    Console.WriteLine($"  Location: {error.FullLocation}");
+    Console.WriteLine($"  Timestamp: {error.Timestamp}");
+    
+    if (!string.IsNullOrEmpty(error.StackTrace))
+    {
+        Console.WriteLine($"  Stack: {error.StackTrace}");
+    }
+}
+```
+
+#### Performance Analysis
+```csharp
+// Get performance metrics
+var metrics = await HtmlBrowserTester.TestPerformanceAsync("https://example.com");
+
+// Display performance report
+Console.WriteLine(metrics.GetReport());
+
+// Check specific thresholds
+if (metrics.TotalLoadTime > TimeSpan.FromSeconds(5))
+{
+    Console.WriteLine("⚠️ Page load time exceeds 5 seconds!");
+}
+
+if (metrics.LongestRequest?.Duration > TimeSpan.FromSeconds(2))
+{
+    Console.WriteLine($"⚠️ Slow resource: {metrics.LongestRequest.Url}");
+}
+```
+
+### Test Result Properties
+
+#### HtmlBrowserTestResult
+- **Url** - The tested URL
+- **PageLoadTime** - Total page load duration
+- **NetworkEntries** - All network requests with detailed info
+- **ConsoleEntries** - All console messages
+- **ConsoleErrors** - Only error messages
+- **ConsoleWarnings** - Only warning messages
+- **FailedRequests** - Failed network requests
+- **CssResources** - CSS file requests
+- **JavaScriptResources** - JS file requests
+- **ImageResources** - Image requests
+- **Passed** - Whether all tests passed
+- **Summary** - Human-readable summary
+
+#### HtmlNetworkEntryDetailed
+- **Url** - Request URL
+- **Method** - HTTP method
+- **Status** - Response status code
+- **Duration** - Request duration
+- **ResourceType** - Type of resource (Document, Stylesheet, Script, etc.)
+- **TransferSize** - Total bytes transferred
+- **ServedFromCache** - Whether served from cache
+- **ErrorType** - Error type if failed
+- **ContentType** - Response content type
+
+#### HtmlConsoleEntryDetailed
+- **Text** - Console message text
+- **Type** - Message type (Error, Warning, Info, etc.)
+- **Timestamp** - When logged
+- **SourceUrl** - Source file URL
+- **LineNumber** - Line in source
+- **StackTrace** - Stack trace for errors
+- **SeverityLevel** - 1=Info, 2=Warning, 3=Error
+- **IsError/IsWarning/IsInfo** - Quick type checks
+
+### Playwright Auto-Setup
+
+Playwright browsers are automatically downloaded on first use. No manual setup required! The download happens once per system and is shared across all applications.
+
+#### Cleaning Playwright Cache
+```powershell
+# View cache size and clean if needed
+Clear-HtmlBrowserCache -WhatIf
+
+# Force clean without confirmation  
+Clear-HtmlBrowserCache -Force
+
+# Skip cleaning temporary files (only clean browser downloads)
+Clear-HtmlBrowserCache -SkipTemp -Force
+
+# Skip cleaning browser downloads (only clean temp files)
+Clear-HtmlBrowserCache -SkipBrowsers -Force
+
+# View detailed information about what will be cleaned
+Clear-HtmlBrowserCache -Verbose
+```
+
+The enhanced cache cleaner now:
+- Cleans multiple Playwright cache locations (LocalAppData and .cache)
+- Removes temporary Playwright files from the temp directory
+- Cleans up trace files left behind by debugging sessions
+- Shows detailed size information for each location
+- Provides granular control over what to clean
+
+#### C# Cache Cleaning
+```csharp
+// Get all cache locations
+var locations = HtmlBrowserCacheCleaner.GetCacheLocations();
+Console.WriteLine($"Found {locations.Count} locations totaling {locations.Sum(l => l.SizeMB):F2} MB");
+
+// Clean all cache
+var result = HtmlBrowserCacheCleaner.CleanAllCache();
+if (result.Success)
+{
+    Console.WriteLine($"Cleaned {result.TotalSizeClearedMB:F2} MB");
+}
+else
+{
+    Console.WriteLine($"Failed to clean {result.Failed.Count} locations");
+}
+
+// Clean only browser downloads
+var browserResult = HtmlBrowserCacheCleaner.CleanAllCache(
+    includeBrowsers: true, 
+    includeTemp: false);
+
+// Get locations without cleaning (for inspection)
+var tempOnly = HtmlBrowserCacheCleaner.GetCacheLocations(
+    includeBrowsers: false,
+    includeTemp: true);
+foreach (var location in tempOnly)
+{
+    Console.WriteLine($"{location.Description}: {location.SizeMB:F2} MB at {location.Path}");
+}
+```
+
+### Integration with Test Frameworks
+
+#### xUnit Example
+```csharp
+[Fact]
+public async Task WebsiteShouldHaveNoErrors()
+{
+    var result = await HtmlBrowserTester.TestUrlAsync("https://mysite.com");
+    
+    Assert.True(result.Passed, result.Summary);
+    Assert.Empty(result.ConsoleErrors);
+    Assert.Empty(result.FailedRequests);
+}
+
+[Fact]
+public async Task CssShouldLoadQuickly()
+{
+    var result = await HtmlBrowserTester.TestUrlAsync("https://mysite.com");
+    
+    foreach (var css in result.CssResources)
+    {
+        Assert.True(css.Duration < TimeSpan.FromSeconds(2),
+            $"CSS {css.Url} took {css.Duration?.TotalSeconds}s");
+    }
+}
+```
+
+#### Pester Example
+```powershell
+Describe "Website Health Check" {
+    It "Should have no console errors" {
+        $result = Test-HtmlBrowser -Url "https://mysite.com"
+        $result.ErrorCount | Should -Be 0
+    }
+    
+    It "Should load all resources successfully" {
+        $result = Test-HtmlBrowser -Url "https://mysite.com"
+        $result.FailedRequestCount | Should -Be 0
+    }
+    
+    It "Should load within 5 seconds" {
+        $metrics = Test-HtmlBrowser -Url "https://mysite.com" -PerformanceOnly
+        $metrics.TotalLoadTime.TotalSeconds | Should -BeLessThan 5
+    }
+}
 ```
 
 ## 🔧 Advanced Features

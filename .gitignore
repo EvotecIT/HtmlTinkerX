@@ -16,3 +16,4 @@ Lib/*
 dotnet-install.sh
 packages-microsoft-prod.deb
 .dotnet/
+.claude/*
