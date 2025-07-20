@@ -39,7 +39,8 @@ public static class HtmlParserFromForm {
             metadata.Id = form.Id;
             metadata.Classes = form.ClassName;
             metadata.Action = form.GetAttribute("action") ?? string.Empty;
-            metadata.Method = form.GetAttribute("method")?.ToUpperInvariant() ?? "GET";
+            string m = form.GetAttribute("method")?.ToUpperInvariant() ?? "GET";
+            metadata.Method = m == "POST" ? FormMethod.Post : FormMethod.Get;
 
             foreach (var field in form.QuerySelectorAll("input,select,textarea,button")) {
                 string? name = field.GetAttribute("name");

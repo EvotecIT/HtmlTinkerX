@@ -77,7 +77,7 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
         }
         obj.Properties.Add(new PSNoteProperty("Fields", fieldObjects.ToArray()));
         obj.Properties.Add(new PSNoteProperty("Action", result.Metadata.Action));
-        obj.Properties.Add(new PSNoteProperty("Method", result.Metadata.Method));
+        obj.Properties.Add(new PSNoteProperty("Method", result.Metadata.Method.ToString().ToUpperInvariant()));
 
         if (IncludeMetadata.IsPresent) {
             obj.Properties.Add(new PSNoteProperty("FormIndex", result.Metadata.FormIndex));

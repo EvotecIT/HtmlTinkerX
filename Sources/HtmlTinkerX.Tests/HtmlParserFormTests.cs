@@ -23,7 +23,7 @@ public class HtmlParserFormTests {
         var forms = HtmlParser.ParseFormsWithAngleSharp(html);
         Assert.Equal(2, forms.Count);
         Assert.Equal("/login", forms[0].Metadata.Action);
-        Assert.Equal("POST", forms[0].Metadata.Method);
+        Assert.Equal(FormMethod.Post, forms[0].Metadata.Method);
         Assert.Equal(2, forms[0].Fields.Count);
         Assert.Equal("user", forms[0].Fields[0].Name);
     }
