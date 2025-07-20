@@ -53,12 +53,12 @@ public static class HtmlLoginParser {
         string sel = el.TagName.ToLowerInvariant();
         string? id = el.Id;
         if (!string.IsNullOrEmpty(id)) {
-            return sel + "#" + CssEscape(id);
+            return sel + "#" + CssEscape(id!);
         }
 
         string? name = el.GetAttribute("name");
         if (!string.IsNullOrEmpty(name)) {
-            return $"{sel}[name='{CssStringEscape(name)}']";
+            return $"{sel}[name='{CssStringEscape(name!)}']";
         }
 
         string cls = el.ClassName ?? string.Empty;
