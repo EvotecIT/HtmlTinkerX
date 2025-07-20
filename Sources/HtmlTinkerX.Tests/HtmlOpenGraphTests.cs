@@ -15,7 +15,7 @@ public class HtmlOpenGraphTests {
     public void ParseOpenGraph_ReturnsExpected() {
         string html = GetSampleHtml();
         var og = HtmlParser.ParseOpenGraph(html);
-        Assert.Equal("Open Graph Title", og.Properties["title"][0]);
-        Assert.Equal("https://example.com/img.png", og.Properties["image"][0]);
+        Assert.Equal("Open Graph Title", og.Properties.Find(p => p.Name == "title")?.Values[0]);
+        Assert.Equal("https://example.com/img.png", og.Properties.Find(p => p.Name == "image")?.Values[0]);
     }
 }
