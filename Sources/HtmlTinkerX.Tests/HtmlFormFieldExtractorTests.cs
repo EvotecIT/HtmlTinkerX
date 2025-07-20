@@ -17,6 +17,6 @@ public class HtmlFormFieldExtractorTests {
         var fields = HtmlFormFieldExtractor.ExtractFields(html);
         Assert.Equal(3, fields.Count);
         Assert.Equal("user", fields[0].Name);
-        Assert.Equal("text", fields[0].Type);
+        Assert.Equal(HtmlFormFieldType.Text, fields[0].Type);
     }
 }

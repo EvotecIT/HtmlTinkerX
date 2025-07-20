@@ -47,13 +47,10 @@ public static class HtmlParserFromForm {
                 if (string.IsNullOrEmpty(name)) {
                     continue;
                 }
-                string? type = field.GetAttribute("type");
-                if (string.IsNullOrEmpty(type)) {
-                    type = field.NodeName.ToLowerInvariant();
-                }
+                string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
                 result.Fields.Add(new HtmlFormField {
                     Name = name!,
-                    Type = type ?? string.Empty
+                    Type = MapType(type)
                 });
             }
             results.Add(result);
@@ -79,5 +76,20 @@ public static class HtmlParserFromForm {
         HttpClient http = client ?? _sharedClient;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
         return ParseFormsWithAngleSharp(content);
+    }
+
+    private static HtmlFormFieldType MapType(string? type) {
+        return type?.ToLowerInvariant() switch {
+            "text" => HtmlFormFieldType.Text,
+            "password" => HtmlFormFieldType.Password,
+            "hidden" => HtmlFormFieldType.Hidden,
+            "checkbox" => HtmlFormFieldType.Checkbox,
+            "radio" => HtmlFormFieldType.Radio,
+            "submit" => HtmlFormFieldType.Submit,
+            "select" => HtmlFormFieldType.Select,
+            "textarea" => HtmlFormFieldType.Textarea,
+            "button" => HtmlFormFieldType.Button,
+            _ => HtmlFormFieldType.Other,
+        };
     }
 }
