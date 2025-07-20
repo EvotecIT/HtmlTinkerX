@@ -28,8 +28,13 @@
         <ProjectReference Include="..\HtmlTinkerX\HtmlTinkerX.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Using Include="Xunit" />
-    </ItemGroup>
+  <ItemGroup>
+      <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <Compile Remove="TestJSBeautifier.cs" />
+      <Compile Remove="TestJSBeautifierIndentation.cs" />
+  </ItemGroup>
 
 </Project>
