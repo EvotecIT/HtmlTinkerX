@@ -52,7 +52,7 @@ public class JavaScriptBeautifierComprehensiveTests {
         string result = beautifier.Beautify(input);
         Assert.Equal(expected, result);
     }
- [Theory]
+    [Theory]
     [InlineData("if (a == 1) b = 2;", "if (a == 1) b = 2;")]
     [InlineData("if(1){2}else{3}", "if (1) {\n    2\n} else {\n    3\n}")]
     [InlineData("if (foo) bar();\nelse\ncar();", "if (foo) bar();\nelse car();")]
@@ -103,7 +103,7 @@ public class JavaScriptBeautifierComprehensiveTests {
         string result = beautifier.Beautify(input);
         Assert.Equal(expected, result);
     }
-  [Theory]
+    [Theory]
     [InlineData("a = 0xff;", "a = 0xff;")]
     [InlineData("a=0xff+4", "a = 0xff + 4")]
     [InlineData("a = 1e10", "a = 1e10")]
@@ -149,7 +149,7 @@ public class JavaScriptBeautifierComprehensiveTests {
         string result = beautifier.Beautify(input);
         Assert.Equal(expected, result);
     }
-   [Theory]
+    [Theory]
     [InlineData("a?b:c", "a ? b : c")]
     [InlineData("a?1:2", "a ? 1 : 2")]
     [InlineData("a?(b):c", "a ? (b) : c")]
@@ -195,7 +195,7 @@ public class JavaScriptBeautifierComprehensiveTests {
         string result = beautifier.Beautify(input);
         Assert.Equal(expected, result);
     }
-   [Theory]
+    [Theory]
     [InlineData("try{a();}catch(b){c();}finally{d();}", "try {\n    a();\n} catch (b) {\n    c();\n} finally {\n    d();\n}")]
     [InlineData("catch(e)", "catch (e)")]
     [InlineData("switch(x) {case 0: case 1: a(); break; default: break}", "switch (x) {\n    case 0:\n    case 1:\n        a();\n        break;\n    default:\n        break\n}")]
@@ -246,7 +246,7 @@ public class JavaScriptBeautifierComprehensiveTests {
         string result = beautifier.Beautify(input);
         Assert.Equal(expected, result);
     }
-   [Theory]
+    [Theory]
     [InlineData("do { a(); } while ( 1 );", "do {\n    a();\n} while (1);")]
     [InlineData("do {} while (1);", "do {} while (1);")]
     [InlineData("do {\n} while (1);", "do {} while (1);")]
@@ -301,7 +301,7 @@ public class JavaScriptBeautifierComprehensiveTests {
 
         Assert.Equal("if (1) {\n    2\n}\nelse {\n    3\n}", result);
     }
- [Fact]
+    [Fact]
     public void TestJslintHappyMode() {
         var beautifier = CreateBeautifier();
         beautifier.Opts.JslintHappy = true;
