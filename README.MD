@@ -1,6 +1,6 @@
-﻿# HtmlTinkerX - Modern HTML Processing for .NET and PowerShell
+﻿# HtmlTinkerX & PSParseHTML - Modern HTML Processing for .NET and PowerShell
 
-HtmlTinkerX is available as NuGet from the Nuget Gallery and as PowerShell module from PSGallery
+HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerShell module from PSGallery
 
 ## 📦 NuGet Package
 [![nuget downloads](https://img.shields.io/nuget/dt/HtmlTinkerX?label=nuget%20downloads)](https://www.nuget.org/packages/HtmlTinkerX)
@@ -115,14 +115,14 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | `Show-HTMLHar`         | `HtmlHarViewer.ShowHar()`            | Visualize HAR files             |
 
 ### Browser Testing
-| PowerShell Cmdlet       | C# Method                                        | Description                            |
-| ----------------------- | ------------------------------------------------ | -------------------------------------- |
-| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestUrlAsync()`              | Comprehensive browser testing          |
-| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestFileAsync()`             | Test local HTML file (with -Path)     |
-| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestCssResourceAsync()`      | Test specific CSS resource (with -CssResource) |
-| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestConsoleErrorsAsync()`    | Get console errors (with -ErrorsOnly)  |
-| `Test-HtmlBrowser`      | `HtmlBrowserTester.TestPerformanceAsync()`      | Get performance metrics (with -PerformanceOnly) |
-| `Clear-HtmlBrowserCache`| `HtmlBrowserCacheCleaner.CleanAllCache()`       | Clean Playwright browser downloads     |
+| PowerShell Cmdlet        | C# Method                                    | Description                                     |
+| ------------------------ | -------------------------------------------- | ----------------------------------------------- |
+| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestUrlAsync()`           | Comprehensive browser testing                   |
+| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestFileAsync()`          | Test local HTML file (with -Path)               |
+| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestCssResourceAsync()`   | Test specific CSS resource (with -CssResource)  |
+| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestConsoleErrorsAsync()` | Get console errors (with -ErrorsOnly)           |
+| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestPerformanceAsync()`   | Get performance metrics (with -PerformanceOnly) |
+| `Clear-HtmlBrowserCache` | `HtmlBrowserCacheCleaner.CleanAllCache()`    | Clean Playwright browser downloads              |
 
 ### Cookies & State
 | PowerShell Cmdlet | C# Method                       | Description              |
@@ -569,7 +569,7 @@ foreach ($error in $errors) {
     Write-Host "Error: $($error.Text)"
     Write-Host "  Location: $($error.FullLocation)"
     Write-Host "  Severity: $($error.SeverityLevel)"
-    
+
     if ($error.StackTrace) {
         Write-Host "  Stack: $($error.StackTrace)"
     }
@@ -616,6 +616,173 @@ $result = Test-HtmlBrowser -Url 'https://example.com' `
     -Proxy 'http://proxy:8080' `
     -ProxyCredential $cred `
     -Timeout 60000
+```
+
+#### Batch Testing Multiple URLs
+```powershell
+# Test multiple URLs and generate report
+$urls = @(
+    'https://example.com/home',
+    'https://example.com/about',
+    'https://example.com/contact'
+)
+
+$results = $urls | ForEach-Object {
+    $result = Test-HtmlBrowser -Url $_
+    [PSCustomObject]@{
+        Url = $_
+        Status = if ($result.Passed) { 'PASS' } else { 'FAIL' }
+        LoadTime = $result.PageLoadTime.TotalSeconds
+        Requests = $result.TotalRequests
+        Failed = $result.FailedRequestCount
+        Errors = $result.ErrorCount
+        Warnings = $result.WarningCount
+    }
+}
+
+# Display results in a table
+$results | Format-Table -AutoSize
+
+# Export to CSV for further analysis
+$results | Export-Csv -Path 'browser-test-results.csv' -NoTypeInformation
+
+# Find pages with issues
+$results | Where-Object { $_.Status -eq 'FAIL' } | ForEach-Object {
+    Write-Warning "Failed: $($_.Url) - $($_.Failed) failed requests, $($_.Errors) errors"
+}
+```
+
+#### Integration with Pester Tests
+```powershell
+# Save as MyWebsite.Tests.ps1
+Describe "Website Browser Tests" {
+
+    BeforeAll {
+        $baseUrl = 'https://mywebsite.com'
+    }
+
+    It "Homepage should load without errors" {
+        $result = Test-HtmlBrowser -Url $baseUrl
+        $result.Passed | Should -BeTrue
+        $result.ConsoleErrors.Count | Should -Be 0
+        $result.FailedRequestCount | Should -Be 0
+    }
+
+    It "All CSS files should load successfully" {
+        $result = Test-HtmlBrowser -Url $baseUrl
+        $cssFiles = $result.CssResources
+
+        $cssFiles.Count | Should -BeGreaterThan 0
+        $cssFiles | ForEach-Object {
+            $_.Status | Should -Be 200
+            $_.ErrorType | Should -BeNullOrEmpty
+        }
+    }
+
+    It "Page should load within 3 seconds" {
+        $result = Test-HtmlBrowser -Url $baseUrl
+        $result.PageLoadTime.TotalSeconds | Should -BeLessOrEqual 3
+    }
+
+    It "Console should not contain JavaScript errors" {
+        $errors = Test-HtmlBrowser -Url $baseUrl -ErrorsOnly
+        $errors | Should -BeNullOrEmpty
+    }
+
+    It "Total page size should be under 5MB" {
+        $metrics = Test-HtmlBrowser -Url $baseUrl -PerformanceOnly
+        $totalMB = $metrics.TotalBytesTransferred / 1MB
+        $totalMB | Should -BeLessOrEqual 5
+    }
+}
+
+# Run tests
+Invoke-Pester -Path .\MyWebsite.Tests.ps1 -Output Detailed
+```
+
+#### Testing Local HTML Reports
+```powershell
+# Test HTMLForgeX generated reports
+$reportPath = "C:\Reports\MonthlyReport.html"
+
+# Basic test
+$result = Test-HtmlBrowser -Path $reportPath
+if (-not $result.Passed) {
+    Write-Warning "Report has issues:"
+    $result.ConsoleErrors | ForEach-Object {
+        Write-Warning "  JS Error: $($_.Text)"
+    }
+    $result.FailedRequests | ForEach-Object {
+        Write-Warning "  Failed Resource: $($_.Url)"
+    }
+}
+
+# Test multiple reports
+Get-ChildItem -Path "C:\Reports" -Filter "*.html" | ForEach-Object {
+    $result = Test-HtmlBrowser -Path $_.FullName
+    [PSCustomObject]@{
+        Report = $_.Name
+        Status = if ($result.Passed) { '✅' } else { '❌' }
+        LoadTime = "$($result.PageLoadTime.TotalSeconds)s"
+        Errors = $result.ErrorCount
+        MissingResources = $result.FailedRequestCount
+    }
+} | Format-Table -AutoSize
+
+# Test with visible browser for debugging
+$debugResult = Test-HtmlBrowser -Path $reportPath -Headless:$false -Timeout 60000
+```
+
+#### Monitoring and Alerting
+```powershell
+# Monitor website health
+function Test-WebsiteHealth {
+    param(
+        [string]$Url,
+        [int]$MaxLoadTime = 5,
+        [int]$MaxErrors = 0
+    )
+
+    $result = Test-HtmlBrowser -Url $Url
+
+    $issues = @()
+
+    if ($result.PageLoadTime.TotalSeconds -gt $MaxLoadTime) {
+        $issues += "Slow load time: $($result.PageLoadTime.TotalSeconds)s"
+    }
+
+    if ($result.ErrorCount -gt $MaxErrors) {
+        $issues += "Console errors: $($result.ErrorCount)"
+    }
+
+    if ($result.FailedRequestCount -gt 0) {
+        $issues += "Failed requests: $($result.FailedRequestCount)"
+    }
+
+    if ($issues.Count -eq 0) {
+        Write-Host "✅ $Url is healthy" -ForegroundColor Green
+    } else {
+        Write-Host "❌ $Url has issues:" -ForegroundColor Red
+        $issues | ForEach-Object { Write-Host "   - $_" -ForegroundColor Yellow }
+
+        # Send alert (example)
+        # Send-MailMessage -To "admin@company.com" -Subject "Website Issue" -Body ($issues -join "`n")
+    }
+
+    return @{
+        Url = $Url
+        Healthy = $issues.Count -eq 0
+        Issues = $issues
+        Timestamp = Get-Date
+    }
+}
+
+# Test multiple sites
+$sites = @('https://site1.com', 'https://site2.com')
+$healthChecks = $sites | ForEach-Object { Test-WebsiteHealth -Url $_ }
+
+# Save results
+$healthChecks | ConvertTo-Json | Out-File "health-check-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
 ```
 
 ### C# Browser Testing
@@ -719,7 +886,7 @@ foreach (var error in errors)
     Console.WriteLine($"  Type: {error.Type}");
     Console.WriteLine($"  Location: {error.FullLocation}");
     Console.WriteLine($"  Timestamp: {error.Timestamp}");
-    
+
     if (!string.IsNullOrEmpty(error.StackTrace))
     {
         Console.WriteLine($"  Stack: {error.StackTrace}");
@@ -745,6 +912,110 @@ if (metrics.LongestRequest?.Duration > TimeSpan.FromSeconds(2))
 {
     Console.WriteLine($"⚠️ Slow resource: {metrics.LongestRequest.Url}");
 }
+```
+
+#### Testing Local HTML Files
+```csharp
+// Test a local HTML file created by HTMLForgeX or other tools
+var localResult = await HtmlBrowserTester.TestFileAsync(@"C:\Projects\MyReport\report.html");
+
+// Check if all resources loaded correctly
+if (localResult.Passed)
+{
+    Console.WriteLine("✅ Local HTML file passed all tests!");
+}
+else
+{
+    // Analyze what went wrong
+    foreach (var failed in localResult.FailedRequests)
+    {
+        Console.WriteLine($"❌ Failed to load: {failed.Url}");
+        Console.WriteLine($"   Error: {failed.ErrorType}");
+    }
+}
+
+// Test with custom timeout for slow local resources
+var slowResult = await HtmlBrowserTester.TestFileAsync(
+    @"C:\MyProject\index.html",
+    timeout: 30000  // 30 seconds
+);
+```
+
+#### Integration Testing Examples
+```csharp
+// Example: Testing in xUnit
+[Fact]
+public async Task Website_Should_Load_Without_Errors()
+{
+    var result = await HtmlBrowserTester.TestUrlAsync("https://mysite.com");
+
+    Assert.True(result.Passed, $"Test failed: {result.Summary}");
+    Assert.Empty(result.ConsoleErrors);
+    Assert.Empty(result.FailedRequests);
+    Assert.True(result.PageLoadTime < TimeSpan.FromSeconds(3),
+        "Page load time exceeded 3 seconds");
+}
+
+// Example: Testing specific CSS resources
+[Theory]
+[InlineData("styles.css")]
+[InlineData("theme.css")]
+public async Task CSS_Files_Should_Load_Successfully(string cssFile)
+{
+    var css = await HtmlBrowserTester.TestCssResourceAsync(
+        "https://mysite.com", cssFile);
+
+    Assert.NotNull(css);
+    Assert.Equal(200, css.Status);
+    Assert.True(css.Duration < TimeSpan.FromSeconds(1));
+}
+
+// Example: Performance regression test
+[Fact]
+public async Task Page_Performance_Should_Meet_Thresholds()
+{
+    var metrics = await HtmlBrowserTester.TestPerformanceAsync("https://mysite.com");
+
+    Assert.True(metrics.TotalLoadTime < TimeSpan.FromSeconds(5));
+    Assert.True(metrics.TotalBytesTransferred < 5 * 1024 * 1024); // 5MB
+    Assert.True(metrics.TotalRequests < 50);
+    Assert.All(metrics.RequestsByResourceType, kvp =>
+    {
+        if (kvp.Key == HtmlNetworkResourceType.Image)
+        {
+            Assert.True(kvp.Value.TotalSizeMB < 2,
+                $"Images exceed 2MB limit: {kvp.Value.TotalSizeMB:F2}MB");
+        }
+    });
+}
+```
+
+#### Batch Testing Multiple Pages
+```csharp
+// Test multiple pages efficiently
+var urls = new[] {
+    "https://example.com/home",
+    "https://example.com/about",
+    "https://example.com/contact"
+};
+
+var results = await Task.WhenAll(
+    urls.Select(url => HtmlBrowserTester.TestUrlAsync(url))
+);
+
+// Generate summary report
+foreach (var (url, result) in urls.Zip(results))
+{
+    Console.WriteLine($"\n{url}:");
+    Console.WriteLine($"  Status: {(result.Passed ? "PASS" : "FAIL")}");
+    Console.WriteLine($"  Load Time: {result.PageLoadTime.TotalSeconds:F2}s");
+    Console.WriteLine($"  Requests: {result.TotalRequests} ({result.FailedRequestCount} failed)");
+    Console.WriteLine($"  Console: {result.ErrorCount} errors, {result.WarningCount} warnings");
+}
+
+// Find slowest page
+var slowest = results.OrderByDescending(r => r.PageLoadTime).First();
+Console.WriteLine($"\nSlowest page: {slowest.Url} ({slowest.PageLoadTime.TotalSeconds:F2}s)");
 ```
 
 ### Test Result Properties
@@ -793,7 +1064,7 @@ Playwright browsers are automatically downloaded on first use. No manual setup r
 # View cache size and clean if needed
 Clear-HtmlBrowserCache -WhatIf
 
-# Force clean without confirmation  
+# Force clean without confirmation
 Clear-HtmlBrowserCache -Force
 
 # Skip cleaning temporary files (only clean browser downloads)
@@ -832,7 +1103,7 @@ else
 
 // Clean only browser downloads
 var browserResult = HtmlBrowserCacheCleaner.CleanAllCache(
-    includeBrowsers: true, 
+    includeBrowsers: true,
     includeTemp: false);
 
 // Get locations without cleaning (for inspection)
@@ -853,7 +1124,7 @@ foreach (var location in tempOnly)
 public async Task WebsiteShouldHaveNoErrors()
 {
     var result = await HtmlBrowserTester.TestUrlAsync("https://mysite.com");
-    
+
     Assert.True(result.Passed, result.Summary);
     Assert.Empty(result.ConsoleErrors);
     Assert.Empty(result.FailedRequests);
@@ -863,7 +1134,7 @@ public async Task WebsiteShouldHaveNoErrors()
 public async Task CssShouldLoadQuickly()
 {
     var result = await HtmlBrowserTester.TestUrlAsync("https://mysite.com");
-    
+
     foreach (var css in result.CssResources)
     {
         Assert.True(css.Duration < TimeSpan.FromSeconds(2),
@@ -879,12 +1150,12 @@ Describe "Website Health Check" {
         $result = Test-HtmlBrowser -Url "https://mysite.com"
         $result.ErrorCount | Should -Be 0
     }
-    
+
     It "Should load all resources successfully" {
         $result = Test-HtmlBrowser -Url "https://mysite.com"
         $result.FailedRequestCount | Should -Be 0
     }
-    
+
     It "Should load within 5 seconds" {
         $metrics = Test-HtmlBrowser -Url "https://mysite.com" -PerformanceOnly
         $metrics.TotalLoadTime.TotalSeconds | Should -BeLessThan 5
@@ -981,6 +1252,60 @@ dotnet add package HtmlTinkerX --version latest
 ```
 
 **⚠️ Important**: Always test updates in a development environment before deploying to production. Breaking changes may occur between versions.
+
+## 🔧 Troubleshooting
+
+### Jint Version Conflict Warning
+
+You may see warnings about conflicting Jint versions when building for .NET Framework 4.7.2:
+
+```
+warning MSB3277: Found conflicts between different versions of "Jint" that could not be resolved.
+There was a conflict between "Jint, Version=3.1.6.0" and "Jint, Version=4.1.0.0"
+```
+
+**Why this happens:**
+- HtmlTinkerX references Jint 3.1.6 directly
+- AngleSharp.Js 1.0.0-beta.43 (a dependency) was compiled against a different version
+- This is a known issue with prerelease packages
+
+**Impact:**
+- The warning only affects .NET Framework 4.7.2 builds
+- .NET 8.0 and .NET Standard 2.0 builds are not affected
+- The library will still work correctly as the older Jint version (3.1.6) is used
+
+**Solutions:**
+1. **Ignore the warning** - It doesn't affect functionality
+2. **Target only modern frameworks** - Use .NET 8.0 or .NET Standard 2.0
+3. **Add binding redirect** in your app.config (for .NET Framework apps):
+   ```xml
+   <configuration>
+     <runtime>
+       <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+         <dependentAssembly>
+           <assemblyIdentity name="Jint" publicKeyToken="2e92ba9c8d81157f" />
+           <bindingRedirect oldVersion="0.0.0.0-4.0.0.0" newVersion="3.1.6.0" />
+         </dependentAssembly>
+       </assemblyBinding>
+     </runtime>
+   </configuration>
+   ```
+
+### Browser Testing Issues
+
+If browser tests fail with "Playwright not found" or similar errors:
+
+1. **First run takes time** - Playwright downloads browsers on first use (~400MB)
+2. **Behind proxy** - Set proxy environment variables:
+   ```powershell
+   $env:HTTPS_PROXY = "http://proxy:8080"
+   $env:HTTP_PROXY = "http://proxy:8080"
+   ```
+3. **Clean and retry**:
+   ```powershell
+   Clear-HtmlBrowserCache -Force
+   # Then run your test again
+   ```
 
 ## 📄 License
 
