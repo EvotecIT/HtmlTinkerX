@@ -602,10 +602,13 @@ Write-Host "Page Load Time: $($metrics.TotalLoadTime.TotalSeconds)s"
 Write-Host "Average Request Duration: $($metrics.AverageRequestDuration.TotalMilliseconds)ms"
 Write-Host "Total Bytes: $($metrics.TotalBytesTransferred / 1KB)KB"
 
-# Resource breakdown
+# Resource breakdown by type
 $metrics.ResourceBreakdown | ForEach-Object {
     Write-Host "$($_.Key): $($_.Value) requests"
 }
+
+# Or get the full formatted report
+Write-Host $metrics.GetReport()
 ```
 
 #### Advanced Testing with Proxy
@@ -1055,9 +1058,39 @@ Console.WriteLine($"\nSlowest page: {slowest.Url} ({slowest.PageLoadTime.TotalSe
 - **SeverityLevel** - 1=Info, 2=Warning, 3=Error
 - **IsError/IsWarning/IsInfo** - Quick type checks
 
+#### HtmlPerformanceMetrics
+- **TotalLoadTime** - Total time to load the page
+- **TotalRequests** - Number of network requests made
+- **TotalBytesTransferred** - Total bytes downloaded
+- **AverageRequestDuration** - Average time per request
+- **LongestRequest** - The slowest network request
+- **ResourceBreakdown** - Dictionary of requests grouped by type (Document, Stylesheet, Script, Image, Font, etc.)
+- **GetReport()** - Returns a formatted text report with all metrics
+
 ### Playwright Auto-Setup
 
 Playwright browsers are automatically downloaded on first use. No manual setup required! The download happens once per system and is shared across all applications.
+
+#### How Auto-Download Works
+When you first use browser testing, Playwright automatically downloads required components:
+
+1. **Playwright Driver & Node.js**:
+   - Windows: `%LOCALAPPDATA%\ms-playwright-driver`
+   - macOS: `~/Library/Caches/ms-playwright-driver`
+   - Linux: `~/.cache/ms-playwright-driver`
+   - Contains the Playwright driver and embedded Node.js runtime
+
+2. **Browser Installations**:
+   - Windows: `%LOCALAPPDATA%\ms-playwright`
+   - macOS: `~/Library/Caches/ms-playwright`
+   - Linux: `~/.cache/ms-playwright`
+   - Contains Chromium, Firefox, and/or WebKit browsers
+
+3. **Download Process**:
+   - Shows progress: "Downloading Playwright driver... X% (Y MB/s)"
+   - Thread-safe - prevents concurrent downloads
+   - Subsequent runs use cached components - no re-download needed
+   - You can manually ensure browsers are installed using `HtmlBrowser.EnsureInstalledAsync()`
 
 #### Cleaning Playwright Cache
 ```powershell
@@ -1086,6 +1119,9 @@ The enhanced cache cleaner now:
 
 #### C# Cache Cleaning
 ```csharp
+// Manually ensure browser is installed (usually not needed - happens automatically)
+await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
 // Get all cache locations
 var locations = HtmlBrowserCacheCleaner.GetCacheLocations();
 Console.WriteLine($"Found {locations.Count} locations totaling {locations.Sum(l => l.SizeMB):F2} MB");
@@ -1293,18 +1329,36 @@ There was a conflict between "Jint, Version=3.1.6.0" and "Jint, Version=4.1.0.0"
 
 ### Browser Testing Issues
 
-If browser tests fail with "Playwright not found" or similar errors:
+If browser tests fail:
 
-1. **First run takes time** - Playwright downloads browsers on first use (~400MB)
-2. **Behind proxy** - Set proxy environment variables:
+1. **First run downloads browsers automatically** - This can take a few minutes (~400MB)
+   - You'll see: "Downloading Playwright driver... X% (Y MB/s)"
+   - This only happens once per system
+   
+2. **Network timeout issues** - Some sites may be slow or blocked
+   - Try increasing timeout: `Test-HtmlBrowser -Url $url -Timeout 60000`
+   - Test with a simple URL first: `Test-HtmlBrowser -Url "http://httpbin.org/html"`
+   
+3. **Behind a proxy** - Set proxy environment variables:
    ```powershell
    $env:HTTPS_PROXY = "http://proxy:8080"
    $env:HTTP_PROXY = "http://proxy:8080"
    ```
-3. **Clean and retry**:
+   Or use proxy parameters:
+   ```powershell
+   Test-HtmlBrowser -Url $url -Proxy "http://proxy:8080" -ProxyCredential (Get-Credential)
+   ```
+   
+4. **Clean and retry** if you suspect corrupted downloads:
    ```powershell
    Clear-HtmlBrowserCache -Force
-   # Then run your test again
+   # Then run your test again - it will re-download browsers
+   ```
+   
+5. **Manual browser installation** (C#):
+   ```csharp
+   // Ensure browser is installed before testing
+   await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
    ```
 
 ## 📄 License

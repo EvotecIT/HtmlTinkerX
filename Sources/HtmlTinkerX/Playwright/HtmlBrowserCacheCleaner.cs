@@ -56,32 +56,58 @@ public static class HtmlBrowserCacheCleaner {
         var locations = new List<CacheLocation>();
         
         if (includeBrowsers) {
-            // Playwright cache in LocalAppData
-            var playwrightPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ms-playwright"
-            );
+            // Get platform-specific paths
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             
-            if (Directory.Exists(playwrightPath)) {
-                locations.Add(new CacheLocation {
-                    Path = playwrightPath,
-                    Description = "Playwright browsers",
-                    Size = GetDirectorySize(playwrightPath)
-                });
-            }
-            
-            // User profile .cache directory
-            var cachePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".cache", "ms-playwright"
-            );
-            
-            if (Directory.Exists(cachePath)) {
-                locations.Add(new CacheLocation {
-                    Path = cachePath,
-                    Description = "Playwright cache",
-                    Size = GetDirectorySize(cachePath)
-                });
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
+                // Windows: ms-playwright in LocalAppData
+                var playwrightPath = Path.Combine(localAppData, "ms-playwright");
+                if (Directory.Exists(playwrightPath)) {
+                    locations.Add(new CacheLocation {
+                        Path = playwrightPath,
+                        Description = "Playwright browsers",
+                        Size = GetDirectorySize(playwrightPath)
+                    });
+                }
+                
+                // Windows: ms-playwright-driver in LocalAppData
+                var driverPath = Path.Combine(localAppData, "ms-playwright-driver");
+                if (Directory.Exists(driverPath)) {
+                    locations.Add(new CacheLocation {
+                        Path = driverPath,
+                        Description = "Playwright driver and Node.js",
+                        Size = GetDirectorySize(driverPath)
+                    });
+                }
+            } else if (Environment.OSVersion.Platform == PlatformID.Unix) {
+                // macOS uses Library/Caches, Linux uses .cache
+                string cacheBase = userProfile;
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX)) {
+                    cacheBase = Path.Combine(userProfile, "Library", "Caches");
+                } else {
+                    cacheBase = Path.Combine(userProfile, ".cache");
+                }
+                
+                // ms-playwright browsers
+                var playwrightPath = Path.Combine(cacheBase, "ms-playwright");
+                if (Directory.Exists(playwrightPath)) {
+                    locations.Add(new CacheLocation {
+                        Path = playwrightPath,
+                        Description = "Playwright browsers",
+                        Size = GetDirectorySize(playwrightPath)
+                    });
+                }
+                
+                // ms-playwright-driver
+                var driverPath = Path.Combine(cacheBase, "ms-playwright-driver");
+                if (Directory.Exists(driverPath)) {
+                    locations.Add(new CacheLocation {
+                        Path = driverPath,
+                        Description = "Playwright driver and Node.js",
+                        Size = GetDirectorySize(driverPath)
+                    });
+                }
             }
         }
         
