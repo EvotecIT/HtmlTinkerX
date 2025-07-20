@@ -57,9 +57,9 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         /// <summary>
         /// Gets or sets the current flag state used during processing.
         /// </summary>
-        public BeautifierFlags Flags { get; set; }
+        public BeautifierFlags Flags { get; set; } = new BeautifierFlags(BeautifierMode.Block);
 
-        private List<BeautifierFlags> FlagStore { get; set; }
+        private List<BeautifierFlags> FlagStore { get; set; } = new();
 
         private bool WantedNewline { get; set; }
 
@@ -67,31 +67,31 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
         private bool DoBlockJustClosed { get; set; }
 
-        private string IndentString { get; set; }
+        private string IndentString { get; set; } = string.Empty;
 
-        private string PreindentString { get; set; }
+        private string PreindentString { get; set; } = string.Empty;
 
-        private string LastWord { get; set; }
+        private string LastWord { get; set; } = string.Empty;
 
-        private string LastType { get; set; }
+        private string LastType { get; set; } = string.Empty;
 
-        private string LastText { get; set; }
+        private string LastText { get; set; } = string.Empty;
 
-        private string LastLastText { get; set; }
+        private string LastLastText { get; set; } = string.Empty;
 
-        private string Input { get; set; }
+        private string? Input { get; set; }
 
-        private List<string> Output { get; set; }
+        private List<string> Output { get; set; } = new();
 
-        private char[] Whitespace { get; set; }
+        private char[] Whitespace { get; set; } = Array.Empty<char>();
 
-        private string Wordchar { get; set; }
+        private string Wordchar { get; set; } = string.Empty;
 
-        private string Digits { get; set; }
+        private string Digits { get; set; } = string.Empty;
 
-        private string[] Punct { get; set; }
+        private string[] Punct { get; set; } = Array.Empty<string>();
 
-        private string[] LineStarters { get; set; }
+        private string[] LineStarters { get; set; } = Array.Empty<string>();
 
         private int ParserPos { get; set; }
 
