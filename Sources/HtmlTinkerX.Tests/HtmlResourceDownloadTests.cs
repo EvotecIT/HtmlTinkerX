@@ -2,12 +2,7 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net.Http;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -20,7 +15,8 @@ public class HtmlResourceDownloadTests {
                     "/file2.js" => "file2",
                     _ => string.Empty
                 };
-                await ctx.Response.Body.WriteAsync(System.Text.Encoding.UTF8.GetBytes(content));
+                var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
             }));
         return new TestServer(builder);
     }

@@ -1,12 +1,8 @@
 using HtmlTinkerX;
-using System;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -40,7 +36,11 @@ public class PreMailerClientRemoteCssAnalyticsTests {
     [Fact]
     public async Task MoveCssInline_InlinesRemoteAndLocalCss_AddsAnalyticsTags() {
         string localCssFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".css");
+#if FRAMEWORK
+        await WriteAllTextAsync(localCssFile, "h1{font-size:42px}");
+#else
         await File.WriteAllTextAsync(localCssFile, "h1{font-size:42px}");
+#endif
         string localCssPath = new Uri(localCssFile).AbsoluteUri;
 
         HttpListener server = StartCssServer("a{color:red}", out string remoteUrl);

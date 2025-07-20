@@ -13,20 +13,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlFormSubmitterTests {
     private static TestServer CreateServer() {
-        var builder = new WebHostBuilder()
-            .ConfigureServices(s => s.AddRouting())
-            .Configure(app => {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => {
-                    endpoints.MapPost("/login", async context => {
-                        var form = await context.Request.ReadFormAsync();
-                        string user = form["user"].ToString();
-                        string pass = form["pass"].ToString();
-                        await context.Response.WriteAsync($"{user}:{pass}");
-                    });
-                });
-            });
-        return new TestServer(builder);
+        return TestServerCompat.CreateFormTestServer();
     }
 
     [Fact]

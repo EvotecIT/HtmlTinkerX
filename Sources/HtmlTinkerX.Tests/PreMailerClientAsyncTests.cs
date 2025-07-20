@@ -1,9 +1,5 @@
 using HtmlTinkerX;
-using System;
-using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -21,7 +17,11 @@ public class PreMailerClientAsyncTests {
     public async Task MoveCssInlineFromFileAsync_ProcessesFile() {
         var options = new PreMailerOptions { RemoveStyleElements = true };
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+#if FRAMEWORK
+        await WriteAllTextAsync(path, HtmlWithMediaQuery);
+#else
         await File.WriteAllTextAsync(path, HtmlWithMediaQuery);
+#endif
         try {
             PreMailerResult result = await PreMailerClient.MoveCssInlineFromFileAsync(path, options, CancellationToken.None);
             Assert.DoesNotContain("<style", result.Html, StringComparison.OrdinalIgnoreCase);
@@ -41,7 +41,11 @@ public class PreMailerClientAsyncTests {
     [Fact]
     public async Task MoveCssInlineFromFileAsync_CanceledToken_Throws() {
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
+#if FRAMEWORK
+        await WriteAllTextAsync(path, HtmlWithMediaQuery);
+#else
         await File.WriteAllTextAsync(path, HtmlWithMediaQuery);
+#endif
         using CancellationTokenSource cts = new();
         cts.Cancel();
         try {

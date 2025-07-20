@@ -2,11 +2,7 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
-using System;
-using System.IO;
 using System.Net.Http;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -16,7 +12,7 @@ public class HtmlUtilitiesTests {
             .Configure(app => app.Run(async ctx => {
                 ctx.Response.ContentType = $"text/plain; charset={charset}";
                 var bytes = System.Text.Encoding.GetEncoding(charset).GetBytes(content);
-                await ctx.Response.Body.WriteAsync(bytes);
+                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
             }));
         return new TestServer(builder);
     }
@@ -58,7 +54,11 @@ public class HtmlUtilitiesTests {
     public async Task ReadFileCheckedAsync_ReturnsContent() {
         string path = Path.GetTempFileName();
         try {
+#if FRAMEWORK
+            await WriteAllTextAsync(path, "async");
+#else
             await File.WriteAllTextAsync(path, "async");
+#endif
             string content = await HtmlUtilities.ReadFileCheckedAsync(path);
             Assert.Equal("async", content);
         } finally {
@@ -86,7 +86,7 @@ public class HtmlUtilitiesTests {
             .Configure(app => app.Run(async ctx => {
                 ctx.Response.ContentType = "text/plain; charset=\"utf-8\"";
                 var bytes = System.Text.Encoding.UTF8.GetBytes("Hello");
-                await ctx.Response.Body.WriteAsync(bytes);
+                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
             }));
         using var server = new TestServer(builder);
         using HttpClient client = server.CreateClient();
@@ -105,7 +105,7 @@ public class HtmlUtilitiesTests {
                 byte[] bytes = new byte[preamble.Length + data.Length];
                 preamble.CopyTo(bytes, 0);
                 data.CopyTo(bytes, preamble.Length);
-                await ctx.Response.Body.WriteAsync(bytes);
+                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
             }));
         using var server = new TestServer(builder);
         using HttpClient client = server.CreateClient();

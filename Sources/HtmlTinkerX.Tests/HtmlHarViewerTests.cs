@@ -1,7 +1,4 @@
 using HtmlTinkerX;
-using System.IO;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -47,7 +44,11 @@ public class HtmlHarViewerTests {
     public async Task ReadHarAsync_InvalidJsonThrows() {
         string path = Path.GetTempFileName();
         try {
+#if FRAMEWORK
+            await WriteAllTextAsync(path, "{ invalid ");
+#else
             await File.WriteAllTextAsync(path, "{ invalid ");
+#endif
             await Assert.ThrowsAsync<InvalidDataException>(() => HtmlHarViewer.ReadHarAsync(path));
         } finally {
             File.Delete(path);

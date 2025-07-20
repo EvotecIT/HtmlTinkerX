@@ -1,0 +1,9 @@
+<Project>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+    <Using Include="System" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="System.Collections.Generic" />
+  </ItemGroup>
+</Project>
