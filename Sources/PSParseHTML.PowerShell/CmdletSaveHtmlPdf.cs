@@ -82,7 +82,7 @@ public sealed class CmdletSaveHtmlPdf : AsyncPSCmdlet {
 
     /// <summary>Paper format (e.g. A4).</summary>
     [Parameter]
-    public string? Format { get; set; }
+    public PdfPageFormat? Format { get; set; }
 
     /// <summary>Paper width (e.g. 8.5in).</summary>
     [Parameter]

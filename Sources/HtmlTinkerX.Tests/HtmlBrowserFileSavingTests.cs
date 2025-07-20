@@ -80,6 +80,21 @@ public class HtmlBrowserFileSavingTests {
     }
 
     [Fact]
+    public async Task SavePagePdfAsync_SetsFormatOption() {
+        string file = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        PagePdfOptions? options = null;
+        var page = new Mock<IPage>();
+        page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>()))
+            .Callback<PagePdfOptions>(o => options = o)
+            .ReturnsAsync(Array.Empty<byte>());
+
+        await HtmlBrowser.SavePagePdfAsync(page.Object, file, format: PdfPageFormat.A4);
+
+        Assert.NotNull(options);
+        Assert.Equal("A4", options!.Format);
+    }
+
+    [Fact]
     public async Task SavePagePdfAsync_NegativeDelayThrows() {
         var page = new Mock<IPage>();
 
