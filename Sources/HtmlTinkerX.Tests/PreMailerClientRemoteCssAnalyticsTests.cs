@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class PreMailerClientRemoteCssAnalyticsTests {
     private static int GetFreePort() {

@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class PreMailerClientFileHelpersTests {
     private const string HtmlContent = "<html><head><style>p{color:red}</style></head><body><p>Hello</p></body></html>";

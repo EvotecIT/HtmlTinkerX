@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.TestHost;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTests {
     private static TestServer CreateServer() {

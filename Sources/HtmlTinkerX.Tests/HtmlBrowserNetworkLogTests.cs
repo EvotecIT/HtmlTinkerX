@@ -4,7 +4,7 @@ using Moq;
 using System.Collections.Generic;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests capturing network log entries with <see cref="HtmlBrowser"/>.

@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using System.IO;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests parsing of HTML forms using <see cref="HtmlParser"/>.

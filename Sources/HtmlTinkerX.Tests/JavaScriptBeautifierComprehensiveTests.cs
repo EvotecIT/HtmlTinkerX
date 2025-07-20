@@ -1,7 +1,7 @@
 using HtmlTinkerX.JavaScriptBeautifier;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Comprehensive tests for JavaScript beautifier covering all major functionality.

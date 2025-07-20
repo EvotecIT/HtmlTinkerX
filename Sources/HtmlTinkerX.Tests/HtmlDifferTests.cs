@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlDifferTests {
     [Fact]

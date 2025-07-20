@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Helper methods for unit tests.

@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using System.IO;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests for file-based formatting helpers in <see cref="HtmlFormatter"/>.

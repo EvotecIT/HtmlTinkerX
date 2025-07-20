@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using System.IO;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlOpenGraphTests {
     private static string GetSampleHtml() {

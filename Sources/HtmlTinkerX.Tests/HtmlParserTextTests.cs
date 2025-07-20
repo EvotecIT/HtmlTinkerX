@@ -1,7 +1,7 @@
 using HtmlTinkerX;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTextTests {
     [Fact]

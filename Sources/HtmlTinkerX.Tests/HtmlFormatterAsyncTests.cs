@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests asynchronous formatting helpers in <see cref="HtmlFormatter"/>.

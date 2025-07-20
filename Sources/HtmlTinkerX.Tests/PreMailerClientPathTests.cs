@@ -4,7 +4,7 @@ using System.IO;
 using System.Reflection;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class PreMailerClientPathTests {
     private static string InvokeNormalize(Uri uri) {

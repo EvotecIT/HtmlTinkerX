@@ -3,7 +3,7 @@ using HtmlTinkerX;
 using System.Linq;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlParserWhitespaceTests {
     [Fact]

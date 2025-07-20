@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlFormatterFileAsyncTests {
     private static string GetPath(string name) => TestHelpers.GetDocumentPath(name);

@@ -6,7 +6,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests file saving operations performed by <see cref="HtmlBrowser"/>.

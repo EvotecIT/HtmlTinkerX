@@ -7,7 +7,7 @@ using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserStateTests {
     [Fact]

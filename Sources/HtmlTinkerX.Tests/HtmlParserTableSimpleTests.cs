@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using System.Collections.Generic;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTableSimpleTests {
     private const string SimpleTable = "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";

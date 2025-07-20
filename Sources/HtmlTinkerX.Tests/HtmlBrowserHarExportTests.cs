@@ -11,7 +11,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Unit tests for exporting HAR files from <see cref="HtmlBrowser"/>.

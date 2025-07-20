@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Reflection;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlHttpClientFactoryTests {
     private static HttpClientHandler GetHandler(HttpClient client) {

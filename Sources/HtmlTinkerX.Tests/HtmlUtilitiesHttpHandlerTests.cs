@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlUtilitiesHttpHandlerTests {
     private sealed class StaticResponseHandler : HttpMessageHandler {

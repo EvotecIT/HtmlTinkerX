@@ -1,7 +1,7 @@
 using HtmlTinkerX;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Unit tests for <see cref="HtmlUtilities.CleanHeaderName"/>.

@@ -3,7 +3,7 @@ using Microsoft.Playwright;
 using Moq;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserConsoleLogTests {
     [Fact]

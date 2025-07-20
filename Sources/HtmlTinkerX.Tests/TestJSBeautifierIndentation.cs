@@ -1,7 +1,7 @@
 ﻿using HtmlTinkerX.JavaScriptBeautifier;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests for JavaScript beautifier indentation options.

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Xunit;
 using HtmlParserExtensions = HtmlTinkerX.HtmlParserExtensions;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests extension methods for <see cref="HtmlParser"/>.

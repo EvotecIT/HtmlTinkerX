@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests synchronous optimization methods on files.

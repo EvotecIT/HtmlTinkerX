@@ -2,7 +2,7 @@ using HtmlTinkerX;
 using HtmlTinkerX.JavaScriptBeautifier;
 using Xunit;
 
-namespace PSParseHTML.Tests;
+namespace HtmlTinkerX.Tests;
 
 /// <summary>
 /// Tests for in-memory formatting methods in <see cref="HtmlFormatter"/>.
