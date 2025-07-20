@@ -187,7 +187,7 @@ public static class HtmlParserFromList {
                 return;
             }
             if (node.NodeType == HtmlNodeType.Text) {
-                string text = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty).Trim();
+                string text = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty)!.Trim();
                 if (!string.IsNullOrWhiteSpace(text)) {
                     list.Add(text);
                 }

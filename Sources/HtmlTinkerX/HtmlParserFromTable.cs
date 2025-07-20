@@ -449,13 +449,13 @@ public static class HtmlParserFromTable {
                     if (cells == null || cells.Count == 0) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cells![0].InnerText ?? string.Empty).Trim();
+                    string header = HtmlEntity.DeEntitize(cells[0].InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
-                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells![1].InnerText ?? string.Empty).Trim() : string.Empty;
+                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText ?? string.Empty)!.Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
                             value = value.Replace(kv.Key, kv.Value);
@@ -497,7 +497,7 @@ public static class HtmlParserFromTable {
                     if (cell == null) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
+                    string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
@@ -552,7 +552,7 @@ public static class HtmlParserFromTable {
 
                     if (cellIndex < cells.Count) {
                         var cell = cells[cellIndex++];
-                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
+                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);
@@ -645,13 +645,13 @@ public static class HtmlParserFromTable {
                     if (cells == null || cells.Count == 0) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cells![0].InnerText ?? string.Empty).Trim();
+                    string header = HtmlEntity.DeEntitize(cells[0].InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
                         }
                     }
-                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells![1].InnerText ?? string.Empty).Trim() : string.Empty;
+                    string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText ?? string.Empty)!.Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
                             value = value.Replace(kv.Key, kv.Value);
@@ -689,7 +689,7 @@ public static class HtmlParserFromTable {
                     if (cell == null) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
+                    string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = header.Replace(kv.Key, kv.Value);
@@ -737,7 +737,7 @@ public static class HtmlParserFromTable {
 
                     if (cellIndex < cells.Count) {
                         var cell = cells[cellIndex++];
-                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
+                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = value.Replace(kv.Key, kv.Value);

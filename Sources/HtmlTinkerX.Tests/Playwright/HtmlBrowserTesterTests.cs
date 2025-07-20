@@ -123,7 +123,7 @@ public class HtmlBrowserTesterTests {
     }
     
     [Fact]
-    public async Task HtmlBrowserTestResult_CalculatesCorrectSummary() {
+    public Task HtmlBrowserTestResult_CalculatesCorrectSummary() {
         // Arrange
         var result = new HtmlBrowserTestResult {
             Url = "https://test.com"
@@ -154,6 +154,8 @@ public class HtmlBrowserTesterTests {
         Assert.Contains("1 console error(s)", summary);
         Assert.Contains("1 console warning(s)", summary);
         Assert.Contains("1 failed request(s)", summary);
+        
+        return Task.CompletedTask;
     }
     
     [Fact]

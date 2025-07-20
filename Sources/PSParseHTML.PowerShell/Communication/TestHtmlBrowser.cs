@@ -74,6 +74,9 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
     [Parameter()]
     public string? CssResource { get; set; }
 
+    /// <summary>
+    /// Processes the record asynchronously.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         string? proxyUsername = null;
         string? proxyPassword = null;
@@ -96,7 +99,7 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
                 var fileResult = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout);
                 cssEntry = fileResult.CssResources.FirstOrDefault(r => r.Url.Contains(CssResource));
             } else {
-                cssEntry = await HtmlBrowserTester.TestCssResourceAsync(Url, CssResource, Engine);
+                cssEntry = await HtmlBrowserTester.TestCssResourceAsync(Url, CssResource!, Engine);
             }
 
             if (cssEntry != null) {
@@ -188,6 +191,9 @@ public sealed class ClearHtmlBrowserCacheCommand : PSCmdlet {
     [Parameter()]
     public SwitchParameter SkipTemp { get; set; }
 
+    /// <summary>
+    /// Processes the record.
+    /// </summary>
     protected override void ProcessRecord() {
         // Get cache locations
         var locations = HtmlBrowserCacheCleaner.GetCacheLocations(

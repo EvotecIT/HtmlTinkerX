@@ -12,7 +12,7 @@ public class HtmlParserWhitespaceTests {
 
         var angleDoc = HtmlParser.ParseWithAngleSharp(html);
         var angleText = angleDoc.QuerySelector("p")!.TextContent.Trim();
-        var angleComments = angleDoc.Descendents<IComment>().Count();
+        var angleComments = angleDoc.Descendants<IComment>().Count();
 
         var agilityDoc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var agilityText = agilityDoc.DocumentNode.SelectSingleNode("//p")!.InnerText.Trim();
