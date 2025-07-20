@@ -44,7 +44,7 @@ public static class HtmlResourceParser {
                         Type = HtmlResourceType.InlineScript,
                         Content = content,
                         Comment = comment,
-                        Name = !string.IsNullOrEmpty(comment) ? comment : $"inline_script_{index}"
+                        Name = !string.IsNullOrEmpty(comment) ? comment! : $"inline_script_{index}"
                     });
                 }
             }
@@ -75,7 +75,7 @@ public static class HtmlResourceParser {
                             Type = HtmlResourceType.InlineCss,
                             Content = text,
                             Comment = comment,
-                            Name = !string.IsNullOrEmpty(comment) ? comment : $"inline_css_{index}"
+                            Name = !string.IsNullOrEmpty(comment) ? comment! : $"inline_css_{index}"
                         });
                     }
                 }

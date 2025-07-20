@@ -158,7 +158,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         /// <param name="s">JavaScript source code to beautify.</param>
         /// <param name="opts">Optional overrides for beautifier options.</param>
         /// <returns>The beautified JavaScript code.</returns>
-        public string Beautify(string s, BeautifierOptions opts = null) {
+        public string Beautify(string s, BeautifierOptions? opts = null) {
             if (opts != null) {
                 Opts = opts;
             }
@@ -360,7 +360,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         private Tuple<string, string> GetNextToken() {
             NNewlines = 0;
 
-            if (ParserPos >= Input.Length) {
+            if (ParserPos >= Input!.Length) {
                 return new Tuple<string, string>("", "TK_EOF");
             }
 

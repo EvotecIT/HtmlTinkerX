@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Reflection;
+#if NET5_0_OR_GREATER
+using System.Runtime.Loader;
+#endif
 
 /// <summary>
 /// OnModuleImportAndRemove is a class that implements the IModuleAssemblyInitializer and IModuleAssemblyCleanup interfaces.
@@ -17,6 +20,11 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve += MyResolveEventHandler;
         }
+#if NET5_0_OR_GREATER
+        else {
+            AssemblyLoadContext.Default.Resolving += ResolveAlc;
+        }
+#endif
     }
 
     /// <summary>
@@ -27,6 +35,11 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve -= MyResolveEventHandler;
         }
+#if NET5_0_OR_GREATER
+        else {
+            AssemblyLoadContext.Default.Resolving -= ResolveAlc;
+        }
+#endif
     }
 
     /// <summary>
@@ -62,6 +75,51 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
 
         return null;
     }
+
+#if NET5_0_OR_GREATER
+    private sealed class LoadContext : AssemblyLoadContext {
+        private readonly string _assemblyDir;
+
+        public LoadContext(string assemblyDir)
+            : base(name: "PSParseHTML", isCollectible: false) {
+            _assemblyDir = assemblyDir;
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName) {
+            string asmPath = Path.Join(_assemblyDir, $"{assemblyName.Name}.dll");
+            if (File.Exists(asmPath)) {
+                return LoadFromAssemblyPath(asmPath);
+            }
+
+            return null;
+        }
+    }
+
+    private static readonly string _assemblyDir =
+        Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location)!;
+
+    private static readonly LoadContext _alc = new LoadContext(_assemblyDir);
+
+    private static Assembly? ResolveAlc(AssemblyLoadContext defaultAlc, AssemblyName assemblyToResolve) {
+        string asmPath = Path.Join(_assemblyDir, $"{assemblyToResolve.Name}.dll");
+        if (IsSatisfyingAssembly(assemblyToResolve, asmPath)) {
+            return _alc.LoadFromAssemblyName(assemblyToResolve);
+        }
+
+        return null;
+    }
+
+    private static bool IsSatisfyingAssembly(AssemblyName requiredAssemblyName, string assemblyPath) {
+        if (requiredAssemblyName.Name == "PSParseHTML.PowerShell" || !File.Exists(assemblyPath)) {
+            return false;
+        }
+
+        AssemblyName asmToLoadName = AssemblyName.GetAssemblyName(assemblyPath);
+
+        return string.Equals(asmToLoadName.Name, requiredAssemblyName.Name, StringComparison.OrdinalIgnoreCase)
+            && asmToLoadName.Version >= requiredAssemblyName.Version;
+    }
+#endif
 
     /// <summary>
     /// Determine if the current runtime is .NET Framework

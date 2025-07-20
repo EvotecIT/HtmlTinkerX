@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -12,6 +13,11 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    /// <summary>
+    /// Semaphore to ensure thread-safe Playwright installation.
+    /// Only one installation process can run at a time across all threads.
+    /// </summary>
+    private static readonly SemaphoreSlim InstallationSemaphore = new SemaphoreSlim(1, 1);
     /// <summary>
     /// Gets the version of the Playwright driver.
     /// </summary>
@@ -119,19 +125,39 @@ public static partial class HtmlBrowser {
     }
 
     /// <summary>
-    /// Ensures that the Playwright driver is installed.
+    /// Ensures that the Playwright driver and browser runtime are installed.
+    /// This method will automatically download and install the required components if they are not present.
     /// </summary>
-    /// <returns></returns>
-    internal static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
-        bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
-
-        if (IsDriverPresent()) {
-            // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
-            // the '.playwright' folder, not to the folder itself.
+    /// <param name="engine">The browser engine to ensure is installed.</param>
+    /// <returns>A task that completes when the installation check/process is finished.</returns>
+    public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
+        // Fast path - check without lock first
+        if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
             Environment.SetEnvironmentVariable(
                 "PLAYWRIGHT_DRIVER_SEARCH_PATH",
                 GetDriverRoot());
-        } else {
+            return;
+        }
+
+        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
+        try {
+            // Double-check inside the lock in case another thread just completed installation
+            if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
+                Environment.SetEnvironmentVariable(
+                    "PLAYWRIGHT_DRIVER_SEARCH_PATH",
+                    GetDriverRoot());
+                return;
+            }
+
+            bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
+
+            if (IsDriverPresent()) {
+                // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
+                // the '.playwright' folder, not to the folder itself.
+                Environment.SetEnvironmentVariable(
+                    "PLAYWRIGHT_DRIVER_SEARCH_PATH",
+                    GetDriverRoot());
+            } else {
             string urlBase = "https://playwright.azureedge.net/builds/driver";
             if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
                 urlBase += "/next";
@@ -182,7 +208,10 @@ public static partial class HtmlBrowser {
             Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
 
             string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-            File.Move(Path.Combine(tempDir, NodeExecutable), nodeDest);
+            string nodeSource = Path.Combine(tempDir, NodeExecutable);
+            if (File.Exists(nodeDest))
+                File.Delete(nodeDest);
+            File.Move(nodeSource, nodeDest);
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
                 try {
                     var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
@@ -191,7 +220,10 @@ public static partial class HtmlBrowser {
                     // ignore
                 }
             }
-            File.Move(Path.Combine(tempDir, "LICENSE"), Path.Combine(baseDir, "node", "LICENSE"));
+            string licenseDest = Path.Combine(baseDir, "node", "LICENSE");
+            if (File.Exists(licenseDest))
+                File.Delete(licenseDest);
+            File.Move(Path.Combine(tempDir, "LICENSE"), licenseDest);
 
             string packageSrc = Path.Combine(tempDir, "package");
             string packageDest = Path.Combine(baseDir, "package");
@@ -205,12 +237,17 @@ public static partial class HtmlBrowser {
 #else
             await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
 #endif
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
-        }
+                Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+            }
 
-        if (!runtimeInstalled) {
-            string runtime = engine.ToString().ToLowerInvariant();
-            Microsoft.Playwright.Program.Main(new[] { "install", runtime });
+            // Re-check runtime installation after driver setup
+            runtimeInstalled = IsBrowserRuntimeInstalled(engine);
+            if (!runtimeInstalled) {
+                string runtime = engine.ToString().ToLowerInvariant();
+                Microsoft.Playwright.Program.Main(new[] { "install", runtime });
+            }
+        } finally {
+            InstallationSemaphore.Release();
         }
     }
 
