@@ -79,7 +79,7 @@ public static class HtmlOutlineBuilder {
                     continue;
                 }
                 int level = int.Parse(node.Name!.Substring(1));
-                string title = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty).Trim();
+                string title = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty)!.Trim();
                 string? id = node.Id;
                 headings.Add((level, title, id));
             }
