@@ -32,20 +32,40 @@ public static class HtmlBrowserTester {
         
         var result = new HtmlBrowserTestResult { Url = url };
         
-        await using var session = await HtmlBrowser.OpenSessionAsync(
-            url, 
-            engine, 
-            clean: false,
-            headless: headless,
-            timeout: timeout,
-            proxy: proxy,
-            proxyUsername: proxyUsername,
-            proxyPassword: proxyPassword);
+        // Ensure Playwright and browser are installed
+        await HtmlBrowser.EnsureInstalledAsync(engine);
         
-        // Enhanced network monitoring
-        var networkEntries = new Dictionary<IRequest, HtmlNetworkEntryDetailed>();
-        
-        session.Page.Request += (_, request) => {
+        // Create a browser session without navigating first
+        var playwright = await Playwright.CreateAsync();
+        try {
+            var browserType = engine switch {
+                HtmlBrowserEngine.Firefox => playwright.Firefox,
+                HtmlBrowserEngine.WebKit => playwright.Webkit,
+                _ => playwright.Chromium
+            };
+            
+            var launchOptions = new BrowserTypeLaunchOptions { Headless = headless };
+            if (!string.IsNullOrEmpty(proxy)) {
+                launchOptions.Proxy = new Proxy {
+                    Server = proxy!,
+                    Username = proxyUsername,
+                    Password = proxyPassword
+                };
+            }
+            
+            var browser = await browserType.LaunchAsync(launchOptions);
+            try {
+                var context = await browser.NewContextAsync();
+                try {
+                    var page = await context.NewPageAsync();
+                    
+                    // Set timeout
+                    page.SetDefaultTimeout(timeout);
+                    
+                    // Enhanced network monitoring - set up BEFORE navigation
+                    var networkEntries = new Dictionary<IRequest, HtmlNetworkEntryDetailed>();
+                    
+                    page.Request += (_, request) => {
             var entry = new HtmlNetworkEntryDetailed {
                 Url = request.Url,
                 Method = HtmlEnumParser.ParseHttpMethod(request.Method),
@@ -63,9 +83,9 @@ public static class HtmlBrowserTester {
             }
             
             networkEntries[request] = entry;
-        };
-        
-        session.Page.Response += (_, response) => {
+                    };
+                    
+                    page.Response += (_, response) => {
             if (networkEntries.TryGetValue(response.Request, out var entry)) {
                 entry.Status = (System.Net.HttpStatusCode)response.Status;
                 entry.ResponseHeaders = new Dictionary<string, string>(response.Headers);
@@ -83,26 +103,26 @@ public static class HtmlBrowserTester {
                 // Calculate header sizes
                 entry.ResponseHeadersSize = response.Headers.Sum(h => h.Key.Length + h.Value.Length + 4); // +4 for ": " and "\r\n"
             }
-        };
-        
-        session.Page.RequestFinished += (_, request) => {
+                    };
+                    
+                    page.RequestFinished += (_, request) => {
             if (networkEntries.TryGetValue(request, out var entry)) {
                 entry.Finished = DateTimeOffset.UtcNow;
                 result.NetworkEntries.Add(entry);
             }
-        };
-        
-        session.Page.RequestFailed += (_, request) => {
+                    };
+                    
+                    page.RequestFailed += (_, request) => {
             if (networkEntries.TryGetValue(request, out var entry)) {
                 entry.Finished = DateTimeOffset.UtcNow;
                 entry.ErrorType = ParseNetworkError(request.Failure);
                 entry.ErrorMessage = request.Failure;
                 result.NetworkEntries.Add(entry);
             }
-        };
-        
-        // Enhanced console monitoring
-        session.Page.Console += async (_, msg) => {
+                    };
+                    
+                    // Enhanced console monitoring
+                    page.Console += async (_, msg) => {
             var entry = new HtmlConsoleEntryDetailed {
                 Text = msg.Text,
                 Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
@@ -142,21 +162,30 @@ public static class HtmlBrowserTester {
             }
             
             result.ConsoleEntries.Add(entry);
-        };
-        
-        // Navigate and measure
-        var startTime = DateTimeOffset.UtcNow;
-        var response = await session.Page.GotoAsync(url, new PageGotoOptions {
+                    };
+                    
+                    // Navigate and measure
+                    var startTime = DateTimeOffset.UtcNow;
+                    var response = await page.GotoAsync(url, new PageGotoOptions {
             WaitUntil = WaitUntilState.NetworkIdle,
             Timeout = timeout
-        });
-        
-        result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
-        
-        // Wait a bit for any delayed console messages or network requests
-        await session.Page.WaitForTimeoutAsync(1000);
-        
-        return result;
+                    });
+                    
+                    result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
+                    
+                    // Wait a bit for any delayed console messages or network requests
+                    await page.WaitForTimeoutAsync(1000);
+                    
+                    return result;
+                } finally {
+                    await context.CloseAsync();
+                }
+            } finally {
+                await browser.CloseAsync();
+            }
+        } finally {
+            playwright.Dispose();
+        }
     }
     
     /// <summary>

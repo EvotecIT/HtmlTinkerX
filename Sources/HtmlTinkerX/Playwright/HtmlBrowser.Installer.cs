@@ -119,10 +119,12 @@ public static partial class HtmlBrowser {
     }
 
     /// <summary>
-    /// Ensures that the Playwright driver is installed.
+    /// Ensures that the Playwright driver and browser runtime are installed.
+    /// This method will automatically download and install the required components if they are not present.
     /// </summary>
-    /// <returns></returns>
-    internal static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
+    /// <param name="engine">The browser engine to ensure is installed.</param>
+    /// <returns>A task that completes when the installation check/process is finished.</returns>
+    public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
         bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
 
         if (IsDriverPresent()) {
