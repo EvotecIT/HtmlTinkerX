@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Reflection;
+#if NET5_0_OR_GREATER
 using System.Runtime.Loader;
+#endif
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
