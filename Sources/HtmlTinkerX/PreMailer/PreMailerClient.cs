@@ -412,9 +412,9 @@ public class PreMailerClient {
         path = path.Replace(alt, desired);
 
         // UNC paths need special handling on Unix where LocalPath starts with
-        // double separators
-        if (uri.IsUnc && desired == '/') {
-            path = "/" + path.TrimStart(desired);
+        // double separators - we want to end up with a single leading slash
+        if (uri.IsUnc && desired == '/' && path.StartsWith("//")) {
+            path = path.Substring(1);
         }
 
         // Preserve trailing slash if present in the original URI

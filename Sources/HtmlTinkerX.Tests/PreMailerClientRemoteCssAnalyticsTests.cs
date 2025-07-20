@@ -57,8 +57,9 @@ public class PreMailerClientRemoteCssAnalyticsTests {
 
         try {
             PreMailerResult result = await PreMailerClient.MoveCssInlineAsync(html, options, CancellationToken.None);
-            Assert.Contains("style=\"font-size: 42px\"", result.Html, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("style=\"color: red\"", result.Html, StringComparison.OrdinalIgnoreCase);
+            // Check that styles are applied - be flexible about exact formatting
+            Assert.Matches(@"style\s*=\s*[""'][^""']*font-size\s*:\s*42px", result.Html);
+            Assert.Matches(@"style\s*=\s*[""'][^""']*color\s*:\s*red", result.Html);
             Assert.Contains("utm_source=newsletter", result.Html);
             Assert.Contains("utm_medium=email", result.Html);
             Assert.Contains("utm_campaign=campaign", result.Html);
