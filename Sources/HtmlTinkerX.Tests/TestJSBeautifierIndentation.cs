@@ -23,7 +23,7 @@
 #endregion
 
 namespace Tests {
-    using Jsbeautifier;
+    using HtmlTinkerX.JavaScriptBeautifier;
     using NUnit.Framework;
 
     [TestFixture]

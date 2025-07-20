@@ -26,7 +26,7 @@ using System.Collections;
 using System.Runtime.InteropServices;
 
 namespace Tests {
-    using Jsbeautifier;
+    using HtmlTinkerX.JavaScriptBeautifier;
     using NUnit.Framework;
 
     [TestFixture]

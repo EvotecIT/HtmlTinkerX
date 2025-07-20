@@ -32,8 +32,8 @@ public class BeautifierFlags {
     /// Initializes a new instance of the <see cref="BeautifierFlags"/> class.
     /// </summary>
     /// <param name="mode">The initial mode.</param>
-    public BeautifierFlags(string mode) {
-        PreviousMode = "BLOCK";
+    public BeautifierFlags(BeautifierMode mode) {
+        PreviousMode = BeautifierMode.Block;
         Mode = mode;
         VarLine = false;
         VarLineTainted = false;
@@ -51,12 +51,12 @@ public class BeautifierFlags {
     /// <summary>
     /// Gets or sets the previous mode.
     /// </summary>
-    public string PreviousMode { get; set; }
+    public BeautifierMode PreviousMode { get; set; }
 
     /// <summary>
     /// Gets or sets the current mode.
     /// </summary>
-    public string Mode { get; set; }
+    public BeautifierMode Mode { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether we're on a variable line.

@@ -99,7 +99,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
         private void BlankState() {
             // internal flags
-            Flags = new BeautifierFlags("BLOCK");
+            Flags = new BeautifierFlags(BeautifierMode.Block);
             FlagStore = new List<BeautifierFlags>();
             WantedNewline = false;
             JustAddedNewline = false;
@@ -125,12 +125,12 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
             // Words which always should start on a new line
             LineStarters = "continue,try,throw,return,var,if,switch,case,default,for,while,break,function".Split(',');
-            SetMode("BLOCK");
+            SetMode(BeautifierMode.Block);
             ParserPos = 0;
         }
 
-        private void SetMode(string mode) {
-            var prev = new BeautifierFlags("BLOCK");
+        private void SetMode(BeautifierMode mode) {
+            var prev = new BeautifierFlags(BeautifierMode.Block);
 
             if (Flags != null) {
                 FlagStore.Add(Flags);
@@ -229,16 +229,16 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             return s == "case" || s == "return" || s == "do" || s == "if" || s == "throw" || s == "else";
         }
 
-        private bool IsArray(string mode) {
-            return mode == "[EXPRESSION]" || mode == "[INDENTED-EXPRESSION]";
+        private bool IsArray(BeautifierMode mode) {
+            return mode == BeautifierMode.ArrayExpression || mode == BeautifierMode.IndentedArrayExpression;
         }
 
-        private bool IsExpression(string mode) {
-            return mode == "[EXPRESSION]" ||
-                mode == "[INDENTED-EXPRESSION]" ||
-                mode == "(EXPRESSION)" ||
-                mode == "(FOR-EXPRESSION)" ||
-                mode == "(COND-EXPRESSION)";
+        private bool IsExpression(BeautifierMode mode) {
+            return mode == BeautifierMode.ArrayExpression ||
+                mode == BeautifierMode.IndentedArrayExpression ||
+                mode == BeautifierMode.Expression ||
+                mode == BeautifierMode.ForExpression ||
+                mode == BeautifierMode.CondExpression;
         }
 
         private void AllowWrapOrPreservedNewline(string tokenText, bool forceLinwrap = false) {
@@ -347,7 +347,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         }
 
         private void RestoreMode() {
-            DoBlockJustClosed = Flags.Mode == "DO_BLOCK";
+            DoBlockJustClosed = Flags.Mode == BeautifierMode.DoBlock;
 
             if (FlagStore.Count > 0) {
                 var mode = Flags.Mode;
@@ -541,7 +541,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             if (c == '\'' || c == '"' ||
                 (c == '/' &&
                 ((LastType == "TK_WORD" && IsSpecialWord(LastText)) ||
-                (LastType == "TK_END_EXPR" && (Flags.PreviousMode == "(FOR-EXPRESSION)" || Flags.PreviousMode == "(COND-EXPRESSION)")) ||
+                (LastType == "TK_END_EXPR" && (Flags.PreviousMode == BeautifierMode.ForExpression || Flags.PreviousMode == BeautifierMode.CondExpression)) ||
                 ((new[] { "TK_COMMENT", "TK_START_EXPR", "TK_START_BLOCK", "TK_END_BLOCK", "TK_OPERATOR", "TK_EQUALS", "TK_EOF", "TK_SEMICOLON", "TK_COMMA" }).Contains(LastType))))) {
                 var sep = c;
                 var esc = false;
@@ -742,52 +742,52 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                         Append(" ");
                     }
 
-                    SetMode("(EXPRESSION)");
+                    SetMode(BeautifierMode.Expression);
                     Append(tokenText);
                     return;
                 }
 
-                if (Flags.Mode == "[EXPRESSION]" || Flags.Mode == "[INDENTED-EXPRESSION]") {
+                if (Flags.Mode == BeautifierMode.ArrayExpression || Flags.Mode == BeautifierMode.IndentedArrayExpression) {
                     if (LastLastText == "]" && LastText == ",") {
                         // # ], [ goes to a new line
-                        if (Flags.Mode == "[EXPRESSION]") {
-                            Flags.Mode = "[INDENTED-EXPRESSION]";
+                        if (Flags.Mode == BeautifierMode.ArrayExpression) {
+                            Flags.Mode = BeautifierMode.IndentedArrayExpression;
                             if (!Opts.KeepArrayIndentation) {
                                 Indent();
                             }
                         }
 
-                        SetMode("[EXPRESSION]");
+                        SetMode(BeautifierMode.ArrayExpression);
 
                         if (!Opts.KeepArrayIndentation) {
                             AppendNewline();
                         }
                     } else if (LastText == "[") {
-                        if (Flags.Mode == "[EXPRESSION]") {
-                            Flags.Mode = "[INDENTED-EXPRESSION]";
+                        if (Flags.Mode == BeautifierMode.ArrayExpression) {
+                            Flags.Mode = BeautifierMode.IndentedArrayExpression;
 
                             if (!Opts.KeepArrayIndentation) {
                                 Indent();
                             }
                         }
-                        SetMode("[EXPRESSION]");
+                        SetMode(BeautifierMode.ArrayExpression);
 
                         if (!Opts.KeepArrayIndentation) {
                             AppendNewline();
                         }
                     } else {
-                        SetMode("[EXPRESSION]");
+                        SetMode(BeautifierMode.ArrayExpression);
                     }
                 } else {
-                    SetMode("[EXPRESSION]");
+                    SetMode(BeautifierMode.ArrayExpression);
                 }
             } else {
                 if (LastText == "for") {
-                    SetMode("(FOR-EXPRESSION)");
+                    SetMode(BeautifierMode.ForExpression);
                 } else if (LastText == "if" || LastText == "while") {
-                    SetMode("(COND-EXPRESSION)");
+                    SetMode(BeautifierMode.CondExpression);
                 } else {
-                    SetMode("(EXPRESSION)");
+                    SetMode(BeautifierMode.Expression);
                 }
             }
 
@@ -811,7 +811,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
             if (LastType == "TK_EQUALS" ||
                 LastType == "TK_OPERATOR") {
-                if (Flags.Mode != "OJBECT") {
+                if (Flags.Mode != BeautifierMode.Object) {
                     AllowWrapOrPreservedNewline(tokenText);
                 }
             }
@@ -828,7 +828,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                         RestoreMode();
                         return;
                     }
-                } else if (Flags.Mode == "[INDENTED-EXPRESSION]") {
+                } else if (Flags.Mode == BeautifierMode.IndentedArrayExpression) {
                     if (LastText == "]") {
                         RestoreMode();
                         AppendNewline();
@@ -843,9 +843,9 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
         private void HandleStartBlock(string tokenText) {
             if (LastWord == "do") {
-                SetMode("DO_BLOCK");
+                SetMode(BeautifierMode.DoBlock);
             } else {
-                SetMode("BLOCK");
+                SetMode(BeautifierMode.Block);
             }
 
             if (Opts.BraceStyle == BraceStyle.Expand) {
@@ -987,7 +987,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                         Append(" ");
                     }
                 }
-            } else if (LastType == "TK_SEMICOLON" && (Flags.Mode == "BLOCK" || Flags.Mode == "DO_BLOCK")) {
+            } else if (LastType == "TK_SEMICOLON" && (Flags.Mode == BeautifierMode.Block || Flags.Mode == BeautifierMode.DoBlock)) {
                 prefix = "NEWLINE";
             } else if (LastType == "TK_SEMICOLON" && IsExpression(Flags.Mode)) {
                 prefix = "SPACE";
@@ -1015,7 +1015,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 LastType == "TK_START_EXPR" ||
                 LastType == "TK_EQUALS" ||
                 LastType == "TK_OPERATOR") {
-                if (Flags.Mode != "OBJECT") {
+                if (Flags.Mode != BeautifierMode.Object) {
                     AllowWrapOrPreservedNewline(tokenText);
                 }
             }
@@ -1085,15 +1085,15 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             Append(tokenText);
             Flags.VarLine = false;
             Flags.VarLineReindented = false;
-            if (Flags.Mode == "OBJECT") {
+            if (Flags.Mode == BeautifierMode.Object) {
                 // OBJECT mode is weird and doesn't get reset too well.
-                Flags.Mode = "BLOCK";
+                Flags.Mode = BeautifierMode.Block;
             }
         }
 
         private void HandleString(string tokenText) {
             if (LastType == "TK_END_EXPR" &&
-                (Flags.PreviousMode == "(COND-EXPRESSION)" || Flags.PreviousMode == "(FOR-EXPRESSION)")) {
+                (Flags.PreviousMode == BeautifierMode.CondExpression || Flags.PreviousMode == BeautifierMode.ForExpression)) {
                 Append(" ");
             } else if (LastType == "TK_WORD") {
                 Append(" ");
@@ -1101,7 +1101,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                        LastType == "TK_START_EXPR" ||
                        LastType == "TK_EQUALS" ||
                        LastType == "TK_OPERATOR") {
-                if (Flags.Mode != "OBJECT") {
+                if (Flags.Mode != BeautifierMode.Object) {
                     AllowWrapOrPreservedNewline(tokenText);
                 }
             } else {
@@ -1145,15 +1145,15 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 return;
             }
 
-            if (LastType == "TK_END_BLOCK" && Flags.Mode != "(EXPRESSION)") {
+            if (LastType == "TK_END_BLOCK" && Flags.Mode != BeautifierMode.Expression) {
                 Append(tokenText);
-                if (Flags.Mode == "OBJECT" && LastText == "}") {
+                if (Flags.Mode == BeautifierMode.Object && LastText == "}") {
                     AppendNewline();
                 } else {
                     Append(" ");
                 }
             } else {
-                if (Flags.Mode == "OBJECT") {
+                if (Flags.Mode == BeautifierMode.Object) {
                     Append(tokenText);
                     AppendNewline();
                 } else {
@@ -1212,15 +1212,15 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                     spaceBefore = true;
                 }
 
-                if (Flags.Mode == "BLOCK" && (LastText == ";" || LastText == "{")) {
+                if (Flags.Mode == BeautifierMode.Block && (LastText == ";" || LastText == "{")) {
                     // { foo: --i }
                     // foo(): --bar
                     AppendNewline();
                 }
             } else if (tokenText == ":") {
                 if (Flags.TernaryDepth == 0) {
-                    if (Flags.Mode == "BLOCK") {
-                        Flags.Mode = "OBJECT";
+                    if (Flags.Mode == BeautifierMode.Block) {
+                        Flags.Mode = BeautifierMode.Object;
                     }
                     spaceBefore = false;
                 } else {
