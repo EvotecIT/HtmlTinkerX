@@ -28,7 +28,7 @@ public class HtmlFormatterTests {
     /// </summary>
     public void FormatJavaScript_RespectsOptions() {
         const string js = "function x(){return 1;};";
-        BeautifierOptions opts = new() { IndentSize = 2, BraceStyle = BraceStyle.Expand };
+        BeautifierOptions opts = new BeautifierOptions() { IndentSize = 2, BraceStyle = BraceStyle.Expand };
         string expected = "function x()\n{\n  return 1;\n};";
 
         string result = HtmlFormatter.FormatJavaScript(js, opts);

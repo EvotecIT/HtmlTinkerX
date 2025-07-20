@@ -31,6 +31,7 @@ public static class HtmlBrowserTester {
         string? proxyPassword = null) {
         
         var result = new HtmlBrowserTestResult { Url = url };
+        var startTime = DateTimeOffset.UtcNow;
 
         try {
             // Ensure Playwright and browser are installed
@@ -167,7 +168,6 @@ public static class HtmlBrowserTester {
                     };
                     
                     // Navigate and measure
-                    var startTime = DateTimeOffset.UtcNow;
                     try {
                         await page.GotoAsync(url, new PageGotoOptions {
                             WaitUntil = WaitUntilState.NetworkIdle,
@@ -200,6 +200,11 @@ public static class HtmlBrowserTester {
             Type = HtmlConsoleMessageType.Error,
             Timestamp = DateTimeOffset.UtcNow
         });
+    }
+
+    // Ensure PageLoadTime is always set
+    if (!result.PageLoadTime.HasValue) {
+        result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
     }
 
     return result;

@@ -25,6 +25,9 @@ jobs:
   test-windows:
     name: 'Windows'
     runs-on: windows-latest
+    strategy:
+      matrix:
+        framework: [net8.0, net472]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,28 +37,32 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Setup .NET Framework
+        if: matrix.framework == 'net472'
+        uses: microsoft/setup-msbuild@v2
+
       - name: Restore dependencies
         run: dotnet restore Sources/HtmlTinkerX.sln
 
       - name: Build solution
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
-      - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal --logger trx --collect:"XPlat Code Coverage"
+      - name: Run tests for ${{ matrix.framework }}
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework ${{ matrix.framework }} --verbosity normal --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-windows
+          name: test-results-windows-${{ matrix.framework }}
           path: '**/*.trx'
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-reports-windows
+          name: coverage-reports-windows-${{ matrix.framework }}
           path: '**/coverage.cobertura.xml'
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -81,7 +88,7 @@ jobs:
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity normal --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
       - name: Upload test results
@@ -114,7 +121,7 @@ jobs:
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity normal --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
       - name: Upload test results

@@ -1,9 +1,5 @@
 using HtmlTinkerX;
-using System;
-using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
@@ -42,7 +38,11 @@ public class PreMailerClientFileHelpersTests {
     public void MoveCssInlineFromFile_RelativePath() {
         string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".html");
         File.WriteAllText(file, HtmlContent);
+#if FRAMEWORK
+        string relative = GetRelativePath(Directory.GetCurrentDirectory(), file);
+#else
         string relative = Path.GetRelativePath(Directory.GetCurrentDirectory(), file);
+#endif
         try {
             PreMailerResult result = PreMailerClient.MoveCssInlineFromFile(relative, null);
             Assert.Contains("Hello", result.Html, StringComparison.OrdinalIgnoreCase);

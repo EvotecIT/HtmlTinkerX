@@ -46,6 +46,11 @@ public class HtmlUtilitiesHttpHandlerTests {
         using HttpClient client = new(new StaticResponseHandler("Hello", "text/plain", "utf-8"), false);
         using CancellationTokenSource cts = new();
         cts.Cancel();
+#if FRAMEWORK
+        // In .NET Framework, cancellation throws OperationCanceledException
+        await Assert.ThrowsAsync<OperationCanceledException>(() => HtmlUtilities.GetStringWithProperEncodingAsync(client, "http://localhost/", cts.Token));
+#else
         await Assert.ThrowsAsync<TaskCanceledException>(() => HtmlUtilities.GetStringWithProperEncodingAsync(client, "http://localhost/", cts.Token));
+#endif
     }
 }
