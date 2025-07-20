@@ -31,18 +31,19 @@ public static class HtmlBrowserTester {
         string? proxyPassword = null) {
         
         var result = new HtmlBrowserTestResult { Url = url };
-        
-        // Ensure Playwright and browser are installed
-        await HtmlBrowser.EnsureInstalledAsync(engine);
-        
-        // Create a browser session without navigating first
-        var playwright = await Playwright.CreateAsync();
+
         try {
-            var browserType = engine switch {
-                HtmlBrowserEngine.Firefox => playwright.Firefox,
-                HtmlBrowserEngine.WebKit => playwright.Webkit,
-                _ => playwright.Chromium
-            };
+            // Ensure Playwright and browser are installed
+            await HtmlBrowser.EnsureInstalledAsync(engine);
+
+            // Create a browser session without navigating first
+            var playwright = await Playwright.CreateAsync();
+            try {
+                var browserType = engine switch {
+                    HtmlBrowserEngine.Firefox => playwright.Firefox,
+                    HtmlBrowserEngine.WebKit => playwright.Webkit,
+                    _ => playwright.Chromium
+                };
             
             var launchOptions = new BrowserTypeLaunchOptions { Headless = headless };
             if (!string.IsNullOrEmpty(proxy)) {
@@ -53,9 +54,10 @@ public static class HtmlBrowserTester {
                 };
             }
             
-            var browser = await browserType.LaunchAsync(launchOptions);
+                var browser = await browserType.LaunchAsync(launchOptions);
             try {
-                var context = await browser.NewContextAsync();
+                var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = true };
+                var context = await browser.NewContextAsync(contextOptions);
                 try {
                     var page = await context.NewPageAsync();
                     
@@ -166,17 +168,23 @@ public static class HtmlBrowserTester {
                     
                     // Navigate and measure
                     var startTime = DateTimeOffset.UtcNow;
-                    var response = await page.GotoAsync(url, new PageGotoOptions {
-            WaitUntil = WaitUntilState.NetworkIdle,
-            Timeout = timeout
-                    });
-                    
-                    result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
-                    
+                    try {
+                        await page.GotoAsync(url, new PageGotoOptions {
+                            WaitUntil = WaitUntilState.NetworkIdle,
+                            Timeout = timeout
+                        });
+                    } catch (Exception ex) {
+                        result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
+                            Text = ex.Message,
+                            Type = HtmlConsoleMessageType.Error,
+                            Timestamp = DateTimeOffset.UtcNow
+                        });
+                    } finally {
+                        result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
+                    }
+
                     // Wait a bit for any delayed console messages or network requests
                     await page.WaitForTimeoutAsync(1000);
-                    
-                    return result;
                 } finally {
                     await context.CloseAsync();
                 }
@@ -186,7 +194,16 @@ public static class HtmlBrowserTester {
         } finally {
             playwright.Dispose();
         }
+    } catch (Exception ex) {
+        result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
+            Text = ex.Message,
+            Type = HtmlConsoleMessageType.Error,
+            Timestamp = DateTimeOffset.UtcNow
+        });
     }
+
+    return result;
+}
     
     /// <summary>
     /// Tests if a specific CSS resource is loaded.

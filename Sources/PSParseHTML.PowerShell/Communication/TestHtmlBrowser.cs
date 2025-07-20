@@ -171,7 +171,7 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
 /// <summary>
 /// Cleans up Playwright browser downloads and cache.
 /// </summary>
-[Cmdlet(VerbsCommon.Clear, "HtmlBrowserCache")]
+[Cmdlet(VerbsCommon.Clear, "HtmlBrowserCache", SupportsShouldProcess = true)]
 public sealed class ClearHtmlBrowserCacheCommand : PSCmdlet {
     /// <summary>
     /// Force cleanup without confirmation.
