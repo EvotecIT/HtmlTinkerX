@@ -30,9 +30,14 @@
     <Compile Remove="TestJSBeautifierIndentation.cs" />
   </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\HtmlTinkerX\HtmlTinkerX.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HtmlTinkerX\HtmlTinkerX.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="TestJSBeautifier.cs" />
+    <Compile Remove="TestJSBeautifierIndentation.cs" />
+  </ItemGroup>
 
   <ItemGroup>
       <Using Include="Xunit" />
