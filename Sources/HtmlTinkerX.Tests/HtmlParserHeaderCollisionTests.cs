@@ -17,7 +17,7 @@ public class HtmlParserHeaderCollisionTests {
         var tables = HtmlParser.ParseTablesWithAngleSharpDetailed(DuplicateHeaders, null, null, true, false, true, null);
         var result = tables[0];
         Assert.Equal(new[] { "A", "A1", "A2", "B" }, result.Metadata.Headers);
-        var row = result.Data[0];
+        var row = result.Data[0].Values;
         Assert.Equal("1", row["A"]);
         Assert.Equal("2", row["A1"]);
         Assert.Equal("3", row["A2"]);
@@ -32,7 +32,7 @@ public class HtmlParserHeaderCollisionTests {
         var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(DuplicateHeaders, false, null, null, true, false, true, null);
         var result = tables[0];
         Assert.Equal(new[] { "A", "A1", "A2", "B" }, result.Metadata.Headers);
-        var row = result.Data[0];
+        var row = result.Data[0].Values;
         Assert.Equal("1", row["A"]);
         Assert.Equal("2", row["A1"]);
         Assert.Equal("3", row["A2"]);

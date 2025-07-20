@@ -20,5 +20,5 @@ public class HtmlTableResult {
     /// <summary>
     /// Table rows with values indexed by header name.
     /// </summary>
-    public List<Dictionary<string, string?>> Data { get; set; } = new();
+    public List<HtmlTableRow> Data { get; set; } = new();
 }

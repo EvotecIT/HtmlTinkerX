@@ -15,12 +15,12 @@ Describe 'AzureStatus HTML parsing' {
         $First = $DataTables[0]
         $First.Metadata.Headers | Should -Contain '*Non-Regional'
         $First.Metadata.Headers | Should -Contain 'East US'
-        $First.Data[0].'Products and services' | Should -Be 'Compute'
-        $First.Data[1].'Products and services' | Should -Not -BeNullOrEmpty
-        $First.Data[1].'East US' | Should -Not -BeNullOrEmpty
-        $First.Data[1].'East US 2' | Should -Not -BeNullOrEmpty
-        $First.Data[2].'Products and services' | Should -Not -BeNullOrEmpty
-        $First.Data[2].'East US' | Should -Not -BeNullOrEmpty
-        $First.Data[2].'East US 2' | Should -Not -BeNullOrEmpty
+        $First.Data[0].Values.'Products and services' | Should -Be 'Compute'
+        $First.Data[1].Values.'Products and services' | Should -Not -BeNullOrEmpty
+        $First.Data[1].Values.'East US' | Should -Not -BeNullOrEmpty
+        $First.Data[1].Values.'East US 2' | Should -Not -BeNullOrEmpty
+        $First.Data[2].Values.'Products and services' | Should -Not -BeNullOrEmpty
+        $First.Data[2].Values.'East US' | Should -Not -BeNullOrEmpty
+        $First.Data[2].Values.'East US 2' | Should -Not -BeNullOrEmpty
     }
 }

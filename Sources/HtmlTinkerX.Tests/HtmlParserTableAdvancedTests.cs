@@ -29,14 +29,14 @@ public class HtmlParserTableAdvancedTests {
         Assert.True(dataTables.Count >= 7);
         foreach (var table in dataTables.Take(7)) {
             Assert.True(table.Data.Count >= 2);
-            Assert.Equal(table.Metadata.ColumnCount, table.Data[0].Count);
-            Assert.Equal(table.Metadata.ColumnCount, table.Data[1].Count);
+            Assert.Equal(table.Metadata.ColumnCount, table.Data[0].Values.Count);
+            Assert.Equal(table.Metadata.ColumnCount, table.Data[1].Values.Count);
         }
 
         var first = dataTables[0];
         Assert.Contains("NonRegional", first.Metadata.Headers);
         Assert.DoesNotContain("*Non-Regional", first.Metadata.Headers);
-        Assert.Equal("Not available", first.Data[1]["NonRegional"]);
+        Assert.Equal("Not available", first.Data[1].Values["NonRegional"]);
     }
 
     [Fact]
@@ -48,14 +48,14 @@ public class HtmlParserTableAdvancedTests {
         Assert.True(dataTables.Count >= 7);
         foreach (var table in dataTables.Take(7)) {
             Assert.True(table.Data.Count >= 2);
-            Assert.Equal(table.Metadata.ColumnCount, table.Data[0].Count);
-            Assert.Equal(table.Metadata.ColumnCount, table.Data[1].Count);
+            Assert.Equal(table.Metadata.ColumnCount, table.Data[0].Values.Count);
+            Assert.Equal(table.Metadata.ColumnCount, table.Data[1].Values.Count);
         }
 
         var first = dataTables[0];
         Assert.Contains("NonRegional", first.Metadata.Headers);
         Assert.DoesNotContain("*Non-Regional", first.Metadata.Headers);
-        Assert.Equal("Not available", first.Data[1]["NonRegional"]);
+        Assert.Equal("Not available", first.Data[1].Values["NonRegional"]);
     }
 
     private static string GetPolishTableHtml() {
@@ -75,10 +75,10 @@ public class HtmlParserTableAdvancedTests {
         Assert.Equal(2, table.Metadata.ColumnCount);
 
         // Check that Polish characters are preserved correctly
-        Assert.Equal("Komórka a1", table.Data[0]["Column1"]);
-        Assert.Equal("Komórka a2", table.Data[0]["Column2"]);
-        Assert.Equal("Komórka a3", table.Data[1]["Column1"]);
-        Assert.Equal("Komórka a4", table.Data[1]["Column2"]);
+        Assert.Equal("Komórka a1", table.Data[0].Values["Column1"]);
+        Assert.Equal("Komórka a2", table.Data[0].Values["Column2"]);
+        Assert.Equal("Komórka a3", table.Data[1].Values["Column1"]);
+        Assert.Equal("Komórka a4", table.Data[1].Values["Column2"]);
     }
 
     [Fact]
@@ -92,10 +92,10 @@ public class HtmlParserTableAdvancedTests {
         Assert.Equal(2, table.Metadata.ColumnCount);
 
         // Check that Polish characters are preserved correctly
-        Assert.Equal("Komórka a1", table.Data[0]["Column1"]);
-        Assert.Equal("Komórka a2", table.Data[0]["Column2"]);
-        Assert.Equal("Komórka a3", table.Data[1]["Column1"]);
-        Assert.Equal("Komórka a4", table.Data[1]["Column2"]);
+        Assert.Equal("Komórka a1", table.Data[0].Values["Column1"]);
+        Assert.Equal("Komórka a2", table.Data[0].Values["Column2"]);
+        Assert.Equal("Komórka a3", table.Data[1].Values["Column1"]);
+        Assert.Equal("Komórka a4", table.Data[1].Values["Column2"]);
     }
 
     [Fact]
@@ -114,10 +114,10 @@ public class HtmlParserTableAdvancedTests {
 
             if (table.Data.Count >= 2) {
                 // Check that Polish characters are preserved correctly (not corrupted as "Kom�rka")
-                var cell1 = table.Data[0]["Column1"];
-                var cell2 = table.Data[0]["Column2"];
-                var cell3 = table.Data[1]["Column1"];
-                var cell4 = table.Data[1]["Column2"];
+                var cell1 = table.Data[0].Values["Column1"];
+                var cell2 = table.Data[0].Values["Column2"];
+                var cell3 = table.Data[1].Values["Column1"];
+                var cell4 = table.Data[1].Values["Column2"];
 
                 // Verify that characters are NOT corrupted (no replacement characters)
                 Assert.DoesNotContain("�", cell1);

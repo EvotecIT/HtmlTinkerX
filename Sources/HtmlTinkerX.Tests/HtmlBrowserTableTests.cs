@@ -36,9 +36,9 @@ public class HtmlBrowserTableTests {
 
         Assert.Equal(4, tables.Count);
 
-        Assert.Equal("Data64-bit", tables[0].Data[0]["Column3"]);
-        Assert.Equal("Source", tables[2].Data[0]["Column1"]);
-        Assert.Equal("D:", tables[2].Data[0]["Column2"]);
+        Assert.Equal("Data64-bit", tables[0].Data[0].Values["Column3"]);
+        Assert.Equal("Source", tables[2].Data[0].Values["Column1"]);
+        Assert.Equal("D:", tables[2].Data[0].Values["Column2"]);
         Assert.Contains("Column3", tables[3].Metadata.Headers);
     }
 }

@@ -27,7 +27,7 @@ public class HtmlParserTableAzureTests {
         var first = dataTables[0];
         Assert.Contains("*Non-Regional", first.Metadata.Headers);
         Assert.Contains("East US", first.Metadata.Headers);
-        Assert.Equal("Compute", first.Data[0]["Products and services"]);
+        Assert.Equal("Compute", first.Data[0].Values["Products and services"]);
     }
 
     [Fact]
@@ -45,6 +45,6 @@ public class HtmlParserTableAzureTests {
         var first = dataTables[0];
         Assert.Contains("*Non-Regional", first.Metadata.Headers);
         Assert.Contains("East US", first.Metadata.Headers);
-        Assert.Equal("Compute", first.Data[0]["Products and services"]);
+        Assert.Equal("Compute", first.Data[0].Values["Products and services"]);
     }
 }

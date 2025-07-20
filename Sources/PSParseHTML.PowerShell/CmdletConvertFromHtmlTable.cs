@@ -152,11 +152,11 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     /// </summary>
     /// <param name="rows">The rows to convert.</param>
     /// <returns>The converted rows.</returns>
-    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+    private PSObject[] ConvertRows(IEnumerable<HtmlTableRow> rows) {
         var list = new List<PSObject>();
         foreach (var row in rows) {
             PSObject obj = new();
-            foreach (var kv in row) {
+            foreach (var kv in row.Values) {
                 // Core library now handles CleanHeaders and EmptyValuePlaceholder processing
                 obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
             }

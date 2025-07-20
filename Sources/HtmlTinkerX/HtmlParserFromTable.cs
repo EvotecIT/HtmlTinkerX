@@ -121,7 +121,7 @@ public static class HtmlParserFromTable {
             }
 
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
-            List<Dictionary<string, string?>> tableRows = new();
+            List<HtmlTableRow> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.QuerySelectorAll("th,td");
@@ -179,7 +179,7 @@ public static class HtmlParserFromTable {
                     dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
                 }
                 if (dict.Count > 0) {
-                    tableRows.Add(dict);
+                    tableRows.Add(new HtmlTableRow { Values = dict });
                 }
             }
 
@@ -453,7 +453,7 @@ public static class HtmlParserFromTable {
                 }
 
                 if (obj.Count > 0) {
-                    result.Data = new List<Dictionary<string, string?>> { obj };
+                    result.Data = new List<HtmlTableRow> { new HtmlTableRow { Values = obj } };
                     metadata.Headers = obj.Keys.ToList();
                     metadata.ColumnCount = obj.Count;
                 }
@@ -507,7 +507,7 @@ public static class HtmlParserFromTable {
             metadata.ColumnCount = headers.Count;
 
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
-            List<Dictionary<string, string?>> tableRows = new();
+            List<HtmlTableRow> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             foreach (var row in rows.Skip(startIndex)) {
                 var cells = row.SelectNodes("th|td");
@@ -568,7 +568,7 @@ public static class HtmlParserFromTable {
                     dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
                 }
                 if (dict.Count > 0) {
-                    tableRows.Add(dict);
+                    tableRows.Add(new HtmlTableRow { Values = dict });
                 }
             }
 

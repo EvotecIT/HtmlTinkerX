@@ -11,7 +11,7 @@ public class HtmlParserTableSkipFooterTests {
         Assert.Single(tables);
         var table = tables[0];
         Assert.Single(table.Data);
-        Assert.Equal("1", table.Data[0]["A"]);
+        Assert.Equal("1", table.Data[0].Values["A"]);
     }
 
     [Fact]
@@ -21,6 +21,6 @@ public class HtmlParserTableSkipFooterTests {
         Assert.Single(tables);
         var table = tables[0];
         Assert.Single(table.Data);
-        Assert.Equal("1", table.Data[0]["A"]);
+        Assert.Equal("1", table.Data[0].Values["A"]);
     }
 }
