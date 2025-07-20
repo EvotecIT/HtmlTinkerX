@@ -5,6 +5,6 @@ Describe 'Get-HTMLFormField' {
         $fields = Get-HTMLFormField -Content $content
         $fields.Count | Should -Be 3
         $fields[0].Name | Should -Be 'user'
-        $fields[0].Type | Should -Be 'text'
+        $fields[0].Type | Should -Be ([HtmlTinkerX.HtmlFormFieldType]::Text)
     }
 }
