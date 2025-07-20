@@ -24,6 +24,11 @@
 
     <ItemGroup>
         <ProjectReference Include="..\HtmlTinkerX\HtmlTinkerX.csproj" />
+        <ProjectReference Include="..\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Management.Automation" Version="7.4.2" />
     </ItemGroup>
 
     <ItemGroup>
