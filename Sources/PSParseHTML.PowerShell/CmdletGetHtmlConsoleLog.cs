@@ -18,11 +18,15 @@ public sealed class CmdletGetHtmlConsoleLog : AsyncPSCmdlet {
     [Parameter(Position = 0, ValueFromPipeline = true)]
     public HtmlBrowserSession? Session { get; set; }
 
+    /// <summary>Optional severity filter.</summary>
+    [Parameter(Position = 1)]
+    public HtmlConsoleSeverity? Severity { get; set; }
+
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
-        WriteObject(HtmlBrowser.GetConsoleLog(session), true);
+        WriteObject(HtmlBrowser.GetConsoleLog(session, Severity), true);
         return Task.CompletedTask;
     }
 }
