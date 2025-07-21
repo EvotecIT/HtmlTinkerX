@@ -58,15 +58,12 @@ public sealed class HtmlResourceLink {
             throw new ArgumentNullException(nameof(path));
         }
 
-        string resolved = HtmlUtilities.ResolvePath(path);
+        string resolved = HtmlUtilities.EnsureDirectoryExists(path);
         if (Directory.Exists(resolved) || !Path.HasExtension(resolved)) {
-            Directory.CreateDirectory(resolved);
             string fileName = string.IsNullOrEmpty(Name)
                 ? (!string.IsNullOrEmpty(Source) ? Path.GetFileName(Source) : $"resource_{Index}")
                 : Name;
             resolved = Path.Combine(resolved, fileName);
-        } else {
-            Directory.CreateDirectory(Path.GetDirectoryName(resolved)!);
         }
 
         if (!string.IsNullOrEmpty(Content)) {

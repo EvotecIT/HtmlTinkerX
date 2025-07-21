@@ -34,11 +34,7 @@ public static partial class HtmlBrowser {
     /// <returns>A task representing the asynchronous operation.</returns>
     public static Task StopTracingAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        string full = HtmlUtilities.ResolvePath(path);
-        string? dir = Path.GetDirectoryName(full);
-        if (!string.IsNullOrEmpty(dir)) {
-            Directory.CreateDirectory(dir);
-        }
+        string full = HtmlUtilities.EnsureDirectoryExists(path);
         return session.Context.Tracing.StopAsync(new Microsoft.Playwright.TracingStopOptions { Path = full });
     }
 
@@ -51,11 +47,7 @@ public static partial class HtmlBrowser {
     /// <returns>A task that completes when the file has been written.</returns>
     public static Task ExportHarAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        string full = HtmlUtilities.ResolvePath(path);
-        string? dir = Path.GetDirectoryName(full);
-        if (!string.IsNullOrEmpty(dir)) {
-            Directory.CreateDirectory(dir);
-        }
+        string full = HtmlUtilities.EnsureDirectoryExists(path);
         var log = new {
             log = new {
                 version = "1.2",

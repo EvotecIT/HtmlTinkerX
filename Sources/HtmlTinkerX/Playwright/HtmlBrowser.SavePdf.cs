@@ -130,11 +130,7 @@ public static partial class HtmlBrowser {
             await page.WaitForTimeoutAsync(delayMs);
         }
 
-        string fullPath = HtmlUtilities.ResolvePath(path);
-        string? dir = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(dir)) {
-            Directory.CreateDirectory(dir);
-        }
+        string fullPath = HtmlUtilities.EnsureDirectoryExists(path);
         var options = new PagePdfOptions {
             Path = fullPath,
             Landscape = landscape,
