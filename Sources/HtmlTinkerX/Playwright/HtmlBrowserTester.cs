@@ -65,107 +65,8 @@ public static class HtmlBrowserTester {
                     // Set timeout
                     page.SetDefaultTimeout(timeout);
                     
-                    // Enhanced network monitoring - set up BEFORE navigation
-                    var networkEntries = new Dictionary<IRequest, HtmlNetworkEntryDetailed>();
-                    
-                    page.Request += (_, request) => {
-            var entry = new HtmlNetworkEntryDetailed {
-                Url = request.Url,
-                Method = HtmlEnumParser.ParseHttpMethod(request.Method),
-                RequestHeaders = new Dictionary<string, string>(request.Headers),
-                Started = DateTimeOffset.UtcNow,
-                ResourceType = DetermineResourceType(request),
-                Initiator = request.Failure ?? string.Empty,
-                PostData = request.PostData
-            };
-            
-            if (request.Headers.TryGetValue("content-length", out var reqSize)) {
-                if (long.TryParse(reqSize, out var size)) {
-                    entry.RequestHeadersSize = size;
-                }
-            }
-            
-            networkEntries[request] = entry;
-                    };
-                    
-                    page.Response += (_, response) => {
-            if (networkEntries.TryGetValue(response.Request, out var entry)) {
-                entry.Status = (System.Net.HttpStatusCode)response.Status;
-                entry.ResponseHeaders = new Dictionary<string, string>(response.Headers);
-                entry.ResponseReceived = DateTimeOffset.UtcNow;
-                entry.ContentType = response.Headers.TryGetValue("content-type", out var ct) ? ct : null;
-                entry.ContentEncoding = response.Headers.TryGetValue("content-encoding", out var ce) ? ce : null;
-                entry.ServedFromCache = response.FromServiceWorker;
-                
-                if (response.Headers.TryGetValue("content-length", out var respSize)) {
-                    if (long.TryParse(respSize, out var size)) {
-                        entry.ResponseBodySize = size;
-                    }
-                }
-                
-                // Calculate header sizes
-                entry.ResponseHeadersSize = response.Headers.Sum(h => h.Key.Length + h.Value.Length + 4); // +4 for ": " and "\r\n"
-            }
-                    };
-                    
-                    page.RequestFinished += (_, request) => {
-            if (networkEntries.TryGetValue(request, out var entry)) {
-                entry.Finished = DateTimeOffset.UtcNow;
-                result.NetworkEntries.Add(entry);
-            }
-                    };
-                    
-                    page.RequestFailed += (_, request) => {
-            if (networkEntries.TryGetValue(request, out var entry)) {
-                entry.Finished = DateTimeOffset.UtcNow;
-                entry.ErrorType = ParseNetworkError(request.Failure);
-                entry.ErrorMessage = request.Failure;
-                result.NetworkEntries.Add(entry);
-            }
-                    };
-                    
-                    // Enhanced console monitoring
-                    page.Console += async (_, msg) => {
-            var entry = new HtmlConsoleEntryDetailed {
-                Text = msg.Text,
-                Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
-                Timestamp = DateTimeOffset.UtcNow,
-                Location = msg.Location
-            };
-            
-            // Parse location string if available
-            if (!string.IsNullOrEmpty(msg.Location)) {
-                // Location format is typically "url:line:column"
-                var parts = msg.Location.Split(':');
-                if (parts.Length >= 2) {
-                    entry.SourceUrl = parts[0];
-                    if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 2], out var line)) {
-                        entry.LineNumber = line;
-                        if (int.TryParse(parts[parts.Length - 1], out var col)) {
-                            entry.ColumnNumber = col;
-                        }
-                    }
-                }
-            }
-            
-            // Extract stack trace for errors
-            if (entry.IsError || entry.IsWarning) {
-                try {
-                    var args = await Task.WhenAll(msg.Args.Select(async arg => {
-                        try {
-                            return await arg.JsonValueAsync<object>().ConfigureAwait(false);
-                        } catch {
-                            return null;
-                        }
-                    })).ConfigureAwait(false);
-                    entry.Arguments = args.Where(a => a != null).ToList()!;
-                } catch {
-                    // Ignore serialization errors
-                }
-            }
-            
-            result.ConsoleEntries.Add(entry);
-                    };
+                    // Enhanced network and console monitoring - set up BEFORE navigation
+                    var networkEntries = InitNetworkListeners(page, result);
                     
                     // Navigate and measure
                     try {
@@ -269,6 +170,115 @@ public static class HtmlBrowserTester {
         
         // Test the file URL
         return await TestUrlAsync(fileUrl, engine, headless, timeout);
+    }
+
+    /// <summary>
+    /// Initializes network and console listeners for the given page.
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="result">Result object to collect events.</param>
+    /// <returns>Dictionary tracking network entries.</returns>
+    private static IDictionary<IRequest, HtmlNetworkEntryDetailed> InitNetworkListeners(
+        IPage page,
+        HtmlBrowserTestResult result) {
+        var networkEntries = new Dictionary<IRequest, HtmlNetworkEntryDetailed>();
+
+        page.Request += (_, request) => {
+            var entry = new HtmlNetworkEntryDetailed {
+                Url = request.Url,
+                Method = HtmlEnumParser.ParseHttpMethod(request.Method),
+                RequestHeaders = new Dictionary<string, string>(request.Headers),
+                Started = DateTimeOffset.UtcNow,
+                ResourceType = DetermineResourceType(request),
+                Initiator = request.Failure ?? string.Empty,
+                PostData = request.PostData
+            };
+
+            if (request.Headers.TryGetValue("content-length", out var reqSize)) {
+                if (long.TryParse(reqSize, out var size)) {
+                    entry.RequestHeadersSize = size;
+                }
+            }
+
+            networkEntries[request] = entry;
+        };
+
+        page.Response += (_, response) => {
+            if (networkEntries.TryGetValue(response.Request, out var entry)) {
+                entry.Status = (System.Net.HttpStatusCode)response.Status;
+                entry.ResponseHeaders = new Dictionary<string, string>(response.Headers);
+                entry.ResponseReceived = DateTimeOffset.UtcNow;
+                entry.ContentType = response.Headers.TryGetValue("content-type", out var ct) ? ct : null;
+                entry.ContentEncoding = response.Headers.TryGetValue("content-encoding", out var ce) ? ce : null;
+                entry.ServedFromCache = response.FromServiceWorker;
+
+                if (response.Headers.TryGetValue("content-length", out var respSize)) {
+                    if (long.TryParse(respSize, out var size)) {
+                        entry.ResponseBodySize = size;
+                    }
+                }
+
+                // Calculate header sizes
+                entry.ResponseHeadersSize = response.Headers.Sum(h => h.Key.Length + h.Value.Length + 4); // +4 for ": " and "\r\n"
+            }
+        };
+
+        page.RequestFinished += (_, request) => {
+            if (networkEntries.TryGetValue(request, out var entry)) {
+                entry.Finished = DateTimeOffset.UtcNow;
+                result.NetworkEntries.Add(entry);
+            }
+        };
+
+        page.RequestFailed += (_, request) => {
+            if (networkEntries.TryGetValue(request, out var entry)) {
+                entry.Finished = DateTimeOffset.UtcNow;
+                entry.ErrorType = ParseNetworkError(request.Failure);
+                entry.ErrorMessage = request.Failure;
+                result.NetworkEntries.Add(entry);
+            }
+        };
+
+        page.Console += async (_, msg) => {
+            var entry = new HtmlConsoleEntryDetailed {
+                Text = msg.Text,
+                Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
+                Timestamp = DateTimeOffset.UtcNow,
+                Location = msg.Location
+            };
+
+            if (!string.IsNullOrEmpty(msg.Location)) {
+                var parts = msg.Location.Split(':');
+                if (parts.Length >= 2) {
+                    entry.SourceUrl = parts[0];
+                    if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 2], out var line)) {
+                        entry.LineNumber = line;
+                        if (int.TryParse(parts[parts.Length - 1], out var col)) {
+                            entry.ColumnNumber = col;
+                        }
+                    }
+                }
+            }
+
+            if (entry.IsError || entry.IsWarning) {
+                try {
+                    var args = await Task.WhenAll(msg.Args.Select(async arg => {
+                        try {
+                            return await arg.JsonValueAsync<object>().ConfigureAwait(false);
+                        } catch {
+                            return null;
+                        }
+                    })).ConfigureAwait(false);
+                    entry.Arguments = args.Where(a => a != null).ToList()!;
+                } catch {
+                    // Ignore serialization errors
+                }
+            }
+
+            result.ConsoleEntries.Add(entry);
+        };
+
+        return networkEntries;
     }
     
     private static HtmlNetworkResourceType DetermineResourceType(IRequest request) {
