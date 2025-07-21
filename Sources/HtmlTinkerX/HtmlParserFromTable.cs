@@ -47,155 +47,174 @@ public static class HtmlParserFromTable {
         for (int tableIndex = 0; tableIndex < tables.Length; tableIndex++) {
             var table = tables[tableIndex];
             var result = new HtmlTableResult();
-            var metadata = result.Metadata;
+            var (metadata, rows, startIndex) = ReadTableMetadata(table, tableIndex, replaceHeaders, skipFooter, cleanHeaders);
 
-            // Extract metadata
-            metadata.TableIndex = tableIndex;
-            metadata.Id = table.Id;
-            metadata.Classes = table.ClassName;
-
-            // Extract all attributes
-            foreach (var attr in table.Attributes) {
-                metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
-            }
-
-            // Check visibility (simple check for display:none)
-            var style = table.GetAttribute("style") ?? string.Empty;
-            var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
-            var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
-            metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
-
-            IElement[] rows = table.QuerySelectorAll("tr").ToArray();
-            if (skipFooter) {
-                rows = rows.Where(row => row.Closest("tfoot") is null).ToArray();
-            }
-            metadata.RowCount = rows.Length;
-
-            if (rows.Length == 0) {
+            if (rows.Length == 0 || metadata.Headers.Count == 0) {
                 continue;
             }
 
-            int headerRowIndex = 0;
-            bool hasHeader = false;
-            for (int i = 0; i < rows.Length; i++) {
-                if (rows[i].QuerySelectorAll("th").Length > 0) {
-                    headerRowIndex = i;
-                    hasHeader = true;
-                    break;
-                }
-            }
-            var headerRow = rows[headerRowIndex];
-            var headerCells = headerRow.QuerySelectorAll("th,td");
-            List<string> headers = new();
-            if (hasHeader) {
-                foreach (var cell in headerCells) {
-                    if (cell == null) {
-                        continue;
-                    }
-                    string header = cell.TextContent.Trim();
-                    if (replaceHeaders != null) {
-                        foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
-                        }
-                    }
-                    if (cleanHeaders) {
-                        header = HtmlParser.CleanHeaderName(header);
-                    }
-                    int colspan = 1;
-                    if (int.TryParse(cell.GetAttribute("colspan"), out int cspan)) {
-                        colspan = cspan;
-                    }
-                    for (int c = 0; c < colspan; c++) {
-                        headers.Add(header);
-                    }
-                }
-            } else {
-                for (int i = 0; i < headerCells.Length; i++) {
-                    headers.Add($"Column{i + 1}");
-                }
-            }
-
-            HtmlParser.EnsureUniqueNames(headers);
-            metadata.Headers = headers;
-            metadata.ColumnCount = headers.Count;
-
-            if (headers.Count == 0) {
-                continue;
-            }
-
-            int startIndex = hasHeader ? headerRowIndex + 1 : 0;
-            List<Dictionary<string, string?>> tableRows = new();
-            Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
-            foreach (var row in rows.Skip(startIndex)) {
-                if (row == null) {
-                    continue;
-                }
-                var cells = row.QuerySelectorAll("th,td");
-                string?[] rowValues = new string?[headers.Count];
-                int col = 0;
-                int cellIndex = 0;
-                while (col < headers.Count) {
-                    if (rowSpans.TryGetValue(col, out var span)) {
-                        rowValues[col] = span.Value;
-                        if (--span.Remaining == 0) {
-                            rowSpans.Remove(col);
-                        } else {
-                            rowSpans[col] = span;
-                        }
-                        col++;
-                        continue;
-                    }
-
-                    if (cellIndex < cells.Length) {
-                        var cell = cells[cellIndex++];
-                        string? value = cell.TextContent.Trim();
-                        if (replaceContent != null) {
-                            foreach (var kv in replaceContent) {
-                                value = value.Replace(kv.Key, kv.Value);
-                            }
-                        }
-                        if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
-                            value = emptyValuePlaceholder ?? string.Empty;
-                        }
-                        int colspan = 1;
-                        int rowspan = 1;
-                        if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
-                            colspan = cs;
-                        }
-                        if (int.TryParse(cell.GetAttribute("rowspan"), out int rs)) {
-                            rowspan = rs;
-                        }
-                        for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                            rowValues[col] = value;
-                            if (rowspan > 1) {
-                                rowSpans[col] = (value, rowspan - 1);
-                            }
-                        }
-                    } else {
-                        if (allProperties) {
-                            rowValues[col] = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
-                        }
-                        col++;
-                    }
-                }
-
-                Dictionary<string, string?> dict = new();
-                for (int i = 0; i < headers.Count; i++) {
-                    string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
-                }
-                if (dict.Count > 0) {
-                    tableRows.Add(dict);
-                }
-            }
-
+            var tableRows = ParseTableRows(rows, startIndex, metadata.Headers, replaceContent, allProperties, emptyValuePlaceholder);
             if (tableRows.Count > 0) {
+                result.Metadata = metadata;
                 result.Data = tableRows;
                 results.Add(result);
             }
         }
 
         return results;
+    }
+
+    internal static (HtmlTableMetadata Metadata, IElement[] Rows, int StartIndex) ReadTableMetadata(
+        IElement table,
+        int tableIndex,
+        IDictionary<string, string>? replaceHeaders,
+        bool skipFooter,
+        bool cleanHeaders) {
+        var metadata = new HtmlTableMetadata {
+            TableIndex = tableIndex,
+            Id = table.Id,
+            Classes = table.ClassName
+        };
+
+        foreach (var attr in table.Attributes) {
+            metadata.Attributes[attr.Name] = attr.Value ?? string.Empty;
+        }
+
+        var style = table.GetAttribute("style") ?? string.Empty;
+        var containsDisplayNone = style.IndexOf("display:none", StringComparison.OrdinalIgnoreCase) >= 0;
+        var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
+        metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
+
+        IElement[] rows = table.QuerySelectorAll("tr").ToArray();
+        if (skipFooter) {
+            rows = rows.Where(r => r.Closest("tfoot") is null).ToArray();
+        }
+        metadata.RowCount = rows.Length;
+
+        if (rows.Length == 0) {
+            return (metadata, rows, 0);
+        }
+
+        int headerRowIndex = 0;
+        bool hasHeader = false;
+        for (int i = 0; i < rows.Length; i++) {
+            if (rows[i].QuerySelectorAll("th").Length > 0) {
+                headerRowIndex = i;
+                hasHeader = true;
+                break;
+            }
+        }
+        var headerRow = rows[headerRowIndex];
+        var headerCells = headerRow.QuerySelectorAll("th,td");
+        List<string> headers = new();
+        if (hasHeader) {
+            foreach (var cell in headerCells) {
+                if (cell == null) {
+                    continue;
+                }
+                string header = cell.TextContent.Trim();
+                if (replaceHeaders != null) {
+                    foreach (var kv in replaceHeaders) {
+                        header = header.Replace(kv.Key, kv.Value);
+                    }
+                }
+                if (cleanHeaders) {
+                    header = HtmlParser.CleanHeaderName(header);
+                }
+                int colspan = 1;
+                if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
+                    colspan = cs;
+                }
+                for (int c = 0; c < colspan; c++) {
+                    headers.Add(header);
+                }
+            }
+        } else {
+            for (int i = 0; i < headerCells.Length; i++) {
+                headers.Add($"Column{i + 1}");
+            }
+        }
+
+        HtmlParser.EnsureUniqueNames(headers);
+        metadata.Headers = headers;
+        metadata.ColumnCount = headers.Count;
+
+        int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+        return (metadata, rows, startIndex);
+    }
+
+    internal static List<Dictionary<string, string?>> ParseTableRows(
+        IElement[] rows,
+        int startIndex,
+        List<string> headers,
+        IDictionary<string, string>? replaceContent,
+        bool allProperties,
+        string? emptyValuePlaceholder) {
+        List<Dictionary<string, string?>> tableRows = new();
+        Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
+        foreach (var row in rows.Skip(startIndex)) {
+            if (row == null) {
+                continue;
+            }
+            var cells = row.QuerySelectorAll("th,td");
+            string?[] rowValues = new string?[headers.Count];
+            int col = 0;
+            int cellIndex = 0;
+            while (col < headers.Count) {
+                if (rowSpans.TryGetValue(col, out var span)) {
+                    rowValues[col] = span.Value;
+                    if (--span.Remaining == 0) {
+                        rowSpans.Remove(col);
+                    } else {
+                        rowSpans[col] = span;
+                    }
+                    col++;
+                    continue;
+                }
+
+                if (cellIndex < cells.Length) {
+                    var cell = cells[cellIndex++];
+                    string? value = cell.TextContent.Trim();
+                    if (replaceContent != null) {
+                        foreach (var kv in replaceContent) {
+                            value = value.Replace(kv.Key, kv.Value);
+                        }
+                    }
+                    if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
+                        value = emptyValuePlaceholder ?? string.Empty;
+                    }
+                    int colspan = 1;
+                    int rowspan = 1;
+                    if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
+                        colspan = cs;
+                    }
+                    if (int.TryParse(cell.GetAttribute("rowspan"), out int rs)) {
+                        rowspan = rs;
+                    }
+                    for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
+                        rowValues[col] = value;
+                        if (rowspan > 1) {
+                            rowSpans[col] = (value, rowspan - 1);
+                        }
+                    }
+                } else {
+                    if (allProperties) {
+                        rowValues[col] = string.IsNullOrEmpty(emptyValuePlaceholder) ? null : emptyValuePlaceholder;
+                    }
+                    col++;
+                }
+            }
+
+            Dictionary<string, string?> dict = new();
+            for (int i = 0; i < headers.Count; i++) {
+                string header = headers[i];
+                dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
+            }
+            if (dict.Count > 0) {
+                tableRows.Add(dict);
+            }
+        }
+        return tableRows;
     }
 
     /// <summary>
