@@ -136,4 +136,11 @@ public class HtmlUtilitiesTests {
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
     }
+
+    [Fact]
+    public void RemoveRedundantWhitespace_CollapsesWhitespace() {
+        const string html = "<div>   Hello  </div>  <span>  World</span>";
+        string result = HtmlUtilities.RemoveRedundantWhitespace(html);
+        Assert.Equal("<div> Hello </div><span> World</span>", result);
+    }
 }
