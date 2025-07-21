@@ -77,7 +77,10 @@ public static class HtmlHarViewer {
     /// </example>
     public static async Task<Har> ReadHarAsync(string path) {
         string json = await HtmlUtilities.ReadFileCheckedAsync(path).ConfigureAwait(false);
-        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var opts = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
         try {
             Har? har = JsonSerializer.Deserialize<Har>(json, opts);
             return har ?? throw new InvalidDataException("Invalid HAR content");
