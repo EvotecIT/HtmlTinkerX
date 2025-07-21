@@ -47,7 +47,7 @@
 
 
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
-        <DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
+        <DefineConstants>$(DefineConstants);NETFRAMEWORK;FRAMEWORK</DefineConstants>
     </PropertyGroup>
 
 </Project>
