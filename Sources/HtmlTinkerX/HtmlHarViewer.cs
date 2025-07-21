@@ -131,7 +131,44 @@ for (const e of entries) {
 }
 </script>
 </body>
-</html>
+        </html>
 """;
+    }
+
+    /// <summary>
+    /// Writes the provided HAR data to the given stream.
+    /// </summary>
+    /// <param name="har">HAR object to serialize.</param>
+    /// <param name="outputStream">Destination stream.</param>
+    /// <returns>A task that completes when writing is finished.</returns>
+    /// <example>
+    /// <code>
+    /// await using FileStream fs = File.Create("copy.har");
+    /// await HtmlHarViewer.WriteHarAsync(har, fs);
+    /// </code>
+    /// </example>
+    public static async Task WriteHarAsync(Har har, Stream outputStream) {
+        if (har == null) {
+            throw new ArgumentNullException(nameof(har));
+        }
+        if (outputStream == null) {
+            throw new ArgumentNullException(nameof(outputStream));
+        }
+
+        var opts = new JsonSerializerOptions {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        string json = JsonSerializer.Serialize(har, opts);
+#if NETSTANDARD2_0 || FRAMEWORK
+        using (var writer = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false), 1024, leaveOpen: true)) {
+            await writer.WriteAsync(json).ConfigureAwait(false);
+            await writer.FlushAsync().ConfigureAwait(false);
+        }
+#else
+        await using var writer = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false), 1024, leaveOpen: true);
+        await writer.WriteAsync(json).ConfigureAwait(false);
+        await writer.FlushAsync().ConfigureAwait(false);
+#endif
     }
 }

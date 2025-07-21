@@ -75,4 +75,24 @@ public class HtmlHarViewerTests {
             File.Delete(path);
         }
     }
+
+    [Fact]
+    /// <summary>
+    /// Serializes a HAR to a stream.
+    /// </summary>
+    public async Task WriteHarAsync_WritesJson() {
+        Har har = await HtmlHarViewer.ReadHarAsync(GetMinimalHarPath());
+        using var ms = new MemoryStream();
+        await HtmlHarViewer.WriteHarAsync(har, ms);
+        ms.Position = 0;
+        using var reader = new StreamReader(ms);
+        string json = await reader.ReadToEndAsync();
+        var opts = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
+        Assert.NotNull(parsed);
+        Assert.Equal(har.Log?.Entries?.Length, parsed.Log?.Entries?.Length);
+    }
 }
