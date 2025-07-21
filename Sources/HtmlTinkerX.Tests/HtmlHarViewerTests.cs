@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using System.Text.Json;
 
 namespace HtmlTinkerX.Tests;
 
@@ -24,6 +25,26 @@ public class HtmlHarViewerTests {
         Har har = await HtmlHarViewer.ReadHarAsync(GetHarPath());
         string html = HtmlHarViewer.BuildViewerHtml(har);
         Assert.Contains("<table>", html);
+    }
+
+    [Fact]
+    /// <summary>
+    /// Ensures the generated viewer embeds valid JSON data.
+    /// </summary>
+    public async Task BuildViewerHtml_EmbedsValidJson() {
+        Har har = await HtmlHarViewer.ReadHarAsync(GetMinimalHarPath());
+        string html = HtmlHarViewer.BuildViewerHtml(har);
+        int idx = html.IndexOf("const har =", StringComparison.Ordinal);
+        Assert.NotEqual(-1, idx);
+        int start = html.IndexOf('{', idx);
+        int end = html.IndexOf("};", start, StringComparison.Ordinal);
+        string json = html.Substring(start, end - start + 1);
+        var opts = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
+        Assert.NotNull(parsed);
     }
 
     [Fact]
