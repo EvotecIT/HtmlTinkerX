@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace HtmlTinkerX;
@@ -10,6 +11,11 @@ public static partial class HtmlBrowser {
     /// Returns console log captured in the specified session.
     /// </summary>
     /// <param name="session">Browser session containing console log entries.</param>
-    public static IEnumerable<HtmlConsoleEntry> GetConsoleLog(HtmlBrowserSession session)
-        => session.ConsoleLog;
+    public static IEnumerable<HtmlConsoleEntry> GetConsoleLog(HtmlBrowserSession session) {
+        if (session == null) {
+            throw new ArgumentNullException(nameof(session));
+        }
+
+        return session.ConsoleLog;
+    }
 }

@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
 using Xunit;
+using System;
 
 namespace HtmlTinkerX.Tests;
 
@@ -27,5 +28,10 @@ public class HtmlBrowserConsoleLogTests {
         Assert.Equal(HtmlConsoleMessageType.Log, entry.Type);
         Assert.Equal("file.js:1:2", entry.Location);
         await session.DisposeAsync();
+    }
+
+    [Fact]
+    public void GetConsoleLog_NullSession_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlBrowser.GetConsoleLog(null!));
     }
 }
