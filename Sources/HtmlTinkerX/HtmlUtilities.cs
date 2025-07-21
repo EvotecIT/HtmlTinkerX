@@ -26,6 +26,23 @@ public static class HtmlUtilities {
     }
 
     /// <summary>
+    /// Ensures the directory for the specified path exists and returns the
+    /// resolved absolute path.
+    /// </summary>
+    /// <param name="path">Directory or file path.</param>
+    /// <returns>The resolved absolute path.</returns>
+    public static string EnsureDirectoryExists(string path) {
+        string fullPath = ResolvePath(path);
+        string? dir = Directory.Exists(fullPath) || !Path.HasExtension(fullPath)
+            ? fullPath
+            : Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(dir)) {
+            Directory.CreateDirectory(dir);
+        }
+        return fullPath;
+    }
+
+    /// <summary>
     /// Reads the contents of a file after verifying that it exists.
     /// </summary>
     /// <param name="path">Path to the file.</param>

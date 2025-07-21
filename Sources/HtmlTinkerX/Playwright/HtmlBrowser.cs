@@ -94,9 +94,8 @@ public static partial class HtmlBrowser {
         }
 
         if (!string.IsNullOrEmpty(videoPath)) {
-            string resolved = HtmlUtilities.ResolvePath(videoPath!);
+            string resolved = HtmlUtilities.EnsureDirectoryExists(videoPath!);
             string dir = Path.GetDirectoryName(resolved) ?? resolved;
-            Directory.CreateDirectory(dir);
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
         }

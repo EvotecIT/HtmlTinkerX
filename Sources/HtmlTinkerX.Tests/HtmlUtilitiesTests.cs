@@ -112,4 +112,28 @@ public class HtmlUtilitiesTests {
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
         Assert.Equal("<meta charset=\"UTF-16\">Hello", result);
     }
+
+    [Fact]
+    public void EnsureDirectoryExists_CreatesMissingDirectory() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try {
+            string full = HtmlUtilities.EnsureDirectoryExists(dir);
+            Assert.True(Directory.Exists(full));
+        } finally {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void EnsureDirectoryExists_CreatesParentForFile() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string file = Path.Combine(dir, "test.txt");
+        try {
+            string full = HtmlUtilities.EnsureDirectoryExists(file);
+            Assert.True(Directory.Exists(Path.GetDirectoryName(full)!));
+            Assert.Equal(Path.GetFullPath(file), full);
+        } finally {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
 }

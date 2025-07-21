@@ -52,8 +52,7 @@ public static partial class HtmlBrowser {
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async IAsyncEnumerable<string> SavePageDownloadsAsync(IPage page, string directory, string? filter = null, [EnumeratorCancellation] CancellationToken cancellationToken = default) {
 
-        string dir = HtmlUtilities.ResolvePath(directory);
-        Directory.CreateDirectory(dir);
+        string dir = HtmlUtilities.EnsureDirectoryExists(directory);
         HashSet<string> downloads = new();
         List<Task> saveTasks = new();
         object sync = new();

@@ -118,11 +118,7 @@ public static partial class HtmlBrowser {
             }
         }
 
-        string fullPath = HtmlUtilities.ResolvePath(path);
-        string? dir = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(dir)) {
-            Directory.CreateDirectory(dir);
-        }
+        string fullPath = HtmlUtilities.EnsureDirectoryExists(path);
         var pwOptions = new PageScreenshotOptions { FullPage = options.FullPage };
         pwOptions.Type = options.Format == ImageFormat.Jpeg ? ScreenshotType.Jpeg : ScreenshotType.Png;
         if (pwOptions.Type == ScreenshotType.Jpeg) {

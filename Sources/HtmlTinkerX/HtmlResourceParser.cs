@@ -105,8 +105,7 @@ public static class HtmlResourceParser {
             throw new ArgumentNullException(nameof(directory));
         }
 
-        string dir = HtmlUtilities.ResolvePath(directory);
-        Directory.CreateDirectory(dir);
+        string dir = HtmlUtilities.EnsureDirectoryExists(directory);
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         List<string> paths = new();
 
