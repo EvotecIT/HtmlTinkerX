@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using AngleSharp.Dom;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -21,5 +22,15 @@ public class HtmlMicrodataTests {
         Assert.Single(mismatches);
         Assert.Equal("https://schema.org/Person", mismatches[0].Type);
         Assert.Contains("foo", mismatches[0].Properties);
+    }
+
+    [Fact]
+    public void MicrodataParser_ExtractItems_ReturnsExpected() {
+        const string html = "<div itemscope itemtype=\"https://schema.org/Product\"><span itemprop=\"name\">Widget</span></div>";
+        IDocument doc = HtmlParser.ParseWithAngleSharp(html);
+        var items = MicrodataParser.ExtractItems(doc);
+        Assert.Single(items);
+        Assert.Equal("https://schema.org/Product", items[0].Type);
+        Assert.Equal("Widget", items[0].Properties["name"][0]);
     }
 }
