@@ -131,4 +131,20 @@ public static class HtmlUtilities {
         // Default to UTF-8 if no encoding could be determined
         return System.Text.Encoding.UTF8.GetString(bytes);
     }
+
+    /// <summary>
+    /// Removes redundant whitespace from the provided HTML string.
+    /// </summary>
+    /// <param name="html">HTML markup to normalize.</param>
+    /// <returns>Markup with collapsed whitespace.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="html"/> is null.</exception>
+    public static string RemoveRedundantWhitespace(string html) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        string collapsed = System.Text.RegularExpressions.Regex.Replace(html, "\\s+", " ");
+        collapsed = System.Text.RegularExpressions.Regex.Replace(collapsed, @">\s+<", "><");
+        return collapsed.Trim();
+    }
 }
