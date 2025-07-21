@@ -13,6 +13,151 @@ namespace HtmlTinkerX;
 /// </summary>
 public static partial class HtmlBrowser {
     internal static Func<Task<IPlaywright>>? PlaywrightFactory { get; set; }
+
+    private static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
+        HtmlBrowserEngine browser,
+        bool clean,
+        bool headless,
+        int slowMo,
+        string? proxy,
+        string? proxyUsername,
+        string? proxyPassword,
+        CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (clean) {
+            CleanInstallDir();
+        }
+
+        await EnsureInstalledAsync(browser).ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var playwright = PlaywrightFactory != null
+            ? await PlaywrightFactory().ConfigureAwait(false)
+            : await Playwright.CreateAsync();
+
+        IBrowserType type = browser switch {
+            HtmlBrowserEngine.Firefox => playwright.Firefox,
+            HtmlBrowserEngine.WebKit => playwright.Webkit,
+            _ => playwright.Chromium,
+        };
+
+        var launchOptions = new BrowserTypeLaunchOptions {
+            Headless = headless,
+            SlowMo = slowMo
+        };
+
+        if (!string.IsNullOrEmpty(proxy)) {
+            launchOptions.Proxy = new Proxy {
+                Server = proxy!,
+                Username = proxyUsername,
+                Password = proxyPassword
+            };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var browserInstance = await type.LaunchAsync(launchOptions);
+        return (playwright, browserInstance);
+    }
+
+    private static async Task<(IBrowserContext Context, IPage Page)> CreateBrowserContextAsync(
+        IBrowser browserInstance,
+        string? username,
+        string? password,
+        HtmlFormLogin? formLogin,
+        string? videoPath,
+        int videoWidth,
+        int videoHeight,
+        string? storageStatePath,
+        string? userAgent,
+        int? viewportWidth,
+        int? viewportHeight,
+        float? deviceScaleFactor,
+        double? geoLatitude,
+        double? geoLongitude,
+        string? timezone,
+        CancellationToken cancellationToken) {
+        BrowserNewContextOptions? contextOptions = null;
+        if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
+            contextOptions = new BrowserNewContextOptions {
+                HttpCredentials = new HttpCredentials {
+                    Username = username!,
+                    Password = password!
+                }
+            };
+        }
+
+        contextOptions ??= new BrowserNewContextOptions();
+        contextOptions.IgnoreHTTPSErrors = true;
+
+        if (!string.IsNullOrEmpty(storageStatePath)) {
+            contextOptions.StorageStatePath = storageStatePath;
+        }
+
+        if (!string.IsNullOrEmpty(videoPath)) {
+            string resolved = HtmlUtilities.ResolvePath(videoPath!);
+            string dir = Path.GetDirectoryName(resolved) ?? resolved;
+            Directory.CreateDirectory(dir);
+            contextOptions.RecordVideoDir = dir;
+            contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
+        }
+
+        if (!string.IsNullOrEmpty(userAgent)) {
+            contextOptions.UserAgent = userAgent;
+        }
+
+        if (viewportWidth.HasValue && viewportHeight.HasValue) {
+            contextOptions.ViewportSize = new ViewportSize { Width = viewportWidth.Value, Height = viewportHeight.Value };
+        }
+
+        if (deviceScaleFactor.HasValue) {
+            contextOptions.DeviceScaleFactor = deviceScaleFactor.Value;
+        }
+
+        if (geoLatitude.HasValue && geoLongitude.HasValue) {
+            contextOptions.Geolocation = new Geolocation {
+                Latitude = (float)geoLatitude.Value,
+                Longitude = (float)geoLongitude.Value,
+                Accuracy = 0
+            };
+            contextOptions.Permissions = new[] { "geolocation" };
+        }
+
+        if (!string.IsNullOrEmpty(timezone)) {
+            contextOptions.TimezoneId = timezone;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var context = await browserInstance.NewContextAsync(contextOptions);
+        var page = await context.NewPageAsync();
+        return (context, page);
+    }
+
+    private static async Task NavigateAsync(
+        IPage page,
+        string url,
+        HtmlFormLogin? formLogin,
+        string? username,
+        string? password,
+        int timeout,
+        CancellationToken cancellationToken) {
+        if (formLogin != null) {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+            if (username != null) {
+                await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
+            }
+            if (password != null) {
+                await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
+            }
+            await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+    }
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
     /// </summary>
@@ -41,81 +186,33 @@ public static partial class HtmlBrowser {
         string? timezone = null,
         int timeout = 10000,
         CancellationToken cancellationToken = default) {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (clean) {
-            CleanInstallDir();
-        }
+        var (playwright, browserInstance) = await LaunchBrowserAsync(
+            browser,
+            clean,
+            headless,
+            slowMo,
+            proxy,
+            proxyUsername,
+            proxyPassword,
+            cancellationToken);
 
-        await EnsureInstalledAsync(browser).ConfigureAwait(false);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
-        IBrowserType type = browser switch {
-            HtmlBrowserEngine.Firefox => playwright.Firefox,
-            HtmlBrowserEngine.WebKit => playwright.Webkit,
-            _ => playwright.Chromium,
-        };
-
-        var launchOptions = new BrowserTypeLaunchOptions {
-            Headless = headless,
-            SlowMo = slowMo
-        };
-        if (!string.IsNullOrEmpty(proxy)) {
-            launchOptions.Proxy = new Proxy {
-                Server = proxy!,
-                Username = proxyUsername,
-                Password = proxyPassword
-            };
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        var browserInstance = await type.LaunchAsync(launchOptions);
-        BrowserNewContextOptions? contextOptions = null;
-        if (formLogin == null && !string.IsNullOrEmpty(username) && password != null) {
-            contextOptions = new BrowserNewContextOptions {
-                HttpCredentials = new HttpCredentials {
-                    Username = username!,
-                    Password = password!
-                }
-            };
-        }
-        contextOptions ??= new BrowserNewContextOptions();
-        contextOptions.IgnoreHTTPSErrors = true;
-        if (!string.IsNullOrEmpty(storageStatePath)) {
-            contextOptions.StorageStatePath = storageStatePath;
-        }
-        if (!string.IsNullOrEmpty(videoPath)) {
-            string resolved = HtmlUtilities.ResolvePath(videoPath!);
-            string dir = Path.GetDirectoryName(resolved) ?? resolved;
-            Directory.CreateDirectory(dir);
-            contextOptions.RecordVideoDir = dir;
-            contextOptions.RecordVideoSize = new RecordVideoSize { Width = videoWidth, Height = videoHeight };
-        }
-        if (!string.IsNullOrEmpty(userAgent)) {
-            contextOptions.UserAgent = userAgent;
-        }
-        if (viewportWidth.HasValue && viewportHeight.HasValue) {
-            contextOptions.ViewportSize = new ViewportSize { Width = viewportWidth.Value, Height = viewportHeight.Value };
-        }
-        if (deviceScaleFactor.HasValue) {
-            contextOptions.DeviceScaleFactor = deviceScaleFactor.Value;
-        }
-        if (geoLatitude.HasValue && geoLongitude.HasValue) {
-            contextOptions.Geolocation = new Geolocation {
-                Latitude = (float)geoLatitude.Value,
-                Longitude = (float)geoLongitude.Value,
-                Accuracy = 0
-            };
-            contextOptions.Permissions = new[] { "geolocation" };
-        }
-        if (!string.IsNullOrEmpty(timezone)) {
-            contextOptions.TimezoneId = timezone;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var context = await browserInstance.NewContextAsync(contextOptions);
-        var page = await context.NewPageAsync();
+        var (context, page) = await CreateBrowserContextAsync(
+            browserInstance,
+            username,
+            password,
+            formLogin,
+            videoPath,
+            videoWidth,
+            videoHeight,
+            storageStatePath,
+            userAgent,
+            viewportWidth,
+            viewportHeight,
+            deviceScaleFactor,
+            geoLatitude,
+            geoLongitude,
+            timezone,
+            cancellationToken);
 
         var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
         HtmlBrowserSession session = new(
@@ -127,23 +224,7 @@ public static partial class HtmlBrowser {
             videoPath,
             network);
 
-        if (formLogin != null) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-            if (username != null) {
-                await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
-            }
-            if (password != null) {
-                await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
-            }
-            await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+        await NavigateAsync(page, url, formLogin, username, password, timeout, cancellationToken);
 
         return session;
     }
