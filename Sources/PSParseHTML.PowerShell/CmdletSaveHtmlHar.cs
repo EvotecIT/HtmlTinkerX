@@ -42,7 +42,7 @@ public sealed class CmdletSaveHtmlHar : AsyncPSCmdlet {
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
         if (ParameterSetName == ParameterSetHar) {
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
             using FileStream fs = File.Create(OutFile);
             await HtmlHarViewer.WriteHarAsync(Har ?? throw new PSArgumentNullException(nameof(Har)), fs).ConfigureAwait(false);
 #else

@@ -160,7 +160,7 @@ for (const e of entries) {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
         string json = JsonSerializer.Serialize(har, opts);
-#if NETSTANDARD2_0 || FRAMEWORK
+#if NETSTANDARD2_0 || NETFRAMEWORK
         using (var writer = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false), 1024, leaveOpen: true)) {
             await writer.WriteAsync(json).ConfigureAwait(false);
             await writer.FlushAsync().ConfigureAwait(false);
