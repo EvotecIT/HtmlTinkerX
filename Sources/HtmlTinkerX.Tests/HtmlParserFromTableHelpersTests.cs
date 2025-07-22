@@ -29,4 +29,15 @@ public class HtmlParserFromTableHelpersTests {
         Assert.Equal("1", row["A"]);
         Assert.Equal("2", row["B"]);
     }
+
+    [Fact]
+    public void ReadTableMetadata_NoThead_DoesNotThrow() {
+        const string html = "<table><tbody><tr><td>1</td><td>2</td></tr></tbody></table>";
+        var doc = HtmlParser.ParseWithAngleSharp(html);
+        var table = doc.QuerySelector("table")!;
+        var (meta, rows, _) = HtmlParserFromTable.ReadTableMetadata(table, 0, null, false, false);
+        Assert.Equal(2, meta.ColumnCount);
+        Assert.Equal(new[] { "Column1", "Column2" }, meta.Headers);
+        Assert.Equal(1, meta.RowCount);
+    }
 }

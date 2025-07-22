@@ -97,11 +97,22 @@ public static class HtmlParserFromTable {
 
         int headerRowIndex = 0;
         bool hasHeader = false;
-        for (int i = 0; i < rows.Length; i++) {
-            if (rows[i].QuerySelectorAll("th").Length > 0) {
-                headerRowIndex = i;
-                hasHeader = true;
-                break;
+        IElement? theadRow = table.QuerySelector("thead tr");
+        if (theadRow != null) {
+            int idx = Array.IndexOf(rows, theadRow);
+            if (idx >= 0) {
+                headerRowIndex = idx;
+                hasHeader = theadRow.QuerySelectorAll("th").Length > 0;
+            }
+        }
+
+        if (!hasHeader) {
+            for (int i = 0; i < rows.Length; i++) {
+                if (rows[i].QuerySelectorAll("th").Length > 0) {
+                    headerRowIndex = i;
+                    hasHeader = true;
+                    break;
+                }
             }
         }
         var headerRow = rows[headerRowIndex];
