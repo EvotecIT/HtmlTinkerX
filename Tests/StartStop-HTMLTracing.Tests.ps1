@@ -21,4 +21,18 @@ describe 'HTML Tracing and HAR' {
         (Test-Path $har) | Should -BeTrue
         Close-HTMLSession -Session $session
     }
+
+    it 'Writes a HAR object to a file' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $session = Invoke-HTMLRendering -Url $uri -Session
+        Invoke-HTMLNavigation -Session $session -Url $uri
+        $harTemp = Join-Path $TestDrive 'temp.har'
+        Save-HTMLHar -Session $session -OutFile $harTemp
+        $harObj = Show-HTMLHar -Path $harTemp
+        $copy = Join-Path $TestDrive 'copy.har'
+        Save-HTMLHar -Har $harObj -OutFile $copy
+        (Test-Path $copy) | Should -BeTrue
+        Close-HTMLSession -Session $session
+    }
 }
