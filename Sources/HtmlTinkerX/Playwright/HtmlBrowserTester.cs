@@ -206,6 +206,9 @@ public static class HtmlBrowserTester {
         page.Response += (_, response) => {
             if (networkEntries.TryGetValue(response.Request, out var entry)) {
                 entry.Status = (System.Net.HttpStatusCode)response.Status;
+                entry.ProtocolVersion = response.GetType()
+                    .GetProperty("Protocol")?
+                    .GetValue(response) as string;
                 entry.ResponseHeaders = new Dictionary<string, string>(response.Headers);
                 entry.ResponseReceived = DateTimeOffset.UtcNow;
                 entry.ContentType = response.Headers.TryGetValue("content-type", out var ct) ? ct : null;

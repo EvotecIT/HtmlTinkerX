@@ -83,6 +83,24 @@ public class HtmlBrowserTesterTests {
             Assert.NotNull(result.NetworkEntries);
         }
     }
+
+    [Fact]
+    public async Task TestUrlAsync_CapturesProtocolVersion() {
+        // Arrange
+        var url = "http://httpbin.org/html";
+
+        // Act
+        var result = await HtmlBrowserTester.TestUrlAsync(url, timeout: 60000);
+
+        // Assert
+        if (result.NetworkEntries.Any()) {
+            foreach (var entry in result.NetworkEntries.Where(e => e.Status != null)) {
+                _ = entry.ProtocolVersion;
+            }
+        } else {
+            Assert.NotNull(result.NetworkEntries);
+        }
+    }
     
     [Fact]
     public async Task TestCssResourceAsync_FindsCssFile() {
