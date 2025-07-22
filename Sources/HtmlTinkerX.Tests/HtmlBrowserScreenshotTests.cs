@@ -4,6 +4,9 @@ using Moq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats;
+using System.Reflection;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -111,5 +114,16 @@ public class HtmlBrowserScreenshotTests {
 
         File.Delete(file);
         Directory.Delete(dir);
+    }
+
+    [Theory]
+    [InlineData(100, 0)]
+    [InlineData(50, 5)]
+    [InlineData(0, 9)]
+    public void GetEncoder_MapsQualityToCompression(int quality, int expected) {
+        MethodInfo method = typeof(HtmlBrowser).GetMethod("GetEncoder", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var encoder = (IImageEncoder)method.Invoke(null, new object[] { ImageFormat.Png, quality })!;
+        var png = Assert.IsType<PngEncoder>(encoder);
+        Assert.Equal(expected, (int)png.CompressionLevel);
     }
 }

@@ -175,6 +175,21 @@ public static partial class HtmlBrowser {
         ImageFormat.Jpeg => new JpegEncoder { Quality = quality },
         ImageFormat.Bmp => new BmpEncoder(),
         ImageFormat.Gif => new GifEncoder(),
-        _ => new PngEncoder()
+        _ => new PngEncoder { CompressionLevel = (PngCompressionLevel)QualityToCompression(quality) }
     };
+
+    private static int QualityToCompression(int quality) {
+        if (quality < 0) {
+            quality = 0;
+        } else if (quality > 100) {
+            quality = 100;
+        }
+        int level = (int)Math.Round((100 - quality) / 10.0);
+        if (level < 0) {
+            level = 0;
+        } else if (level > 9) {
+            level = 9;
+        }
+        return level;
+    }
 }
