@@ -69,7 +69,6 @@ public static partial class HtmlBrowser {
             list.Add(nc);
         }
         cancellationToken.ThrowIfCancellationRequested();
-        if (list.Count > 0)
-            await session.Context.AddCookiesAsync(list).ConfigureAwait(false);
+        await session.Context.AddCookiesAsync(list).ConfigureAwait(false);
     }
 }

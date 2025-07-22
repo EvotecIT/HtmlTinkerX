@@ -92,6 +92,24 @@ public class HtmlBrowserCookiesTests {
     }
 
     [Fact]
+    public async Task SetCookiesAsync_EmptyList_StillCallsAddCookiesAsync() {
+        var context = new Mock<IBrowserContext>();
+        var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
+        typeof(HtmlBrowserSession)
+            .GetField("<Context>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(session, context.Object);
+
+        IEnumerable<HtmlCookie> cookies = Array.Empty<HtmlCookie>();
+
+        context.Setup(c => c.AddCookiesAsync(It.Is<IEnumerable<Cookie>>(l => !l.Any())))
+            .Returns(Task.CompletedTask).Verifiable();
+
+        await HtmlBrowser.SetCookiesAsync(session, cookies);
+
+        context.Verify();
+    }
+
+    [Fact]
     public async Task GetCookiesAsync_FiltersByDomain() {
         var context = new Mock<IBrowserContext>();
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
