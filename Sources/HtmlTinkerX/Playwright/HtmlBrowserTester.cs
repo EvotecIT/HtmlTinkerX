@@ -240,30 +240,46 @@ public static class HtmlBrowserTester {
             }
         };
 
-        page.Console += async (_, msg) => {
-            var entry = new HtmlConsoleEntryDetailed {
+        page.Console += async (_, msg) =>
+        {
+            var entry = new HtmlConsoleEntryDetailed
+            {
                 Text = msg.Text,
                 Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
                 Timestamp = DateTimeOffset.UtcNow,
                 Location = msg.Location
             };
 
-            if (entry.IsError) {
-                try {
-                    var firstArg = msg.Args.FirstOrDefault();
-                    if (firstArg != null) {
-                        var obj = await firstArg.JsonValueAsync<object>().ConfigureAwait(false);
-                        if (obj is JsonObject jsonObj) {
-                            if (jsonObj.TryGetPropertyValue("message", out var messageNode) && messageNode is not null) {
-                                entry.Text = messageNode.ToString();
-                            }
-                            if (jsonObj.TryGetPropertyValue("stack", out var stackNode) && stackNode is not null) {
-                                entry.StackTrace = stackNode.ToString();
-                            }
+            if (entry.IsError)
+            {
+                var firstArg = msg.Args.FirstOrDefault();
+                if (firstArg != null)
+                {
+                    try
+                    {
+                        string? message = await firstArg.EvaluateAsync<string?>("arg => arg?.message").ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(message))
+                        {
+                            entry.Text = message;
                         }
                     }
-                } catch {
-                    // Ignore stack trace parsing errors
+                    catch
+                    {
+                        // Ignore message extraction failures
+                    }
+
+                    try
+                    {
+                        string? stack = await firstArg.EvaluateAsync<string?>("arg => arg?.stack").ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(stack))
+                        {
+                            entry.StackTrace = stack;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore stack trace extraction failures
+                    }
                 }
             }
 

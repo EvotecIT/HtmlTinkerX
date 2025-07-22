@@ -61,28 +61,43 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         _network = network ?? new ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
 
         Page.Console += async (_, msg) => {
-            HtmlConsoleEntry entry = new() {
+            HtmlConsoleEntry entry = new()
+            {
                 Text = msg.Text,
                 Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
                 Location = msg.Location?.ToString()
             };
 
-            if (entry.Type == HtmlConsoleMessageType.Error || entry.Type == HtmlConsoleMessageType.Assert) {
-                try {
-                    var firstArg = msg.Args.FirstOrDefault();
-                    if (firstArg != null) {
-                        var obj = await firstArg.JsonValueAsync<object>().ConfigureAwait(false);
-                        if (obj is System.Text.Json.Nodes.JsonObject jsonObj) {
-                            if (jsonObj.TryGetPropertyValue("message", out var messageNode) && messageNode is not null) {
-                                entry.Text = messageNode.ToString();
-                            }
-                            if (jsonObj.TryGetPropertyValue("stack", out var stackNode) && stackNode is not null) {
-                                entry.StackTrace = stackNode.ToString();
-                            }
+            if (entry.Type == HtmlConsoleMessageType.Error || entry.Type == HtmlConsoleMessageType.Assert)
+            {
+                var firstArg = msg.Args.FirstOrDefault();
+                if (firstArg != null)
+                {
+                    try
+                    {
+                        string? message = await firstArg.EvaluateAsync<string?>("arg => arg?.message").ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(message))
+                        {
+                            entry.Text = message;
                         }
                     }
-                } catch {
-                    // Ignore stack trace parsing errors
+                    catch
+                    {
+                        // Ignore message extraction failures
+                    }
+
+                    try
+                    {
+                        string? stack = await firstArg.EvaluateAsync<string?>("arg => arg?.stack").ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(stack))
+                        {
+                            entry.StackTrace = stack;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore stack trace extraction failures
+                    }
                 }
             }
 
