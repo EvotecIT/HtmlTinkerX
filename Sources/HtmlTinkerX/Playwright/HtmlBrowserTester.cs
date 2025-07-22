@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json.Nodes;
 
 namespace HtmlTinkerX;
 
@@ -246,6 +247,25 @@ public static class HtmlBrowserTester {
                 Timestamp = DateTimeOffset.UtcNow,
                 Location = msg.Location
             };
+
+            if (entry.IsError) {
+                try {
+                    var firstArg = msg.Args.FirstOrDefault();
+                    if (firstArg != null) {
+                        var obj = await firstArg.JsonValueAsync<object>().ConfigureAwait(false);
+                        if (obj is JsonObject jsonObj) {
+                            if (jsonObj.TryGetPropertyValue("message", out var messageNode) && messageNode is not null) {
+                                entry.Text = messageNode.ToString();
+                            }
+                            if (jsonObj.TryGetPropertyValue("stack", out var stackNode) && stackNode is not null) {
+                                entry.StackTrace = stackNode.ToString();
+                            }
+                        }
+                    }
+                } catch {
+                    // Ignore stack trace parsing errors
+                }
+            }
 
             if (!string.IsNullOrEmpty(msg.Location)) {
                 var parts = msg.Location.Split(':');

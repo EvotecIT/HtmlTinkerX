@@ -2,7 +2,9 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json.Nodes;
 
 namespace HtmlTinkerX;
 
@@ -58,12 +60,32 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         VideoPath = videoPath;
         _network = network ?? new ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
 
-        Page.Console += (_, msg) => {
+        Page.Console += async (_, msg) => {
             HtmlConsoleEntry entry = new() {
                 Text = msg.Text,
                 Type = HtmlEnumParser.ParseConsoleMessageType(msg.Type),
                 Location = msg.Location?.ToString()
             };
+
+            if (entry.Type == HtmlConsoleMessageType.Error || entry.Type == HtmlConsoleMessageType.Assert) {
+                try {
+                    var firstArg = msg.Args.FirstOrDefault();
+                    if (firstArg != null) {
+                        var obj = await firstArg.JsonValueAsync<object>().ConfigureAwait(false);
+                        if (obj is System.Text.Json.Nodes.JsonObject jsonObj) {
+                            if (jsonObj.TryGetPropertyValue("message", out var messageNode) && messageNode is not null) {
+                                entry.Text = messageNode.ToString();
+                            }
+                            if (jsonObj.TryGetPropertyValue("stack", out var stackNode) && stackNode is not null) {
+                                entry.StackTrace = stackNode.ToString();
+                            }
+                        }
+                    }
+                } catch {
+                    // Ignore stack trace parsing errors
+                }
+            }
+
             _console.Enqueue(entry);
         };
 

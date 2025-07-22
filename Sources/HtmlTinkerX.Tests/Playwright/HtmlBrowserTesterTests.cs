@@ -111,6 +111,21 @@ public class HtmlBrowserTesterTests {
         Assert.NotNull(errors);
         Assert.All(errors, error => Assert.True(error.IsError));
     }
+
+    [Fact]
+    public async Task ConsoleError_CapturesStackTrace() {
+        // Arrange
+        var url = "data:text/html,<script>console.error(new Error('fail'));</script>";
+
+        // Act
+        var errors = await HtmlBrowserTester.TestConsoleErrorsAsync(url);
+
+        // Assert
+        var error = Assert.Single(errors);
+        Assert.True(error.IsError);
+        Assert.False(string.IsNullOrEmpty(error.StackTrace));
+        Assert.Contains("Error: fail", error.StackTrace);
+    }
     
     [Fact]
     public async Task TestPerformanceAsync_ReturnsMetrics() {
