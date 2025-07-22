@@ -3,6 +3,7 @@ using Microsoft.Playwright;
 using Moq;
 using Xunit;
 using System;
+using System.Linq;
 
 namespace HtmlTinkerX.Tests;
 
@@ -33,5 +34,31 @@ public class HtmlBrowserConsoleLogTests {
     [Fact]
     public void GetConsoleLog_NullSession_Throws() {
         Assert.Throws<ArgumentNullException>(() => HtmlBrowser.GetConsoleLog(null!));
+    }
+
+    [Fact]
+    public async Task GetConsoleLog_FiltersBySeverity() {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+
+        var err = new Mock<IConsoleMessage>();
+        err.SetupGet(m => m.Text).Returns("boom");
+        err.SetupGet(m => m.Type).Returns("error");
+
+        var info = new Mock<IConsoleMessage>();
+        info.SetupGet(m => m.Text).Returns("hi");
+        info.SetupGet(m => m.Type).Returns("log");
+
+        var session = new HtmlBrowserSession(playwright.Object, browser.Object, context.Object, page.Object);
+
+        page.Raise(p => p.Console += null!, page.Object, err.Object);
+        page.Raise(p => p.Console += null!, page.Object, info.Object);
+
+        var entries = HtmlBrowser.GetConsoleLog(session, HtmlConsoleSeverity.Error).ToList();
+        Assert.Single(entries);
+        Assert.Equal(HtmlConsoleMessageType.Error, entries[0].Type);
+        await session.DisposeAsync();
     }
 }

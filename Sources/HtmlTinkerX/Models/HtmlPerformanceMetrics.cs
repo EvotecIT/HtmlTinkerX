@@ -25,7 +25,9 @@ public sealed class HtmlPerformanceMetrics {
     /// <summary>Breakdown of requests by resource type.</summary>
     public IDictionary<HtmlNetworkResourceType, int> ResourceBreakdown { get; set; } = new Dictionary<HtmlNetworkResourceType, int>();
 
-    /// <summary>Gets a formatted report of the metrics.</summary>
+    /// <summary>
+    /// Gets a formatted report of the metrics.
+    /// </summary>
     public string GetReport() {
         var report = new System.Text.StringBuilder();
         report.AppendLine("=== Performance Metrics ===");
@@ -47,4 +49,9 @@ public sealed class HtmlPerformanceMetrics {
 
         return report.ToString();
     }
+
+    /// <summary>
+    /// Returns a formatted string representing the metrics.
+    /// </summary>
+    public override string ToString() => GetReport();
 }

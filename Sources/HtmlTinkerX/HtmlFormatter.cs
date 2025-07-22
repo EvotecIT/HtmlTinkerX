@@ -6,6 +6,7 @@ using NUglify.Html;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -306,5 +307,22 @@ public static class HtmlFormatter {
             alphabeticallyOrderAttributes,
             removeEmptyBlocks,
             isFragment).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Asynchronously inlines CSS in the provided HTML string using PreMailer.Net.
+    /// </summary>
+    /// <param name="html">HTML markup to process.</param>
+    /// <param name="options">Optional processing options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>HTML with CSS inlined.</returns>
+    public static async Task<string> FormatHtmlInlineCssAsync(
+        string html,
+        PreMailerOptions? options = null,
+        CancellationToken cancellationToken = default) {
+        PreMailerResult result = await PreMailerClient
+            .MoveCssInlineAsync(html, options, cancellationToken)
+            .ConfigureAwait(false);
+        return result.Html;
     }
 }
