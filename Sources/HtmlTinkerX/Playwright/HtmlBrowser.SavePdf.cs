@@ -172,4 +172,181 @@ public static partial class HtmlBrowser {
         cancellationToken.ThrowIfCancellationRequested();
         await page.PdfAsync(options).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Exports a PDF from an already loaded page and returns the bytes.
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="delayMs">Optional delay in milliseconds before generating the PDF.</param>
+    /// <param name="selector">Optional selector that must appear before printing.</param>
+    /// <param name="landscape">Print pages in landscape orientation.</param>
+    /// <param name="printBackground">Include background graphics.</param>
+    /// <param name="format">Standard page size to use.</param>
+    /// <param name="width">Page width.</param>
+    /// <param name="height">Page height.</param>
+    /// <param name="marginTop">Top margin.</param>
+    /// <param name="marginRight">Right margin.</param>
+    /// <param name="marginBottom">Bottom margin.</param>
+    /// <param name="marginLeft">Left margin.</param>
+    /// <param name="pageRanges">Page ranges to print.</param>
+    /// <param name="scale">Scaling factor.</param>
+    /// <param name="displayHeaderFooter">Display header and footer.</param>
+    /// <param name="headerTemplate">HTML template for the header.</param>
+    /// <param name="footerTemplate">HTML template for the footer.</param>
+    /// <param name="preferCssPageSize">Use @page size from CSS.</param>
+    /// <param name="outline">Create tagged outline.</param>
+    /// <param name="tagged">Produce tagged PDF.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Generated PDF bytes.</returns>
+    public static async Task<byte[]> GetPagePdfAsync(
+        IPage page,
+        int delayMs = 0,
+        string? selector = null,
+        bool landscape = false,
+        bool printBackground = false,
+        PdfPageFormat? format = null,
+        string? width = null,
+        string? height = null,
+        string? marginTop = null,
+        string? marginRight = null,
+        string? marginBottom = null,
+        string? marginLeft = null,
+        string? pageRanges = null,
+        float? scale = null,
+        bool displayHeaderFooter = false,
+        string? headerTemplate = null,
+        string? footerTemplate = null,
+        bool preferCssPageSize = false,
+        bool outline = false,
+        bool tagged = false,
+        CancellationToken cancellationToken = default) {
+        if (delayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        }
+        if (!string.IsNullOrEmpty(selector)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.WaitForSelectorAsync(selector!, new PageWaitForSelectorOptions { Timeout = 10000 }).ConfigureAwait(false);
+        }
+        if (delayMs > 0) {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.WaitForTimeoutAsync(delayMs).ConfigureAwait(false);
+        }
+
+        var options = new PagePdfOptions {
+            Landscape = landscape,
+            PrintBackground = printBackground,
+            Format = format switch {
+                PdfPageFormat.A0 => "A0",
+                PdfPageFormat.A1 => "A1",
+                PdfPageFormat.A2 => "A2",
+                PdfPageFormat.A3 => "A3",
+                PdfPageFormat.A4 => "A4",
+                PdfPageFormat.A5 => "A5",
+                PdfPageFormat.A6 => "A6",
+                PdfPageFormat.Letter => "Letter",
+                PdfPageFormat.Legal => "Legal",
+                PdfPageFormat.Tabloid => "Tabloid",
+                PdfPageFormat.Ledger => "Ledger",
+                _ => null
+            },
+            Width = width,
+            Height = height,
+            PageRanges = pageRanges,
+            Scale = scale,
+            DisplayHeaderFooter = displayHeaderFooter,
+            HeaderTemplate = headerTemplate,
+            FooterTemplate = footerTemplate,
+            PreferCSSPageSize = preferCssPageSize,
+            Outline = outline,
+            Tagged = tagged
+        };
+        if (marginTop != null || marginRight != null || marginBottom != null || marginLeft != null) {
+            options.Margin = new Margin {
+                Top = marginTop,
+                Right = marginRight,
+                Bottom = marginBottom,
+                Left = marginLeft
+            };
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return await page.PdfAsync(options).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Exports a PDF of the specified page URL and returns the bytes.
+    /// </summary>
+    public static async Task<byte[]> GetPagePdfAsync(
+        string url,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        int delayMs = 0,
+        string? selector = null,
+        bool landscape = false,
+        bool printBackground = false,
+        PdfPageFormat? format = null,
+        string? width = null,
+        string? height = null,
+        string? marginTop = null,
+        string? marginRight = null,
+        string? marginBottom = null,
+        string? marginLeft = null,
+        string? pageRanges = null,
+        float? scale = null,
+        bool displayHeaderFooter = false,
+        string? headerTemplate = null,
+        string? footerTemplate = null,
+        bool preferCssPageSize = false,
+        bool outline = false,
+        bool tagged = false,
+        string? username = null,
+        string? password = null,
+        HtmlFormLogin? formLogin = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null,
+        CancellationToken cancellationToken = default) {
+        if (delayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        }
+        await using HtmlBrowserSession session = await OpenSessionAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin,
+            headless,
+            slowMo,
+            null,
+            proxy: proxy,
+            proxyUsername: proxyUsername,
+            proxyPassword: proxyPassword,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        return await GetPagePdfAsync(
+            session.Page,
+            delayMs,
+            selector,
+            landscape,
+            printBackground,
+            format,
+            width,
+            height,
+            marginTop,
+            marginRight,
+            marginBottom,
+            marginLeft,
+            pageRanges,
+            scale,
+            displayHeaderFooter,
+            headerTemplate,
+            footerTemplate,
+            preferCssPageSize,
+            outline,
+            tagged,
+            cancellationToken).ConfigureAwait(false);
+    }
 }
