@@ -15,7 +15,7 @@ public sealed class ScreenshotOptions {
     /// <summary>Image file format.</summary>
     public ImageFormat Format { get; set; } = ImageFormat.Png;
 
-    /// <summary>Encoder quality for JPEG output.</summary>
+    /// <summary>Encoder quality for JPEG output and compression for PNG.</summary>
     public int Quality { get; set; } = 100;
 
     /// <summary>Optional CSS selector to wait for before capturing.</summary>
