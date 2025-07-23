@@ -13,10 +13,10 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 
 ## 🛠️ Project Information
-[![.NET Tests](https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml/badge.svg)](https://github.com/EvotecIT/PSParseHTML/actions/workflows/dotnet-tests.yml)
-[![PowerShell Tests](https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml/badge.svg)](https://github.com/EvotecIT/PSParseHTML/actions/workflows/powershell-tests-7.yml)
-[![top language](https://img.shields.io/github/languages/top/evotecit/PSParseHTML.svg)](https://github.com/EvotecIT/PSParseHTML)
-[![codecov](https://codecov.io/gh/EvotecIT/PSParseHTML/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/PSParseHTML)
+[![.NET Tests](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/dotnet-tests.yml/badge.svg)](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/dotnet-tests.yml)
+[![PowerShell Tests](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/powershell-tests-7.yml/badge.svg)](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/powershell-tests-7.yml)
+[![top language](https://img.shields.io/github/languages/top/evotecit/HtmlTinkerX.svg)](https://github.com/EvotecIT/HtmlTinkerX)
+[![codecov](https://codecov.io/gh/EvotecIT/HtmlTinkerX/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/HtmlTinkerX)
 
 ## 👨‍💻 Author & Social
 [![Twitter Follow](https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social)](https://twitter.com/PrzemyslawKlys)
