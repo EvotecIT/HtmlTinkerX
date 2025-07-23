@@ -9,13 +9,12 @@
     DotNetFrameworkVersion = '4.7.2'
     FunctionsToExport      = @()
     GUID                   = 'f0387960-7034-4918-a1e1-d5847cbf90df'
-    ModuleVersion          = '2.0.0'
+    ModuleVersion          = '2.0.1'
     PowerShellVersion      = '5.1'
     PrivateData            = @{
         PSData = @{
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
-            Prerelease                 = 'Preview4'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
