@@ -36,7 +36,10 @@ public static class HtmlCookieParser {
             if (parts.Length < 7) {
                 continue;
             }
-            float? expires = float.TryParse(parts[4], out float f) ? f : null;
+            float? expires = null;
+            if (float.TryParse(parts[4], out float f) && f != 0) {
+                expires = f;
+            }
             list.Add(new HtmlCookie {
                 Domain = parts[0],
                 Path = parts[2],
