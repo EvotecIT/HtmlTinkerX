@@ -18,6 +18,11 @@ public static partial class HtmlBrowser {
     /// Only one installation process can run at a time across all threads.
     /// </summary>
     private static readonly SemaphoreSlim InstallationSemaphore = new SemaphoreSlim(1, 1);
+
+    /// <summary>
+    /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
+    /// </summary>
+    internal static Action<string[]> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
     /// <summary>
     /// Gets the version of the Playwright driver.
     /// </summary>
@@ -244,7 +249,11 @@ public static partial class HtmlBrowser {
             runtimeInstalled = IsBrowserRuntimeInstalled(engine);
             if (!runtimeInstalled) {
                 string runtime = engine.ToString().ToLowerInvariant();
-                Microsoft.Playwright.Program.Main(new[] { "install", runtime });
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+                    PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
+                } else {
+                    PlaywrightInstaller(new[] { "install", runtime });
+                }
             }
         } finally {
             InstallationSemaphore.Release();
