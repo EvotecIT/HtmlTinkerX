@@ -1041,6 +1041,7 @@ Console.WriteLine($"\nSlowest page: {slowest.Url} ({slowest.PageLoadTime.TotalSe
 - **Url** - Request URL
 - **Method** - HTTP method
 - **Status** - Response status code
+- **ProtocolVersion** - HTTP protocol version
 - **Duration** - Request duration
 - **ResourceType** - Type of resource (Document, Stylesheet, Script, etc.)
 - **TransferSize** - Total bytes transferred

@@ -19,6 +19,9 @@ public sealed class HtmlNetworkEntryDetailed {
     /// <summary>Response status code.</summary>
     public System.Net.HttpStatusCode? Status { get; set; }
 
+    /// <summary>HTTP protocol version.</summary>
+    public string? ProtocolVersion { get; set; }
+
     /// <summary>Response headers.</summary>
     public IDictionary<string, string>? ResponseHeaders { get; set; }
 
