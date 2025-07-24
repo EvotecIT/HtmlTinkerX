@@ -76,6 +76,9 @@ public static class HtmlHarViewer {
     /// </code>
     /// </example>
     public static async Task<Har> ReadHarAsync(string path) {
+        if (!File.Exists(path)) {
+            throw new FileNotFoundException($"File not found: {path}", path);
+        }
         string json = await HtmlUtilities.ReadFileCheckedAsync(path).ConfigureAwait(false);
         var opts = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,

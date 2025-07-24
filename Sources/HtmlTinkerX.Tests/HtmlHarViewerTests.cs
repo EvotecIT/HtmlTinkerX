@@ -78,6 +78,15 @@ public class HtmlHarViewerTests {
 
     [Fact]
     /// <summary>
+    /// Ensures missing files throw <see cref="FileNotFoundException"/>.
+    /// </summary>
+    public async Task ReadHarAsync_FileNotFoundThrows() {
+        string missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".har");
+        await Assert.ThrowsAsync<FileNotFoundException>(() => HtmlHarViewer.ReadHarAsync(missingPath));
+    }
+
+    [Fact]
+    /// <summary>
     /// Serializes a HAR to a stream.
     /// </summary>
     public async Task WriteHarAsync_WritesJson() {
