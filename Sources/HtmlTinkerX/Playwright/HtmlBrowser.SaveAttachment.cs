@@ -114,10 +114,9 @@ public static partial class HtmlBrowser {
                     yield return path;
                 }
             }
-
-            await producer.ConfigureAwait(false);
         } finally {
             page.Download -= Handler;
+            await producer.ConfigureAwait(false);
         }
     }
 }
