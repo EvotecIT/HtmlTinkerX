@@ -8,7 +8,7 @@ Describe 'Invoke-HTMLLogin' {
         try {
             Invoke-HTMLLogin -Session $session -Username 'user' -Password 'pass' -PassThru | Should -Be $session
         } finally {
-            Close-HTMLSession -Session $session
+            Close-HtmlBrowserSession -Session $session
         }
     }
 }

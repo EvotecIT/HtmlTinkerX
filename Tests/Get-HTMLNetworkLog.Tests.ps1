@@ -16,7 +16,7 @@ Describe 'Get-HTMLNetworkLog' {
         Start-Sleep -Milliseconds 500
 
         $log = Get-HTMLNetworkLog -Session $session
-        Close-HTMLSession -Session $session
+        Close-HtmlBrowserSession -Session $session
 
         $log.Count | Should -BeGreaterThan 0
     }

@@ -5,9 +5,9 @@ Describe 'Register-HTMLRoute' {
         $session = Invoke-HTMLRendering -Url 'about:blank' -Session
         Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
         Invoke-HTMLNavigation -Session $session -Url $uri
-        $text = Get-HTMLContent -Session $session -Selector '#result' -AsText
+        $text = Get-HtmlBrowserContent -Session $session -Selector '#result' -AsText
         $text | Should -Be 'error'
-        Close-HTMLSession -Session $session
+        Close-HtmlBrowserSession -Session $session
     }
 
     It 'Rewrites request to data.json' {
@@ -23,8 +23,8 @@ Describe 'Register-HTMLRoute' {
             }) | Out-Null
         }
         Invoke-HTMLNavigation -Session $session -Url $uri
-        $text = Get-HTMLContent -Session $session -Selector '#result' -AsText
+        $text = Get-HtmlBrowserContent -Session $session -Selector '#result' -AsText
         $text | Should -Be 'mock'
-        Close-HTMLSession -Session $session
+        Close-HtmlBrowserSession -Session $session
     }
 }

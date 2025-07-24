@@ -15,13 +15,13 @@ Describe 'ConvertFrom-HTMLCookie' {
         $cookies[0].Name | Should -Be 'ID'
     }
 
-    It 'Works with Set-HTMLCookie' {
+    It 'Works with Set-HtmlBrowserCookie' {
         $line = "example.com`tFALSE`t/`tFALSE`t0`tID`tabc"
         $cookies = ConvertFrom-HTMLCookie -Content $line -Format Netscape
         $session = Invoke-HTMLRendering -Url 'about:blank' -Session
-        Set-HTMLCookie -Session $session -Cookie $cookies
-        $result = Get-HTMLCookie -Session $session -Domain 'example.com'
-        Close-HTMLSession -Session $session
+        Set-HtmlBrowserCookie -Session $session -Cookie $cookies
+        $result = Get-HtmlBrowserCookie -Session $session -Domain 'example.com'
+        Close-HtmlBrowserSession -Session $session
         $result.Count | Should -Be 1
         $result[0].Name | Should -Be 'ID'
     }

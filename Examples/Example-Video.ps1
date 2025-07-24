@@ -13,9 +13,9 @@ $sessionParams = @{
 }
 
 $session = Open-HTMLSession @sessionParams
-$session = Start-HTMLVideoRecording -Session $session -OutFile "$PSScriptRoot\Output\WP1.webm"
+$session = Start-HtmlBrowserVideoCapture -Session $session -OutFile "$PSScriptRoot\Output\WP1.webm"
 # Get interactable elements from the session
-Get-HTMLInteractable -Session $session -Filter "Media" -IncludeHidden | Format-Table
+Get-HtmlBrowserInteractable -Session $session -Filter "Media" -IncludeHidden | Format-Table
 # # We should add new cmdlet that will navigate to the page we tell it to navigate to
 Invoke-HTMLNavigation -Session $Session -Url 'https://evotec.xyz/wp-admin/edit.php'
 # # We should add new cmdlet that will navigate to the page we tell it to navigate to
