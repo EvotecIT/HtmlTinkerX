@@ -578,11 +578,13 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                         while (esc || Input[ParserPos] != sep) {
                             resultingString += Input[ParserPos];
                             if (esc1 != 0 && esc1 >= esc2) {
-                                if (!int.TryParse(new string(resultingString.Skip(Math.Max(0, resultingString.Count() - esc2)).Take(esc2).ToArray()), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out esc1))
+                                var hex = resultingString.Substring(resultingString.Length - esc2, esc2);
+                                if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.CurrentCulture, out esc1)) {
                                     esc1 = 0;
+                                }
+
                                 if (esc1 != 0 && esc1 >= 0x20 && esc1 <= 0x7e) {
-                                    // FIXME
-                                    resultingString = new string(resultingString.Take(2 + esc2).ToArray());
+                                    resultingString = resultingString.Substring(0, resultingString.Length - (esc2 + 2));
 
                                     if ((char)esc1 == sep || (char)esc1 == '\\') {
                                         resultingString += '\\';
@@ -590,6 +592,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
                                     resultingString += (char)esc1;
                                 }
+
                                 esc1 = 0;
                             }
 
@@ -599,20 +602,15 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                                 esc = Input[ParserPos] == '\\';
                             } else {
                                 esc = false;
-                                // TODO
-                                //if (/*this.Opts.UnescapeStrings*/false)
-                                /*{
-                                    if (this.Input[this.ParserPos] == 'x')
-                                    {
-                                        ++esc1;
+                                if (Opts.UnescapeStrings) {
+                                    if (Input[ParserPos] == 'x') {
+                                        esc1 = 1;
                                         esc2 = 2;
-                                    }
-                                    else if (this.Input[this.ParserPos] == 'u')
-                                    {
-                                        ++esc1;
+                                    } else if (Input[ParserPos] == 'u') {
+                                        esc1 = 1;
                                         esc2 = 4;
                                     }
-                                }*/
+                                }
                             }
 
                             ParserPos += 1;

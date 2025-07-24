@@ -54,6 +54,16 @@ public class JavaScriptBeautifierTests {
         Assert.Equal(expected, result);
     }
 
+    [Fact]
+    public void TestUnescapeHexSequences() {
+        var beautifier = new Beautifier();
+        beautifier.Opts.UnescapeStrings = true;
+
+        string result = beautifier.Beautify("'\\x41\\u0042'");
+
+        Assert.Equal("'AB'", result);
+    }
+
     [Theory]
     [InlineData("function test(){var x=1;if(x>0){return x;}}",
                 "function test() {\n    var x = 1;\n    if (x > 0) {\n        return x;\n    }\n}")]
