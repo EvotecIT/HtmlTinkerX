@@ -44,6 +44,7 @@ public class BeautifierOptions {
         EvalCode = false;
         WrapLineLength = 0;
         BreakChainedMethods = false;
+        UnescapeStrings = false;
     }
 
     /// <summary>
@@ -105,4 +106,9 @@ public class BeautifierOptions {
     /// Gets or sets a value indicating whether to break chained methods.
     /// </summary>
     public bool BreakChainedMethods { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether hexadecimal escape sequences in strings should be converted to characters.
+    /// </summary>
+    public bool UnescapeStrings { get; set; }
 }
