@@ -20,7 +20,7 @@ Describe 'Invoke-HTMLRendering' {
         $ua = $session.Page.EvaluateAsync('navigator.userAgent',$null).GetAwaiter().GetResult()
         $w = [int]($session.Page.EvaluateAsync('window.innerWidth',$null).GetAwaiter().GetResult().ToString())
         $d = [double]($session.Page.EvaluateAsync('window.devicePixelRatio',$null).GetAwaiter().GetResult().ToString())
-        Close-HTMLSession -Session $session
+        Close-HtmlBrowserSession -Session $session
         $ua | Should -Be 'MyAgent'
         $w | Should -Be 123
         [double]$d | Should -Be 2
@@ -32,7 +32,7 @@ Describe 'Invoke-HTMLRendering' {
         $session = Invoke-HTMLRendering -Url $uri -Session -GeoLatitude 50 -GeoLongitude 20 -Timezone 'Europe/Warsaw'
         $lat = [double]($session.Page.EvaluateAsync('new Promise(r=>navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))',$null).GetAwaiter().GetResult().ToString())
         $tz = $session.Page.EvaluateAsync('Intl.DateTimeFormat().resolvedOptions().timeZone',$null).GetAwaiter().GetResult()
-        Close-HTMLSession -Session $session
+        Close-HtmlBrowserSession -Session $session
         [math]::Round($lat,0) | Should -Be 50
         $tz | Should -Be 'Europe/Warsaw'
     }

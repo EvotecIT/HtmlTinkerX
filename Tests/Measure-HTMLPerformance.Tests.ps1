@@ -1,6 +1,6 @@
-Describe 'Measure-HTMLPerformance' {
+Describe 'Measure-HtmlBrowserPerformance' {
     It 'Returns performance metrics' {
-        $metrics = Measure-HTMLPerformance -Url 'https://example.com'
+        $metrics = Measure-HtmlBrowserPerformance -Url 'https://example.com'
 
         $metrics | Should -Not -BeNullOrEmpty
         $metrics.TotalRequests | Should -BeGreaterOrEqual 0

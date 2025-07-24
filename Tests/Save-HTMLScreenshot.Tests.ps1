@@ -1,9 +1,9 @@
-Describe 'Save-HTMLScreenshot' {
+Describe 'Save-HtmlBrowserScreenshot' {
     It 'Creates a screenshot file' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'shot.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -11,7 +11,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'proxy.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Proxy 'http://localhost:8080'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Proxy 'http://localhost:8080'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -19,7 +19,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'full.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Full -Selector '#loaded'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Full -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -27,7 +27,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'clip.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 50 -Height 50 -Selector '#loaded'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 50 -Height 50 -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -35,7 +35,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'element.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -ElementSelector '#loaded'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -ElementSelector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -43,7 +43,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'highlight.png'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -HighlightSelector '#loaded' -OverlayText 'demo'
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -HighlightSelector '#loaded' -OverlayText 'demo'
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -52,7 +52,7 @@ Describe 'Save-HTMLScreenshot' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $before = Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $beforeTime = if ($before) { $before.LastWriteTime } else { [datetime]::MinValue }
-        Save-HTMLScreenshot -Url $uri -Selector '#loaded' -Open
+        Save-HtmlBrowserScreenshot -Url $uri -Selector '#loaded' -Open
         $after = Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         $after.LastWriteTime | Should -BeGreaterThan $beforeTime
     }
@@ -60,7 +60,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'delay.jpg'
-        Save-HTMLScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Format Jpeg -Quality 50 -Delay 100
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Selector '#loaded' -Format Jpeg -Quality 50 -Delay 100
         (Test-Path $outfile) | Should -BeTrue
     }
 
@@ -68,7 +68,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $base = Join-Path $TestDrive 'noext'
-        Save-HTMLScreenshot -Url $uri -OutFile $base -Selector '#loaded' -Format Jpeg
+        Save-HtmlBrowserScreenshot -Url $uri -OutFile $base -Selector '#loaded' -Format Jpeg
         (Test-Path "$base.jpg") | Should -BeTrue
     }
 
@@ -76,7 +76,7 @@ Describe 'Save-HTMLScreenshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $outfile = Join-Path $TestDrive 'invalid.png'
-        { Save-HTMLScreenshot -Url $uri -OutFile $outfile -X -1 -Y 0 -Width 10 -Height 10 -Selector '#loaded' } | Should -Throw
-        { Save-HTMLScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 0 -Height 10 -Selector '#loaded' } | Should -Throw
+        { Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -X -1 -Y 0 -Width 10 -Height 10 -Selector '#loaded' } | Should -Throw
+        { Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -X 0 -Y 0 -Width 0 -Height 10 -Selector '#loaded' } | Should -Throw
     }
 }

@@ -1,6 +1,6 @@
 Describe 'Proxy parameters' {
     It 'Cmdlets expose proxy parameters' {
-        $cmdlets = 'ConvertFrom-HTML','ConvertFrom-HtmlTable','ConvertFrom-HtmlAttributes','ConvertFrom-HtmlList','Convert-HTMLToText','Invoke-HTMLRendering','Save-HTMLScreenshot'
+        $cmdlets = 'ConvertFrom-HTML','ConvertFrom-HtmlTable','ConvertFrom-HtmlAttributes','ConvertFrom-HtmlList','Convert-HTMLToText','Invoke-HTMLRendering','Save-HtmlBrowserScreenshot'
         foreach($cmd in $cmdlets){
             $params = (Get-Command $cmd).Parameters.Keys
             $params | Should -Contain 'Proxy'
@@ -11,8 +11,8 @@ Describe 'Proxy parameters' {
     It 'Throws when ProxyCredential used without Proxy' {
         $cred = New-Object PSCredential('u',(ConvertTo-SecureString 'p' -AsPlainText -Force))
         { Invoke-HTMLRendering -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
-        { Get-HTMLInteractable -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
-        { Set-HTMLHttpClientOption -ProxyCredential $cred } | Should -Throw
+        { Get-HtmlBrowserInteractable -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        { Set-HtmlBrowserClientOption -ProxyCredential $cred } | Should -Throw
     }
 }
 
