@@ -61,4 +61,20 @@ public class HtmlCookieParserTests {
         Assert.Equal("abc123xyz", c.Value);
         Assert.Equal("example.com", c.Domain);
     }
+
+    [Fact]
+    public void ParseOrgJsonCookie_AllowsLowercaseProperties() {
+        string json = "{\"path\":\"/\",\"secure\":\"true\",\"name\":\"sessionId\",\"httponly\":\"true\",\"domain\":\"example.com\",\"value\":\"abc123xyz\"}";
+        HtmlCookie c = HtmlCookieParser.ParseOrgJsonCookie(json);
+        Assert.True(c.Secure);
+        Assert.True(c.HttpOnly);
+    }
+
+    [Fact]
+    public void ParseOrgJsonCookie_AllowsMixedCaseProperties() {
+        string json = "{\"Path\":\"/\",\"SeCuRe\":\"true\",\"name\":\"sessionId\",\"HtTpOnLy\":\"true\",\"Domain\":\"example.com\",\"value\":\"abc123xyz\"}";
+        HtmlCookie c = HtmlCookieParser.ParseOrgJsonCookie(json);
+        Assert.True(c.Secure);
+        Assert.True(c.HttpOnly);
+    }
 }
