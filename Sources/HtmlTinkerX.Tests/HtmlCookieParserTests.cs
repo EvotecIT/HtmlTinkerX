@@ -21,6 +21,20 @@ public class HtmlCookieParserTests {
     }
 
     [Fact]
+    public void ParseNetscapeFile_ParsesLargeExpiration() {
+        string data = "example.com\tFALSE\t/\tTRUE\t9223372036854775807\tsessionId\tabc123xyz";
+        List<HtmlCookie> result = HtmlCookieParser.ParseNetscapeFile(data);
+        Assert.Single(result);
+        HtmlCookie c = result[0];
+        Assert.Equal("sessionId", c.Name);
+        Assert.Equal("abc123xyz", c.Value);
+        Assert.Equal("example.com", c.Domain);
+        Assert.Equal("/", c.Path);
+        Assert.True(c.Secure);
+        Assert.True(c.Expires > 1e18f);
+    }
+
+    [Fact]
     public void ParseSetCookieHeader_ParsesCookie() {
         string header = "Set-Cookie: sessionId=abc123xyz; Path=/; Secure; Expires=Wed, 31 Jan 2024 23:59:59 GMT";
         HtmlCookie c = HtmlCookieParser.ParseSetCookieHeader(header);
