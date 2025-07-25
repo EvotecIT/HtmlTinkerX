@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -181,7 +182,7 @@ public static class HtmlBrowserTester {
     private static IDictionary<IRequest, HtmlNetworkEntryDetailed> InitNetworkListeners(
         IPage page,
         HtmlBrowserTestResult result) {
-        var networkEntries = new Dictionary<IRequest, HtmlNetworkEntryDetailed>();
+        var networkEntries = new ConcurrentDictionary<IRequest, HtmlNetworkEntryDetailed>();
 
         page.Request += (_, request) => {
             var entry = new HtmlNetworkEntryDetailed {
@@ -200,7 +201,7 @@ public static class HtmlBrowserTester {
                 }
             }
 
-            networkEntries[request] = entry;
+            networkEntries.GetOrAdd(request, entry);
         };
 
         page.Response += (_, response) => {
@@ -228,17 +229,21 @@ public static class HtmlBrowserTester {
 
         page.RequestFinished += (_, request) => {
             if (networkEntries.TryGetValue(request, out var entry)) {
-                entry.Finished = DateTimeOffset.UtcNow;
-                result.NetworkEntries.Add(entry);
+                if (entry.Finished is null) {
+                    entry.Finished = DateTimeOffset.UtcNow;
+                    result.NetworkEntries.Add(entry);
+                }
             }
         };
 
         page.RequestFailed += (_, request) => {
             if (networkEntries.TryGetValue(request, out var entry)) {
-                entry.Finished = DateTimeOffset.UtcNow;
                 entry.ErrorType = ParseNetworkError(request.Failure);
                 entry.ErrorMessage = request.Failure;
-                result.NetworkEntries.Add(entry);
+                if (entry.Finished is null) {
+                    entry.Finished = DateTimeOffset.UtcNow;
+                    result.NetworkEntries.Add(entry);
+                }
             }
         };
 
