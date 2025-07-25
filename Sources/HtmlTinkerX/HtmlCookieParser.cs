@@ -18,6 +18,17 @@ public static class HtmlCookieParser {
         };
     }
 
+    private static bool TryGetPropertyIgnoreCase(JsonElement element, string name, out JsonElement value) {
+        foreach (JsonProperty property in element.EnumerateObject()) {
+            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) {
+                value = property.Value;
+                return true;
+            }
+        }
+        value = default;
+        return false;
+    }
+
     /// <summary>
     /// Parses cookies from a Netscape HTTP cookie file.
     /// </summary>
@@ -122,8 +133,8 @@ public static class HtmlCookieParser {
                 Domain = root.TryGetProperty("Domain", out var d) ? d.GetString() : null,
                 Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
                 Value = root.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
-                Secure = root.TryGetProperty("Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
-                HttpOnly = root.TryGetProperty("HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
+                Secure = TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
+                HttpOnly = TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
             if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
                 cookie.Expires = (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
