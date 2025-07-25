@@ -40,7 +40,21 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// </summary>
     public string? VideoPath { get; internal set; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
+    private readonly ConcurrentQueue<IRequest> _order = new();
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
+    private int? _networkLogLimit;
+    /// <summary>
+    /// Gets or sets the maximum number of network log entries to keep.
+    /// </summary>
+    public int? NetworkLogLimit {
+        get => _networkLogLimit;
+        set {
+            _networkLogLimit = value;
+            if (value.HasValue) {
+                TrimNetworkLog(value.Value);
+            }
+        }
+    }
     /// <summary>Captured network log entries.</summary>
     public IEnumerable<HtmlNetworkEntry> NetworkLog => _network.Values;
     /// <summary>Captured console log entries.</summary>
@@ -75,6 +89,10 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 Started = System.DateTimeOffset.UtcNow
             };
             _network[req] = entry;
+            _order.Enqueue(req);
+            if (NetworkLogLimit.HasValue) {
+                TrimNetworkLog(NetworkLogLimit.Value);
+            }
         };
 
         Page.Response += (_, res) => {
@@ -100,6 +118,12 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 entry.Finished = System.DateTimeOffset.UtcNow;
             }
         };
+    }
+
+    private void TrimNetworkLog(int limit) {
+        while (_order.Count > limit && _order.TryDequeue(out IRequest? oldReq)) {
+            _network.TryRemove(oldReq, out _);
+        }
     }
 
     /// <summary>
