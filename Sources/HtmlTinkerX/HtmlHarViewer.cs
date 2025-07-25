@@ -158,6 +158,10 @@ for (const e of entries) {
             throw new ArgumentNullException(nameof(outputStream));
         }
 
+        if (har.Log == null) {
+            har.Log = new HarLog();
+        }
+
         var opts = new JsonSerializerOptions {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase

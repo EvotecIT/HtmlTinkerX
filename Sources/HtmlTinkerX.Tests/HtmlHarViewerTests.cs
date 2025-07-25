@@ -104,4 +104,21 @@ public class HtmlHarViewerTests {
         Assert.NotNull(parsed);
         Assert.Equal(har.Log?.Entries?.Length, parsed.Log?.Entries?.Length);
     }
+
+    [Fact]
+    public async Task WriteHarAsync_AllowsNullLog() {
+        var har = new Har { Log = null };
+        using var ms = new MemoryStream();
+        await HtmlHarViewer.WriteHarAsync(har, ms);
+        ms.Position = 0;
+        using var reader = new StreamReader(ms);
+        string json = await reader.ReadToEndAsync();
+        var opts = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
+        Assert.NotNull(parsed);
+        Assert.NotNull(parsed.Log);
+    }
 }
