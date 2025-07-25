@@ -59,29 +59,37 @@ public static partial class HtmlBrowser {
         System.Threading.Channels.Channel<string> channel = System.Threading.Channels.Channel.CreateUnbounded<string>();
 
         void Handler(object? _, IDownload dl) {
-            bool match = string.IsNullOrEmpty(filter) ||
-                         dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
-            if (!match) {
-                return;
-            }
+            try {
+                bool match = string.IsNullOrEmpty(filter) ||
+                             dl.Url.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             dl.SuggestedFilename.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!match) {
+                    return;
+                }
 
-            string filePath = Path.Combine(dir, dl.SuggestedFilename);
-            bool save;
-            lock (sync) {
-                save = downloads.Add(filePath);
-            }
-            if (!save) {
-                return;
-            }
+                string filePath = Path.Combine(dir, dl.SuggestedFilename);
+                bool save;
+                lock (sync) {
+                    save = downloads.Add(filePath);
+                }
+                if (!save) {
+                    return;
+                }
 
-            Task saveTask = Task.Run(async () => {
-                await dl.SaveAsAsync(filePath).ConfigureAwait(false);
-                await channel.Writer.WriteAsync(filePath, cancellationToken).ConfigureAwait(false);
-            }, cancellationToken);
+                Task saveTask = Task.Run(async () => {
+                    try {
+                        await dl.SaveAsAsync(filePath).ConfigureAwait(false);
+                        await channel.Writer.WriteAsync(filePath, cancellationToken).ConfigureAwait(false);
+                    } catch (Exception ex) {
+                        channel.Writer.TryComplete(ex);
+                    }
+                }, cancellationToken);
 
-            lock (sync) {
-                saveTasks.Add(saveTask);
+                lock (sync) {
+                    saveTasks.Add(saveTask);
+                }
+            } catch (Exception ex) {
+                channel.Writer.TryComplete(ex);
             }
         }
 

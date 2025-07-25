@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -54,6 +55,35 @@ public class HtmlBrowserDownloadFilterTests {
         Assert.Contains(path1, files);
         Assert.True(File.Exists(path1));
         Assert.False(File.Exists(path2));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task SavePageDownloadsAsync_DownloadFailure_FaultsEnumeration() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var page = new Mock<IPage>();
+        page.Setup(p => p.QuerySelectorAllAsync(It.IsAny<string>()))
+            .ReturnsAsync(Array.Empty<IElementHandle>());
+        page.Setup(p => p.WaitForSelectorAsync(It.IsAny<string>(), It.IsAny<PageWaitForSelectorOptions?>()))
+            .ReturnsAsync((IElementHandle?)null);
+        page.Setup(p => p.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
+            .Callback(() => {
+                var dl = new Mock<IDownload>();
+                dl.SetupGet(d => d.Url).Returns("https://example.com/fail.txt");
+                dl.SetupGet(d => d.SuggestedFilename).Returns("fail.txt");
+                dl.Setup(d => d.SaveAsAsync(It.IsAny<string>()))
+                    .ThrowsAsync(new InvalidOperationException("boom"));
+
+                page.Raise(p => p.Download += null!, page.Object, dl.Object);
+            })
+            .ReturnsAsync((JsonElement?)default);
+        page.Setup(p => p.WaitForLoadStateAsync(It.IsAny<LoadState>(), It.IsAny<PageWaitForLoadStateOptions?>()))
+            .Returns(Task.CompletedTask);
+
+        await Assert.ThrowsAsync<ChannelClosedException>(async () => {
+            await foreach (string _ in HtmlBrowser.SavePageDownloadsAsync(page.Object, dir)) { }
+        });
 
         Directory.Delete(dir, true);
     }
