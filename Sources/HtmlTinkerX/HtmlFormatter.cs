@@ -320,9 +320,17 @@ public static class HtmlFormatter {
         string html,
         PreMailerOptions? options = null,
         CancellationToken cancellationToken = default) {
-        PreMailerResult result = await PreMailerClient
-            .MoveCssInlineAsync(html, options, cancellationToken)
-            .ConfigureAwait(false);
-        return result.Html;
+        try {
+            PreMailerResult result = await PreMailerClient
+                .MoveCssInlineAsync(html, options, cancellationToken)
+                .ConfigureAwait(false);
+            return result.Html;
+        } catch (TaskCanceledException) {
+            throw;
+        } catch (Exception ex) when (options?.DownloadRemoteCss == true) {
+            LoggingMessages.Logger.WriteWarning(
+                "Failed to inline remote CSS: {0}", ex.Message);
+            return html;
+        }
     }
 }

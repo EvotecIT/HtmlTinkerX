@@ -23,4 +23,16 @@ public class FormatHtmlInlineCssAsyncTests {
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
             HtmlFormatter.FormatHtmlInlineCssAsync(Html, null, cts.Token));
     }
+
+    [Fact]
+    public async Task FormatHtmlInlineCssAsync_InvalidCssUrl_ReturnsHtml() {
+        const string invalidUrlHtml =
+            "<html><head><link rel='stylesheet' href='http://localhost:1/style.css'></head><body><p>Hello</p></body></html>";
+        var options = new PreMailerOptions { DownloadRemoteCss = true };
+        string result = await HtmlFormatter.FormatHtmlInlineCssAsync(
+            invalidUrlHtml,
+            options,
+            CancellationToken.None);
+        Assert.Contains("<p>Hello</p>", result, System.StringComparison.OrdinalIgnoreCase);
+    }
 }
