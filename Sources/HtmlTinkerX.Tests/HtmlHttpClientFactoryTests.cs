@@ -21,6 +21,32 @@ public class HtmlHttpClientFactoryTests {
         return field?.GetValue(client) as HttpClientHandler;
     }
 
+    private static int GetFreePort() {
+        var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static HttpListener StartCookieServer(out string url) {
+        int port = GetFreePort();
+        string prefix = $"http://localhost:{port}/";
+        url = prefix;
+        HttpListener listener = new();
+        listener.Prefixes.Add(prefix);
+        listener.Start();
+        _ = Task.Run(async () => {
+            var context = await listener.GetContextAsync();
+            context.Response.Headers.Add("Set-Cookie", "session=abc");
+            byte[] data = System.Text.Encoding.UTF8.GetBytes("ok");
+            context.Response.ContentLength64 = data.Length;
+            await context.Response.OutputStream.WriteAsync(data, 0, data.Length);
+            context.Response.OutputStream.Close();
+        });
+        return listener;
+    }
+
     [Fact]
     public void Create_AppliesDefaultHeaders() {
         HtmlHttpClientFactory.DefaultHeaders["X-Test"] = "1";
@@ -62,5 +88,31 @@ public class HtmlHttpClientFactoryTests {
         Assert.Contains("localhost", proxyUri.ToString());
         Assert.Contains("1234", proxyUri.ToString());
         Assert.Same(cred, handler.Proxy?.Credentials);
+    }
+
+    [Fact]
+    public void Create_WithCookieContainer_ReturnsSameInstance() {
+        using HttpClient client = HtmlHttpClientFactory.Create(out CookieContainer cookies);
+        HttpClientHandler? handler = GetHandler(client);
+        if (handler == null) {
+            return;
+        }
+        Assert.Same(cookies, handler.CookieContainer);
+    }
+
+    [Fact]
+    public async Task Create_WithCookieContainer_StoresCookies() {
+        HttpListener server = StartCookieServer(out string url);
+        try {
+            using HttpClient client = HtmlHttpClientFactory.Create(out CookieContainer container);
+            HttpResponseMessage response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            Cookie cookie = container.GetCookies(new System.Uri(url))["session"];
+            Assert.NotNull(cookie);
+            Assert.Equal("abc", cookie.Value);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
     }
 }

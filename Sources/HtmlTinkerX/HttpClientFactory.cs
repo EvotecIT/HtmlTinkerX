@@ -44,6 +44,32 @@ public static class HtmlHttpClientFactory {
     }
 
     /// <summary>
+    /// Creates a new <see cref="HttpClient"/> with cookie support and returns the used container.
+    /// </summary>
+    /// <param name="cookieContainer">Container that will store cookies for the created handler.</param>
+    /// <param name="proxy">Optional proxy address.</param>
+    /// <param name="credential">Optional proxy credentials.</param>
+    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy = null, ICredentials? credential = null) {
+        cookieContainer = new CookieContainer();
+        HttpClientHandler handler = new() {
+            CookieContainer = cookieContainer,
+            UseCookies = true
+        };
+        string? proxyToUse = proxy ?? DefaultProxy;
+        if (!string.IsNullOrEmpty(proxyToUse)) {
+            handler.Proxy = new WebProxy(proxyToUse);
+            handler.UseProxy = true;
+            ICredentials? credToUse = credential ?? DefaultProxyCredential;
+            if (credToUse != null) {
+                handler.Proxy!.Credentials = credToUse;
+            }
+        }
+        HttpClient client = new HttpClient(handler, disposeHandler: true);
+        ApplyDefaults(client);
+        return client;
+    }
+
+    /// <summary>
     /// Gets a shared instance using the configured defaults.
     /// </summary>
     public static HttpClient Shared {
