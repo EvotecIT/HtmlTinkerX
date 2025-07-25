@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using System;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -47,5 +48,10 @@ public class HtmlParserTests {
 
         var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(server.BaseAddress.ToString(), client);
         Assert.NotNull(doc.DocumentNode);
+    }
+
+    [Fact]
+    public void ParseTablesWithAngleSharpDetailed_NullHtml_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseTablesWithAngleSharpDetailed(null!));
     }
 }
