@@ -47,15 +47,15 @@ public static class HtmlCookieParser {
             if (parts.Length < 7) {
                 continue;
             }
-            float? expires = null;
-            if (float.TryParse(parts[4], out float f) && f != 0) {
-                expires = f;
+            long? expires = null;
+            if (long.TryParse(parts[4], out long l) && l != 0) {
+                expires = l;
             }
             list.Add(new HtmlCookie {
                 Domain = parts[0],
                 Path = parts[2],
                 Secure = parts[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
-                Expires = expires,
+                Expires = expires.HasValue ? (float?)expires.Value : null,
                 Name = parts[5],
                 Value = parts[6]
             });
