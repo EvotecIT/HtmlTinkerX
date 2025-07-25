@@ -2,6 +2,8 @@ using Xunit;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using Moq;
+using Microsoft.Playwright;
 
 namespace HtmlTinkerX.Tests.Playwright;
 
@@ -219,8 +221,8 @@ public class HtmlBrowserTesterTests {
     [InlineData(HtmlConsoleMessageType.Info, 1, false, false)]
     [InlineData(HtmlConsoleMessageType.Log, 1, false, false)]
     public void HtmlConsoleEntryDetailed_PropertiesWorkCorrectly(
-        HtmlConsoleMessageType type, 
-        int expectedSeverity, 
+        HtmlConsoleMessageType type,
+        int expectedSeverity,
         bool shouldBeError,
         bool shouldBeWarning) {
         // Arrange
@@ -237,5 +239,33 @@ public class HtmlBrowserTesterTests {
         Assert.Equal(shouldBeError, entry.IsError);
         Assert.Equal(shouldBeWarning, entry.IsWarning);
         Assert.Equal("https://test.com/script.js:42:10", entry.FullLocation);
+    }
+
+    [Fact]
+    public void InitNetworkListeners_NoDuplicateEntries_WhenRequestTriggersMultipleEvents() {
+        var page = new Moq.Mock<Microsoft.Playwright.IPage>();
+        var result = new HtmlBrowserTestResult();
+
+        var request = new Moq.Mock<Microsoft.Playwright.IRequest>();
+        request.SetupGet(r => r.Url).Returns("https://example.com/");
+        request.SetupGet(r => r.Method).Returns("GET");
+        request.SetupGet(r => r.Headers).Returns(new System.Collections.Generic.Dictionary<string, string>());
+        request.SetupGet(r => r.ResourceType).Returns("document");
+
+        var response = new Moq.Mock<Microsoft.Playwright.IResponse>();
+        response.SetupGet(r => r.Request).Returns(request.Object);
+        response.SetupGet(r => r.Status).Returns(200);
+        response.SetupGet(r => r.Headers).Returns(new System.Collections.Generic.Dictionary<string, string>());
+
+        var method = typeof(HtmlBrowserTester).GetMethod("InitNetworkListeners", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var network = (System.Collections.Generic.IDictionary<Microsoft.Playwright.IRequest, HtmlNetworkEntryDetailed>)method.Invoke(null, new object[] { page.Object, result })!;
+
+        page.Raise(p => p.Request += null!, page.Object, request.Object);
+        page.Raise(p => p.Response += null!, page.Object, response.Object);
+        page.Raise(p => p.RequestFinished += null!, page.Object, request.Object);
+        page.Raise(p => p.RequestFailed += null!, page.Object, request.Object);
+
+        Assert.Single(network);
+        Assert.Single(result.NetworkEntries);
     }
 }
