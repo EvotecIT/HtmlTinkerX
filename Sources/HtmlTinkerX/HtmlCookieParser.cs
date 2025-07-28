@@ -9,24 +9,26 @@ namespace HtmlTinkerX;
 /// Provides helpers for parsing common cookie formats.
 /// </summary>
 public static class HtmlCookieParser {
-    private static SameSiteAttribute? ParseSameSite(string? value) {
-        return value?.ToLowerInvariant() switch {
-            "lax" => SameSiteAttribute.Lax,
-            "strict" => SameSiteAttribute.Strict,
-            "none" => SameSiteAttribute.None,
-            _ => null
-        };
-    }
-
-    private static bool TryGetPropertyIgnoreCase(JsonElement element, string name, out JsonElement value) {
-        foreach (JsonProperty property in element.EnumerateObject()) {
-            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) {
-                value = property.Value;
-                return true;
-            }
+    private static class CookieHelpers {
+        public static SameSiteAttribute? ParseSameSite(string? value) {
+            return value?.ToLowerInvariant() switch {
+                "lax" => SameSiteAttribute.Lax,
+                "strict" => SameSiteAttribute.Strict,
+                "none" => SameSiteAttribute.None,
+                _ => null
+            };
         }
-        value = default;
-        return false;
+
+        public static bool TryGetPropertyIgnoreCase(JsonElement element, string name, out JsonElement value) {
+            foreach (JsonProperty property in element.EnumerateObject()) {
+                if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) {
+                    value = property.Value;
+                    return true;
+                }
+            }
+            value = default;
+            return false;
+        }
     }
 
     /// <summary>
@@ -110,7 +112,7 @@ public static class HtmlCookieParser {
                     cookie.HttpOnly = val is null || val.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
                 case "samesite":
-                    cookie.SameSite = ParseSameSite(val);
+                    cookie.SameSite = CookieHelpers.ParseSameSite(val);
                     break;
             }
         }
@@ -133,8 +135,8 @@ public static class HtmlCookieParser {
                 Domain = root.TryGetProperty("Domain", out var d) ? d.GetString() : null,
                 Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
                 Value = root.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
-                Secure = TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
-                HttpOnly = TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
+                Secure = CookieHelpers.TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
+                HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
             if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
                 cookie.Expires = (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
@@ -160,7 +162,7 @@ public static class HtmlCookieParser {
             Value = root.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
             Secure = root.TryGetProperty("secure", out var s) ? s.GetBoolean() : (bool?)null,
             HttpOnly = root.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null,
-            SameSite = root.TryGetProperty("sameSite", out var ss) ? ParseSameSite(ss.GetString()) : null
+            SameSite = root.TryGetProperty("sameSite", out var ss) ? CookieHelpers.ParseSameSite(ss.GetString()) : null
         };
         if (root.TryGetProperty("expires", out var e)) {
             double exp = e.GetDouble();
