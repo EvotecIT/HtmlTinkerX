@@ -7,6 +7,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Playwright collection")]
 public class HtmlBrowserInstallerTests
 {
     [Fact]

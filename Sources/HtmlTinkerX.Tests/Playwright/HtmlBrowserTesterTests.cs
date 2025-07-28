@@ -7,6 +7,7 @@ using Microsoft.Playwright;
 
 namespace HtmlTinkerX.Tests.Playwright;
 
+[Collection("Playwright collection")]
 public class HtmlBrowserTesterTests {
     [Fact]
     public async Task TestUrlAsync_ValidUrl_ReturnsTestResult() {
