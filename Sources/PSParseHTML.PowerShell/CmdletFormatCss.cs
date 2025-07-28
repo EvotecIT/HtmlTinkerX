@@ -34,11 +34,11 @@ public sealed class CmdletFormatCss : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string formatted = ParameterSetName == ParameterSetFile
-            ? await HtmlFormatter.FormatCssFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            ? await HtmlFormatter.FormatCssFileAsync(Path.ToFullPath()).ConfigureAwait(false)
             : await HtmlFormatter.FormatCssAsync(Content).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, formatted);
 #else

@@ -208,7 +208,7 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
             case ParameterSetClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     Url,
-                    HtmlUtilities.ResolvePath(OutFile!),
+                    OutFile!.ToFullPath(),
                     Browser,
                     Clean.IsPresent,
                     options,
@@ -220,8 +220,8 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
                 break;
             case ParameterSetFileClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
-                    new System.Uri(HtmlUtilities.ResolvePath(Path!)).AbsoluteUri,
-                    HtmlUtilities.ResolvePath(OutFile!),
+                    new System.Uri(Path!.ToFullPath()).AbsoluteUri,
+                    OutFile!.ToFullPath(),
                     Browser,
                     Clean.IsPresent,
                     options,
@@ -234,22 +234,22 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
             case ParameterSetSessionClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                    HtmlUtilities.ResolvePath(OutFile!),
+                    OutFile!.ToFullPath(),
                     options).ConfigureAwait(false);
                 break;
             case ParameterSetSessionDefault:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                    HtmlUtilities.ResolvePath(OutFile!),
+                    OutFile!.ToFullPath(),
                     options).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
-                    ? new System.Uri(HtmlUtilities.ResolvePath(Path!)).AbsoluteUri
+                    ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
                     : Url;
                 await HtmlBrowser.CaptureScreenshotAsync(
                     target,
-                    HtmlUtilities.ResolvePath(OutFile!),
+                    OutFile!.ToFullPath(),
                     Browser,
                     Clean.IsPresent,
                     options,
@@ -264,7 +264,7 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
         if (Open.IsPresent) {
             try {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
-                    FileName = HtmlUtilities.ResolvePath(OutFile!),
+                    FileName = OutFile!.ToFullPath(),
                     UseShellExecute = true,
                 });
             } catch (System.Exception ex) {

@@ -161,7 +161,7 @@ public static class HtmlBrowserTester {
         int timeout = 30000) {
         
         // Resolve the file path
-        var resolvedPath = HtmlUtilities.ResolvePath(filePath);
+        var resolvedPath = filePath.ToFullPath();
         if (!System.IO.File.Exists(resolvedPath)) {
             throw new System.IO.FileNotFoundException($"HTML file not found: {resolvedPath}");
         }

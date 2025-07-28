@@ -26,6 +26,14 @@ public static class HtmlUtilities {
     }
 
     /// <summary>
+    /// Converts a path to an absolute file system path.
+    /// </summary>
+    /// <param name="path">File system path to resolve.</param>
+    /// <returns>Absolute file path.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="path"/> is null or empty.</exception>
+    public static string ToFullPath(this string path) => ResolvePath(path);
+
+    /// <summary>
     /// Ensures the directory for the specified path exists and returns the
     /// resolved absolute path.
     /// </summary>

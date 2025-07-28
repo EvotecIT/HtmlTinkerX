@@ -32,7 +32,7 @@ public sealed class CmdletConvertFromHtmlCookie : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         string data = ParameterSetName == ParameterSetFile
-            ? File.ReadAllText(HtmlUtilities.ResolvePath(Path))
+            ? File.ReadAllText(Path.ToFullPath())
             : Content;
 
         switch (Format) {

@@ -67,7 +67,7 @@ public class HtmlBrowserVideoRecordingTests {
 
         await HtmlBrowser.StopVideoRecordingAsync(session);
 
-        video.Verify(v => v.SaveAsAsync(HtmlUtilities.ResolvePath(outFile)), Times.Once);
+        video.Verify(v => v.SaveAsAsync(outFile.ToFullPath()), Times.Once);
         Assert.False(File.Exists(tempVideo));
         if (useSession) {
             Assert.False(File.Exists(statePath!));

@@ -31,7 +31,7 @@ public class PreMailerClient {
     /// <param name="options">Optional processing options.</param>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
     public static PreMailerClient FromFile(string htmlFilePath, PreMailerOptions? options = null) {
-        string path = HtmlUtilities.ResolvePath(htmlFilePath);
+        string path = htmlFilePath.ToFullPath();
         if (!File.Exists(path)) {
             throw new FileNotFoundException($"HTML file not found: {path}", path);
         }

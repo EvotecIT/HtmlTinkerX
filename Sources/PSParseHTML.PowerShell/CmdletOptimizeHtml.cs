@@ -37,10 +37,10 @@ public sealed class CmdletOptimizeHtml : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetFile
-            ? await HtmlOptimizer.OptimizeHtmlFileAsync(HtmlUtilities.ResolvePath(Path), CSSDecodeEscapes.IsPresent).ConfigureAwait(false)
+            ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent).ConfigureAwait(false)
             : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, result);
 #else

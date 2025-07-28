@@ -135,7 +135,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         }
 
         if (Video != null && !string.IsNullOrEmpty(VideoPath)) {
-            string fullPath = HtmlUtilities.ResolvePath(VideoPath!);
+            string fullPath = VideoPath!.ToFullPath();
             await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
             try {
                 string tempPath = await Video.PathAsync().ConfigureAwait(false);

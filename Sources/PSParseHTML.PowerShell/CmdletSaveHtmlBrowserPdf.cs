@@ -137,7 +137,7 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
-        string outPath = HtmlUtilities.ResolvePath(OutFile);
+        string outPath = OutFile.ToFullPath();
         string? dir = System.IO.Path.GetDirectoryName(outPath);
         if (!string.IsNullOrEmpty(dir)) {
             Directory.CreateDirectory(dir);

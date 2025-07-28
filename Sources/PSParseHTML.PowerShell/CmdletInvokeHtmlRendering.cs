@@ -154,7 +154,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(HtmlUtilities.ResolvePath(Path!)).AbsoluteUri
+            ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
             : Url;
 
         if (Session.IsPresent) {
@@ -185,7 +185,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             WriteObject(sess);
         } else if (!string.IsNullOrEmpty(OutFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutFile!);
+            string outPath = OutFile!.ToFullPath();
             await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout, token).ConfigureAwait(false);
         } else {
             string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout, token).ConfigureAwait(false);

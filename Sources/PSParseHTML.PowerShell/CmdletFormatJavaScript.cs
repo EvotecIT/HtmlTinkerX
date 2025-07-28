@@ -100,11 +100,11 @@ public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
         };
 
         string formatted = ParameterSetName == ParameterSetFile
-            ? await HtmlFormatter.FormatJavaScriptFileAsync(HtmlUtilities.ResolvePath(Path), opts).ConfigureAwait(false)
+            ? await HtmlFormatter.FormatJavaScriptFileAsync(Path.ToFullPath(), opts).ConfigureAwait(false)
             : await HtmlFormatter.FormatJavaScriptAsync(Content, opts).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, formatted);
 #else

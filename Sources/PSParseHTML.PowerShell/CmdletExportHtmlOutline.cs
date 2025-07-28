@@ -56,7 +56,7 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
 
         var opts = new JsonSerializerOptions { WriteIndented = true };
         string json = JsonSerializer.Serialize(outline, opts);
-        string outPath = HtmlUtilities.ResolvePath(Path);
+        string outPath = Path.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
         System.IO.File.WriteAllText(outPath, json);
 #else
