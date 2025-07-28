@@ -16,7 +16,7 @@ public static partial class HtmlBrowser {
     /// <param name="path">File path where the session state should be stored.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static Task ExportSessionAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
-        string fullPath = HtmlUtilities.ResolvePath(path);
+        string fullPath = path.ToFullPath();
         string? dir = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrEmpty(dir)) {
             Directory.CreateDirectory(dir);
@@ -84,7 +84,7 @@ public static partial class HtmlBrowser {
             videoPath: null,
             videoWidth: 800,
             videoHeight: 600,
-            storageStatePath: HtmlUtilities.ResolvePath(statePath),
+            storageStatePath: statePath.ToFullPath(),
             userAgent: userAgent,
             viewportWidth: viewportWidth,
             viewportHeight: viewportHeight,

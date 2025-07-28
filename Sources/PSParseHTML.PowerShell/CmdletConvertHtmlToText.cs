@@ -71,7 +71,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         string text = ParameterSetName switch {
-            ParameterSetFile => HtmlParserToText.ConvertFileToText(HtmlUtilities.ResolvePath(Path)),
+            ParameterSetFile => HtmlParserToText.ConvertFileToText(Path.ToFullPath()),
             ParameterSetUrl => HtmlParserToText.ConvertToText(
                 await HtmlUtilities.GetStringWithProperEncodingAsync(
                     HttpClientHelper.Create(Proxy, ProxyCredential),
@@ -80,7 +80,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
         };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, text);
 #else

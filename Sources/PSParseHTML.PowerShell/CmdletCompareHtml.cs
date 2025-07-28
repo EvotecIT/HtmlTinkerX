@@ -52,7 +52,7 @@ public sealed class CmdletCompareHtml : AsyncPSCmdlet {
     private static bool TryReadFile(string path, out string content) {
         content = string.Empty;
         try {
-            string fullPath = HtmlUtilities.ResolvePath(path);
+            string fullPath = path.ToFullPath();
             if (File.Exists(fullPath)) {
                 content = File.ReadAllText(fullPath);
                 return true;

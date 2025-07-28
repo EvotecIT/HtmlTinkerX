@@ -346,7 +346,7 @@ public static partial class HtmlBrowser {
     /// <param name="timeout">Navigation timeout in milliseconds.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task SavePageContentAsync(string url, string path, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
-        string fullPath = HtmlUtilities.ResolvePath(path);
+        string fullPath = path.ToFullPath();
         string content = await GetPageContentAsync(url, browser, clean, username, password, formLogin, headless, slowMo, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout, cancellationToken).ConfigureAwait(false);
 #if NETSTANDARD2_0 || NETFRAMEWORK
         File.WriteAllText(fullPath, content);

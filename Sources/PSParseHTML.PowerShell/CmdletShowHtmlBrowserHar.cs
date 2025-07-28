@@ -27,10 +27,10 @@ public sealed class CmdletShowHtmlBrowserHar : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         Har har = await HtmlHarViewer.ReadHarAsync(Path).ConfigureAwait(false);
-        string resolved = HtmlUtilities.ResolvePath(Path);
+        string resolved = Path.ToFullPath();
         string outPath = OutFile is null
             ? System.IO.Path.ChangeExtension(resolved, ".html")
-            : HtmlUtilities.ResolvePath(OutFile);
+            : OutFile.ToFullPath();
 
         string html = HtmlHarViewer.BuildViewerHtml(har);
 #if NETSTANDARD2_0 || NETFRAMEWORK

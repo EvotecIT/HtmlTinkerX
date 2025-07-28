@@ -74,7 +74,7 @@ public static partial class HtmlBrowser {
             proxyPassword: proxyPassword,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        string fullPath = HtmlUtilities.ResolvePath(path);
+        string fullPath = path.ToFullPath();
         await CaptureScreenshotAsync(
             session.Page,
             fullPath,

@@ -33,11 +33,11 @@ public sealed class CmdletOptimizeJavaScript : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string optimized = ParameterSetName == ParameterSetFile
-            ? await HtmlOptimizer.OptimizeJavaScriptFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            ? await HtmlOptimizer.OptimizeJavaScriptFileAsync(Path.ToFullPath()).ConfigureAwait(false)
             : await HtmlOptimizer.OptimizeJavaScriptAsync(Content).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(outPath, optimized);
 #else

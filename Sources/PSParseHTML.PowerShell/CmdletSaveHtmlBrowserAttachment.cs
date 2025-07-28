@@ -67,12 +67,12 @@ public sealed class CmdletSaveHtmlBrowserAttachment : AsyncPSCmdlet {
         IAsyncEnumerable<string> files = ParameterSetName switch {
             ParameterSetSession => HtmlBrowser.SavePageDownloadsAsync(
                 (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
-                HtmlUtilities.ResolvePath(Path),
+                Path.ToFullPath(),
                 Filter,
                 token),
             _ => HtmlBrowser.SavePageDownloadsAsync(
                 Url,
-                HtmlUtilities.ResolvePath(Path),
+                Path.ToFullPath(),
                 Browser,
                 Clean.IsPresent,
                 Filter,

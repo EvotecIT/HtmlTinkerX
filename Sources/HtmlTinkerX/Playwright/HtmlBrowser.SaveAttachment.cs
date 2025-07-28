@@ -37,7 +37,7 @@ public static partial class HtmlBrowser {
             null,
             cancellationToken: cancellationToken).ConfigureAwait(false);
         var page = session.Page;
-        string dir = HtmlUtilities.ResolvePath(directory);
+        string dir = directory.ToFullPath();
         await foreach (string file in SavePageDownloadsAsync(page, dir, filter, cancellationToken).ConfigureAwait(false)) {
             yield return file;
         }

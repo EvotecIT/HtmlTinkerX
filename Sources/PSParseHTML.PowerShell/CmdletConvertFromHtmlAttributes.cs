@@ -85,7 +85,7 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
                 Id,
                 Name),
             ParameterSetFile => HtmlParserExtensions.GetElementsFromFile(
-                HtmlUtilities.ResolvePath(Path),
+                Path.ToFullPath(),
                 Tag,
                 Class,
                 Id,

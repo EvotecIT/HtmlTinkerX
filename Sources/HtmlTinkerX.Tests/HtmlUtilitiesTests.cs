@@ -33,6 +33,15 @@ public class HtmlUtilitiesTests {
     }
 
     [Fact]
+    public void ToFullPath_ReturnsSameAsResolvePath() {
+        string temp = Path.GetTempPath();
+        Environment.SetEnvironmentVariable("TMP_TEST", temp);
+        string expected = HtmlUtilities.ResolvePath("%TMP_TEST%");
+        string actual = "%TMP_TEST%".ToFullPath();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
     public void ReadFileChecked_ReturnsContent() {
         string path = Path.GetTempFileName();
         try {

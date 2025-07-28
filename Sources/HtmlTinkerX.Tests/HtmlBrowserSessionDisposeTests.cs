@@ -55,7 +55,7 @@ public class HtmlBrowserSessionDisposeTests {
 
         await session.DisposeAsync();
 
-        video.Verify(v => v.SaveAsAsync(HtmlUtilities.ResolvePath(outFile)), Moq.Times.Once);
+        video.Verify(v => v.SaveAsAsync(outFile.ToFullPath()), Moq.Times.Once);
         Assert.False(System.IO.File.Exists(tempVideo));
         browser.Verify();
         context.Verify();

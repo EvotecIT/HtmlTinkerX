@@ -33,11 +33,11 @@ public sealed class CmdletOptimizeCss : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetPath
-            ? await HtmlOptimizer.OptimizeCssFileAsync(HtmlUtilities.ResolvePath(Path)).ConfigureAwait(false)
+            ? await HtmlOptimizer.OptimizeCssFileAsync(Path.ToFullPath()).ConfigureAwait(false)
             : await HtmlOptimizer.OptimizeCssAsync(Css).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(outPath, result);
 #else

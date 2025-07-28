@@ -65,7 +65,7 @@ public sealed class CmdletFormatHtml : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetFile
             ? await HtmlFormatter.FormatHtmlFileAsync(
-                HtmlUtilities.ResolvePath(Path),
+                Path.ToFullPath(),
                 Indent,
                 BlockStartLine,
                 RemoveHTMLComments.IsPresent,
@@ -86,7 +86,7 @@ public sealed class CmdletFormatHtml : AsyncPSCmdlet {
                 RemoveEmptyBlocks.IsPresent).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = HtmlUtilities.ResolvePath(OutputFile!);
+            string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, result);
 #else
