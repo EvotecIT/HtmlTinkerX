@@ -34,7 +34,7 @@ public static class HtmlResourceParser {
                     Type = HtmlResourceType.Script,
                     Source = src,
                     Comment = comment,
-                    Name = Path.GetFileName(src)
+                    Name = GetFileNameFromUrl(src)
                 });
             } else if (includeInline) {
                 string content = script.TextContent ?? string.Empty;
@@ -60,7 +60,7 @@ public static class HtmlResourceParser {
                         Type = HtmlResourceType.Css,
                         Source = href,
                         Comment = comment,
-                        Name = Path.GetFileName(href)
+                        Name = GetFileNameFromUrl(href)
                     });
                 }
             }
@@ -110,12 +110,15 @@ public static class HtmlResourceParser {
         List<string> paths = new();
 
         foreach (var link in links.Where(l => !string.IsNullOrEmpty(l.Source))) {
-            Uri srcUri = Uri.TryCreate(link.Source, UriKind.Absolute, out var abs) ? abs : new Uri(baseUri, link.Source);
+            Uri srcUri = new(link.Source, UriKind.RelativeOrAbsolute);
+            if (!srcUri.IsAbsoluteUri) {
+                srcUri = new Uri(baseUri, srcUri);
+            }
 #if NETSTANDARD2_0 || NETFRAMEWORK
             using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false)) {
                 response.EnsureSuccessStatusCode();
                 using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                string filePath = Path.Combine(dir, Path.GetFileName(srcUri.LocalPath));
+                string filePath = Path.Combine(dir, Path.GetFileName(srcUri.AbsolutePath));
                 using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
                 await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
                 paths.Add(filePath);
@@ -124,7 +127,7 @@ public static class HtmlResourceParser {
             using HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             await using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            string filePath = Path.Combine(dir, Path.GetFileName(srcUri.LocalPath));
+            string filePath = Path.Combine(dir, Path.GetFileName(srcUri.AbsolutePath));
             await using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
             await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
             paths.Add(filePath);
@@ -144,6 +147,18 @@ public static class HtmlResourceParser {
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         List<HtmlResourceLink> links = await ParseUrlAsync(url, includeCss, includeInline: false, client: http).ConfigureAwait(false);
         return await DownloadResourcesAsync(links, baseUri, directory, http).ConfigureAwait(false);
+    }
+
+    private static string GetFileNameFromUrl(string url) {
+        if (Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out var uri)) {
+            string path = uri.IsAbsoluteUri ? uri.AbsolutePath : uri.OriginalString;
+            int idx = path.IndexOfAny(new[] { '?', '#' });
+            if (idx >= 0) {
+                path = path.Substring(0, idx);
+            }
+            return Path.GetFileName(path);
+        }
+        return Path.GetFileName(url);
     }
 
     private static string? GetPrecedingComment(IElement element) {
