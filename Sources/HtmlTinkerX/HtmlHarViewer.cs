@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -97,8 +98,18 @@ public static class HtmlHarViewer {
     /// </summary>
     /// <param name="har">HAR data.</param>
     /// <returns>HTML string.</returns>
+    /// <example>
+    /// <code>
+    /// Har har = await HtmlHarViewer.ReadHarAsync("session.har");
+    /// string html = HtmlHarViewer.BuildViewerHtml(har);
+    /// await File.WriteAllTextAsync("har.html", html);
+    /// </code>
+    /// </example>
     public static string BuildViewerHtml(Har har) {
-        var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var opts = new JsonSerializerOptions {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.Default
+        };
         string json = JsonSerializer.Serialize(har, opts);
         return $$"""
 <!DOCTYPE html>
@@ -120,8 +131,9 @@ thead { background: #eee; }
 </thead>
 <tbody id='entries'></tbody>
 </table>
+<script type='application/json' id='har-data'>{{json}}</script>
 <script>
-const har = {{json}};
+const har = JSON.parse(document.getElementById('har-data').textContent);
 const entries = (har.log && har.log.entries) || [];
 const tbody = document.getElementById('entries');
 for (const e of entries) {

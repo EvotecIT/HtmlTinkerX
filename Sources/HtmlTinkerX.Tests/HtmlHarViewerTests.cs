@@ -34,17 +34,59 @@ public class HtmlHarViewerTests {
     public async Task BuildViewerHtml_EmbedsValidJson() {
         Har har = await HtmlHarViewer.ReadHarAsync(GetMinimalHarPath());
         string html = HtmlHarViewer.BuildViewerHtml(har);
-        int idx = html.IndexOf("const har =", StringComparison.Ordinal);
-        Assert.NotEqual(-1, idx);
-        int start = html.IndexOf('{', idx);
-        int end = html.IndexOf("};", start, StringComparison.Ordinal);
-        string json = html.Substring(start, end - start + 1);
+        string marker = "<script type='application/json' id='har-data'>";
+        int start = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.NotEqual(-1, start);
+        start += marker.Length;
+        int end = html.IndexOf("</script>", start, StringComparison.Ordinal);
+        string json = html.Substring(start, end - start);
         var opts = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
         Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
         Assert.NotNull(parsed);
+    }
+
+    [Fact]
+    /// <summary>
+    /// Ensures malicious input is safely encoded in the viewer.
+    /// </summary>
+    public void BuildViewerHtml_EncodesMaliciousInput() {
+        var har = new Har {
+            Log = new HarLog {
+                Entries = new[] {
+                    new HarEntry {
+                        StartedDateTime = DateTime.UtcNow,
+                        Request = new HarRequest {
+                            Method = "GET",
+                            Url = "</script><script>alert('x')</script>"
+                        },
+                        Response = new HarResponse {
+                            Status = 200
+                        }
+                    }
+                }
+            }
+        };
+
+        string html = HtmlHarViewer.BuildViewerHtml(har);
+        Assert.DoesNotContain("</script><script>alert('x')</script>", html, StringComparison.Ordinal);
+
+        string marker = "<script type='application/json' id='har-data'>";
+        int start = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        start += marker.Length;
+        int end = html.IndexOf("</script>", start, StringComparison.Ordinal);
+        string json = html.Substring(start, end - start);
+
+        var opts = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
+        Assert.NotNull(parsed);
+        Assert.Equal("</script><script>alert('x')</script>", parsed.Log!.Entries![0].Request!.Url);
     }
 
     [Fact]
