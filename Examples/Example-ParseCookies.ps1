@@ -14,3 +14,8 @@ Close-HTMLSession -Session $session
 $header = 'Set-Cookie: id=abc; Path=/; Secure'
 $cookie = ConvertFrom-HTMLCookie -Content $header -Format SetCookie
 $cookie
+
+# Parse OrgJson cookie with lowercase property names
+$json = '{"name":"id","value":"abc","path":"/","domain":"example.com"}'
+$cookie = ConvertFrom-HTMLCookie -Content $json -Format OrgJson
+$cookie

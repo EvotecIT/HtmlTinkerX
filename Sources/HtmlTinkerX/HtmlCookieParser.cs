@@ -131,14 +131,14 @@ public static class HtmlCookieParser {
             using JsonDocument doc = JsonDocument.Parse(input);
             JsonElement root = doc.RootElement;
             HtmlCookie cookie = new() {
-                Path = root.TryGetProperty("Path", out var p) ? p.GetString() : null,
-                Domain = root.TryGetProperty("Domain", out var d) ? d.GetString() : null,
-                Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
-                Value = root.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
+                Path = CookieHelpers.TryGetPropertyIgnoreCase(root, "Path", out var p) ? p.GetString() : null,
+                Domain = CookieHelpers.TryGetPropertyIgnoreCase(root, "Domain", out var d) ? d.GetString() : null,
+                Name = CookieHelpers.TryGetPropertyIgnoreCase(root, "name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+                Value = CookieHelpers.TryGetPropertyIgnoreCase(root, "value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
                 Secure = CookieHelpers.TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
                 HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
-            if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
+            if (CookieHelpers.TryGetPropertyIgnoreCase(root, "Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
                 cookie.Expires = (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
             }
             return cookie;
@@ -156,15 +156,15 @@ public static class HtmlCookieParser {
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement root = doc.RootElement;
         HtmlCookie cookie = new() {
-            Domain = root.TryGetProperty("domain", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : null,
-            Path = root.TryGetProperty("path", out var p) ? p.GetString() : null,
-            Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
-            Value = root.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
-            Secure = root.TryGetProperty("secure", out var s) ? s.GetBoolean() : (bool?)null,
-            HttpOnly = root.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null,
-            SameSite = root.TryGetProperty("sameSite", out var ss) ? CookieHelpers.ParseSameSite(ss.GetString()) : null
+            Domain = CookieHelpers.TryGetPropertyIgnoreCase(root, "domain", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : null,
+            Path = CookieHelpers.TryGetPropertyIgnoreCase(root, "path", out var p) ? p.GetString() : null,
+            Name = CookieHelpers.TryGetPropertyIgnoreCase(root, "name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+            Value = CookieHelpers.TryGetPropertyIgnoreCase(root, "value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
+            Secure = CookieHelpers.TryGetPropertyIgnoreCase(root, "secure", out var s) ? s.GetBoolean() : (bool?)null,
+            HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "httpOnly", out var h) ? h.GetBoolean() : (bool?)null,
+            SameSite = CookieHelpers.TryGetPropertyIgnoreCase(root, "sameSite", out var ss) ? CookieHelpers.ParseSameSite(ss.GetString()) : null
         };
-        if (root.TryGetProperty("expires", out var e)) {
+        if (CookieHelpers.TryGetPropertyIgnoreCase(root, "expires", out var e)) {
             double exp = e.GetDouble();
             cookie.Expires = (float)(exp >= 1e12 ? exp / 1000.0 : exp);
         }
@@ -184,14 +184,14 @@ public static class HtmlCookieParser {
         if (root.ValueKind == JsonValueKind.Array) {
             foreach (JsonElement el in root.EnumerateArray()) {
                 HtmlCookie c = new() {
-                    Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
-                    Value = el.TryGetProperty("value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
-                    Domain = el.TryGetProperty("domain", out var d) ? d.GetString() : null,
-                    Path = el.TryGetProperty("path", out var p) ? p.GetString() : null,
-                    Secure = el.TryGetProperty("secure", out var s) ? s.GetBoolean() : (bool?)null,
-                    HttpOnly = el.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null
+                    Name = CookieHelpers.TryGetPropertyIgnoreCase(el, "name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+                    Value = CookieHelpers.TryGetPropertyIgnoreCase(el, "value", out var v) ? v.GetString() ?? string.Empty : string.Empty,
+                    Domain = CookieHelpers.TryGetPropertyIgnoreCase(el, "domain", out var d) ? d.GetString() : null,
+                    Path = CookieHelpers.TryGetPropertyIgnoreCase(el, "path", out var p) ? p.GetString() : null,
+                    Secure = CookieHelpers.TryGetPropertyIgnoreCase(el, "secure", out var s) ? s.GetBoolean() : (bool?)null,
+                    HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(el, "httpOnly", out var h) ? h.GetBoolean() : (bool?)null
                 };
-                if (el.TryGetProperty("expires", out var e)) {
+                if (CookieHelpers.TryGetPropertyIgnoreCase(el, "expires", out var e)) {
                     c.Expires = (float)e.GetDouble();
                 }
                 list.Add(c);
