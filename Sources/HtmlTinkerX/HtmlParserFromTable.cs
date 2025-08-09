@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace HtmlTinkerX;
 
@@ -16,8 +17,8 @@ public static class HtmlParserFromTable {
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
     /// </summary>
     /// <param name="html">HTML content containing tables.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
@@ -39,6 +40,8 @@ public static class HtmlParserFromTable {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         var document = HtmlParser.ParseWithAngleSharp(html);
         var tables = document.QuerySelectorAll("table");
@@ -126,7 +129,7 @@ public static class HtmlParserFromTable {
                 string header = cell.TextContent.Trim();
                 if (replaceHeaders != null) {
                     foreach (var kv in replaceHeaders) {
-                        header = header.Replace(kv.Key, kv.Value);
+                        header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                     }
                 }
                 if (cleanHeaders) {
@@ -188,7 +191,7 @@ public static class HtmlParserFromTable {
                     string? value = cell.TextContent.Trim();
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
+                            value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                         }
                     }
                     if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
@@ -232,8 +235,8 @@ public static class HtmlParserFromTable {
     /// Extracts table data from HTML markup using AngleSharp.
     /// </summary>
     /// <param name="html">HTML content containing tables.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithAngleSharp(
@@ -244,6 +247,8 @@ public static class HtmlParserFromTable {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         var document = HtmlParser.ParseWithAngleSharp(html);
         var tables = document.QuerySelectorAll("table");
@@ -275,7 +280,7 @@ public static class HtmlParserFromTable {
                     string header = cell.TextContent.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
+                            header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
                     int colspan = 1;
@@ -320,7 +325,7 @@ public static class HtmlParserFromTable {
                         string value = cell.TextContent.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
-                                value = value.Replace(kv.Key, kv.Value);
+                                value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                             }
                         }
                         int colspan = 1;
@@ -367,8 +372,8 @@ public static class HtmlParserFromTable {
     /// Extracts table data from a web page using AngleSharp.
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
@@ -383,6 +388,8 @@ public static class HtmlParserFromTable {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         bool disposeClient = false;
         HttpClient http;
@@ -410,8 +417,8 @@ public static class HtmlParserFromTable {
     /// </summary>
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
@@ -429,6 +436,8 @@ public static class HtmlParserFromTable {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
@@ -482,13 +491,13 @@ public static class HtmlParserFromTable {
                     string header = HtmlEntity.DeEntitize(cells[0].InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
+                            header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
                     string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText ?? string.Empty)!.Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
+                            value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                         }
                     }
                     if (string.IsNullOrEmpty(header)) {
@@ -530,7 +539,7 @@ public static class HtmlParserFromTable {
                     string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
+                            header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
                     if (cleanHeaders) {
@@ -585,7 +594,7 @@ public static class HtmlParserFromTable {
                         string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
-                                value = value.Replace(kv.Key, kv.Value);
+                                value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                             }
                         }
                         if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
@@ -637,19 +646,21 @@ public static class HtmlParserFromTable {
     /// </summary>
     /// <param name="html">HTML content containing tables.</param>
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static List<List<Dictionary<string, string?>>> ParseTablesWithHtmlAgilityPack(
         string html,
         bool reverseTable = false,
         IDictionary<string, string>? replaceContent = null,
-        IDictionary<string, string>? replaceHeaders = null,
+       IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
@@ -678,13 +689,13 @@ public static class HtmlParserFromTable {
                     string header = HtmlEntity.DeEntitize(cells[0].InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
+                            header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
                     string value = cells.Count > 1 ? HtmlEntity.DeEntitize(cells[1].InnerText ?? string.Empty)!.Trim() : string.Empty;
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
-                            value = value.Replace(kv.Key, kv.Value);
+                            value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                         }
                     }
                     if (string.IsNullOrEmpty(header)) {
@@ -722,7 +733,7 @@ public static class HtmlParserFromTable {
                     string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
-                            header = header.Replace(kv.Key, kv.Value);
+                            header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
                     int colspan = 1;
@@ -770,7 +781,7 @@ public static class HtmlParserFromTable {
                         string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
-                                value = value.Replace(kv.Key, kv.Value);
+                                value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                             }
                         }
                         int colspan = 1;
@@ -818,8 +829,8 @@ public static class HtmlParserFromTable {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
-    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
-    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
@@ -835,6 +846,8 @@ public static class HtmlParserFromTable {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
+        replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
+        replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
 
         bool disposeClient = false;
         HttpClient http;
@@ -856,4 +869,8 @@ public static class HtmlParserFromTable {
             }
         }
     }
+
+    private static string ReplaceCaseInsensitive(string input, string oldValue, string newValue) =>
+        Regex.Replace(input, Regex.Escape(oldValue), _ => newValue,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }
