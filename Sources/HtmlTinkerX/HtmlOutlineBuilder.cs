@@ -57,7 +57,9 @@ public static class HtmlOutlineBuilder {
             if (node is not IElement element) {
                 continue;
             }
-            int level = int.Parse(element.TagName.Substring(1));
+            if (!int.TryParse(element.TagName.Substring(1), out int level)) {
+                continue;
+            }
             string title = element.TextContent.Trim();
             headings.Add((level, title, element.Id));
         }
@@ -78,7 +80,9 @@ public static class HtmlOutlineBuilder {
                 if (node == null) {
                     continue;
                 }
-                int level = int.Parse(node.Name!.Substring(1));
+                if (!int.TryParse(node.Name!.Substring(1), out int level)) {
+                    continue;
+                }
                 string title = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty)!.Trim();
                 string? id = node.Id;
                 headings.Add((level, title, id));
