@@ -17,7 +17,7 @@ public class HtmlCookieParserTests {
         Assert.Equal("example.com", c.Domain);
         Assert.Equal("/", c.Path);
         Assert.True(c.Secure);
-        Assert.Equal(1704067199f, c.Expires);
+        Assert.Equal(1704067199d, c.Expires);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class HtmlCookieParserTests {
         Assert.Equal("example.com", c.Domain);
         Assert.Equal("/", c.Path);
         Assert.True(c.Secure);
-        Assert.True(c.Expires > 1e18f);
+        Assert.True(c.Expires > 1e18d);
     }
 
     [Fact]

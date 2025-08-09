@@ -49,15 +49,15 @@ public static class HtmlCookieParser {
             if (parts.Length < 7) {
                 continue;
             }
-            long? expires = null;
-            if (long.TryParse(parts[4], out long l) && l != 0) {
-                expires = l;
+            double? expires = null;
+            if (double.TryParse(parts[4], out double d) && d != 0) {
+                expires = d;
             }
             list.Add(new HtmlCookie {
                 Domain = parts[0],
                 Path = parts[2],
                 Secure = parts[3].Equals("TRUE", StringComparison.OrdinalIgnoreCase),
-                Expires = expires.HasValue ? (float?)expires.Value : null,
+                Expires = expires,
                 Name = parts[5],
                 Value = parts[6]
             });
@@ -102,7 +102,7 @@ public static class HtmlCookieParser {
                     break;
                 case "expires":
                     if (DateTime.TryParse(val, out DateTime dt)) {
-                        cookie.Expires = (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
+                        cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
                     }
                     break;
                 case "secure":
@@ -139,7 +139,7 @@ public static class HtmlCookieParser {
                 HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
             if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
-                cookie.Expires = (float)new DateTimeOffset(dt).ToUnixTimeSeconds();
+                cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
             }
             return cookie;
         }
@@ -166,7 +166,7 @@ public static class HtmlCookieParser {
         };
         if (root.TryGetProperty("expires", out var e)) {
             double exp = e.GetDouble();
-            cookie.Expires = (float)(exp >= 1e12 ? exp / 1000.0 : exp);
+            cookie.Expires = exp >= 1e12 ? exp / 1000.0 : exp;
         }
         return cookie;
     }
@@ -192,7 +192,7 @@ public static class HtmlCookieParser {
                     HttpOnly = el.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null
                 };
                 if (el.TryGetProperty("expires", out var e)) {
-                    c.Expires = (float)e.GetDouble();
+                    c.Expires = e.GetDouble();
                 }
                 list.Add(c);
             }

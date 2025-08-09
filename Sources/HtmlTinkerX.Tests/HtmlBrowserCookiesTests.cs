@@ -27,7 +27,7 @@ public class HtmlBrowserCookiesTests {
                 Value = "value",
                 Domain = "domain",
                 Path = "/path",
-                Expires = 123f,
+                Expires = 123,
                 HttpOnly = true,
                 Secure = false,
                 SameSite = SameSiteAttribute.Lax
@@ -43,7 +43,7 @@ public class HtmlBrowserCookiesTests {
         Assert.Equal("value", c.Value);
         Assert.Equal("domain", c.Domain);
         Assert.Equal("/path", c.Path);
-        Assert.Equal(123f, c.Expires);
+        Assert.Equal(123d, c.Expires);
         Assert.True(c.HttpOnly);
         Assert.False(c.Secure);
         Assert.Equal(SameSiteAttribute.Lax, c.SameSite);
@@ -66,7 +66,7 @@ public class HtmlBrowserCookiesTests {
                 Url = "https://example.com",
                 Domain = "domain",
                 Path = "/path",
-                Expires = 456f,
+                Expires = 456,
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteAttribute.Strict
@@ -80,7 +80,7 @@ public class HtmlBrowserCookiesTests {
             l.First().Url == "https://example.com" &&
             l.First().Domain == "domain" &&
             l.First().Path == "/path" &&
-            l.First().Expires == 456f &&
+            l.First().Expires == 456 &&
             l.First().HttpOnly == true &&
             l.First().Secure == true &&
             l.First().SameSite == SameSiteAttribute.Strict
