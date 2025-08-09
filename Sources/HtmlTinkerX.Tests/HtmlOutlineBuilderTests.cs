@@ -23,4 +23,15 @@ public class HtmlOutlineBuilderTests {
         Assert.Equal("Detail 1.1.1", outline[0].Children[0].Children[0].Title);
         Assert.Equal("Section 2", outline[1].Title);
     }
+
+    [Theory]
+    [InlineData(HtmlParserEngine.AgilityPack)]
+    [InlineData(HtmlParserEngine.AngleSharp)]
+    public void Build_SkipsMalformedHeadings(HtmlParserEngine engine) {
+        string html = "<h1>Good</h1><hX>Bad</hX><h1>Also Good</h1>";
+        var outline = HtmlOutlineBuilder.Build(html, engine);
+        Assert.Equal(2, outline.Count);
+        Assert.Equal("Good", outline[0].Title);
+        Assert.Equal("Also Good", outline[1].Title);
+    }
 }

@@ -15,4 +15,22 @@ Describe 'Export-HTMLOutline' {
             Remove-Item -LiteralPath $outFile -ErrorAction SilentlyContinue
         }
     }
+
+    It 'Skips malformed heading tags' {
+        $content = @'
+<h1>Good</h1>
+<hX>Bad</hX>
+<h1>Also Good</h1>
+'@
+        $outFile = Join-Path $PSScriptRoot 'outline_test_malformed.json'
+        try {
+            Export-HTMLOutline -Content $content -Path $outFile
+            $outline = Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json
+            $outline.Count | Should -Be 2
+            $outline[0].title | Should -Be 'Good'
+            $outline[1].title | Should -Be 'Also Good'
+        } finally {
+            Remove-Item -LiteralPath $outFile -ErrorAction SilentlyContinue
+        }
+    }
 }
