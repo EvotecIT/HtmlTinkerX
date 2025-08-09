@@ -1,7 +1,6 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -59,9 +58,23 @@ public static class HtmlFormSubmitter {
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         if (method == FormMethod.Get) {
-            string query = string.Join("&", fields.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
-            string url = actionUrl.Contains("?") ? $"{actionUrl}&{query}" : $"{actionUrl}?{query}";
-            using HttpResponseMessage response = await http.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            var builder = new UriBuilder(actionUrl);
+            var parameters = new List<KeyValuePair<string, string>>();
+            if (!string.IsNullOrEmpty(builder.Query)) {
+                string[] existing = builder.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string pair in existing) {
+                    string[] kv = pair.Split(new[] { '=' }, 2);
+                    string key = Uri.UnescapeDataString(kv[0]);
+                    string value = kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : string.Empty;
+                    parameters.Add(new KeyValuePair<string, string>(key, value));
+                }
+            }
+            foreach (var kv in fields) {
+                parameters.Add(kv);
+            }
+            using var queryContent = new FormUrlEncodedContent(parameters);
+            builder.Query = await queryContent.ReadAsStringAsync().ConfigureAwait(false);
+            using HttpResponseMessage response = await http.GetAsync(builder.Uri, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         } else {
