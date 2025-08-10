@@ -57,4 +57,25 @@ public class HtmlResourceDownloadTests {
         Assert.Equal("file2", c2);
         Directory.Delete(dir, true);
     }
+
+    [Fact]
+    public async Task DownloadResourcesAsync_StripsQueryAndFragmentFromFileName() {
+        using var server = CreateServer();
+        using HttpClient client = server.CreateClient();
+        var links = new List<HtmlResourceLink> {
+            new() { Source = "file1.txt?x=1#frag" },
+            new() { Source = "file2.js?y=2#frag" }
+        };
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+        List<string> paths = await HtmlResourceParser.DownloadResourcesAsync(links, server.BaseAddress!, dir, client);
+
+        Assert.Contains(Path.Combine(dir, "file1.txt"), paths);
+        Assert.Contains(Path.Combine(dir, "file2.js"), paths);
+        string c1 = File.ReadAllText(Path.Combine(dir, "file1.txt"));
+        string c2 = File.ReadAllText(Path.Combine(dir, "file2.js"));
+        Assert.Equal("file1", c1);
+        Assert.Equal("file2", c2);
+        Directory.Delete(dir, true);
+    }
 }
