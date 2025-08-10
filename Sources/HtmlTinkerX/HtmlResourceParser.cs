@@ -150,15 +150,15 @@ public static class HtmlResourceParser {
     }
 
     private static string GetFileNameFromUrl(string url) {
-        if (Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out var uri)) {
-            string path = uri.IsAbsoluteUri ? uri.AbsolutePath : uri.OriginalString;
-            int idx = path.IndexOfAny(new[] { '?', '#' });
-            if (idx >= 0) {
-                path = path.Substring(0, idx);
-            }
-            return Path.GetFileName(path);
+        if (Uri.TryCreate(url, UriKind.Absolute, out var abs) &&
+            (abs.Scheme == Uri.UriSchemeHttp || abs.Scheme == Uri.UriSchemeHttps)) {
+            return Path.GetFileName(abs.AbsolutePath);
         }
-        return Path.GetFileName(url);
+
+        string decoded = Uri.UnescapeDataString(url);
+        int idx = decoded.IndexOfAny(new[] { '?', '#' });
+        string path = idx >= 0 ? decoded.Substring(0, idx) : decoded;
+        return Path.GetFileName(path);
     }
 
     private static string? GetPrecedingComment(IElement element) {
