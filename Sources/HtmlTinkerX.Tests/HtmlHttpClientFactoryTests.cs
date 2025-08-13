@@ -72,6 +72,31 @@ public class HtmlHttpClientFactoryTests {
     }
 
     [Fact]
+    public async Task Shared_IsThreadSafe() {
+        HtmlHttpClientFactory.ResetShared();
+        const int count = 20;
+        HttpClient?[] clients = new HttpClient?[count];
+        Task[] tasks = new Task[count];
+        TaskCompletionSource<bool> start = new();
+        for (int i = 0; i < count; i++) {
+            int index = i;
+            tasks[i] = Task.Run(async () => {
+                await start.Task;
+                clients[index] = HtmlHttpClientFactory.Shared;
+            });
+        }
+        start.SetResult(true);
+        await Task.WhenAll(tasks);
+        HttpClient? first = clients[0];
+        Assert.NotNull(first);
+        HttpClient firstClient = first!;
+        foreach (HttpClient? client in clients) {
+            Assert.NotNull(client);
+            Assert.Same(firstClient, client!);
+        }
+    }
+
+    [Fact]
     public void Create_WithProxy_ConfiguresProxy() {
         var cred = new NetworkCredential("u", "p");
         using HttpClient client = HtmlHttpClientFactory.Create("http://localhost:1234", cred);

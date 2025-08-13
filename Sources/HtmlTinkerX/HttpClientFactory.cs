@@ -10,7 +10,8 @@ namespace HtmlTinkerX;
 /// Default timeout, headers and proxy settings can be configured globally.
 /// </summary>
 public static class HtmlHttpClientFactory {
-    private static HttpClient? _sharedClient;
+    private static readonly object _sharedClientLock = new();
+    private static volatile HttpClient? _sharedClient;
 
     /// <summary>Default timeout used for new clients.</summary>
     public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(100);
@@ -75,16 +76,22 @@ public static class HtmlHttpClientFactory {
     public static HttpClient Shared {
         get {
             if (_sharedClient == null) {
-                _sharedClient = Create();
+                lock (_sharedClientLock) {
+                    if (_sharedClient == null) {
+                        _sharedClient = Create();
+                    }
+                }
             }
-            return _sharedClient;
+            return _sharedClient!;
         }
     }
 
     /// <summary>Recreates the shared client with current defaults.</summary>
     public static void ResetShared() {
-        _sharedClient?.Dispose();
-        _sharedClient = null;
+        lock (_sharedClientLock) {
+            _sharedClient?.Dispose();
+            _sharedClient = null;
+        }
     }
 
     private static void ApplyDefaults(HttpClient client) {
