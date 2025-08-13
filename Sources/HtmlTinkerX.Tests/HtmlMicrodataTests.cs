@@ -33,4 +33,17 @@ public class HtmlMicrodataTests {
         Assert.Equal("https://schema.org/Product", items[0].Type);
         Assert.Equal("Widget", items[0].Properties["name"][0]);
     }
+
+    private class JsonLdPerson {
+        public string? Name { get; set; }
+    }
+
+    [Fact]
+    public void MicrodataParser_ExtractJsonLd_ReturnsModels() {
+        const string html = "<script type=\"application/ld+json\">{\"name\":\"Jane\"}</script>";
+        IDocument doc = HtmlParser.ParseWithAngleSharp(html);
+        var people = MicrodataParser.ExtractJsonLd<JsonLdPerson>(doc);
+        Assert.Single(people);
+        Assert.Equal("Jane", people[0].Name);
+    }
 }
