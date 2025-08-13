@@ -111,6 +111,7 @@ public static class HtmlHarViewer {
             Encoder = JavaScriptEncoder.Default
         };
         string json = JsonSerializer.Serialize(har, opts);
+        string encodedJson = HtmlEncoder.Default.Encode(json);
         return $$"""
 <!DOCTYPE html>
 <html>
@@ -131,7 +132,7 @@ thead { background: #eee; }
 </thead>
 <tbody id='entries'></tbody>
 </table>
-<script type='application/json' id='har-data'>{{json}}</script>
+<script type='application/json' id='har-data'>{{encodedJson}}</script>
 <script>
 const har = JSON.parse(document.getElementById('har-data').textContent);
 const entries = (har.log && har.log.entries) || [];
