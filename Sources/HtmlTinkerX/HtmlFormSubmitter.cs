@@ -30,6 +30,8 @@ public static class HtmlFormSubmitter {
             throw new ArgumentNullException(nameof(fields));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         var form = page.Locator(formSelector);
         await WithCancellation(form.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }), cancellationToken).ConfigureAwait(false);
         foreach (var kv in fields) {
@@ -88,6 +90,8 @@ public static class HtmlFormSubmitter {
         if (fields == null) {
             throw new ArgumentNullException(nameof(fields));
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         if (method == FormMethod.Get) {

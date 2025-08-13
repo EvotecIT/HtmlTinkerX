@@ -64,7 +64,7 @@ public class HtmlFormSubmitterTests {
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
             HtmlFormSubmitter.SubmitAsync(server.BaseAddress + "login", FormMethod.Post, fields, client, cts.Token));
     }
 }
