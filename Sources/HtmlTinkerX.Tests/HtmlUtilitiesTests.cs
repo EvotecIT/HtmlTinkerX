@@ -2,11 +2,17 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using System.Diagnostics;
 using System.Net.Http;
+using System.Text.RegularExpressions;
+using Xunit.Abstractions;
 
 namespace HtmlTinkerX.Tests;
 
 public class HtmlUtilitiesTests {
+    private readonly ITestOutputHelper _output;
+
+    public HtmlUtilitiesTests(ITestOutputHelper output) => _output = output;
     private static TestServer CreateServer(string content, string charset) {
         var builder = new WebHostBuilder()
             .Configure(app => app.Run(async ctx => {
@@ -151,5 +157,36 @@ public class HtmlUtilitiesTests {
         const string html = "<div>   Hello  </div>  <span>  World</span>";
         string result = HtmlUtilities.RemoveRedundantWhitespace(html);
         Assert.Equal("<div> Hello </div><span> World</span>", result);
+    }
+
+    [Fact]
+    public void RemoveRedundantWhitespace_PerformanceBenchmark() {
+        const string html = "<div>   Hello  </div>  <span>  World</span>";
+        const int iterations = 10000;
+
+        static string OldRemove(string h) {
+            string collapsed = Regex.Replace(h, "\\s+", " ");
+            collapsed = Regex.Replace(collapsed, @">\s+<", "><");
+            return collapsed.Trim();
+        }
+
+        OldRemove(html);
+        HtmlUtilities.RemoveRedundantWhitespace(html);
+
+        var oldWatch = Stopwatch.StartNew();
+        for (int i = 0; i < iterations; i++) {
+            OldRemove(html);
+        }
+        oldWatch.Stop();
+
+        var newWatch = Stopwatch.StartNew();
+        for (int i = 0; i < iterations; i++) {
+            HtmlUtilities.RemoveRedundantWhitespace(html);
+        }
+        newWatch.Stop();
+
+        _output.WriteLine($"Old: {oldWatch.ElapsedMilliseconds} ms, New: {newWatch.ElapsedMilliseconds} ms");
+
+        Assert.True(newWatch.Elapsed <= oldWatch.Elapsed);
     }
 }

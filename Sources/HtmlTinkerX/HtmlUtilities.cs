@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace HtmlTinkerX;
 
@@ -9,6 +10,8 @@ namespace HtmlTinkerX;
 /// Helper methods for working with file paths.
 /// </summary>
 public static class HtmlUtilities {
+    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex TagWhitespaceRegex = new(@">\s+<", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     /// <summary>
     /// Resolves the provided path to an absolute file system path.
     /// Environment variables are expanded and relative paths are
@@ -151,8 +154,8 @@ public static class HtmlUtilities {
             throw new ArgumentNullException(nameof(html));
         }
 
-        string collapsed = System.Text.RegularExpressions.Regex.Replace(html, "\\s+", " ");
-        collapsed = System.Text.RegularExpressions.Regex.Replace(collapsed, @">\s+<", "><");
+        string collapsed = WhitespaceRegex.Replace(html, " ");
+        collapsed = TagWhitespaceRegex.Replace(collapsed, "><");
         return collapsed.Trim();
     }
 }
