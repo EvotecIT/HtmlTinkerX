@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using System.Net;
 using System.Text.Json;
 
 namespace HtmlTinkerX.Tests;
@@ -40,6 +41,7 @@ public class HtmlHarViewerTests {
         start += marker.Length;
         int end = html.IndexOf("</script>", start, StringComparison.Ordinal);
         string json = html.Substring(start, end - start);
+        json = WebUtility.HtmlDecode(json);
         var opts = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -79,6 +81,7 @@ public class HtmlHarViewerTests {
         start += marker.Length;
         int end = html.IndexOf("</script>", start, StringComparison.Ordinal);
         string json = html.Substring(start, end - start);
+        json = WebUtility.HtmlDecode(json);
 
         var opts = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,
@@ -87,6 +90,39 @@ public class HtmlHarViewerTests {
         Har? parsed = JsonSerializer.Deserialize<Har>(json, opts);
         Assert.NotNull(parsed);
         Assert.Equal("</script><script>alert('x')</script>", parsed.Log!.Entries![0].Request!.Url);
+    }
+
+    [Fact]
+    /// <summary>
+    /// Verifies the embedded JSON payload is HTML-encoded.
+    /// </summary>
+    public void BuildViewerHtml_EncodesJsonScriptTag() {
+        var har = new Har {
+            Log = new HarLog {
+                Entries = new[] {
+                    new HarEntry {
+                        StartedDateTime = DateTime.UtcNow,
+                        Request = new HarRequest {
+                            Method = "GET",
+                            Url = "</script><script>alert('x')</script>"
+                        },
+                        Response = new HarResponse {
+                            Status = 200
+                        }
+                    }
+                }
+            }
+        };
+
+        string html = HtmlHarViewer.BuildViewerHtml(har);
+        string marker = "<script type='application/json' id='har-data'>";
+        int start = html.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        start += marker.Length;
+        int end = html.IndexOf("</script>", start, StringComparison.Ordinal);
+        string json = html.Substring(start, end - start);
+
+        Assert.DoesNotContain("</script>", json, StringComparison.Ordinal);
     }
 
     [Fact]
