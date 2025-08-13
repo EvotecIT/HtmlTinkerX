@@ -19,6 +19,8 @@ public static class ParseCookiesExample {
         await HtmlBrowser.SetCookiesAsync(session, cookies).ConfigureAwait(false);
         List<HtmlCookie> result = await HtmlBrowser.GetCookiesAsync(session).ConfigureAwait(false);
         Console.WriteLine($"Retrieved {result.Count} cookie(s) from session.");
+        string netscape = HtmlCookieParser.ToNetscapeFile(result);
+        Console.WriteLine(netscape);
         await HtmlBrowser.CloseSessionAsync(session).ConfigureAwait(false);
 
         string header = "Set-Cookie: id=abc; Path=/; Secure";
