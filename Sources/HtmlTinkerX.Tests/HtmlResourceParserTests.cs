@@ -14,4 +14,14 @@ public class HtmlResourceParserTests {
         Assert.Equal("app.js", links[0].Name);
         Assert.Equal("main.css", links[1].Name);
     }
+
+    [Fact]
+    public async Task ParseUrlAsync_InvalidUrl_ThrowsArgumentException() {
+        await Assert.ThrowsAsync<ArgumentException>(() => HtmlResourceParser.ParseUrlAsync("invalid"));
+    }
+
+    [Fact]
+    public async Task DownloadResourcesFromUrlAsync_InvalidUrl_ThrowsArgumentException() {
+        await Assert.ThrowsAsync<ArgumentException>(() => HtmlResourceParser.DownloadResourcesFromUrlAsync("invalid", "dir"));
+    }
 }

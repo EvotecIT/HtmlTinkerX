@@ -91,8 +91,12 @@ public static class HtmlResourceParser {
             throw new ArgumentNullException(nameof(url));
         }
 
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) {
+            throw new ArgumentException("The URL must be an absolute URI.", nameof(url));
+        }
+
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString()).ConfigureAwait(false);
         return Parse(content, includeCss, includeInline);
     }
 
@@ -143,9 +147,12 @@ public static class HtmlResourceParser {
             throw new ArgumentNullException(nameof(url));
         }
 
-        Uri baseUri = new(url);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var baseUri)) {
+            throw new ArgumentException("The URL must be an absolute URI.", nameof(url));
+        }
+
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        List<HtmlResourceLink> links = await ParseUrlAsync(url, includeCss, includeInline: false, client: http).ConfigureAwait(false);
+        List<HtmlResourceLink> links = await ParseUrlAsync(baseUri.ToString(), includeCss, includeInline: false, client: http).ConfigureAwait(false);
         return await DownloadResourcesAsync(links, baseUri, directory, http).ConfigureAwait(false);
     }
 
