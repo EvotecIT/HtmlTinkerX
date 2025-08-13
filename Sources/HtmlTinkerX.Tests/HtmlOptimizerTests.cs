@@ -1,4 +1,9 @@
 using HtmlTinkerX;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -33,5 +38,23 @@ public class HtmlOptimizerTests {
 
         string result = HtmlOptimizer.OptimizeJavaScript(formatted);
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public async Task EmbedImagesAsDataUriAsync_ReplacesImageSources() {
+        var builder = new WebHostBuilder()
+            .Configure(app => app.Run(async ctx => {
+                byte[] img = System.Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=");
+                ctx.Response.ContentType = "image/png";
+                await ctx.Response.Body.WriteAsync(img, 0, img.Length);
+            }));
+        using var server = new TestServer(builder);
+        using HttpClient client = server.CreateClient();
+        string html = $"<html><body><img src=\"{server.BaseAddress}image.png\" /></body></html>";
+
+        string result = await HtmlOptimizer.EmbedImagesAsDataUriAsync(html, client: client);
+
+        Assert.Contains("data:image/png;base64", result);
+        Assert.DoesNotContain("image.png", result);
     }
 }
