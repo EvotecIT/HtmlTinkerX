@@ -352,9 +352,9 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="html">HTML content containing microdata.</param>
     /// <returns>List of microdata items.</returns>
-    public static List<HtmlMicrodataItem> ParseMicrodataItems(string html) {
-        return HtmlParserFromMicrodata.ParseMicrodataItems(html);
-    }
+      public static List<HtmlMicrodataItem> ParseMicrodataItems(string html) {
+          return HtmlParserFromMicrodata.ParseMicrodataItems(html);
+      }
 
     /// <summary>
     /// Extracts microdata items from a web page.
@@ -362,18 +362,32 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
     /// <returns>List of microdata items.</returns>
-    public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null) {
-        return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
-    }
+      public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null) {
+          return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
+      }
+
+      /// <summary>
+      /// Extracts JSON-LD objects from HTML markup and deserializes them to the specified model.
+      /// </summary>
+      /// <typeparam name="T">Type to deserialize JSON-LD blocks into.</typeparam>
+      /// <param name="html">HTML content containing JSON-LD script blocks.</param>
+      /// <returns>List of deserialized models.</returns>
+      public static List<T> ParseJsonLd<T>(string html) {
+          if (html == null) {
+              throw new ArgumentNullException(nameof(html));
+          }
+          IDocument document = ParseWithAngleSharp(html);
+          return MicrodataParser.ExtractJsonLd<T>(document);
+      }
 
     /// <summary>
     /// Compares microdata items with built-in schema definitions and returns mismatches.
     /// </summary>
     /// <param name="items">Microdata items to validate.</param>
     /// <returns>List of mismatches found.</returns>
-    public static List<MicrodataSchemaMismatch> ValidateMicrodataItems(List<HtmlMicrodataItem> items) {
-        return MicrodataSchemaValidator.Validate(items);
-    }
+      public static List<MicrodataSchemaMismatch> ValidateMicrodataItems(List<HtmlMicrodataItem> items) {
+          return MicrodataSchemaValidator.Validate(items);
+      }
 
 
     /// <summary>

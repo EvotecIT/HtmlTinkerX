@@ -1,5 +1,6 @@
 using AngleSharp.Dom;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace HtmlTinkerX;
 
@@ -13,6 +14,26 @@ internal static class MicrodataParser {
             items.Add(ParseItem(root));
         }
         return items;
+    }
+
+    internal static List<T> ExtractJsonLd<T>(IDocument document) {
+        List<T> results = new();
+        JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
+        foreach (var script in document.QuerySelectorAll("script[type='application/ld+json']")) {
+            string json = script.TextContent;
+            if (string.IsNullOrWhiteSpace(json)) {
+                continue;
+            }
+            try {
+                T? model = JsonSerializer.Deserialize<T>(json, options);
+                if (model != null) {
+                    results.Add(model);
+                }
+            } catch (JsonException) {
+                // Ignore invalid JSON-LD blocks
+            }
+        }
+        return results;
     }
 
     private static HtmlMicrodataItem ParseItem(IElement element) {
