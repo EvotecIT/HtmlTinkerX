@@ -11,4 +11,11 @@ public class HtmlDiffViewerTests {
         string html = HtmlDiffViewer.BuildViewerHtml(diffs);
         Assert.Contains("<table>", html);
     }
+
+    [Fact]
+    public void BuildViewerHtml_EncodesScriptTags() {
+        var diffs = HtmlDiffer.Compare("<p></p>", "<script>alert('x')</script>");
+        string html = HtmlDiffViewer.BuildViewerHtml(diffs);
+        Assert.DoesNotContain("<script>", html);
+    }
 }

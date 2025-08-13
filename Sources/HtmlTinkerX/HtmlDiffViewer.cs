@@ -2,6 +2,7 @@ using AngleSharp.Diffing.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 
 namespace HtmlTinkerX;
 
@@ -20,7 +21,8 @@ public static class HtmlDiffViewer {
         }
 
         string rows = string.Join(Environment.NewLine,
-            diffs.Select(d => $"<tr><td>{d.GetType().Name}</td><td>{d.Target}</td><td>{d.Result}</td></tr>"));
+            diffs.Select(d =>
+                $"<tr><td>{d.GetType().Name}</td><td>{WebUtility.HtmlEncode(d.Target.ToString())}</td><td>{WebUtility.HtmlEncode(d.Result.ToString())}</td></tr>"));
 
         return $$"""
 <!DOCTYPE html>
