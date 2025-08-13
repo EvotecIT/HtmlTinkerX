@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -48,5 +49,22 @@ public class HtmlFormSubmitterTests {
         string action = server.BaseAddress + "login?existing=value";
         string result = await HtmlFormSubmitter.SubmitAsync(action, FormMethod.Get, fields, client);
         Assert.Equal("admin:secret:value", result);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_CanceledToken_Throws() {
+        using var server = CreateServer();
+        using HttpClient client = server.CreateClient();
+
+        var fields = new Dictionary<string, string> {
+            ["user"] = "admin",
+            ["pass"] = "secret"
+        };
+
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            HtmlFormSubmitter.SubmitAsync(server.BaseAddress + "login", FormMethod.Post, fields, client, cts.Token));
     }
 }
