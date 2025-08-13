@@ -35,6 +35,43 @@ public class HtmlCookieParserTests {
     }
 
     [Fact]
+    public void ToNetscapeFile_FormatsCookie() {
+        List<HtmlCookie> cookies = new() {
+            new HtmlCookie { Domain = "example.com", Path = "/", Secure = true, Expires = 1704067199d, Name = "sessionId", Value = "abc123xyz" }
+        };
+        string file = HtmlCookieParser.ToNetscapeFile(cookies);
+        string[] lines = file.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("# Netscape HTTP Cookie File", lines[0]);
+        string[] parts = lines[1].Split('\t');
+        Assert.Equal(7, parts.Length);
+        Assert.Equal("example.com", parts[0]);
+        Assert.Equal("FALSE", parts[1]);
+        Assert.Equal("/", parts[2]);
+        Assert.Equal("TRUE", parts[3]);
+        Assert.Equal("1704067199", parts[4]);
+        Assert.Equal("sessionId", parts[5]);
+        Assert.Equal("abc123xyz", parts[6]);
+    }
+
+    [Fact]
+    public void ToNetscapeFile_RoundTrips() {
+        List<HtmlCookie> cookies = new() {
+            new HtmlCookie { Domain = ".example.com", Path = "/", Secure = false, Expires = 1704067200d, Name = "id", Value = "1" }
+        };
+        string file = HtmlCookieParser.ToNetscapeFile(cookies);
+        Assert.Contains("\tTRUE\t", file);
+        List<HtmlCookie> parsed = HtmlCookieParser.ParseNetscapeFile(file);
+        Assert.Single(parsed);
+        HtmlCookie c = parsed[0];
+        Assert.Equal(".example.com", c.Domain);
+        Assert.Equal("/", c.Path);
+        Assert.False(c.Secure);
+        Assert.Equal(1704067200d, c.Expires);
+        Assert.Equal("id", c.Name);
+        Assert.Equal("1", c.Value);
+    }
+
+    [Fact]
     public void ParseSetCookieHeader_ParsesCookie() {
         string header = "Set-Cookie: sessionId=abc123xyz; Path=/; Secure; Expires=Wed, 31 Jan 2024 23:59:59 GMT";
         HtmlCookie c = HtmlCookieParser.ParseSetCookieHeader(header);

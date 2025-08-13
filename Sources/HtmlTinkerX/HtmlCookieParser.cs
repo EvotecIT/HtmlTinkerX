@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Playwright;
 
@@ -198,5 +200,35 @@ public static class HtmlCookieParser {
             }
         }
         return list;
+    }
+
+    /// <summary>
+    /// Converts cookies to the Netscape HTTP cookie file format.
+    /// </summary>
+    /// <param name="cookies">Collection of cookies to convert.</param>
+    public static string ToNetscapeFile(IEnumerable<HtmlCookie> cookies) {
+        if (cookies == null) {
+            throw new ArgumentNullException(nameof(cookies));
+        }
+        StringBuilder sb = new();
+        sb.AppendLine("# Netscape HTTP Cookie File");
+        foreach (HtmlCookie cookie in cookies) {
+            string domain = cookie.Domain ?? string.Empty;
+            bool tail = domain.StartsWith(".", StringComparison.Ordinal);
+            string flag = tail ? "TRUE" : "FALSE";
+            string path = cookie.Path ?? "/";
+            string secure = cookie.Secure == true ? "TRUE" : "FALSE";
+            string expires = cookie.Expires.HasValue ? cookie.Expires.Value.ToString(CultureInfo.InvariantCulture) : "0";
+            string name = cookie.Name ?? string.Empty;
+            string value = cookie.Value ?? string.Empty;
+            sb.Append(domain).Append('\t')
+              .Append(flag).Append('\t')
+              .Append(path).Append('\t')
+              .Append(secure).Append('\t')
+              .Append(expires).Append('\t')
+              .Append(name).Append('\t')
+              .Append(value).Append('\n');
+        }
+        return sb.ToString();
     }
 }
