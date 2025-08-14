@@ -55,7 +55,16 @@ public static class HtmlFormatter {
     /// <param name="js">JavaScript code to format.</param>
     /// <returns>Formatted JavaScript string.</returns>
     public static Task<string> FormatJavaScriptAsync(string js)
-        => Task.Run(() => FormatJavaScript(js));
+        => FormatJavaScriptAsync(js, cancellationToken: CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using default JsBeautifier options.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js, CancellationToken cancellationToken)
+        => FormatJavaScriptAsync(js, null, cancellationToken);
 
     /// <summary>
     /// Formats JavaScript code from a file using default JsBeautifier options.
@@ -76,7 +85,17 @@ public static class HtmlFormatter {
     /// <param name="options">Optional Beautifier options object.</param>
     /// <returns>A task returning the formatted JavaScript string.</returns>
     public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options = null)
-        => Task.Run(() => FormatJavaScript(js, options));
+        => FormatJavaScriptAsync(js, options, CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code using JsBeautifier.
+    /// </summary>
+    /// <param name="js">JavaScript code to format.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    public static Task<string> FormatJavaScriptAsync(string js, BeautifierOptions? options, CancellationToken cancellationToken)
+        => Task.Run(() => FormatJavaScript(js, options), cancellationToken);
 
     /// <summary>
     /// Asynchronously formats JavaScript code from a file using JsBeautifier.
@@ -85,21 +104,31 @@ public static class HtmlFormatter {
     /// <param name="options">Optional Beautifier options object.</param>
     /// <returns>A task returning the formatted JavaScript string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null) {
-        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
-        return await FormatJavaScriptAsync(js, options).ConfigureAwait(false);
+    public static Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options = null)
+        => FormatJavaScriptFileAsync(filePath, options, CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats JavaScript code from a file using JsBeautifier.
+    /// </summary>
+    /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="options">Optional Beautifier options object.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>A task returning the formatted JavaScript string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatJavaScriptFileAsync(string filePath, BeautifierOptions? options, CancellationToken cancellationToken) {
+        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath, cancellationToken).ConfigureAwait(false);
+        return await FormatJavaScriptAsync(js, options, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Asynchronously formats JavaScript code from a file using default JsBeautifier options.
     /// </summary>
     /// <param name="filePath">Path to the JavaScript file.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
     /// <returns>Formatted JavaScript string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> FormatJavaScriptFileAsync(string filePath) {
-        string js = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
-        return await FormatJavaScriptAsync(js).ConfigureAwait(false);
-    }
+    public static Task<string> FormatJavaScriptFileAsync(string filePath, CancellationToken cancellationToken)
+        => FormatJavaScriptFileAsync(filePath, null, cancellationToken);
 
     /// <summary>
     /// Formats CSS using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
@@ -125,7 +154,16 @@ public static class HtmlFormatter {
     /// <param name="css">CSS content to format.</param>
     /// <returns>Formatted CSS string.</returns>
     public static Task<string> FormatCssAsync(string css)
-        => Task.Run(() => FormatCss(css));
+        => FormatCssAsync(css, CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats CSS content using AngleSharp.
+    /// </summary>
+    /// <param name="css">CSS content to format.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted CSS string.</returns>
+    public static Task<string> FormatCssAsync(string css, CancellationToken cancellationToken)
+        => Task.Run(() => FormatCss(css), cancellationToken);
 
     /// <summary>
     /// Formats a CSS file using AngleSharp's <see cref="CssParser"/> and <see cref="CssStyleFormatter"/>.
@@ -144,9 +182,19 @@ public static class HtmlFormatter {
     /// <param name="filePath">Path to the CSS file.</param>
     /// <returns>Formatted CSS string.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static async Task<string> FormatCssFileAsync(string filePath) {
-        string css = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
-        return await FormatCssAsync(css).ConfigureAwait(false);
+    public static Task<string> FormatCssFileAsync(string filePath)
+        => FormatCssFileAsync(filePath, CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats a CSS file using AngleSharp.
+    /// </summary>
+    /// <param name="filePath">Path to the CSS file.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted CSS string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatCssFileAsync(string filePath, CancellationToken cancellationToken) {
+        string css = await HtmlUtilities.ReadFileCheckedAsync(filePath, cancellationToken).ConfigureAwait(false);
+        return await FormatCssAsync(css, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -235,6 +283,66 @@ public static class HtmlFormatter {
         bool alphabeticallyOrderAttributes = false,
         bool removeEmptyBlocks = false,
         bool isFragment = false)
+        => FormatHtmlAsync(
+            html,
+            indent,
+            blockStartLine,
+            removeComments,
+            removeOptionalTags,
+            outputTextNodesOnNewLine,
+            removeEmptyAttributes,
+            alphabeticallyOrderAttributes,
+            removeEmptyBlocks,
+            isFragment,
+            CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously formats HTML markup using default settings.
+    /// </summary>
+    /// <param name="html">HTML content to format.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted HTML string.</returns>
+    public static Task<string> FormatHtmlAsync(string html, CancellationToken cancellationToken)
+        => FormatHtmlAsync(
+            html,
+            "    ",
+            BlockStart.SameLine,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            cancellationToken);
+
+    /// <summary>
+    /// Asynchronously formats HTML markup using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <param name="html">HTML content to format.</param>
+    /// <param name="indent">Indentation string to use.</param>
+    /// <param name="blockStartLine">How blocks should start.</param>
+    /// <param name="removeComments">Whether to remove HTML comments.</param>
+    /// <param name="removeOptionalTags">Whether to remove optional tags.</param>
+    /// <param name="outputTextNodesOnNewLine">Whether to output text nodes on a new line.</param>
+    /// <param name="removeEmptyAttributes">Whether to remove empty attributes.</param>
+    /// <param name="alphabeticallyOrderAttributes">Whether to order attributes alphabetically.</param>
+    /// <param name="removeEmptyBlocks">Whether to remove empty CSS blocks.</param>
+    /// <param name="isFragment">Treat input as HTML fragment.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted HTML string.</returns>
+    public static Task<string> FormatHtmlAsync(
+        string html,
+        string indent,
+        BlockStart blockStartLine,
+        bool removeComments,
+        bool removeOptionalTags,
+        bool outputTextNodesOnNewLine,
+        bool removeEmptyAttributes,
+        bool alphabeticallyOrderAttributes,
+        bool removeEmptyBlocks,
+        bool isFragment,
+        CancellationToken cancellationToken)
         => Task.Run(() =>
             FormatHtml(
                 html,
@@ -246,7 +354,7 @@ public static class HtmlFormatter {
                 removeEmptyAttributes,
                 alphabeticallyOrderAttributes,
                 removeEmptyBlocks,
-                isFragment));
+                isFragment), cancellationToken);
 
     /// <summary>
     /// Formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
@@ -283,7 +391,7 @@ public static class HtmlFormatter {
     /// Asynchronously formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
     /// </summary>
     /// <inheritdoc cref="FormatHtmlFile(string,string,BlockStart,bool,bool,bool,bool,bool,bool,bool)"/>
-    public static async Task<string> FormatHtmlFileAsync(
+    public static Task<string> FormatHtmlFileAsync(
         string filePath,
         string indent = "    ",
         BlockStart blockStartLine = BlockStart.SameLine,
@@ -293,9 +401,71 @@ public static class HtmlFormatter {
         bool removeEmptyAttributes = false,
         bool alphabeticallyOrderAttributes = false,
         bool removeEmptyBlocks = false,
-        bool isFragment = false) {
+        bool isFragment = false)
+        => FormatHtmlFileAsync(
+            filePath,
+            indent,
+            blockStartLine,
+            removeComments,
+            removeOptionalTags,
+            outputTextNodesOnNewLine,
+            removeEmptyAttributes,
+            alphabeticallyOrderAttributes,
+            removeEmptyBlocks,
+            isFragment,
+            CancellationToken.None);
 
-        string html = await HtmlUtilities.ReadFileCheckedAsync(filePath).ConfigureAwait(false);
+    /// <summary>
+    /// Asynchronously formats HTML markup from a file using default settings.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted HTML string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static Task<string> FormatHtmlFileAsync(string filePath, CancellationToken cancellationToken)
+        => FormatHtmlFileAsync(
+            filePath,
+            "    ",
+            BlockStart.SameLine,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            cancellationToken);
+
+    /// <summary>
+    /// Asynchronously formats HTML markup from a file using NUglify's <see cref="HtmlSettings"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the HTML file.</param>
+    /// <param name="indent">Indentation string to use.</param>
+    /// <param name="blockStartLine">How blocks should start.</param>
+    /// <param name="removeComments">Whether to remove HTML comments.</param>
+    /// <param name="removeOptionalTags">Whether to remove optional tags.</param>
+    /// <param name="outputTextNodesOnNewLine">Whether to output text nodes on a new line.</param>
+    /// <param name="removeEmptyAttributes">Whether to remove empty attributes.</param>
+    /// <param name="alphabeticallyOrderAttributes">Whether to order attributes alphabetically.</param>
+    /// <param name="removeEmptyBlocks">Whether to remove empty CSS blocks.</param>
+    /// <param name="isFragment">Treat input as HTML fragment.</param>
+    /// <param name="cancellationToken">Token to observe cancellation requests.</param>
+    /// <returns>Formatted HTML string.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    public static async Task<string> FormatHtmlFileAsync(
+        string filePath,
+        string indent,
+        BlockStart blockStartLine,
+        bool removeComments,
+        bool removeOptionalTags,
+        bool outputTextNodesOnNewLine,
+        bool removeEmptyAttributes,
+        bool alphabeticallyOrderAttributes,
+        bool removeEmptyBlocks,
+        bool isFragment,
+        CancellationToken cancellationToken) {
+
+        string html = await HtmlUtilities.ReadFileCheckedAsync(filePath, cancellationToken).ConfigureAwait(false);
         return await FormatHtmlAsync(
             html,
             indent,
@@ -306,7 +476,8 @@ public static class HtmlFormatter {
             removeEmptyAttributes,
             alphabeticallyOrderAttributes,
             removeEmptyBlocks,
-            isFragment).ConfigureAwait(false);
+            isFragment,
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

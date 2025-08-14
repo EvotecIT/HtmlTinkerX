@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -28,5 +29,29 @@ public class HtmlFormatterAsyncTests {
         string result = await HtmlFormatter.FormatCssAsync(content);
         Assert.False(string.IsNullOrWhiteSpace(result));
         Assert.NotEqual(content, result);
+    }
+
+    [Fact]
+    public async Task FormatHtmlAsync_CanceledToken_Throws() {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            HtmlFormatter.FormatHtmlAsync("<html></html>", cancellationToken: cts.Token));
+    }
+
+    [Fact]
+    public async Task FormatCssAsync_CanceledToken_Throws() {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            HtmlFormatter.FormatCssAsync("body{}", cts.Token));
+    }
+
+    [Fact]
+    public async Task FormatJavaScriptAsync_CanceledToken_Throws() {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            HtmlFormatter.FormatJavaScriptAsync("function x(){return 1;}", cts.Token));
     }
 }
