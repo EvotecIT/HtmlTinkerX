@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace HtmlTinkerX;
 
@@ -136,7 +137,7 @@ public static class HtmlParserFromTable {
                     header = HtmlParser.CleanHeaderName(header);
                 }
                 int colspan = 1;
-                if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
+                if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
                     colspan = cs;
                 }
                 for (int c = 0; c < colspan; c++) {
@@ -199,10 +200,10 @@ public static class HtmlParserFromTable {
                     }
                     int colspan = 1;
                     int rowspan = 1;
-                    if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
+                    if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
                         colspan = cs;
                     }
-                    if (int.TryParse(cell.GetAttribute("rowspan"), out int rs)) {
+                    if (int.TryParse(cell.GetAttribute("rowspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs)) {
                         rowspan = rs;
                     }
                     for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
@@ -284,7 +285,7 @@ public static class HtmlParserFromTable {
                         }
                     }
                     int colspan = 1;
-                    if (int.TryParse(cell.GetAttribute("colspan"), out int cs)) {
+                    if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
                         colspan = cs;
                     }
                     for (int c = 0; c < colspan; c++) {
@@ -330,10 +331,10 @@ public static class HtmlParserFromTable {
                         }
                         int colspan = 1;
                         int rowspan = 1;
-                        if (int.TryParse(cell.GetAttribute("colspan"), out int cs2)) {
+                        if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs2)) {
                             colspan = cs2;
                         }
-                        if (int.TryParse(cell.GetAttribute("rowspan"), out int rs2)) {
+                        if (int.TryParse(cell.GetAttribute("rowspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs2)) {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
@@ -546,7 +547,7 @@ public static class HtmlParserFromTable {
                         header = HtmlParser.CleanHeaderName(header);
                     }
                     int colspan = 1;
-                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), out int cs)) {
+                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
                         colspan = cs;
                     }
                     for (int c = 0; c < colspan; c++) {
@@ -602,10 +603,10 @@ public static class HtmlParserFromTable {
                         }
                         int colspan = 1;
                         int rowspan = 1;
-                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), out int cs2)) {
+                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs2)) {
                             colspan = cs2;
                         }
-                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), out int rs2)) {
+                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs2)) {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
@@ -737,7 +738,7 @@ public static class HtmlParserFromTable {
                         }
                     }
                     int colspan = 1;
-                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), out int cs)) {
+                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
                         colspan = cs;
                     }
                     for (int c = 0; c < colspan; c++) {
@@ -786,10 +787,10 @@ public static class HtmlParserFromTable {
                         }
                         int colspan = 1;
                         int rowspan = 1;
-                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), out int cs2)) {
+                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs2)) {
                             colspan = cs2;
                         }
-                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), out int rs2)) {
+                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs2)) {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {

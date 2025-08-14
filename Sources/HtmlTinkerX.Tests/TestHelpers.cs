@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Globalization;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -33,5 +34,24 @@ internal static class TestHelpers {
     /// <param name="actual">The actual string.</param>
     public static void EqualIgnoringLineEndings(string expected, string actual) {
         Assert.Equal(NormalizeLineEndings(expected), NormalizeLineEndings(actual));
+    }
+
+    /// <summary>
+    /// Executes an action using the specified culture and restores the original culture afterwards.
+    /// </summary>
+    /// <param name="cultureName">The culture to apply for the duration of the action.</param>
+    /// <param name="action">The action to execute.</param>
+    public static void WithCulture(string cultureName, Action action) {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUICulture = CultureInfo.CurrentUICulture;
+        try {
+            var culture = new CultureInfo(cultureName);
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
+            action();
+        } finally {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUICulture;
+        }
     }
 }
