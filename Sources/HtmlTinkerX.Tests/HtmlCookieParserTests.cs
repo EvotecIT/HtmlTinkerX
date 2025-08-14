@@ -100,12 +100,40 @@ public class HtmlCookieParserTests {
     }
 
     [Fact]
+    public void ParseSetCookieHeader_ParsesSpecificDate() {
+        CultureInfo original = CultureInfo.CurrentCulture;
+        try {
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+            string header = "Set-Cookie: id=1; Path=/; Expires=Tue, 05 Mar 2024 15:00:00 GMT";
+            HtmlCookie c = HtmlCookieParser.ParseSetCookieHeader(header);
+            Assert.Equal(1709650800L, c.Expires);
+        }
+        finally {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [Fact]
     public void ParseOrgJsonCookie_ParsesJson() {
         string json = "{\"Path\":\"/\",\"Secure\":\"false\",\"name\":\"sessionId\",\"Expires\":\"Sun, 31 Dec 2023 23:59:59 GMT\",\"Domain\":\"example.com\",\"value\":\"abc123xyz\"}";
         HtmlCookie c = HtmlCookieParser.ParseOrgJsonCookie(json);
         Assert.Equal("sessionId", c.Name);
         Assert.Equal("abc123xyz", c.Value);
         Assert.Equal("example.com", c.Domain);
+    }
+
+    [Fact]
+    public void ParseOrgJsonCookie_ParsesDateRegardlessOfCulture() {
+        CultureInfo original = CultureInfo.CurrentCulture;
+        try {
+            CultureInfo.CurrentCulture = new CultureInfo("fr-FR");
+            string json = "{\"name\":\"id\",\"value\":\"1\",\"Expires\":\"Tue, 05 Mar 2024 15:00:00 GMT\"}";
+            HtmlCookie c = HtmlCookieParser.ParseOrgJsonCookie(json);
+            Assert.Equal(1709650800L, c.Expires);
+        }
+        finally {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     [Fact]

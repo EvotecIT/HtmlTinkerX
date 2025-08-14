@@ -140,7 +140,7 @@ public static class HtmlCookieParser {
                 Secure = CookieHelpers.TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
                 HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
-            if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), out DateTime dt)) {
+            if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime dt)) {
                 cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
             }
             return cookie;
