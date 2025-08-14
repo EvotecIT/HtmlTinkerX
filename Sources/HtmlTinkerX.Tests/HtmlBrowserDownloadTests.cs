@@ -38,8 +38,8 @@ public class HtmlBrowserDownloadTests {
         logger.OnErrorMessage += (_, e) => errors.Add(e);
         LoggingMessages.Logger = logger;
 
-        await Assert.ThrowsAsync<PlaywrightException>(
-            () => HtmlBrowser.OpenSessionAsync("https://invalid"));
+        var ex = await Record.ExceptionAsync(() => HtmlBrowser.OpenSessionAsync("https://invalid"));
+        Assert.IsType<PlaywrightException>(ex);
 
         Assert.Single(errors);
         Assert.Contains("https://invalid", errors[0].Message);
