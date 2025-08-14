@@ -153,4 +153,18 @@ public class HtmlParserTableAdvancedTests {
         }
 //#endif
     }
+
+    [Fact]
+    public void ParseTablesDetailed_NonUSCulture_ParsesSpans() {
+        const string html = "<table><tr><th>A</th><th>B</th></tr><tr><td rowspan=\"2\">1</td><td>2</td></tr><tr><td>3</td></tr></table>";
+        TestHelpers.WithCulture("fr-FR", () => {
+            var angle = HtmlParser.ParseTablesWithAngleSharpDetailed(html, null, null, false, false, false, null);
+            Assert.Single(angle);
+            Assert.Equal("3", angle[0].Data[1]["B"]);
+
+            var agility = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, false, false, false, null);
+            Assert.Single(agility);
+            Assert.Equal("3", agility[0].Data[1]["B"]);
+        });
+    }
 }

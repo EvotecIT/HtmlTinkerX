@@ -6,6 +6,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTableSimpleTests {
     private const string SimpleTable = "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";
+    private const string SpanTable = "<table><tr><th>A</th><th>B</th></tr><tr><td colspan=\"2\">1</td></tr></table>";
 
     [Fact]
     public void ParseTablesWithAngleSharp_ReturnsData() {
@@ -34,5 +35,27 @@ public class HtmlParserTableSimpleTests {
         var row = tables[0][0];
         Assert.Equal("V", row["K"]);
         Assert.Equal("Y", row["X"]);
+    }
+
+    [Fact]
+    public void ParseTablesWithAngleSharp_NonUSCulture_ParsesSpans() {
+        TestHelpers.WithCulture("fr-FR", () => {
+            var tables = HtmlParser.ParseTablesWithAngleSharp(SpanTable);
+            Assert.Single(tables);
+            Assert.Single(tables[0]);
+            Assert.Equal("1", tables[0][0]["A"]);
+            Assert.Equal("1", tables[0][0]["B"]);
+        });
+    }
+
+    [Fact]
+    public void ParseTablesWithHtmlAgilityPack_NonUSCulture_ParsesSpans() {
+        TestHelpers.WithCulture("fr-FR", () => {
+            var tables = HtmlParser.ParseTablesWithHtmlAgilityPack(SpanTable);
+            Assert.Single(tables);
+            Assert.Single(tables[0]);
+            Assert.Equal("1", tables[0][0]["A"]);
+            Assert.Equal("1", tables[0][0]["B"]);
+        });
     }
 }

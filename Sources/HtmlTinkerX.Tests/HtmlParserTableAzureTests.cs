@@ -47,4 +47,17 @@ public class HtmlParserTableAzureTests {
         Assert.Contains("East US", first.Metadata.Headers);
         Assert.Equal("Compute", first.Data[0]["Products and services"]);
     }
+
+    [Fact]
+    public void ParseAzureStatus_NonUSCulture() {
+        TestHelpers.WithCulture("fr-FR", () => {
+            string html = GetAzureStatusHtml();
+
+            var agility = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html);
+            var angle = HtmlParser.ParseTablesWithAngleSharpDetailed(html);
+
+            Assert.True(agility.Count >= 7);
+            Assert.True(angle.Count >= 7);
+        });
+    }
 }
