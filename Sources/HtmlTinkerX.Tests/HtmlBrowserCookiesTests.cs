@@ -43,7 +43,7 @@ public class HtmlBrowserCookiesTests {
         Assert.Equal("value", c.Value);
         Assert.Equal("domain", c.Domain);
         Assert.Equal("/path", c.Path);
-        Assert.Equal(123d, c.Expires);
+        Assert.Equal(123L, c.Expires);
         Assert.True(c.HttpOnly);
         Assert.False(c.Secure);
         Assert.Equal(SameSiteAttribute.Lax, c.SameSite);

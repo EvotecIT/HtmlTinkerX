@@ -1,5 +1,6 @@
 using HtmlTinkerX;
 using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Playwright;
 using Xunit;
 
@@ -17,7 +18,7 @@ public class HtmlCookieParserTests {
         Assert.Equal("example.com", c.Domain);
         Assert.Equal("/", c.Path);
         Assert.True(c.Secure);
-        Assert.Equal(1704067199d, c.Expires);
+        Assert.Equal(1704067199L, c.Expires);
     }
 
     [Fact]
@@ -31,13 +32,29 @@ public class HtmlCookieParserTests {
         Assert.Equal("example.com", c.Domain);
         Assert.Equal("/", c.Path);
         Assert.True(c.Secure);
-        Assert.True(c.Expires > 1e18d);
+        Assert.True(c.Expires > 1_000_000_000_000_000_000L);
+    }
+
+    [Fact]
+    public void ParseNetscapeFile_ParsesCookie_WithCommaCulture() {
+        CultureInfo original = CultureInfo.CurrentCulture;
+        try {
+            CultureInfo.CurrentCulture = new CultureInfo("fr-FR");
+            string data = "example.com\tFALSE\t/\tTRUE\t1704067199\tsessionId\tabc123xyz";
+            List<HtmlCookie> result = HtmlCookieParser.ParseNetscapeFile(data);
+            Assert.Single(result);
+            HtmlCookie c = result[0];
+            Assert.Equal(1704067199L, c.Expires);
+        }
+        finally {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 
     [Fact]
     public void ToNetscapeFile_FormatsCookie() {
         List<HtmlCookie> cookies = new() {
-            new HtmlCookie { Domain = "example.com", Path = "/", Secure = true, Expires = 1704067199d, Name = "sessionId", Value = "abc123xyz" }
+            new HtmlCookie { Domain = "example.com", Path = "/", Secure = true, Expires = 1704067199L, Name = "sessionId", Value = "abc123xyz" }
         };
         string file = HtmlCookieParser.ToNetscapeFile(cookies);
         string[] lines = file.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -56,7 +73,7 @@ public class HtmlCookieParserTests {
     [Fact]
     public void ToNetscapeFile_RoundTrips() {
         List<HtmlCookie> cookies = new() {
-            new HtmlCookie { Domain = ".example.com", Path = "/", Secure = false, Expires = 1704067200d, Name = "id", Value = "1" }
+            new HtmlCookie { Domain = ".example.com", Path = "/", Secure = false, Expires = 1704067200L, Name = "id", Value = "1" }
         };
         string file = HtmlCookieParser.ToNetscapeFile(cookies);
         Assert.Contains("\tTRUE\t", file);
@@ -66,7 +83,7 @@ public class HtmlCookieParserTests {
         Assert.Equal(".example.com", c.Domain);
         Assert.Equal("/", c.Path);
         Assert.False(c.Secure);
-        Assert.Equal(1704067200d, c.Expires);
+        Assert.Equal(1704067200L, c.Expires);
         Assert.Equal("id", c.Name);
         Assert.Equal("1", c.Value);
     }

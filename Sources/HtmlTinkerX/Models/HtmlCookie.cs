@@ -22,7 +22,7 @@ public sealed class HtmlCookie {
     public string? Path { get; set; }
 
     /// <summary>Expiration time as UNIX timestamp.</summary>
-    public double? Expires { get; set; }
+    public long? Expires { get; set; }
 
     /// <summary>True when the cookie is HTTP only.</summary>
     public bool? HttpOnly { get; set; }

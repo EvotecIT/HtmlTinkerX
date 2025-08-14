@@ -33,7 +33,7 @@ public sealed class CmdletNewHtmlBrowserCookie : PSCmdlet {
 
     /// <summary>Cookie expiration time as UNIX timestamp.</summary>
     [Parameter]
-    public float? Expires { get; set; }
+    public long? Expires { get; set; }
 
     /// <summary>Mark cookie as HTTP only.</summary>
     [Parameter]

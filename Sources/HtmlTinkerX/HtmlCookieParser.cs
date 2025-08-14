@@ -51,8 +51,8 @@ public static class HtmlCookieParser {
             if (parts.Length < 7) {
                 continue;
             }
-            double? expires = null;
-            if (double.TryParse(parts[4], out double d) && d != 0) {
+            long? expires = null;
+            if (long.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out long d) && d != 0) {
                 expires = d;
             }
             list.Add(new HtmlCookie {
@@ -168,7 +168,8 @@ public static class HtmlCookieParser {
         };
         if (root.TryGetProperty("expires", out var e)) {
             double exp = e.GetDouble();
-            cookie.Expires = exp >= 1e12 ? exp / 1000.0 : exp;
+            long seconds = (long)(exp >= 1e12 ? exp / 1000.0 : exp);
+            cookie.Expires = seconds;
         }
         return cookie;
     }
@@ -194,7 +195,7 @@ public static class HtmlCookieParser {
                     HttpOnly = el.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null
                 };
                 if (el.TryGetProperty("expires", out var e)) {
-                    c.Expires = e.GetDouble();
+                    c.Expires = (long)e.GetDouble();
                 }
                 list.Add(c);
             }
