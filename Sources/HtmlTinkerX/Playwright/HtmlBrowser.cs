@@ -139,23 +139,28 @@ public static partial class HtmlBrowser {
         string? password,
         int timeout,
         CancellationToken cancellationToken) {
-        if (formLogin != null) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-            if (username != null) {
-                await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
+        try {
+            if (formLogin != null) {
+                cancellationToken.ThrowIfCancellationRequested();
+                await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+                if (username != null) {
+                    await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
+                }
+                if (password != null) {
+                    await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
+                }
+                await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
             }
-            if (password != null) {
-                await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
-            }
-            await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-        }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteError("Failed to navigate to {0}: {1}", url, ex.Message);
+            throw;
+        }
     }
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
