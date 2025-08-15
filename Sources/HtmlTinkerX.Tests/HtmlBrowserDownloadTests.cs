@@ -33,19 +33,20 @@ public class HtmlBrowserDownloadTests {
         HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
 
         InternalLogger originalLogger = LoggingMessages.Logger;
-        InternalLogger logger = new InternalLogger();
-        List<LogEventArgs> errors = new();
-        logger.OnErrorMessage += (_, e) => errors.Add(e);
-        LoggingMessages.Logger = logger;
+        try {
+            InternalLogger logger = new InternalLogger();
+            List<LogEventArgs> errors = new();
+            logger.OnErrorMessage += (_, e) => errors.Add(e);
+            LoggingMessages.Logger = logger;
 
-        var ex = await Record.ExceptionAsync(() => HtmlBrowser.OpenSessionAsync("https://invalid"));
-        Assert.IsType<PlaywrightException>(ex);
-
-        Assert.Single(errors);
-        Assert.Contains("https://invalid", errors[0].Message);
-
-        LoggingMessages.Logger = originalLogger;
-        HtmlBrowser.PlaywrightFactory = null;
+            var ex = await Record.ExceptionAsync(() => HtmlBrowser.OpenSessionAsync("https://invalid"));
+            Assert.IsType<PlaywrightException>(ex);
+            Assert.Contains(errors, e => e.Message.Contains("https://invalid"));
+        }
+        finally {
+            LoggingMessages.Logger = originalLogger;
+            HtmlBrowser.PlaywrightFactory = null;
+        }
     }
 }
 

@@ -52,27 +52,29 @@ public class HtmlBrowserVideoRecordingTests {
         playwright.SetupGet(p => p.Chromium).Returns(browserType.Object);
         HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
 
-        HtmlBrowserSession session;
-        if (useSession) {
-            var initContext = new Mock<IBrowserContext>();
-            initContext.Setup(c => c.StorageStateAsync(It.IsAny<BrowserContextStorageStateOptions>())).ReturnsAsync("{}");
-            var initBrowser = new Mock<IBrowser>();
-            initBrowser.SetupGet(b => b.BrowserType).Returns(browserType.Object);
-            var initPage = new Mock<IPage>();
-            initPage.SetupGet(p => p.Url).Returns("https://example.com");
-            session = await HtmlBrowser.StartVideoRecordingAsync(new HtmlBrowserSession(playwright.Object, initBrowser.Object, initContext.Object, initPage.Object), outFile);
-        } else {
-            session = await HtmlBrowser.StartVideoRecordingAsync("https://example.com", outFile);
+        try {
+            HtmlBrowserSession session;
+            if (useSession) {
+                var initContext = new Mock<IBrowserContext>();
+                initContext.Setup(c => c.StorageStateAsync(It.IsAny<BrowserContextStorageStateOptions>())).ReturnsAsync("{}");
+                var initBrowser = new Mock<IBrowser>();
+                initBrowser.SetupGet(b => b.BrowserType).Returns(browserType.Object);
+                var initPage = new Mock<IPage>();
+                initPage.SetupGet(p => p.Url).Returns("https://example.com");
+                session = await HtmlBrowser.StartVideoRecordingAsync(new HtmlBrowserSession(playwright.Object, initBrowser.Object, initContext.Object, initPage.Object), outFile);
+            } else {
+                session = await HtmlBrowser.StartVideoRecordingAsync("https://example.com", outFile);
+            }
+
+            await HtmlBrowser.StopVideoRecordingAsync(session);
+
+            video.Verify(v => v.SaveAsAsync(outFile.ToFullPath()), Times.Once);
+            Assert.False(File.Exists(tempVideo));
+            if (useSession) {
+                Assert.False(File.Exists(statePath!));
+            }
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
         }
-
-        await HtmlBrowser.StopVideoRecordingAsync(session);
-
-        video.Verify(v => v.SaveAsAsync(outFile.ToFullPath()), Times.Once);
-        Assert.False(File.Exists(tempVideo));
-        if (useSession) {
-            Assert.False(File.Exists(statePath!));
-        }
-
-        HtmlBrowser.PlaywrightFactory = null;
     }
 }
