@@ -57,4 +57,13 @@ public class HtmlOptimizerTests {
         Assert.Contains("data:image/png;base64", result);
         Assert.DoesNotContain("image.png", result);
     }
+
+    [Fact]
+    public async Task EmbedImagesAsDataUriAsync_IgnoresMissingOrDataSources() {
+        const string html = "<html><body><img /><img src=\"data:image/png;base64,AAA=\" /></body></html>";
+
+        string result = await HtmlOptimizer.EmbedImagesAsDataUriAsync(html);
+
+        Assert.Equal(html, result);
+    }
 }

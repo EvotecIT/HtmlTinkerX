@@ -156,7 +156,11 @@ public static class HtmlOptimizer {
 
         foreach (var element in document.Images) {
             string? src = element.GetAttribute("src");
-            if (string.IsNullOrEmpty(src) || src.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
+            if (src is null) {
+                continue;
+            }
+
+            if (src.Length == 0 || src.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
                 continue;
             }
 
