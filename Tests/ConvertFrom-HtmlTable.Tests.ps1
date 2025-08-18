@@ -173,15 +173,22 @@
     }
 
     It 'Parses Wikipedia escape sequence table with correct columns' {
-        $Tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
-        $Tables.Count | Should -BeGreaterOrEqual 2
+        [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['User-Agent'] = 'HtmlTinkerX.Tests'
+        try {
+            $Tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
+            $Tables.Count | Should -BeGreaterOrEqual 2
 
-        $Table = $Tables[1]
-        $Columns = $Table[0].PSObject.Properties.Name
-        $Columns[0] | Should -Be 'Sequence'
-        $Columns[1] | Should -Be 'Meaning'
+            $Table = $Tables[1]
+            $Columns = $Table[0].PSObject.Properties.Name
+            $Columns[0] | Should -Be 'Sequence'
+            $Columns[1] | Should -Be 'Meaning'
 
-        ($Table | Where-Object Sequence -eq '`n').Meaning | Should -Be 'Newline'
-        $Table.Count | Should -BeGreaterOrEqual 10
+            ($Table | Where-Object Sequence -eq '`n').Meaning | Should -Be 'Newline'
+            $Table.Count | Should -BeGreaterOrEqual 10
+        }
+        finally {
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.Remove('User-Agent') | Out-Null
+            [HtmlTinkerX.HtmlHttpClientFactory]::ResetShared()
+        }
     }
 }

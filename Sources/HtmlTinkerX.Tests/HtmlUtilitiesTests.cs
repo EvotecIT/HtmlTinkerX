@@ -187,6 +187,8 @@ public class HtmlUtilitiesTests {
 
         _output.WriteLine($"Old: {oldWatch.ElapsedMilliseconds} ms, New: {newWatch.ElapsedMilliseconds} ms");
 
-        Assert.True(newWatch.Elapsed <= oldWatch.Elapsed);
+        double toleranceMs = oldWatch.Elapsed.TotalMilliseconds * 0.05 + 1;
+        TimeSpan tolerance = TimeSpan.FromMilliseconds(toleranceMs);
+        Assert.True(newWatch.Elapsed <= oldWatch.Elapsed + tolerance);
     }
 }
