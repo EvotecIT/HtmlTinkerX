@@ -26,7 +26,7 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
     /// <summary>URL of a page with forms.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Include additional metadata like form index and CSS classes.</summary>
     [Parameter]
@@ -46,7 +46,8 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
         List<HtmlFormResult> forms;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(url, client).ConfigureAwait(false);
         } else {
             forms = HtmlParser.ParseFormsWithAngleSharp(Content);
         }

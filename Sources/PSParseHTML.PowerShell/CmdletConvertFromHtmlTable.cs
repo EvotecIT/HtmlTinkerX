@@ -35,7 +35,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     /// <summary>URL of a page with tables.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Replacements to apply to table cell contents.</summary>
     [Parameter]
@@ -92,11 +92,12 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             List<HtmlTableResult> tables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+                string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
                 if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
+                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(url, client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client).ConfigureAwait(false);
                     tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {
@@ -115,11 +116,12 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             List<HtmlTableResult> detailedTables;
             if (ParameterSetName == ParameterSetUrl) {
                 using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+                string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
                 if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
+                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(url, client).ConfigureAwait(false)).DocumentElement.OuterHtml;
                     detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 } else {
-                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client).ConfigureAwait(false);
                     detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
                 }
             } else {

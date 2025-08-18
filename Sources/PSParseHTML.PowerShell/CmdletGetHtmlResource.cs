@@ -29,7 +29,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
     /// <summary>URL of an HTML page.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address used when downloading by URL.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
@@ -67,7 +67,8 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
         switch (ParameterSetName) {
             case ParameterSetUrl:
                 client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                links = await HtmlResourceParser.ParseUrlAsync(Url.ToString(), IncludeCss.IsPresent, IncludeInline.IsPresent, client).ConfigureAwait(false);
+                string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+                links = await HtmlResourceParser.ParseUrlAsync(url, IncludeCss.IsPresent, IncludeInline.IsPresent, client).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
                 string html = await HtmlUtilities.ReadFileCheckedAsync(Path).ConfigureAwait(false);
@@ -83,7 +84,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
             foreach (var link in links) {
                 if (string.IsNullOrEmpty(link.Content) && !string.IsNullOrEmpty(link.Source)) {
                     Uri srcUri = ParameterSetName switch {
-                        ParameterSetUrl => new Uri(Url, link.Source),
+                        ParameterSetUrl => new Uri((Url ?? throw new PSArgumentNullException(nameof(Url))), link.Source),
                         ParameterSetFile => new Uri(new Uri(System.IO.Path.GetDirectoryName(Path)! + System.IO.Path.DirectorySeparatorChar), link.Source),
                         _ => new Uri(link.Source, UriKind.RelativeOrAbsolute)
                     };
@@ -110,8 +111,11 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
                 return;
             }
             var paths = new List<string>();
+            string outDir = OutDirectory ?? throw new PSArgumentNullException(nameof(OutDirectory));
+            Uri baseUri = Url ?? throw new PSArgumentNullException(nameof(Url));
+            HttpClient httpClient = client ?? throw new PSArgumentNullException(nameof(client));
             foreach (var link in links) {
-                paths.Add(await link.SaveAsync(OutDirectory!, Url, client!).ConfigureAwait(false));
+                paths.Add(await link.SaveAsync(outDir, baseUri, httpClient).ConfigureAwait(false));
             }
             WriteObject(paths.ToArray(), true);
         } else {

@@ -21,7 +21,7 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
 
     /// <summary>Form object created by ConvertFrom-HtmlForm.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
-    public PSObject Form { get; set; } = null!;
+    public PSObject? Form { get; set; }
 
     /// <summary>Hashtable of field values keyed by name.</summary>
     [Parameter(Mandatory = true, Position = 1)]
@@ -51,9 +51,10 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        string action = Form.Properties["Action"]?.Value as string ?? string.Empty;
+        PSObject form = Form ?? throw new PSArgumentNullException(nameof(Form));
+        string action = form.Properties["Action"]?.Value as string ?? string.Empty;
         FormMethod method = FormMethod.Get;
-        object? methodValue = Form.Properties["Method"]?.Value;
+        object? methodValue = form.Properties["Method"]?.Value;
         if (methodValue is FormMethod m) {
             method = m;
         } else if (methodValue is string ms && ms.Equals("POST", StringComparison.OrdinalIgnoreCase)) {
@@ -68,10 +69,10 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
                 ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
             string selector;
-            string? id = Form.Properties["FormId"]?.Value as string;
+            string? id = form.Properties["FormId"]?.Value as string;
             if (!string.IsNullOrEmpty(id)) {
                 selector = $"form#{id}";
-            } else if (Form.Properties["FormIndex"]?.Value is int idx) {
+            } else if (form.Properties["FormIndex"]?.Value is int idx) {
                 selector = $"form:nth-of-type({idx + 1})";
             } else {
                 selector = "form";

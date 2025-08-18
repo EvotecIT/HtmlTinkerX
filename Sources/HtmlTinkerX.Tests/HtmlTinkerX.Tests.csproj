@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net472;net8.0</TargetFrameworks>
+        <TargetFrameworks>net472;net8.0;net9.0</TargetFrameworks>
         <ImplicitUsings Condition=" '$(TargetFramework)' != 'net472' ">enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>

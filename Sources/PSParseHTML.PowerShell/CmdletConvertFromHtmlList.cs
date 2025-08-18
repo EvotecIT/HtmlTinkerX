@@ -26,7 +26,7 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
     /// <summary>URL of a page with lists.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Selects parsing engine.</summary>
     [Parameter]
@@ -63,10 +63,11 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
         List<HtmlListResult> results;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
             if (Engine == HtmlParserEngine.AngleSharp) {
-                results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
+                results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(url, TagPlaceholder, client).ConfigureAwait(false);
             } else {
-                results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
+                results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, TagPlaceholder, client).ConfigureAwait(false);
             }
         } else {
             if (Engine == HtmlParserEngine.AngleSharp) {

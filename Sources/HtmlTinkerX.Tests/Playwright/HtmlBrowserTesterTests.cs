@@ -261,10 +261,10 @@ public class HtmlBrowserTesterTests {
         var method = typeof(HtmlBrowserTester).GetMethod("InitNetworkListeners", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
         var network = (System.Collections.Generic.IDictionary<Microsoft.Playwright.IRequest, HtmlNetworkEntryDetailed>)method.Invoke(null, new object[] { page.Object, result })!;
 
-        page.Raise(p => p.Request += null!, page.Object, request.Object);
-        page.Raise(p => p.Response += null!, page.Object, response.Object);
-        page.Raise(p => p.RequestFinished += null!, page.Object, request.Object);
-        page.Raise(p => p.RequestFailed += null!, page.Object, request.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, request.Object);
+        page.Raise(p => p.Response += (_, _) => { }, page.Object, response.Object);
+        page.Raise(p => p.RequestFinished += (_, _) => { }, page.Object, request.Object);
+        page.Raise(p => p.RequestFailed += (_, _) => { }, page.Object, request.Object);
 
         Assert.Single(network);
         Assert.Single(result.NetworkEntries);

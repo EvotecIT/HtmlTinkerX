@@ -29,9 +29,9 @@ public class HtmlBrowserNetworkLogTests {
 
         var session = new HtmlBrowserSession(playwright.Object, browser.Object, context.Object, page.Object);
 
-        page.Raise(p => p.Request += null!, page.Object, request.Object);
-        page.Raise(p => p.Response += null!, page.Object, response.Object);
-        page.Raise(p => p.RequestFinished += null!, page.Object, request.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, request.Object);
+        page.Raise(p => p.Response += (_, _) => { }, page.Object, response.Object);
+        page.Raise(p => p.RequestFinished += (_, _) => { }, page.Object, request.Object);
 
         HtmlNetworkEntry entry = Assert.Single(HtmlBrowser.GetNetworkLog(session));
         Assert.Equal("https://example.com/", entry.Url);

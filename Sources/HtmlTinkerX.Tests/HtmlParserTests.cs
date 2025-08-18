@@ -52,6 +52,8 @@ public class HtmlParserTests {
 
     [Fact]
     public void ParseTablesWithAngleSharpDetailed_NullHtml_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseTablesWithAngleSharpDetailed(null!));
+        var method = typeof(HtmlParser).GetMethod(nameof(HtmlParser.ParseTablesWithAngleSharpDetailed))
+            ?? throw new MissingMethodException();
+        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { null, null, null, false, false, false, null }));
     }
 }

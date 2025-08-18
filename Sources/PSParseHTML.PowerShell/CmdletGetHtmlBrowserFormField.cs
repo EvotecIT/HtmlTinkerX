@@ -23,7 +23,7 @@ public sealed class CmdletGetHtmlBrowserFormField : AsyncPSCmdlet {
     /// <summary>URL of the page to download.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address used when downloading.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
@@ -39,7 +39,8 @@ public sealed class CmdletGetHtmlBrowserFormField : AsyncPSCmdlet {
         List<HtmlFormField> fields;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            fields = await HtmlFormFieldExtractor.ExtractUrlFieldsAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            fields = await HtmlFormFieldExtractor.ExtractUrlFieldsAsync(url, client).ConfigureAwait(false);
         } else {
             fields = HtmlFormFieldExtractor.ExtractFields(Content);
         }

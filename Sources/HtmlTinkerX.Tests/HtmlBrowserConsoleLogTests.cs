@@ -22,7 +22,7 @@ public class HtmlBrowserConsoleLogTests {
 
         var session = new HtmlBrowserSession(playwright.Object, browser.Object, context.Object, page.Object);
 
-        page.Raise(p => p.Console += null!, page.Object, message.Object);
+        page.Raise(p => p.Console += (_, _) => { }, page.Object, message.Object);
 
         HtmlConsoleEntry entry = Assert.Single(HtmlBrowser.GetConsoleLog(session));
         Assert.Equal("hello", entry.Text);
@@ -33,7 +33,11 @@ public class HtmlBrowserConsoleLogTests {
 
     [Fact]
     public void GetConsoleLog_NullSession_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlBrowser.GetConsoleLog(null!));
+        var method = typeof(HtmlBrowser).GetMethod(
+            nameof(HtmlBrowser.GetConsoleLog),
+            new[] { typeof(HtmlBrowserSession), typeof(HtmlConsoleSeverity) })
+            ?? throw new MissingMethodException();
+        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { null, HtmlConsoleSeverity.Info }));
     }
 
     [Fact]
@@ -53,8 +57,8 @@ public class HtmlBrowserConsoleLogTests {
 
         var session = new HtmlBrowserSession(playwright.Object, browser.Object, context.Object, page.Object);
 
-        page.Raise(p => p.Console += null!, page.Object, err.Object);
-        page.Raise(p => p.Console += null!, page.Object, info.Object);
+        page.Raise(p => p.Console += (_, _) => { }, page.Object, err.Object);
+        page.Raise(p => p.Console += (_, _) => { }, page.Object, info.Object);
 
         var entries = HtmlBrowser.GetConsoleLog(session, HtmlConsoleSeverity.Error).ToList();
         Assert.Single(entries);

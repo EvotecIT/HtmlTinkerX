@@ -194,7 +194,7 @@ public static class HtmlOptimizer {
             element.SetAttribute("src", $"data:{mediaType};base64,{base64}");
         }
 
-        return document.DocumentElement!.OuterHtml;
+        return document.DocumentElement?.OuterHtml ?? string.Empty;
     }
 
     /// <summary>

@@ -25,7 +25,7 @@ public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {
     /// <summary>URL of a page with microdata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address when downloading by URL.</summary>
     [Parameter]
@@ -41,7 +41,8 @@ public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {
         List<HtmlMicrodataItem> items;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            items = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            items = await HtmlParser.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
         } else {
             items = HtmlParser.ParseMicrodataItems(Content);
         }

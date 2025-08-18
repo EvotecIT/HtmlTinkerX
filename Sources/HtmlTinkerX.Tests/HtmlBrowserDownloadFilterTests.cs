@@ -36,8 +36,8 @@ public class HtmlBrowserDownloadFilterTests {
                     .Callback<string>(p => File.WriteAllText(p, "other"))
                     .Returns(Task.CompletedTask);
 
-                page.Raise(p => p.Download += null!, page.Object, dl1.Object);
-                page.Raise(p => p.Download += null!, page.Object, dl2.Object);
+                page.Raise(p => p.Download += (_, _) => { }, page.Object, dl1.Object);
+                page.Raise(p => p.Download += (_, _) => { }, page.Object, dl2.Object);
             })
             .ReturnsAsync((JsonElement?)default);
         page.Setup(p => p.WaitForLoadStateAsync(It.IsAny<LoadState>(), It.IsAny<PageWaitForLoadStateOptions?>()))
@@ -75,7 +75,7 @@ public class HtmlBrowserDownloadFilterTests {
                 dl.Setup(d => d.SaveAsAsync(It.IsAny<string>()))
                     .ThrowsAsync(new InvalidOperationException("boom"));
 
-                page.Raise(p => p.Download += null!, page.Object, dl.Object);
+                page.Raise(p => p.Download += (_, _) => { }, page.Object, dl.Object);
             })
             .ReturnsAsync((JsonElement?)default);
         page.Setup(p => p.WaitForLoadStateAsync(It.IsAny<LoadState>(), It.IsAny<PageWaitForLoadStateOptions?>()))

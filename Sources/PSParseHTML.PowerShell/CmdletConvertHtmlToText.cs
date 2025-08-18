@@ -46,7 +46,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>
     /// Optional path to write the resulting text.
@@ -75,12 +75,13 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
             ParameterSetUrl => HtmlParserToText.ConvertToText(
                 await HtmlUtilities.GetStringWithProperEncodingAsync(
                     HttpClientHelper.Create(Proxy, ProxyCredential),
-                    Url.ToString()).ConfigureAwait(false)),
+                    (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString()).ConfigureAwait(false)),
             _ => HtmlParserToText.ConvertToText(Content)
         };
 
         if (!string.IsNullOrEmpty(OutputFile)) {
-            string outPath = OutputFile!.ToFullPath();
+            string outPath = OutputFile ?? throw new PSArgumentNullException(nameof(OutputFile));
+            outPath = outPath.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, text);
 #else

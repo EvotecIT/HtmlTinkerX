@@ -20,11 +20,13 @@ public class HtmlDifferTests {
 
     [Fact]
     public void Compare_NullReference_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlDiffer.Compare(null!, "<p></p>"));
+        var method = typeof(HtmlDiffer).GetMethod(nameof(HtmlDiffer.Compare)) ?? throw new MissingMethodException();
+        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { null, "<p></p>" }));
     }
 
     [Fact]
     public void Compare_NullDifference_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlDiffer.Compare("<p></p>", null!));
+        var method = typeof(HtmlDiffer).GetMethod(nameof(HtmlDiffer.Compare)) ?? throw new MissingMethodException();
+        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { "<p></p>", null }));
     }
 }

@@ -34,9 +34,9 @@ public class HtmlBrowserNetworkLogLimitTests {
         HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
         session.NetworkLogLimit = 2;
 
-        page.Raise(p => p.Request += null!, page.Object, req1.Object);
-        page.Raise(p => p.Request += null!, page.Object, req2.Object);
-        page.Raise(p => p.Request += null!, page.Object, req3.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, req1.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, req2.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, req3.Object);
 
         Assert.Equal(2, session.NetworkLog.Count());
         Assert.DoesNotContain(session.NetworkLog, e => e.Url == "https://1.com");
@@ -62,8 +62,8 @@ public class HtmlBrowserNetworkLogLimitTests {
 
         HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
 
-        page.Raise(p => p.Request += null!, page.Object, req1.Object);
-        page.Raise(p => p.Request += null!, page.Object, req2.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, req1.Object);
+        page.Raise(p => p.Request += (_, _) => { }, page.Object, req2.Object);
 
         Assert.Equal(2, session.NetworkLog.Count());
         await session.DisposeAsync();

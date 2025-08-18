@@ -25,7 +25,7 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
     /// <summary>URL of the page to analyze.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl, Position = 0)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Destination path for the JSON outline.</summary>
     [Parameter(Mandatory = true, Position = 1)]
@@ -49,7 +49,8 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
         List<HtmlOutlineItem> outline;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            outline = await HtmlOutlineBuilder.BuildFromUrlAsync(Url.ToString(), Engine, client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            outline = await HtmlOutlineBuilder.BuildFromUrlAsync(url, Engine, client).ConfigureAwait(false);
         } else {
             outline = HtmlOutlineBuilder.Build(Content, Engine);
         }

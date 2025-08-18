@@ -25,7 +25,7 @@ public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
     /// <summary>URL of a page with Open Graph metadata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address when downloading by URL.</summary>
     [Parameter]
@@ -41,7 +41,8 @@ public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
         HtmlOpenGraph graph;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            graph = await HtmlParser.ParseUrlOpenGraphAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            graph = await HtmlParser.ParseUrlOpenGraphAsync(url, client).ConfigureAwait(false);
         } else {
             graph = HtmlParser.ParseOpenGraph(Content);
         }

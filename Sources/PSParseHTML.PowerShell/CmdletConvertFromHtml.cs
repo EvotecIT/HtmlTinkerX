@@ -35,7 +35,7 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     /// <summary>URL of a HTML page.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Selects parsing engine.</summary>
     [Parameter]
@@ -63,12 +63,13 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
         ValidateProxy(Proxy, ProxyCredential);
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
             if (Engine == HtmlParserEngine.AngleSharp) {
-                IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
+                IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(url, client).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
                 return;
             }
-            HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+            HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client).ConfigureAwait(false);
             WriteObject(Raw.IsPresent ? doc2 : doc2.DocumentNode);
             return;
         }

@@ -31,7 +31,7 @@ public sealed class CmdletTestHtmlMicrodata : AsyncPSCmdlet {
     /// <summary>URL of a page with microdata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address when downloading by URL.</summary>
     [Parameter]
@@ -50,7 +50,8 @@ public sealed class CmdletTestHtmlMicrodata : AsyncPSCmdlet {
             _items.AddRange(HtmlParser.ParseMicrodataItems(Content));
         } else if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            var list = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            var list = await HtmlParser.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
             _items.AddRange(list);
         } else {
             _items.AddRange(Items);

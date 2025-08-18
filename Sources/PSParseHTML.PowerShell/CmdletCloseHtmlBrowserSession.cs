@@ -16,7 +16,7 @@ namespace PSParseHTML.PowerShell;
 public sealed class CmdletCloseHtmlBrowserSession : AsyncPSCmdlet {
     /// <summary>Browser session to dispose.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
-    public HtmlBrowserSession Session { get; set; } = null!;
+    public HtmlBrowserSession? Session { get; set; }
 
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
@@ -26,9 +26,10 @@ public sealed class CmdletCloseHtmlBrowserSession : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
-        await HtmlBrowser.CloseSessionAsync(Session, token).ConfigureAwait(false);
+        HtmlBrowserSession session = Session ?? throw new PSArgumentNullException(nameof(Session));
+        await HtmlBrowser.CloseSessionAsync(session, token).ConfigureAwait(false);
         object? defaultSession = GetVariableValue("PSParseHTML_DefaultSession");
-        if (defaultSession is HtmlBrowserSession sess && ReferenceEquals(sess, Session)) {
+        if (defaultSession is HtmlBrowserSession sess && ReferenceEquals(sess, session)) {
             SessionState.PSVariable.Remove("PSParseHTML_DefaultSession");
         }
     }

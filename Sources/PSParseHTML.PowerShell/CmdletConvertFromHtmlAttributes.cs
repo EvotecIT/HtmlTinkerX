@@ -39,7 +39,7 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
     /// <summary>URL of HTML page to download.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Tag name to search for.</summary>
     [Parameter]
@@ -106,6 +106,7 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
 
     private async Task<string> DownloadHtmlAsync() {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
+        string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, url).ConfigureAwait(false);
     }
 }

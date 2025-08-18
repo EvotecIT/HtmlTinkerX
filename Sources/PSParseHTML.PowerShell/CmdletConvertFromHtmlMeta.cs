@@ -25,7 +25,7 @@ public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
     /// <summary>URL of a page with meta tags.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
-    public Uri Url { get; set; } = null!;
+    public Uri? Url { get; set; }
 
     /// <summary>Proxy server address to use when downloading by URL.</summary>
     [Parameter]
@@ -41,7 +41,8 @@ public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
         List<HtmlMetaTag> tags;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            tags = await HtmlParser.ParseUrlMetaTagsAsync(Url.ToString(), client).ConfigureAwait(false);
+            string url = (Url ?? throw new PSArgumentNullException(nameof(Url))).ToString();
+            tags = await HtmlParser.ParseUrlMetaTagsAsync(url, client).ConfigureAwait(false);
         } else {
             tags = HtmlParser.ParseMetaTags(Content);
         }

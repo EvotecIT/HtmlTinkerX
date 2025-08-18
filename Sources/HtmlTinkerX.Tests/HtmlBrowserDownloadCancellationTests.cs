@@ -35,8 +35,8 @@ public class HtmlBrowserDownloadCancellationTests {
                         File.WriteAllText(p, "file2");
                     });
 
-                page.Raise(p => p.Download += null!, page.Object, dl1.Object);
-                page.Raise(p => p.Download += null!, page.Object, dl2.Object);
+                page.Raise(p => p.Download += (_, _) => { }, page.Object, dl1.Object);
+                page.Raise(p => p.Download += (_, _) => { }, page.Object, dl2.Object);
             })
             .ReturnsAsync((JsonElement?)default);
         page.Setup(p => p.WaitForLoadStateAsync(It.IsAny<LoadState>(), It.IsAny<PageWaitForLoadStateOptions?>()))

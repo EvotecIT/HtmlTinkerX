@@ -16,11 +16,21 @@ public class HtmlScriptRunnerTests {
 
     [Fact]
     public async Task RunAsync_NullHtml_Throws() {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => HtmlScriptRunner.RunAsync<int>(null!, "1"));
+        var method = typeof(HtmlScriptRunner).GetMethod(nameof(HtmlScriptRunner.RunAsync))
+            ?.MakeGenericMethod(typeof(int)) ?? throw new MissingMethodException();
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => {
+            object? taskObj = method.Invoke(null, new object?[] { null, "1" });
+            await (taskObj as Task ?? throw new InvalidOperationException());
+        });
     }
 
     [Fact]
     public async Task RunAsync_NullScript_Throws() {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => HtmlScriptRunner.RunAsync<int>("<html></html>", null!));
+        var method = typeof(HtmlScriptRunner).GetMethod(nameof(HtmlScriptRunner.RunAsync))
+            ?.MakeGenericMethod(typeof(int)) ?? throw new MissingMethodException();
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => {
+            object? taskObj = method.Invoke(null, new object?[] { "<html></html>", null });
+            await (taskObj as Task ?? throw new InvalidOperationException());
+        });
     }
 }
