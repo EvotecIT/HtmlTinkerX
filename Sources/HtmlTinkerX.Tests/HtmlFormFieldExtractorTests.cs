@@ -19,4 +19,9 @@ public class HtmlFormFieldExtractorTests {
         Assert.Equal("user", fields[0].Name);
         Assert.Equal(HtmlFormFieldType.Text, fields[0].Type);
     }
+
+    [Fact]
+    public void ExtractFields_NullHtml_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlFormFieldExtractor.ExtractFields(null));
+    }
 }

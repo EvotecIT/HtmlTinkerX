@@ -24,25 +24,29 @@ public static class HtmlParserExtensions {
     /// var divs = HtmlParserExtensions.GetElements(html, tag: "div");
     /// </code>
     /// </example>
-    public static IEnumerable<IElement> GetElements(string html, string? tag = null, string? className = null, string? id = null, string? name = null) {
+    public static IEnumerable<IElement> GetElements(string? html, string? tag = null, string? className = null, string? id = null, string? name = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
 
         var document = HtmlParser.ParseWithAngleSharp(html);
 
-        if (!string.IsNullOrEmpty(tag)) {
-            return document.GetElementsByTagName(tag!);
+        if (!(tag == null || tag.Length == 0)) {
+            string tagValue = tag;
+            return document.GetElementsByTagName(tagValue);
         }
-        if (!string.IsNullOrEmpty(className)) {
-            return document.GetElementsByClassName(className!);
+        if (!(className == null || className.Length == 0)) {
+            string classValue = className;
+            return document.GetElementsByClassName(classValue);
         }
-        if (!string.IsNullOrEmpty(id)) {
-            var element = document.GetElementById(id!);
+        if (!(id == null || id.Length == 0)) {
+            string idValue = id;
+            var element = document.GetElementById(idValue);
             return element != null ? new[] { element } : Array.Empty<IElement>();
         }
-        if (!string.IsNullOrEmpty(name)) {
-            return document.GetElementsByName(name!);
+        if (!(name == null || name.Length == 0)) {
+            string nameValue = name;
+            return document.GetElementsByName(nameValue);
         }
 
         return Array.Empty<IElement>();

@@ -27,4 +27,12 @@ public class HtmlParserFormTests {
         Assert.Equal(2, forms[0].Fields.Count);
         Assert.Equal("user", forms[0].Fields[0].Name);
     }
+
+    [Fact]
+    /// <summary>
+    /// Throws when html content is null.
+    /// </summary>
+    public void ParseFormsWithAngleSharp_NullHtml_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseFormsWithAngleSharp(null));
+    }
 }

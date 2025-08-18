@@ -23,7 +23,7 @@ public static class HtmlParserFromForm {
     /// var forms = HtmlParserFromForm.ParseFormsWithAngleSharp(html);
     /// </code>
     /// </example>
-    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html) {
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string? html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -44,12 +44,13 @@ public static class HtmlParserFromForm {
 
             foreach (var field in form.QuerySelectorAll("input,select,textarea,button")) {
                 string? name = field.GetAttribute("name");
-                if (string.IsNullOrEmpty(name)) {
+                if (name == null || name.Length == 0) {
                     continue;
                 }
+                string nameValue = name;
                 string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
                 result.Fields.Add(new HtmlFormField {
-                    Name = name!,
+                    Name = nameValue,
                     Type = MapType(type)
                 });
             }
@@ -69,7 +70,7 @@ public static class HtmlParserFromForm {
     /// var forms = await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url);
     /// </code>
     /// </example>
-    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null) {
+    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string? url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }

@@ -15,7 +15,7 @@ public static class HtmlFormFieldExtractor {
     /// </summary>
     /// <param name="html">HTML content to parse.</param>
     /// <returns>List of form fields.</returns>
-    public static List<HtmlFormField> ExtractFields(string html) {
+    public static List<HtmlFormField> ExtractFields(string? html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -25,12 +25,13 @@ public static class HtmlFormFieldExtractor {
         List<HtmlFormField> results = new();
         foreach (var field in fields) {
             string? name = field.GetAttribute("name");
-            if (string.IsNullOrEmpty(name)) {
+            if (name == null || name.Length == 0) {
                 continue;
             }
+            string nameValue = name;
             string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
             results.Add(new HtmlFormField {
-                Name = name!,
+                Name = nameValue,
                 Type = MapType(type)
             });
         }
@@ -58,7 +59,7 @@ public static class HtmlFormFieldExtractor {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
     /// <returns>List of form fields.</returns>
-    public static async Task<List<HtmlFormField>> ExtractUrlFieldsAsync(string url, HttpClient? client = null) {
+    public static async Task<List<HtmlFormField>> ExtractUrlFieldsAsync(string? url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }

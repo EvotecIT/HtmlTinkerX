@@ -71,6 +71,14 @@ public class HtmlParserExtensionsTests {
 
     [Fact]
     /// <summary>
+    /// Throws when html content is null.
+    /// </summary>
+    public void GetElements_NullHtml_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlParserExtensions.GetElements(null));
+    }
+
+    [Fact]
+    /// <summary>
     /// Validates combined selection filters produce correct counts.
     /// </summary>
     public void GetElements_ByClassTagIdName_CombinedCounts() {

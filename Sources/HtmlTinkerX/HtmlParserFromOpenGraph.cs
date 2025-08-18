@@ -21,7 +21,7 @@ public static class HtmlParserFromOpenGraph {
     /// string title = og.Properties["title"].First();
     /// </code>
     /// </example>
-    public static HtmlOpenGraph ParseOpenGraph(string html) {
+    public static HtmlOpenGraph ParseOpenGraph(string? html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -31,10 +31,11 @@ public static class HtmlParserFromOpenGraph {
         HtmlOpenGraph result = new();
         foreach (var node in nodes) {
             string? property = node.GetAttribute("property");
-            if (string.IsNullOrEmpty(property)) {
+            if (property == null || property.Length == 0) {
                 continue;
             }
-            string key = property!.Substring(3); // remove "og:" prefix
+            string propValue = property;
+            string key = propValue.Substring(3); // remove "og:" prefix
             string content = node.GetAttribute("content") ?? string.Empty;
 
             OpenGraphProperty? existing = result.Properties.Find(p => p.Name == key);
@@ -56,7 +57,7 @@ public static class HtmlParserFromOpenGraph {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
     /// <returns>The parsed Open Graph metadata.</returns>
-    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string url, HttpClient? client = null) {
+    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string? url, HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
