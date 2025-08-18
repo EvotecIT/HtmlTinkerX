@@ -18,7 +18,7 @@ public static class HtmlParserFromList {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
-    public static List<HtmlListResult> ParseListsWithAngleSharpDetailed(string html, string tagPlaceholder = " ") {
+    public static List<HtmlListResult> ParseListsWithAngleSharpDetailed(string? html, string tagPlaceholder = " ") {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -86,7 +86,7 @@ public static class HtmlParserFromList {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with joined item texts.</returns>
-    public static List<List<string>> ParseListsWithAngleSharp(string html, string tagPlaceholder = " ") {
+    public static List<List<string>> ParseListsWithAngleSharp(string? html, string tagPlaceholder = " ") {
         var detailed = ParseListsWithAngleSharpDetailed(html, tagPlaceholder);
         List<List<string>> result = new();
         foreach (var list in detailed) {
@@ -102,7 +102,7 @@ public static class HtmlParserFromList {
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -118,7 +118,7 @@ public static class HtmlParserFromList {
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with joined item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
         var detailed = await ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client).ConfigureAwait(false);
         List<List<string>> result = new();
         foreach (var list in detailed) {
@@ -133,7 +133,7 @@ public static class HtmlParserFromList {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
-    public static List<HtmlListResult> ParseListsWithHtmlAgilityPackDetailed(string html, string tagPlaceholder = " ") {
+    public static List<HtmlListResult> ParseListsWithHtmlAgilityPackDetailed(string? html, string tagPlaceholder = " ") {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -187,7 +187,7 @@ public static class HtmlParserFromList {
                 return;
             }
             if (node.NodeType == HtmlNodeType.Text) {
-                string text = HtmlEntity.DeEntitize(node.InnerText ?? string.Empty)!.Trim();
+                string text = (HtmlEntity.DeEntitize(node.InnerText ?? string.Empty) ?? string.Empty).Trim();
                 if (!string.IsNullOrWhiteSpace(text)) {
                     list.Add(text);
                 }
@@ -208,7 +208,7 @@ public static class HtmlParserFromList {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with joined item texts.</returns>
-    public static List<List<string>> ParseListsWithHtmlAgilityPack(string html, string tagPlaceholder = " ") {
+    public static List<List<string>> ParseListsWithHtmlAgilityPack(string? html, string tagPlaceholder = " ") {
         var detailed = ParseListsWithHtmlAgilityPackDetailed(html, tagPlaceholder);
         List<List<string>> result = new();
         foreach (var list in detailed) {
@@ -224,7 +224,7 @@ public static class HtmlParserFromList {
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -240,7 +240,7 @@ public static class HtmlParserFromList {
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with joined item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
         var detailed = await ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client).ConfigureAwait(false);
         List<List<string>> result = new();
         foreach (var list in detailed) {

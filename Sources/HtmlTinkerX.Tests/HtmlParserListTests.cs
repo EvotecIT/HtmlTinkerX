@@ -61,4 +61,9 @@ public class HtmlParserListTests {
         Assert.Equal(1, lists[1].Metadata.ListIndex);
         Assert.Equal(2, lists[1].Items.Count);
     }
+
+    [Fact]
+    public void ParseListsWithAngleSharpDetailed_NullHtml_Throws() {
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseListsWithAngleSharpDetailed(null, " "));
+    }
 }
