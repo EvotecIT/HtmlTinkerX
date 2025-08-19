@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -54,6 +55,7 @@ public class HtmlParserTests {
     public void ParseTablesWithAngleSharpDetailed_NullHtml_Throws() {
         var method = typeof(HtmlParser).GetMethod(nameof(HtmlParser.ParseTablesWithAngleSharpDetailed))
             ?? throw new MissingMethodException();
-        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { null, null, null, false, false, false, null }));
+        var ex = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, new object?[] { null, null, null, false, false, false, null }));
+        Assert.IsType<ArgumentNullException>(ex.InnerException);
     }
 }

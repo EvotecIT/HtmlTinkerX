@@ -4,6 +4,7 @@ using Moq;
 using Xunit;
 using System;
 using System.Linq;
+using System.Reflection;
 
 namespace HtmlTinkerX.Tests;
 
@@ -37,7 +38,8 @@ public class HtmlBrowserConsoleLogTests {
             nameof(HtmlBrowser.GetConsoleLog),
             new[] { typeof(HtmlBrowserSession), typeof(HtmlConsoleSeverity) })
             ?? throw new MissingMethodException();
-        Assert.Throws<ArgumentNullException>(() => method.Invoke(null, new object?[] { null, HtmlConsoleSeverity.Info }));
+        var ex = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, new object?[] { null, HtmlConsoleSeverity.Info }));
+        Assert.IsType<ArgumentNullException>(ex.InnerException);
     }
 
     [Fact]
