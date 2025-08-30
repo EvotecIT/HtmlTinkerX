@@ -37,7 +37,7 @@ public class HtmlOptimizerFileAsyncTests {
         await File.WriteAllTextAsync(path, "<html><!--c--><body> <p>Hi</p></body></html>");
 #endif
         try {
-            string result = await HtmlOptimizer.OptimizeHtmlFileAsync(path, false);
+            string result = await HtmlOptimizer.OptimizeHtmlFileAsync(path, false, treatAsDocument: true, removeComments: true);
             Assert.Equal("<html><body><p>Hi</p></body></html>", result);
         } finally {
             File.Delete(path);

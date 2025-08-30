@@ -34,11 +34,23 @@ public sealed class CmdletOptimizeHtml : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter CSSDecodeEscapes { get; set; }
 
+    /// <summary>Treat the input as a full HTML document.</summary>
+    [Parameter]
+    public SwitchParameter TreatAsDocument { get; set; }
+
+    /// <summary>Remove HTML comments during optimization.</summary>
+    [Parameter]
+    public SwitchParameter RemoveComments { get; set; }
+
+    /// <summary>Remove optional HTML tags such as closing <c>&lt;/p&gt;</c>.</summary>
+    [Parameter]
+    public SwitchParameter RemoveOptionalTags { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetFile
-            ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent).ConfigureAwait(false)
-            : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent).ConfigureAwait(false);
+            ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent).ConfigureAwait(false)
+            : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK

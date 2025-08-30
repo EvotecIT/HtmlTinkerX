@@ -17,17 +17,45 @@ public class HtmlOptimizerTests {
     }
 
     [Fact]
-    public void OptimizeHtml_MinifiesContent() {
+    public void OptimizeHtml_TreatAsDocumentMinifiesContent() {
         const string input = "<html><!--c--><body> <p>Hi</p></body></html>";
-        string result = HtmlOptimizer.OptimizeHtml(input, false);
+        string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true, removeComments: true);
         Assert.Equal("<html><body><p>Hi</p></body></html>", result);
     }
 
     [Fact]
     public void OptimizeHtml_PreservesMotw() {
         const string input = "<!-- saved from url=(0014)about:internet --><html><body>test</body></html>";
-        string result = HtmlOptimizer.OptimizeHtml(input, false);
+        string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true);
         Assert.StartsWith("<!-- saved from url=(0014)about:internet -->", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_DoesNotWrapFragmentsByDefault() {
+        const string input = "<tr></tr>";
+        string result = HtmlOptimizer.OptimizeHtml(input, false);
+        Assert.Equal("<tr></tr>", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_PreservesCommentsByDefault() {
+        const string input = "<html><!--c--><body>Hi</body></html>";
+        string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true);
+        Assert.Contains("<!--c-->", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_RemoveCommentsWhenRequested() {
+        const string input = "<html><!--c--><body>Hi</body></html>";
+        string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true, removeComments: true);
+        Assert.DoesNotContain("<!--c-->", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_RemoveOptionalTagsWhenRequested() {
+        const string input = "<html><body><p>Hi</p></body></html>";
+        string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true, removeOptionalTags: true);
+        Assert.DoesNotContain("</p>", result);
     }
 
     [Fact]

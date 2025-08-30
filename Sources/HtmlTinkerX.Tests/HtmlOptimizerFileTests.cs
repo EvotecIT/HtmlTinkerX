@@ -32,7 +32,7 @@ public class HtmlOptimizerFileTests {
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".html");
         File.WriteAllText(path, "<html><!--c--><body> <p>Hi</p></body></html>");
         try {
-            string result = HtmlOptimizer.OptimizeHtmlFile(path, false);
+            string result = HtmlOptimizer.OptimizeHtmlFile(path, false, treatAsDocument: true, removeComments: true);
             Assert.Equal("<html><body><p>Hi</p></body></html>", result);
         } finally {
             File.Delete(path);
