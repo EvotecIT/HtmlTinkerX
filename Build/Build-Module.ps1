@@ -10,7 +10,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         # ID used to uniquely identify this module
         GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
         # Version number of this module.
-        ModuleVersion        = '2.0.1'
+        ModuleVersion        = '2.0.3'
         # Author of this module
         Author               = 'Przemyslaw Klys'
         # Company or vendor of this module
@@ -120,7 +120,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         ModulesPath         = "$PSScriptRoot\..\Artefacts\Packed\Modules"
         RequiredModulesPath = "$PSScriptRoot\..\Artefacts\Packed\Modules"
         AddRequiredModules  = $true
-        ArtefactName        = '<ModuleName>.<TagModuleVersionWithPreRelease>.zip'
+        ArtefactName        = 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>.zip'
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat
 
