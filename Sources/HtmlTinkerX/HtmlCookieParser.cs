@@ -31,6 +31,57 @@ public static class HtmlCookieParser {
             value = default;
             return false;
         }
+
+        public static bool TryParseUnixTimestamp(string? value, out long seconds) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                seconds = default;
+                return false;
+            }
+
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue)) {
+                seconds = NormalizeUnixTimestamp(longValue);
+                return true;
+            }
+
+            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double doubleValue)) {
+                seconds = NormalizeUnixTimestamp(doubleValue);
+                return true;
+            }
+
+            seconds = default;
+            return false;
+        }
+
+        public static bool TryParseUnixTimestamp(JsonElement element, out long seconds) {
+            switch (element.ValueKind) {
+                case JsonValueKind.Number:
+                    if (element.TryGetInt64(out long longValue)) {
+                        seconds = NormalizeUnixTimestamp(longValue);
+                        return true;
+                    }
+
+                    if (element.TryGetDouble(out double doubleValue)) {
+                        seconds = NormalizeUnixTimestamp(doubleValue);
+                        return true;
+                    }
+
+                    break;
+                case JsonValueKind.String:
+                    return TryParseUnixTimestamp(element.GetString(), out seconds);
+            }
+
+            seconds = default;
+            return false;
+        }
+
+        private static long NormalizeUnixTimestamp(long value) {
+            return value >= 1_000_000_000_000 ? value / 1000L : value;
+        }
+
+        private static long NormalizeUnixTimestamp(double value) {
+            double normalized = value >= 1_000_000_000_000d ? value / 1000d : value;
+            return (long)Math.Round(normalized, MidpointRounding.AwayFromZero);
+        }
     }
 
     /// <summary>
@@ -103,8 +154,13 @@ public static class HtmlCookieParser {
                     cookie.Domain = val;
                     break;
                 case "expires":
-                    if (DateTime.TryParse(val, out DateTime dt)) {
-                        cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
+                    if (val is not null) {
+                        if (CookieHelpers.TryParseUnixTimestamp(val, out long unixTimestamp)) {
+                            cookie.Expires = unixTimestamp;
+                        } else if (DateTime.TryParse(val, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime dt) ||
+                            DateTime.TryParse(val, out dt)) {
+                            cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
+                        }
                     }
                     break;
                 case "secure":
@@ -140,8 +196,16 @@ public static class HtmlCookieParser {
                 Secure = CookieHelpers.TryGetPropertyIgnoreCase(root, "Secure", out var s) ? s.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null,
                 HttpOnly = CookieHelpers.TryGetPropertyIgnoreCase(root, "HttpOnly", out var h) ? h.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) : null
             };
-            if (root.TryGetProperty("Expires", out var e) && DateTime.TryParse(e.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime dt)) {
-                cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
+            if (root.TryGetProperty("Expires", out var e)) {
+                if (CookieHelpers.TryParseUnixTimestamp(e, out long unixTimestamp)) {
+                    cookie.Expires = unixTimestamp;
+                } else if (e.ValueKind == JsonValueKind.String) {
+                    string? expiresText = e.GetString();
+                    if (!string.IsNullOrEmpty(expiresText) && (DateTime.TryParse(expiresText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime dt) ||
+                        DateTime.TryParse(expiresText, out dt))) {
+                        cookie.Expires = new DateTimeOffset(dt).ToUnixTimeSeconds();
+                    }
+                }
             }
             return cookie;
         }
@@ -166,10 +230,8 @@ public static class HtmlCookieParser {
             HttpOnly = root.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null,
             SameSite = root.TryGetProperty("sameSite", out var ss) ? CookieHelpers.ParseSameSite(ss.GetString()) : null
         };
-        if (root.TryGetProperty("expires", out var e)) {
-            double exp = e.GetDouble();
-            long seconds = (long)(exp >= 1e12 ? exp / 1000.0 : exp);
-            cookie.Expires = seconds;
+        if (root.TryGetProperty("expires", out var e) && CookieHelpers.TryParseUnixTimestamp(e, out long expires)) {
+            cookie.Expires = expires;
         }
         return cookie;
     }
@@ -194,8 +256,8 @@ public static class HtmlCookieParser {
                     Secure = el.TryGetProperty("secure", out var s) ? s.GetBoolean() : (bool?)null,
                     HttpOnly = el.TryGetProperty("httpOnly", out var h) ? h.GetBoolean() : (bool?)null
                 };
-                if (el.TryGetProperty("expires", out var e)) {
-                    c.Expires = (long)e.GetDouble();
+                if (el.TryGetProperty("expires", out var e) && CookieHelpers.TryParseUnixTimestamp(e, out long expires)) {
+                    c.Expires = expires;
                 }
                 list.Add(c);
             }

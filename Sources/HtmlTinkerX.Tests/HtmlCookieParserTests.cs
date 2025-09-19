@@ -114,6 +114,27 @@ public class HtmlCookieParserTests {
     }
 
     [Fact]
+    public void ParseSetCookieHeader_ParsesIso8601Expiration() {
+        string header = "sessionId=abc; Expires=2024-03-05T15:00:00Z";
+        HtmlCookie cookie = HtmlCookieParser.ParseSetCookieHeader(header);
+        Assert.Equal(1709650800L, cookie.Expires);
+    }
+
+    [Fact]
+    public void ParseSetCookieHeader_ParsesUnixSecondsExpiration() {
+        string header = "sessionId=abc; Expires=1709650800";
+        HtmlCookie cookie = HtmlCookieParser.ParseSetCookieHeader(header);
+        Assert.Equal(1709650800L, cookie.Expires);
+    }
+
+    [Fact]
+    public void ParseSetCookieHeader_ParsesUnixMillisecondsExpiration() {
+        string header = "sessionId=abc; Expires=1709650800000";
+        HtmlCookie cookie = HtmlCookieParser.ParseSetCookieHeader(header);
+        Assert.Equal(1709650800L, cookie.Expires);
+    }
+
+    [Fact]
     public void ParseOrgJsonCookie_ParsesJson() {
         string json = "{\"Path\":\"/\",\"Secure\":\"false\",\"name\":\"sessionId\",\"Expires\":\"Sun, 31 Dec 2023 23:59:59 GMT\",\"Domain\":\"example.com\",\"value\":\"abc123xyz\"}";
         HtmlCookie c = HtmlCookieParser.ParseOrgJsonCookie(json);
