@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -40,7 +41,10 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// </summary>
     public string? VideoPath { get; internal set; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
-    private readonly ConcurrentQueue<IRequest> _order = new();
+    private ConcurrentQueue<IRequest>? _order;
+    private object? _networkSync;
+    private ConcurrentQueue<IRequest> RequestOrder => LazyInitializer.EnsureInitialized(ref _order, () => new ConcurrentQueue<IRequest>())!;
+    private object NetworkSync => LazyInitializer.EnsureInitialized(ref _networkSync, () => new object())!;
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
     private int? _networkLogLimit;
     /// <summary>
@@ -51,12 +55,45 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         set {
             _networkLogLimit = value;
             if (value.HasValue) {
-                TrimNetworkLog(value.Value);
+                lock (NetworkSync) {
+                    TrimNetworkLog(value.Value);
+                }
             }
         }
     }
     /// <summary>Captured network log entries.</summary>
-    public IEnumerable<HtmlNetworkEntry> NetworkLog => _network.Values;
+    public IEnumerable<HtmlNetworkEntry> NetworkLog {
+        get {
+            ConcurrentDictionary<IRequest, HtmlNetworkEntry>? network = _network;
+            if (network is null) {
+                return Array.Empty<HtmlNetworkEntry>();
+            }
+
+            List<IRequest> orderedRequests = new List<IRequest>();
+            List<HtmlNetworkEntry> orderedEntries = new List<HtmlNetworkEntry>();
+
+            lock (NetworkSync) {
+                ConcurrentQueue<IRequest> requestOrder = RequestOrder;
+
+                while (requestOrder.TryDequeue(out IRequest? request)) {
+                    orderedRequests.Add(request);
+                }
+
+                if (orderedRequests.Count == 0) {
+                    orderedEntries.AddRange(network.Values);
+                } else {
+                    foreach (IRequest request in orderedRequests) {
+                        requestOrder.Enqueue(request);
+                        if (network.TryGetValue(request, out HtmlNetworkEntry? entry)) {
+                            orderedEntries.Add(entry);
+                        }
+                    }
+                }
+            }
+
+            return orderedEntries;
+        }
+    }
     /// <summary>Captured console log entries.</summary>
     public IEnumerable<HtmlConsoleEntry> ConsoleLog => _console;
 
@@ -88,10 +125,13 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 RequestHeaders = new Dictionary<string, string>(req.Headers),
                 Started = System.DateTimeOffset.UtcNow
             };
-            _network[req] = entry;
-            _order.Enqueue(req);
-            if (NetworkLogLimit.HasValue) {
-                TrimNetworkLog(NetworkLogLimit.Value);
+
+            lock (NetworkSync) {
+                _network[req] = entry;
+                RequestOrder.Enqueue(req);
+                if (NetworkLogLimit.HasValue) {
+                    TrimNetworkLog(NetworkLogLimit.Value);
+                }
             }
         };
 
@@ -121,8 +161,9 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     }
 
     private void TrimNetworkLog(int limit) {
-        while (_order.Count > limit && _order.TryDequeue(out IRequest? oldReq)) {
-            _network.TryRemove(oldReq, out _);
+        ConcurrentQueue<IRequest> requestOrder = RequestOrder;
+        while (requestOrder.Count > limit && requestOrder.TryDequeue(out IRequest? oldReq)) {
+            _network?.TryRemove(oldReq, out _);
         }
     }
 
