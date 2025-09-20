@@ -18,7 +18,8 @@ public class HtmlBrowserSessionDisposeTests {
     [Fact]
     public async Task DisposeAsync_DisposesAllPlaywrightObjects() {
         var playwright = new Mock<IPlaywright>();
-        playwright.Setup(p => p.Dispose()).Verifiable();
+        var asyncPlaywright = playwright.As<IAsyncDisposable>();
+        asyncPlaywright.Setup(p => p.DisposeAsync()).Returns(new ValueTask(Task.CompletedTask)).Verifiable();
         var browser = new Mock<IBrowser>();
         browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
         var context = new Mock<IBrowserContext>();
@@ -29,7 +30,34 @@ public class HtmlBrowserSessionDisposeTests {
 
         await session.DisposeAsync();
 
-        playwright.Verify();
+        asyncPlaywright.Verify(p => p.DisposeAsync(), Times.Once);
+        browser.Verify();
+        context.Verify();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WaitsForPlaywrightDisposal() {
+        var playwrightDispose = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var playwright = new Mock<IPlaywright>();
+        var asyncPlaywright = playwright.As<IAsyncDisposable>();
+        asyncPlaywright.Setup(p => p.DisposeAsync()).Returns(new ValueTask(playwrightDispose.Task)).Verifiable();
+        var browser = new Mock<IBrowser>();
+        browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
+        var context = new Mock<IBrowserContext>();
+        context.Setup(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
+        var page = new Mock<IPage>();
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+
+        Task disposeTask = session.DisposeAsync().AsTask();
+
+        Assert.False(disposeTask.IsCompleted);
+
+        playwrightDispose.SetResult(true);
+
+        await disposeTask;
+
+        asyncPlaywright.Verify(p => p.DisposeAsync(), Times.Once);
         browser.Verify();
         context.Verify();
     }

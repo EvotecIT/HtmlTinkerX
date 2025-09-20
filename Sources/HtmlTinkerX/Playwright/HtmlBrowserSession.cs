@@ -152,8 +152,9 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         if (Browser != null) {
             await Browser.CloseAsync().ConfigureAwait(false);
         }
+
         if (Playwright != null) {
-            Playwright.Dispose();
+            await Playwright.DisposeAsync().ConfigureAwait(false);
         }
     }
 }
