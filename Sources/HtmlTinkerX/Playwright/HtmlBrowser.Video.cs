@@ -86,41 +86,50 @@ public static partial class HtmlBrowser {
         string? timezone = null,
         CancellationToken cancellationToken = default) {
         string temp = Path.GetTempFileName();
-        await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
-        string url = session.Page.Url;
-        HtmlBrowserEngine engine = session.Browser.BrowserType.Name switch {
-            "firefox" => HtmlBrowserEngine.Firefox,
-            "webkit" => HtmlBrowserEngine.WebKit,
-            _ => HtmlBrowserEngine.Chromium
-        };
+        try {
+            await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
+            string url = session.Page.Url;
+            HtmlBrowserEngine engine = session.Browser.BrowserType.Name switch {
+                "firefox" => HtmlBrowserEngine.Firefox,
+                "webkit" => HtmlBrowserEngine.WebKit,
+                _ => HtmlBrowserEngine.Chromium
+            };
 
-        HtmlBrowserSession newSession = await OpenSessionAsync(
-            url,
-            engine,
-            clean: false,
-            username: null,
-            password: null,
-            formLogin: null,
-            headless: headless,
-            slowMo: slowMo,
-            videoPath: videoPath,
-            videoWidth: width,
-            videoHeight: height,
-            storageStatePath: temp,
-            userAgent: userAgent,
-            viewportWidth: viewportWidth,
-            viewportHeight: viewportHeight,
-            deviceScaleFactor: deviceScaleFactor,
-            proxy: null,
-            proxyUsername: null,
-            proxyPassword: null,
-            geoLatitude: geoLatitude,
-            geoLongitude: geoLongitude,
-            timezone: timezone,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            HtmlBrowserSession newSession = await OpenSessionAsync(
+                url,
+                engine,
+                clean: false,
+                username: null,
+                password: null,
+                formLogin: null,
+                headless: headless,
+                slowMo: slowMo,
+                videoPath: videoPath,
+                videoWidth: width,
+                videoHeight: height,
+                storageStatePath: temp,
+                userAgent: userAgent,
+                viewportWidth: viewportWidth,
+                viewportHeight: viewportHeight,
+                deviceScaleFactor: deviceScaleFactor,
+                proxy: null,
+                proxyUsername: null,
+                proxyPassword: null,
+                geoLatitude: geoLatitude,
+                geoLongitude: geoLongitude,
+                timezone: timezone,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        File.Delete(temp);
-        return newSession;
+            return newSession;
+        } finally {
+            try {
+                if (!string.IsNullOrEmpty(temp) && File.Exists(temp)) {
+                    File.Delete(temp);
+                }
+            } catch (IOException) {
+            } catch (System.UnauthorizedAccessException) {
+            }
+        }
     }
 
     /// <summary>

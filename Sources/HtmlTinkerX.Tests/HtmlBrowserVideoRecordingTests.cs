@@ -75,4 +75,55 @@ public class HtmlBrowserVideoRecordingTests {
 
         HtmlBrowser.PlaywrightFactory = null;
     }
+
+    [Fact]
+    public async Task StartVideoRecordingAsync_RemovesTempStorageFileOnFailure() {
+        string? statePath = null;
+
+        var page = new Mock<IPage>();
+        page.SetupGet(p => p.Url).Returns("https://example.com");
+
+        var context = new Mock<IBrowserContext>();
+        context.Setup(c => c.StorageStateAsync(It.IsAny<BrowserContextStorageStateOptions>()))
+            .Callback<BrowserContextStorageStateOptions>(o => {
+                statePath = o.Path;
+                if (statePath != null) {
+                    File.WriteAllText(statePath, "{}");
+                }
+            })
+            .ReturnsAsync("{}");
+        context.Setup(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(Task.CompletedTask);
+
+        var browserType = new Mock<IBrowserType>();
+        browserType.SetupGet(bt => bt.Name).Returns("chromium");
+
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(b => b.BrowserType).Returns(browserType.Object);
+        browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions>())).Returns(Task.CompletedTask);
+
+        var existingPlaywright = new Mock<IPlaywright>();
+
+        HtmlBrowserSession session = new(existingPlaywright.Object, browser.Object, context.Object, page.Object);
+
+        var failingBrowserType = new Mock<IBrowserType>();
+        failingBrowserType.Setup(bt => bt.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .ThrowsAsync(new SerializationException("Launch failed"));
+
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(p => p.Chromium).Returns(failingBrowserType.Object);
+
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+
+        try {
+            await Assert.ThrowsAsync<SerializationException>(() => HtmlBrowser.StartVideoRecordingAsync(session, "video.webm"));
+            Assert.NotNull(statePath);
+            Assert.False(File.Exists(statePath!));
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
+            await session.DisposeAsync();
+            if (statePath != null && File.Exists(statePath)) {
+                File.Delete(statePath);
+            }
+        }
+    }
 }
