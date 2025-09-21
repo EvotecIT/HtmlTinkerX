@@ -2,6 +2,7 @@ using Xunit;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using System.Diagnostics;
 using Moq;
 using Microsoft.Playwright;
 
@@ -140,15 +141,75 @@ public class HtmlBrowserTesterTests {
     public async Task TestPerformanceAsync_ReturnsMetrics() {
         // Arrange
         var url = "data:text/html,<html><body>Test</body></html>";
-        
+
         // Act
         var metrics = await HtmlBrowserTester.TestPerformanceAsync(url);
-        
+
         // Assert
         Assert.NotNull(metrics);
         Assert.NotNull(metrics.TotalLoadTime);
         Assert.True(metrics.TotalRequests >= 0); // May be 0 for data URLs
         Assert.NotNull(metrics.ResourceBreakdown);
+    }
+
+    [Fact]
+    public async Task TestUrlAsync_DoesNotAccumulatePlaywrightProcesses() {
+        // Arrange
+        var url = "data:text/html,<html><body>Resource Cleanup</body></html>";
+        var initialProcessCount = CountPlaywrightProcesses();
+
+        // Act
+        for (var i = 0; i < 3; i++) {
+            var result = await HtmlBrowserTester.TestUrlAsync(url);
+            Assert.NotNull(result);
+            await Task.Delay(250);
+        }
+
+        await Task.Delay(1000);
+        var finalProcessCount = CountPlaywrightProcesses();
+
+        // Assert
+        Assert.True(finalProcessCount <= initialProcessCount, $"Expected Playwright processes to remain at or below the initial count. Initial: {initialProcessCount}, Final: {finalProcessCount}.");
+    }
+
+    private static int CountPlaywrightProcesses() {
+        var processes = Process.GetProcesses();
+        var count = 0;
+
+        foreach (var process in processes) {
+            try {
+                if (IsPlaywrightProcess(process)) {
+                    count++;
+                }
+            } catch (InvalidOperationException) {
+                // Process exited while enumerating; ignore.
+            } catch (System.ComponentModel.Win32Exception) {
+                // Access denied on process details; ignore this instance.
+            } finally {
+                process.Dispose();
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsPlaywrightProcess(Process process) {
+        var name = process.ProcessName;
+
+        if (name.IndexOf("playwright", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return true;
+        }
+
+        try {
+            var mainModuleName = process.MainModule?.ModuleName;
+            if (mainModuleName is string moduleName && moduleName.IndexOf("playwright", StringComparison.OrdinalIgnoreCase) >= 0) {
+                return true;
+            }
+        } catch (System.ComponentModel.Win32Exception) {
+            // Access denied retrieving module information; fall back to name checks.
+        }
+
+        return false;
     }
     
     [Fact]
