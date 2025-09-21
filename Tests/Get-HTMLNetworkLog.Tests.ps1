@@ -13,7 +13,7 @@ Describe 'Get-HTMLNetworkLog' {
             }) | Out-Null
         }
         Invoke-HTMLNavigation -Session $session -Url $uri
-        Start-Sleep -Milliseconds 500
+        $null = $session.Page.WaitForFunctionAsync('document.getElementById("result").textContent!=="loading"')
 
         $log = Get-HTMLNetworkLog -Session $session
         Close-HtmlBrowserSession -Session $session

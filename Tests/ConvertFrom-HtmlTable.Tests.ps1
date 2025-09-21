@@ -1,5 +1,6 @@
 ﻿Describe -Name 'ConvertFrom-HtmlTable' {
-    It 'Given a HTML table online with polish chars - Should convert it to a PowerShell object' {
+    $AllowNet = $env:ALLOW_NETWORK_TESTS -eq '1'
+    It 'Given a HTML table online with polish chars - Should convert it to a PowerShell object' -Skip:(-not $AllowNet) {
         $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
 
         $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
@@ -34,7 +35,7 @@
         $Table[1].Column2 | Should -Be 'Komórka a4'
     }
 
-    It 'Parses URL with Polish characters correctly - AgilityPack' {
+    It 'Parses URL with Polish characters correctly - AgilityPack' -Skip:(-not $AllowNet) {
         $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
 
         $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
@@ -53,7 +54,7 @@
         }
     }
 
-    It 'Parses URL with Polish characters correctly - AngleSharp' {
+    It 'Parses URL with Polish characters correctly - AngleSharp' -Skip:(-not $AllowNet) {
         $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
 
         $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AngleSharp
@@ -71,7 +72,7 @@
             $Table[1].Column2 | Should -Be 'Komórka a4'
         }
     }
-    It 'Given a HTML Page with Tables' {
+    It 'Given a HTML Page with Tables' -Skip:(-not $AllowNet) {
         $AllTables = ConvertFrom-HtmlTable -Url 'https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference'
         $AllTables.Count | Should -BeGreaterThan 0
     }
@@ -172,7 +173,7 @@
         $Result[0].Age | Should -Be '30'
     }
 
-    It 'Parses Wikipedia escape sequence table with correct columns' {
+    It 'Parses Wikipedia escape sequence table with correct columns' -Skip:(-not $AllowNet) {
         [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['User-Agent'] = 'HtmlTinkerX.Tests'
         try {
             $Tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'

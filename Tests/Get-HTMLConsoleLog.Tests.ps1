@@ -3,7 +3,7 @@ Describe 'Get-HtmlBrowserConsoleLog' {
         $path = Join-Path $PSScriptRoot 'Documents/console_page.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
-        Start-Sleep -Milliseconds 500
+        $null = $session.Page.WaitForSelectorAsync('#result')
         $log = Get-HtmlBrowserConsoleLog -Session $session
         Close-HtmlBrowserSession -Session $session
 

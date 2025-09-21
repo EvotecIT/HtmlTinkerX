@@ -5,6 +5,7 @@ describe 'HTML Tracing and HAR' {
         $session = Invoke-HTMLRendering -Url $uri -Session
         Start-HtmlBrowserTracing -Session $session
         Invoke-HTMLNavigation -Session $session -Url $uri
+        $null = $session.Page.WaitForSelectorAsync('#loaded')
         $trace = Join-Path $TestDrive 'trace.zip'
         Stop-HtmlBrowserTracing -Session $session -OutFile $trace
         (Test-Path $trace) | Should -BeTrue
@@ -16,6 +17,7 @@ describe 'HTML Tracing and HAR' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
         Invoke-HTMLNavigation -Session $session -Url $uri
+        $null = $session.Page.WaitForSelectorAsync('#loaded')
         $har = Join-Path $TestDrive 'out.har'
         Save-HtmlBrowserHar -Session $session -OutFile $har
         (Test-Path $har) | Should -BeTrue
@@ -27,6 +29,7 @@ describe 'HTML Tracing and HAR' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $session = Invoke-HTMLRendering -Url $uri -Session
         Invoke-HTMLNavigation -Session $session -Url $uri
+        $null = $session.Page.WaitForSelectorAsync('#loaded')
         $harTemp = Join-Path $TestDrive 'temp.har'
         Save-HtmlBrowserHar -Session $session -OutFile $harTemp
         $harObj = Show-HtmlBrowserHar -Path $harTemp
