@@ -163,16 +163,11 @@ public static partial class HtmlBrowser {
     /// <param name="engine">The browser engine to ensure is installed.</param>
     /// <returns>A task that completes when the installation check/process is finished.</returns>
     public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
-        // Unit-test shortcut: when a custom PlaywrightFactory is injected, skip installer work.
-        if (PlaywrightFactory != null) {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+        // Unit-test shortcut: when a custom PlaywrightFactory is injected, skip installer + smoke.
+        if (PlaywrightFactory != null) return;
+        // Quick check – if browsers are present and a smoke launch works, we’re done
+        if (IsBrowserRuntimeInstalled(engine) && await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false))
             return;
-        }
-        // Quick check – if everything looks ready, set the search path and exit early
-        if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine) && IsDriverComplete()) {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
-            return;
-        }
 
         // Cross-process mutex to avoid races among parallel test runs/processes
         System.Threading.Mutex? globalMutex = null;
@@ -191,26 +186,17 @@ public static partial class HtmlBrowser {
 
             await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
             try {
-                // Double-check inside locks
-                if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine) && IsDriverComplete()) {
-                    Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
-                    return;
-                }
+                // Ensure the browser runtime is installed (this also bootstraps the driver via Program.Main)
+                bool withDeps = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && ShouldTryInstallDeps();
+                await EnsureBrowsersAsync(engine, preferWithDeps: withDeps).ConfigureAwait(false);
 
-                // Ensure driver files exist and are healthy
-                await EnsureDriverAsync(force: !IsDriverPresent() || !IsDriverComplete()).ConfigureAwait(false);
-
-                // Ensure the browser runtime is installed
-                await EnsureBrowsersAsync(engine).ConfigureAwait(false);
-
-                // Smoke launch to self-heal partial/broken installs
-                if (!await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false)) {
+                // Smoke launch to self-heal partial/broken installs (unless explicitly skipped)
+                if (!SkipSmokeLaunch() && !await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false)) {
                     // Attempt repair: force driver + runtime reinstall, then re-smoke
                     CleanInstallDir();
-                    await EnsureDriverAsync(force: true).ConfigureAwait(false);
                     await EnsureBrowsersAsync(engine, preferWithDeps: ShouldTryInstallDeps()).ConfigureAwait(false);
 
-                    if (!await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false)) {
+                    if (!SkipSmokeLaunch() && !await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false)) {
                         throw new InvalidOperationException("Playwright failed to launch after repair attempt. Please review environment and logs.");
                     }
                 }
@@ -230,13 +216,9 @@ public static partial class HtmlBrowser {
         return ci || optIn;
     }
 
-    private static async Task EnsureDriverAsync(bool force) {
-        // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing '.playwright'
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
-        if (!force && IsDriverPresent() && IsDriverComplete())
-            return;
-
-        await DownloadAndExtractDriverAsync().ConfigureAwait(false);
+    private static bool SkipSmokeLaunch() {
+        var skip = (Environment.GetEnvironmentVariable("HTMLINKERX_SKIP_SMOKE") ?? string.Empty).Equals("1", StringComparison.OrdinalIgnoreCase);
+        return skip;
     }
 
     private static async Task DownloadAndExtractDriverAsync() {

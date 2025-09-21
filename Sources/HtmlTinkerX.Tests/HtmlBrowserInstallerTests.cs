@@ -24,6 +24,8 @@ public class HtmlBrowserInstallerTests
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
         // Opt into dependency installation for this test to verify flag propagation
         Environment.SetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS", "1");
+        // Skip smoke launch in CI/unit test
+        Environment.SetEnvironmentVariable("HTMLINKERX_SKIP_SMOKE", "1");
 
         try
         {
@@ -53,6 +55,7 @@ public class HtmlBrowserInstallerTests
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
             Environment.SetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS", null);
+            Environment.SetEnvironmentVariable("HTMLINKERX_SKIP_SMOKE", null);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
