@@ -5,6 +5,8 @@ describe 'HTML Video Recording' {
         $out = Join-Path $TestDrive 'video.webm'
         $session = Start-HtmlBrowserVideoCapture -Url $uri -OutFile $out -Width 320 -Height 240
         Invoke-HTMLNavigation -Session $session -Url $uri
+        $null = $session.Page.WaitForSelectorAsync('#loaded').GetAwaiter().GetResult()
+        $null = $session.Page.WaitForTimeoutAsync(250).GetAwaiter().GetResult()
         Stop-HtmlBrowserVideoCapture -Session $session
         (Test-Path $out) | Should -BeTrue
     }
