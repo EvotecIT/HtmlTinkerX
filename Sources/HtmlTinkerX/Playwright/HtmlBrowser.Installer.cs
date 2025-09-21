@@ -215,10 +215,32 @@ public static partial class HtmlBrowser {
     }
 
     private static bool ShouldTryInstallDeps() {
-        // Only opt-in via environment variables; do not assume CI wants --with-deps
+        // Opt-in via env or auto-enable in CI on Linux when sudo works non-interactively
         var optIn = (Environment.GetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS") ?? Environment.GetEnvironmentVariable("PLAYWRIGHT_INSTALL_DEPS") ?? string.Empty)
             .Equals("1", StringComparison.OrdinalIgnoreCase);
-        return optIn;
+        if (optIn) return true;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            var ci = (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") ?? Environment.GetEnvironmentVariable("CI") ?? string.Empty)
+                .Equals("true", StringComparison.OrdinalIgnoreCase);
+            if (ci && CanUseSudoNonInteractive()) return true;
+        }
+        return false;
+    }
+
+    private static bool CanUseSudoNonInteractive() {
+        try {
+            var psi = new ProcessStartInfo {
+                FileName = "sudo",
+                Arguments = "-n true",
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
+            using var p = Process.Start(psi);
+            if (p == null) return false;
+            if (!p.WaitForExit(2000)) { try { p.Kill(); } catch { } return false; }
+            return p.ExitCode == 0;
+        } catch { return false; }
     }
 
     private static bool SkipSmokeLaunch() {

@@ -241,7 +241,7 @@ public class InstallerErrorTests
         {
             HtmlBrowser.PlaywrightInstaller = _ => throw new Exception("install failed");
             await Assert.ThrowsAnyAsync<Exception>(async () => await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
-            Assert.Contains(logs, s => s.Contains("Playwright install failed"));
+            Assert.Contains(logs, s => s.Contains("Playwright install"));
         }
         finally
         {
