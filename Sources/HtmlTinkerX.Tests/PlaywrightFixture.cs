@@ -16,6 +16,9 @@ public sealed class PlaywrightFixture : IAsyncLifetime {
         var skip = (Environment.GetEnvironmentVariable("HTMLINKERX_SKIP_FIXTURE_INSTALL") ?? string.Empty)
             .Equals("1", StringComparison.OrdinalIgnoreCase);
         if (!skip) {
+            // Emit logs to console in CI to help diagnose Playwright installation issues
+            if ((Environment.GetEnvironmentVariable("CI") ?? string.Empty).Equals("true", StringComparison.OrdinalIgnoreCase))
+                HtmlBrowser.Logger = s => Console.WriteLine($"[HtmlTinkerX] {s}");
             await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
         }
     }

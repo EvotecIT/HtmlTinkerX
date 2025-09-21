@@ -69,7 +69,19 @@ public static partial class HtmlBrowser {
         // Preferred: call Playwright's built-in CLI entrypoint. On .NET Framework this can fail
         // with BadImageFormatException or similar if the runtime cannot execute the entry point.
         try {
-            return Microsoft.Playwright.Program.Main(args);
+            int code = Microsoft.Playwright.Program.Main(args);
+            if (code == 0) return 0;
+            LogError($"Playwright Program.Main exited {code}. Falling back to Node CLI.");
+            // If non-zero, try Node CLI fallback as well
+            try {
+                if (!IsDriverComplete()) {
+                    DownloadAndExtractDriverAsync().GetAwaiter().GetResult();
+                }
+                return RunNodeCli(args);
+            } catch (Exception inner) {
+                LogError("Fallback Node CLI installer failed", inner);
+                return code; // return original non-zero if fallback throws
+            }
         } catch (Exception ex) when (
             ex is BadImageFormatException ||
             ex is TypeInitializationException ||
