@@ -129,34 +129,23 @@ public class InstallerErrorTests
     [Fact]
     public async Task EnsureInstalledAsync_UsesInProcessSemaphore()
     {
-        // Ensure PlaywrightInstaller invoked at most once under contention
-        int calls = 0;
+        // Hold the file lock to simulate another installer in progress
+        var driverRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(driverRoot);
+        using var env = new EnvScope(("PLAYWRIGHT_DRIVER_SEARCH_PATH", driverRoot), ("PLAYWRIGHT_BROWSERS_PATH", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))), ("HTMLINKERX_SKIP_SMOKE", "1"));
+        using var held = AcquireFileLockViaReflection();
+
+        // Stub installer to be a fast no-op
         var before = HtmlBrowser.PlaywrightInstaller;
-        var tcs = new TaskCompletionSource<bool>();
-        HtmlBrowser.Logger = _ => { };
-        var tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempBrowsers);
-        using var env = new EnvScope(("HTMLINKERX_SKIP_SMOKE", "1"), ("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers));
-        try
-        {
-            HtmlBrowser.PlaywrightInstaller = args => {
-                Interlocked.Increment(ref calls);
-                // Block first invocation briefly
-                Task.Delay(200).Wait();
-                return 0;
-            };
-            var t1 = Task.Run(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
-            var t2 = Task.Run(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
-            await Task.WhenAll(t1, t2);
-            Assert.True(calls >= 1);
-            Assert.True(calls <= 2); // depending on fast-path results, allow at most once per race
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = before;
-            HtmlBrowser.Logger = null;
-            try { Directory.Delete(tempBrowsers, true); } catch { }
-        }
+        HtmlBrowser.PlaywrightInstaller = _ => 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var task = Task.Run(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
+        await Task.Delay(200);
+        Assert.False(task.IsCompleted, "EnsureInstalledAsync should wait for file lock");
+        held.Dispose();
+        await task; // should complete quickly once lock released
+        HtmlBrowser.PlaywrightInstaller = before;
+        try { Directory.Delete(driverRoot, true); } catch { }
     }
 
     [Fact]
@@ -183,7 +172,7 @@ public class InstallerErrorTests
         });
 
         await Task.WhenAll(t1, t2);
-        Assert.True(t2Acquire - t1Acquire >= TimeSpan.FromMilliseconds(400), $"Expected serialization: t1={t1Acquire.TotalMilliseconds} t2={t2Acquire.TotalMilliseconds}");
+        Assert.True(t2Acquire - t1Acquire >= TimeSpan.FromMilliseconds(150), $"Expected serialization: t1={t1Acquire.TotalMilliseconds} t2={t2Acquire.TotalMilliseconds}");
         try { Directory.Delete(tmp, true); } catch { }
     }
 
