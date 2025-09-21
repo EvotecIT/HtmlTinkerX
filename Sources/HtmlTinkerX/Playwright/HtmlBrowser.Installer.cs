@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -23,6 +24,11 @@ public static partial class HtmlBrowser {
     /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
     /// </summary>
     internal static Action<string[]> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
+
+    /// <summary>
+    /// Factory used to create <see cref="HttpClient"/> instances. Exposed for unit testing.
+    /// </summary>
+    internal static Func<HttpClient> HttpClientFactory { get; set; } = DefaultHttpClientFactory;
     /// <summary>
     /// Gets the version of the Playwright driver.
     /// </summary>
@@ -112,6 +118,47 @@ public static partial class HtmlBrowser {
         return version == DriverVersion;
     }
 
+    /// <summary>
+    /// Determines whether the driver installation directory is corrupted.
+    /// </summary>
+    private static bool IsDriverCorrupted() {
+        string baseDir = GetDriverPath();
+        if (!Directory.Exists(baseDir))
+            return false;
+
+        string nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
+        if (!File.Exists(nodePath))
+            return true;
+
+        try {
+            if (new FileInfo(nodePath).Length == 0)
+                return true;
+        } catch {
+            return true;
+        }
+
+        string packageDir = Path.Combine(baseDir, "package");
+        if (!Directory.Exists(packageDir))
+            return true;
+
+        try {
+            if (!Directory.EnumerateFileSystemEntries(packageDir).Any())
+                return true;
+        } catch {
+            return true;
+        }
+
+        if (!File.Exists(VersionFile))
+            return true;
+
+        try {
+            string version = File.ReadAllText(VersionFile).Trim();
+            return !string.Equals(version, DriverVersion, StringComparison.OrdinalIgnoreCase);
+        } catch {
+            return true;
+        }
+    }
+
 
     /// <summary>
     /// Removes the Playwright driver installation directory.
@@ -136,125 +183,49 @@ public static partial class HtmlBrowser {
     /// <param name="engine">The browser engine to ensure is installed.</param>
     /// <returns>A task that completes when the installation check/process is finished.</returns>
     public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
+        ValidateExistingInstallation(engine);
+
         // Fast path - check without lock first
         if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
-            Environment.SetEnvironmentVariable(
-                "PLAYWRIGHT_DRIVER_SEARCH_PATH",
-                GetDriverRoot());
+            EnsureDriverSearchPath();
             return;
         }
 
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
-            // Double-check inside the lock in case another thread just completed installation
+            ValidateExistingInstallation(engine);
+
             if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
-                Environment.SetEnvironmentVariable(
-                    "PLAYWRIGHT_DRIVER_SEARCH_PATH",
-                    GetDriverRoot());
+                EnsureDriverSearchPath();
                 return;
             }
 
             bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
 
-            if (IsDriverPresent()) {
-                // PLAYWRIGHT_DRIVER_SEARCH_PATH must point to the directory containing
-                // the '.playwright' folder, not to the folder itself.
-                Environment.SetEnvironmentVariable(
-                    "PLAYWRIGHT_DRIVER_SEARCH_PATH",
-                    GetDriverRoot());
+            if (!IsDriverPresent()) {
+                await DownloadAndInstallDriverAsync().ConfigureAwait(false);
             } else {
-            string urlBase = "https://playwright.azureedge.net/builds/driver";
-            if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
-                urlBase += "/next";
-            string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
-
-            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
-
-            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            var total = response.Content.Headers.ContentLength ?? -1L;
-            var mem = new MemoryStream();
-            var buffer = new byte[81920];
-            var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            long read = 0;
-            int lastProgress = 0;
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            while (true) {
-                int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-                if (n == 0)
-                    break;
-                await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
-                if (total > 0) {
-                    read += n;
-                    int progress = (int)(read * 100 / total);
-                    if (progress != lastProgress) {
-                        double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
-                        Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
-                        lastProgress = progress;
-                    }
-                }
-            }
-            Console.WriteLine();
-            mem.Position = 0;
-
-            string baseDir = GetDriverPath();
-            if (Directory.Exists(baseDir))
-                Directory.Delete(baseDir, true);
-
-            string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-
-            using (var archive = new ZipArchive(mem)) {
-                archive.ExtractToDirectory(tempDir);
+                EnsureDriverSearchPath();
             }
 
-            Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
-
-            string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-            string nodeSource = Path.Combine(tempDir, NodeExecutable);
-            if (File.Exists(nodeDest))
-                File.Delete(nodeDest);
-            File.Move(nodeSource, nodeDest);
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-                try {
-                    var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
-                    chmod?.WaitForExit();
-                } catch {
-                    // ignore
-                }
-            }
-            string licenseDest = Path.Combine(baseDir, "node", "LICENSE");
-            if (File.Exists(licenseDest))
-                File.Delete(licenseDest);
-            File.Move(Path.Combine(tempDir, "LICENSE"), licenseDest);
-
-            string packageSrc = Path.Combine(tempDir, "package");
-            string packageDest = Path.Combine(baseDir, "package");
-            if (Directory.Exists(packageDest))
-                Directory.Delete(packageDest, true);
-            Directory.Move(packageSrc, packageDest);
-            Directory.Delete(tempDir, true);
-
-#if NETSTANDARD2_0 || NETFRAMEWORK
-            File.WriteAllText(VersionFile, DriverVersion);
-#else
-            await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
-#endif
-                Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
-            }
-
-            // Re-check runtime installation after driver setup
-            runtimeInstalled = IsBrowserRuntimeInstalled(engine);
             if (!runtimeInstalled) {
-                string runtime = engine.ToString().ToLowerInvariant();
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
-                    PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
-                } else {
-                    PlaywrightInstaller(new[] { "install", runtime });
-                }
+                InstallRuntime(engine);
             }
+        } finally {
+            InstallationSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Repairs the Playwright installation by cleaning driver and runtime directories and reinstalling.
+    /// </summary>
+    /// <param name="engine">The browser engine to reinstall.</param>
+    public static async Task RepairInstallationAsync(HtmlBrowserEngine engine) {
+        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
+        try {
+            CleanInstallDir();
+            await DownloadAndInstallDriverAsync().ConfigureAwait(false);
+            InstallRuntime(engine);
         } finally {
             InstallationSemaphore.Release();
         }
@@ -295,6 +266,29 @@ public static partial class HtmlBrowser {
         return false;
     }
 
+    private static bool IsBrowserRuntimeCorrupted(HtmlBrowserEngine engine) {
+        string path = GetBrowserInstallPath();
+        if (!Directory.Exists(path))
+            return false;
+        string prefix = engine.ToString().ToLowerInvariant() + "-";
+        var candidates = Directory.GetDirectories(path).Where(dir =>
+            Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (candidates.Length == 0)
+            return false;
+
+        foreach (string dir in candidates) {
+            try {
+                if (Directory.EnumerateFileSystemEntries(dir).Any()) {
+                    return false;
+                }
+            } catch {
+                return true;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Cleans the browser installation directory and removes the Playwright driver.
     /// </summary>
@@ -304,5 +298,158 @@ public static partial class HtmlBrowser {
             Directory.Delete(path, recursive: true);
         }
         CleanDriver();
+    }
+
+    private static void CleanBrowserRuntime(HtmlBrowserEngine engine) {
+        string path = GetBrowserInstallPath();
+        if (!Directory.Exists(path))
+            return;
+
+        string prefix = engine.ToString().ToLowerInvariant() + "-";
+        foreach (string dir in Directory.GetDirectories(path)) {
+            if (!Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            try {
+                Directory.Delete(dir, true);
+            } catch {
+                // Ignore cleanup errors - best effort only.
+            }
+        }
+    }
+
+    private static void ValidateExistingInstallation(HtmlBrowserEngine engine) {
+        if (IsDriverCorrupted()) {
+            CleanDriver();
+        }
+
+        if (IsBrowserRuntimeCorrupted(engine)) {
+            CleanBrowserRuntime(engine);
+        }
+    }
+
+    private static void EnsureDriverSearchPath() {
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+    }
+
+    private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+
+    private static async Task DownloadAndInstallDriverAsync() {
+        string urlBase = "https://playwright.azureedge.net/builds/driver";
+        if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
+            urlBase += "/next";
+        string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
+
+        using var client = HttpClientFactory();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var total = response.Content.Headers.ContentLength ?? -1L;
+        using var mem = new MemoryStream();
+        var buffer = new byte[81920];
+        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        long read = 0;
+        int lastProgress = 0;
+        var sw = Stopwatch.StartNew();
+        while (true) {
+            int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            if (n == 0)
+                break;
+            await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
+            if (total > 0) {
+                read += n;
+                int progress = (int)(read * 100 / total);
+                if (progress != lastProgress) {
+                    double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
+                    Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
+                    lastProgress = progress;
+                }
+            }
+        }
+        Console.WriteLine();
+        mem.Position = 0;
+
+        string baseDir = GetDriverPath();
+        string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
+
+        try {
+            if (Directory.Exists(baseDir))
+                Directory.Delete(baseDir, true);
+
+            Directory.CreateDirectory(tempDir);
+
+            using (var archive = new ZipArchive(mem, ZipArchiveMode.Read, leaveOpen: true)) {
+                archive.ExtractToDirectory(tempDir);
+            }
+
+            Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
+
+            string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
+            string nodeSource = Path.Combine(tempDir, NodeExecutable);
+            if (File.Exists(nodeDest))
+                File.Delete(nodeDest);
+            File.Move(nodeSource, nodeDest);
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+                try {
+                    var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
+                    chmod?.WaitForExit();
+                } catch {
+                    // ignore
+                }
+            }
+            string licenseDest = Path.Combine(baseDir, "node", "LICENSE");
+            if (File.Exists(licenseDest))
+                File.Delete(licenseDest);
+            File.Move(Path.Combine(tempDir, "LICENSE"), licenseDest);
+
+            string packageSrc = Path.Combine(tempDir, "package");
+            string packageDest = Path.Combine(baseDir, "package");
+            if (Directory.Exists(packageDest))
+                Directory.Delete(packageDest, true);
+            Directory.Move(packageSrc, packageDest);
+
+#if NETSTANDARD2_0 || NETFRAMEWORK
+            File.WriteAllText(VersionFile, DriverVersion);
+#else
+            await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
+#endif
+        } catch {
+            try {
+                if (Directory.Exists(tempDir)) {
+                    Directory.Delete(tempDir, true);
+                }
+            } catch {
+                // ignore cleanup failure
+            }
+
+            CleanDriver();
+            throw;
+        } finally {
+            try {
+                if (Directory.Exists(tempDir)) {
+                    Directory.Delete(tempDir, true);
+                }
+            } catch {
+                // ignore cleanup failure
+            }
+        }
+
+        EnsureDriverSearchPath();
+    }
+
+    private static void InstallRuntime(HtmlBrowserEngine engine) {
+        string runtime = engine.ToString().ToLowerInvariant();
+
+        try {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+                PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
+            } else {
+                PlaywrightInstaller(new[] { "install", runtime });
+            }
+        } catch {
+            CleanBrowserRuntime(engine);
+            throw;
+        }
     }
 }
