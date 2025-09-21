@@ -76,20 +76,10 @@ public static partial class HtmlBrowser {
         try {
             int code = Microsoft.Playwright.Program.Main(args);
             if (code == 0) { LastInstallerError = null; return 0; }
+            // Do not fall back on non-zero exit: respect upstream CLI result for .NET runtimes.
             LastInstallerError = $"Program.Main exited {code}";
-            LogError($"Playwright Program.Main exited {code}. Falling back to Node CLI.");
-            // If non-zero, try Node CLI fallback as well
-            try {
-                if (!IsDriverComplete()) {
-                    // Ignore custom mirrors that tests may set concurrently
-                    DownloadAndExtractDriverAsync(ignoreCustomMirror: true).GetAwaiter().GetResult();
-                }
-                return RunNodeCli(args);
-            } catch (Exception inner) {
-                LastInstallerError = $"Node CLI fallback threw: {inner.Message}";
-                LogError("Fallback Node CLI installer failed", inner);
-                return code; // return original non-zero if fallback throws
-            }
+            LogError($"Playwright Program.Main exited {code}. Skipping Node fallback (only used on unsupported runtimes).");
+            return code;
         } catch (Exception ex) when (
             ex is BadImageFormatException ||
             ex is TypeInitializationException ||
@@ -142,12 +132,15 @@ public static partial class HtmlBrowser {
             RedirectStandardError = true
         };
 
-        // Forward proxy-related environment variables and explicit driver root so the CLI can find it
+        // Forward explicit driver root so the CLI can find it
         psi.Environment["PLAYWRIGHT_DRIVER_SEARCH_PATH"] = GetDriverRoot();
         var browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (!string.IsNullOrEmpty(browsersPath)) psi.Environment["PLAYWRIGHT_BROWSERS_PATH"] = browsersPath;
         // Enable install debug logging for better CI diagnostics
         psi.Environment["DEBUG"] = "pw:install";
+        // Sanitize mirror env vars to prevent test mirrors from bleeding into global installs
+        if (psi.Environment.ContainsKey("PLAYWRIGHT_DOWNLOAD_HOST")) psi.Environment.Remove("PLAYWRIGHT_DOWNLOAD_HOST");
+        if (psi.Environment.ContainsKey("HTMLINKERX_PLAYWRIGHT_HOST")) psi.Environment.Remove("HTMLINKERX_PLAYWRIGHT_HOST");
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start Node process");
         // Drain output to avoid deadlocks
