@@ -74,12 +74,34 @@ public static partial class HtmlBrowser {
         // Preferred: call Playwright's built-in CLI entrypoint. On .NET Framework this can fail
         // with BadImageFormatException or similar if the runtime cannot execute the entry point.
         try {
-            int code = Microsoft.Playwright.Program.Main(args);
-            if (code == 0) { LastInstallerError = null; return 0; }
-            // Do not fall back on non-zero exit: respect upstream CLI result for .NET runtimes.
-            LastInstallerError = $"Program.Main exited {code}";
-            LogError($"Playwright Program.Main exited {code}. Skipping Node fallback (only used on unsupported runtimes).");
-            return code;
+            // Capture Program.Main stdout/stderr for diagnostics on non-zero exit
+            var prevOut = Console.Out;
+            var prevErr = Console.Error;
+            using var swOut = new System.IO.StringWriter();
+            using var swErr = new System.IO.StringWriter();
+            try {
+                Console.SetOut(swOut);
+                Console.SetError(swErr);
+                int code = Microsoft.Playwright.Program.Main(args);
+                if (code == 0) { LastInstallerError = null; return 0; }
+                var outStr = swOut.ToString();
+                var errStr = swErr.ToString();
+                var combined = (errStr + "\n" + outStr).Trim();
+                if (!string.IsNullOrWhiteSpace(combined)) {
+                    // Trim to a reasonable size
+                    if (combined.Length > 4000) combined = combined.Substring(0, 4000) + "...";
+                    LastInstallerError = combined;
+                    LogError($"Playwright Program.Main exited {code}. Details: {combined}");
+                } else {
+                    LastInstallerError = $"Program.Main exited {code}";
+                    LogError(LastInstallerError);
+                }
+                // Respect upstream exit code; no Node fallback here
+                return code;
+            } finally {
+                try { Console.SetOut(prevOut); } catch { }
+                try { Console.SetError(prevErr); } catch { }
+            }
         } catch (Exception ex) when (
             ex is BadImageFormatException ||
             ex is TypeInitializationException ||
