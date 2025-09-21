@@ -30,6 +30,8 @@ jobs:
     strategy:
       matrix:
         framework: [net8.0, net472]
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,6 +50,16 @@ jobs:
 
       - name: Build solution
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: pw-${{ runner.os }}-${{ matrix.framework }}-${{ hashFiles('Sources/HtmlTinkerX/HtmlTinkerX.csproj') }}
+
+      - name: Preinstall + smoke
+        run: dotnet run --project Tools/LocalSmoke/LocalSmoke.csproj -c ${{ env.BUILD_CONFIGURATION }} --no-build
+        timeout-minutes: 5
 
       - name: Run tests for ${{ matrix.framework }}
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework ${{ matrix.framework }} --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
@@ -108,6 +120,8 @@ jobs:
   test-ubuntu:
     name: 'Ubuntu'
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -122,6 +136,16 @@ jobs:
 
       - name: Build solution
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: pw-${{ runner.os }}-net8.0-${{ hashFiles('Sources/HtmlTinkerX/HtmlTinkerX.csproj') }}
+
+      - name: Preinstall + smoke
+        run: dotnet run --project Tools/LocalSmoke/LocalSmoke.csproj -c ${{ env.BUILD_CONFIGURATION }} --no-build
+        timeout-minutes: 5
 
       - name: Run tests
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
@@ -175,6 +199,8 @@ jobs:
   test-macos:
     name: 'macOS'
     runs-on: macos-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -189,6 +215,16 @@ jobs:
 
       - name: Build solution
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: pw-${{ runner.os }}-net8.0-${{ hashFiles('Sources/HtmlTinkerX/HtmlTinkerX.csproj') }}
+
+      - name: Preinstall + smoke
+        run: dotnet run --project Tools/LocalSmoke/LocalSmoke.csproj -c ${{ env.BUILD_CONFIGURATION }} --no-build
+        timeout-minutes: 5
 
       - name: Run tests
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
