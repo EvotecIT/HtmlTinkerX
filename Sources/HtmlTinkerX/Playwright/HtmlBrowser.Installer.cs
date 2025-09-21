@@ -15,6 +15,12 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private const int DownloadBufferSize = 81920; // 80 KiB default HttpClient buffer size
+    private static readonly TimeSpan InstallLockTimeout = TimeSpan.FromMinutes(10);
+
+    internal static Action<string>? Logger { get; set; }
+    private static void LogInfo(string message) { try { Logger?.Invoke(message); } catch { } }
+    private static void LogError(string message, Exception? ex = null) { try { Logger?.Invoke(ex is null ? message : message + ": " + ex.Message); } catch { } }
     /// <summary>
     /// Semaphore to ensure thread-safe Playwright installation.
     /// Only one installation process can run at a time across all threads.
@@ -31,10 +37,9 @@ public static partial class HtmlBrowser {
     private static string DriverVersion {
         get {
             var asm = typeof(Microsoft.Playwright.Playwright).Assembly;
-            var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            string? info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             if (!string.IsNullOrEmpty(info)) {
-                // Strip build metadata (e.g. "+commit") but keep pre-release tags (e.g. "-next", "-beta").
-                var trimmed = info.Split('+')[0];
+                var trimmed = info!.Split('+')[0];
                 return trimmed;
             }
             return asm.GetName().Version?.ToString(3) ?? "1.52.0";
@@ -147,13 +152,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     internal static void CleanDriver() {
         string root = GetDriverRoot();
-        if (Directory.Exists(root)) {
-            try {
-                Directory.Delete(root, true);
-            } catch {
-                // ignore
-            }
-        }
+        if (Directory.Exists(root)) TryDeleteDirectory(root);
     }
 
     /// <summary>
@@ -169,21 +168,9 @@ public static partial class HtmlBrowser {
         if (IsBrowserRuntimeInstalled(engine) && await TrySmokeLaunchAsync(engine, CancellationToken.None).ConfigureAwait(false))
             return;
 
-        // Cross-process mutex to avoid races among parallel test runs/processes
-        System.Threading.Mutex? globalMutex = null;
-        bool hasMutex = false;
+        // Cross-process file lock + in-process semaphore to avoid races among parallel runs
+        using var fileLock = AcquireInstallFileLock();
         try {
-            try {
-                // "Global\\" works on Windows; on Unix it's just a name
-                globalMutex = new System.Threading.Mutex(false, $"Global\\HtmlTinkerX.Playwright.Install.{DriverVersion}");
-                hasMutex = globalMutex.WaitOne(TimeSpan.FromMinutes(10));
-            } catch {
-                try {
-                    globalMutex = new System.Threading.Mutex(false, $"HtmlTinkerX.Playwright.Install.{DriverVersion}");
-                    hasMutex = globalMutex.WaitOne(TimeSpan.FromMinutes(10));
-                } catch { /* ignore */ }
-            }
-
             await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
             try {
                 // Ensure the browser runtime is installed (this also bootstraps the driver via Program.Main)
@@ -200,12 +187,29 @@ public static partial class HtmlBrowser {
                         throw new InvalidOperationException("Playwright failed to launch after repair attempt. Please review environment and logs.");
                     }
                 }
-            } finally {
-                InstallationSemaphore.Release();
+            } finally { InstallationSemaphore.Release(); }
+        } finally { fileLock?.Dispose(); }
+    }
+
+    private sealed class FileLock : IDisposable {
+        private readonly FileStream _stream;
+        public FileLock(FileStream stream) { _stream = stream; }
+        public void Dispose() { try { _stream.Dispose(); } catch { } }
+    }
+
+    private static IDisposable AcquireInstallFileLock() {
+        string root = GetDriverRoot();
+        Directory.CreateDirectory(root);
+        string lockPath = Path.Combine(root, ".install.lock");
+        var start = DateTime.UtcNow;
+        while (true) {
+            try {
+                var fs = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                return new FileLock(fs);
+            } catch (IOException) {
+                if (DateTime.UtcNow - start > InstallLockTimeout) throw;
+                Thread.Sleep(200);
             }
-        } finally {
-            try { if (hasMutex) globalMutex?.ReleaseMutex(); } catch { }
-            globalMutex?.Dispose();
         }
     }
 
@@ -237,29 +241,26 @@ public static partial class HtmlBrowser {
         response.EnsureSuccessStatusCode();
 
         var total = response.Content.Headers.ContentLength ?? -1L;
-        var mem = new MemoryStream();
-        var buffer = new byte[81920];
-        var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        long read = 0;
-        int lastProgress = 0;
-        var sw = Stopwatch.StartNew();
-        while (true) {
-            int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-            if (n == 0)
-                break;
-            await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
-            if (total > 0) {
-                read += n;
-                int progress = (int)(read * 100 / total);
-                if (progress != lastProgress) {
-                    double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
-                    Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
-                    lastProgress = progress;
+        var buffer = new byte[DownloadBufferSize];
+        string tempZip = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N") + ".zip");
+        long read = 0; int lastProgress = 0; var sw = Stopwatch.StartNew();
+        using (var inStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+        using (var outStream = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None, DownloadBufferSize, useAsync: true)) {
+            while (true) {
+                int n = await inStream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                if (n == 0) break;
+                await outStream.WriteAsync(buffer, 0, n).ConfigureAwait(false);
+                if (total > 0) {
+                    read += n;
+                    int progress = (int)(read * 100 / total);
+                    if (progress != lastProgress) {
+                        double speed = read / 1024d / 1024d / Math.Max(sw.Elapsed.TotalSeconds, 0.1);
+                        LogInfo($"Downloading Playwright driver... {progress}% ({speed:F1} MB/s)");
+                        lastProgress = progress;
+                    }
                 }
             }
         }
-        Console.WriteLine();
-        mem.Position = 0;
 
         string baseDir = GetDriverPath();
         if (Directory.Exists(baseDir))
@@ -267,10 +268,11 @@ public static partial class HtmlBrowser {
 
         string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
-
-        using (var archive = new ZipArchive(mem)) {
-            archive.ExtractToDirectory(tempDir);
+        using (var zipFs = new FileStream(tempZip, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (var archive = new ZipArchive(zipFs, ZipArchiveMode.Read)) {
+            ExtractZipSafely(archive, tempDir);
         }
+        try { File.Delete(tempZip); } catch { }
 
         Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
 
@@ -281,9 +283,16 @@ public static partial class HtmlBrowser {
         File.Move(nodeSource, nodeDest);
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             try {
-                var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
-                chmod?.WaitForExit();
-            } catch { /* ignore */ }
+                using var proc = Process.Start(new ProcessStartInfo {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{nodeDest}\"",
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                });
+                proc?.WaitForExit(5000);
+                if (proc is { ExitCode: not 0 }) LogError("chmod failed", null);
+            } catch (Exception ex) { LogError("chmod threw", ex); }
         }
         string licenseDest = Path.Combine(baseDir, "node", "LICENSE");
         if (File.Exists(licenseDest))
@@ -295,7 +304,7 @@ public static partial class HtmlBrowser {
         if (Directory.Exists(packageDest))
             Directory.Delete(packageDest, true);
         MoveDirectoryRobust(packageSrc, packageDest);
-        Directory.Delete(tempDir, true);
+        TryDeleteDirectory(tempDir);
 
 #if NETSTANDARD2_0 || NETFRAMEWORK
         File.WriteAllText(VersionFile, DriverVersion);
@@ -303,6 +312,22 @@ public static partial class HtmlBrowser {
         await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
 #endif
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+    }
+
+    private static void ExtractZipSafely(ZipArchive archive, string destinationDir) {
+        string destFull = Path.GetFullPath(destinationDir) + Path.DirectorySeparatorChar;
+        foreach (var entry in archive.Entries) {
+            string targetPath = Path.GetFullPath(Path.Combine(destinationDir, entry.FullName.Replace('/', Path.DirectorySeparatorChar)));
+            if (!targetPath.StartsWith(destFull, StringComparison.Ordinal)) {
+                throw new InvalidOperationException("Zip entry outside target directory detected.");
+            }
+            if (string.IsNullOrEmpty(entry.Name)) {
+                Directory.CreateDirectory(targetPath);
+                continue;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+            entry.ExtractToFile(targetPath, overwrite: true);
+        }
     }
 
     private static void MoveDirectoryRobust(string src, string dest) {
@@ -327,9 +352,9 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static async Task EnsureBrowsersAsync(HtmlBrowserEngine engine, bool preferWithDeps = false) {
+    private static Task EnsureBrowsersAsync(HtmlBrowserEngine engine, bool preferWithDeps = false) {
         bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
-        if (runtimeInstalled) return;
+        if (runtimeInstalled) return Task.CompletedTask;
         string runtime = engine.ToString().ToLowerInvariant();
         try {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && preferWithDeps) {
@@ -337,7 +362,8 @@ public static partial class HtmlBrowser {
             } else {
                 PlaywrightInstaller(new[] { "install", runtime });
             }
-        } catch {
+        } catch (Exception ex) {
+            LogError("Playwright install failed", ex);
             // Retry without deps or with deps as a fallback depending on first attempt
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
                 try {
@@ -348,11 +374,13 @@ public static partial class HtmlBrowser {
                     } else {
                         throw;
                     }
-                } catch {
+                } catch (Exception ex2) {
+                    LogError("Playwright install retry failed", ex2);
                     throw;
                 }
             } else throw;
         }
+        return Task.CompletedTask;
     }
 
     private static async Task<bool> TrySmokeLaunchAsync(HtmlBrowserEngine engine, CancellationToken cancellationToken) {
@@ -416,9 +444,15 @@ public static partial class HtmlBrowser {
     /// </summary>
     private static void CleanInstallDir() {
         string path = GetBrowserInstallPath();
-        if (Directory.Exists(path)) {
-            Directory.Delete(path, recursive: true);
-        }
+        if (Directory.Exists(path)) TryDeleteDirectory(path);
         CleanDriver();
+    }
+
+    private static void TryDeleteDirectory(string dir) {
+        for (int i = 0; i < 5; i++) {
+            try { Directory.Delete(dir, true); return; }
+            catch { Thread.Sleep(200); }
+        }
+        try { Directory.Delete(dir, true); } catch (Exception ex) { LogError($"Failed to delete directory {dir}", ex); }
     }
 }

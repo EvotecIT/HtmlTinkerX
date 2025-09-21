@@ -132,9 +132,9 @@ public class HtmlHttpClientFactoryTests {
             using HttpClient client = HtmlHttpClientFactory.Create(out CookieContainer container);
             HttpResponseMessage response = await client.GetAsync(url);
             response.EnsureSuccessStatusCode();
-            Cookie cookie = container.GetCookies(new System.Uri(url))["session"];
+            Cookie? cookie = container.GetCookies(new System.Uri(url))["session"];
             Assert.NotNull(cookie);
-            Assert.Equal("abc", cookie.Value);
+            Assert.Equal("abc", cookie!.Value);
         } finally {
             server.Stop();
             server.Close();

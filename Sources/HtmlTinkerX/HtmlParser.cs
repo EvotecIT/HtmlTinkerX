@@ -212,7 +212,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with item texts.</returns>
-    public static List<List<string>> ParseListsWithAngleSharp(string html, string tagPlaceholder = " ") {
+    public static List<List<string>> ParseListsWithAngleSharp(string? html, string tagPlaceholder = " ") {
         return HtmlParserFromList.ParseListsWithAngleSharp(html, tagPlaceholder);
     }
 
@@ -233,7 +233,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List of lists with item texts.</returns>
-    public static List<List<string>> ParseListsWithHtmlAgilityPack(string html, string tagPlaceholder = " ") {
+    public static List<List<string>> ParseListsWithHtmlAgilityPack(string? html, string tagPlaceholder = " ") {
         return HtmlParserFromList.ParseListsWithHtmlAgilityPack(html, tagPlaceholder);
     }
 
@@ -254,7 +254,7 @@ public static class HtmlParser {
     /// <param name="html">HTML content containing lists.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
     /// <returns>List parse results with metadata.</returns>
-    public static List<HtmlListResult> ParseListsWithAngleSharpDetailed(string html, string tagPlaceholder = " ") {
+    public static List<HtmlListResult> ParseListsWithAngleSharpDetailed(string? html, string tagPlaceholder = " ") {
         return HtmlParserFromList.ParseListsWithAngleSharpDetailed(html, tagPlaceholder);
     }
 
@@ -295,7 +295,7 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="html">HTML content containing forms.</param>
     /// <returns>List of form parse results.</returns>
-    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html) {
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string? html) {
         return HtmlParserFromForm.ParseFormsWithAngleSharp(html);
     }
 
@@ -333,7 +333,7 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="html">HTML content containing Open Graph meta tags.</param>
     /// <returns>Parsed Open Graph metadata.</returns>
-    public static HtmlOpenGraph ParseOpenGraph(string html) {
+    public static HtmlOpenGraph ParseOpenGraph(string? html) {
         return HtmlParserFromOpenGraph.ParseOpenGraph(html);
     }
 
