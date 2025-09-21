@@ -38,3 +38,23 @@ function Wait-RecordedFrame {
     if ($ExtraDelayMs -gt 0) { Start-Sleep -Milliseconds $ExtraDelayMs }
 }
 
+function Wait-FileReady {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Path,
+        [int]$TimeoutSeconds = 5
+    )
+    if (-not (Test-Path $Path)) { return $false }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed -lt [TimeSpan]::FromSeconds($TimeoutSeconds)) {
+        try {
+            $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            $fs.Dispose()
+            return $true
+        } catch {
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    return $false
+}
