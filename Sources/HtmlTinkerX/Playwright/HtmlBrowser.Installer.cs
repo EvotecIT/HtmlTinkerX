@@ -96,7 +96,23 @@ public static partial class HtmlBrowser {
                     LastInstallerError = $"Program.Main exited {code}";
                     LogError(LastInstallerError);
                 }
-                // Respect upstream exit code; no Node fallback here
+                // Targeted self-heal: if assets are missing, fall back to Node CLI installer
+                if (combined.IndexOf("missing required assets", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    combined.IndexOf("build your project", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    try {
+                        if (!IsDriverComplete()) {
+                            DownloadAndExtractDriverAsync(ignoreCustomMirror: true).GetAwaiter().GetResult();
+                        }
+                        int nodeCode = RunNodeCli(args);
+                        if (nodeCode == 0) { LastInstallerError = null; return 0; }
+                        LastInstallerError = (LastInstallerError ?? "") + $"; Node CLI exited {nodeCode}";
+                    } catch (Exception inner) {
+                        LastInstallerError = $"Node CLI fallback threw: {inner.Message}";
+                        LogError("Assets‑missing fallback via Node CLI failed", inner);
+                    }
+                }
+                // Otherwise, respect upstream exit code
                 return code;
             } finally {
                 try { Console.SetOut(prevOut); } catch { }
