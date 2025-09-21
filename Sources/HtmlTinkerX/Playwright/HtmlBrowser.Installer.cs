@@ -399,6 +399,16 @@ public static partial class HtmlBrowser {
                 await Task.Delay(delay).ConfigureAwait(false);
             }
         }
+        // Last-chance fallback for unexpected CDN gaps: try a known-good driver version
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) {
+            foreach (var v in new[] { "1.55.0", "1.54.0" }) {
+                string altUrl = $"{urlBase}/playwright-{v}-{DownloadPlatformId}.zip";
+                LogError($"Primary driver version {DriverVersion} 404. Trying fallback driver {v}: {altUrl}");
+                var altResp = await client.GetAsync(altUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                if (altResp.IsSuccessStatusCode) { response = altResp; url = altUrl; break; }
+            }
+            response.EnsureSuccessStatusCode();
+        }
         if (response is null) throw last ?? new InvalidOperationException("Failed to download Playwright driver.");
 
         var total = response.Content.Headers.ContentLength ?? -1L;
