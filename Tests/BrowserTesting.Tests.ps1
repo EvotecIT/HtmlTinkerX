@@ -1,26 +1,12 @@
 Describe "Test-HtmlBrowser" {
     BeforeAll {
-        $script:UsingLocalServer = $false
-        $script:BaseUrl = $null
-        if (Get-Command python3 -ErrorAction SilentlyContinue) {
-            # Serve the Tests directory so /Documents and /SampleResources resolve correctly
-            $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-            $listener.Start(); $port = ($listener.LocalEndpoint).Port; $listener.Stop()
-            $script:Server = Start-Process -FilePath python3 -ArgumentList '-u','-m','http.server',$port,'--bind','127.0.0.1' -WorkingDirectory $PSScriptRoot -PassThru
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            while ($true) { try { $c=[Net.Sockets.TcpClient]::new(); $c.Connect('127.0.0.1',$port); $c.Dispose(); break } catch { if ($sw.Elapsed.TotalSeconds -gt 20) { throw 'HTTP server failed to start.' } Start-Sleep -Milliseconds 200 } }
-            $script:UsingLocalServer = $true
-            $script:BaseUrl = "http://127.0.0.1:$port"
-        } else {
-            $script:BaseUrl = $null
-        }
+        Import-Module (Join-Path $PSScriptRoot 'Common/TestHelpers.psm1') -Force
+        $script:Site = Initialize-TestSite -Root $PSScriptRoot
     }
-    AfterAll {
-        if ($script:Server -and -not $script:Server.HasExited) { $script:Server | Stop-Process -Force }
-    }
+    AfterAll { if ($script:Site) { $script:Site | Cleanup-TestSite } }
     Context "Basic Functionality" {
         It "Should return HtmlBrowserTestResult object" {
-            $url = $UsingLocalServer ? ($BaseUrl + '/Documents/dynamic.html') : ([System.Uri]::new((Join-Path $PSScriptRoot 'Documents/dynamic.html')).AbsoluteUri)
+            $url = Get-TestUrl -Site $Site -RelativePath 'Documents/dynamic.html'
             $result = Test-HtmlBrowser -Url $url
 
             $result | Should -Not -BeNullOrEmpty
@@ -29,7 +15,7 @@ Describe "Test-HtmlBrowser" {
         }
 
         It "Should capture network entries" {
-            $url = $UsingLocalServer ? ($BaseUrl + '/Documents/sample_resources.html') : ([System.Uri]::new((Join-Path $PSScriptRoot 'Documents/dynamic.html')).AbsoluteUri)
+            $url = Get-TestUrl -Site $Site -RelativePath 'Documents/sample_resources.html'
             $result = Test-HtmlBrowser -Url $url
 
             $result.NetworkEntries | Should -Not -BeNullOrEmpty
@@ -41,7 +27,7 @@ Describe "Test-HtmlBrowser" {
         }
 
         It "Should capture timing information" {
-            $url = $UsingLocalServer ? ($BaseUrl + '/Documents/dynamic.html') : ([System.Uri]::new((Join-Path $PSScriptRoot 'Documents/dynamic.html')).AbsoluteUri)
+            $url = Get-TestUrl -Site $Site -RelativePath 'Documents/dynamic.html'
             $result = Test-HtmlBrowser -Url $url
 
             $result.PageLoadTime | Should -Not -BeNullOrEmpty
@@ -79,8 +65,8 @@ Describe "Test-HtmlBrowser" {
     }
 
     Context "CSS Resource Testing" {
-        It "Should find CSS resources when specified" -Skip:(-not $UsingLocalServer) {
-            $css = Test-HtmlBrowser -Url ($BaseUrl + '/Documents/sample_resources.html') -CssResource ".css"
+        It "Should find CSS resources when specified" -Skip:(-not $Site.UsingLocalServer) {
+            $css = Test-HtmlBrowser -Url (Get-TestUrl -Site $Site -RelativePath 'Documents/sample_resources.html') -CssResource ".css"
 
             if ($css) {
                 $css.ResourceType | Should -Be "Stylesheet"
@@ -91,7 +77,7 @@ Describe "Test-HtmlBrowser" {
 
     Context "Browser Engine Support" {
         It "Should work with Chromium engine" {
-            $url = $UsingLocalServer ? ($BaseUrl + '/Documents/dynamic.html') : ([System.Uri]::new((Join-Path $PSScriptRoot 'Documents/dynamic.html')).AbsoluteUri)
+            $url = Get-TestUrl -Site $Site -RelativePath 'Documents/dynamic.html'
             $result = Test-HtmlBrowser -Url $url -Engine Chromium
 
             $result | Should -Not -BeNullOrEmpty
@@ -123,7 +109,8 @@ Describe "Clear-HtmlBrowserCache" {
 
 Describe "Test Result Objects" {
     BeforeAll {
-        $script:TestResult = Test-HtmlBrowser -Url "https://example.com"
+        $url = Get-TestUrl -Site $Site -RelativePath 'Documents/dynamic.html'
+        $script:TestResult = Test-HtmlBrowser -Url $url
     }
 
     It "Should have Summary property" {
