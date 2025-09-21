@@ -4,10 +4,17 @@ name: Test .NET
 on:
   push:
     branches:
-      - '**'
+      - v1-legacy
+      - v2-speedygonzales
+    paths-ignore:
+      - '*.md'
+      - 'Docs/**'
+      - 'Examples/**'
+      - '.gitignore'
   pull_request:
     branches:
-      - '**'
+      - v1-legacy
+      - v2-speedygonzales
   workflow_dispatch:
 
 env:
@@ -24,7 +31,7 @@ jobs:
       matrix:
         framework: [net8.0, net472]
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -114,7 +121,7 @@ jobs:
     name: 'Ubuntu'
     runs-on: ubuntu-latest
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -193,7 +200,7 @@ jobs:
     name: 'macOS'
     runs-on: macos-latest
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
