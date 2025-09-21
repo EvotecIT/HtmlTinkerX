@@ -29,8 +29,9 @@ public static partial class HtmlBrowser {
 
     /// <summary>
     /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
+    /// Should return the exit code from the Playwright CLI (0 = success).
     /// </summary>
-    internal static Action<string[]> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
+    internal static Func<string[], int> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
     /// <summary>
     /// Gets the version of the Playwright driver. Prefer InformationalVersion so pre-release channels are honored.
     /// </summary>
@@ -214,10 +215,10 @@ public static partial class HtmlBrowser {
     }
 
     private static bool ShouldTryInstallDeps() {
-        var ci = (Environment.GetEnvironmentVariable("CI") ?? string.Empty).Equals("true", StringComparison.OrdinalIgnoreCase);
+        // Only opt-in via environment variables; do not assume CI wants --with-deps
         var optIn = (Environment.GetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS") ?? Environment.GetEnvironmentVariable("PLAYWRIGHT_INSTALL_DEPS") ?? string.Empty)
             .Equals("1", StringComparison.OrdinalIgnoreCase);
-        return ci || optIn;
+        return optIn;
     }
 
     private static bool SkipSmokeLaunch() {
@@ -333,8 +334,8 @@ public static partial class HtmlBrowser {
     private static void MoveDirectoryRobust(string src, string dest) {
         try {
             Directory.Move(src, dest);
-        } catch (Exception) {
-            // Cross-volume or other move issues – fallback to copy
+        } catch (Exception ex) {
+            LogError("Directory.Move failed; falling back to copy", ex);
             CopyDirectory(src, dest);
         }
     }
@@ -357,23 +358,19 @@ public static partial class HtmlBrowser {
         if (runtimeInstalled) return Task.CompletedTask;
         string runtime = engine.ToString().ToLowerInvariant();
         try {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && preferWithDeps) {
-                PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
-            } else {
-                PlaywrightInstaller(new[] { "install", runtime });
-            }
+            int code = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && preferWithDeps
+                ? PlaywrightInstaller(new[] { "install", "--with-deps", runtime })
+                : PlaywrightInstaller(new[] { "install", runtime });
+            if (code != 0) throw new InvalidOperationException($"Playwright install exited with code {code}");
         } catch (Exception ex) {
             LogError("Playwright install failed", ex);
             // Retry without deps or with deps as a fallback depending on first attempt
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
                 try {
-                    if (preferWithDeps) {
-                        PlaywrightInstaller(new[] { "install", runtime });
-                    } else if (ShouldTryInstallDeps()) {
-                        PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
-                    } else {
-                        throw;
-                    }
+                    int code2 = preferWithDeps
+                        ? PlaywrightInstaller(new[] { "install", runtime })
+                        : ShouldTryInstallDeps() ? PlaywrightInstaller(new[] { "install", "--with-deps", runtime }) : -1;
+                    if (code2 != 0) throw new InvalidOperationException(code2 == -1 ? "No fallback attempted" : $"Playwright install retry exited with code {code2}");
                 } catch (Exception ex2) {
                     LogError("Playwright install retry failed", ex2);
                     throw;
@@ -397,7 +394,7 @@ public static partial class HtmlBrowser {
             await using var browser = await type.LaunchAsync(new Microsoft.Playwright.BrowserTypeLaunchOptions { Headless = true });
             await browser.CloseAsync();
             return true;
-        } catch (Exception) { return false; }
+        } catch (Exception ex) { LogError("Smoke launch failed", ex); return false; }
     }
 
     /// <summary>
@@ -449,9 +446,24 @@ public static partial class HtmlBrowser {
     }
 
     private static void TryDeleteDirectory(string dir) {
-        for (int i = 0; i < 5; i++) {
-            try { Directory.Delete(dir, true); return; }
-            catch { Thread.Sleep(200); }
+        int delay = 150;
+        for (int i = 0; i < 6; i++) {
+            try {
+                if (Directory.Exists(dir)) {
+                    // Normalize file attributes to avoid readonly/hidden lock on Windows
+                    foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)) {
+                        try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                    }
+                    Directory.Delete(dir, true);
+                }
+                return;
+            } catch (IOException) {
+                Thread.Sleep(delay);
+                delay = Math.Min(delay * 2, 2000);
+            } catch (UnauthorizedAccessException) {
+                Thread.Sleep(delay);
+                delay = Math.Min(delay * 2, 2000);
+            }
         }
         try { Directory.Delete(dir, true); } catch (Exception ex) { LogError($"Failed to delete directory {dir}", ex); }
     }

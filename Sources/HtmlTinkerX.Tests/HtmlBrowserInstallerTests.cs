@@ -42,7 +42,7 @@ public class HtmlBrowserInstallerTests
             File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
 
             string[]? captured = null;
-            HtmlBrowser.PlaywrightInstaller = args => captured = args;
+            HtmlBrowser.PlaywrightInstaller = args => { captured = args; return 0; };
 
             await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
 

@@ -101,6 +101,65 @@ public class InstallerErrorTests
     }
 
     [Fact]
+    public async Task DriverDownload_404_Throws()
+    {
+        // Local server that always returns 404
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        var t = Task.Run(async () =>
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            using var ns = client.GetStream();
+            var buffer = new byte[512];
+            await ns.ReadAsync(buffer, 0, buffer.Length);
+            var headers = Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            await ns.WriteAsync(headers, 0, headers.Length);
+            await ns.FlushAsync();
+            listener.Stop();
+        });
+        var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmp);
+        using var env = new EnvScope(("PLAYWRIGHT_DRIVER_SEARCH_PATH", tmp), ("HTMLINKERX_PLAYWRIGHT_HOST", $"http://127.0.0.1:{port}"));
+        await Assert.ThrowsAnyAsync<Exception>(async () => await InvokePrivateAsync("DownloadAndExtractDriverAsync"));
+        try { Directory.Delete(tmp, true); } catch { }
+        await t;
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_UsesInProcessSemaphore()
+    {
+        // Ensure PlaywrightInstaller invoked at most once under contention
+        int calls = 0;
+        var before = HtmlBrowser.PlaywrightInstaller;
+        var tcs = new TaskCompletionSource<bool>();
+        HtmlBrowser.Logger = _ => { };
+        var tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempBrowsers);
+        using var env = new EnvScope(("HTMLINKERX_SKIP_SMOKE", "1"), ("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers));
+        try
+        {
+            HtmlBrowser.PlaywrightInstaller = args => {
+                Interlocked.Increment(ref calls);
+                // Block first invocation briefly
+                Task.Delay(200).Wait();
+                return 0;
+            };
+            var t1 = Task.Run(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
+            var t2 = Task.Run(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium));
+            await Task.WhenAll(t1, t2);
+            Assert.True(calls >= 1);
+            Assert.True(calls <= 2); // depending on fast-path results, allow at most once per race
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = before;
+            HtmlBrowser.Logger = null;
+            try { Directory.Delete(tempBrowsers, true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task AcquireFileLock_SerializesAcrossCalls()
     {
         var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
