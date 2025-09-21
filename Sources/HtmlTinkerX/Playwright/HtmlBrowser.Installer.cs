@@ -31,7 +31,7 @@ public static partial class HtmlBrowser {
     /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
     /// Should return the exit code from the Playwright CLI (0 = success).
     /// </summary>
-    internal static Func<string[], int> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
+    internal static Func<string[], int> PlaywrightInstaller { get; set; } = DefaultPlaywrightInstaller;
     /// <summary>
     /// Gets the version of the Playwright driver. Prefer InformationalVersion so pre-release channels are honored.
     /// </summary>
@@ -63,6 +63,81 @@ public static partial class HtmlBrowser {
     private static string DownloadPlatformId => CurrentPlatform.ToDownloadPlatformId();
 
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
+
+    private static int DefaultPlaywrightInstaller(string[] args)
+    {
+        // Preferred: call Playwright's built-in CLI entrypoint. On .NET Framework this can fail
+        // with BadImageFormatException or similar if the runtime cannot execute the entry point.
+        try {
+            return Microsoft.Playwright.Program.Main(args);
+        } catch (Exception ex) when (
+            ex is BadImageFormatException ||
+            ex is TypeInitializationException ||
+            ex is MissingMethodException ||
+            ex is FileLoadException ||
+            ex is PlatformNotSupportedException)
+        {
+            // Fallback path: ensure the local driver (node + package) exists and
+            // invoke the Node-based CLI directly. This path is runtime-agnostic
+            // and works on .NET Framework and mono environments.
+            try {
+                if (!IsDriverComplete()) {
+                    // Synchronously download the driver so we have Node + package
+                    DownloadAndExtractDriverAsync().GetAwaiter().GetResult();
+                }
+                return RunNodeCli(args);
+            } catch (Exception inner) {
+                LogError("Fallback Node CLI installer failed", inner);
+                throw; // bubble up so EnsureBrowsersAsync can report properly
+            }
+        }
+    }
+
+    private static int RunNodeCli(string[] args)
+    {
+        var baseDir = GetDriverPath();
+        var nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
+        var packageDir = Path.Combine(baseDir, "package");
+        if (!File.Exists(nodePath) || !Directory.Exists(packageDir))
+            throw new InvalidOperationException("Playwright driver components not found for Node CLI fallback.");
+
+        // Find cli.js under the package directory
+        var cli = Directory.EnumerateFiles(packageDir, "cli.js", SearchOption.AllDirectories).FirstOrDefault();
+        if (string.IsNullOrEmpty(cli))
+            throw new InvalidOperationException("Playwright CLI entrypoint (cli.js) not found.");
+
+        static string Quote(string s) => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? (s.Contains(' ') || s.Contains('\"') ? $"\"{s.Replace("\"", "\\\"")}\"" : s)
+            : (s.Contains(' ') ? $"\"{s.Replace("\"", "\\\"")}\"" : s);
+
+        string argLine = Quote(cli) + (args.Length > 0 ? (" " + string.Join(" ", args.Select(Quote))) : string.Empty);
+
+        var psi = new ProcessStartInfo {
+            FileName = nodePath,
+            Arguments = argLine,
+            WorkingDirectory = packageDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        // Forward proxy-related environment variables and explicit driver root so the CLI can find it
+        psi.Environment["PLAYWRIGHT_DRIVER_SEARCH_PATH"] = GetDriverRoot();
+        var browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        if (!string.IsNullOrEmpty(browsersPath)) psi.Environment["PLAYWRIGHT_BROWSERS_PATH"] = browsersPath;
+
+        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start Node process");
+        // Drain output to avoid deadlocks
+        string stdout = proc.StandardOutput.ReadToEnd();
+        string stderr = proc.StandardError.ReadToEnd();
+        proc.WaitForExit();
+        if (proc.ExitCode != 0) {
+            LogError($"Node CLI exited with code {proc.ExitCode}. STDERR: {stderr}");
+        } else if (!string.IsNullOrWhiteSpace(stdout)) {
+            LogInfo(stdout);
+        }
+        return proc.ExitCode;
+    }
 
     /// <summary>
     /// Gets the root directory for the Playwright driver installation.
@@ -260,8 +335,24 @@ public static partial class HtmlBrowser {
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
 
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        // Simple retry for transient network issues
+        const int maxAttempts = 3;
+        HttpResponseMessage? response = null;
+        Exception? last = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                break;
+            } catch (Exception ex) {
+                last = ex;
+                if (attempt == maxAttempts) throw;
+                int delay = 500 * attempt;
+                LogError($"Driver download attempt {attempt} failed; retrying in {delay}ms", ex);
+                await Task.Delay(delay).ConfigureAwait(false);
+            }
+        }
+        if (response is null) throw last ?? new InvalidOperationException("Failed to download Playwright driver.");
 
         var total = response.Content.Headers.ContentLength ?? -1L;
         var buffer = new byte[DownloadBufferSize];

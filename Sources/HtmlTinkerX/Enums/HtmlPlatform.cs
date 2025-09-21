@@ -6,6 +6,8 @@ namespace HtmlTinkerX;
 public enum HtmlPlatform {
     /// <summary>Windows x64 platform.</summary>
     WindowsX64,
+    /// <summary>Windows Arm64 platform.</summary>
+    WindowsArm64,
     /// <summary>macOS x64 platform.</summary>
     Mac,
     /// <summary>macOS Arm64 platform.</summary>

@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using System;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -12,7 +13,11 @@ public sealed class PlaywrightFixture : IAsyncLifetime {
     /// Performs one-time initialization of Playwright.
     /// </summary>
     public async Task InitializeAsync() {
-        await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+        var skip = (Environment.GetEnvironmentVariable("HTMLINKERX_SKIP_FIXTURE_INSTALL") ?? string.Empty)
+            .Equals("1", StringComparison.OrdinalIgnoreCase);
+        if (!skip) {
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+        }
     }
 
     /// <summary>

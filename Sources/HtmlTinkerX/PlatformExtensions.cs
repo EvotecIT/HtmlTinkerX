@@ -8,7 +8,9 @@ namespace HtmlTinkerX;
 internal static class PlatformExtensions {
     public static HtmlPlatform GetCurrentPlatform() {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return HtmlPlatform.WindowsX64;
+            return RuntimeInformation.OSArchitecture == Architecture.Arm64
+                ? HtmlPlatform.WindowsArm64
+                : HtmlPlatform.WindowsX64;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             return RuntimeInformation.OSArchitecture == Architecture.Arm64
                 ? HtmlPlatform.MacArm64
@@ -20,6 +22,7 @@ internal static class PlatformExtensions {
 
     public static string ToPlatformId(this HtmlPlatform platform) => platform switch {
         HtmlPlatform.WindowsX64 => "win32_x64",
+        HtmlPlatform.WindowsArm64 => "win32_arm64",
         HtmlPlatform.Mac => "darwin-x64",
         HtmlPlatform.MacArm64 => "darwin-arm64",
         HtmlPlatform.LinuxArm64 => "linux-arm64",
@@ -28,6 +31,7 @@ internal static class PlatformExtensions {
 
     public static string ToDownloadPlatformId(this HtmlPlatform platform) => platform switch {
         HtmlPlatform.WindowsX64 => "win32_x64",
+        HtmlPlatform.WindowsArm64 => "win32_arm64",
         HtmlPlatform.Mac => "mac",
         HtmlPlatform.MacArm64 => "mac-arm64",
         HtmlPlatform.LinuxArm64 => "linux-arm64",
