@@ -1,6 +1,9 @@
-. (Join-Path $PSScriptRoot '_TestUtils.ps1')
+try { . (Join-Path $PSScriptRoot '_TestUtils.ps1') } catch {}
 
 describe 'HTML Video Recording' {
+    BeforeAll {
+        try { . (Join-Path $PSScriptRoot '_TestUtils.ps1') } catch {}
+    }
     it 'Records a short video' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -10,6 +13,7 @@ describe 'HTML Video Recording' {
         Invoke-HTMLNavigation -Session $session -Url $uri
         Wait-RecordedFrame $session
         Stop-HtmlBrowserVideoCapture -Session $session
+        $null = Wait-FileReady -Path $out
         (Test-Path $out) | Should -BeTrue
     }
 
@@ -22,6 +26,7 @@ describe 'HTML Video Recording' {
         $defaultSession = Get-Variable -Name 'PSParseHTML_DefaultSession' -ValueOnly -ErrorAction SilentlyContinue
         Wait-RecordedFrame $defaultSession
         Stop-HtmlBrowserVideoCapture
+        $null = Wait-FileReady -Path $out
         (Test-Path $out) | Should -BeTrue
     }
 
@@ -34,6 +39,7 @@ describe 'HTML Video Recording' {
         Invoke-HTMLNavigation -Session $record -Url $uri
         Wait-RecordedFrame $record
         Stop-HtmlBrowserVideoCapture -Session $record
+        $null = Wait-FileReady -Path $out
         (Test-Path $out) | Should -BeTrue
     }
 
@@ -47,6 +53,7 @@ describe 'HTML Video Recording' {
         $d = [double]($session.Page.EvaluateAsync('window.devicePixelRatio',$null).GetAwaiter().GetResult().ToString())
         Wait-RecordedFrame $session
         Stop-HtmlBrowserVideoCapture -Session $session
+        $null = Wait-FileReady -Path $out
         $ua | Should -Be 'VideoUA'
         $w | Should -Be 200
         [double]$d | Should -Be 2
@@ -61,6 +68,7 @@ describe 'HTML Video Recording' {
         $tz = $session.Page.EvaluateAsync('Intl.DateTimeFormat().resolvedOptions().timeZone',$null).GetAwaiter().GetResult()
         Wait-RecordedFrame $session
         Stop-HtmlBrowserVideoCapture -Session $session
+        $null = Wait-FileReady -Path $out
         [math]::Round($lat,0) | Should -Be 40
         $tz | Should -Be 'America/New_York'
     }
@@ -73,6 +81,7 @@ describe 'HTML Video Recording' {
         Invoke-HTMLNavigation -Session $session -Url $uri
         Wait-RecordedFrame $session
         Stop-HtmlBrowserVideoCapture -Session $session -OutFile $out
+        $null = Wait-FileReady -Path $out
         (Test-Path $out) | Should -BeTrue
     }
 
@@ -84,6 +93,7 @@ describe 'HTML Video Recording' {
         Invoke-HTMLNavigation -Session $session -Url $uri
         Wait-RecordedFrame $session
         Stop-HtmlBrowserVideoCapture -Session $session -OutFile $out
+        $null = Wait-FileReady -Path $out
         (Test-Path $out) | Should -BeTrue
     }
 }
