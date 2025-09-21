@@ -36,5 +36,14 @@ function Cleanup-TestSite {
     process { if ($Site.Server) { $Site.Server | Stop-TestHttpServer } }
 }
 
-Export-ModuleMember -Function Initialize-TestSite,Get-TestUrl,Cleanup-TestSite
+# Approved-verb wrappers (exported)
+function Start-TestSite {
+    [CmdletBinding()] param([string]$Root = $PSScriptRoot, [int]$TimeoutSeconds = 20)
+    Initialize-TestSite -Root $Root -TimeoutSeconds $TimeoutSeconds
+}
+function Stop-TestSite {
+    [CmdletBinding()] param([Parameter(Mandatory,ValueFromPipeline)][object]$Site)
+    process { Cleanup-TestSite -Site $Site }
+}
 
+Export-ModuleMember -Function Start-TestSite,Get-TestUrl,Stop-TestSite

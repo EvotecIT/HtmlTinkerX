@@ -1,9 +1,9 @@
 Describe "Test-HtmlBrowser" {
     BeforeAll {
         Import-Module (Join-Path $PSScriptRoot 'Common/TestHelpers.psm1') -Force
-        $script:Site = Initialize-TestSite -Root $PSScriptRoot
+        $script:Site = Start-TestSite -Root $PSScriptRoot
     }
-    AfterAll { if ($script:Site) { $script:Site | Cleanup-TestSite } }
+    AfterAll { if ($script:Site) { $script:Site | Stop-TestSite } }
     Context "Basic Functionality" {
         It "Should return HtmlBrowserTestResult object" {
             $url = Get-TestUrl -Site $Site -RelativePath 'Documents/dynamic.html'
@@ -19,7 +19,7 @@ Describe "Test-HtmlBrowser" {
             $result = Test-HtmlBrowser -Url $url
 
             $result.NetworkEntries | Should -Not -BeNullOrEmpty
-            if ($UsingLocalServer) {
+            if ($Site.UsingLocalServer) {
                 $result.TotalRequests | Should -BeGreaterThan 0
             } else {
                 $result.TotalRequests | Should -BeGreaterOrEqual 0
@@ -55,12 +55,12 @@ Describe "Test-HtmlBrowser" {
 
     Context "Performance Testing" {
         It "Should return performance metrics with -PerformanceOnly" {
-            $url = $UsingLocalServer ? ($BaseUrl + '/Documents/sample_resources.html') : ([System.Uri]::new((Join-Path $PSScriptRoot 'Documents/dynamic.html')).AbsoluteUri)
+            $url = Get-TestUrl -Site $Site -RelativePath 'Documents/sample_resources.html'
             $metrics = Test-HtmlBrowser -Url $url -PerformanceOnly
 
             $metrics | Should -Not -BeNullOrEmpty
             $metrics.GetType().Name | Should -Be "HtmlPerformanceMetrics"
-            if ($UsingLocalServer) { $metrics.TotalRequests | Should -BeGreaterThan 0 }
+            if ($Site.UsingLocalServer) { $metrics.TotalRequests | Should -BeGreaterThan 0 }
         }
     }
 

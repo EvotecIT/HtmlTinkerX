@@ -1,7 +1,7 @@
 Describe 'Save-HTMLAttachment streaming' {
     It 'Outputs file paths as downloads complete' -Skip:(-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
         Import-Module (Join-Path $PSScriptRoot 'Common/TestHelpers.psm1') -Force
-        $site = Initialize-TestSite -Root (Join-Path $PSScriptRoot 'Documents')
+        $site = Start-TestSite -Root (Join-Path $PSScriptRoot 'Documents')
         try {
             $uri = Get-TestUrl -Site $site -RelativePath 'multi_download.html'
             $dest = Join-Path $TestDrive 'stream'
@@ -14,7 +14,7 @@ Describe 'Save-HTMLAttachment streaming' {
             Test-Path (Join-Path $dest 'download2.txt') | Should -BeTrue
         }
         finally {
-            $site | Cleanup-TestSite
+            $site | Stop-TestSite
         }
     }
 }

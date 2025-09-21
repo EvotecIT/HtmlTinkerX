@@ -24,7 +24,7 @@ Describe 'Save-HTMLAttachment' {
         Set-Content -Encoding utf8 -Path (Join-Path $root 'links.html') -Value $html
 
         # Start a local server bound to IPv4 on a free port
-        $site = Initialize-TestSite -Root $root
+        $site = Start-TestSite -Root $root
         try {
             # Act
             $dest = Join-Path $TestDrive 'dl'
@@ -36,7 +36,7 @@ Describe 'Save-HTMLAttachment' {
             $names | Should -Contain 'DnsClientX-PowerShellModule.v0.4.0.zip'
             $names | Should -Contain 'DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip'
         } finally {
-            $site | Cleanup-TestSite
+            $site | Stop-TestSite
         }
     }
 
@@ -47,12 +47,12 @@ Describe 'Save-HTMLAttachment' {
         New-Item -ItemType Directory -Path $root | Out-Null
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         1..2 | ForEach-Object {
-            $dir = Join-Path $root "c$_"; New-Item -ItemType Directory -Path $dir | Out-Null; Set-Content -Path (Join-Path $dir "f$_`n.txt") -Value "data$_"
+            $dir = Join-Path $root "c$_"; New-Item -ItemType Directory -Path $dir | Out-Null; Set-Content -Path (Join-Path $dir ("f{0}.txt" -f $_)) -Value "data$_"
         }
         [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $root 'c1'), (Join-Path $root 'DnsClientX-PowerShellModule.v0.4.0.zip'))
         [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $root 'c2'), (Join-Path $root 'DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip'))
         Set-Content -Encoding utf8 -Path (Join-Path $root 'links.html') -Value '<a href="DnsClientX-PowerShellModule.v0.4.0.zip">a</a><a href="DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip">b</a>'
-        $site = Initialize-TestSite -Root $root
+        $site = Start-TestSite -Root $root
         try {
             $dest = Join-Path $TestDrive 'dl-full'
             [array] $files = Save-HTMLAttachment -Url (Get-TestUrl -Site $site -RelativePath 'links.html') -Path $dest -Filter 'DnsClientX-PowerShellModule.v0.4.0.zip'
@@ -60,7 +60,7 @@ Describe 'Save-HTMLAttachment' {
                 (Get-Item $p).Length | Should -BeGreaterThan 0
             }
         } finally {
-            $site | Cleanup-TestSite
+            $site | Stop-TestSite
         }
     }
 }

@@ -1,9 +1,9 @@
 Describe 'Measure-HtmlBrowserPerformance' {
     BeforeAll {
         Import-Module (Join-Path $PSScriptRoot 'Common/TestHelpers.psm1') -Force
-        $script:Site = Initialize-TestSite -Root $PSScriptRoot
+        $script:Site = Start-TestSite -Root $PSScriptRoot
     }
-    AfterAll { if ($script:Site) { $script:Site | Cleanup-TestSite } }
+    AfterAll { if ($script:Site) { $script:Site | Stop-TestSite } }
 
     It 'Returns performance metrics' {
         $url = Get-TestUrl -Site $Site -RelativePath 'Documents/sample_resources.html'
