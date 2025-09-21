@@ -4,17 +4,10 @@ name: Test .NET
 on:
   push:
     branches:
-      - v1-legacy
-      - v2-speedygonzales
-    paths-ignore:
-      - '*.md'
-      - 'Docs/**'
-      - 'Examples/**'
-      - '.gitignore'
+      - '**'
   pull_request:
     branches:
-      - v1-legacy
-      - v2-speedygonzales
+      - '**'
   workflow_dispatch:
 
 env:
