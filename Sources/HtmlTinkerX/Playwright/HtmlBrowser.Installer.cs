@@ -354,30 +354,38 @@ public static partial class HtmlBrowser {
     }
 
     private static Task EnsureBrowsersAsync(HtmlBrowserEngine engine, bool preferWithDeps = false) {
-        bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
-        if (runtimeInstalled) return Task.CompletedTask;
+        if (IsBrowserRuntimeInstalled(engine)) return Task.CompletedTask;
         string runtime = engine.ToString().ToLowerInvariant();
-        try {
-            int code = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && preferWithDeps
-                ? PlaywrightInstaller(new[] { "install", "--with-deps", runtime })
-                : PlaywrightInstaller(new[] { "install", runtime });
-            if (code != 0) throw new InvalidOperationException($"Playwright install exited with code {code}");
-        } catch (Exception ex) {
-            LogError("Playwright install failed", ex);
-            // Retry without deps or with deps as a fallback depending on first attempt
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
-                try {
-                    int code2 = preferWithDeps
-                        ? PlaywrightInstaller(new[] { "install", runtime })
-                        : ShouldTryInstallDeps() ? PlaywrightInstaller(new[] { "install", "--with-deps", runtime }) : -1;
-                    if (code2 != 0) throw new InvalidOperationException(code2 == -1 ? "No fallback attempted" : $"Playwright install retry exited with code {code2}");
-                } catch (Exception ex2) {
-                    LogError("Playwright install retry failed", ex2);
-                    throw;
-                }
-            } else throw;
+
+        // Build attempt list: on Linux try both orders, elsewhere try plain install
+        var attempts = new System.Collections.Generic.List<string[]>();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            if (preferWithDeps) {
+                attempts.Add(new[] { "install", "--with-deps", runtime });
+                attempts.Add(new[] { "install", runtime });
+            } else {
+                attempts.Add(new[] { "install", runtime });
+                // try with-deps as a last resort only if env explicitly opts in
+                if (ShouldTryInstallDeps()) attempts.Add(new[] { "install", "--with-deps", runtime });
+            }
+        } else {
+            attempts.Add(new[] { "install", runtime });
         }
-        return Task.CompletedTask;
+
+        Exception? lastEx = null;
+        int lastCode = 0;
+        foreach (var args in attempts) {
+            try {
+                int code = PlaywrightInstaller(args);
+                if (code == 0) return Task.CompletedTask;
+                lastCode = code;
+                LogError($"Playwright install exited with code {code} for '{string.Join(" ", args)}'");
+            } catch (Exception ex) {
+                lastEx = ex;
+                LogError($"Playwright install threw for '{string.Join(" ", args)}'", ex);
+            }
+        }
+        throw new InvalidOperationException($"Playwright install failed (last exit {lastCode}).", lastEx);
     }
 
     private static async Task<bool> TrySmokeLaunchAsync(HtmlBrowserEngine engine, CancellationToken cancellationToken) {
