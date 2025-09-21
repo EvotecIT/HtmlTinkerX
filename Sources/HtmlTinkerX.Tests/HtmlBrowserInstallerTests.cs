@@ -22,6 +22,8 @@ public class HtmlBrowserInstallerTests
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+        // Opt into dependency installation for this test to verify flag propagation
+        Environment.SetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS", "1");
 
         try
         {
@@ -30,7 +32,10 @@ public class HtmlBrowserInstallerTests
             string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
             string nodeDir = Path.Combine(baseDir, "node", platformId);
             Directory.CreateDirectory(nodeDir);
-            Directory.CreateDirectory(Path.Combine(baseDir, "package"));
+            var pkgDir = Path.Combine(baseDir, "package");
+            Directory.CreateDirectory(pkgDir);
+            // create a fake cli.js to satisfy completeness checks without network
+            File.WriteAllText(Path.Combine(pkgDir, "cli.js"), "// fake");
             File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "");
             File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
 
@@ -47,6 +52,7 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.PlaywrightInstaller = args => Microsoft.Playwright.Program.Main(args);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("HTMLINKERX_INSTALL_DEPS", null);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
