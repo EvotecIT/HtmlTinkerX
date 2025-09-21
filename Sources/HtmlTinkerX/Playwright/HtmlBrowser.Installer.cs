@@ -78,7 +78,8 @@ public static partial class HtmlBrowser {
             // If non-zero, try Node CLI fallback as well
             try {
                 if (!IsDriverComplete()) {
-                    DownloadAndExtractDriverAsync().GetAwaiter().GetResult();
+                    // Ignore custom mirrors that tests may set concurrently
+                    DownloadAndExtractDriverAsync(ignoreCustomMirror: true).GetAwaiter().GetResult();
                 }
                 return RunNodeCli(args);
             } catch (Exception inner) {
@@ -99,7 +100,7 @@ public static partial class HtmlBrowser {
             try {
                 if (!IsDriverComplete()) {
                     // Synchronously download the driver so we have Node + package
-                    DownloadAndExtractDriverAsync().GetAwaiter().GetResult();
+                    DownloadAndExtractDriverAsync(ignoreCustomMirror: true).GetAwaiter().GetResult();
                 }
                 return RunNodeCli(args);
             } catch (Exception inner) {
@@ -343,10 +344,15 @@ public static partial class HtmlBrowser {
         return skip;
     }
 
-    private static async Task DownloadAndExtractDriverAsync() {
-        string baseUrl = Environment.GetEnvironmentVariable("PLAYWRIGHT_DOWNLOAD_HOST")
-            ?? Environment.GetEnvironmentVariable("HTMLINKERX_PLAYWRIGHT_HOST")
-            ?? "https://playwright.azureedge.net";
+    private static Task DownloadAndExtractDriverAsync() => DownloadAndExtractDriverAsync(ignoreCustomMirror: false);
+
+    private static async Task DownloadAndExtractDriverAsync(bool ignoreCustomMirror) {
+        string baseUrl = "https://playwright.azureedge.net";
+        if (!ignoreCustomMirror) {
+            var mirror = Environment.GetEnvironmentVariable("PLAYWRIGHT_DOWNLOAD_HOST");
+            if (string.IsNullOrWhiteSpace(mirror)) mirror = Environment.GetEnvironmentVariable("HTMLINKERX_PLAYWRIGHT_HOST");
+            if (!string.IsNullOrWhiteSpace(mirror)) baseUrl = mirror!;
+        }
         string urlBase = baseUrl.TrimEnd('/') + "/builds/driver";
         if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
             urlBase += "/next";
