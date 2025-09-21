@@ -127,6 +127,23 @@ public class InstallerErrorTests
     }
 
     [Fact]
+    public async Task DriverDownload_ConnectionRefused_Throws()
+    {
+        // Port with no server listening
+        int port;
+        var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        l.Start();
+        port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+
+        var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmp);
+        using var env = new EnvScope(("PLAYWRIGHT_DRIVER_SEARCH_PATH", tmp), ("HTMLINKERX_PLAYWRIGHT_HOST", $"http://127.0.0.1:{port}"));
+        await Assert.ThrowsAnyAsync<Exception>(async () => await InvokePrivateAsync("DownloadAndExtractDriverAsync"));
+        try { Directory.Delete(tmp, true); } catch { }
+    }
+
+    [Fact]
     public async Task EnsureInstalledAsync_UsesInProcessSemaphore()
     {
         // Hold the file lock to simulate another installer in progress

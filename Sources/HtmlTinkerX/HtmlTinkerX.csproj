@@ -13,7 +13,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
-    <ItemGroup>
+  <ItemGroup>
         <PackageReference Include="AngleSharp" Version="1.3.0" />
         <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.154" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.0" />
@@ -31,7 +31,12 @@
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-    </ItemGroup>
+  </ItemGroup>
+
+  <!-- Ensure .NET Framework 4.7.2 gets the Jint version compatible with AngleSharp.Js -->
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+    <PackageReference Include="Jint" Version="4.1.0" />
+  </ItemGroup>
 
     <ItemGroup>
         <Using Include="System.Net.Http" />
