@@ -41,6 +41,9 @@ public static partial class HtmlBrowser {
             string? info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             if (!string.IsNullOrEmpty(info)) {
                 var trimmed = info!.Split('+')[0];
+                // Normalize pre-release tags to the numeric prefix only (e.g. 1.55.0-beta.1 => 1.55.0)
+                var dashIdx = trimmed.IndexOf('-');
+                if (dashIdx > 0) trimmed = trimmed.Substring(0, dashIdx);
                 return trimmed;
             }
             return asm.GetName().Version?.ToString(3) ?? "1.52.0";
@@ -357,17 +360,35 @@ public static partial class HtmlBrowser {
         if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
             urlBase += "/next";
         string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
+        LogInfo($"Driver URL: {url}");
 
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
 
-        // Simple retry for transient network issues
+        // Simple retry for transient issues + alternate platform ids on 404
         const int maxAttempts = 3;
         HttpResponseMessage? response = null;
         Exception? last = null;
+        string[] altPlatformIds = Array.Empty<string>();
+        // Try a couple of alternates only on specific platforms if primary 404s
+        if (CurrentPlatform == HtmlPlatform.LinuxX64)
+            altPlatformIds = new[] { "linux-x64" };
+        else if (CurrentPlatform == HtmlPlatform.WindowsX64)
+            altPlatformIds = new[] { "win32_x64" }; // primary already win32_x64; kept for consistency
+        else if (CurrentPlatform == HtmlPlatform.Mac)
+            altPlatformIds = new[] { "mac" };
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound && altPlatformIds.Length > 0) {
+                    foreach (var alt in altPlatformIds) {
+                        string altUrl = $"{urlBase}/playwright-{DriverVersion}-{alt}.zip";
+                        LogInfo($"Primary driver URL 404; trying alternate: {altUrl}");
+                        var altResp = await client.GetAsync(altUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                        if (altResp.IsSuccessStatusCode) { response = altResp; url = altUrl; break; }
+                    }
+                }
                 response.EnsureSuccessStatusCode();
                 break;
             } catch (Exception ex) {
