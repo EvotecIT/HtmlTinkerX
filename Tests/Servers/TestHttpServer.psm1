@@ -15,7 +15,7 @@ function Get-FreeTcpPort {
 
 function Wait-UntilPortOpen {
     param(
-        [string]$Host = '127.0.0.1',
+        [string]$Hostname = '127.0.0.1',
         [int]$Port,
         [int]$TimeoutSeconds = 20
     )
@@ -23,7 +23,7 @@ function Wait-UntilPortOpen {
     while ($true) {
         try {
             $c = [System.Net.Sockets.TcpClient]::new()
-            $c.Connect($Host, $Port)
+            $c.Connect($Hostname, $Port)
             $c.Dispose()
             return $true
         } catch {
@@ -44,8 +44,8 @@ function Start-TestHttpServer {
     if (-not $py) { return $null }
 
     $port = Get-FreeTcpPort
-    $args = @('-u','-m','http.server',$port,'--bind','127.0.0.1')
-    $proc = Start-Process -FilePath $py.Source -ArgumentList $args -WorkingDirectory $Root -PassThru
+    $pyArgs = @('-u','-m','http.server',$port,'--bind','127.0.0.1')
+    $proc = Start-Process -FilePath $py.Source -ArgumentList $pyArgs -WorkingDirectory $Root -PassThru
     if (-not (Wait-UntilPortOpen -Port $port -TimeoutSeconds $TimeoutSeconds)) {
         try { if ($proc -and -not $proc.HasExited) { $proc | Stop-Process -Force } } catch {}
         throw 'HTTP server failed to start.'
@@ -66,4 +66,3 @@ function Stop-TestHttpServer {
 }
 
 Export-ModuleMember -Function Start-TestHttpServer,Stop-TestHttpServer
-
