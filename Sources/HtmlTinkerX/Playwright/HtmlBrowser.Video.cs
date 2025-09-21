@@ -147,6 +147,17 @@ public static partial class HtmlBrowser {
             throw new System.ArgumentException("Output path required.");
         }
 
+        // Give Playwright a chance to produce at least one frame before closing.
+        if (session.Video != null) {
+            try {
+                // Two rAFs + tiny delay to ensure a rendered frame is captured
+                await session.Page.EvaluateAsync("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))").ConfigureAwait(false);
+                await Task.Delay(75, cancellationToken).ConfigureAwait(false);
+            } catch (System.Exception) {
+                // Best-effort only
+            }
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         await session.DisposeAsync().ConfigureAwait(false);
     }

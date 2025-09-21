@@ -1,14 +1,17 @@
 Describe 'Save-HTMLAttachment streaming' {
     It 'Outputs file paths as downloads complete' -Skip:(-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+        . (Join-Path $PSScriptRoot '_TestUtils.ps1')
+        $address = '127.0.0.1'
+        $port = Get-FreeTcpPort -Address $address
         # Bind explicitly to IPv4 to avoid macOS IPv6-only listener issues
-        $server = Start-Process -FilePath python3 -ArgumentList '-u', '-m', 'http.server', '8010', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        $server = Start-Process -FilePath python3 -ArgumentList '-u', '-m', 'http.server', "$port", '--bind', $address -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
         Start-Sleep -Seconds 1
         $timeout = [System.Diagnostics.Stopwatch]::StartNew()
         while ($true) {
             try {
                 $socket = New-Object Net.Sockets.TcpClient
-                # Use localhost to allow IPv4/IPv6 resolution as needed
-                $socket.Connect('localhost', 8010)
+                # Probe the exact IPv4 address and randomized port we bound to
+                $socket.Connect($address, $port)
                 $socket.Dispose()
                 break
             } catch {
@@ -20,7 +23,7 @@ Describe 'Save-HTMLAttachment streaming' {
         }
         try {
             # Match the server bind address to avoid IPv6/IPv4 mismatch
-            $uri = 'http://127.0.0.1:8010/multi_download.html'
+            $uri = "http://$address:$port/multi_download.html"
             $dest = Join-Path $TestDrive 'stream'
             $results = @()
             foreach ($file in Save-HTMLAttachment -Url $uri -Path $dest) {
