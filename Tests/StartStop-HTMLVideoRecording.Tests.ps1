@@ -7,7 +7,9 @@ describe 'HTML Video Recording' {
         Invoke-HTMLNavigation -Session $session -Url $uri
         # Ensure at least one rendered frame by waiting for dynamic content
         $null = $session.Page.WaitForSelectorAsync('#loaded')
-        Start-Sleep -Milliseconds 150
+        # Nudge compositor to ensure at least one frame is recorded
+        $null = $session.Page.EvaluateAsync('window.scrollTo(0,1); document.body.style.outline="1px solid #f00"',$null)
+        $null = $session.Page.WaitForTimeoutAsync(200)
         Stop-HtmlBrowserVideoCapture -Session $session
         (Test-Path $out) | Should -BeTrue
     }
