@@ -64,13 +64,16 @@ public static partial class HtmlBrowser {
 
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
 
+    private static string? LastInstallerError;
+
     private static int DefaultPlaywrightInstaller(string[] args)
     {
         // Preferred: call Playwright's built-in CLI entrypoint. On .NET Framework this can fail
         // with BadImageFormatException or similar if the runtime cannot execute the entry point.
         try {
             int code = Microsoft.Playwright.Program.Main(args);
-            if (code == 0) return 0;
+            if (code == 0) { LastInstallerError = null; return 0; }
+            LastInstallerError = $"Program.Main exited {code}";
             LogError($"Playwright Program.Main exited {code}. Falling back to Node CLI.");
             // If non-zero, try Node CLI fallback as well
             try {
@@ -79,6 +82,7 @@ public static partial class HtmlBrowser {
                 }
                 return RunNodeCli(args);
             } catch (Exception inner) {
+                LastInstallerError = $"Node CLI fallback threw: {inner.Message}";
                 LogError("Fallback Node CLI installer failed", inner);
                 return code; // return original non-zero if fallback throws
             }
@@ -99,6 +103,7 @@ public static partial class HtmlBrowser {
                 }
                 return RunNodeCli(args);
             } catch (Exception inner) {
+                LastInstallerError = $"Node CLI fallback threw: {inner.Message}";
                 LogError("Fallback Node CLI installer failed", inner);
                 throw; // bubble up so EnsureBrowsersAsync can report properly
             }
@@ -137,6 +142,8 @@ public static partial class HtmlBrowser {
         psi.Environment["PLAYWRIGHT_DRIVER_SEARCH_PATH"] = GetDriverRoot();
         var browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (!string.IsNullOrEmpty(browsersPath)) psi.Environment["PLAYWRIGHT_BROWSERS_PATH"] = browsersPath;
+        // Enable install debug logging for better CI diagnostics
+        psi.Environment["DEBUG"] = "pw:install";
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start Node process");
         // Drain output to avoid deadlocks
@@ -144,6 +151,7 @@ public static partial class HtmlBrowser {
         string stderr = proc.StandardError.ReadToEnd();
         proc.WaitForExit();
         if (proc.ExitCode != 0) {
+            LastInstallerError = string.IsNullOrWhiteSpace(stderr) ? $"Node CLI exited with code {proc.ExitCode}" : stderr.Trim();
             LogError($"Node CLI exited with code {proc.ExitCode}. STDERR: {stderr}");
         } else if (!string.IsNullOrWhiteSpace(stdout)) {
             LogInfo(stdout);
@@ -481,6 +489,19 @@ public static partial class HtmlBrowser {
     private static Task EnsureBrowsersAsync(HtmlBrowserEngine engine, bool preferWithDeps = false) {
         if (IsBrowserRuntimeInstalled(engine)) return Task.CompletedTask;
         string runtime = engine.ToString().ToLowerInvariant();
+        // In CI, prefer a writable temp-backed cache unless user overrides
+        var ci = (Environment.GetEnvironmentVariable("CI") ?? string.Empty).Equals("true", StringComparison.OrdinalIgnoreCase);
+        var currentBp = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        if (ci && string.IsNullOrEmpty(currentBp)) {
+            string baseTmp = Environment.GetEnvironmentVariable("RUNNER_TEMP")
+                ?? Environment.GetEnvironmentVariable("AGENT_TEMPDIRECTORY")
+                ?? Path.GetTempPath();
+            string bp = Path.Combine(baseTmp, "ms-playwright");
+            try { Directory.CreateDirectory(bp); } catch { }
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", bp);
+        }
+        // Proactively ensure target browser path exists (stabilizes permissions in CI and local)
+        try { Directory.CreateDirectory(GetBrowserInstallPath()); } catch { }
 
         // Build attempt list: on Linux try both orders, elsewhere try plain install
         var attempts = new System.Collections.Generic.List<string[]>();
@@ -504,13 +525,15 @@ public static partial class HtmlBrowser {
                 int code = PlaywrightInstaller(args);
                 if (code == 0) return Task.CompletedTask;
                 lastCode = code;
-                LogError($"Playwright install exited with code {code} for '{string.Join(" ", args)}'");
+                var msg = LastInstallerError;
+                LogError($"Playwright install exited with code {code} for '{string.Join(" ", args)}'" + (string.IsNullOrEmpty(msg) ? string.Empty : $": {msg}"));
             } catch (Exception ex) {
                 lastEx = ex;
                 LogError($"Playwright install threw for '{string.Join(" ", args)}'", ex);
             }
         }
-        throw new InvalidOperationException($"Playwright install failed (last exit {lastCode}).", lastEx);
+        string detail = LastInstallerError is { Length: > 0 } ? $" Details: {LastInstallerError}" : string.Empty;
+        throw new InvalidOperationException($"Playwright install failed (last exit {lastCode}).{detail}", lastEx);
     }
 
     private static async Task<bool> TrySmokeLaunchAsync(HtmlBrowserEngine engine, CancellationToken cancellationToken) {
