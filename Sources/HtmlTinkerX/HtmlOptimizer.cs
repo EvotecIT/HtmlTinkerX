@@ -5,9 +5,11 @@ using NUglify.Css;
 using NUglify.Html;
 using NUglify.JavaScript;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -129,6 +131,7 @@ public static class HtmlOptimizer {
 
         UglifyResult result = Uglify.Html(html, effectiveSettings);
         string output = result.Code ?? string.Empty;
+        output = ShortenBooleanAttributesIfRequested(output, effectiveSettings);
 
         if (hasMotw) {
             return "<!-- saved from url=(0014)about:internet -->" + Environment.NewLine + output;
@@ -379,6 +382,69 @@ public static class HtmlOptimizer {
         return await OptimizeJavaScriptAsync(js).ConfigureAwait(false);
 }
 
+    private static readonly Regex BooleanAttributeValuePattern = new(
+        "(?<=\\s)(?<name>[A-Za-z_:][\\w:.-]*?)=(?:\"(?<value>[^\"]*)\"|'(?<value>[^']*)'|(?<value>[^\\s>/]+))(?=[\\s>/])",
+#if NETSTANDARD2_0 || NET472
+        RegexOptions.IgnoreCase
+#else
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+#endif
+    );
+
+    private static readonly HashSet<string> BooleanAttributes = new(
+        new[] {
+            "allowfullscreen",
+            "async",
+            "autofocus",
+            "autoplay",
+            "checked",
+            "compact",
+            "controls",
+            "declare",
+            "default",
+            "defer",
+            "disabled",
+            "formnovalidate",
+            "hidden",
+            "inert",
+            "ismap",
+            "itemscope",
+            "loop",
+            "multiple",
+            "muted",
+            "nomodule",
+            "novalidate",
+            "open",
+            "playsinline",
+            "readonly",
+            "required",
+            "reversed",
+            "scoped",
+            "selected",
+            "typemustmatch"
+        },
+        StringComparer.OrdinalIgnoreCase);
+
+    private static string ShortenBooleanAttributesIfRequested(string html, HtmlSettings settings) {
+        if (string.IsNullOrEmpty(html) || !settings.ShortBooleanAttribute) {
+            return html;
+        }
+
+        return BooleanAttributeValuePattern.Replace(html, static match => {
+            string name = match.Groups["name"].Value;
+            if (!BooleanAttributes.Contains(name)) {
+                return match.Value;
+            }
+
+            string value = match.Groups["value"].Value;
+            if (!value.Equals(name, StringComparison.OrdinalIgnoreCase)) {
+                return match.Value;
+            }
+
+            return name;
+        });
+    }
+
     private static HtmlSettings CloneHtmlSettings(HtmlSettings settings) {
         HtmlSettings clone = new() {
             AttributesCaseSensitive = settings.AttributesCaseSensitive,
@@ -389,6 +455,9 @@ public static class HtmlOptimizer {
             RemoveInvalidClosingTags = settings.RemoveInvalidClosingTags,
             RemoveEmptyAttributes = settings.RemoveEmptyAttributes,
             RemoveAttributeQuotes = settings.RemoveAttributeQuotes,
+#pragma warning disable CS0618 // RemoveQuotedAttributes is obsolete in favor of RemoveAttributeQuotes but still exposed for older targets
+            RemoveQuotedAttributes = settings.RemoveQuotedAttributes,
+#pragma warning restore CS0618
             DecodeEntityCharacters = settings.DecodeEntityCharacters,
             AttributeQuoteChar = settings.AttributeQuoteChar,
             RemoveScriptStyleTypeAttribute = settings.RemoveScriptStyleTypeAttribute,
@@ -421,6 +490,15 @@ public static class HtmlOptimizer {
                 clone.TagsWithNonCollapsibleWhitespaces[kvp.Key] = kvp.Value;
             }
         }
+
+#pragma warning disable CS0618 // TagsWithNonCollapsableWhitespaces is retained for backwards compatibility
+        if (settings.TagsWithNonCollapsableWhitespaces != null) {
+            clone.TagsWithNonCollapsableWhitespaces.Clear();
+            foreach (var kvp in settings.TagsWithNonCollapsableWhitespaces) {
+                clone.TagsWithNonCollapsableWhitespaces[kvp.Key] = kvp.Value;
+            }
+        }
+#pragma warning restore CS0618
 
         if (settings.KeepCommentsRegex != null) {
             clone.KeepCommentsRegex.Clear();

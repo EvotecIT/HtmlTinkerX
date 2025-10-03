@@ -70,15 +70,22 @@ public class HtmlOptimizerTests {
 
     [Fact]
     public void OptimizeHtml_ShortBooleanAttributesWhenRequested() {
-        const string input = "<a hx-boost=true></a>";
-        string defaultResult = HtmlOptimizer.OptimizeHtml(input, cssDecodeEscapes: false);
-        string result = HtmlOptimizer.OptimizeHtml(
-            input,
+        const string hxInput = "<a hx-boost=true></a>";
+        string defaultResult = HtmlOptimizer.OptimizeHtml(hxInput, cssDecodeEscapes: false);
+        string hxShortened = HtmlOptimizer.OptimizeHtml(
+            hxInput,
+            cssDecodeEscapes: false,
+            shortBooleanAttributes: true);
+
+        const string booleanInput = "<input type=\"checkbox\" checked=\"checked\" />";
+        string booleanShortened = HtmlOptimizer.OptimizeHtml(
+            booleanInput,
             cssDecodeEscapes: false,
             shortBooleanAttributes: true);
 
         Assert.Equal("<a hx-boost=true></a>", defaultResult);
-        Assert.Equal("<a hx-boost></a>", result);
+        Assert.Equal("<a hx-boost></a>", hxShortened);
+        Assert.Equal("<input type=checkbox checked />", booleanShortened);
     }
 
     [Fact]
