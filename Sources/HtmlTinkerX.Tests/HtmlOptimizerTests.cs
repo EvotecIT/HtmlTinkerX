@@ -2,6 +2,8 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using NUglify.Html;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
@@ -77,6 +79,34 @@ public class HtmlOptimizerTests {
 
         Assert.Equal("<a hx-boost=true></a>", defaultResult);
         Assert.Equal("<a hx-boost></a>", result);
+    }
+
+    [Fact]
+    public void CreateDefaultHtmlSettings_UsesSafeDefaults() {
+        HtmlSettings settings = HtmlOptimizer.CreateDefaultHtmlSettings();
+
+        Assert.False(settings.RemoveComments);
+        Assert.False(settings.RemoveOptionalTags);
+        Assert.True(settings.IsFragmentOnly);
+        Assert.False(settings.ShortBooleanAttribute);
+        Assert.False(settings.CssSettings.DecodeEscapes);
+    }
+
+    [Fact]
+    public void OptimizeHtml_WithCustomSettingsHonorsNuGlifyOptions() {
+        const string input = "<div hidden=\"hidden\" data-flag=\"value\"><!--comment--></div>";
+        HtmlSettings settings = HtmlOptimizer.CreateDefaultHtmlSettings();
+        settings.RemoveComments = true;
+        settings.ShortBooleanAttribute = true;
+        settings.RemoveAttributeQuotes = false;
+        settings.AlphabeticallyOrderAttributes = true;
+
+        string result = HtmlOptimizer.OptimizeHtml(input, settings);
+
+        Assert.DoesNotContain("<!--comment-->", result);
+        Assert.Contains("hidden", result);
+        Assert.Contains("data-flag=\"value\"", result);
+        Assert.StartsWith("<div", result);
     }
 
     [Fact]

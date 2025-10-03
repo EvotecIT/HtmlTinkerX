@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using NUglify.Html;
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
@@ -50,15 +51,46 @@ public sealed class CmdletOptimizeHtml : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ShortBooleanAttributes { get; set; }
 
+    /// <summary>Custom NUglify settings to use during optimization.</summary>
+    [Parameter]
+    public HtmlSettings? HtmlSettings { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        if (HtmlSettings != null) {
+            EnsureNoSwitch(nameof(CSSDecodeEscapes));
+            EnsureNoSwitch(nameof(TreatAsDocument));
+            EnsureNoSwitch(nameof(RemoveComments));
+            EnsureNoSwitch(nameof(RemoveOptionalTags));
+            EnsureNoSwitch(nameof(ShortBooleanAttributes));
+
+            string resultWithSettings = ParameterSetName == ParameterSetFile
+                ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), HtmlSettings!).ConfigureAwait(false)
+                : await HtmlOptimizer.OptimizeHtmlAsync(Content, HtmlSettings!).ConfigureAwait(false);
+
+            await WriteOutputAsync(resultWithSettings).ConfigureAwait(false);
+            return;
+        }
+
         string result = ParameterSetName == ParameterSetFile
             ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent, ShortBooleanAttributes.IsPresent).ConfigureAwait(false)
             : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent, ShortBooleanAttributes.IsPresent).ConfigureAwait(false);
+
+        await WriteOutputAsync(result).ConfigureAwait(false);
+    }
+
+    private void EnsureNoSwitch(string parameterName) {
+        if (MyInvocation.BoundParameters.ContainsKey(parameterName)) {
+            throw new PSArgumentException($"-{parameterName} cannot be used together with -HtmlSettings.");
+        }
+    }
+
+    private async Task WriteOutputAsync(string result) {
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
             System.IO.File.WriteAllText(outPath, result);
+            await Task.CompletedTask;
 #else
             await System.IO.File.WriteAllTextAsync(outPath, result, CancelToken).ConfigureAwait(false);
 #endif

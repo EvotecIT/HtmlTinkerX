@@ -5,11 +5,12 @@ public static class CustomizeHtmlSettingsExample {
     public static void Run() {
         string html = "<input type=\"checkbox\" checked=\"checked\" />";
 
-        string optimized = HtmlOptimizer.OptimizeHtml(
-            html,
-            cssDecodeEscapes: false,
-            removeOptionalTags: true,
-            shortBooleanAttributes: true);
+        var settings = HtmlOptimizer.CreateDefaultHtmlSettings();
+        settings.RemoveOptionalTags = true;
+        settings.ShortBooleanAttribute = true;
+        settings.RemoveAttributeQuotes = false;
+
+        string optimized = HtmlOptimizer.OptimizeHtml(html, settings);
 
         Console.WriteLine(optimized);
     }

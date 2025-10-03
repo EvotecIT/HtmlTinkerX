@@ -102,6 +102,17 @@
         $result | Should -Be '<input type=checkbox checked />'
     }
 
+    It 'Supports custom HtmlSettings' {
+        $settings = [HtmlTinkerX.HtmlOptimizer]::CreateDefaultHtmlSettings()
+        $settings.ShortBooleanAttribute = $true
+        $settings.RemoveComments = $true
+
+        $content = '<a hx-boost=true><!--c--></a>'
+        $result = Optimize-HTML -Content $content -HtmlSettings $settings
+
+        $result | Should -Be '<a hx-boost></a>'
+    }
+
     It 'Removes optional tags when requested' {
         $content = '<html><body><p>Hi</p></body></html>'
         $result = Optimize-HTML -Content $content -TreatAsDocument -RemoveOptionalTags
