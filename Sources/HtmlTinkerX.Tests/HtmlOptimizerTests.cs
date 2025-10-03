@@ -59,6 +59,27 @@ public class HtmlOptimizerTests {
     }
 
     [Fact]
+    public void OptimizeHtml_PreservesLiteralTrueValuesByDefault() {
+        const string input = "<a hx-boost=true></a>";
+        string result = HtmlOptimizer.OptimizeHtml(input, cssDecodeEscapes: false);
+
+        Assert.Equal("<a hx-boost=true></a>", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_ShortBooleanAttributesWhenRequested() {
+        const string input = "<a hx-boost=true></a>";
+        string defaultResult = HtmlOptimizer.OptimizeHtml(input, cssDecodeEscapes: false);
+        string result = HtmlOptimizer.OptimizeHtml(
+            input,
+            cssDecodeEscapes: false,
+            shortBooleanAttributes: true);
+
+        Assert.Equal("<a hx-boost=true></a>", defaultResult);
+        Assert.Equal("<a hx-boost></a>", result);
+    }
+
+    [Fact]
     public void OptimizeJavaScript_MinifiesInput() {
         const string formatted = "(function() {\n    function main() {\n        var tabButtons = [].slice.call(document.querySelectorAll('ul.tab-nav li a.buttonTab'));\n        tabButtons.map(function(button) {\n            button.addEventListener('click', function() {\n                document.querySelector('li a.active.buttonTab').classList.remove('active');\n                button.classList.add('active');\n                document.querySelector('.tab-pane.active').classList.remove('active');\n                document.querySelector(button.getAttribute('href')).classList.add('active');\n            });\n        });\n    }\n    if (document.readyState !== 'loading') {\n        main();\n    } else {\n        document.addEventListener('DOMContentLoaded', main);\n    }\n})();";
 

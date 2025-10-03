@@ -46,11 +46,15 @@ public sealed class CmdletOptimizeHtml : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter RemoveOptionalTags { get; set; }
 
+    /// <summary>Shorten boolean attributes during optimization.</summary>
+    [Parameter]
+    public SwitchParameter ShortBooleanAttributes { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string result = ParameterSetName == ParameterSetFile
-            ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent).ConfigureAwait(false)
-            : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent).ConfigureAwait(false);
+            ? await HtmlOptimizer.OptimizeHtmlFileAsync(Path.ToFullPath(), CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent, ShortBooleanAttributes.IsPresent).ConfigureAwait(false)
+            : await HtmlOptimizer.OptimizeHtmlAsync(Content, CSSDecodeEscapes.IsPresent, TreatAsDocument.IsPresent, RemoveComments.IsPresent, RemoveOptionalTags.IsPresent, ShortBooleanAttributes.IsPresent).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK

@@ -72,8 +72,15 @@ public static class HtmlOptimizer {
     /// <param name="treatAsDocument">When set, NUglify treats the input as a full HTML document.</param>
     /// <param name="removeComments">Remove HTML comments while minifying.</param>
     /// <param name="removeOptionalTags">Remove optional HTML tags such as closing <c>&lt;/p&gt;</c>.</param>
+    /// <param name="shortBooleanAttributes">Shorten boolean attributes (for example, turn <c>disabled="disabled"</c> into <c>disabled</c>).</param>
     /// <returns>Optimized HTML output.</returns>
-    public static string OptimizeHtml(string html, bool cssDecodeEscapes, bool treatAsDocument = false, bool removeComments = false, bool removeOptionalTags = false) {
+    public static string OptimizeHtml(
+        string html,
+        bool cssDecodeEscapes,
+        bool treatAsDocument = false,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool shortBooleanAttributes = false) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -81,7 +88,8 @@ public static class HtmlOptimizer {
         HtmlSettings settings = new() {
             RemoveOptionalTags = removeOptionalTags,
             RemoveComments = removeComments,
-            IsFragmentOnly = !treatAsDocument
+            IsFragmentOnly = !treatAsDocument,
+            ShortBooleanAttribute = shortBooleanAttributes
         };
         settings.CssSettings.DecodeEscapes = cssDecodeEscapes;
 
@@ -106,13 +114,24 @@ public static class HtmlOptimizer {
     /// <param name="treatAsDocument">When set, NUglify treats the input as a full HTML document.</param>
     /// <param name="removeComments">Remove HTML comments while minifying.</param>
     /// <param name="removeOptionalTags">Remove optional HTML tags such as closing <c>&lt;/p&gt;</c>.</param>
+    /// <param name="shortBooleanAttributes">Shorten boolean attributes (for example, turn <c>disabled="disabled"</c> into <c>disabled</c>).</param>
     /// <param name="embedImages">When set, downloads external images and embeds them using data URIs.</param>
     /// <param name="baseUrl">Optional base URL used to resolve relative image paths.</param>
     /// <param name="client">Optional <see cref="HttpClient"/> used for downloads.</param>
     /// <param name="cancellationToken">Token used to cancel download operations.</param>
     /// <returns>Optimized HTML output.</returns>
-    public static async Task<string> OptimizeHtmlAsync(string html, bool cssDecodeEscapes, bool treatAsDocument = false, bool removeComments = false, bool removeOptionalTags = false, bool embedImages = false, string? baseUrl = null, HttpClient? client = null, CancellationToken cancellationToken = default) {
-        string optimized = await Task.Run(() => OptimizeHtml(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags), cancellationToken).ConfigureAwait(false);
+    public static async Task<string> OptimizeHtmlAsync(
+        string html,
+        bool cssDecodeEscapes,
+        bool treatAsDocument = false,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool shortBooleanAttributes = false,
+        bool embedImages = false,
+        string? baseUrl = null,
+        HttpClient? client = null,
+        CancellationToken cancellationToken = default) {
+        string optimized = await Task.Run(() => OptimizeHtml(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags, shortBooleanAttributes), cancellationToken).ConfigureAwait(false);
         if (!embedImages) {
             return optimized;
         }
@@ -128,25 +147,35 @@ public static class HtmlOptimizer {
     /// <param name="treatAsDocument">When set, NUglify treats the input as a full HTML document.</param>
     /// <param name="removeComments">Remove HTML comments while minifying.</param>
     /// <param name="removeOptionalTags">Remove optional HTML tags such as closing <c>&lt;/p&gt;</c>.</param>
+    /// <param name="shortBooleanAttributes">Shorten boolean attributes (for example, turn <c>disabled="disabled"</c> into <c>disabled</c>).</param>
     /// <returns>Optimized HTML output.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
-    public static string OptimizeHtmlFile(string filePath, bool cssDecodeEscapes, bool treatAsDocument = false, bool removeComments = false, bool removeOptionalTags = false) {
+    public static string OptimizeHtmlFile(string filePath, bool cssDecodeEscapes, bool treatAsDocument = false, bool removeComments = false, bool removeOptionalTags = false, bool shortBooleanAttributes = false) {
         string html = HtmlUtilities.ReadFileChecked(filePath);
-        return OptimizeHtml(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags);
+        return OptimizeHtml(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags, shortBooleanAttributes);
     }
 
     /// <summary>
     /// Asynchronously minifies HTML content from a file.
     /// </summary>
-    /// <inheritdoc cref="OptimizeHtmlFile(string,bool,bool,bool,bool)"/>
-    public static async Task<string> OptimizeHtmlFileAsync(string filePath, bool cssDecodeEscapes, bool treatAsDocument = false, bool removeComments = false, bool removeOptionalTags = false, bool embedImages = false, HttpClient? client = null, CancellationToken cancellationToken = default) {
+    /// <inheritdoc cref="OptimizeHtmlFile(string,bool,bool,bool,bool,bool)"/>
+    public static async Task<string> OptimizeHtmlFileAsync(
+        string filePath,
+        bool cssDecodeEscapes,
+        bool treatAsDocument = false,
+        bool removeComments = false,
+        bool removeOptionalTags = false,
+        bool shortBooleanAttributes = false,
+        bool embedImages = false,
+        HttpClient? client = null,
+        CancellationToken cancellationToken = default) {
         string html = await HtmlUtilities.ReadFileCheckedAsync(filePath, cancellationToken).ConfigureAwait(false);
         string? baseUrl = null;
         try {
             baseUrl = new Uri(Path.GetFullPath(filePath)).AbsoluteUri;
         } catch {
         }
-        return await OptimizeHtmlAsync(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags, embedImages, baseUrl, client, cancellationToken).ConfigureAwait(false);
+        return await OptimizeHtmlAsync(html, cssDecodeEscapes, treatAsDocument, removeComments, removeOptionalTags, shortBooleanAttributes, embedImages, baseUrl, client, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
