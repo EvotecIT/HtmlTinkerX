@@ -88,6 +88,31 @@
         $result | Should -Not -Match '<!--c-->'
     }
 
+    It 'Preserves hx boolean attributes' {
+        $content = '<a hx-boost=true hx-get="/search" hx-target="#results"></a>'
+        $result = Optimize-HTML -Content $content -CSSDecodeEscapes:$false
+        $result | Should -Match 'hx-boost=true'
+        $result | Should -Match 'hx-get=/search'
+        $result | Should -Match 'hx-target=#results'
+    }
+
+    It 'Can shorten boolean attributes when requested' {
+        $content = '<input type="checkbox" checked="checked" />'
+        $result = Optimize-HTML -Content $content -ShortBooleanAttributes
+        $result | Should -Be '<input type=checkbox checked />'
+    }
+
+    It 'Supports custom HtmlSettings' {
+        $settings = [HtmlTinkerX.HtmlOptimizer]::CreateDefaultHtmlSettings()
+        $settings.ShortBooleanAttribute = $true
+        $settings.RemoveComments = $true
+
+        $content = '<a hx-boost=true><!--c--></a>'
+        $result = Optimize-HTML -Content $content -HtmlSettings $settings
+
+        $result | Should -Be '<a hx-boost></a>'
+    }
+
     It 'Removes optional tags when requested' {
         $content = '<html><body><p>Hi</p></body></html>'
         $result = Optimize-HTML -Content $content -TreatAsDocument -RemoveOptionalTags
