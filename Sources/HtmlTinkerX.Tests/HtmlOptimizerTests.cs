@@ -2,6 +2,8 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using NUglify.Html;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
@@ -56,6 +58,62 @@ public class HtmlOptimizerTests {
         const string input = "<html><body><p>Hi</p></body></html>";
         string result = HtmlOptimizer.OptimizeHtml(input, false, treatAsDocument: true, removeOptionalTags: true);
         Assert.DoesNotContain("</p>", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_PreservesLiteralTrueValuesByDefault() {
+        const string input = "<a hx-boost=true></a>";
+        string result = HtmlOptimizer.OptimizeHtml(input, cssDecodeEscapes: false);
+
+        Assert.Equal("<a hx-boost=true></a>", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_ShortBooleanAttributesWhenRequested() {
+        const string hxInput = "<a hx-boost=true></a>";
+        string defaultResult = HtmlOptimizer.OptimizeHtml(hxInput, cssDecodeEscapes: false);
+        string hxShortened = HtmlOptimizer.OptimizeHtml(
+            hxInput,
+            cssDecodeEscapes: false,
+            shortBooleanAttributes: true);
+
+        const string booleanInput = "<input type=\"checkbox\" checked=\"checked\" />";
+        string booleanShortened = HtmlOptimizer.OptimizeHtml(
+            booleanInput,
+            cssDecodeEscapes: false,
+            shortBooleanAttributes: true);
+
+        Assert.Equal("<a hx-boost=true></a>", defaultResult);
+        Assert.Equal("<a hx-boost></a>", hxShortened);
+        Assert.Equal("<input type=checkbox checked />", booleanShortened);
+    }
+
+    [Fact]
+    public void CreateDefaultHtmlSettings_UsesSafeDefaults() {
+        HtmlSettings settings = HtmlOptimizer.CreateDefaultHtmlSettings();
+
+        Assert.False(settings.RemoveComments);
+        Assert.False(settings.RemoveOptionalTags);
+        Assert.True(settings.IsFragmentOnly);
+        Assert.False(settings.ShortBooleanAttribute);
+        Assert.False(settings.CssSettings.DecodeEscapes);
+    }
+
+    [Fact]
+    public void OptimizeHtml_WithCustomSettingsHonorsNuGlifyOptions() {
+        const string input = "<div hidden=\"hidden\" data-flag=\"value\"><!--comment--></div>";
+        HtmlSettings settings = HtmlOptimizer.CreateDefaultHtmlSettings();
+        settings.RemoveComments = true;
+        settings.ShortBooleanAttribute = true;
+        settings.RemoveAttributeQuotes = false;
+        settings.AlphabeticallyOrderAttributes = true;
+
+        string result = HtmlOptimizer.OptimizeHtml(input, settings);
+
+        Assert.DoesNotContain("<!--comment-->", result);
+        Assert.Contains("hidden", result);
+        Assert.Contains("data-flag=\"value\"", result);
+        Assert.StartsWith("<div", result);
     }
 
     [Fact]
