@@ -16,6 +16,7 @@
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
+            RequireLicenseAcceptance   = $false
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
     }
