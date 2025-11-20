@@ -1,6 +1,12 @@
 
 Import-Module .\PSParseHTML.psd1 -Force
 
+
+$Tables = ConvertFrom-HtmlTable -Url "https://www.semperis.com/purple-knight/security-indicators/" -IncludeMetadata
+$Tables
+
+return
+
 $html = (Invoke-WebRequest -Uri 'https://en.wikipedia.org/wiki/PowerShell').Content
 $Tables = ConvertFrom-HtmlTable -Content $html
 foreach ($Table in $Tables) {
