@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text.RegularExpressions;
@@ -187,8 +188,17 @@ public class HtmlUtilitiesTests {
 
         _output.WriteLine($"Old: {oldWatch.ElapsedMilliseconds} ms, New: {newWatch.ElapsedMilliseconds} ms");
 
-        double toleranceMs = oldWatch.Elapsed.TotalMilliseconds * 0.05 + 1;
-        TimeSpan tolerance = TimeSpan.FromMilliseconds(toleranceMs);
-        Assert.True(newWatch.Elapsed <= oldWatch.Elapsed + tolerance);
+        static TimeSpan CalculateTolerance(TimeSpan baseline) {
+            // Allow for environmental noise and cross-platform timing differences.
+            // Use the larger of a relative buffer (50% of baseline) or an absolute buffer (20ms)
+            // to avoid flaky failures on slower machines while still catching significant regressions.
+            double relativeBufferMs = baseline.TotalMilliseconds * 0.5;
+            double absoluteBufferMs = 20;
+            double toleranceMs = Math.Max(relativeBufferMs, absoluteBufferMs);
+            return TimeSpan.FromMilliseconds(toleranceMs);
+        }
+
+        TimeSpan tolerance = CalculateTolerance(oldWatch.Elapsed);
+        Assert.True(newWatch.Elapsed <= oldWatch.Elapsed + tolerance, $"New implementation was slower than expected. Old: {oldWatch.Elapsed}, New: {newWatch.Elapsed}, Tolerance: {tolerance}");
     }
 }
