@@ -64,6 +64,6 @@ public class HtmlParserListTests {
 
     [Fact]
     public void ParseListsWithAngleSharpDetailed_NullHtml_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseListsWithAngleSharpDetailed(null, " "));
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseListsWithAngleSharpDetailed(null!, " "));
     }
 }

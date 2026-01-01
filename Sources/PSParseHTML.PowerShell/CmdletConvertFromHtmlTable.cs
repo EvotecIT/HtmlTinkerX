@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 ///   <code>ConvertFrom-HtmlTable -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
-[OutputType(typeof(PSObject[]))]
+[OutputType(typeof(HtmlTableResult))]
 public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
@@ -72,6 +72,11 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter SkipFooter { get; set; }
 
+    /// <summary>Controls how cell text is extracted (Compact, Lines, Markdown).</summary>
+    [Parameter]
+    [ValidateSet("Compact", "Lines", "Markdown")]
+    public string CellTextFormat { get; set; } = nameof(HtmlCellTextFormat.Compact);
+
     /// <summary>
     /// Proxy server address used when <see cref="Url"/> is specified.
     /// Include protocol and port if required.
@@ -88,107 +93,34 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        if (IncludeMetadata.IsPresent) {
-            List<HtmlTableResult> tables;
-            if (ParameterSetName == ParameterSetUrl) {
-                using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                } else {
-                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                }
-            } else {
-                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    tables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                } else {
-                    tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                }
-            }
+        var detailedTables = await GetTablesDetailedAsync();
 
-            foreach (var tableResult in tables) {
-                WriteObject(CreateTableObject(tableResult));
-            }
-        } else {
-            // Use the detailed parsing methods but extract only the Data part
-            List<HtmlTableResult> detailedTables;
-            if (ParameterSetName == ParameterSetUrl) {
-                using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
-                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                } else {
-                    var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
-                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                }
-            } else {
-                if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                    detailedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                } else {
-                    detailedTables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder);
-                }
-            }
-
-            // Return array of arrays - each table as a separate array (extract Data from detailed results)
-            var tableArrays = new List<PSObject[]>();
-            foreach (var tableResult in detailedTables) {
-                tableArrays.Add(ConvertRows(tableResult.Data));
-            }
-
-            if (tableArrays.Count == 1) {
-                WriteObject(tableArrays[0], false);
-            } else {
-                if (tableArrays.Count > 1) {
-                    WriteWarning($"{tableArrays.Count} tables found. Returning array of tables.");
-                }
-                WriteObject(tableArrays.ToArray(), false);
-            }
+        foreach (var tableResult in detailedTables) {
+            WriteObject(tableResult, false);
         }
     }
 
-    /// <summary>
-    /// Convert the rows to PowerShell objects.
-    /// </summary>
-    /// <param name="rows">The rows to convert.</param>
-    /// <returns>The converted rows.</returns>
-    private PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
-        var list = new List<PSObject>();
-        foreach (var row in rows) {
-            PSObject obj = new();
-            foreach (var kv in row) {
-                // Core library now handles CleanHeaders and EmptyValuePlaceholder processing
-                obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
+    private async Task<List<HtmlTableResult>> GetTablesDetailedAsync() {
+        if (ParameterSetName == ParameterSetUrl) {
+            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
+                string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
+                return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
             }
-            list.Add(obj);
-        }
-        return list.ToArray();
-    }
 
-    /// <summary>
-    /// Creates a PSObject with flattened table metadata and data.
-    /// </summary>
-    /// <param name="tableResult">The table parse result containing metadata and data.</param>
-    /// <returns>A PSObject with flattened structure.</returns>
-    private PSObject CreateTableObject(HtmlTableResult tableResult) {
-        PSObject tableObject = new();
-        tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
-
-        if (IncludeMetadata.IsPresent) {
-            tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
-            tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
-            tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
-            tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
-            tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
-            tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
-            tableObject.Properties.Add(new PSNoteProperty("Headers", tableResult.Metadata.Headers.ToArray()));
-            tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
+            var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+            return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
         }
 
-        return tableObject;
+        if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
+            return HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+        }
+
+        return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
     }
 
-
+    private HtmlCellTextFormat GetCellTextFormat() =>
+        Enum.TryParse<HtmlCellTextFormat>(CellTextFormat, true, out var fmt) ? fmt : HtmlCellTextFormat.Compact;
 
     /// <summary>
     /// Cast the dictionary to a dictionary of strings.

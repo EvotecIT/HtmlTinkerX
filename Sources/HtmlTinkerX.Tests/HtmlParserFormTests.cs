@@ -33,6 +33,6 @@ public class HtmlParserFormTests {
     /// Throws when html content is null.
     /// </summary>
     public void ParseFormsWithAngleSharp_NullHtml_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseFormsWithAngleSharp(null));
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseFormsWithAngleSharp(null!));
     }
 }

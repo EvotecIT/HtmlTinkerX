@@ -21,6 +21,6 @@ public class HtmlOpenGraphTests {
 
     [Fact]
     public void ParseOpenGraph_NullHtml_Throws() {
-        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseOpenGraph(null));
+        Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseOpenGraph(null!));
     }
 }

@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using System.Text;
 
 namespace HtmlTinkerX;
 
@@ -24,6 +25,7 @@ public static class HtmlParserFromTable {
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
     /// <returns>List of table parse results with metadata.</returns>
     /// <example>
     /// <code>
@@ -37,7 +39,8 @@ public static class HtmlParserFromTable {
         bool allProperties = false,
         bool skipFooter = false,
         bool cleanHeaders = false,
-        string? emptyValuePlaceholder = null) {
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -52,12 +55,13 @@ public static class HtmlParserFromTable {
             var table = tables[tableIndex];
             var result = new HtmlTableResult();
             var (metadata, rows, startIndex) = ReadTableMetadata(table, tableIndex, replaceHeaders, skipFooter, cleanHeaders);
+            var dataValueLookup = BuildDataValueLookup(table);
 
             if (rows.Length == 0 || metadata.Headers.Count == 0) {
                 continue;
             }
 
-            var tableRows = ParseTableRows(rows, startIndex, metadata.Headers, replaceContent, allProperties, emptyValuePlaceholder);
+            var tableRows = ParseTableRows(rows, startIndex, metadata.Headers, replaceContent, allProperties, emptyValuePlaceholder, cellTextFormat, dataValueLookup);
             if (tableRows.Count > 0) {
                 result.Metadata = metadata;
                 result.Data = tableRows;
@@ -99,27 +103,29 @@ public static class HtmlParserFromTable {
             return (metadata, rows, 0);
         }
 
-        int headerRowIndex = 0;
+        int headerRowIndex = -1;
         bool hasHeader = false;
-        IElement? theadRow = table.QuerySelector("thead tr");
-        if (theadRow != null) {
-            int idx = Array.IndexOf(rows, theadRow);
-            if (idx >= 0) {
-                headerRowIndex = idx;
-                hasHeader = theadRow.QuerySelectorAll("th").Length > 0;
-            }
+        IElement? headerRow = SelectBestHeaderRow(table, rows);
+
+        if (headerRow != null) {
+            headerRowIndex = Array.IndexOf(rows, headerRow);
+            hasHeader = headerRow.QuerySelectorAll("th").Length > 0;
         }
 
         if (!hasHeader) {
             for (int i = 0; i < rows.Length; i++) {
                 if (rows[i].QuerySelectorAll("th").Length > 0) {
                     headerRowIndex = i;
+                    headerRow = rows[i];
                     hasHeader = true;
                     break;
                 }
             }
         }
-        var headerRow = rows[headerRowIndex];
+
+        if (headerRow == null) {
+            return (metadata, rows, 0);
+        }
         var headerCells = headerRow.QuerySelectorAll("th,td");
         List<string> headers = new();
         if (hasHeader) {
@@ -127,7 +133,7 @@ public static class HtmlParserFromTable {
                 if (cell == null) {
                     continue;
                 }
-                string header = cell.TextContent.Trim();
+                string header = GetHeaderText(cell);
                 if (replaceHeaders != null) {
                     foreach (var kv in replaceHeaders) {
                         header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
@@ -164,10 +170,14 @@ public static class HtmlParserFromTable {
         List<string> headers,
         IDictionary<string, string>? replaceContent,
         bool allProperties,
-        string? emptyValuePlaceholder) {
+        string? emptyValuePlaceholder,
+        HtmlCellTextFormat cellTextFormat,
+        IDictionary<string, string>? dataValueLookup = null) {
         List<Dictionary<string, string?>> tableRows = new();
         Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
-        foreach (var row in rows.Skip(startIndex)) {
+        int categoryIndex = headers.FindIndex(h => h.Equals("Category", StringComparison.OrdinalIgnoreCase));
+        int severityIndex = headers.FindIndex(h => h.Equals("Severity", StringComparison.OrdinalIgnoreCase));
+        foreach (var row in OrderDataRows(rows, startIndex)) {
             if (row == null) {
                 continue;
             }
@@ -189,7 +199,7 @@ public static class HtmlParserFromTable {
 
                 if (cellIndex < cells.Length) {
                     var cell = cells[cellIndex++];
-                    string? value = cell.TextContent.Trim();
+                    string? value = FormatCellText(cell, cellTextFormat);
                     if (replaceContent != null) {
                         foreach (var kv in replaceContent) {
                             value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
@@ -207,9 +217,9 @@ public static class HtmlParserFromTable {
                         rowspan = rs;
                     }
                     for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                        rowValues[col] = value;
+                        rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                         if (rowspan > 1) {
-                            rowSpans[col] = (value, rowspan - 1);
+                            rowSpans[col] = (rowValues[col], rowspan - 1);
                         }
                     }
                 } else {
@@ -224,6 +234,30 @@ public static class HtmlParserFromTable {
             for (int i = 0; i < headers.Count; i++) {
                 string header = headers[i];
                 dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
+            }
+            // Override Category/Severity from row-level data attributes when present.
+            if (!string.IsNullOrEmpty(row.GetAttribute("data-category"))) {
+                string key = row.GetAttribute("data-category")!;
+                string val = key;
+                if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                    val = label;
+                }
+                dict["Category"] = val;
+            }
+            if (!string.IsNullOrEmpty(row.GetAttribute("data-severity"))) {
+                string key = row.GetAttribute("data-severity")!;
+                string val = key;
+                if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                    val = label;
+                }
+                dict["Severity"] = val;
+            }
+            // Second chance: fill Category/Severity from data-* even if a non-empty placeholder was present.
+            if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
+                dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
+            }
+            if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
+                dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
             }
             if (dict.Count > 0) {
                 tableRows.Add(dict);
@@ -260,6 +294,7 @@ public static class HtmlParserFromTable {
             if (rows.Length == 0) {
                 continue;
             }
+            var dataValueLookup = BuildDataValueLookup(table);
 
             int headerRowIndex = 0;
             bool hasHeader = false;
@@ -301,6 +336,8 @@ public static class HtmlParserFromTable {
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
+            int categoryIndex = headers.FindIndex(h => h.Equals("Category", StringComparison.OrdinalIgnoreCase));
+            int severityIndex = headers.FindIndex(h => h.Equals("Severity", StringComparison.OrdinalIgnoreCase));
             foreach (var row in rows.Skip(startIndex)) {
                 if (row == null) {
                     continue;
@@ -323,7 +360,7 @@ public static class HtmlParserFromTable {
 
                     if (cellIndex < cells.Length) {
                         var cell = cells[cellIndex++];
-                        string value = cell.TextContent.Trim();
+                        string value = FormatCellText(cell, HtmlCellTextFormat.Compact);
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
@@ -351,15 +388,41 @@ public static class HtmlParserFromTable {
                     }
                 }
 
-                Dictionary<string, string?> dict = new();
-                for (int i = 0; i < headers.Count; i++) {
-                    string header = headers[i];
-                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
-                }
-                if (dict.Count > 0) {
-                    tableRows.Add(dict);
+            Dictionary<string, string?> dict = new();
+            for (int i = 0; i < headers.Count; i++) {
+                string header = headers[i];
+                dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
+            }
+            if (categoryIndex >= 0) {
+                string key = (row.GetAttribute("data-category") ?? string.Empty).Trim();
+                if (key.Length > 0) {
+                    string val = key;
+                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                        val = label;
+                    }
+                    dict["Category"] = val;
                 }
             }
+            if (severityIndex >= 0) {
+                string key = (row.GetAttribute("data-severity") ?? string.Empty).Trim();
+                if (key.Length > 0) {
+                    string val = key;
+                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                        val = label;
+                    }
+                    dict["Severity"] = val;
+                }
+            }
+            if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
+                dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
+            }
+            if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
+                dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
+            }
+            if (dict.Count > 0) {
+                tableRows.Add(dict);
+            }
+        }
 
             if (tableRows.Count > 0) {
                 result.Add(tableRows);
@@ -424,6 +487,7 @@ public static class HtmlParserFromTable {
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
@@ -433,7 +497,8 @@ public static class HtmlParserFromTable {
         bool allProperties = false,
         bool skipFooter = false,
         bool cleanHeaders = false,
-        string? emptyValuePlaceholder = null) {
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -452,6 +517,7 @@ public static class HtmlParserFromTable {
             var table = tables[tableIndex];
             var result = new HtmlTableResult();
             var metadata = result.Metadata;
+            var dataValueLookup = BuildDataValueLookup(table);
 
             // Extract metadata
             metadata.TableIndex = tableIndex;
@@ -518,14 +584,25 @@ public static class HtmlParserFromTable {
 
             int headerRowIndex = 0;
             bool hasHeader = false;
-            for (int i = 0; i < rows.Count; i++) {
-                if (rows[i].SelectNodes("th")?.Count > 0) {
-                    headerRowIndex = i;
-                    hasHeader = true;
-                    break;
+            HtmlNode? headerRow = SelectBestHeaderRow(rows);
+            if (headerRow != null) {
+                headerRowIndex = rows.IndexOf(headerRow);
+                hasHeader = headerRow.SelectNodes("th")?.Count > 0;
+            }
+
+            if (!hasHeader) {
+                for (int i = 0; i < rows.Count; i++) {
+                    if (rows[i].SelectNodes("th")?.Count > 0) {
+                        headerRowIndex = i;
+                        headerRow = rows[i];
+                        hasHeader = true;
+                        break;
+                    }
                 }
             }
-            var headerRow = rows[headerRowIndex];
+            if (headerRow == null) {
+                continue;
+            }
             var headerCells = headerRow.SelectNodes("th|td");
             if (headerCells == null) {
                 continue;
@@ -537,7 +614,7 @@ public static class HtmlParserFromTable {
                     if (cell == null) {
                         continue;
                     }
-                    string header = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
+                    string header = GetHeaderText(cell);
                     if (replaceHeaders != null) {
                         foreach (var kv in replaceHeaders) {
                             header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
@@ -567,7 +644,9 @@ public static class HtmlParserFromTable {
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
-            foreach (var row in rows.Skip(startIndex)) {
+            int categoryIndex = headers.FindIndex(h => h.Equals("Category", StringComparison.OrdinalIgnoreCase));
+            int severityIndex = headers.FindIndex(h => h.Equals("Severity", StringComparison.OrdinalIgnoreCase));
+            foreach (var row in OrderDataRows(rows, startIndex)) {
                 if (row == null) {
                     continue;
                 }
@@ -592,7 +671,7 @@ public static class HtmlParserFromTable {
 
                     if (cellIndex < cells.Count) {
                         var cell = cells[cellIndex++];
-                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
+                        string value = FormatCellText(cell, cellTextFormat);
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
@@ -610,9 +689,9 @@ public static class HtmlParserFromTable {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                            rowValues[col] = value;
+                            rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                             if (rowspan > 1) {
-                                rowSpans[col] = (value, rowspan - 1);
+                                rowSpans[col] = (rowValues[col], rowspan - 1);
                             }
                         }
                     } else {
@@ -627,6 +706,32 @@ public static class HtmlParserFromTable {
                 for (int i = 0; i < headers.Count; i++) {
                     string header = headers[i];
                     dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
+                }
+                if (categoryIndex >= 0) {
+                    string key = row.GetAttributeValue("data-category", string.Empty).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
+                        string val = key;
+                        if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                            val = label;
+                        }
+                        dict["Category"] = val;
+                    }
+                }
+                if (severityIndex >= 0) {
+                    string key = row.GetAttributeValue("data-severity", string.Empty).Trim();
+                    if (!string.IsNullOrEmpty(key)) {
+                        string val = key;
+                        if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                            val = label;
+                        }
+                        dict["Severity"] = val;
+                    }
+                }
+                if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
+                    dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
+                }
+                if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
+                    dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
@@ -675,6 +780,7 @@ public static class HtmlParserFromTable {
             if (rows == null || rows.Count == 0) {
                 continue;
             }
+            var dataValueLookup = BuildDataValueLookup(table);
 
             if (reverseTable) {
                 Dictionary<string, string?> obj = new();
@@ -779,7 +885,7 @@ public static class HtmlParserFromTable {
 
                     if (cellIndex < cells.Count) {
                         var cell = cells[cellIndex++];
-                        string value = HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty)!.Trim();
+                        string value = FormatCellText(cell, HtmlCellTextFormat.Compact);
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
@@ -869,6 +975,377 @@ public static class HtmlParserFromTable {
                 http.Dispose();
             }
         }
+    }
+
+    private static IElement? SelectBestHeaderRow(IElement table, IElement[] allRows) {
+        // Look at thead rows first – prefer the one with the largest effective column span, then most cells, then the last occurrence.
+        var theadRows = table.QuerySelectorAll("thead tr").ToArray();
+        if (theadRows.Length == 0) {
+            return null;
+        }
+
+        return theadRows
+            .Select((r, idx) => new {
+                Row = r,
+                EffectiveCols = SumColSpans(r.QuerySelectorAll("th,td")),
+                CellCount = r.QuerySelectorAll("th,td").Length,
+                Index = idx
+            })
+            .OrderByDescending(x => x.EffectiveCols)
+            .ThenByDescending(x => x.CellCount)
+            .ThenByDescending(x => x.Index)
+            .First().Row;
+    }
+
+    private static HtmlNode? SelectBestHeaderRow(HtmlNodeCollection rows) {
+        if (rows == null || rows.Count == 0) {
+            return null;
+        }
+
+        // Prefer thead rows when present; otherwise rows is already scoped.
+        var candidates = rows.Where(r => r.ParentNode?.Name.Equals("thead", StringComparison.OrdinalIgnoreCase) == true).ToList();
+        if (candidates.Count == 0) {
+            return null;
+        }
+
+        return candidates
+            .Select((r, idx) => new {
+                Row = r,
+                EffectiveCols = SumColSpans(r.SelectNodes("th|td")),
+                CellCount = r.SelectNodes("th|td")?.Count ?? 0,
+                Index = idx
+            })
+            .OrderByDescending(x => x.EffectiveCols)
+            .ThenByDescending(x => x.CellCount)
+            .ThenByDescending(x => x.Index)
+            .First().Row;
+    }
+
+    private static IEnumerable<IElement> OrderDataRows(IElement[] rows, int startIndex) =>
+        rows.Skip(startIndex)
+            .OrderBy(r => r.Closest("tfoot") != null ? 1 : 0); // ensure tfoot rows come last
+
+    private static IEnumerable<HtmlNode> OrderDataRows(HtmlNodeCollection rows, int startIndex) {
+        if (rows == null) {
+            yield break;
+        }
+        foreach (var row in rows.Cast<HtmlNode>().Skip(startIndex).OrderBy(r => r.Ancestors("tfoot").Any() ? 1 : 0)) {
+            yield return row;
+        }
+    }
+
+    private static string GetHeaderText(IElement cell) {
+        // Prefer explicit dropdown header text if present
+        var dropdownHead = cell.QuerySelector(".table-dropdown-head");
+        if (dropdownHead != null) {
+            return dropdownHead.TextContent.Trim();
+        }
+
+        // Otherwise, collect text but skip menus/lists that often live in header filters
+        var sb = new StringBuilder();
+        AppendHeaderNodeText(cell, sb);
+        return CleanupHeader(sb.ToString());
+    }
+
+    private static string GetHeaderText(HtmlNode cell) {
+        var dropdownHead = cell.SelectSingleNode(".//*[contains(@class,'table-dropdown-head')]");
+        if (dropdownHead != null) {
+            return HtmlEntity.DeEntitize(dropdownHead.InnerText ?? string.Empty)!.Trim();
+        }
+
+        var sb = new StringBuilder();
+        AppendHeaderNodeText(cell, sb);
+        return CleanupHeader(sb.ToString());
+    }
+
+    private static readonly HashSet<string> HeaderSkipTags = new(StringComparer.OrdinalIgnoreCase) { "ul", "ol", "li", "script", "style", "select", "option" };
+
+    private static void AppendHeaderNodeText(INode node, StringBuilder sb) {
+        if (node is IText textNode) {
+            sb.Append(textNode.Data);
+            return;
+        }
+        if (node is IElement el) {
+            if (HeaderSkipTags.Contains(el.TagName)) {
+                return;
+            }
+            foreach (var child in el.ChildNodes) {
+                AppendHeaderNodeText(child, sb);
+            }
+        }
+    }
+
+    private static void AppendHeaderNodeText(HtmlNode node, StringBuilder sb) {
+        if (node is HtmlTextNode textNode) {
+            sb.Append(textNode.Text);
+            return;
+        }
+        if (node.NodeType != HtmlNodeType.Element) {
+            foreach (var child in node.ChildNodes) {
+                AppendHeaderNodeText(child, sb);
+            }
+            return;
+        }
+        if (HeaderSkipTags.Contains(node.Name)) {
+            return;
+        }
+        foreach (var child in node.ChildNodes) {
+            AppendHeaderNodeText(child, sb);
+        }
+    }
+
+    private static string CleanupHeader(string raw) {
+        return Regex.Replace(raw, @"\s+", " ").Trim();
+    }
+
+    private static IDictionary<string, string> BuildDataValueLookup(IElement table) {
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var li in table.QuerySelectorAll("li[data-value]")) {
+            string key = li.GetAttribute("data-value") ?? string.Empty;
+            key = key.Trim();
+            if (key.Length == 0) {
+                continue;
+            }
+            string text = li.TextContent.Trim();
+            if (!dict.ContainsKey(key)) {
+                dict[key] = text;
+            }
+        }
+        return dict;
+    }
+
+    private static IDictionary<string, string> BuildDataValueLookup(HtmlNode table) {
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var items = table.SelectNodes(".//li[@data-value]");
+        if (items != null) {
+            foreach (var li in items) {
+                string key = li.GetAttributeValue("data-value", string.Empty);
+                string text = HtmlEntity.DeEntitize(li.InnerText ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(key)) {
+                    if (!dict.ContainsKey(key)) {
+                        dict[key] = text;
+                    }
+                }
+            }
+        }
+        return dict;
+    }
+
+    private static string? FillFromDataAttributes(string header, string? current, IElement row, IDictionary<string, string>? lookup) {
+        if (!string.IsNullOrEmpty(current) || lookup == null) {
+            return current;
+        }
+        if (header.Equals("Category", StringComparison.OrdinalIgnoreCase)) {
+            string key = row.GetAttribute("data-category") ?? string.Empty;
+            key = key.Trim();
+            if (key.Length == 0) {
+                return current;
+            }
+            if (lookup.TryGetValue(key, out var label)) {
+                return label;
+            }
+            return key; // fallback to raw code
+        }
+        if (header.Equals("Severity", StringComparison.OrdinalIgnoreCase)) {
+            string key = row.GetAttribute("data-severity") ?? string.Empty;
+            key = key.Trim();
+            if (key.Length == 0) {
+                return current;
+            }
+            if (lookup.TryGetValue(key, out var label)) {
+                return label;
+            }
+            return key;
+        }
+        return current;
+    }
+
+    private static string? FillFromDataAttributes(string header, string? current, HtmlNode row, IDictionary<string, string>? lookup) {
+        if (!string.IsNullOrEmpty(current) || lookup == null) {
+            return current;
+        }
+        if (header.Equals("Category", StringComparison.OrdinalIgnoreCase)) {
+            string key = row.GetAttributeValue("data-category", string.Empty).Trim();
+            if (!string.IsNullOrEmpty(key)) {
+                if (lookup.TryGetValue(key, out var label)) {
+                    return label;
+                }
+                return key;
+            }
+        }
+        if (header.Equals("Severity", StringComparison.OrdinalIgnoreCase)) {
+            string key = row.GetAttributeValue("data-severity", string.Empty).Trim();
+            if (!string.IsNullOrEmpty(key)) {
+                if (lookup.TryGetValue(key, out var label)) {
+                    return label;
+                }
+                return key;
+            }
+        }
+        return current;
+    }
+
+    private static int SumColSpans(IEnumerable<IElement> cells) {
+        int total = 0;
+        foreach (var cell in cells) {
+            if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs) && cs > 0) {
+                total += cs;
+            } else {
+                total += 1;
+            }
+        }
+        return total;
+    }
+
+    private static int SumColSpans(HtmlNodeCollection? cells) {
+        if (cells == null) {
+            return 0;
+        }
+        int total = 0;
+        foreach (var cell in cells) {
+            if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs) && cs > 0) {
+                total += cs;
+            } else {
+                total += 1;
+            }
+        }
+        return total;
+    }
+
+    private static string FormatCellText(IElement cell, HtmlCellTextFormat format) {
+        if (format == HtmlCellTextFormat.Compact) {
+            return HtmlEntity.DeEntitize(cell.TextContent).Trim();
+        }
+        var sb = new StringBuilder();
+        AppendNodeText(cell, sb);
+        var cleaned = CleanupText(sb.ToString(), format);
+        return HtmlEntity.DeEntitize(cleaned);
+    }
+
+    private static string FormatCellText(HtmlNode cell, HtmlCellTextFormat format) {
+        if (format == HtmlCellTextFormat.Compact) {
+            return HtmlEntity.DeEntitize(cell.InnerText ?? string.Empty).Trim();
+        }
+        var sb = new StringBuilder();
+        AppendNodeText(cell, sb);
+        var cleaned = CleanupText(sb.ToString(), format);
+        return HtmlEntity.DeEntitize(cleaned);
+    }
+
+    private static readonly HashSet<string> BlockTags = new(StringComparer.OrdinalIgnoreCase) { "p", "div", "section", "article", "header", "footer", "ul", "ol" };
+    private static readonly HashSet<string> LineTags = new(StringComparer.OrdinalIgnoreCase) { "br", "tr", "li" };
+
+    private static void AppendNodeText(INode node, StringBuilder sb) {
+        switch (node) {
+            case IText textNode:
+                var text = textNode.Data;
+                if (string.IsNullOrWhiteSpace(text)) {
+                    return;
+                }
+                sb.Append(Regex.Replace(text, @"\s+", " "));
+                break;
+            case IElement element:
+                bool addBullet = element.TagName.Equals("li", StringComparison.OrdinalIgnoreCase);
+                int startLength = sb.Length;
+                int beforeChildren = sb.Length;
+                if (addBullet) {
+                    AppendNewlineIfNeeded(sb);
+                    sb.Append("- ");
+                    beforeChildren = sb.Length;
+                }
+                foreach (var child in element.ChildNodes) {
+                    AppendNodeText(child, sb);
+                }
+                bool wroteChildren = sb.Length > beforeChildren;
+                if (addBullet) {
+                    string addedText = sb.ToString(beforeChildren, sb.Length - beforeChildren);
+                    if (string.IsNullOrWhiteSpace(addedText)) {
+                        sb.Length = startLength; // remove stray bullet
+                        wroteChildren = false;
+                    }
+                }
+                if (wroteChildren && (BlockTags.Contains(element.TagName) || LineTags.Contains(element.TagName))) {
+                    AppendNewlineIfNeeded(sb);
+                }
+                break;
+        }
+    }
+
+    private static void AppendNodeText(HtmlNode node, StringBuilder sb) {
+        if (node is HtmlTextNode textNode) {
+            var text = textNode.Text;
+            if (string.IsNullOrWhiteSpace(text)) {
+                return;
+            }
+            sb.Append(Regex.Replace(text, @"\s+", " "));
+            return;
+        }
+
+        if (node.NodeType != HtmlNodeType.Element) {
+            foreach (var child in node.ChildNodes) {
+                AppendNodeText(child, sb);
+            }
+            return;
+        }
+
+        var tag = node.Name;
+        bool addBullet = tag.Equals("li", StringComparison.OrdinalIgnoreCase);
+        int startLength = sb.Length;
+        int beforeChildren = sb.Length;
+        if (addBullet) {
+            AppendNewlineIfNeeded(sb);
+            sb.Append("- ");
+            beforeChildren = sb.Length;
+        }
+
+        foreach (var child in node.ChildNodes) {
+            AppendNodeText(child, sb);
+        }
+
+        bool wroteChildren = sb.Length > beforeChildren;
+        if (addBullet) {
+            string addedText = sb.ToString(beforeChildren, sb.Length - beforeChildren);
+            if (string.IsNullOrWhiteSpace(addedText)) {
+                sb.Length = startLength;
+                wroteChildren = false;
+            }
+        }
+
+        if (wroteChildren && (BlockTags.Contains(tag) || LineTags.Contains(tag))) {
+            AppendNewlineIfNeeded(sb);
+        }
+    }
+
+    private static void AppendNewlineIfNeeded(StringBuilder sb) {
+        if (sb.Length == 0) {
+            return;
+        }
+        if (sb[sb.Length - 1] != '\n') {
+            sb.Append('\n');
+        }
+    }
+
+    private static string CleanupText(string raw, HtmlCellTextFormat format) {
+        if (format == HtmlCellTextFormat.Compact) {
+            return raw.Trim();
+        }
+
+        // Collapse spaces but keep deliberate newlines.
+        string normalized = Regex.Replace(raw, @"[ \t]+", " ");
+        normalized = Regex.Replace(normalized, @"\n{3,}", "\n\n");
+
+        if (format == HtmlCellTextFormat.Markdown) {
+            // Ensure list items are on their own lines; already prefixed with "- ".
+            normalized = Regex.Replace(normalized, @"\n- ", "\n- ");
+        }
+
+        // Drop empty bullet lines that can appear from list scaffolding.
+        var lines = normalized.Split('\n')
+            .Where(l => !Regex.IsMatch(l, @"^\s*-\s*$"))
+            .ToArray();
+        normalized = string.Join("\n", lines);
+
+        return normalized.Trim();
     }
 
     private static string ReplaceCaseInsensitive(string input, string oldValue, string newValue) =>
