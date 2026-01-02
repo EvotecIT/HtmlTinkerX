@@ -1,11 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  #content { padding: 8px; }
+  #box {
+    width: 40px;
+    height: 40px;
+    background: #d33;
+    animation: slide 0.6s linear infinite alternate;
+  }
+  @keyframes slide {
+    from { transform: translateX(0); }
+    to { transform: translateX(240px); }
+  }
+</style>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const div = document.getElementById('content');
+    const box = document.createElement('div');
+    box.id = 'box';
+    div.appendChild(box);
+
+    // Keep the page visually active to ensure Playwright video recording produces frames reliably.
+    const counter = document.createElement('div');
+    counter.id = 'counter';
+    div.appendChild(counter);
+    let tick = 0;
+    function frame() {
+      counter.textContent = 'tick ' + tick++;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
     setTimeout(function() {
-      div.innerHTML = '<p id="loaded">Dynamic Content</p>';
+      const loaded = document.createElement('p');
+      loaded.id = 'loaded';
+      loaded.textContent = 'Dynamic Content';
+      div.appendChild(loaded);
     }, 50);
   });
 </script>
