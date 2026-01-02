@@ -14,6 +14,8 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private const string PlaywrightWithDepsEnvVar = "HTMLTINKERX_PLAYWRIGHT_WITH_DEPS";
+
     /// <summary>
     /// Semaphore to ensure thread-safe Playwright installation.
     /// Only one installation process can run at a time across all threads.
@@ -442,7 +444,7 @@ public static partial class HtmlBrowser {
         string runtime = engine.ToString().ToLowerInvariant();
 
         try {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && ShouldUsePlaywrightWithDepsOnLinux()) {
                 PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
             } else {
                 PlaywrightInstaller(new[] { "install", runtime });
@@ -451,5 +453,72 @@ public static partial class HtmlBrowser {
             CleanBrowserRuntime(engine);
             throw;
         }
+    }
+
+    private static bool ShouldUsePlaywrightWithDepsOnLinux() {
+        bool? overrideValue = ReadBooleanEnvironmentVariable(PlaywrightWithDepsEnvVar);
+        if (overrideValue.HasValue) {
+            return overrideValue.Value;
+        }
+
+        return IsRunningAsRoot();
+    }
+
+    private static bool? ReadBooleanEnvironmentVariable(string name) {
+        string? value = Environment.GetEnvironmentVariable(name);
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        value = value.Trim();
+        if (value == "1") {
+            return true;
+        }
+        if (value == "0") {
+            return false;
+        }
+
+        if (bool.TryParse(value, out bool parsed)) {
+            return parsed;
+        }
+
+        if (string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "y", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+        if (string.Equals(value, "no", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "n", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private static bool IsRunningAsRoot() {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            return false;
+        }
+
+        // Prefer /proc/self/status (fully managed) to avoid platform-specific P/Invoke.
+        try {
+            const string procStatus = "/proc/self/status";
+            if (File.Exists(procStatus)) {
+                foreach (string line in File.ReadLines(procStatus)) {
+                    if (!line.StartsWith("Uid:", StringComparison.Ordinal)) {
+                        continue;
+                    }
+
+                    string[] parts = line.Split(new[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2 && uint.TryParse(parts[1], out uint uid)) {
+                        return uid == 0;
+                    }
+                    break;
+                }
+            }
+        } catch (IOException) {
+            // ignore
+        } catch (UnauthorizedAccessException) {
+            // ignore
+        }
+
+        return string.Equals(Environment.UserName, "root", StringComparison.OrdinalIgnoreCase);
     }
 }

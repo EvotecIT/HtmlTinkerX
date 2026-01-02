@@ -16,7 +16,7 @@ namespace HtmlTinkerX.Tests;
 public class HtmlBrowserInstallerTests
 {
     [Fact]
-    public async Task EnsureInstalledAsync_InstallsDepsOnLinux()
+    public async Task EnsureInstalledAsync_InstallsDepsOnLinux_WhenEnabled()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
@@ -27,6 +27,7 @@ public class HtmlBrowserInstallerTests
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+        Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", "1");
 
         var originalInstaller = HtmlBrowser.PlaywrightInstaller;
 
@@ -54,6 +55,53 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", null);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_DoesNotInstallDepsOnLinux_WhenDisabled()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return;
+        }
+
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+        Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", "0");
+
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+
+        try
+        {
+            // prepare fake driver so IsDriverPresent returns true
+            string baseDir = Path.Combine(tempDriver, ".playwright");
+            string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
+            string nodeDir = Path.Combine(baseDir, "node", platformId);
+            Directory.CreateDirectory(nodeDir);
+            Directory.CreateDirectory(Path.Combine(baseDir, "package"));
+            File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "");
+            File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
+
+            string[]? captured = null;
+            HtmlBrowser.PlaywrightInstaller = args => captured = args;
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
+            Assert.NotNull(captured);
+            Assert.DoesNotContain("--with-deps", captured);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", null);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
@@ -272,4 +320,3 @@ public class HtmlBrowserInstallerTests
         }
     }
 }
-

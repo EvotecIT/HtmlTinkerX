@@ -94,6 +94,7 @@ public static class HtmlParser {
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithAngleSharpDetailed(
         string html,
@@ -102,8 +103,9 @@ public static class HtmlParser {
         bool allProperties = false,
         bool skipFooter = false,
         bool cleanHeaders = false,
-        string? emptyValuePlaceholder = null) {
-        return HtmlParserFromTable.ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder);
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        return HtmlParserFromTable.ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
     }
 
     /// <summary>
@@ -153,6 +155,7 @@ public static class HtmlParser {
     /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
@@ -162,8 +165,9 @@ public static class HtmlParser {
         bool allProperties = false,
         bool skipFooter = false,
         bool cleanHeaders = false,
-        string? emptyValuePlaceholder = null) {
-        return HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder);
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        return HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
     }
 
     /// <summary>

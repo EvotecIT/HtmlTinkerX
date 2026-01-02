@@ -1070,7 +1070,7 @@ Console.WriteLine($"\nSlowest page: {slowest.Url} ({slowest.PageLoadTime.TotalSe
 
 ### Playwright Auto-Setup
 
-Playwright browsers are automatically downloaded on first use. No manual setup required! The download happens once per system and is shared across all applications.
+Playwright browsers are automatically downloaded on first use. No manual setup required. The download is cached per-user (default locations below).
 
 #### How Auto-Download Works
 When you first use browser testing, Playwright automatically downloads required components:
@@ -1092,6 +1092,13 @@ When you first use browser testing, Playwright automatically downloads required 
    - Thread-safe - prevents concurrent downloads
    - Subsequent runs use cached components - no re-download needed
    - You can manually ensure browsers are installed using `HtmlBrowser.EnsureInstalledAsync()`
+
+#### Linux: Avoiding sudo prompts
+On Linux, Playwright can also install OS-level dependencies when invoked with `--with-deps` (this typically requires root/sudo).
+
+By default, HtmlTinkerX only uses `--with-deps` when running as root to avoid unexpected sudo prompts during normal test execution. You can override this behavior by setting:
+- `HTMLTINKERX_PLAYWRIGHT_WITH_DEPS=1` to force `--with-deps`
+- `HTMLTINKERX_PLAYWRIGHT_WITH_DEPS=0` to never use `--with-deps`
 
 #### Cleaning Playwright Cache
 ```powershell

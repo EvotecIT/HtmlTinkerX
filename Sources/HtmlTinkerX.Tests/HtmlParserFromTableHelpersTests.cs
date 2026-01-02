@@ -23,7 +23,7 @@ public class HtmlParserFromTableHelpersTests {
         var doc = HtmlParser.ParseWithAngleSharp(html);
         var table = doc.QuerySelector("table")!;
         var (meta, rows, start) = HtmlParserFromTable.ReadTableMetadata(table, 0, null, false, false);
-        var data = HtmlParserFromTable.ParseTableRows(rows, start, meta.Headers, null, false, null);
+        var data = HtmlParserFromTable.ParseTableRows(rows, start, meta.Headers, null, false, null, HtmlCellTextFormat.Compact);
         Assert.Single(data);
         var row = data[0];
         Assert.Equal("1", row["A"]);
