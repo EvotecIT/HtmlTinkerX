@@ -124,7 +124,17 @@ public static class HtmlParserFromTable {
         }
 
         if (headerRow == null) {
-            return (metadata, rows, 0);
+            // No <thead> and no <th> detected. Use first non-empty row to determine column count and emit default headers.
+            for (int i = 0; i < rows.Length; i++) {
+                if (rows[i].QuerySelectorAll("th,td").Length > 0) {
+                    headerRowIndex = i;
+                    headerRow = rows[i];
+                    break;
+                }
+            }
+            if (headerRow == null) {
+                return (metadata, rows, 0);
+            }
         }
         var headerCells = headerRow.QuerySelectorAll("th,td");
         List<string> headers = new();
@@ -151,7 +161,8 @@ public static class HtmlParserFromTable {
                 }
             }
         } else {
-            for (int i = 0; i < headerCells.Length; i++) {
+            int columnCount = SumColSpans(headerCells);
+            for (int i = 0; i < columnCount; i++) {
                 headers.Add($"Column{i + 1}");
             }
         }
@@ -601,7 +612,17 @@ public static class HtmlParserFromTable {
                 }
             }
             if (headerRow == null) {
-                continue;
+                // No <thead> and no <th> detected. Use first non-empty row to determine column count and emit default headers.
+                for (int i = 0; i < rows.Count; i++) {
+                    if (rows[i].SelectNodes("th|td")?.Count > 0) {
+                        headerRowIndex = i;
+                        headerRow = rows[i];
+                        break;
+                    }
+                }
+                if (headerRow == null) {
+                    continue;
+                }
             }
             var headerCells = headerRow.SelectNodes("th|td");
             if (headerCells == null) {
@@ -632,7 +653,8 @@ public static class HtmlParserFromTable {
                     }
                 }
             } else {
-                for (int i = 0; i < headerCells.Count; i++) {
+                int columnCount = SumColSpans(headerCells);
+                for (int i = 0; i < columnCount; i++) {
                     headers.Add($"Column{i + 1}");
                 }
             }

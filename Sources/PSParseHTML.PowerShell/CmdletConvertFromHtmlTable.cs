@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 ///   <code>ConvertFrom-HtmlTable -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
-[OutputType(typeof(HtmlTableResult))]
+[OutputType(typeof(PSObject[]))]
 public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
@@ -95,9 +95,27 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         ValidateProxy(Proxy, ProxyCredential);
         var detailedTables = await GetTablesDetailedAsync();
 
-        foreach (var tableResult in detailedTables) {
-            WriteObject(tableResult, false);
+        if (IncludeMetadata.IsPresent) {
+            foreach (var tableResult in detailedTables) {
+                WriteObject(CreateTableObject(tableResult), false);
+            }
+            return;
         }
+
+        var tableArrays = new List<PSObject[]>();
+        foreach (var tableResult in detailedTables) {
+            tableArrays.Add(ConvertRows(tableResult.Data));
+        }
+
+        if (tableArrays.Count == 1) {
+            WriteObject(tableArrays[0], false);
+            return;
+        }
+
+        if (tableArrays.Count > 1) {
+            WriteWarning($"{tableArrays.Count} tables found. Returning array of tables.");
+        }
+        WriteObject(tableArrays.ToArray(), false);
     }
 
     private async Task<List<HtmlTableResult>> GetTablesDetailedAsync() {
@@ -121,6 +139,34 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
 
     private HtmlCellTextFormat GetCellTextFormat() =>
         Enum.TryParse<HtmlCellTextFormat>(CellTextFormat, true, out var fmt) ? fmt : HtmlCellTextFormat.Compact;
+
+    private static PSObject[] ConvertRows(IEnumerable<Dictionary<string, string?>> rows) {
+        var list = new List<PSObject>();
+        foreach (var row in rows) {
+            PSObject obj = new();
+            foreach (var kv in row) {
+                obj.Properties.Add(new PSNoteProperty(kv.Key, kv.Value));
+            }
+            list.Add(obj);
+        }
+        return list.ToArray();
+    }
+
+    private PSObject CreateTableObject(HtmlTableResult tableResult) {
+        PSObject tableObject = new();
+        tableObject.Properties.Add(new PSNoteProperty("Data", ConvertRows(tableResult.Data)));
+
+        tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
+        tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
+        tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
+        tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
+        tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
+        tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
+        tableObject.Properties.Add(new PSNoteProperty("Headers", tableResult.Metadata.Headers.ToArray()));
+        tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
+
+        return tableObject;
+    }
 
     /// <summary>
     /// Cast the dictionary to a dictionary of strings.
