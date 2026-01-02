@@ -492,20 +492,12 @@ public static partial class HtmlBrowser {
         return null;
     }
 
-    [DllImport("libc")]
-    private static extern uint geteuid();
-
     private static bool IsRunningAsRoot() {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
             return false;
         }
 
-        try {
-            return geteuid() == 0;
-        } catch {
-            // ignore
-        }
-
+        // Prefer /proc/self/status (fully managed) to avoid platform-specific P/Invoke.
         try {
             const string procStatus = "/proc/self/status";
             if (File.Exists(procStatus)) {
@@ -521,7 +513,9 @@ public static partial class HtmlBrowser {
                     break;
                 }
             }
-        } catch {
+        } catch (IOException) {
+            // ignore
+        } catch (UnauthorizedAccessException) {
             // ignore
         }
 

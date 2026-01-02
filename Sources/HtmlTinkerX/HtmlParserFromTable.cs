@@ -247,21 +247,25 @@ public static class HtmlParserFromTable {
                 dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
             }
             // Override Category/Severity from row-level data attributes when present.
-            if (!string.IsNullOrEmpty(row.GetAttribute("data-category"))) {
-                string key = row.GetAttribute("data-category")!;
-                string val = key;
-                if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
-                    val = label;
+            if (categoryIndex >= 0) {
+                string key = (row.GetAttribute("data-category") ?? string.Empty).Trim();
+                if (key.Length > 0) {
+                    string val = key;
+                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                        val = label;
+                    }
+                    dict["Category"] = val;
                 }
-                dict["Category"] = val;
             }
-            if (!string.IsNullOrEmpty(row.GetAttribute("data-severity"))) {
-                string key = row.GetAttribute("data-severity")!;
-                string val = key;
-                if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
-                    val = label;
+            if (severityIndex >= 0) {
+                string key = (row.GetAttribute("data-severity") ?? string.Empty).Trim();
+                if (key.Length > 0) {
+                    string val = key;
+                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
+                        val = label;
+                    }
+                    dict["Severity"] = val;
                 }
-                dict["Severity"] = val;
             }
             // Second chance: fill Category/Severity from data-* even if a non-empty placeholder was present.
             if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
@@ -339,7 +343,8 @@ public static class HtmlParserFromTable {
                     }
                 }
             } else {
-                for (int i = 0; i < headerCells.Length; i++) {
+                int columnCount = SumColSpans(headerCells);
+                for (int i = 0; i < columnCount; i++) {
                     headers.Add($"Column{i + 1}");
                 }
             }
@@ -399,41 +404,41 @@ public static class HtmlParserFromTable {
                     }
                 }
 
-            Dictionary<string, string?> dict = new();
-            for (int i = 0; i < headers.Count; i++) {
-                string header = headers[i];
-                dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
-            }
-            if (categoryIndex >= 0) {
-                string key = (row.GetAttribute("data-category") ?? string.Empty).Trim();
-                if (key.Length > 0) {
-                    string val = key;
-                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
-                        val = label;
+                Dictionary<string, string?> dict = new();
+                for (int i = 0; i < headers.Count; i++) {
+                    string header = headers[i];
+                    dict[string.IsNullOrEmpty(header) ? i.ToString() : header] = rowValues[i];
+                }
+                if (categoryIndex >= 0) {
+                    string key = (row.GetAttribute("data-category") ?? string.Empty).Trim();
+                    if (key.Length > 0) {
+                        string val = key;
+                        if (dataValueLookup.TryGetValue(key, out var label)) {
+                            val = label;
+                        }
+                        dict["Category"] = val;
                     }
-                    dict["Category"] = val;
+                }
+                if (severityIndex >= 0) {
+                    string key = (row.GetAttribute("data-severity") ?? string.Empty).Trim();
+                    if (key.Length > 0) {
+                        string val = key;
+                        if (dataValueLookup.TryGetValue(key, out var label)) {
+                            val = label;
+                        }
+                        dict["Severity"] = val;
+                    }
+                }
+                if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
+                    dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
+                }
+                if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
+                    dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
+                }
+                if (dict.Count > 0) {
+                    tableRows.Add(dict);
                 }
             }
-            if (severityIndex >= 0) {
-                string key = (row.GetAttribute("data-severity") ?? string.Empty).Trim();
-                if (key.Length > 0) {
-                    string val = key;
-                    if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
-                        val = label;
-                    }
-                    dict["Severity"] = val;
-                }
-            }
-            if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
-                dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
-            }
-            if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
-                dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
-            }
-            if (dict.Count > 0) {
-                tableRows.Add(dict);
-            }
-        }
 
             if (tableRows.Count > 0) {
                 result.Add(tableRows);
@@ -802,8 +807,6 @@ public static class HtmlParserFromTable {
             if (rows == null || rows.Count == 0) {
                 continue;
             }
-            var dataValueLookup = BuildDataValueLookup(table);
-
             if (reverseTable) {
                 Dictionary<string, string?> obj = new();
                 int index = 0;
@@ -838,6 +841,8 @@ public static class HtmlParserFromTable {
                 }
                 continue;
             }
+
+            var dataValueLookup = BuildDataValueLookup(table);
 
             int headerRowIndex = 0;
             bool hasHeader = false;
@@ -874,7 +879,8 @@ public static class HtmlParserFromTable {
                     }
                 }
             } else {
-                for (int i = 0; i < headerCells.Count; i++) {
+                int columnCount = SumColSpans(headerCells);
+                for (int i = 0; i < columnCount; i++) {
                     headers.Add($"Column{i + 1}");
                 }
             }
@@ -922,9 +928,9 @@ public static class HtmlParserFromTable {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                            rowValues[col] = value;
+                            rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                             if (rowspan > 1) {
-                                rowSpans[col] = (value, rowspan - 1);
+                                rowSpans[col] = (rowValues[col], rowspan - 1);
                             }
                         }
                     } else {
@@ -1123,13 +1129,9 @@ public static class HtmlParserFromTable {
     private static IDictionary<string, string> BuildDataValueLookup(IElement table) {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var li in table.QuerySelectorAll("li[data-value]")) {
-            string key = li.GetAttribute("data-value") ?? string.Empty;
-            key = key.Trim();
-            if (key.Length == 0) {
-                continue;
-            }
             string text = li.TextContent.Trim();
-            if (!dict.ContainsKey(key)) {
+            string key = (li.GetAttribute("data-value") ?? string.Empty).Trim();
+            if (key.Length > 0 && !dict.ContainsKey(key)) {
                 dict[key] = text;
             }
         }
@@ -1141,12 +1143,10 @@ public static class HtmlParserFromTable {
         var items = table.SelectNodes(".//li[@data-value]");
         if (items != null) {
             foreach (var li in items) {
-                string key = li.GetAttributeValue("data-value", string.Empty);
+                string key = li.GetAttributeValue("data-value", string.Empty).Trim();
                 string text = HtmlEntity.DeEntitize(li.InnerText ?? string.Empty).Trim();
-                if (!string.IsNullOrEmpty(key)) {
-                    if (!dict.ContainsKey(key)) {
-                        dict[key] = text;
-                    }
+                if (key.Length > 0 && !dict.ContainsKey(key)) {
+                    dict[key] = text;
                 }
             }
         }
