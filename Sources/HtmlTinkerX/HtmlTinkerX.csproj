@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.5</VersionPrefix>
+        <VersionPrefix>2.0.6</VersionPrefix>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>HtmlTinkerX</AssemblyName>
         <AssemblyTitle>HtmlTinkerX</AssemblyTitle>

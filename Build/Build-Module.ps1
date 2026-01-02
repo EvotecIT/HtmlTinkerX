@@ -10,7 +10,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         # ID used to uniquely identify this module
         GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
         # Version number of this module.
-        ModuleVersion        = '2.0.5'
+        ModuleVersion        = '2.0.6'
         # Author of this module
         Author               = 'Przemyslaw Klys'
         # Company or vendor of this module
