@@ -260,35 +260,49 @@ public static partial class HtmlBrowser {
         string path = GetBrowserInstallPath();
         if (!Directory.Exists(path))
             return false;
-        string prefix = engine.ToString().ToLowerInvariant() + "-";
-        foreach (string dir in Directory.GetDirectories(path)) {
-            if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                return true;
+        var prefixes = GetRuntimePrefixes(engine);
+        foreach (string prefix in prefixes) {
+            bool found = false;
+            foreach (string dir in Directory.GetDirectories(path)) {
+                if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return false;
         }
-        return false;
+        return true;
     }
 
     private static bool IsBrowserRuntimeCorrupted(HtmlBrowserEngine engine) {
         string path = GetBrowserInstallPath();
         if (!Directory.Exists(path))
             return false;
-        string prefix = engine.ToString().ToLowerInvariant() + "-";
-        var candidates = Directory.GetDirectories(path).Where(dir =>
-            Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (candidates.Length == 0)
-            return false;
+        var prefixes = GetRuntimePrefixes(engine);
+        foreach (string prefix in prefixes) {
+            var candidates = Directory.GetDirectories(path).Where(dir =>
+                Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (candidates.Length == 0)
+                continue;
 
-        foreach (string dir in candidates) {
-            try {
-                if (Directory.EnumerateFileSystemEntries(dir).Any()) {
-                    return false;
+            bool allEmpty = true;
+            foreach (string dir in candidates) {
+                try {
+                    if (Directory.EnumerateFileSystemEntries(dir).Any()) {
+                        allEmpty = false;
+                        break;
+                    }
+                } catch {
+                    return true;
                 }
-            } catch {
-                return true;
             }
+
+            if (allEmpty)
+                return true;
         }
 
-        return true;
+        return false;
     }
 
     /// <summary>
@@ -307,16 +321,25 @@ public static partial class HtmlBrowser {
         if (!Directory.Exists(path))
             return;
 
-        string prefix = engine.ToString().ToLowerInvariant() + "-";
-        foreach (string dir in Directory.GetDirectories(path)) {
-            if (!Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                continue;
-            try {
-                Directory.Delete(dir, true);
-            } catch {
-                // Ignore cleanup errors - best effort only.
+        var prefixes = GetRuntimePrefixes(engine);
+        foreach (string prefix in prefixes) {
+            foreach (string dir in Directory.GetDirectories(path)) {
+                if (!Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                try {
+                    Directory.Delete(dir, true);
+                } catch {
+                    // Ignore cleanup errors - best effort only.
+                }
             }
         }
+    }
+
+    private static string[] GetRuntimePrefixes(HtmlBrowserEngine engine) {
+        if (engine == HtmlBrowserEngine.Chromium) {
+            return new[] { "chromium-", "chromium_headless_shell-" };
+        }
+        return new[] { engine.ToString().ToLowerInvariant() + "-" };
     }
 
     private static void ValidateExistingInstallation(HtmlBrowserEngine engine) {
