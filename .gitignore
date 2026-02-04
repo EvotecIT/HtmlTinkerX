@@ -4,6 +4,8 @@ Ignore/*
 .vscode/*
 Releases/*
 Artefacts/*
+Build/Artefacts/*
+Sources/Artefacts/*
 Sources/.vs
 Sources/*/.vs
 Sources/*/obj
