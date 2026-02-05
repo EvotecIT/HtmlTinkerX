@@ -73,7 +73,7 @@ Build-Module -ModuleName 'PSParseHTML' {
     New-ConfigurationFormat -ApplyTo 'OnMergePSM1', 'OnMergePSD1' -Sort None @ConfigurationFormat
     # format PSD1 and PSM1 files within the module
     # enable formatting is required to make sure that formatting is applied (with default settings)
-    New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'DefaultPSM1' -Sort None -UpdateProjectRoot @ConfigurationFormat
+    New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'DefaultPSM1' -Sort None @ConfigurationFormat
     # when creating PSD1 use special style without comments and with only required parameters
     New-ConfigurationFormat -ApplyTo 'DefaultPSD1', 'OnMergePSD1' -PSD1Style 'Minimal'
 
