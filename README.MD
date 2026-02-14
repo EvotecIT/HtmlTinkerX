@@ -8,7 +8,7 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 
 ## 💻 PowerShell Module
 [![powershell gallery version](https://img.shields.io/powershellgallery/v/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
-[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSParseHTML)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/v/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow&include_prereleases)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery platforms](https://img.shields.io/powershellgallery/p/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 
