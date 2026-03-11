@@ -135,6 +135,7 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | PowerShell Cmdlet          | C# Method                               | Description                   |
 | -------------------------- | --------------------------------------- | ----------------------------- |
 | `Get-HTMLResource`         | `HtmlResourceParser.ExtractResources()` | Extract scripts and CSS       |
+| `Invoke-HTMLCrawl`         | `HtmlCrawler.CrawlAsync()`              | Crawl a site offline          |
 | `Save-HTMLAttachment`      | `HtmlBrowser.SaveAttachmentsAsync()`    | Download files from pages     |
 | `Get-HTMLContent`          | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
 | `Export-HTMLOutline`       | `HtmlOutlineBuilder.BuildOutline()`     | Generate document outlines    |
@@ -175,6 +176,38 @@ string minified = HtmlOptimizer.OptimizeHtml(html);
 // Browser automation
 await using var session = await HtmlBrowser.OpenSessionAsync("https://example.com");
 await HtmlBrowser.SaveScreenshotAsync(session, "screenshot.png");
+
+// Offline crawl
+var crawl = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    MaxDepth = 1,
+    MaxPages = 10,
+    UseSitemaps = true,
+    RespectRobotsTxt = true,
+    DeduplicatePages = true,
+    OutputPath = "crawl-output"
+});
+
+Console.WriteLine(crawl.Summary.ToReportText(crawl.SitemapUrls));
+Console.WriteLine(crawl.PagesCsvPath);
+
+// Keep full tracking query strings when a site uses them as real page identity
+var exactUrls = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    IgnoreTrackingQueryParameters = false
+});
+
+// Allow non-HTML responses when you intentionally want them in the crawl
+var permissive = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    SkipKnownAssetUrls = false,
+    RestrictToAllowedContentTypes = false
+});
+
+// Download discovered images/documents into the offline dataset
+var richSnapshot = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    MaxDepth = 1,
+    DownloadAssets = true,
+    OutputPath = "crawl-output"
+});
+// Stored HTML now points at local ../assets/... paths by default
 ```
 
 ### PowerShell Example
@@ -190,7 +223,61 @@ $minified = Optimize-HTML -Path 'page.html'
 $session = Start-HTMLSession -Url 'https://example.com'
 Save-HTMLScreenshot -Session $session -OutFile 'screenshot.png'
 Close-HTMLSession -Session $session
+
+# Offline crawl
+$crawl = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -MaxPages 10 -DeduplicatePages
+$crawl.Pages | Select-Object Url, Title, Depth
+$crawl.SkippedPages | Select-Object Url, SkipReason
+$crawl.Summary.ToReportText($crawl.SitemapUrls)
+
+# Preserve full tracked URLs when query strings are meaningful
+$exactUrls = Invoke-HTMLCrawl -Url 'https://example.com/docs' -KeepTrackingQueryParameters
+
+# Allow non-HTML responses such as PDFs when needed
+$permissive = Invoke-HTMLCrawl -Url 'https://example.com/docs' -AllowAssetUrls -AllowAnyContentType
+
+# Download discovered images/documents into the offline dataset
+$richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -DownloadAssets -OutPath '.\crawl-output'
+# Stored HTML now points at local ../assets/... paths by default
+# Internal page links are also rewritten to local saved .html files by default
+
+# Resume a previous crawl snapshot
+$resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
+
+Persisted crawl artifacts now include:
+- `crawl-result.json` for the manifest and resume state
+- `index.html` as a browsable offline entry point into the saved dataset
+- `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests
+- `pages.jsonl` and `pages.csv` for page-level datasets
+- `skipped-pages.jsonl` for skipped candidates
+- `links.jsonl` for discovered page-to-page links
+- `assets/` and `assets.jsonl` for downloaded images/documents when `DownloadAssets` is enabled
+- `chunks.jsonl` for deduplicated text chunks ready for local search/RAG pipelines
+- `graph.json` for page nodes and cross-page link edges with offline degree metadata
+- `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
+
+By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
+
+By default the crawler is page-oriented and only keeps `text/html` and `application/xhtml+xml` responses. Use `RestrictToAllowedContentTypes = false` in C# or `-AllowAnyContentType` in PowerShell when you intentionally want non-HTML responses included.
+
+It also skips obvious asset/document URLs such as `*.pdf`, `*.jpg`, `*.zip`, and fonts before fetching them. Use `SkipKnownAssetUrls = false` in C# or `-AllowAssetUrls` in PowerShell when those URLs are part of the dataset you want.
+
+If you want those assets as part of the offline dataset without treating them as pages, enable `DownloadAssets` in C# or `-DownloadAssets` in PowerShell. That saves discovered image/document URLs, stylesheet links, and CSS `url(...)` assets into `assets/` and records them in `assets.jsonl`.
+
+When assets are downloaded, stored HTML snapshots are also rewritten to local relative paths by default, so an `<img>` can point at `../assets/...` instead of the original remote URL. Use `RewriteAssetReferencesToLocal = false` in C# or `-KeepRemoteAssetUrls` in PowerShell if you want to keep the original references.
+
+Stored HTML also rewrites internal page links to local saved `.html` files by default, which makes the persisted crawl much more browsable offline. Use `RewritePageLinksToLocal = false` in C# or `-KeepRemotePageUrls` in PowerShell if you want to preserve original page URLs.
+
+Pages that use `<base href>` are also handled correctly during crawl discovery and offline rewrite, and the saved HTML strips the original `<base>` tag so local links and assets do not get redirected back to the live site.
+
+Each saved page also gets a sidecar `.json` manifest with its metadata, outgoing links, referenced asset URLs, and any downloaded asset file paths resolved relative to that page. The generated `index.html` links to those manifests directly.
+
+Those per-page manifests now also include lightweight search metadata such as heading extraction, word counts, character counts, and a short summary snippet, and `index.html` surfaces the same summary information for quick offline scanning.
+
+The persisted dataset also exports a global `chunks.jsonl` file with deduplicated text chunks, per-chunk summaries, heading context, normalized keywords, and relative links back to each saved page, text file, and manifest so it is easy to feed into local search or RAG tooling.
+
+It also exports `graph.json`, which captures fetched pages as nodes and discovered page-to-page links as edges, including fetched/skipped/external node categories, edge relation types, in-degree/out-degree counts, and relative paths back to saved HTML and manifest files for offline analysis or navigation tooling. The generated summaries now also break those graph counts down by node category, edge relation, and skipped-node reason.
 
 ## 🔧 PowerShell Cmdlets
 
@@ -248,6 +335,8 @@ Close-HTMLSession -Session $session
 
 ### Content & Resources
 - **Get-HTMLResource** - Extract script and CSS resources
+- **Invoke-HTMLCrawl** - Crawl sites offline with optional browser rendering
+: supports sitemap discovery, `robots.txt`, filtering, auth, and selector-based extraction
 - **Save-HTMLAttachment** - Download files from pages
 - **Get-HTMLContent** - Retrieve page content
 - **Get-HTMLFormField** - Extract form field information
