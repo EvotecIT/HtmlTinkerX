@@ -1105,9 +1105,9 @@ public static class HtmlCrawler {
         List<HtmlCrawlPage> externalGraphPages = skippedPageList
             .Where(page => IsExternalSkipReason(page.SkipReason))
             .ToList();
-        HashSet<string> fetchedUrls = pageList.Select(page => page.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> skippedUrls = skippedGraphPages.Select(page => page.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> externalSkippedUrls = externalGraphPages.Select(page => page.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> fetchedUrls = new(pageList.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> skippedUrls = new(skippedGraphPages.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> externalSkippedUrls = new(externalGraphPages.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
         HashSet<string> edgeKeys = new(StringComparer.OrdinalIgnoreCase);
         List<GraphEdgeRecord> edges = new();
         Dictionary<string, int> incomingTotal = new(StringComparer.OrdinalIgnoreCase);
