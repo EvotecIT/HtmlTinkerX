@@ -134,6 +134,18 @@ public sealed class PesterTestHttpServer : IDisposable {
             } catch {
             }
         }
+
+        function Get-ExpectedRelativePath {
+            param(
+                [Parameter(Mandatory)]
+                [string] $FromFilePath,
+                [Parameter(Mandatory)]
+                [string] $ToFilePath
+            )
+
+            $fromDirectory = Split-Path $FromFilePath -Parent
+            [System.IO.Path]::GetRelativePath($fromDirectory, $ToFilePath).Replace('\', '/')
+        }
     }
 
     It 'Crawls same-host links offline' {
@@ -373,7 +385,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $about = $result.Pages | Where-Object { $_.Url -eq ($prefix + 'about') } | Select-Object -First 1
             $html = Get-Content $homePage.HtmlPath -Raw
             $indexHtml = Get-Content $result.IndexHtmlPath -Raw
-            $expected = [System.Uri]::UnescapeDataString(([System.Uri]((Split-Path $homePage.HtmlPath -Parent) + [System.IO.Path]::DirectorySeparatorChar)).MakeRelativeUri([System.Uri]$about.HtmlPath).ToString()).Replace('\', '/')
+            $expected = Get-ExpectedRelativePath -FromFilePath $homePage.HtmlPath -ToFilePath $about.HtmlPath
 
             $html | Should -Match ([regex]::Escape($expected))
             $html | Should -Match 'https://example\.com/remote'
@@ -420,7 +432,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $indexHtml = Get-Content $result.IndexHtmlPath -Raw
             $chunksJson = Get-Content $result.ChunksJsonlPath -Raw
             $graph = Get-Content $result.GraphJsonPath -Raw | ConvertFrom-Json
-            $expected = [System.Uri]::UnescapeDataString(([System.Uri]((Split-Path $homePage.HtmlPath -Parent) + [System.IO.Path]::DirectorySeparatorChar)).MakeRelativeUri([System.Uri]$guidePage.HtmlPath).ToString()).Replace('\', '/')
+            $expected = Get-ExpectedRelativePath -FromFilePath $homePage.HtmlPath -ToFilePath $guidePage.HtmlPath
 
             $html | Should -Not -Match '<base'
             $html | Should -Match ([regex]::Escape($expected))
