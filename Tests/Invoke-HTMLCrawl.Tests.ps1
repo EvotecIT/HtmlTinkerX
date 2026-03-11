@@ -1,166 +1,211 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1"
 
 Describe 'Invoke-HTMLCrawl' {
-    It 'Crawls same-host links offline' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
+    BeforeAll {
+        if (-not ('PesterTestHttpServer' -as [type])) {
+            Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Concurrent;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
+public sealed class PesterTestHttpServer : IDisposable {
+    private sealed class ServerResponse {
+        public string Body { get; set; } = string.Empty;
+        public string ContentType { get; set; } = "text/html; charset=utf-8";
+    }
 
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
+    private readonly HttpListener _listener = new HttpListener();
+    private readonly ConcurrentDictionary<string, ServerResponse> _responses = new ConcurrentDictionary<string, ServerResponse>(StringComparer.OrdinalIgnoreCase);
+    private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+    private readonly Task _serverTask;
 
-            $responses = @{
-                '/'      = "<html><head><title>Home</title></head><body><a href='/about'>About</a></body></html>"
-                '/about' = "<html><head><title>About</title></head><body>About page</body></html>"
-            }
+    public PesterTestHttpServer(string prefix) {
+        Prefix = prefix;
+        _listener.Prefixes.Add(prefix);
+        _listener.Start();
+        _serverTask = Task.Run(ListenAsync);
+    }
+
+    public string Prefix { get; }
+
+    public void AddResponse(string path, string body, string contentType) {
+        _responses[path] = new ServerResponse {
+            Body = body ?? string.Empty,
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "text/html; charset=utf-8" : contentType
+        };
+    }
+
+    private async Task ListenAsync() {
+        while (!_cancellation.IsCancellationRequested) {
+            HttpListenerContext context;
 
             try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/html; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+                context = await _listener.GetContextAsync().ConfigureAwait(false);
+            } catch (HttpListenerException) when (_cancellation.IsCancellationRequested || !_listener.IsListening) {
+                break;
+            } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                break;
             }
-        } -ArgumentList $prefix
+
+            string rawUrl = string.IsNullOrWhiteSpace(context.Request.RawUrl) ? "/" : context.Request.RawUrl;
+            if (!_responses.TryGetValue(rawUrl, out ServerResponse response)) {
+                context.Response.StatusCode = 404;
+                context.Response.Close();
+                continue;
+            }
+
+            byte[] bytes = Encoding.UTF8.GetBytes(response.Body);
+            context.Response.ContentType = response.ContentType;
+            context.Response.ContentLength64 = bytes.Length;
+            await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+            context.Response.OutputStream.Close();
+        }
+    }
+
+    public void Dispose() {
+        _cancellation.Cancel();
+        try {
+            if (_listener.IsListening) {
+                _listener.Stop();
+            }
+        } catch {
+        }
+
+        _listener.Close();
 
         try {
-            Start-Sleep -Milliseconds 200
+            _serverTask.Wait(TimeSpan.FromSeconds(5));
+        } catch {
+        }
+
+        _cancellation.Dispose();
+    }
+}
+"@
+        }
+
+        function New-TestServerPrefix {
+            $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+            $tcpListener.Start()
+            $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
+            $tcpListener.Stop()
+
+            "http://127.0.0.1:$port/"
+        }
+
+        function Start-TestHttpServer {
+            param(
+                [Parameter(Mandatory)]
+                [hashtable] $Responses,
+                [string] $Prefix = (New-TestServerPrefix)
+            )
+
+            $server = [PesterTestHttpServer]::new($Prefix)
+            foreach ($entry in $Responses.GetEnumerator()) {
+                $contentType = 'text/html; charset=utf-8'
+                $body = ''
+
+                if ($entry.Value -is [hashtable]) {
+                    $body = [string] $entry.Value.Body
+                    if ($entry.Value.ContainsKey('ContentType')) {
+                        $contentType = [string] $entry.Value.ContentType
+                    }
+                } else {
+                    $body = [string] $entry.Value
+                }
+
+                $server.AddResponse([string] $entry.Key, $body, $contentType)
+            }
+
+            $server
+        }
+
+        function Stop-TestHttpServer {
+            param(
+                [Parameter(Mandatory)]
+                $Server
+            )
+
+            try {
+                $Server.Dispose()
+            } catch {
+            }
+        }
+    }
+
+    It 'Crawls same-host links offline' {
+        $server = Start-TestHttpServer -Responses @{
+            '/'      = "<html><head><title>Home</title></head><body><a href='/about'>About</a></body></html>"
+            '/about' = "<html><head><title>About</title></head><body>About page</body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10
             $result.PageCount | Should -Be 2
             $result.Pages.Url | Should -Contain $prefix
             $result.Pages.Url | Should -Contain ($prefix + 'about')
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Uses sitemap and skips robots-blocked pages' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/'           = "<html><head><title>Home</title></head><body>Home</body></html>"
-                '/robots.txt' = "User-agent: *`nDisallow: /blocked`nSitemap: ${JobPrefix}sitemap.xml`n"
-                '/sitemap.xml' = "<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><url><loc>${JobPrefix}from-sitemap</loc></url><url><loc>${JobPrefix}blocked</loc></url></urlset>"
-                '/from-sitemap' = "<html><head><title>Mapped</title></head><body>Mapped page</body></html>"
-                '/blocked'    = "<html><head><title>Blocked</title></head><body>Blocked page</body></html>"
+        $prefix = New-TestServerPrefix
+        $server = Start-TestHttpServer -Prefix $prefix -Responses @{
+            '/'            = "<html><head><title>Home</title></head><body>Home</body></html>"
+            '/robots.txt'  = @{
+                Body = "User-agent: *`nDisallow: /blocked`nSitemap: ${prefix}sitemap.xml`n"
+                ContentType = 'text/plain; charset=utf-8'
             }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/plain; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+            '/sitemap.xml' = @{
+                Body = "<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><url><loc>${prefix}from-sitemap</loc></url><url><loc>${prefix}blocked</loc></url></urlset>"
+                ContentType = 'text/plain; charset=utf-8'
             }
-        } -ArgumentList $prefix
+            '/from-sitemap' = @{
+                Body = "<html><head><title>Mapped</title></head><body>Mapped page</body></html>"
+                ContentType = 'text/plain; charset=utf-8'
+            }
+            '/blocked' = @{
+                Body = "<html><head><title>Blocked</title></head><body>Blocked page</body></html>"
+                ContentType = 'text/plain; charset=utf-8'
+            }
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 10
             $result.PageCount | Should -Be 2
             $result.Pages.Url | Should -Contain $prefix
             $result.Pages.Url | Should -Contain ($prefix + 'from-sitemap')
             $result.SkippedPages.Url | Should -Contain ($prefix + 'blocked')
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Persists and resumes a crawl from disk' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
         $outputPath = Join-Path $TestDrive 'crawl-artifacts'
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/'            = "<html><head><title>Home</title></head><body>Home</body></html>"
-                '/robots.txt'  = "User-agent: *`nSitemap: ${JobPrefix}sitemap.xml`n"
-                '/sitemap.xml' = "<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><url><loc>${JobPrefix}from-sitemap</loc></url></urlset>"
-                '/from-sitemap' = "<html><head><title>Mapped</title></head><body>Mapped page</body></html>"
+        $prefix = New-TestServerPrefix
+        $server = Start-TestHttpServer -Prefix $prefix -Responses @{
+            '/'            = "<html><head><title>Home</title></head><body>Home</body></html>"
+            '/robots.txt'  = @{
+                Body = "User-agent: *`nSitemap: ${prefix}sitemap.xml`n"
+                ContentType = 'text/plain; charset=utf-8'
             }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/plain; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+            '/sitemap.xml' = @{
+                Body = "<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><url><loc>${prefix}from-sitemap</loc></url></urlset>"
+                ContentType = 'text/plain; charset=utf-8'
             }
-        } -ArgumentList $prefix
+            '/from-sitemap' = @{
+                Body = "<html><head><title>Mapped</title></head><body>Mapped page</body></html>"
+                ContentType = 'text/plain; charset=utf-8'
+            }
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
             $partial = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -OutPath $outputPath
             $partial.PageCount | Should -Be 1
             $partial.PendingPages.Count | Should -BeGreaterThan 0
@@ -177,112 +222,38 @@ Describe 'Invoke-HTMLCrawl' {
             (Test-Path (Join-Path $outputPath 'summary.txt')) | Should -BeTrue
             (Get-Content (Join-Path $outputPath 'summary.txt') -Raw) | Should -Match 'Sitemap sources:'
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Supports path prefix scoping and canonical URLs' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/docs/index' = "<html><body><a href='/docs/page-1'>Docs</a><a href='/blog/post-1'>Blog</a></body></html>"
-                '/docs/page-1' = "<html><head><link rel='canonical' href='/docs/canonical-page' /></head><body>Docs page</body></html>"
-                '/blog/post-1' = "<html><body>Blog page</body></html>"
-            }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/html; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
-            }
-        } -ArgumentList $prefix
+        $server = Start-TestHttpServer -Responses @{
+            '/docs/index' = "<html><body><a href='/docs/page-1'>Docs</a><a href='/blog/post-1'>Blog</a></body></html>"
+            '/docs/page-1' = "<html><head><link rel='canonical' href='/docs/canonical-page' /></head><body>Docs page</body></html>"
+            '/blog/post-1' = "<html><body>Blog page</body></html>"
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url ($prefix + 'docs/index') -MaxDepth 1 -MaxPages 10 -PathPrefix '/docs' -UseCanonicalUrls
             $result.PageCount | Should -Be 2
             $result.SkippedPages | Where-Object { $_.SkipReason -eq 'OutsidePathScope' } | Should -Not -BeNullOrEmpty
             ($result.Pages | Where-Object { $_.RequestedUrl -eq ($prefix + 'docs/page-1') }).Url | Should -Be ($prefix + 'docs/canonical-page')
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Can skip duplicate-content pages' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = "<html><body><a href='/copy-a'>Copy A</a><a href='/copy-b'>Copy B</a><a href='/unique'>Unique</a></body></html>"
-                '/copy-a' = "<html><body><main><h1>Same</h1><p>Duplicate body</p></main></body></html>"
-                '/copy-b' = "<html><body><main><h1>Same</h1><p>Duplicate body</p></main></body></html>"
-                '/unique' = "<html><body><main><h1>Different</h1></main></body></html>"
-            }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/html; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
-            }
-        } -ArgumentList $prefix
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><a href='/copy-a'>Copy A</a><a href='/copy-b'>Copy B</a><a href='/unique'>Unique</a></body></html>"
+            '/copy-a' = "<html><body><main><h1>Same</h1><p>Duplicate body</p></main></body></html>"
+            '/copy-b' = "<html><body><main><h1>Same</h1><p>Duplicate body</p></main></body></html>"
+            '/unique' = "<html><body><main><h1>Different</h1></main></body></html>"
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10 -Selector 'main' -DeduplicatePages
             $result.PageCount | Should -Be 3
             $result.Pages.Url | Should -Contain ($prefix + 'copy-a')
@@ -291,202 +262,85 @@ Describe 'Invoke-HTMLCrawl' {
             ($result.SkippedPages | Where-Object { $_.SkipReason -eq 'DuplicateContent' }).Url | Should -Contain ($prefix + 'copy-b')
             $result.Summary.DuplicatePageCount | Should -Be 1
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Can keep tracking query parameters when requested' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = "<html><body><a href='/page?utm_source=newsletter'>Tracked A</a><a href='/page?fbclid=12345'>Tracked B</a></body></html>"
-                '/page?utm_source=newsletter' = "<html><body>Tracked A</body></html>"
-                '/page?fbclid=12345' = "<html><body>Tracked B</body></html>"
-            }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if ($responses.ContainsKey($rawUrl)) {
-                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                        $context.Response.ContentType = 'text/html; charset=utf-8'
-                        $context.Response.ContentLength64 = $bytes.Length
-                        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    } else {
-                        $context.Response.StatusCode = 404
-                    }
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
-            }
-        } -ArgumentList $prefix
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><a href='/page?utm_source=newsletter'>Tracked A</a><a href='/page?fbclid=12345'>Tracked B</a></body></html>"
+            '/page?utm_source=newsletter' = "<html><body>Tracked A</body></html>"
+            '/page?fbclid=12345' = "<html><body>Tracked B</body></html>"
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10 -KeepTrackingQueryParameters
             $result.PageCount | Should -Be 3
             $result.Pages.Url | Should -Contain ($prefix + 'page?utm_source=newsletter')
             $result.Pages.Url | Should -Contain ($prefix + 'page?fbclid=12345')
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Can allow non-html content types when requested' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = @{
-                    Body = "<html><body><a href='/file.pdf'>PDF</a></body></html>"
-                    ContentType = 'text/html; charset=utf-8'
-                }
-                '/file.pdf' = @{
-                    Body = '%PDF-1.7 fake'
-                    ContentType = 'application/pdf'
-                }
+        $server = Start-TestHttpServer -Responses @{
+            '/' = @{
+                Body = "<html><body><a href='/file.pdf'>PDF</a></body></html>"
+                ContentType = 'text/html; charset=utf-8'
             }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if (-not $responses.ContainsKey($rawUrl)) {
-                        $context.Response.StatusCode = 404
-                        $context.Response.OutputStream.Close()
-                        continue
-                    }
-
-                    $response = $responses[$rawUrl]
-                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($response.Body)
-                    $context.Response.ContentType = $response.ContentType
-                    $context.Response.ContentLength64 = $bytes.Length
-                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+            '/file.pdf' = @{
+                Body = '%PDF-1.7 fake'
+                ContentType = 'application/pdf'
             }
-        } -ArgumentList $prefix
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10 -AllowAnyContentType -AllowAssetUrls
             $result.PageCount | Should -Be 2
             ($result.Pages | Where-Object { $_.Url -eq ($prefix + 'file.pdf') }).ContentType | Should -Be 'application/pdf'
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Can download assets into the crawl dataset' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
         $outputPath = Join-Path $TestDrive 'crawl-assets'
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = @{
-                    Body = "<html><head><link rel='stylesheet' href='/css/site.css' /><style>.hero{background-image:url('/images/bg.png');}</style></head><body><img src='/images/logo.png' alt='Logo' /><div style=""background-image:url('/images/card.png')""></div><a href='/files/manual.pdf'>Manual</a></body></html>"
-                    ContentType = 'text/html; charset=utf-8'
-                }
-                '/css/site.css' = @{
-                    Body = "@import '/css/theme.css'; .page{background-image:url('/images/logo.png'); color:#333;}"
-                    ContentType = 'text/css'
-                }
-                '/css/theme.css' = @{
-                    Body = ".theme{background-image:url('/images/bg.png');}"
-                    ContentType = 'text/css'
-                }
-                '/images/logo.png' = @{
-                    Body = 'fake-png'
-                    ContentType = 'image/png'
-                }
-                '/images/bg.png' = @{
-                    Body = 'fake-bg'
-                    ContentType = 'image/png'
-                }
-                '/images/card.png' = @{
-                    Body = 'fake-card'
-                    ContentType = 'image/png'
-                }
-                '/files/manual.pdf' = @{
-                    Body = '%PDF-1.7 fake'
-                    ContentType = 'application/pdf'
-                }
+        $server = Start-TestHttpServer -Responses @{
+            '/' = @{
+                Body = "<html><head><link rel='stylesheet' href='/css/site.css' /><style>.hero{background-image:url('/images/bg.png');}</style></head><body><img src='/images/logo.png' alt='Logo' /><div style=""background-image:url('/images/card.png')""></div><a href='/files/manual.pdf'>Manual</a></body></html>"
+                ContentType = 'text/html; charset=utf-8'
             }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if (-not $responses.ContainsKey($rawUrl)) {
-                        $context.Response.StatusCode = 404
-                        $context.Response.OutputStream.Close()
-                        continue
-                    }
-
-                    $response = $responses[$rawUrl]
-                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($response.Body)
-                    $context.Response.ContentType = $response.ContentType
-                    $context.Response.ContentLength64 = $bytes.Length
-                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+            '/css/site.css' = @{
+                Body = "@import '/css/theme.css'; .page{background-image:url('/images/logo.png'); color:#333;}"
+                ContentType = 'text/css'
             }
-        } -ArgumentList $prefix
+            '/css/theme.css' = @{
+                Body = ".theme{background-image:url('/images/bg.png');}"
+                ContentType = 'text/css'
+            }
+            '/images/logo.png' = @{
+                Body = 'fake-png'
+                ContentType = 'image/png'
+            }
+            '/images/bg.png' = @{
+                Body = 'fake-bg'
+                ContentType = 'image/png'
+            }
+            '/images/card.png' = @{
+                Body = 'fake-card'
+                ContentType = 'image/png'
+            }
+            '/files/manual.pdf' = @{
+                Body = '%PDF-1.7 fake'
+                ContentType = 'application/pdf'
+            }
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 5 -DownloadAssets -OutPath $outputPath
             $result.AssetCount | Should -Be 6
             $result.Assets.FilePath | ForEach-Object { Test-Path $_ | Should -BeTrue }
@@ -501,58 +355,19 @@ Describe 'Invoke-HTMLCrawl' {
             $indexHtml | Should -Match 'Pages CSV'
             $indexHtml | Should -Match 'assets/site-'
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Rewrites internal page links to local files in saved HTML' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
         $outputPath = Join-Path $TestDrive 'crawl-local-links'
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = "<html><body><a href='/about'>About</a><a href='https://example.com/remote'>Remote</a></body></html>"
-                '/about' = "<html><body>About page</body></html>"
-            }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if (-not $responses.ContainsKey($rawUrl)) {
-                        $context.Response.StatusCode = 404
-                        $context.Response.OutputStream.Close()
-                        continue
-                    }
-
-                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($responses[$rawUrl])
-                    $context.Response.ContentType = 'text/html; charset=utf-8'
-                    $context.Response.ContentLength64 = $bytes.Length
-                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
-            }
-        } -ArgumentList $prefix
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><a href='/about'>About</a><a href='https://example.com/remote'>Remote</a></body></html>"
+            '/about' = "<html><body>About page</body></html>"
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10 -OutPath $outputPath
             $homePage = $result.Pages | Where-Object { $_.Url -eq $prefix } | Select-Object -First 1
             $about = $result.Pages | Where-Object { $_.Url -eq ($prefix + 'about') } | Select-Object -First 1
@@ -565,73 +380,33 @@ Describe 'Invoke-HTMLCrawl' {
             $indexHtml | Should -Match ([regex]::Escape([System.IO.Path]::GetFileName($homePage.HtmlPath)))
             $indexHtml | Should -Match ([regex]::Escape([System.IO.Path]::GetFileName($about.HtmlPath)))
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 
     It 'Honors base href for discovered links, assets, and offline rewrites' {
-        $tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $tcpListener.Start()
-        $port = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
-        $tcpListener.Stop()
-
-        $prefix = "http://localhost:$port/"
         $outputPath = Join-Path $TestDrive 'crawl-base-href'
-        $job = Start-Job -ScriptBlock {
-            param($JobPrefix)
-
-            $listener = [System.Net.HttpListener]::new()
-            $listener.Prefixes.Add($JobPrefix)
-            $listener.Start()
-
-            $responses = @{
-                '/' = @{
-                    Body = "<html><head><title>Offline Home</title><base href='/docs/' /><link rel='stylesheet' href='css/site.css' /></head><body><h1>Offline Home</h1><p>Useful docs for offline testing and local search metadata.</p><a href='guide'>Guide</a><a href='manual.pdf'>Manual</a><a href='https://example.com/offsite'>Offsite</a><img src='images/logo.png' alt='Logo' /></body></html>"
-                    ContentType = 'text/html; charset=utf-8'
-                }
-                '/docs/guide' = @{
-                    Body = '<html><body><h1>Guide page</h1><p>Guide content for offline browsing.</p></body></html>'
-                    ContentType = 'text/html; charset=utf-8'
-                }
-                '/docs/css/site.css' = @{
-                    Body = ".hero{background-image:url('../images/logo.png');}"
-                    ContentType = 'text/css'
-                }
-                '/docs/images/logo.png' = @{
-                    Body = 'fake-png'
-                    ContentType = 'image/png'
-                }
+        $server = Start-TestHttpServer -Responses @{
+            '/' = @{
+                Body = "<html><head><title>Offline Home</title><base href='/docs/' /><link rel='stylesheet' href='css/site.css' /></head><body><h1>Offline Home</h1><p>Useful docs for offline testing and local search metadata.</p><a href='guide'>Guide</a><a href='manual.pdf'>Manual</a><a href='https://example.com/offsite'>Offsite</a><img src='images/logo.png' alt='Logo' /></body></html>"
+                ContentType = 'text/html; charset=utf-8'
             }
-
-            try {
-                while ($listener.IsListening) {
-                    $pending = $listener.GetContextAsync()
-                    if (-not $pending.Wait(3000)) {
-                        break
-                    }
-                    $context = $pending.Result
-                    $rawUrl = if ($context.Request.RawUrl) { $context.Request.RawUrl } else { '/' }
-                    if (-not $responses.ContainsKey($rawUrl)) {
-                        $context.Response.StatusCode = 404
-                        $context.Response.OutputStream.Close()
-                        continue
-                    }
-
-                    $response = $responses[$rawUrl]
-                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($response.Body)
-                    $context.Response.ContentType = $response.ContentType
-                    $context.Response.ContentLength64 = $bytes.Length
-                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-                    $context.Response.OutputStream.Close()
-                }
-            } finally {
-                $listener.Stop()
-                $listener.Close()
+            '/docs/guide' = @{
+                Body = '<html><body><h1>Guide page</h1><p>Guide content for offline browsing.</p></body></html>'
+                ContentType = 'text/html; charset=utf-8'
             }
-        } -ArgumentList $prefix
+            '/docs/css/site.css' = @{
+                Body = ".hero{background-image:url('../images/logo.png');}"
+                ContentType = 'text/css'
+            }
+            '/docs/images/logo.png' = @{
+                Body = 'fake-png'
+                ContentType = 'image/png'
+            }
+        }
 
         try {
-            Start-Sleep -Milliseconds 200
+            $prefix = $server.Prefix
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 1 -MaxPages 10 -DownloadAssets -OutPath $outputPath
             $homePage = $result.Pages | Where-Object { $_.Url -eq $prefix } | Select-Object -First 1
             $guidePage = $result.Pages | Where-Object { $_.Url -eq ($prefix + 'docs/guide') } | Select-Object -First 1
@@ -704,7 +479,7 @@ Describe 'Invoke-HTMLCrawl' {
             $indexHtml | Should -Match 'Edge relation'
             $indexHtml | Should -Match 'Skipped-node reason'
         } finally {
-            $null = Receive-Job -Job $job -Wait -AutoRemoveJob
+            Stop-TestHttpServer $server
         }
     }
 }
