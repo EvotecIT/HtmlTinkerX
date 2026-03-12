@@ -501,6 +501,8 @@ public class HtmlCrawlerTests {
             Assert.Contains("@ article", page.ContentComparisonPreviewSummary, StringComparison.Ordinal);
             Assert.Contains("Hello", page.ContentComparisonPreviewSummary, StringComparison.Ordinal);
             Assert.Equal(1, result.Summary.ContentComparisonWinnerCounts["Reader"]);
+            Assert.StartsWith("Reader ", result.Summary.ContentComparisonWinnerPreviewSamples["Reader"], StringComparison.Ordinal);
+            Assert.Contains("@ article", result.Summary.ContentComparisonWinnerPreviewSamples["Reader"], StringComparison.Ordinal);
             Assert.True(result.Summary.AverageBestContentComparisonWordDelta >= 0);
             Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Raw);
             Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Focused);
@@ -533,6 +535,9 @@ public class HtmlCrawlerTests {
             Assert.Contains("Raw ", indexHtml, StringComparison.Ordinal);
             Assert.Contains("preview: Reader ", indexHtml, StringComparison.Ordinal);
             Assert.Contains("@ article", indexHtml, StringComparison.Ordinal);
+            Assert.Contains("Best comparison sample <code>Reader</code>", indexHtml, StringComparison.Ordinal);
+            string report = result.Summary.ToReportText(result.SitemapUrls);
+            Assert.Contains("Best comparison sample Reader:", report, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();

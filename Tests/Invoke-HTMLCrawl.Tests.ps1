@@ -309,9 +309,15 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page = $result.Pages | Select-Object -First 1
             $manifest = Get-Content $page.ManifestPath -Raw | ConvertFrom-Json
             $indexHtml = Get-Content (Join-Path $outputPath 'index.html') -Raw
+            $summaryPreview = $result.Summary.ContentComparisonWinnerPreviewSamples['Reader']
+            if ($null -eq $summaryPreview) {
+                $summaryPreview = $result.Summary.ContentComparisonWinnerPreviewSamples.Reader
+            }
 
             $page.ContentComparisons.Count | Should -Be 3
             $result.Summary.ContentComparisonWinnerCounts['Reader'] | Should -Be 1
+            $summaryPreview | Should -Match '^Reader '
+            $summaryPreview | Should -Match '@ article'
             $result.Summary.AverageBestContentComparisonWordDelta | Should -BeGreaterThan -1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Raw' }).Count | Should -Be 1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Focused' }).Count | Should -Be 1
@@ -343,6 +349,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $indexHtml | Should -Match 'Raw '
             $indexHtml | Should -Match 'preview: Reader '
             $indexHtml | Should -Match '@ article'
+            ($result.Summary.ToReportText($result.SitemapUrls)) | Should -Match 'Best comparison sample Reader:'
         } finally {
             Stop-TestHttpServer $server
         }

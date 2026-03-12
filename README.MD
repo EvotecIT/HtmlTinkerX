@@ -246,6 +246,7 @@ Console.WriteLine($"{reader.Pages[0].ContentSelectionScore} across {reader.Pages
 Console.WriteLine(string.Join(", ", reader.Pages[0].ContentComparisons.Select(c => $"{c.Mode}:{c.WordCount}")));
 Console.WriteLine(reader.Pages[0].ContentComparisonDeltaSummary);
 Console.WriteLine(reader.Pages[0].ContentComparisonPreviewSummary);
+Console.WriteLine(reader.Summary.ContentComparisonWinnerPreviewSamples["Reader"]);
 
 // Remove noisy blocks by class or id while keeping smart cleanup enabled
 var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -309,10 +310,12 @@ $reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -
 $reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
 $reader.Pages[0].ContentComparisons | Select-Object Mode, ReasonCode, ElementSelectorHint, WordCount, Summary
 $reader.Pages[0] | Select-Object BestContentComparisonMode, BestContentComparisonReasonCode, BestContentComparisonWordCount, RunnerUpContentComparisonMode, BestContentComparisonWordDelta, ContentComparisonDeltaSummary, ContentComparisonPreviewSummary
+$reader.Summary.ContentComparisonWinnerPreviewSamples
 # persisted index.html now shows the same compact deltas, for example:
 # Reader 0 | Focused -12 | Raw -37
 # and a side-by-side preview line, for example:
 # Reader 142w @ article: Hello main article... | Focused 130w @ main: Hello main... | Raw 118w: Menu item Hello...
+# summary/report output also includes one representative preview sample per winning mode
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'

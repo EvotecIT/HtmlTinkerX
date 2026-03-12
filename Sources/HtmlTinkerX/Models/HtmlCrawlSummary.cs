@@ -84,6 +84,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Counts of pages by the strongest extraction mode chosen from content comparisons.</summary>
     public IDictionary<string, int> ContentComparisonWinnerCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Representative comparison preview samples grouped by the strongest extraction mode chosen from content comparisons.</summary>
+    public IDictionary<string, string> ContentComparisonWinnerPreviewSamples { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Average word-count delta between the best and runner-up extraction modes when comparison mode is enabled.</summary>
     public double AverageBestContentComparisonWordDelta { get; set; }
 
@@ -163,6 +166,14 @@ public sealed class HtmlCrawlSummary {
             .Where(page => page.Status == HtmlCrawlPageStatus.Success && page.BestContentComparisonMode.HasValue)
             .GroupBy(page => page.BestContentComparisonMode!.Value.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.ContentComparisonWinnerCounts[group.Key] = group.Count();
+            HtmlCrawlPage? representativePage = group
+                .Where(page => !string.IsNullOrWhiteSpace(page.ContentComparisonPreviewSummary))
+                .OrderByDescending(page => page.BestContentComparisonWordCount ?? 0)
+                .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(representativePage?.ContentComparisonPreviewSummary)) {
+                summary.ContentComparisonWinnerPreviewSamples[group.Key] = representativePage.ContentComparisonPreviewSummary!;
+            }
         }
         double[] comparisonDeltas = result.Pages
             .Where(page => page.Status == HtmlCrawlPageStatus.Success && page.BestContentComparisonWordDelta.HasValue)
@@ -237,7 +248,7 @@ public sealed class HtmlCrawlSummary {
             }
         }
 
-        if (ContentModeCounts.Count > 0 || ContentSelectionCounts.Count > 0 || ContentComparisonWinnerCounts.Count > 0) {
+        if (ContentModeCounts.Count > 0 || ContentSelectionCounts.Count > 0 || ContentComparisonWinnerCounts.Count > 0 || ContentComparisonWinnerPreviewSamples.Count > 0) {
             report.AppendLine();
             report.AppendLine("Content summary:");
             foreach (var item in ContentModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
@@ -251,6 +262,9 @@ public sealed class HtmlCrawlSummary {
             }
             if (AverageBestContentComparisonWordDelta > 0) {
                 report.AppendLine($"- Average best-comparison delta: {AverageBestContentComparisonWordDelta.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} words");
+            }
+            foreach (var item in ContentComparisonWinnerPreviewSamples.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Best comparison sample {item.Key}: {item.Value}");
             }
         }
 

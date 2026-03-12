@@ -1797,7 +1797,7 @@ public static class HtmlCrawler {
             builder.AppendLine("  </section>");
         }
 
-        if (summary.ContentModeCounts.Count > 0 || summary.ContentSelectionCounts.Count > 0 || summary.ContentComparisonWinnerCounts.Count > 0) {
+        if (summary.ContentModeCounts.Count > 0 || summary.ContentSelectionCounts.Count > 0 || summary.ContentComparisonWinnerCounts.Count > 0 || summary.ContentComparisonWinnerPreviewSamples.Count > 0) {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Content Summary</h2>");
             builder.AppendLine("    <ul>");
@@ -1826,6 +1826,13 @@ public static class HtmlCrawler {
                 builder.Append("      <li>Average best-comparison delta: ")
                     .Append(HtmlEncode(summary.AverageBestContentComparisonWordDelta.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)))
                     .AppendLine(" words</li>");
+            }
+            foreach (var item in summary.ContentComparisonWinnerPreviewSamples.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Best comparison sample <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: <span class=\"muted\">")
+                    .Append(HtmlEncode(item.Value))
+                    .AppendLine("</span></li>");
             }
             builder.AppendLine("    </ul>");
             builder.AppendLine("  </section>");
