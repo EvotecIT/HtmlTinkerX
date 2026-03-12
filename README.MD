@@ -224,6 +224,12 @@ var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCra
 Console.WriteLine($"{hybrid.Pages[0].RenderMode}: {hybrid.Pages[0].RenderReason}");
 Console.WriteLine(string.Join(", ", hybrid.Pages[0].AppliedInteractions));
 Console.WriteLine(hybrid.Summary.ToReportText(hybrid.SitemapUrls));
+
+// Reuse a built-in profile for a known site
+var profiled = await HtmlCrawler.CrawlAsync("https://evotec.xyz/", new HtmlCrawlOptions {
+    ProfileName = "evotec-xyz"
+});
+Console.WriteLine(profiled.AppliedProfileName);
 ```
 
 ### PowerShell Example
@@ -262,6 +268,10 @@ $hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSe
 $hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
 $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 # summary now includes interaction totals and per-interaction counts
+
+# Reuse a built-in profile for a known site
+$profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
+$profiled.AppliedProfileName
 
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'

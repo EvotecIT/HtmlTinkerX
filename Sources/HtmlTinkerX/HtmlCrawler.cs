@@ -156,6 +156,10 @@ public static class HtmlCrawler {
         }
 
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
+        HtmlCrawlProfile? appliedProfile = HtmlCrawlProfiles.Resolve(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile);
+        if (appliedProfile != null) {
+            HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
+        }
         ValidateOptions(resolvedOptions);
 
         try {
@@ -170,8 +174,13 @@ public static class HtmlCrawler {
             } else {
                 result = new HtmlCrawlResult {
                     StartUrl = startUri.AbsoluteUri,
+                    AppliedProfileName = appliedProfile?.Name,
                     Started = DateTimeOffset.UtcNow
                 };
+            }
+
+            if (string.IsNullOrWhiteSpace(result.AppliedProfileName) && appliedProfile != null) {
+                result.AppliedProfileName = appliedProfile.Name;
             }
 
             Queue<CrawlRequest> pending = new();
@@ -1564,6 +1573,11 @@ public static class HtmlCrawler {
             .Append("\">")
             .Append(HtmlEncode(result.StartUrl))
             .AppendLine("</a></p>");
+        if (!string.IsNullOrWhiteSpace(result.AppliedProfileName)) {
+            builder.Append("  <p class=\"meta\">Profile: <code>")
+                .Append(HtmlEncode(result.AppliedProfileName))
+                .AppendLine("</code></p>");
+        }
 
         builder.AppendLine("  <section>");
         builder.AppendLine("    <h2>Overview</h2>");

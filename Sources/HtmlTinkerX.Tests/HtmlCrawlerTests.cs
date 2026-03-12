@@ -58,6 +58,24 @@ public class HtmlCrawlerTests {
         Assert.NotSame(options.FormLogin, clone.FormLogin);
     }
 
+    [Fact]
+    public void HtmlCrawlProfiles_ResolveAndApplyBuiltInProfile() {
+        Uri startUri = new("https://evotec.xyz/");
+        HtmlCrawlProfile? profile = HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true);
+
+        Assert.NotNull(profile);
+        Assert.Equal("evotec-xyz", profile!.Name, ignoreCase: true);
+
+        HtmlCrawlOptions options = new();
+        HtmlCrawlProfiles.Apply(options, profile);
+
+        Assert.Equal("main", options.Selector);
+        Assert.Equal("#main", options.WaitForSelector);
+        Assert.Contains(".sharing-popup", options.ExcludeSelectors);
+        Assert.Contains("Load more", options.ClickTexts);
+        Assert.Equal(2, options.InteractionRepeatCount);
+    }
+
     private static int GetFreePort() {
         var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -221,6 +239,33 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Read More", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Profile_AppliesSelectorExclusionsAndProfileMetadata() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                ProfileName = "evotec-xyz"
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal("evotec-xyz", result.AppliedProfileName, ignoreCase: true);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlRenderReasonCode.StaticRenderDisabled, page.RenderReasonCode);
         } finally {
             server.Stop();
             server.Close();

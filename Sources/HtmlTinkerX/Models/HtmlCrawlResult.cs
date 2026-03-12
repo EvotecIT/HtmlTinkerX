@@ -32,6 +32,9 @@ public sealed class HtmlCrawlResult {
     /// <summary>Sitemaps used to discover crawl candidates.</summary>
     public IList<string> SitemapUrls { get; set; } = new List<string>();
 
+    /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
+    public string? AppliedProfileName { get; set; }
+
     /// <summary>Manifest path used when crawl artifacts were persisted.</summary>
     public string? ManifestPath { get; set; }
 

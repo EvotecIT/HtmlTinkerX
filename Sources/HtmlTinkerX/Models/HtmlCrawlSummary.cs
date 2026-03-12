@@ -12,6 +12,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Starting URL used for the crawl.</summary>
     public string StartUrl { get; set; } = string.Empty;
 
+    /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
+    public string? AppliedProfileName { get; set; }
+
     /// <summary>Total successful or failed fetches recorded in <see cref="HtmlCrawlResult.Pages"/>.</summary>
     public int PageCount { get; set; }
 
@@ -105,6 +108,7 @@ public sealed class HtmlCrawlSummary {
     internal static HtmlCrawlSummary FromResult(HtmlCrawlResult result) {
         var summary = new HtmlCrawlSummary {
             StartUrl = result.StartUrl,
+            AppliedProfileName = result.AppliedProfileName,
             PageCount = result.Pages.Count,
             SuccessfulPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Success),
             FailedPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Failed),
@@ -168,6 +172,9 @@ public sealed class HtmlCrawlSummary {
         StringBuilder report = new();
         report.AppendLine("=== HTML Crawl Summary ===");
         report.AppendLine($"Start URL: {StartUrl}");
+        if (!string.IsNullOrWhiteSpace(AppliedProfileName)) {
+            report.AppendLine($"Profile: {AppliedProfileName}");
+        }
         report.AppendLine($"Pages fetched: {PageCount}");
         report.AppendLine($"Successful pages: {SuccessfulPageCount}");
         report.AppendLine($"Failed pages: {FailedPageCount}");

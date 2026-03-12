@@ -66,6 +66,12 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional directory or manifest path used to resume a previous crawl.</summary>
     public string? ResumePath { get; set; }
 
+    /// <summary>Optional built-in profile name used to preconfigure crawl behavior.</summary>
+    public string? ProfileName { get; set; }
+
+    /// <summary>When true, applies a built-in profile automatically when the start host matches one.</summary>
+    public bool AutoProfile { get; set; }
+
     /// <summary>Stores the fetched HTML in the result.</summary>
     public bool IncludeHtml { get; set; } = true;
 
@@ -254,6 +260,8 @@ public sealed class HtmlCrawlOptions {
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutputPath,
             ResumePath = ResumePath,
+            ProfileName = ProfileName,
+            AutoProfile = AutoProfile,
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             Selector = Selector,

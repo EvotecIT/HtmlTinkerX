@@ -105,6 +105,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? ResumePath { get; set; }
 
+    /// <summary>Optional built-in crawl profile name used to preconfigure crawl behavior.</summary>
+    [Parameter]
+    public string? Profile { get; set; }
+
+    /// <summary>Apply a built-in crawl profile automatically when the start host matches one.</summary>
+    [Parameter]
+    public SwitchParameter AutoProfile { get; set; }
+
     /// <summary>Optional CSS selector used to focus extracted content.</summary>
     [Parameter]
     public string? Selector { get; set; }
@@ -325,6 +333,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutPath?.ToFullPath(),
             ResumePath = ResumePath?.ToFullPath(),
+            ProfileName = Profile,
+            AutoProfile = AutoProfile.IsPresent,
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,

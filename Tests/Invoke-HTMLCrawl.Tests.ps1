@@ -219,6 +219,26 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can apply a built-in crawl profile' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Profile 'evotec-xyz'
+            $page = $result.Pages | Select-Object -First 1
+
+            $result.AppliedProfileName | Should -Be 'evotec-xyz'
+            $page.Html | Should -Match 'Hello'
+            $page.Text | Should -Match 'World'
+            $page.Html | Should -Not -Match 'Share'
+            $page.Text | Should -Not -Match 'Polish'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Persists and resumes a crawl from disk' {
         $outputPath = Join-Path $TestDrive 'crawl-artifacts'
         $prefix = New-TestServerPrefix
