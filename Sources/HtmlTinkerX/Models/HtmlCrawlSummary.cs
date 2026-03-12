@@ -66,6 +66,12 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Number of external graph nodes.</summary>
     public int GraphExternalNodeCount { get; set; }
 
+    /// <summary>Counts of fetched pages by render mode.</summary>
+    public IDictionary<string, int> RenderModeCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Counts of fetched pages by render-reason category.</summary>
+    public IDictionary<string, int> RenderReasonCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Counts of graph nodes by category.</summary>
     public IDictionary<string, int> GraphNodeCategories { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -114,6 +120,12 @@ public sealed class HtmlCrawlSummary {
         summary.GraphFetchedNodeCount = result.GraphFetchedNodeCount;
         summary.GraphSkippedNodeCount = result.GraphSkippedNodeCount;
         summary.GraphExternalNodeCount = result.GraphExternalNodeCount;
+        foreach (var group in result.Pages.GroupBy(page => page.RenderMode.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            summary.RenderModeCounts[group.Key] = group.Count();
+        }
+        foreach (var group in result.Pages.GroupBy(page => page.RenderReasonCode.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            summary.RenderReasonCounts[group.Key] = group.Count();
+        }
         foreach (var item in result.GraphNodeCategories) {
             summary.GraphNodeCategories[item.Key] = item.Value;
         }
@@ -162,6 +174,17 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"External graph nodes: {GraphExternalNodeCount}");
         report.AppendLine($"Discovered links: {TotalDiscoveredLinks}");
         report.AppendLine($"Duration: {DurationMs} ms");
+
+        if (RenderModeCounts.Count > 0 || RenderReasonCounts.Count > 0) {
+            report.AppendLine();
+            report.AppendLine("Render summary:");
+            foreach (var item in RenderModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Render mode {item.Key}: {item.Value}");
+            }
+            foreach (var item in RenderReasonCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Render reason {item.Key}: {item.Value}");
+            }
+        }
 
         if (GraphNodeCategories.Count > 0) {
             report.AppendLine();

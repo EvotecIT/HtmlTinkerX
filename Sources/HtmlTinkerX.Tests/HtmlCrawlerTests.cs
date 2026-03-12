@@ -226,6 +226,7 @@ public class HtmlCrawlerTests {
         HtmlCrawler.AutoRenderDecision decision = HtmlCrawler.EvaluateAutoRender(page, options);
         Assert.True(decision.ShouldRender);
         Assert.Contains("JavaScript shell", decision.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HtmlCrawlRenderReasonCode.AutoRenderJavaScriptShell, decision.ReasonCode);
         Assert.True(HtmlCrawler.ShouldRetryWithRendering(page, options));
     }
 
@@ -244,7 +245,53 @@ public class HtmlCrawlerTests {
         HtmlCrawler.AutoRenderDecision decision = HtmlCrawler.EvaluateAutoRender(page, options);
         Assert.False(decision.ShouldRender);
         Assert.Contains("meeting", decision.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HtmlCrawlRenderReasonCode.StaticThresholdMet, decision.ReasonCode);
         Assert.False(HtmlCrawler.ShouldRetryWithRendering(page, options));
+    }
+
+    [Fact]
+    public void HtmlCrawlSummary_AggregatesRenderModesAndReasonCodes() {
+        HtmlCrawlResult result = new() {
+            StartUrl = "https://example.com/",
+            Started = DateTimeOffset.UtcNow.AddSeconds(-2),
+            Finished = DateTimeOffset.UtcNow,
+            Pages = {
+                new HtmlCrawlPage {
+                    Url = "https://example.com/",
+                    Status = HtmlCrawlPageStatus.Success,
+                    Rendered = false,
+                    RenderMode = HtmlCrawlRenderMode.Static,
+                    RenderReasonCode = HtmlCrawlRenderReasonCode.StaticRenderDisabled,
+                    RenderReason = "Kept static because browser rendering was not enabled.",
+                    Text = "Hello world",
+                    Started = DateTimeOffset.UtcNow.AddSeconds(-2),
+                    Finished = DateTimeOffset.UtcNow.AddSeconds(-1)
+                },
+                new HtmlCrawlPage {
+                    Url = "https://example.com/app",
+                    Status = HtmlCrawlPageStatus.Success,
+                    Rendered = true,
+                    RenderMode = HtmlCrawlRenderMode.AutoRendered,
+                    RenderReasonCode = HtmlCrawlRenderReasonCode.AutoRenderJavaScriptShell,
+                    RenderReason = "Auto-render triggered because the static HTML looked like a JavaScript shell container.",
+                    Text = "Rendered content",
+                    Started = DateTimeOffset.UtcNow.AddSeconds(-1),
+                    Finished = DateTimeOffset.UtcNow
+                }
+            }
+        };
+
+        HtmlCrawlSummary summary = result.Summary;
+
+        Assert.Equal(1, summary.RenderModeCounts["Static"]);
+        Assert.Equal(1, summary.RenderModeCounts["AutoRendered"]);
+        Assert.Equal(1, summary.RenderReasonCounts["StaticRenderDisabled"]);
+        Assert.Equal(1, summary.RenderReasonCounts["AutoRenderJavaScriptShell"]);
+        Assert.Equal(1, summary.AutoRenderedPageCount);
+        string report = summary.ToReportText(result.SitemapUrls);
+        Assert.Contains("Render summary:", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Render mode AutoRendered: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Render reason AutoRenderJavaScriptShell: 1", report, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -815,6 +862,9 @@ public class HtmlCrawlerTests {
             Assert.Contains("Offline Home", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Useful docs for offline testing", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("keywords: offline", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Render Summary", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Render mode", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("StaticRenderDisabled", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Chunks JSONL", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Graph JSON", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Graph Summary", indexHtml, StringComparison.OrdinalIgnoreCase);

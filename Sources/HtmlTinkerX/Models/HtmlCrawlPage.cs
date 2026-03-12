@@ -76,6 +76,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Explains why the selected render mode was used for this page.</summary>
     public string? RenderReason { get; set; }
 
+    /// <summary>Categorizes why the selected render mode was used for this page.</summary>
+    public HtmlCrawlRenderReasonCode RenderReasonCode { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 

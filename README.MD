@@ -217,6 +217,7 @@ var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCra
     ExcludeSelectors = { ".language-switcher", ".share-links", ".related-posts" }
 });
 Console.WriteLine($"{hybrid.Pages[0].RenderMode}: {hybrid.Pages[0].RenderReason}");
+Console.WriteLine(hybrid.Summary.ToReportText(hybrid.SitemapUrls));
 ```
 
 ### PowerShell Example
@@ -253,6 +254,7 @@ $richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -Do
 # Hybrid crawl for JavaScript-heavy pages with lazy loading and noisy chrome removal
 $hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
 $hybrid.Pages | Select-Object Url, RenderMode, RenderReason
+$hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'

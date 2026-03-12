@@ -24,6 +24,7 @@ public static class HtmlCrawler {
     internal sealed class AutoRenderDecision {
         public bool ShouldRender { get; set; }
         public string Reason { get; set; } = string.Empty;
+        public HtmlCrawlRenderReasonCode ReasonCode { get; set; }
     }
 
     private sealed class PageSearchMetadata {
@@ -245,18 +246,22 @@ public static class HtmlCrawler {
                 if (resolvedOptions.Render) {
                     page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
+                    page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
                     page = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
                     if (resolvedOptions.AutoRender) {
                         AutoRenderDecision decision = EvaluateAutoRender(page, resolvedOptions);
+                        page.RenderReasonCode = decision.ReasonCode;
                         page.RenderReason = decision.Reason;
                         if (decision.ShouldRender) {
                             page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
                             page.RenderMode = HtmlCrawlRenderMode.AutoRendered;
+                            page.RenderReasonCode = decision.ReasonCode;
                             page.RenderReason = decision.Reason;
                         }
                     } else {
+                        page.RenderReasonCode = HtmlCrawlRenderReasonCode.StaticRenderDisabled;
                         page.RenderReason = "Kept static because browser rendering was not enabled.";
                     }
                 }
@@ -883,7 +888,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReason,Started,Finished,DurationMs,LinkCount,AssetCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,Started,Finished,DurationMs,LinkCount,AssetCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -903,6 +908,7 @@ public static class HtmlCrawler {
                 page.DuplicateOfUrl,
                 page.Rendered,
                 page.RenderMode,
+                page.RenderReasonCode,
                 page.RenderReason,
                 page.Started,
                 page.Finished,
@@ -929,6 +935,7 @@ public static class HtmlCrawler {
                 EscapeCsv(page.DuplicateOfUrl),
                 EscapeCsv(page.Rendered.ToString()),
                 EscapeCsv(page.RenderMode.ToString()),
+                EscapeCsv(page.RenderReasonCode.ToString()),
                 EscapeCsv(page.RenderReason),
                 EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
@@ -1097,6 +1104,7 @@ public static class HtmlCrawler {
             page.Title,
             page.Rendered,
             page.RenderMode,
+            page.RenderReasonCode,
             page.RenderReason,
             page.Started,
             page.Finished,
@@ -1597,6 +1605,28 @@ public static class HtmlCrawler {
             builder.AppendLine("  </section>");
         }
 
+        if (summary.RenderModeCounts.Count > 0 || summary.RenderReasonCounts.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Render Summary</h2>");
+            builder.AppendLine("    <ul>");
+            foreach (var item in summary.RenderModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Render mode <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            foreach (var item in summary.RenderReasonCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Render reason <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            builder.AppendLine("    </ul>");
+            builder.AppendLine("  </section>");
+        }
+
         if (summary.GraphNodeCategories.Count > 0 || summary.GraphEdgeRelations.Count > 0 || summary.GraphSkippedNodeReasons.Count > 0) {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Graph Summary</h2>");
@@ -1652,6 +1682,10 @@ public static class HtmlCrawler {
             }
             builder.Append("<br><span class=\"muted\">")
                 .Append(HtmlEncode(page.RenderMode.ToString()));
+            if (page.RenderReasonCode != HtmlCrawlRenderReasonCode.None) {
+                builder.Append(" / ")
+                    .Append(HtmlEncode(page.RenderReasonCode.ToString()));
+            }
             if (!string.IsNullOrWhiteSpace(page.RenderReason)) {
                 builder.Append(": ")
                     .Append(HtmlEncode(page.RenderReason));
@@ -2075,6 +2109,7 @@ public static class HtmlCrawler {
         if (page.Status != HtmlCrawlPageStatus.Success) {
             return new AutoRenderDecision {
                 ShouldRender = false,
+                ReasonCode = HtmlCrawlRenderReasonCode.StaticStatusNotSuccess,
                 Reason = $"Kept static because page status was {page.Status}."
             };
         }
@@ -2085,6 +2120,7 @@ public static class HtmlCrawler {
         if (selectorMissed) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderSelectorMiss,
                 Reason = $"Auto-render triggered because selector '{options.Selector}' produced no stored HTML or text in static mode."
             };
         }
@@ -2093,6 +2129,7 @@ public static class HtmlCrawler {
         if (!string.IsNullOrWhiteSpace(options.WaitForSelector) && wordCount < options.AutoRenderTextWordThreshold) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderWaitForSelectorThin,
                 Reason = $"Auto-render triggered because WaitForSelector '{options.WaitForSelector}' was configured and static text stayed below {options.AutoRenderTextWordThreshold} words."
             };
         }
@@ -2100,6 +2137,7 @@ public static class HtmlCrawler {
         if (wordCount >= options.AutoRenderTextWordThreshold) {
             return new AutoRenderDecision {
                 ShouldRender = false,
+                ReasonCode = HtmlCrawlRenderReasonCode.StaticThresholdMet,
                 Reason = $"Kept static because extracted text reached {wordCount} words, meeting the {options.AutoRenderTextWordThreshold}-word threshold."
             };
         }
@@ -2108,6 +2146,7 @@ public static class HtmlCrawler {
         if (string.IsNullOrWhiteSpace(html)) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderNoHtml,
                 Reason = "Auto-render triggered because static extraction produced no stored HTML."
             };
         }
@@ -2127,6 +2166,7 @@ public static class HtmlCrawler {
         if (hasShellMarker) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderJavaScriptShell,
                 Reason = "Auto-render triggered because the static HTML looked like a JavaScript shell container."
             };
         }
@@ -2134,6 +2174,7 @@ public static class HtmlCrawler {
         if (scriptCount >= 6) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderManyScripts,
                 Reason = $"Auto-render triggered because the static page contained {scriptCount} script tags but only {wordCount} extracted words."
             };
         }
@@ -2141,12 +2182,14 @@ public static class HtmlCrawler {
         if (headingCount == 0) {
             return new AutoRenderDecision {
                 ShouldRender = true,
+                ReasonCode = HtmlCrawlRenderReasonCode.AutoRenderNoHeadings,
                 Reason = "Auto-render triggered because the static page had no headings and very little extracted text."
             };
         }
 
         return new AutoRenderDecision {
             ShouldRender = false,
+            ReasonCode = HtmlCrawlRenderReasonCode.StaticHeuristicsNotTriggered,
             Reason = $"Kept static because auto-render heuristics did not trigger, even though extracted text stayed at {wordCount} words."
         };
     }
@@ -2236,6 +2279,7 @@ public static class HtmlCrawler {
             Error = $"Duplicate of {originalUrl}",
             Rendered = page.Rendered,
             RenderMode = page.RenderMode,
+            RenderReasonCode = page.RenderReasonCode,
             RenderReason = page.RenderReason,
             Started = page.Started,
             Finished = page.Finished
