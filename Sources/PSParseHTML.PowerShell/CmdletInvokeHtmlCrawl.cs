@@ -113,6 +113,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string[] ExcludeSelector { get; set; } = System.Array.Empty<string>();
 
+    /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
+    [Parameter]
+    public string[] ClickSelector { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Optional selectors to dismiss on rendered pages before extraction.</summary>
+    [Parameter]
+    public string[] DismissSelector { get; set; } = System.Array.Empty<string>();
+
     /// <summary>Optional selector to wait for on rendered pages.</summary>
     [Parameter]
     public string? WaitForSelector { get; set; }
@@ -135,6 +143,11 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int AutoScrollDelayMs { get; set; } = 400;
+
+    /// <summary>Delay after each rendered interaction in milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int InteractionDelayMs { get; set; } = 300;
 
     /// <summary>Minimum extracted word count before static pages are considered rich enough to skip AutoRender fallback.</summary>
     [Parameter]
@@ -303,11 +316,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
             ExcludeSelectors = new List<string>(ExcludeSelector),
+            ClickSelectors = new List<string>(ClickSelector),
+            DismissSelectors = new List<string>(DismissSelector),
             WaitForSelector = WaitForSelector,
             WaitAfterLoadMs = WaitAfterLoadMs,
             AutoScroll = AutoScroll.IsPresent,
             AutoScrollSteps = AutoScrollSteps,
             AutoScrollDelayMs = AutoScrollDelayMs,
+            InteractionDelayMs = InteractionDelayMs,
             AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,

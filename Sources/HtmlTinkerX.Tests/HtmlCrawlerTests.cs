@@ -24,10 +24,14 @@ public class HtmlCrawlerTests {
         };
         options.Headers["X-Test"] = "one";
         options.IncludePatterns.Add("*docs*");
+        options.ClickSelectors.Add(".load-more");
+        options.DismissSelectors.Add(".cookie-banner");
 
         HtmlCrawlOptions clone = options.Clone();
         clone.Headers["X-Test"] = "two";
         clone.IncludePatterns.Add("*blog*");
+        clone.ClickSelectors.Add(".expand");
+        clone.DismissSelectors.Add(".newsletter");
         clone.ClearSensitiveData();
 
         Assert.Equal("secret", options.Password);
@@ -35,10 +39,14 @@ public class HtmlCrawlerTests {
         Assert.Equal("one", options.Headers["X-Test"]);
         Assert.Single(options.IncludePatterns);
         Assert.Empty(options.ExcludeSelectors);
+        Assert.Single(options.ClickSelectors);
+        Assert.Single(options.DismissSelectors);
         Assert.Null(clone.Password);
         Assert.Null(clone.ProxyPassword);
         Assert.Equal("two", clone.Headers["X-Test"]);
         Assert.Equal(2, clone.IncludePatterns.Count);
+        Assert.Equal(2, clone.ClickSelectors.Count);
+        Assert.Equal(2, clone.DismissSelectors.Count);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
     }
 

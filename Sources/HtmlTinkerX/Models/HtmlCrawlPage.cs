@@ -64,6 +64,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Discovered asset URLs referenced from the page.</summary>
     public IList<string> AssetUrls { get; set; } = new List<string>();
 
+    /// <summary>Rendered interactions that were successfully applied before extraction.</summary>
+    public IList<string> AppliedInteractions { get; set; } = new List<string>();
+
     /// <summary>Error message when the page could not be fetched.</summary>
     public string? Error { get; set; }
 

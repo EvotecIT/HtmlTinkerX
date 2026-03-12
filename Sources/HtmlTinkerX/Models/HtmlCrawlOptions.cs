@@ -78,6 +78,12 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     public IList<string> ExcludeSelectors { get; set; } = new List<string>();
 
+    /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
+    public IList<string> ClickSelectors { get; set; } = new List<string>();
+
+    /// <summary>Optional selectors to dismiss on rendered pages before extraction.</summary>
+    public IList<string> DismissSelectors { get; set; } = new List<string>();
+
     /// <summary>Optional selector that must appear before rendered extraction continues.</summary>
     public string? WaitForSelector { get; set; }
 
@@ -92,6 +98,9 @@ public sealed class HtmlCrawlOptions {
 
     /// <summary>Delay after each auto-scroll step in milliseconds.</summary>
     public int AutoScrollDelayMs { get; set; } = 400;
+
+    /// <summary>Delay after each rendered interaction in milliseconds.</summary>
+    public int InteractionDelayMs { get; set; } = 300;
 
     /// <summary>Minimum extracted word count before static pages are considered rich enough to skip auto-render fallback.</summary>
     public int AutoRenderTextWordThreshold { get; set; } = 40;
@@ -240,11 +249,14 @@ public sealed class HtmlCrawlOptions {
             IncludeText = IncludeText,
             Selector = Selector,
             ExcludeSelectors = new List<string>(ExcludeSelectors),
+            ClickSelectors = new List<string>(ClickSelectors),
+            DismissSelectors = new List<string>(DismissSelectors),
             WaitForSelector = WaitForSelector,
             WaitAfterLoadMs = WaitAfterLoadMs,
             AutoScroll = AutoScroll,
             AutoScrollSteps = AutoScrollSteps,
             AutoScrollDelayMs = AutoScrollDelayMs,
+            InteractionDelayMs = InteractionDelayMs,
             AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,

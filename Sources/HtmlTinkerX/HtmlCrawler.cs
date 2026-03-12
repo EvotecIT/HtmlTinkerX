@@ -341,6 +341,9 @@ public static class HtmlCrawler {
         if (options.AutoScrollDelayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(options.AutoScrollDelayMs), "AutoScrollDelayMs must be zero or greater.");
         }
+        if (options.InteractionDelayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.InteractionDelayMs), "InteractionDelayMs must be zero or greater.");
+        }
         if (options.AutoRenderTextWordThreshold <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.AutoRenderTextWordThreshold), "AutoRenderTextWordThreshold must be greater than zero.");
         }
@@ -888,7 +891,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,Started,Finished,DurationMs,LinkCount,AssetCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -910,6 +913,7 @@ public static class HtmlCrawler {
                 page.RenderMode,
                 page.RenderReasonCode,
                 page.RenderReason,
+                page.AppliedInteractions,
                 page.Started,
                 page.Finished,
                 DurationMs = (long)page.Duration.TotalMilliseconds,
@@ -942,6 +946,7 @@ public static class HtmlCrawler {
                 EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Links.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.AssetUrls.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.AppliedInteractions.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Error)));
         }
 
@@ -1106,6 +1111,7 @@ public static class HtmlCrawler {
             page.RenderMode,
             page.RenderReasonCode,
             page.RenderReason,
+            page.AppliedInteractions,
             page.Started,
             page.Finished,
             DurationMs = (long)page.Duration.TotalMilliseconds,
@@ -1690,6 +1696,10 @@ public static class HtmlCrawler {
                 builder.Append(": ")
                     .Append(HtmlEncode(page.RenderReason));
             }
+            if (page.AppliedInteractions.Count > 0) {
+                builder.Append("<br>interactions: ")
+                    .Append(HtmlEncode(string.Join(" | ", page.AppliedInteractions)));
+            }
             builder.Append("</span>");
             builder.AppendLine("</td>");
             builder.Append("          <td class=\"summary\"><strong>")
@@ -2051,6 +2061,8 @@ public static class HtmlCrawler {
                 await session.Page.WaitForTimeoutAsync(options.WaitAfterLoadMs).ConfigureAwait(false);
             }
 
+            await ApplyRenderedInteractionsAsync(session.Page, page, options, cancellationToken).ConfigureAwait(false);
+
             if (options.AutoScroll) {
                 await AutoScrollPageAsync(session.Page, options, cancellationToken).ConfigureAwait(false);
             }
@@ -2085,6 +2097,42 @@ public static class HtmlCrawler {
         }
 
         return page;
+    }
+
+    private static async Task ApplyRenderedInteractionsAsync(IPage page, HtmlCrawlPage crawlPage, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        foreach (string selector in options.DismissSelectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await TryClickRenderedSelectorAsync(page, selector, options, cancellationToken).ConfigureAwait(false)) {
+                crawlPage.AppliedInteractions.Add($"Dismissed: {selector}");
+            }
+        }
+
+        foreach (string selector in options.ClickSelectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await TryClickRenderedSelectorAsync(page, selector, options, cancellationToken).ConfigureAwait(false)) {
+                crawlPage.AppliedInteractions.Add($"Clicked: {selector}");
+            }
+        }
+    }
+
+    private static async Task<bool> TryClickRenderedSelectorAsync(IPage page, string selector, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        try {
+            ILocator locator = page.Locator(selector).First;
+            if (await locator.CountAsync().ConfigureAwait(false) == 0) {
+                return false;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await locator.ClickAsync(new LocatorClickOptions {
+                Timeout = Math.Min(options.Timeout, 3000)
+            }).ConfigureAwait(false);
+            if (options.InteractionDelayMs > 0) {
+                await page.WaitForTimeoutAsync(options.InteractionDelayMs).ConfigureAwait(false);
+            }
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     private static async Task AutoScrollPageAsync(IPage page, HtmlCrawlOptions options, CancellationToken cancellationToken) {

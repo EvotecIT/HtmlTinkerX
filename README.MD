@@ -213,10 +213,13 @@ var richSnapshot = await HtmlCrawler.CrawlAsync("https://example.com/docs", new 
 var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCrawlOptions {
     AutoRender = true,
     WaitForSelector = "#main",
+    DismissSelectors = { ".cookie-banner button", "#consent-accept" },
+    ClickSelectors = { ".load-more", ".expand-details" },
     AutoScroll = true,
     ExcludeSelectors = { ".language-switcher", ".share-links", ".related-posts" }
 });
 Console.WriteLine($"{hybrid.Pages[0].RenderMode}: {hybrid.Pages[0].RenderReason}");
+Console.WriteLine(string.Join(", ", hybrid.Pages[0].AppliedInteractions));
 Console.WriteLine(hybrid.Summary.ToReportText(hybrid.SitemapUrls));
 ```
 
@@ -252,8 +255,8 @@ $richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -Do
 # Internal page links are also rewritten to local saved .html files by default
 
 # Hybrid crawl for JavaScript-heavy pages with lazy loading and noisy chrome removal
-$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
-$hybrid.Pages | Select-Object Url, RenderMode, RenderReason
+$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -DismissSelector '.cookie-banner button', '#consent-accept' -ClickSelector '.load-more', '.expand-details' -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
+$hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
 $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 
 # Resume a previous crawl snapshot
