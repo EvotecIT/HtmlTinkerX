@@ -25,13 +25,17 @@ public class HtmlCrawlerTests {
         options.Headers["X-Test"] = "one";
         options.IncludePatterns.Add("*docs*");
         options.ClickSelectors.Add(".load-more");
+        options.ClickTexts.Add("Load more");
         options.DismissSelectors.Add(".cookie-banner");
+        options.DismissTexts.Add("Accept");
 
         HtmlCrawlOptions clone = options.Clone();
         clone.Headers["X-Test"] = "two";
         clone.IncludePatterns.Add("*blog*");
         clone.ClickSelectors.Add(".expand");
+        clone.ClickTexts.Add("Show more");
         clone.DismissSelectors.Add(".newsletter");
+        clone.DismissTexts.Add("Dismiss");
         clone.ClearSensitiveData();
 
         Assert.Equal("secret", options.Password);
@@ -40,13 +44,17 @@ public class HtmlCrawlerTests {
         Assert.Single(options.IncludePatterns);
         Assert.Empty(options.ExcludeSelectors);
         Assert.Single(options.ClickSelectors);
+        Assert.Single(options.ClickTexts);
         Assert.Single(options.DismissSelectors);
+        Assert.Single(options.DismissTexts);
         Assert.Null(clone.Password);
         Assert.Null(clone.ProxyPassword);
         Assert.Equal("two", clone.Headers["X-Test"]);
         Assert.Equal(2, clone.IncludePatterns.Count);
         Assert.Equal(2, clone.ClickSelectors.Count);
+        Assert.Equal(2, clone.ClickTexts.Count);
         Assert.Equal(2, clone.DismissSelectors.Count);
+        Assert.Equal(2, clone.DismissTexts.Count);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
     }
 

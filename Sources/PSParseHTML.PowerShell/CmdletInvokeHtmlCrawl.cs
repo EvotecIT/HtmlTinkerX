@@ -117,9 +117,17 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string[] ClickSelector { get; set; } = System.Array.Empty<string>();
 
+    /// <summary>Optional visible texts to click once on rendered pages before extraction.</summary>
+    [Parameter]
+    public string[] ClickText { get; set; } = System.Array.Empty<string>();
+
     /// <summary>Optional selectors to dismiss on rendered pages before extraction.</summary>
     [Parameter]
     public string[] DismissSelector { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Optional visible texts to dismiss on rendered pages before extraction.</summary>
+    [Parameter]
+    public string[] DismissText { get; set; } = System.Array.Empty<string>();
 
     /// <summary>Optional selector to wait for on rendered pages.</summary>
     [Parameter]
@@ -148,6 +156,11 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int InteractionDelayMs { get; set; } = 300;
+
+    /// <summary>Number of times click interactions should be retried on rendered pages.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int InteractionRepeatCount { get; set; } = 1;
 
     /// <summary>Minimum extracted word count before static pages are considered rich enough to skip AutoRender fallback.</summary>
     [Parameter]
@@ -317,13 +330,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Selector = Selector,
             ExcludeSelectors = new List<string>(ExcludeSelector),
             ClickSelectors = new List<string>(ClickSelector),
+            ClickTexts = new List<string>(ClickText),
             DismissSelectors = new List<string>(DismissSelector),
+            DismissTexts = new List<string>(DismissText),
             WaitForSelector = WaitForSelector,
             WaitAfterLoadMs = WaitAfterLoadMs,
             AutoScroll = AutoScroll.IsPresent,
             AutoScrollSteps = AutoScrollSteps,
             AutoScrollDelayMs = AutoScrollDelayMs,
             InteractionDelayMs = InteractionDelayMs,
+            InteractionRepeatCount = InteractionRepeatCount,
             AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,

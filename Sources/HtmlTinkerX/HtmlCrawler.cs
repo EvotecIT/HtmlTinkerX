@@ -344,6 +344,9 @@ public static class HtmlCrawler {
         if (options.InteractionDelayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(options.InteractionDelayMs), "InteractionDelayMs must be zero or greater.");
         }
+        if (options.InteractionRepeatCount <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.InteractionRepeatCount), "InteractionRepeatCount must be greater than zero.");
+        }
         if (options.AutoRenderTextWordThreshold <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.AutoRenderTextWordThreshold), "AutoRenderTextWordThreshold must be greater than zero.");
         }
@@ -2100,6 +2103,13 @@ public static class HtmlCrawler {
     }
 
     private static async Task ApplyRenderedInteractionsAsync(IPage page, HtmlCrawlPage crawlPage, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        foreach (string text in options.DismissTexts.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await TryClickRenderedTextAsync(page, text, options, cancellationToken).ConfigureAwait(false)) {
+                crawlPage.AppliedInteractions.Add($"Dismissed text: {text}");
+            }
+        }
+
         foreach (string selector in options.DismissSelectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
             cancellationToken.ThrowIfCancellationRequested();
             if (await TryClickRenderedSelectorAsync(page, selector, options, cancellationToken).ConfigureAwait(false)) {
@@ -2107,10 +2117,23 @@ public static class HtmlCrawler {
             }
         }
 
-        foreach (string selector in options.ClickSelectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (await TryClickRenderedSelectorAsync(page, selector, options, cancellationToken).ConfigureAwait(false)) {
-                crawlPage.AppliedInteractions.Add($"Clicked: {selector}");
+        for (int i = 0; i < options.InteractionRepeatCount; i++) {
+            foreach (string text in options.ClickTexts.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await TryClickRenderedTextAsync(page, text, options, cancellationToken).ConfigureAwait(false)) {
+                    crawlPage.AppliedInteractions.Add(options.InteractionRepeatCount > 1
+                        ? $"Clicked text [{i + 1}]: {text}"
+                        : $"Clicked text: {text}");
+                }
+            }
+
+            foreach (string selector in options.ClickSelectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await TryClickRenderedSelectorAsync(page, selector, options, cancellationToken).ConfigureAwait(false)) {
+                    crawlPage.AppliedInteractions.Add(options.InteractionRepeatCount > 1
+                        ? $"Clicked [{i + 1}]: {selector}"
+                        : $"Clicked: {selector}");
+                }
             }
         }
     }
@@ -2118,6 +2141,26 @@ public static class HtmlCrawler {
     private static async Task<bool> TryClickRenderedSelectorAsync(IPage page, string selector, HtmlCrawlOptions options, CancellationToken cancellationToken) {
         try {
             ILocator locator = page.Locator(selector).First;
+            if (await locator.CountAsync().ConfigureAwait(false) == 0) {
+                return false;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await locator.ClickAsync(new LocatorClickOptions {
+                Timeout = Math.Min(options.Timeout, 3000)
+            }).ConfigureAwait(false);
+            if (options.InteractionDelayMs > 0) {
+                await page.WaitForTimeoutAsync(options.InteractionDelayMs).ConfigureAwait(false);
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private static async Task<bool> TryClickRenderedTextAsync(IPage page, string text, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        try {
+            ILocator locator = page.GetByText(text).First;
             if (await locator.CountAsync().ConfigureAwait(false) == 0) {
                 return false;
             }

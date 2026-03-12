@@ -214,7 +214,10 @@ var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCra
     AutoRender = true,
     WaitForSelector = "#main",
     DismissSelectors = { ".cookie-banner button", "#consent-accept" },
+    DismissTexts = { "Accept", "I agree" },
     ClickSelectors = { ".load-more", ".expand-details" },
+    ClickTexts = { "Load more", "Show more" },
+    InteractionRepeatCount = 2,
     AutoScroll = true,
     ExcludeSelectors = { ".language-switcher", ".share-links", ".related-posts" }
 });
@@ -255,7 +258,7 @@ $richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -Do
 # Internal page links are also rewritten to local saved .html files by default
 
 # Hybrid crawl for JavaScript-heavy pages with lazy loading and noisy chrome removal
-$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -DismissSelector '.cookie-banner button', '#consent-accept' -ClickSelector '.load-more', '.expand-details' -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
+$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -DismissSelector '.cookie-banner button', '#consent-accept' -DismissText 'Accept', 'I agree' -ClickSelector '.load-more', '.expand-details' -ClickText 'Load more', 'Show more' -InteractionRepeatCount 2 -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
 $hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
 $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 
