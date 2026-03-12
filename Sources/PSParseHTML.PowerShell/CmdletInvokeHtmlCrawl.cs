@@ -296,6 +296,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
+        ValidateProfile(Profile);
 
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
@@ -424,5 +425,20 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Credential = null;
             ProxyCredential = null;
         }
+    }
+
+    private static void ValidateProfile(string? profileName) {
+        if (string.IsNullOrWhiteSpace(profileName)) {
+            return;
+        }
+
+        foreach (string knownProfile in HtmlCrawlProfiles.Names) {
+            if (string.Equals(knownProfile, profileName.Trim(), System.StringComparison.OrdinalIgnoreCase)) {
+                return;
+            }
+        }
+
+        string availableProfiles = string.Join(", ", HtmlCrawlProfiles.Names);
+        throw new PSArgumentException($"Unknown crawl profile '{profileName}'. Available profiles: {availableProfiles}.", nameof(Profile));
     }
 }

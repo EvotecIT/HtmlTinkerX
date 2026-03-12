@@ -72,13 +72,29 @@ public static class HtmlCrawlProfiles {
         }
     };
 
+    private static readonly IReadOnlyList<string> BuiltInProfileNames = BuiltInProfiles
+        .Select(profile => profile.Name)
+        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
     /// <summary>Gets the built-in crawl profiles.</summary>
     public static IReadOnlyList<HtmlCrawlProfile> Defaults => BuiltInProfiles;
 
+    /// <summary>Gets the built-in crawl profile names.</summary>
+    public static IReadOnlyList<string> Names => BuiltInProfileNames;
+
+    internal static HtmlCrawlProfile? ResolveByName(string? profileName) {
+        if (string.IsNullOrWhiteSpace(profileName)) {
+            return null;
+        }
+
+        return BuiltInProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Name, profileName.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
     internal static HtmlCrawlProfile? Resolve(string? profileName, Uri startUri, bool autoProfile) {
         if (!string.IsNullOrWhiteSpace(profileName)) {
-            return BuiltInProfiles.FirstOrDefault(profile =>
-                string.Equals(profile.Name, profileName.Trim(), StringComparison.OrdinalIgnoreCase));
+            return ResolveByName(profileName);
         }
 
         if (!autoProfile) {

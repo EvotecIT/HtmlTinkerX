@@ -239,6 +239,15 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Rejects unknown crawl profile names with available values' {
+        $thrown = {
+            Invoke-HTMLCrawl -Url 'https://example.com/' -Profile 'missing-profile'
+        } | Should -Throw -PassThru
+
+        $thrown.Exception.Message | Should -Match 'evotec-xyz'
+        $thrown.Exception.Message | Should -Match 'wordpress-content'
+    }
+
     It 'Persists and resumes a crawl from disk' {
         $outputPath = Join-Path $TestDrive 'crawl-artifacts'
         $prefix = New-TestServerPrefix

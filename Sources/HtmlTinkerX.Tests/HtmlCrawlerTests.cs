@@ -65,6 +65,8 @@ public class HtmlCrawlerTests {
 
         Assert.NotNull(profile);
         Assert.Equal("evotec-xyz", profile!.Name, ignoreCase: true);
+        Assert.Contains("evotec-xyz", HtmlCrawlProfiles.Names);
+        Assert.Contains("wordpress-content", HtmlCrawlProfiles.Names);
 
         HtmlCrawlOptions options = new();
         HtmlCrawlProfiles.Apply(options, profile);
@@ -74,6 +76,18 @@ public class HtmlCrawlerTests {
         Assert.Contains(".sharing-popup", options.ExcludeSelectors);
         Assert.Contains("Load more", options.ClickTexts);
         Assert.Equal(2, options.InteractionRepeatCount);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_UnknownProfile_ThrowsHelpfulError() {
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            HtmlCrawler.CrawlAsync("https://example.com/", new HtmlCrawlOptions {
+                ProfileName = "missing-profile"
+            }));
+
+        Assert.Contains("Unknown crawl profile", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("evotec-xyz", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("wordpress-content", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int GetFreePort() {

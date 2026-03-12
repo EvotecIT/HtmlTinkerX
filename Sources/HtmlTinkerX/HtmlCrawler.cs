@@ -156,6 +156,11 @@ public static class HtmlCrawler {
         }
 
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
+        if (!string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && HtmlCrawlProfiles.ResolveByName(resolvedOptions.ProfileName) == null) {
+            string availableProfiles = string.Join(", ", HtmlCrawlProfiles.Names);
+            throw new ArgumentException($"Unknown crawl profile '{resolvedOptions.ProfileName}'. Available profiles: {availableProfiles}.", nameof(HtmlCrawlOptions.ProfileName));
+        }
+
         HtmlCrawlProfile? appliedProfile = HtmlCrawlProfiles.Resolve(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile);
         if (appliedProfile != null) {
             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);

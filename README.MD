@@ -272,6 +272,8 @@ $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
+# Available profile names: evotec-xyz, wordpress-content
+# Unknown names fail fast and report the built-in values
 
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
