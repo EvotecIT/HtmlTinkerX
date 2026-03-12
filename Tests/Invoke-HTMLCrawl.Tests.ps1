@@ -308,6 +308,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -ContentMode Reader -CompareContentModes -OutPath $outputPath
             $page = $result.Pages | Select-Object -First 1
             $manifest = Get-Content $page.ManifestPath -Raw | ConvertFrom-Json
+            $indexHtml = Get-Content (Join-Path $outputPath 'index.html') -Raw
 
             $page.ContentComparisons.Count | Should -Be 3
             $result.Summary.ContentComparisonWinnerCounts['Reader'] | Should -Be 1
@@ -323,8 +324,17 @@ public sealed class PesterTestHttpServer : IDisposable {
             $manifest.BestContentComparison.BestContentComparisonWordCount | Should -BeGreaterThan 10
             $manifest.BestContentComparison.RunnerUpContentComparisonMode | Should -Be 'Focused'
             $manifest.BestContentComparison.BestContentComparisonWordDelta | Should -BeGreaterThan -1
+            $page.ContentComparisonDeltaSummary | Should -Match '^Reader 0'
+            $page.ContentComparisonDeltaSummary | Should -Match 'Focused '
+            $page.ContentComparisonDeltaSummary | Should -Match 'Raw '
+            $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match '^Reader 0'
+            $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match 'Focused '
+            $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match 'Raw '
             $manifest.ContentComparisons.Count | Should -Be 3
             (($manifest.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' }).ReasonCode) | Should -Be 'ReaderBestCandidate'
+            $indexHtml | Should -Match 'deltas: Reader 0'
+            $indexHtml | Should -Match 'Focused '
+            $indexHtml | Should -Match 'Raw '
         } finally {
             Stop-TestHttpServer $server
         }

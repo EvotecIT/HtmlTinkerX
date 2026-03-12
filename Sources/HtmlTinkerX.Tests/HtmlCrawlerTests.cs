@@ -492,6 +492,10 @@ public class HtmlCrawlerTests {
             Assert.True(page.BestContentComparisonWordCount > 10);
             Assert.Equal(HtmlCrawlContentMode.Focused, page.RunnerUpContentComparisonMode);
             Assert.True(page.BestContentComparisonWordDelta >= 0);
+            Assert.NotNull(page.ContentComparisonDeltaSummary);
+            Assert.StartsWith("Reader 0", page.ContentComparisonDeltaSummary, StringComparison.Ordinal);
+            Assert.Contains("Focused ", page.ContentComparisonDeltaSummary, StringComparison.Ordinal);
+            Assert.Contains("Raw ", page.ContentComparisonDeltaSummary, StringComparison.Ordinal);
             Assert.Equal(1, result.Summary.ContentComparisonWinnerCounts["Reader"]);
             Assert.True(result.Summary.AverageBestContentComparisonWordDelta >= 0);
             Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Raw);
@@ -507,9 +511,18 @@ public class HtmlCrawlerTests {
             Assert.Equal("Reader", manifest.RootElement.GetProperty("BestContentComparison").GetProperty("BestContentComparisonMode").GetString());
             Assert.Equal("Focused", manifest.RootElement.GetProperty("BestContentComparison").GetProperty("RunnerUpContentComparisonMode").GetString());
             Assert.True(manifest.RootElement.GetProperty("BestContentComparison").GetProperty("BestContentComparisonWordDelta").GetInt32() >= 0);
+            string manifestDeltaSummary = manifest.RootElement.GetProperty("BestContentComparison").GetProperty("ContentComparisonDeltaSummary").GetString()!;
+            Assert.StartsWith("Reader 0", manifestDeltaSummary, StringComparison.Ordinal);
+            Assert.Contains("Focused ", manifestDeltaSummary, StringComparison.Ordinal);
+            Assert.Contains("Raw ", manifestDeltaSummary, StringComparison.Ordinal);
             Assert.Contains(comparisons.EnumerateArray(), item =>
                 string.Equals(item.GetProperty("Mode").GetString(), "Reader", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(item.GetProperty("ReasonCode").GetString(), HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate.ToString(), StringComparison.OrdinalIgnoreCase));
+
+            string indexHtml = File.ReadAllText(Path.Combine(outputPath, "index.html"));
+            Assert.Contains("deltas: Reader 0", indexHtml, StringComparison.Ordinal);
+            Assert.Contains("Focused ", indexHtml, StringComparison.Ordinal);
+            Assert.Contains("Raw ", indexHtml, StringComparison.Ordinal);
         } finally {
             server.Stop();
             server.Close();

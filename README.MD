@@ -244,6 +244,7 @@ Console.WriteLine($"{reader.Pages[0].ContentModeUsed} / {reader.Pages[0].Content
 Console.WriteLine(reader.Pages[0].ContentElementSelectorHint);
 Console.WriteLine($"{reader.Pages[0].ContentSelectionScore} across {reader.Pages[0].ReaderCandidateCount} reader candidates");
 Console.WriteLine(string.Join(", ", reader.Pages[0].ContentComparisons.Select(c => $"{c.Mode}:{c.WordCount}")));
+Console.WriteLine(reader.Pages[0].ContentComparisonDeltaSummary);
 
 // Remove noisy blocks by class or id while keeping smart cleanup enabled
 var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -306,7 +307,9 @@ $focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -Co
 $reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -CompareContentModes -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
 $reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
 $reader.Pages[0].ContentComparisons | Select-Object Mode, ReasonCode, ElementSelectorHint, WordCount, Summary
-$reader.Pages[0] | Select-Object BestContentComparisonMode, BestContentComparisonReasonCode, BestContentComparisonWordCount, RunnerUpContentComparisonMode, BestContentComparisonWordDelta
+$reader.Pages[0] | Select-Object BestContentComparisonMode, BestContentComparisonReasonCode, BestContentComparisonWordCount, RunnerUpContentComparisonMode, BestContentComparisonWordDelta, ContentComparisonDeltaSummary
+# persisted index.html now shows the same compact deltas, for example:
+# Reader 0 | Focused -12 | Raw -37
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'

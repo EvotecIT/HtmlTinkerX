@@ -977,7 +977,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1015,6 +1015,7 @@ public static class HtmlCrawler {
                 page.BestContentComparisonWordCount,
                 page.RunnerUpContentComparisonMode,
                 page.BestContentComparisonWordDelta,
+                page.ContentComparisonDeltaSummary,
                 page.AppliedInteractions,
                 page.Started,
                 page.Finished,
@@ -1059,6 +1060,7 @@ public static class HtmlCrawler {
                 EscapeCsv(page.BestContentComparisonWordCount?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.RunnerUpContentComparisonMode?.ToString()),
                 EscapeCsv(page.BestContentComparisonWordDelta?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.ContentComparisonDeltaSummary),
                 EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
@@ -1246,7 +1248,8 @@ public static class HtmlCrawler {
                 page.BestContentComparisonReasonCode,
                 page.BestContentComparisonWordCount,
                 page.RunnerUpContentComparisonMode,
-                page.BestContentComparisonWordDelta
+                page.BestContentComparisonWordDelta,
+                page.ContentComparisonDeltaSummary
             },
             ContentComparisons = page.ContentComparisons
                 .OrderBy(comparison => comparison.Mode.ToString(), StringComparer.OrdinalIgnoreCase)
@@ -1945,6 +1948,10 @@ public static class HtmlCrawler {
             if (page.ContentComparisons.Count > 0) {
                 builder.Append("<br>comparisons: ")
                     .Append(HtmlEncode(string.Join(" | ", page.ContentComparisons.Select(comparison => comparison.Mode.ToString()))));
+                if (!string.IsNullOrWhiteSpace(page.ContentComparisonDeltaSummary)) {
+                    builder.Append("<br>deltas: ")
+                        .Append(HtmlEncode(page.ContentComparisonDeltaSummary));
+                }
             }
             if (page.BestContentComparisonMode.HasValue) {
                 builder.Append("<br>best comparison: <code>")
@@ -2475,6 +2482,7 @@ public static class HtmlCrawler {
         page.BestContentComparisonWordDelta = bestComparison != null && runnerUpComparison != null
             ? bestComparison.WordCount - runnerUpComparison.WordCount
             : null;
+        page.ContentComparisonDeltaSummary = BuildContentComparisonDeltaSummary(page.ContentComparisons, bestComparison);
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
     }
@@ -2728,6 +2736,7 @@ public static class HtmlCrawler {
             BestContentComparisonWordCount = page.BestContentComparisonWordCount,
             RunnerUpContentComparisonMode = page.RunnerUpContentComparisonMode,
             BestContentComparisonWordDelta = page.BestContentComparisonWordDelta,
+            ContentComparisonDeltaSummary = page.ContentComparisonDeltaSummary,
             Started = page.Started,
             Finished = page.Finished
         };
@@ -2961,6 +2970,33 @@ public static class HtmlCrawler {
             .ThenByDescending(comparison => comparison.CharacterCount)
             .ThenBy(comparison => GetContentModePreference(comparison.Mode))
             .FirstOrDefault();
+    }
+
+    private static string? BuildContentComparisonDeltaSummary(
+        IEnumerable<HtmlCrawlContentComparison> comparisons,
+        HtmlCrawlContentComparison? bestComparison = null) {
+        List<HtmlCrawlContentComparison> comparisonList = comparisons.ToList();
+        if (comparisonList.Count == 0) {
+            return null;
+        }
+
+        bestComparison ??= GetBestContentComparison(comparisonList);
+        if (bestComparison == null) {
+            return null;
+        }
+
+        return string.Join(" | ", comparisonList
+            .OrderBy(comparison => comparison.Mode == bestComparison.Mode ? 0 : 1)
+            .ThenBy(comparison => GetContentModePreference(comparison.Mode))
+            .ThenByDescending(comparison => comparison.WordCount)
+            .ThenByDescending(comparison => comparison.CharacterCount)
+            .Select(comparison => {
+                int delta = comparison.WordCount - bestComparison.WordCount;
+                string formattedDelta = delta > 0
+                    ? $"+{delta.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+                    : delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return $"{comparison.Mode} {formattedDelta}";
+            }));
     }
 
     private static int GetContentModePreference(HtmlCrawlContentMode mode) {

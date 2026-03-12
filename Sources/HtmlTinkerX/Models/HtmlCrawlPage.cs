@@ -130,6 +130,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Word-count delta between the best and runner-up extraction modes when comparison mode is enabled.</summary>
     public int? BestContentComparisonWordDelta { get; set; }
 
+    /// <summary>Compact summary of per-mode word deltas relative to the best extraction mode when comparison mode is enabled.</summary>
+    public string? ContentComparisonDeltaSummary { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 
