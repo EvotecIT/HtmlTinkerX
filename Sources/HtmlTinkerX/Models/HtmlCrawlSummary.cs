@@ -15,6 +15,12 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
     public string? AppliedProfileName { get; set; }
 
+    /// <summary>Categorizes why the applied crawl profile was selected.</summary>
+    public HtmlCrawlProfileSelectionReasonCode AppliedProfileReasonCode { get; set; }
+
+    /// <summary>Explains why the applied crawl profile was selected.</summary>
+    public string? AppliedProfileReason { get; set; }
+
     /// <summary>Total successful or failed fetches recorded in <see cref="HtmlCrawlResult.Pages"/>.</summary>
     public int PageCount { get; set; }
 
@@ -124,6 +130,8 @@ public sealed class HtmlCrawlSummary {
         var summary = new HtmlCrawlSummary {
             StartUrl = result.StartUrl,
             AppliedProfileName = result.AppliedProfileName,
+            AppliedProfileReasonCode = result.AppliedProfileReasonCode,
+            AppliedProfileReason = result.AppliedProfileReason,
             PageCount = result.Pages.Count,
             SuccessfulPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Success),
             FailedPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Failed),
@@ -213,6 +221,12 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Start URL: {StartUrl}");
         if (!string.IsNullOrWhiteSpace(AppliedProfileName)) {
             report.AppendLine($"Profile: {AppliedProfileName}");
+            if (AppliedProfileReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {
+                report.AppendLine($"Profile reason code: {AppliedProfileReasonCode}");
+            }
+            if (!string.IsNullOrWhiteSpace(AppliedProfileReason)) {
+                report.AppendLine($"Profile reason: {AppliedProfileReason}");
+            }
         }
         report.AppendLine($"Pages fetched: {PageCount}");
         report.AppendLine($"Successful pages: {SuccessfulPageCount}");

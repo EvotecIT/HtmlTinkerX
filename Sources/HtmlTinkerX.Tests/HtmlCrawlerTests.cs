@@ -569,10 +569,13 @@ public class HtmlCrawlerTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Equal("evotec-xyz", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, result.AppliedProfileReasonCode);
             Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("evotec-xyz", page.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, page.AppliedProfileReasonCode);
             Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
             Assert.Equal(HtmlCrawlRenderReasonCode.StaticRenderDisabled, page.RenderReasonCode);
             Assert.Equal(3, page.ContentComparisons.Count);
@@ -599,10 +602,12 @@ public class HtmlCrawlerTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Equal("wordpress-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileWordPressMarkers, result.AppliedProfileReasonCode);
             Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileWordPressMarkers, page.AppliedProfileReasonCode);
         } finally {
             server.Stop();
             server.Close();
@@ -625,10 +630,12 @@ public class HtmlCrawlerTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Equal("docs-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileDocumentationMarkers, result.AppliedProfileReasonCode);
             Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
             Assert.Equal(3, page.ContentComparisons.Count);
             Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileDocumentationMarkers, page.AppliedProfileReasonCode);
         } finally {
             server.Stop();
             server.Close();
@@ -651,10 +658,12 @@ public class HtmlCrawlerTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Equal("api-docs-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileApiDocumentationMarkers, result.AppliedProfileReasonCode);
             Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
             Assert.Equal(3, page.ContentComparisons.Count);
             Assert.DoesNotContain("Swagger UI", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Users API", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileApiDocumentationMarkers, page.AppliedProfileReasonCode);
         } finally {
             server.Stop();
             server.Close();
@@ -698,12 +707,16 @@ public class HtmlCrawlerTests {
 
             Assert.Equal("custom-docs", named.AppliedProfileName, ignoreCase: true);
             Assert.Equal("custom-docs", automatic.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, named.AppliedProfileReasonCode);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileHostMatch, automatic.AppliedProfileReasonCode);
             HtmlCrawlPage namedPage = Assert.Single(named.Pages);
             HtmlCrawlPage automaticPage = Assert.Single(automatic.Pages);
             Assert.DoesNotContain("Sidebar", namedPage.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Feedback", automaticPage.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(3, namedPage.ContentComparisons.Count);
             Assert.Equal(3, automaticPage.ContentComparisons.Count);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, namedPage.AppliedProfileReasonCode);
+            Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileHostMatch, automaticPage.AppliedProfileReasonCode);
         } finally {
             server.Stop();
             server.Close();

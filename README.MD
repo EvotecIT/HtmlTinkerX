@@ -260,6 +260,7 @@ var profiled = await HtmlCrawler.CrawlAsync("https://evotec.xyz/", new HtmlCrawl
     ProfileName = "evotec-xyz"
 });
 Console.WriteLine(profiled.AppliedProfileName);
+Console.WriteLine(profiled.AppliedProfileReasonCode);
 Console.WriteLine(profiled.Pages[0].ContentComparisonDeltaSummary);
 ```
 
@@ -321,6 +322,7 @@ $reader.Summary.ContentComparisonWinnerPreviewSamples
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
+$profiled.AppliedProfileReasonCode
 $profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, ContentComparisonDeltaSummary
 # Available profile names: api-docs-content, docs-content, evotec-xyz, wordpress-content
 # Unknown names fail fast and report the built-in values
@@ -329,18 +331,22 @@ $profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, C
 # AutoProfile can also infer the generic WordPress profile from page markers
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
 $wordpress.AppliedProfileName
+$wordpress.AppliedProfileReasonCode
 
 # AutoProfile can also infer a documentation-style profile from docs markers
 $docs = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -AutoProfile
 $docs.AppliedProfileName
+$docs.AppliedProfileReasonCode
 
 # AutoProfile can also infer API documentation profiles from Swagger/ReDoc-style markers
 $apiDocs = Invoke-HTMLCrawl -Url 'https://api.example.com/docs/' -AutoProfile
 $apiDocs.AppliedProfileName
+$apiDocs.AppliedProfileReasonCode
 
 # Load custom profiles from JSON
 $custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
 $custom.AppliedProfileName
+$custom.AppliedProfileReasonCode
 
 # Example custom profile file snippet
 # [
@@ -381,6 +387,8 @@ The crawl reports and per-page manifests now also expose extraction observabilit
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
 
 Profiles can also carry tuning defaults. The built-in `evotec-xyz`, `docs-content`, and `api-docs-content` profiles default to `Reader` mode and enable comparison mode automatically, with tuned reader thresholds for their content shapes. Custom profile JSON can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
+
+The crawl result, summary, page manifests, `pages.jsonl/csv`, and offline `index.html` now also expose why a profile was chosen through `AppliedProfileReasonCode` and `AppliedProfileReason`, so it is easy to tell explicit selection from host matching, WordPress markers, docs markers, and API-doc markers.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

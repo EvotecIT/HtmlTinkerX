@@ -366,10 +366,12 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page = $result.Pages | Select-Object -First 1
 
             $result.AppliedProfileName | Should -Be 'evotec-xyz'
+            $result.AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
             $page.Html | Should -Match 'Hello'
             $page.Text | Should -Match 'World'
             $page.Html | Should -Not -Match 'Share'
             $page.Text | Should -Not -Match 'Polish'
+            $page.AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
             $page.ContentModeUsed | Should -Be 'Reader'
             $page.ContentComparisons.Count | Should -Be 3
             $page.BestContentComparisonMode | Should -Not -BeNullOrEmpty
@@ -389,10 +391,12 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page = $result.Pages | Select-Object -First 1
 
             $result.AppliedProfileName | Should -Be 'wordpress-content'
+            $result.AppliedProfileReasonCode | Should -Be 'AutoProfileWordPressMarkers'
             $page.Html | Should -Match 'Hello'
             $page.Text | Should -Match 'World'
             $page.Html | Should -Not -Match 'Share'
             $page.Text | Should -Not -Match 'Polish'
+            $page.AppliedProfileReasonCode | Should -Be 'AutoProfileWordPressMarkers'
         } finally {
             Stop-TestHttpServer $server
         }
@@ -409,10 +413,12 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page = $result.Pages | Select-Object -First 1
 
             $result.AppliedProfileName | Should -Be 'docs-content'
+            $result.AppliedProfileReasonCode | Should -Be 'AutoProfileDocumentationMarkers'
             $page.ContentModeUsed | Should -Be 'Reader'
             $page.ContentComparisons.Count | Should -Be 3
             $page.Text | Should -Not -Match 'On this page'
             $page.Text | Should -Match 'Documentation body'
+            $page.AppliedProfileReasonCode | Should -Be 'AutoProfileDocumentationMarkers'
         } finally {
             Stop-TestHttpServer $server
         }
@@ -429,10 +435,12 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page = $result.Pages | Select-Object -First 1
 
             $result.AppliedProfileName | Should -Be 'api-docs-content'
+            $result.AppliedProfileReasonCode | Should -Be 'AutoProfileApiDocumentationMarkers'
             $page.ContentModeUsed | Should -Be 'Reader'
             $page.ContentComparisons.Count | Should -Be 3
             $page.Text | Should -Not -Match 'Swagger UI'
             $page.Text | Should -Match 'Users API'
+            $page.AppliedProfileReasonCode | Should -Be 'AutoProfileApiDocumentationMarkers'
         } finally {
             Stop-TestHttpServer $server
         }
@@ -465,11 +473,15 @@ public sealed class PesterTestHttpServer : IDisposable {
 
             $named.AppliedProfileName | Should -Be 'custom-docs'
             $automatic.AppliedProfileName | Should -Be 'custom-docs'
+            $named.AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
+            $automatic.AppliedProfileReasonCode | Should -Be 'AutoProfileHostMatch'
             $named.Pages[0].ContentModeUsed | Should -Be 'Focused'
             $named.Pages[0].ContentComparisons.Count | Should -Be 3
             $named.Pages[0].Text | Should -Not -Match 'Sidebar'
             $automatic.Pages[0].Text | Should -Not -Match 'Feedback'
             $automatic.Pages[0].ContentComparisons.Count | Should -Be 3
+            $named.Pages[0].AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
+            $automatic.Pages[0].AppliedProfileReasonCode | Should -Be 'AutoProfileHostMatch'
         } finally {
             Stop-TestHttpServer $server
         }

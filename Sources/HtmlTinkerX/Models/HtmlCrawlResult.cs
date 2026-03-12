@@ -35,6 +35,12 @@ public sealed class HtmlCrawlResult {
     /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
     public string? AppliedProfileName { get; set; }
 
+    /// <summary>Categorizes why the applied crawl profile was selected.</summary>
+    public HtmlCrawlProfileSelectionReasonCode AppliedProfileReasonCode { get; set; }
+
+    /// <summary>Explains why the applied crawl profile was selected.</summary>
+    public string? AppliedProfileReason { get; set; }
+
     /// <summary>Manifest path used when crawl artifacts were persisted.</summary>
     public string? ManifestPath { get; set; }
 

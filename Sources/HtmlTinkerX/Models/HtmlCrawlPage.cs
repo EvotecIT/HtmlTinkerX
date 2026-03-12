@@ -82,6 +82,15 @@ public sealed class HtmlCrawlPage {
     /// <summary>Categorizes why the selected render mode was used for this page.</summary>
     public HtmlCrawlRenderReasonCode RenderReasonCode { get; set; }
 
+    /// <summary>Name of the crawl profile that was active when this page was processed, when one was used.</summary>
+    public string? AppliedProfileName { get; set; }
+
+    /// <summary>Categorizes why the active crawl profile was selected for this page.</summary>
+    public HtmlCrawlProfileSelectionReasonCode AppliedProfileReasonCode { get; set; }
+
+    /// <summary>Explains why the active crawl profile was selected for this page.</summary>
+    public string? AppliedProfileReason { get; set; }
+
     /// <summary>Records which content-selection mode produced the stored HTML and text for this page.</summary>
     public HtmlCrawlContentMode ContentModeUsed { get; set; } = HtmlCrawlContentMode.Focused;
 

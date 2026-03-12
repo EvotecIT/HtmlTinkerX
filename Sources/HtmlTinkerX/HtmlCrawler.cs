@@ -27,6 +27,12 @@ public static class HtmlCrawler {
         public HtmlCrawlRenderReasonCode ReasonCode { get; set; }
     }
 
+    internal sealed class ProfileSelectionDecision {
+        public HtmlCrawlProfile? Profile { get; set; }
+        public HtmlCrawlProfileSelectionReasonCode ReasonCode { get; set; }
+        public string? Reason { get; set; }
+    }
+
     private sealed class ContentSelectionResult {
         public HtmlCrawlContentMode ModeUsed { get; set; } = HtmlCrawlContentMode.Focused;
         public HtmlCrawlContentSelectionReasonCode ReasonCode { get; set; }
@@ -215,7 +221,8 @@ public static class HtmlCrawler {
             throw new ArgumentException($"Unknown crawl profile '{resolvedOptions.ProfileName}'. Available profiles: {availableProfiles}.", nameof(HtmlCrawlOptions.ProfileName));
         }
 
-        HtmlCrawlProfile? appliedProfile = HtmlCrawlProfiles.Resolve(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile, customProfiles);
+        ProfileSelectionDecision profileDecision = ResolveInitialProfileDecision(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile, customProfiles);
+        HtmlCrawlProfile? appliedProfile = profileDecision.Profile;
         if (appliedProfile != null) {
             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
         }
@@ -234,12 +241,20 @@ public static class HtmlCrawler {
                 result = new HtmlCrawlResult {
                     StartUrl = startUri.AbsoluteUri,
                     AppliedProfileName = appliedProfile?.Name,
+                    AppliedProfileReasonCode = profileDecision.ReasonCode,
+                    AppliedProfileReason = profileDecision.Reason,
                     Started = DateTimeOffset.UtcNow
                 };
             }
 
             if (string.IsNullOrWhiteSpace(result.AppliedProfileName) && appliedProfile != null) {
                 result.AppliedProfileName = appliedProfile.Name;
+            }
+            if (result.AppliedProfileReasonCode == HtmlCrawlProfileSelectionReasonCode.None && profileDecision.ReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {
+                result.AppliedProfileReasonCode = profileDecision.ReasonCode;
+            }
+            if (string.IsNullOrWhiteSpace(result.AppliedProfileReason) && !string.IsNullOrWhiteSpace(profileDecision.Reason)) {
+                result.AppliedProfileReason = profileDecision.Reason;
             }
 
             Queue<CrawlRequest> pending = new();
@@ -321,11 +336,13 @@ public static class HtmlCrawler {
                     FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
-                        HtmlCrawlProfile? inferredProfile = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
-                        if (inferredProfile != null) {
-                            appliedProfile = inferredProfile;
+                        ProfileSelectionDecision inferredProfileDecision = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
+                        if (inferredProfileDecision.Profile != null) {
+                            appliedProfile = inferredProfileDecision.Profile;
                             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
                             result.AppliedProfileName = appliedProfile.Name;
+                            result.AppliedProfileReasonCode = inferredProfileDecision.ReasonCode;
+                            result.AppliedProfileReason = inferredProfileDecision.Reason;
                             if (!string.IsNullOrWhiteSpace(fetchedPage.RawHtml)) {
                                 PopulatePageFromHtml(page, fetchedPage.RawHtml!, next.Uri, resolvedOptions);
                             }
@@ -348,6 +365,8 @@ public static class HtmlCrawler {
                         page.RenderReason = "Kept static because browser rendering was not enabled.";
                     }
                 }
+
+                ApplyProfileMetadata(page, result);
 
                 if (page.Status == HtmlCrawlPageStatus.Skipped) {
                     result.SkippedPages.Add(page);
@@ -977,7 +996,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -999,6 +1018,9 @@ public static class HtmlCrawler {
                 page.RenderMode,
                 page.RenderReasonCode,
                 page.RenderReason,
+                page.AppliedProfileName,
+                page.AppliedProfileReasonCode,
+                page.AppliedProfileReason,
                 page.ContentModeUsed,
                 page.ContentSelectionReasonCode,
                 page.ContentSelectionReason,
@@ -1045,6 +1067,9 @@ public static class HtmlCrawler {
                 EscapeCsv(page.RenderMode.ToString()),
                 EscapeCsv(page.RenderReasonCode.ToString()),
                 EscapeCsv(page.RenderReason),
+                EscapeCsv(page.AppliedProfileName),
+                EscapeCsv(page.AppliedProfileReasonCode.ToString()),
+                EscapeCsv(page.AppliedProfileReason),
                 EscapeCsv(page.ContentModeUsed.ToString()),
                 EscapeCsv(page.ContentSelectionReasonCode.ToString()),
                 EscapeCsv(page.ContentSelectionReason),
@@ -1233,6 +1258,9 @@ public static class HtmlCrawler {
             page.RenderMode,
             page.RenderReasonCode,
             page.RenderReason,
+            page.AppliedProfileName,
+            page.AppliedProfileReasonCode,
+            page.AppliedProfileReason,
             Extraction = new {
                 page.ContentModeUsed,
                 page.ContentSelectionReasonCode,
@@ -1722,7 +1750,18 @@ public static class HtmlCrawler {
         if (!string.IsNullOrWhiteSpace(result.AppliedProfileName)) {
             builder.Append("  <p class=\"meta\">Profile: <code>")
                 .Append(HtmlEncode(result.AppliedProfileName))
-                .AppendLine("</code></p>");
+                .Append("</code>");
+            if (result.AppliedProfileReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {
+                builder.Append(" <span class=\"muted\">(")
+                    .Append(HtmlEncode(result.AppliedProfileReasonCode.ToString()))
+                    .Append(")</span>");
+            }
+            builder.AppendLine("</p>");
+            if (!string.IsNullOrWhiteSpace(result.AppliedProfileReason)) {
+                builder.Append("  <p class=\"meta\">Profile reason: ")
+                    .Append(HtmlEncode(result.AppliedProfileReason))
+                    .AppendLine("</p>");
+            }
         }
 
         builder.AppendLine("  <section>");
@@ -1921,6 +1960,20 @@ public static class HtmlCrawler {
             if (!string.IsNullOrWhiteSpace(page.RenderReason)) {
                 builder.Append(": ")
                     .Append(HtmlEncode(page.RenderReason));
+            }
+            if (!string.IsNullOrWhiteSpace(page.AppliedProfileName)) {
+                builder.Append("<br>profile: <code>")
+                    .Append(HtmlEncode(page.AppliedProfileName))
+                    .Append("</code>");
+                if (page.AppliedProfileReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {
+                    builder.Append(" <span class=\"muted\">(")
+                        .Append(HtmlEncode(page.AppliedProfileReasonCode.ToString()))
+                        .Append(")</span>");
+                }
+                if (!string.IsNullOrWhiteSpace(page.AppliedProfileReason)) {
+                    builder.Append("<br>")
+                        .Append(HtmlEncode(page.AppliedProfileReason));
+                }
             }
             if (page.AppliedInteractions.Count > 0) {
                 builder.Append("<br>interactions: ")
@@ -2502,29 +2555,75 @@ public static class HtmlCrawler {
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
     }
 
-    private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page, IReadOnlyList<HtmlCrawlProfile> customProfiles) {
+    private static ProfileSelectionDecision ResolveInitialProfileDecision(
+        string? profileName,
+        Uri startUri,
+        bool autoProfile,
+        IReadOnlyList<HtmlCrawlProfile> customProfiles) {
+        if (!string.IsNullOrWhiteSpace(profileName)) {
+            HtmlCrawlProfile? explicitProfile = HtmlCrawlProfiles.ResolveByName(profileName, customProfiles);
+            return new ProfileSelectionDecision {
+                Profile = explicitProfile,
+                ReasonCode = explicitProfile == null ? HtmlCrawlProfileSelectionReasonCode.None : HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName,
+                Reason = explicitProfile == null ? null : $"Applied profile '{explicitProfile.Name}' because it was explicitly requested."
+            };
+        }
+
+        if (autoProfile) {
+            HtmlCrawlProfile? hostMatchedProfile = HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true, customProfiles);
+            if (hostMatchedProfile != null) {
+                return new ProfileSelectionDecision {
+                    Profile = hostMatchedProfile,
+                    ReasonCode = HtmlCrawlProfileSelectionReasonCode.AutoProfileHostMatch,
+                    Reason = $"Auto-profile matched '{hostMatchedProfile.Name}' from the starting host '{startUri.Host}'."
+                };
+            }
+        }
+
+        return new ProfileSelectionDecision();
+    }
+
+    private static void ApplyProfileMetadata(HtmlCrawlPage page, HtmlCrawlResult result) {
+        page.AppliedProfileName = result.AppliedProfileName;
+        page.AppliedProfileReasonCode = result.AppliedProfileReasonCode;
+        page.AppliedProfileReason = result.AppliedProfileReason;
+    }
+
+    private static ProfileSelectionDecision InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page, IReadOnlyList<HtmlCrawlProfile> customProfiles) {
         if (LooksLikeWordPressSite(html, page)) {
             HtmlCrawlProfile? wordpressProfile = HtmlCrawlProfiles.ResolveByName("wordpress-content", customProfiles);
             if (wordpressProfile != null) {
-                return wordpressProfile;
+                return new ProfileSelectionDecision {
+                    Profile = wordpressProfile,
+                    ReasonCode = HtmlCrawlProfileSelectionReasonCode.AutoProfileWordPressMarkers,
+                    Reason = "Auto-profile inferred WordPress content markers from the fetched page."
+                };
             }
         }
 
         if (LooksLikeApiDocumentationSite(html, page)) {
             HtmlCrawlProfile? apiDocsProfile = HtmlCrawlProfiles.ResolveByName("api-docs-content", customProfiles);
             if (apiDocsProfile != null) {
-                return apiDocsProfile;
+                return new ProfileSelectionDecision {
+                    Profile = apiDocsProfile,
+                    ReasonCode = HtmlCrawlProfileSelectionReasonCode.AutoProfileApiDocumentationMarkers,
+                    Reason = "Auto-profile inferred API documentation markers such as Swagger/ReDoc or OpenAPI links."
+                };
             }
         }
 
         if (LooksLikeDocumentationSite(html, page)) {
             HtmlCrawlProfile? docsProfile = HtmlCrawlProfiles.ResolveByName("docs-content", customProfiles);
             if (docsProfile != null) {
-                return docsProfile;
+                return new ProfileSelectionDecision {
+                    Profile = docsProfile,
+                    ReasonCode = HtmlCrawlProfileSelectionReasonCode.AutoProfileDocumentationMarkers,
+                    Reason = "Auto-profile inferred documentation markers such as TOC/sidebar chrome around article content."
+                };
             }
         }
 
-        return HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true, customProfiles);
+        return ResolveInitialProfileDecision(null, startUri, autoProfile: true, customProfiles);
     }
 
     private static bool LooksLikeWordPressSite(string? html, HtmlCrawlPage page) {
@@ -2802,6 +2901,9 @@ public static class HtmlCrawler {
             RenderMode = page.RenderMode,
             RenderReasonCode = page.RenderReasonCode,
             RenderReason = page.RenderReason,
+            AppliedProfileName = page.AppliedProfileName,
+            AppliedProfileReasonCode = page.AppliedProfileReasonCode,
+            AppliedProfileReason = page.AppliedProfileReason,
             ContentModeUsed = page.ContentModeUsed,
             ContentSelectionReasonCode = page.ContentSelectionReasonCode,
             ContentSelectionReason = page.ContentSelectionReason,
