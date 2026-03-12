@@ -1,0 +1,50 @@
+Import-Module "$PSScriptRoot/../PSParseHTML.psd1"
+
+Describe 'Get-HtmlCrawlProfile' {
+    It 'Lists built-in crawl profiles' {
+        $profiles = Get-HtmlCrawlProfile
+
+        $profiles.Name | Should -Contain 'api-docs-content'
+        $profiles.Name | Should -Contain 'docs-content'
+        $profiles.Name | Should -Contain 'wordpress-content'
+    }
+
+    It 'Can filter built-in crawl profiles by name' {
+        $profile = Get-HtmlCrawlProfile -Name 'docs-content'
+
+        @($profile).Count | Should -Be 1
+        $profile.Name | Should -Be 'docs-content'
+        $profile.ContentMode | Should -Be 'Reader'
+        $profile.CompareContentModes | Should -BeTrue
+        $profile.ReaderMinimumWordCount | Should -Be 35
+        $profile.ReaderMinimumScore | Should -Be 35
+    }
+
+    It 'Can read custom crawl profiles from JSON' {
+        $profilePath = Join-Path $TestDrive 'crawl-profiles-get.json'
+        @'
+[
+  {
+    "name": "custom-docs",
+    "hosts": [ "docs.example.com" ],
+    "selector": "article",
+    "contentMode": "Reader",
+    "compareContentModes": true,
+    "readerMinimumWordCount": 30,
+    "readerMinimumScore": 40
+  }
+]
+'@ | Set-Content -Path $profilePath
+
+        $profile = Get-HtmlCrawlProfile -Path $profilePath -Name 'custom-docs'
+
+        @($profile).Count | Should -Be 1
+        $profile.Name | Should -Be 'custom-docs'
+        $profile.Hosts | Should -Contain 'docs.example.com'
+        $profile.Selector | Should -Be 'article'
+        $profile.ContentMode | Should -Be 'Reader'
+        $profile.CompareContentModes | Should -BeTrue
+        $profile.ReaderMinimumWordCount | Should -Be 30
+        $profile.ReaderMinimumScore | Should -Be 40
+    }
+}

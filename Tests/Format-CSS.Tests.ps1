@@ -12,7 +12,8 @@
 .tabs-content { display: none }
 .tabs-content.active { display: block }
 "@
-        $Output = Format-CSS -Content $Content
+        $Output = (Format-CSS -Content $Content) -replace "`r`n", "`n"
+        $ExpectedOutput = $ExpectedOutput -replace "`r`n", "`n"
         $Output | Should -Be $ExpectedOutput
     }
 }

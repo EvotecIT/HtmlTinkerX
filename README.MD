@@ -135,6 +135,7 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | PowerShell Cmdlet          | C# Method                               | Description                   |
 | -------------------------- | --------------------------------------- | ----------------------------- |
 | `Get-HTMLResource`         | `HtmlResourceParser.ExtractResources()` | Extract scripts and CSS       |
+| `Invoke-HTMLCrawl`         | `HtmlCrawler.CrawlAsync()`              | Crawl a site offline          |
 | `Save-HTMLAttachment`      | `HtmlBrowser.SaveAttachmentsAsync()`    | Download files from pages     |
 | `Get-HTMLContent`          | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
 | `Export-HTMLOutline`       | `HtmlOutlineBuilder.BuildOutline()`     | Generate document outlines    |
@@ -175,6 +176,92 @@ string minified = HtmlOptimizer.OptimizeHtml(html);
 // Browser automation
 await using var session = await HtmlBrowser.OpenSessionAsync("https://example.com");
 await HtmlBrowser.SaveScreenshotAsync(session, "screenshot.png");
+
+// Offline crawl
+var crawl = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    MaxDepth = 1,
+    MaxPages = 10,
+    UseSitemaps = true,
+    RespectRobotsTxt = true,
+    DeduplicatePages = true,
+    OutputPath = "crawl-output"
+});
+
+Console.WriteLine(crawl.Summary.ToReportText(crawl.SitemapUrls));
+Console.WriteLine(crawl.PagesCsvPath);
+
+// Keep full tracking query strings when a site uses them as real page identity
+var exactUrls = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    IgnoreTrackingQueryParameters = false
+});
+
+// Allow non-HTML responses when you intentionally want them in the crawl
+var permissive = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    SkipKnownAssetUrls = false,
+    RestrictToAllowedContentTypes = false
+});
+
+// Download discovered images/documents into the offline dataset
+var richSnapshot = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    MaxDepth = 1,
+    DownloadAssets = true,
+    OutputPath = "crawl-output"
+});
+// Stored HTML now points at local ../assets/... paths by default
+
+// Hybrid crawl for JavaScript-heavy pages with cleanup of known noisy blocks
+var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCrawlOptions {
+    AutoRender = true,
+    WaitForSelector = "#main",
+    DismissSelectors = { ".cookie-banner button", "#consent-accept" },
+    DismissTexts = { "Accept", "I agree" },
+    ClickSelectors = { ".load-more", ".expand-details" },
+    ClickTexts = { "Load more", "Show more" },
+    InteractionRepeatCount = 2,
+    AutoScroll = true,
+    ExcludeSelectors = { ".language-switcher", ".share-links", ".related-posts" }
+});
+Console.WriteLine($"{hybrid.Pages[0].RenderMode}: {hybrid.Pages[0].RenderReason}");
+Console.WriteLine(string.Join(", ", hybrid.Pages[0].AppliedInteractions));
+Console.WriteLine(hybrid.Summary.ToReportText(hybrid.SitemapUrls));
+
+// Choose how content is selected before cleanup
+var raw = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "#main",
+    ContentMode = HtmlCrawlContentMode.Raw
+});
+var focused = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    ContentMode = HtmlCrawlContentMode.Focused
+});
+var reader = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    ContentMode = HtmlCrawlContentMode.Reader,
+    CompareContentModes = true,
+    ReaderMinimumWordCount = 30,
+    ReaderMinimumScore = 40
+});
+Console.WriteLine($"{reader.Pages[0].ContentModeUsed} / {reader.Pages[0].ContentSelectionReasonCode}");
+Console.WriteLine(reader.Pages[0].ContentElementSelectorHint);
+Console.WriteLine($"{reader.Pages[0].ContentSelectionScore} across {reader.Pages[0].ReaderCandidateCount} reader candidates");
+Console.WriteLine(string.Join(", ", reader.Pages[0].ContentComparisons.Select(c => $"{c.Mode}:{c.WordCount}")));
+Console.WriteLine(reader.Pages[0].ContentComparisonDeltaSummary);
+Console.WriteLine(reader.Pages[0].ContentComparisonPreviewSummary);
+Console.WriteLine(reader.Summary.ContentComparisonWinnerPreviewSamples["Reader"]);
+
+// Remove noisy blocks by class or id while keeping smart cleanup enabled
+var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    ExcludeClasses = { "promo-box", "doc-tools" },
+    ExcludeIds = { "reader-tools" }
+});
+
+// Reuse a built-in profile for a common site family
+var profiled = await HtmlCrawler.CrawlAsync("https://docs.example.com/", new HtmlCrawlOptions {
+    ProfileName = "docs-content"
+});
+Console.WriteLine(profiled.AppliedProfileName);
+Console.WriteLine(profiled.AppliedProfileReasonCode);
+Console.WriteLine(profiled.Pages[0].ContentComparisonDeltaSummary);
 ```
 
 ### PowerShell Example
@@ -190,7 +277,140 @@ $minified = Optimize-HTML -Path 'page.html'
 $session = Start-HTMLSession -Url 'https://example.com'
 Save-HTMLScreenshot -Session $session -OutFile 'screenshot.png'
 Close-HTMLSession -Session $session
+
+# Offline crawl
+$crawl = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -MaxPages 10 -DeduplicatePages
+$crawl.Pages | Select-Object Url, Title, Depth
+$crawl.SkippedPages | Select-Object Url, SkipReason
+$crawl.Summary.ToReportText($crawl.SitemapUrls)
+
+# Preserve full tracked URLs when query strings are meaningful
+$exactUrls = Invoke-HTMLCrawl -Url 'https://example.com/docs' -KeepTrackingQueryParameters
+
+# Allow non-HTML responses such as PDFs when needed
+$permissive = Invoke-HTMLCrawl -Url 'https://example.com/docs' -AllowAssetUrls -AllowAnyContentType
+
+# Download discovered images/documents into the offline dataset
+$richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -DownloadAssets -OutPath '.\crawl-output'
+# Stored HTML now points at local ../assets/... paths by default
+# Internal page links are also rewritten to local saved .html files by default
+
+# Hybrid crawl for JavaScript-heavy pages with lazy loading and noisy chrome removal
+$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -DismissSelector '.cookie-banner button', '#consent-accept' -DismissText 'Accept', 'I agree' -ClickSelector '.load-more', '.expand-details' -ClickText 'Load more', 'Show more' -InteractionRepeatCount 2 -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
+$hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
+$hybrid.Summary.ToReportText($hybrid.SitemapUrls)
+# summary now includes interaction totals and per-interaction counts
+
+# Remove noisy blocks by class or id, and keep smart cleanup enabled by default
+$clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ExcludeClass 'promo-box', 'doc-tools' -ExcludeId 'reader-tools'
+# Use -DisableSmartContentCleanup if you want the raw selected content without heuristic pruning
+
+# Choose how content is selected before cleanup
+$raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
+$focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ContentMode Focused
+$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -CompareContentModes -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
+$reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
+$reader.Pages[0].ContentComparisons | Select-Object Mode, ReasonCode, ElementSelectorHint, WordCount, Summary
+$reader.Pages[0] | Select-Object BestContentComparisonMode, BestContentComparisonReasonCode, BestContentComparisonWordCount, RunnerUpContentComparisonMode, BestContentComparisonWordDelta, ContentComparisonDeltaSummary, ContentComparisonPreviewSummary
+$reader.Summary.ContentComparisonWinnerPreviewSamples
+# persisted index.html now shows the same compact deltas, for example:
+# Reader 0 | Focused -12 | Raw -37
+# and a side-by-side preview line, for example:
+# Reader 142w @ article: Hello main article... | Focused 130w @ main: Hello main... | Raw 118w: Menu item Hello...
+# summary/report output also includes one representative preview sample per winning mode
+
+# Reuse a built-in profile for a common site family
+$profiled = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'docs-content'
+$profiled.AppliedProfileName
+$profiled.AppliedProfileReasonCode
+$profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, ContentComparisonDeltaSummary
+# Available profile names: api-docs-content, docs-content, wordpress-content
+# Unknown names fail fast and report the built-in values
+# docs-content also defaults to Reader mode and enables comparison mode so tuning output is available immediately
+
+# AutoProfile can also infer the generic WordPress profile from page markers
+$wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
+$wordpress.AppliedProfileName
+$wordpress.AppliedProfileReasonCode
+
+# AutoProfile can also infer a documentation-style profile from docs markers
+$docs = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -AutoProfile
+$docs.AppliedProfileName
+$docs.AppliedProfileReasonCode
+
+# AutoProfile can also infer API documentation profiles from Swagger/ReDoc-style markers
+$apiDocs = Invoke-HTMLCrawl -Url 'https://api.example.com/docs/' -AutoProfile
+$apiDocs.AppliedProfileName
+$apiDocs.AppliedProfileReasonCode
+
+# Load custom profiles from JSON
+$custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
+$custom.AppliedProfileName
+$custom.AppliedProfileReasonCode
+
+# Example custom profile file snippet
+# [
+#   {
+#     "name": "custom-docs",
+#     "hosts": [ "docs.example.com" ],
+#     "selector": "article",
+#     "contentMode": "Reader",
+#     "readerMinimumWordCount": 30,
+#     "readerMinimumScore": 40,
+#     "excludeClasses": [ "sidebar", "feedback-box" ]
+#   }
+# ]
+
+# Inspect built-in or custom profiles
+Get-HtmlCrawlProfile
+Get-HtmlCrawlProfile -Path '.\crawl-profiles.json' -Name 'custom-docs'
+
+# Resume a previous crawl snapshot
+$resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
+
+Persisted crawl artifacts now include:
+- `crawl-result.json` for the manifest and resume state
+- `index.html` as a browsable offline entry point into the saved dataset
+- `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests, including extraction metadata such as content mode, selection reason, and selected element hints
+- `pages.jsonl` and `pages.csv` for page-level datasets
+- `skipped-pages.jsonl` for skipped content-page candidates
+- `skipped-assets.jsonl` for discovered asset/document URLs that were intentionally not crawled as pages
+- `links.jsonl` for discovered page-to-page links
+- `assets/` and `assets.jsonl` for downloaded images/documents when `DownloadAssets` is enabled
+- `chunks.jsonl` for deduplicated text chunks ready for local search/RAG pipelines
+- `graph.json` for page nodes and cross-page link edges with offline degree metadata
+- `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
+
+The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
+
+If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
+
+Profiles can also carry tuning defaults. The built-in `docs-content` and `api-docs-content` profiles default to `Reader` mode and enable comparison mode automatically, with tuned reader thresholds for their content shapes. Site-specific tuning should live in custom profile JSON loaded through `ProfilePath` / `-ProfilePath`, which can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
+
+The crawl result, summary, page manifests, `pages.jsonl/csv`, and offline `index.html` now also expose why a profile was chosen through `AppliedProfileReasonCode` and `AppliedProfileReason`, so it is easy to tell explicit selection from host matching, WordPress markers, docs markers, and API-doc markers.
+
+By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
+
+By default the crawler is page-oriented and only keeps `text/html` and `application/xhtml+xml` responses. Use `RestrictToAllowedContentTypes = false` in C# or `-AllowAnyContentType` in PowerShell when you intentionally want non-HTML responses included.
+
+It also skips obvious asset/document URLs such as `*.pdf`, `*.jpg`, `*.zip`, and fonts before fetching them. Use `SkipKnownAssetUrls = false` in C# or `-AllowAssetUrls` in PowerShell when those URLs are part of the dataset you want.
+
+If you want those assets as part of the offline dataset without treating them as pages, enable `DownloadAssets` in C# or `-DownloadAssets` in PowerShell. That saves discovered image/document URLs, stylesheet links, and CSS `url(...)` assets into `assets/` and records them in `assets.jsonl`. Without `DownloadAssets`, `assets.jsonl` is still created as part of the dataset shape, but it stays empty because the crawl is page-only.
+
+When assets are downloaded, stored HTML snapshots are also rewritten to local relative paths by default, so an `<img>` can point at `../assets/...` instead of the original remote URL. Use `RewriteAssetReferencesToLocal = false` in C# or `-KeepRemoteAssetUrls` in PowerShell if you want to keep the original references.
+
+Stored HTML also rewrites internal page links to local saved `.html` files by default, which makes the persisted crawl much more browsable offline. Use `RewritePageLinksToLocal = false` in C# or `-KeepRemotePageUrls` in PowerShell if you want to preserve original page URLs.
+
+Pages that use `<base href>` are also handled correctly during crawl discovery and offline rewrite, and the saved HTML strips the original `<base>` tag so local links and assets do not get redirected back to the live site.
+
+Each saved page also gets a sidecar `.json` manifest with its metadata, outgoing links, referenced asset URLs, and any downloaded asset file paths resolved relative to that page. The generated `index.html` links to those manifests directly.
+
+Those per-page manifests now also include lightweight search metadata such as heading extraction, word counts, character counts, and a short summary snippet, and `index.html` surfaces the same summary information for quick offline scanning.
+
+The persisted dataset also exports a global `chunks.jsonl` file with deduplicated text chunks, per-chunk summaries, heading context, normalized keywords, and relative links back to each saved page, text file, and manifest so it is easy to feed into local search or RAG tooling.
+
+It also exports `graph.json`, which captures fetched pages as nodes and discovered page-to-page links as edges, including fetched/skipped/external node categories, edge relation types, in-degree/out-degree counts, and relative paths back to saved HTML and manifest files for offline analysis or navigation tooling. The generated summaries now also break those graph counts down by node category, edge relation, and skipped-node reason.
 
 ## 🔧 PowerShell Cmdlets
 
@@ -248,6 +468,8 @@ Close-HTMLSession -Session $session
 
 ### Content & Resources
 - **Get-HTMLResource** - Extract script and CSS resources
+- **Invoke-HTMLCrawl** - Crawl sites offline with optional browser rendering
+: supports sitemap discovery, `robots.txt`, filtering, auth, and selector-based extraction
 - **Save-HTMLAttachment** - Download files from pages
 - **Get-HTMLContent** - Retrieve page content
 - **Get-HTMLFormField** - Extract form field information
