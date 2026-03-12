@@ -5,6 +5,7 @@ Describe 'Get-HtmlCrawlProfile' {
         $profiles = Get-HtmlCrawlProfile
 
         $profiles.Name | Should -Contain 'evotec-xyz'
+        $profiles.Name | Should -Contain 'docs-content'
         $profiles.Name | Should -Contain 'wordpress-content'
     }
 

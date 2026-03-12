@@ -322,13 +322,17 @@ $reader.Summary.ContentComparisonWinnerPreviewSamples
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
 $profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, ContentComparisonDeltaSummary
-# Available profile names: evotec-xyz, wordpress-content
+# Available profile names: docs-content, evotec-xyz, wordpress-content
 # Unknown names fail fast and report the built-in values
 # evotec-xyz also defaults to Reader mode and enables comparison mode so tuning output is available immediately
 
 # AutoProfile can also infer the generic WordPress profile from page markers
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
 $wordpress.AppliedProfileName
+
+# AutoProfile can also infer a documentation-style profile from docs markers
+$docs = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -AutoProfile
+$docs.AppliedProfileName
 
 # Load custom profiles from JSON
 $custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
@@ -372,7 +376,7 @@ The crawl reports and per-page manifests now also expose extraction observabilit
 
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
 
-Profiles can also carry tuning defaults. The built-in `evotec-xyz` profile now defaults to `Reader` mode, sets reader thresholds, and enables comparison mode automatically. Custom profile JSON can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
+Profiles can also carry tuning defaults. The built-in `evotec-xyz` and `docs-content` profiles default to `Reader` mode and enable comparison mode automatically, with tuned reader thresholds. Custom profile JSON can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

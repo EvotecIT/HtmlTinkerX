@@ -2510,6 +2510,13 @@ public static class HtmlCrawler {
             }
         }
 
+        if (LooksLikeDocumentationSite(html, page)) {
+            HtmlCrawlProfile? docsProfile = HtmlCrawlProfiles.ResolveByName("docs-content", customProfiles);
+            if (docsProfile != null) {
+                return docsProfile;
+            }
+        }
+
         return HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true, customProfiles);
     }
 
@@ -2539,6 +2546,34 @@ public static class HtmlCrawler {
         }
 
         return false;
+    }
+
+    private static bool LooksLikeDocumentationSite(string? html, HtmlCrawlPage page) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return false;
+        }
+
+        string normalizedHtml = html.ToLowerInvariant();
+        bool hasArticle = normalizedHtml.Contains("<article", StringComparison.Ordinal)
+            || normalizedHtml.Contains("role=\"main\"", StringComparison.Ordinal)
+            || normalizedHtml.Contains("role='main'", StringComparison.Ordinal);
+        bool hasDocsChrome = normalizedHtml.Contains("table of contents", StringComparison.Ordinal)
+            || normalizedHtml.Contains("on this page", StringComparison.Ordinal)
+            || normalizedHtml.Contains("edit this page", StringComparison.Ordinal)
+            || normalizedHtml.Contains("theme-doc-", StringComparison.Ordinal)
+            || normalizedHtml.Contains("docs-sidebar", StringComparison.Ordinal)
+            || normalizedHtml.Contains("docs-nav", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class=\"sidebar", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class='sidebar", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class=\"toc", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class='toc", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class=\"table-of-contents", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class='table-of-contents", StringComparison.Ordinal);
+        bool hasDocsLinks = page.Links.Any(url => url.Contains("/docs/", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("/documentation/", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("#", StringComparison.Ordinal));
+
+        return hasArticle && (hasDocsChrome || hasDocsLinks);
     }
 
     private static async Task AutoScrollPageAsync(IPage page, HtmlCrawlOptions options, CancellationToken cancellationToken) {

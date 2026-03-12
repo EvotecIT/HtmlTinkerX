@@ -48,6 +48,32 @@ public static class HtmlCrawlProfiles {
             InteractionRepeatCount = 2
         },
         new HtmlCrawlProfile {
+            Name = "docs-content",
+            Selector = "main",
+            ContentMode = HtmlCrawlContentMode.Reader,
+            CompareContentModes = true,
+            ReaderMinimumWordCount = 35,
+            ReaderMinimumScore = 35,
+            ExcludeSelectors = {
+                ".sidebar",
+                ".side-nav",
+                ".sidenav",
+                ".toc",
+                ".table-of-contents",
+                ".on-this-page",
+                ".docs-nav",
+                ".docs-sidebar",
+                ".breadcrumbs",
+                ".breadcrumb",
+                ".pagination-nav",
+                ".theme-doc-toc-desktop",
+                ".theme-doc-toc-mobile",
+                ".theme-doc-breadcrumbs",
+                ".edit-this-page",
+                ".feedback-box"
+            }
+        },
+        new HtmlCrawlProfile {
             Name = "evotec-xyz",
             Hosts = {
                 "evotec.xyz",

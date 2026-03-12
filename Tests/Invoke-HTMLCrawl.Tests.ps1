@@ -398,6 +398,26 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can auto-apply the docs profile from documentation markers' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><head><title>Docs</title></head><body><main><aside class='sidebar'><a href='/docs/start'>Start</a></aside><article><h1>Install</h1><nav aria-label='Table of contents'>On this page</nav><p>Documentation body with enough words to keep reader mode active and useful for extraction testing.</p></article></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -AutoProfile
+            $page = $result.Pages | Select-Object -First 1
+
+            $result.AppliedProfileName | Should -Be 'docs-content'
+            $page.ContentModeUsed | Should -Be 'Reader'
+            $page.ContentComparisons.Count | Should -Be 3
+            $page.Text | Should -Not -Match 'On this page'
+            $page.Text | Should -Match 'Documentation body'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can load custom crawl profiles from JSON' {
         $profilePath = Join-Path $TestDrive 'crawl-profiles.json'
         @'

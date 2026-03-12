@@ -66,6 +66,7 @@ public class HtmlCrawlerTests {
         Assert.NotNull(profile);
         Assert.Equal("evotec-xyz", profile!.Name, ignoreCase: true);
         Assert.Contains("evotec-xyz", HtmlCrawlProfiles.Names);
+        Assert.Contains("docs-content", HtmlCrawlProfiles.Names);
         Assert.Contains("wordpress-content", HtmlCrawlProfiles.Names);
 
         HtmlCrawlOptions options = new();
@@ -601,6 +602,32 @@ public class HtmlCrawlerTests {
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_AutoProfile_DetectsDocumentationMarkersAndAppliesDocsProfile() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><aside class='sidebar'><a href='/docs/start'>Start</a></aside><article><h1>Install</h1><nav aria-label='Table of contents'>On this page</nav><p>Documentation body with enough words to keep reader mode active and useful for extraction testing.</p></article></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                AutoProfile = true
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal("docs-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
+            Assert.Equal(3, page.ContentComparisons.Count);
+            Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();
