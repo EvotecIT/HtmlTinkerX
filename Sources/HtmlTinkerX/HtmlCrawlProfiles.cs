@@ -54,6 +54,7 @@ public static class HtmlCrawlProfiles {
                 "www.evotec.xyz"
             },
             Selector = "main",
+            CompareContentModes = true,
             WaitForSelector = "#main",
             ExcludeSelectors = {
                 ".wpml-ls",
@@ -198,6 +199,9 @@ public static class HtmlCrawlProfiles {
         if (Math.Abs(options.ReaderMinimumScore - defaults.ReaderMinimumScore) < 0.0001 && profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0) {
             options.ReaderMinimumScore = profile.ReaderMinimumScore.Value;
         }
+        if (options.CompareContentModes == defaults.CompareContentModes && profile.CompareContentModes.HasValue) {
+            options.CompareContentModes = profile.CompareContentModes.Value;
+        }
         if (string.IsNullOrWhiteSpace(options.WaitForSelector) && !string.IsNullOrWhiteSpace(profile.WaitForSelector)) {
             options.WaitForSelector = profile.WaitForSelector;
         }
@@ -244,6 +248,7 @@ public static class HtmlCrawlProfiles {
             ContentMode = profile.ContentMode,
             ReaderMinimumWordCount = profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0 ? profile.ReaderMinimumWordCount.Value : null,
             ReaderMinimumScore = profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0 ? profile.ReaderMinimumScore.Value : null,
+            CompareContentModes = profile.CompareContentModes,
             WaitForSelector = string.IsNullOrWhiteSpace(profile.WaitForSelector) ? null : profile.WaitForSelector.Trim(),
             PathPrefix = string.IsNullOrWhiteSpace(profile.PathPrefix) ? null : profile.PathPrefix.Trim(),
             AutoRender = profile.AutoRender,

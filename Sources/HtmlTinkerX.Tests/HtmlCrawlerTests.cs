@@ -73,6 +73,7 @@ public class HtmlCrawlerTests {
 
         Assert.Equal("main", options.Selector);
         Assert.Equal("#main", options.WaitForSelector);
+        Assert.True(options.CompareContentModes);
         Assert.Equal(20, options.ReaderMinimumWordCount);
         Assert.Equal(25, options.ReaderMinimumScore);
         Assert.Contains(".sharing-popup", options.ExcludeSelectors);
@@ -92,6 +93,7 @@ public class HtmlCrawlerTests {
                   "hosts": [ "docs.example.com" ],
                   "selector": "article",
                   "contentMode": "Reader",
+                  "compareContentModes": true,
                   "readerMinimumWordCount": 30,
                   "readerMinimumScore": 40,
                   "excludeSelectors": [ ".sidebar", ".feedback" ],
@@ -107,6 +109,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("docs.example.com", profile.Hosts);
             Assert.Equal("article", profile.Selector);
             Assert.Equal(HtmlCrawlContentMode.Reader, profile.ContentMode);
+            Assert.True(profile.CompareContentModes);
             Assert.Equal(30, profile.ReaderMinimumWordCount);
             Assert.Equal(40, profile.ReaderMinimumScore);
             Assert.Contains(".sidebar", profile.ExcludeSelectors);
@@ -568,6 +571,8 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(HtmlCrawlRenderReasonCode.StaticRenderDisabled, page.RenderReasonCode);
+            Assert.Equal(3, page.ContentComparisons.Count);
+            Assert.NotNull(page.BestContentComparisonMode);
         } finally {
             server.Stop();
             server.Close();
@@ -609,6 +614,7 @@ public class HtmlCrawlerTests {
             "name": "custom-docs",
             "hosts": [ "localhost" ],
             "selector": "article",
+            "compareContentModes": true,
             "excludeSelectors": [ ".sidebar", ".feedback-box" ]
           }
         ]
@@ -636,8 +642,12 @@ public class HtmlCrawlerTests {
 
             Assert.Equal("custom-docs", named.AppliedProfileName, ignoreCase: true);
             Assert.Equal("custom-docs", automatic.AppliedProfileName, ignoreCase: true);
-            Assert.DoesNotContain("Sidebar", Assert.Single(named.Pages).Text, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("Feedback", Assert.Single(automatic.Pages).Text, StringComparison.OrdinalIgnoreCase);
+            HtmlCrawlPage namedPage = Assert.Single(named.Pages);
+            HtmlCrawlPage automaticPage = Assert.Single(automatic.Pages);
+            Assert.DoesNotContain("Sidebar", namedPage.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Feedback", automaticPage.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(3, namedPage.ContentComparisons.Count);
+            Assert.Equal(3, automaticPage.ContentComparisons.Count);
         } finally {
             server.Stop();
             server.Close();

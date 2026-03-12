@@ -260,6 +260,7 @@ var profiled = await HtmlCrawler.CrawlAsync("https://evotec.xyz/", new HtmlCrawl
     ProfileName = "evotec-xyz"
 });
 Console.WriteLine(profiled.AppliedProfileName);
+Console.WriteLine(profiled.Pages[0].ContentComparisonDeltaSummary);
 ```
 
 ### PowerShell Example
@@ -320,8 +321,10 @@ $reader.Summary.ContentComparisonWinnerPreviewSamples
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
+$profiled.Pages[0] | Select-Object BestContentComparisonMode, ContentComparisonDeltaSummary
 # Available profile names: evotec-xyz, wordpress-content
 # Unknown names fail fast and report the built-in values
+# evotec-xyz also enables comparison mode by default so tuning output is available immediately
 
 # AutoProfile can also infer the generic WordPress profile from page markers
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
@@ -368,6 +371,8 @@ Persisted crawl artifacts now include:
 The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
 
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
+
+Profiles can also enable comparison mode automatically. The built-in `evotec-xyz` profile now does this by default, and custom profile JSON can opt in with `"compareContentModes": true`.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

@@ -24,6 +24,9 @@ public sealed class HtmlCrawlProfile {
     /// <summary>Optional minimum score applied to reader-mode candidates when the caller keeps the default value.</summary>
     public double? ReaderMinimumScore { get; set; }
 
+    /// <summary>Optionally enables side-by-side raw, focused, and reader comparisons when the caller keeps the default value.</summary>
+    public bool? CompareContentModes { get; set; }
+
     /// <summary>Optional selector that rendered crawls wait for before extraction.</summary>
     public string? WaitForSelector { get; set; }
 

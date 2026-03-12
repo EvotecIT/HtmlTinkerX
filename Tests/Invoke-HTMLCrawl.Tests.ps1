@@ -370,6 +370,8 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page.Text | Should -Match 'World'
             $page.Html | Should -Not -Match 'Share'
             $page.Text | Should -Not -Match 'Polish'
+            $page.ContentComparisons.Count | Should -Be 3
+            $page.BestContentComparisonMode | Should -Not -BeNullOrEmpty
         } finally {
             Stop-TestHttpServer $server
         }
@@ -403,6 +405,7 @@ public sealed class PesterTestHttpServer : IDisposable {
     "name": "custom-docs",
     "hosts": [ "127.0.0.1" ],
     "selector": "article",
+    "compareContentModes": true,
     "readerMinimumWordCount": 30,
     "readerMinimumScore": 40,
     "excludeSelectors": [ ".sidebar", ".feedback-box" ]
@@ -422,8 +425,10 @@ public sealed class PesterTestHttpServer : IDisposable {
             $named.AppliedProfileName | Should -Be 'custom-docs'
             $automatic.AppliedProfileName | Should -Be 'custom-docs'
             $named.Pages[0].ContentModeUsed | Should -Be 'Focused'
+            $named.Pages[0].ContentComparisons.Count | Should -Be 3
             $named.Pages[0].Text | Should -Not -Match 'Sidebar'
             $automatic.Pages[0].Text | Should -Not -Match 'Feedback'
+            $automatic.Pages[0].ContentComparisons.Count | Should -Be 3
         } finally {
             Stop-TestHttpServer $server
         }
