@@ -469,6 +469,47 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_CompareContentModes_PopulatesPageDiagnosticsAndManifestComparisons() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><div class='sidebar'><a href='/a'>A</a><a href='/b'>B</a><a href='/c'>C</a><a href='/d'>D</a></div><article><h1>Hello</h1><p>This is the main body content with enough words to beat the sidebar links.</p><p>Second paragraph keeps the article score high.</p></article></main></body></html>"
+        };
+
+        string outputPath = Path.Combine(Path.GetTempPath(), "htmltinkerx-compare-" + Guid.NewGuid().ToString("N"));
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                ContentMode = HtmlCrawlContentMode.Reader,
+                CompareContentModes = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(3, page.ContentComparisons.Count);
+            Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Raw);
+            Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Focused);
+            HtmlCrawlContentComparison reader = Assert.Single(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Reader);
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate, reader.ReasonCode);
+            Assert.Equal("article", reader.ElementSelectorHint);
+            Assert.True(reader.WordCount > 10);
+
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(page.ManifestPath!));
+            JsonElement comparisons = manifest.RootElement.GetProperty("ContentComparisons");
+            Assert.Equal(3, comparisons.GetArrayLength());
+            Assert.Contains(comparisons.EnumerateArray(), item =>
+                string.Equals(item.GetProperty("Mode").GetString(), "Reader", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.GetProperty("ReasonCode").GetString(), HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate.ToString(), StringComparison.OrdinalIgnoreCase));
+        } finally {
+            server.Stop();
+            server.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_Profile_AppliesSelectorExclusionsAndProfileMetadata() {
         Dictionary<string, string> responses = new() {
             ["/"] = "<html><head><title>Home</title></head><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"

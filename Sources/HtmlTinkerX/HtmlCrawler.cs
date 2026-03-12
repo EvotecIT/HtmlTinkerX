@@ -977,7 +977,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1009,6 +1009,7 @@ public static class HtmlCrawler {
                 page.ContentSelectionScore,
                 page.ReaderCandidateCount,
                 page.ReaderRootElementSelectorHint,
+                ContentComparisonCount = page.ContentComparisons.Count,
                 page.AppliedInteractions,
                 page.Started,
                 page.Finished,
@@ -1047,6 +1048,7 @@ public static class HtmlCrawler {
                 EscapeCsv(page.ContentSelectionScore?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.ReaderCandidateCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.ReaderRootElementSelectorHint),
+                EscapeCsv(page.ContentComparisons.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
@@ -1229,6 +1231,21 @@ public static class HtmlCrawler {
                 page.ReaderCandidateCount,
                 page.ReaderRootElementSelectorHint
             },
+            ContentComparisons = page.ContentComparisons
+                .OrderBy(comparison => comparison.Mode.ToString(), StringComparer.OrdinalIgnoreCase)
+                .Select(comparison => new {
+                    comparison.Mode,
+                    comparison.ReasonCode,
+                    comparison.Reason,
+                    comparison.ElementSelectorHint,
+                    comparison.WordCount,
+                    comparison.CharacterCount,
+                    comparison.Summary,
+                    comparison.Score,
+                    comparison.ReaderCandidateCount,
+                    comparison.ReaderRootElementSelectorHint
+                })
+                .ToArray(),
             page.AppliedInteractions,
             page.Started,
             page.Finished,
@@ -1896,6 +1913,10 @@ public static class HtmlCrawler {
                     .Append(HtmlEncode(page.ReaderRootElementSelectorHint))
                     .Append("</code>");
             }
+            if (page.ContentComparisons.Count > 0) {
+                builder.Append("<br>comparisons: ")
+                    .Append(HtmlEncode(string.Join(" | ", page.ContentComparisons.Select(comparison => comparison.Mode.ToString()))));
+            }
             builder.Append("</span>");
             builder.AppendLine("</td>");
             builder.Append("          <td class=\"summary\"><strong>")
@@ -2391,6 +2412,9 @@ public static class HtmlCrawler {
         page.ContentSelectionScore = contentSelection.Score;
         page.ReaderCandidateCount = contentSelection.ReaderCandidateCount;
         page.ReaderRootElementSelectorHint = contentSelection.ReaderRootElementSelectorHint;
+        page.ContentComparisons = options.CompareContentModes
+            ? BuildContentComparisons(html, options)
+            : new List<HtmlCrawlContentComparison>();
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
     }
@@ -2638,6 +2662,7 @@ public static class HtmlCrawler {
             ContentSelectionScore = page.ContentSelectionScore,
             ReaderCandidateCount = page.ReaderCandidateCount,
             ReaderRootElementSelectorHint = page.ReaderRootElementSelectorHint,
+            ContentComparisons = CloneContentComparisons(page.ContentComparisons),
             Started = page.Started,
             Finished = page.Finished
         };
@@ -2801,6 +2826,46 @@ public static class HtmlCrawler {
             or ".entry-content"
             or ".post-content"
             or "article";
+    }
+
+    private static IList<HtmlCrawlContentComparison> BuildContentComparisons(string html, HtmlCrawlOptions options) {
+        List<HtmlCrawlContentComparison> comparisons = new();
+        foreach (HtmlCrawlContentMode mode in new[] { HtmlCrawlContentMode.Raw, HtmlCrawlContentMode.Focused, HtmlCrawlContentMode.Reader }) {
+            HtmlCrawlOptions comparisonOptions = options.Clone();
+            comparisonOptions.ContentMode = mode;
+            ContentSelectionResult selection = SelectContent(html, comparisonOptions);
+            string selectedHtml = ApplyContentCleanup(selection.Html, comparisonOptions);
+            string text = HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, comparisonOptions));
+            comparisons.Add(new HtmlCrawlContentComparison {
+                Mode = mode,
+                ReasonCode = selection.ReasonCode,
+                Reason = selection.Reason,
+                ElementSelectorHint = BuildElementSelectorHint(selection.Element),
+                WordCount = CountWords(text),
+                CharacterCount = text.Length,
+                Summary = BuildSummary(text),
+                Score = selection.Score,
+                ReaderCandidateCount = selection.ReaderCandidateCount,
+                ReaderRootElementSelectorHint = selection.ReaderRootElementSelectorHint
+            });
+        }
+
+        return comparisons;
+    }
+
+    private static IList<HtmlCrawlContentComparison> CloneContentComparisons(IEnumerable<HtmlCrawlContentComparison> comparisons) {
+        return comparisons.Select(comparison => new HtmlCrawlContentComparison {
+            Mode = comparison.Mode,
+            ReasonCode = comparison.ReasonCode,
+            Reason = comparison.Reason,
+            ElementSelectorHint = comparison.ElementSelectorHint,
+            WordCount = comparison.WordCount,
+            CharacterCount = comparison.CharacterCount,
+            Summary = comparison.Summary,
+            Score = comparison.Score,
+            ReaderCandidateCount = comparison.ReaderCandidateCount,
+            ReaderRootElementSelectorHint = comparison.ReaderRootElementSelectorHint
+        }).ToList();
     }
 
     private static bool TrySelectPreferredContentElement(IDocument document, out IElement? element) {

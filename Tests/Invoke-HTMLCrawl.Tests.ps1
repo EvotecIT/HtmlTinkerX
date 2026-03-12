@@ -297,6 +297,32 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can compare extraction modes side by side for diagnostics' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><main><div class='sidebar'><a href='/a'>A</a><a href='/b'>B</a><a href='/c'>C</a><a href='/d'>D</a></div><article><h1>Hello</h1><p>This is the main body content with enough words to beat the sidebar links.</p><p>Second paragraph keeps the article score high.</p></article></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $outputPath = Join-Path $TestDrive 'crawl-compare'
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -ContentMode Reader -CompareContentModes -OutPath $outputPath
+            $page = $result.Pages | Select-Object -First 1
+            $manifest = Get-Content $page.ManifestPath -Raw | ConvertFrom-Json
+
+            $page.ContentComparisons.Count | Should -Be 3
+            ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Raw' }).Count | Should -Be 1
+            ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Focused' }).Count | Should -Be 1
+            $reader = $page.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' } | Select-Object -First 1
+            $reader.ReasonCode | Should -Be 'ReaderBestCandidate'
+            $reader.ElementSelectorHint | Should -Be 'article'
+            $reader.WordCount | Should -BeGreaterThan 10
+            $manifest.ContentComparisons.Count | Should -Be 3
+            (($manifest.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' }).ReasonCode) | Should -Be 'ReaderBestCandidate'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can apply a built-in crawl profile' {
         $server = Start-TestHttpServer -Responses @{
             '/' = "<html><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"

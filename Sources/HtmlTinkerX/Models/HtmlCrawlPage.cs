@@ -112,6 +112,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Compact selector-like hint for the reader root element when reader-mode scoring was used.</summary>
     public string? ReaderRootElementSelectorHint { get; set; }
 
+    /// <summary>Optional side-by-side extraction diagnostics for raw, focused, and reader modes.</summary>
+    public IList<HtmlCrawlContentComparison> ContentComparisons { get; set; } = new List<HtmlCrawlContentComparison>();
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 

@@ -87,6 +87,9 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Controls how the crawler chooses the HTML region used for stored content and text extraction.</summary>
     public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
 
+    /// <summary>When true, the crawler also evaluates raw, focused, and reader extraction alternatives for diagnostics and persisted manifests.</summary>
+    public bool CompareContentModes { get; set; }
+
     /// <summary>Minimum word count a reader-mode candidate must have before it is considered article-like content.</summary>
     public int ReaderMinimumWordCount { get; set; } = 20;
 
@@ -288,6 +291,7 @@ public sealed class HtmlCrawlOptions {
             IncludeText = IncludeText,
             Selector = Selector,
             ContentMode = ContentMode,
+            CompareContentModes = CompareContentModes,
             ReaderMinimumWordCount = ReaderMinimumWordCount,
             ReaderMinimumScore = ReaderMinimumScore,
             ExcludeSelectors = new List<string>(ExcludeSelectors),

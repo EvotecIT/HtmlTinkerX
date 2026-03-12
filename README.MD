@@ -236,12 +236,14 @@ var focused = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlC
 });
 var reader = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
     ContentMode = HtmlCrawlContentMode.Reader,
+    CompareContentModes = true,
     ReaderMinimumWordCount = 30,
     ReaderMinimumScore = 40
 });
 Console.WriteLine($"{reader.Pages[0].ContentModeUsed} / {reader.Pages[0].ContentSelectionReasonCode}");
 Console.WriteLine(reader.Pages[0].ContentElementSelectorHint);
 Console.WriteLine($"{reader.Pages[0].ContentSelectionScore} across {reader.Pages[0].ReaderCandidateCount} reader candidates");
+Console.WriteLine(string.Join(", ", reader.Pages[0].ContentComparisons.Select(c => $"{c.Mode}:{c.WordCount}")));
 
 // Remove noisy blocks by class or id while keeping smart cleanup enabled
 var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -301,8 +303,9 @@ $clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -Excl
 # Choose how content is selected before cleanup
 $raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
 $focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ContentMode Focused
-$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
+$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -CompareContentModes -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
 $reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
+$reader.Pages[0].ContentComparisons | Select-Object Mode, ReasonCode, ElementSelectorHint, WordCount, Summary
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
@@ -353,6 +356,8 @@ Persisted crawl artifacts now include:
 - `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
 
 The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
+
+If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction. That is useful when tuning selectors, cleanup rules, or reader thresholds for a specific site family without running three separate crawls.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

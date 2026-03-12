@@ -125,6 +125,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
 
+    /// <summary>Also compare raw, focused, and reader extraction alternatives for diagnostics and persisted manifests.</summary>
+    [Parameter]
+    public SwitchParameter CompareContentModes { get; set; }
+
     /// <summary>Minimum word count a reader-mode candidate must have before it is treated as article-like content.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
@@ -371,6 +375,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
             ContentMode = ContentMode,
+            CompareContentModes = CompareContentModes.IsPresent,
             ReaderMinimumWordCount = ReaderMinimumWordCount,
             ReaderMinimumScore = ReaderMinimumScore,
             ExcludeSelectors = new List<string>(ExcludeSelector),
