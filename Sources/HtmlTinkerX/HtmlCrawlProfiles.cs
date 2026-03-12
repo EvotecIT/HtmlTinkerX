@@ -74,6 +74,28 @@ public static class HtmlCrawlProfiles {
             }
         },
         new HtmlCrawlProfile {
+            Name = "api-docs-content",
+            Selector = "main",
+            ContentMode = HtmlCrawlContentMode.Reader,
+            CompareContentModes = true,
+            ReaderMinimumWordCount = 25,
+            ReaderMinimumScore = 30,
+            ExcludeSelectors = {
+                ".swagger-ui .topbar",
+                ".swagger-ui .scheme-container",
+                ".swagger-ui .download-url-wrapper",
+                ".swagger-ui .auth-wrapper",
+                ".swagger-ui .information-container",
+                ".swagger-ui .models",
+                ".redoc-wrap .menu-content",
+                ".redoc-wrap .api-content > div[role='navigation']",
+                ".rapi-doc-navbar",
+                ".rapi-doc-header",
+                ".breadcrumbs",
+                ".breadcrumb"
+            }
+        },
+        new HtmlCrawlProfile {
             Name = "evotec-xyz",
             Hosts = {
                 "evotec.xyz",

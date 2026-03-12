@@ -4,6 +4,7 @@ Describe 'Get-HtmlCrawlProfile' {
     It 'Lists built-in crawl profiles' {
         $profiles = Get-HtmlCrawlProfile
 
+        $profiles.Name | Should -Contain 'api-docs-content'
         $profiles.Name | Should -Contain 'evotec-xyz'
         $profiles.Name | Should -Contain 'docs-content'
         $profiles.Name | Should -Contain 'wordpress-content'

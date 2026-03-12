@@ -418,6 +418,26 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can auto-apply the api docs profile from api documentation markers' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><head><title>API</title></head><body><main><div class='swagger-ui'><div class='topbar'>Swagger UI</div></div><article><h1>Users API</h1><p>API reference body with enough words to keep reader mode useful for extraction testing.</p><a href='/openapi.json'>OpenAPI</a><button>Try it out</button></article></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -AutoProfile
+            $page = $result.Pages | Select-Object -First 1
+
+            $result.AppliedProfileName | Should -Be 'api-docs-content'
+            $page.ContentModeUsed | Should -Be 'Reader'
+            $page.ContentComparisons.Count | Should -Be 3
+            $page.Text | Should -Not -Match 'Swagger UI'
+            $page.Text | Should -Match 'Users API'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can load custom crawl profiles from JSON' {
         $profilePath = Join-Path $TestDrive 'crawl-profiles.json'
         @'

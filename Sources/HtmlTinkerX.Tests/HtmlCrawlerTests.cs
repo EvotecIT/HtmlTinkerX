@@ -65,6 +65,7 @@ public class HtmlCrawlerTests {
 
         Assert.NotNull(profile);
         Assert.Equal("evotec-xyz", profile!.Name, ignoreCase: true);
+        Assert.Contains("api-docs-content", HtmlCrawlProfiles.Names);
         Assert.Contains("evotec-xyz", HtmlCrawlProfiles.Names);
         Assert.Contains("docs-content", HtmlCrawlProfiles.Names);
         Assert.Contains("wordpress-content", HtmlCrawlProfiles.Names);
@@ -628,6 +629,32 @@ public class HtmlCrawlerTests {
             Assert.Equal(3, page.ContentComparisons.Count);
             Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_AutoProfile_DetectsApiDocumentationMarkersAndAppliesApiDocsProfile() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>API</title></head><body><main><div class='swagger-ui'><div class='topbar'>Swagger UI</div></div><article><h1>Users API</h1><p>API reference body with enough words to keep reader mode useful for extraction testing.</p><a href='/openapi.json'>OpenAPI</a><button>Try it out</button></article></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                AutoProfile = true
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal("api-docs-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
+            Assert.Equal(3, page.ContentComparisons.Count);
+            Assert.DoesNotContain("Swagger UI", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Users API", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();

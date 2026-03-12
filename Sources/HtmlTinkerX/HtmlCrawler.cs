@@ -2510,6 +2510,13 @@ public static class HtmlCrawler {
             }
         }
 
+        if (LooksLikeApiDocumentationSite(html, page)) {
+            HtmlCrawlProfile? apiDocsProfile = HtmlCrawlProfiles.ResolveByName("api-docs-content", customProfiles);
+            if (apiDocsProfile != null) {
+                return apiDocsProfile;
+            }
+        }
+
         if (LooksLikeDocumentationSite(html, page)) {
             HtmlCrawlProfile? docsProfile = HtmlCrawlProfiles.ResolveByName("docs-content", customProfiles);
             if (docsProfile != null) {
@@ -2546,6 +2553,31 @@ public static class HtmlCrawler {
         }
 
         return false;
+    }
+
+    private static bool LooksLikeApiDocumentationSite(string? html, HtmlCrawlPage page) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return false;
+        }
+
+        string normalizedHtml = html.ToLowerInvariant();
+        bool hasApiUiMarkers = normalizedHtml.Contains("swagger-ui", StringComparison.Ordinal)
+            || normalizedHtml.Contains("redoc-wrap", StringComparison.Ordinal)
+            || normalizedHtml.Contains("<rapi-doc", StringComparison.Ordinal)
+            || normalizedHtml.Contains("data-spec-url", StringComparison.Ordinal)
+            || normalizedHtml.Contains("scalar-api-reference", StringComparison.Ordinal)
+            || normalizedHtml.Contains("try it out", StringComparison.Ordinal)
+            || normalizedHtml.Contains("openapi", StringComparison.Ordinal);
+        bool hasApiSpecLinks = page.Links.Any(url => url.Contains("swagger.json", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("openapi.json", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("openapi.yaml", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("openapi.yml", StringComparison.OrdinalIgnoreCase))
+            || page.AssetUrls.Any(url => url.Contains("swagger.json", StringComparison.OrdinalIgnoreCase)
+                || url.Contains("openapi.json", StringComparison.OrdinalIgnoreCase)
+                || url.Contains("openapi.yaml", StringComparison.OrdinalIgnoreCase)
+                || url.Contains("openapi.yml", StringComparison.OrdinalIgnoreCase));
+
+        return hasApiUiMarkers || hasApiSpecLinks;
     }
 
     private static bool LooksLikeDocumentationSite(string? html, HtmlCrawlPage page) {
