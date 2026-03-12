@@ -357,6 +357,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $result.AssetCount | Should -Be 6
             $result.Assets.FilePath | ForEach-Object { Test-Path $_ | Should -BeTrue }
             (Test-Path (Join-Path $outputPath 'assets.jsonl')) | Should -BeTrue
+            (Test-Path (Join-Path $outputPath 'skipped-assets.jsonl')) | Should -BeTrue
             (Test-Path $result.IndexHtmlPath) | Should -BeTrue
             (Get-Content $result.Pages[0].HtmlPath -Raw) | Should -Match '\.\./assets/'
             $stylesheet = $result.Assets | Where-Object { $_.Url -eq ($prefix + 'css/site.css') } | Select-Object -First 1
@@ -440,6 +441,11 @@ public sealed class PesterTestHttpServer : IDisposable {
             (Test-Path $result.ChunksJsonlPath) | Should -BeTrue
             (Test-Path $result.GraphJsonPath) | Should -BeTrue
             $result.Summary.ChunkCount | Should -BeGreaterThan 0
+            $result.SkippedContentPageCount | Should -Be 1
+            $result.SkippedAssetCount | Should -Be 1
+            $result.Summary.SkippedContentPageCount | Should -Be 1
+            $result.Summary.SkippedAssetCount | Should -Be 1
+            (Test-Path $result.SkippedAssetsJsonlPath) | Should -BeTrue
             $result.GraphNodeCount | Should -Be 4
             $result.GraphEdgeCount | Should -Be 3
             $result.GraphFetchedNodeCount | Should -Be 2
@@ -490,6 +496,8 @@ public sealed class PesterTestHttpServer : IDisposable {
             $indexHtml | Should -Match 'Node category'
             $indexHtml | Should -Match 'Edge relation'
             $indexHtml | Should -Match 'Skipped-node reason'
+            $indexHtml | Should -Match 'Skipped Pages'
+            $indexHtml | Should -Match 'Skipped Assets'
         } finally {
             Stop-TestHttpServer $server
         }

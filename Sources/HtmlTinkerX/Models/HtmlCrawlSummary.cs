@@ -27,6 +27,12 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Number of skipped candidates.</summary>
     public int SkippedPageCount { get; set; }
 
+    /// <summary>Number of skipped content-page candidates.</summary>
+    public int SkippedContentPageCount { get; set; }
+
+    /// <summary>Number of skipped asset candidates.</summary>
+    public int SkippedAssetCount { get; set; }
+
     /// <summary>Number of skipped candidates that duplicated earlier content.</summary>
     public int DuplicatePageCount { get; set; }
 
@@ -86,6 +92,8 @@ public sealed class HtmlCrawlSummary {
             FailedPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Failed),
             RenderedPageCount = result.Pages.Count(page => page.Rendered),
             SkippedPageCount = result.SkippedPages.Count,
+            SkippedContentPageCount = result.SkippedPages.Count(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath),
+            SkippedAssetCount = result.SkippedPages.Count(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath),
             DuplicatePageCount = result.SkippedPages.Count(page => page.SkipReason == HtmlCrawlSkipReason.DuplicateContent),
             PendingPageCount = result.PendingPages.Count,
             SitemapCount = result.SitemapUrls.Count,
@@ -135,6 +143,8 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Failed pages: {FailedPageCount}");
         report.AppendLine($"Rendered pages: {RenderedPageCount}");
         report.AppendLine($"Skipped candidates: {SkippedPageCount}");
+        report.AppendLine($"Skipped page candidates: {SkippedContentPageCount}");
+        report.AppendLine($"Skipped asset candidates: {SkippedAssetCount}");
         report.AppendLine($"Duplicate-content skips: {DuplicatePageCount}");
         report.AppendLine($"Pending candidates: {PendingPageCount}");
         report.AppendLine($"Sitemaps used: {SitemapCount}");

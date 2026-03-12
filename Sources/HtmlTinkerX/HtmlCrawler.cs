@@ -83,6 +83,7 @@ public static class HtmlCrawler {
         public string PagesJsonlPath { get; set; } = string.Empty;
         public string PagesCsvPath { get; set; } = string.Empty;
         public string SkippedPagesJsonlPath { get; set; } = string.Empty;
+        public string SkippedAssetsJsonlPath { get; set; } = string.Empty;
         public string LinksJsonlPath { get; set; } = string.Empty;
         public string AssetsJsonlPath { get; set; } = string.Empty;
         public string ChunksJsonlPath { get; set; } = string.Empty;
@@ -115,6 +116,20 @@ public static class HtmlCrawler {
         "no", "not", "of", "on", "or", "our", "ours", "she", "so", "some", "than", "that", "the", "their",
         "them", "then", "there", "these", "they", "this", "those", "to", "too", "up", "us", "was", "we",
         "were", "what", "when", "where", "which", "who", "will", "with", "you", "your"
+    };
+
+    private static readonly string[] ContentFallbackSelectors = {
+        "main",
+        "[role='main']",
+        "#main",
+        "#main-content",
+        ".main-content",
+        ".site-main",
+        "#content",
+        ".content",
+        ".entry-content",
+        ".post-content",
+        "article"
     };
 
     /// <summary>
@@ -784,6 +799,7 @@ public static class HtmlCrawler {
         result.PagesJsonlPath = artifactPaths.PagesJsonlPath;
         result.PagesCsvPath = artifactPaths.PagesCsvPath;
         result.SkippedPagesJsonlPath = artifactPaths.SkippedPagesJsonlPath;
+        result.SkippedAssetsJsonlPath = artifactPaths.SkippedAssetsJsonlPath;
         result.LinksJsonlPath = artifactPaths.LinksJsonlPath;
         result.AssetsJsonlPath = artifactPaths.AssetsJsonlPath;
         result.ChunksJsonlPath = artifactPaths.ChunksJsonlPath;
@@ -888,10 +904,35 @@ public static class HtmlCrawler {
                 EscapeCsv(page.Error)));
         }
 
+        List<HtmlCrawlPage> skippedContentPages = result.SkippedPages
+            .Where(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath)
+            .ToList();
+        List<HtmlCrawlPage> skippedAssetPages = result.SkippedPages
+            .Where(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath)
+            .ToList();
+
         StringBuilder skippedPagesJsonl = new();
-        foreach (HtmlCrawlPage page in result.SkippedPages) {
+        foreach (HtmlCrawlPage page in skippedContentPages) {
             cancellationToken.ThrowIfCancellationRequested();
             skippedPagesJsonl.AppendLine(JsonSerializer.Serialize(new {
+                page.Url,
+                page.RequestedUrl,
+                page.CanonicalUrl,
+                page.ParentUrl,
+                page.Depth,
+                page.Status,
+                page.SkipReason,
+                page.ContentType,
+                page.ContentFingerprint,
+                page.DuplicateOfUrl,
+                page.Error
+            }));
+        }
+
+        StringBuilder skippedAssetsJsonl = new();
+        foreach (HtmlCrawlPage page in skippedAssetPages) {
+            cancellationToken.ThrowIfCancellationRequested();
+            skippedAssetsJsonl.AppendLine(JsonSerializer.Serialize(new {
                 page.Url,
                 page.RequestedUrl,
                 page.CanonicalUrl,
@@ -976,6 +1017,7 @@ public static class HtmlCrawler {
         await WriteTextAsync(artifactPaths.PagesJsonlPath, pagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.PagesCsvPath, pagesCsv.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.SkippedPagesJsonlPath, skippedPagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
+        await WriteTextAsync(artifactPaths.SkippedAssetsJsonlPath, skippedAssetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.LinksJsonlPath, linksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.AssetsJsonlPath, assetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.ChunksJsonlPath, chunksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
@@ -1425,6 +1467,17 @@ public static class HtmlCrawler {
     }
 
     private static string BuildIndexHtml(HtmlCrawlResult result, HtmlCrawlSummary summary, string indexHtmlPath) {
+        List<HtmlCrawlPage> skippedContentPages = result.SkippedPages
+            .Where(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath)
+            .OrderBy(page => page.Depth)
+            .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        List<HtmlCrawlPage> skippedAssetPages = result.SkippedPages
+            .Where(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath)
+            .OrderBy(page => page.Depth)
+            .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         StringBuilder builder = new();
         builder.AppendLine("<!DOCTYPE html>");
         builder.AppendLine("<html lang=\"en\">");
@@ -1465,7 +1518,8 @@ public static class HtmlCrawler {
         AppendStatCard(builder, "Pages", summary.PageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Successful", summary.SuccessfulPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Failed", summary.FailedPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        AppendStatCard(builder, "Skipped", summary.SkippedPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "Skipped Pages", summary.SkippedContentPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "Skipped Assets", summary.SkippedAssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Assets", summary.AssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Chunks", summary.ChunkCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Graph Edges", summary.GraphEdgeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -1481,6 +1535,7 @@ public static class HtmlCrawler {
         AppendArtifactLink(builder, indexHtmlPath, "Pages JSONL", result.PagesJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Pages CSV", result.PagesCsvPath);
         AppendArtifactLink(builder, indexHtmlPath, "Skipped Pages JSONL", result.SkippedPagesJsonlPath);
+        AppendArtifactLink(builder, indexHtmlPath, "Skipped Assets JSONL", result.SkippedAssetsJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Links JSONL", result.LinksJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Assets JSONL", result.AssetsJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Chunks JSONL", result.ChunksJsonlPath);
@@ -1634,13 +1689,40 @@ public static class HtmlCrawler {
             builder.AppendLine("  </section>");
         }
 
-        if (result.SkippedPages.Count > 0) {
+        if (skippedContentPages.Count > 0) {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Skipped Pages</h2>");
             builder.AppendLine("    <table>");
             builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Depth</th></tr></thead>");
             builder.AppendLine("      <tbody>");
-            foreach (HtmlCrawlPage page in result.SkippedPages.OrderBy(page => page.Depth).ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)) {
+            foreach (HtmlCrawlPage page in skippedContentPages) {
+                builder.AppendLine("        <tr>");
+                builder.Append("          <td><a href=\"")
+                    .Append(HtmlEncode(page.Url))
+                    .Append("\">")
+                    .Append(HtmlEncode(page.Url))
+                    .AppendLine("</a></td>");
+                builder.Append("          <td><code>")
+                    .Append(HtmlEncode(page.SkipReason.ToString()))
+                    .AppendLine("</code></td>");
+                builder.Append("          <td>")
+                    .Append(HtmlEncode(page.Depth.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</td>");
+                builder.AppendLine("        </tr>");
+            }
+            builder.AppendLine("      </tbody>");
+            builder.AppendLine("    </table>");
+            builder.AppendLine("  </section>");
+        }
+
+        if (skippedAssetPages.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Skipped Assets</h2>");
+            builder.AppendLine("    <p class=\"muted\">These URLs were discovered as asset candidates and intentionally not crawled as content pages.</p>");
+            builder.AppendLine("    <table>");
+            builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Depth</th></tr></thead>");
+            builder.AppendLine("      <tbody>");
+            foreach (HtmlCrawlPage page in skippedAssetPages) {
                 builder.AppendLine("        <tr>");
                 builder.Append("          <td><a href=\"")
                     .Append(HtmlEncode(page.Url))
@@ -1733,6 +1815,7 @@ public static class HtmlCrawler {
                 PagesJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "pages.jsonl"), fullPath),
                 PagesCsvPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "pages.csv"), fullPath),
                 SkippedPagesJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "skipped-pages.jsonl"), fullPath),
+                SkippedAssetsJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "skipped-assets.jsonl"), fullPath),
                 LinksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "links.jsonl"), fullPath),
                 AssetsJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "assets.jsonl"), fullPath),
                 ChunksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "chunks.jsonl"), fullPath),
@@ -1757,6 +1840,7 @@ public static class HtmlCrawler {
             PagesJsonlPath = EnsurePathIsWithinDirectory(stem + ".pages.jsonl", baseDirectory),
             PagesCsvPath = EnsurePathIsWithinDirectory(stem + ".pages.csv", baseDirectory),
             SkippedPagesJsonlPath = EnsurePathIsWithinDirectory(stem + ".skipped.jsonl", baseDirectory),
+            SkippedAssetsJsonlPath = EnsurePathIsWithinDirectory(stem + ".skipped-assets.jsonl", baseDirectory),
             LinksJsonlPath = EnsurePathIsWithinDirectory(stem + ".links.jsonl", baseDirectory),
             AssetsJsonlPath = EnsurePathIsWithinDirectory(stem + ".assets.jsonl", baseDirectory),
             ChunksJsonlPath = EnsurePathIsWithinDirectory(stem + ".chunks.jsonl", baseDirectory),
@@ -1847,7 +1931,8 @@ public static class HtmlCrawler {
             page.Links = ExtractLinks(html, request.Uri, options);
             page.AssetUrls = ExtractAssetUrls(html, request.Uri, options);
             page.Html = options.IncludeHtml ? SelectHtml(html, options.Selector) : string.Empty;
-            page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(string.IsNullOrEmpty(page.Html) ? html : page.Html) : string.Empty;
+            string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
+            page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml)) : string.Empty;
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
@@ -1902,10 +1987,11 @@ public static class HtmlCrawler {
             page.Links = ExtractLinks(fullHtml, request.Uri, options);
             page.AssetUrls = ExtractAssetUrls(fullHtml, request.Uri, options);
             page.Html = options.IncludeHtml
-                ? await GetRenderedHtmlAsync(session.Page, options.Selector).ConfigureAwait(false)
+                ? SelectHtml(fullHtml, options.Selector)
                 : string.Empty;
+            string textSourceHtml = SelectTextSourceHtml(fullHtml, options.Selector, page.Html);
             page.Text = options.IncludeText
-                ? await GetRenderedTextAsync(session.Page, options.Selector).ConfigureAwait(false)
+                ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml))
                 : string.Empty;
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
@@ -1915,24 +2001,6 @@ public static class HtmlCrawler {
         }
 
         return page;
-    }
-
-    private static async Task<string> GetRenderedHtmlAsync(IPage page, string? selector) {
-        if (string.IsNullOrEmpty(selector)) {
-            return await page.ContentAsync().ConfigureAwait(false);
-        }
-
-        ILocator locator = page.Locator(selector!);
-        return await locator.EvaluateAsync<string>("el => el.outerHTML").ConfigureAwait(false);
-    }
-
-    private static async Task<string> GetRenderedTextAsync(IPage page, string? selector) {
-        if (string.IsNullOrEmpty(selector)) {
-            return await page.InnerTextAsync("html").ConfigureAwait(false);
-        }
-
-        ILocator locator = page.Locator(selector!);
-        return await locator.InnerTextAsync().ConfigureAwait(false);
     }
 
     private static bool IsAllowedPageContent(string? contentType, string content, HtmlCrawlOptions options) {
@@ -2094,7 +2162,119 @@ public static class HtmlCrawler {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        return document.QuerySelector(selector!)?.OuterHtml ?? string.Empty;
+        IElement? selected = document.QuerySelector(selector!);
+        if (selected != null) {
+            return selected.OuterHtml;
+        }
+
+        if (LooksLikeSemanticContentSelector(selector) && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+            return fallback!.OuterHtml;
+        }
+
+        return string.Empty;
+    }
+
+    private static string SelectTextSourceHtml(string html, string? selector, string? selectedHtml) {
+        if (!string.IsNullOrWhiteSpace(selectedHtml)) {
+            return selectedHtml!;
+        }
+
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        if ((string.IsNullOrWhiteSpace(selector) || LooksLikeSemanticContentSelector(selector))
+            && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+            return fallback!.OuterHtml;
+        }
+
+        return html;
+    }
+
+    private static bool LooksLikeSemanticContentSelector(string? selector) {
+        if (string.IsNullOrWhiteSpace(selector)) {
+            return false;
+        }
+
+        string normalized = selector.Trim().ToLowerInvariant();
+        return normalized is "main"
+            or "[role='main']"
+            or "[role=\"main\"]"
+            or "#main"
+            or "#main-content"
+            or ".main-content"
+            or ".site-main"
+            or "#content"
+            or ".content"
+            or ".entry-content"
+            or ".post-content"
+            or "article";
+    }
+
+    private static bool TrySelectPreferredContentElement(IDocument document, out IElement? element) {
+        foreach (string selector in ContentFallbackSelectors) {
+            element = document.QuerySelector(selector);
+            if (element != null) {
+                return true;
+            }
+        }
+
+        element = null;
+        return false;
+    }
+
+    private static string PrepareHtmlForTextExtraction(string html) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return html;
+        }
+
+        if (LooksLikeFullHtmlDocument(html)) {
+            IDocument document = HtmlParser.ParseWithAngleSharp(html);
+            StripBoilerplateElements(document);
+            return document.DocumentElement?.OuterHtml ?? html;
+        }
+
+        IDocument fragment = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_text\">{html}</div>");
+        IElement? wrapper = fragment.QuerySelector("#__htmltinkerx_text");
+        if (wrapper == null) {
+            return html;
+        }
+
+        StripBoilerplateElements(wrapper);
+        return wrapper.InnerHtml;
+    }
+
+    private static void StripBoilerplateElements(IParentNode container) {
+        foreach (IElement element in container.QuerySelectorAll(
+                     "script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.wpml-ls,.sharing-popup,.post-footer-sharing,.socials-sharing,.gem-pagination,.menu-toggle,.minisearch,.skip-link,.skip-link-screen-reader-text").ToArray()) {
+            element.Remove();
+        }
+
+        foreach (IElement element in container.QuerySelectorAll("*").Where(ShouldRemoveBoilerplateElement).ToArray()) {
+            element.Remove();
+        }
+    }
+
+    private static bool ShouldRemoveBoilerplateElement(IElement element) {
+        string combined = string.Join(" ",
+            element.Id ?? string.Empty,
+            element.ClassName ?? string.Empty,
+            element.GetAttribute("aria-label") ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(combined)) {
+            return false;
+        }
+
+        string normalized = combined.ToLowerInvariant();
+        return normalized.Contains("site-header", StringComparison.Ordinal)
+               || normalized.Contains("primary-navigation", StringComparison.Ordinal)
+               || normalized.Contains("nav-menu", StringComparison.Ordinal)
+               || normalized.Contains("menu-item-search", StringComparison.Ordinal)
+               || normalized.Contains("footer-nav", StringComparison.Ordinal)
+               || normalized.Contains("footer-site-info", StringComparison.Ordinal)
+               || normalized.Contains("wpml-ls", StringComparison.Ordinal)
+               || normalized.Contains("sharing-popup", StringComparison.Ordinal)
+               || normalized.Contains("post-footer-sharing", StringComparison.Ordinal)
+               || normalized.Contains("socials-sharing", StringComparison.Ordinal)
+               || normalized.Contains("gem-pagination", StringComparison.Ordinal)
+               || normalized.Contains("skip-link", StringComparison.Ordinal)
+               || normalized.Contains("search", StringComparison.Ordinal) && normalized.Contains("form", StringComparison.Ordinal);
     }
 
     private static List<string> ExtractLinks(string html, Uri baseUri, HtmlCrawlOptions options) {

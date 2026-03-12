@@ -250,7 +250,8 @@ Persisted crawl artifacts now include:
 - `index.html` as a browsable offline entry point into the saved dataset
 - `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests
 - `pages.jsonl` and `pages.csv` for page-level datasets
-- `skipped-pages.jsonl` for skipped candidates
+- `skipped-pages.jsonl` for skipped content-page candidates
+- `skipped-assets.jsonl` for discovered asset/document URLs that were intentionally not crawled as pages
 - `links.jsonl` for discovered page-to-page links
 - `assets/` and `assets.jsonl` for downloaded images/documents when `DownloadAssets` is enabled
 - `chunks.jsonl` for deduplicated text chunks ready for local search/RAG pipelines
@@ -263,7 +264,7 @@ By default the crawler is page-oriented and only keeps `text/html` and `applicat
 
 It also skips obvious asset/document URLs such as `*.pdf`, `*.jpg`, `*.zip`, and fonts before fetching them. Use `SkipKnownAssetUrls = false` in C# or `-AllowAssetUrls` in PowerShell when those URLs are part of the dataset you want.
 
-If you want those assets as part of the offline dataset without treating them as pages, enable `DownloadAssets` in C# or `-DownloadAssets` in PowerShell. That saves discovered image/document URLs, stylesheet links, and CSS `url(...)` assets into `assets/` and records them in `assets.jsonl`.
+If you want those assets as part of the offline dataset without treating them as pages, enable `DownloadAssets` in C# or `-DownloadAssets` in PowerShell. That saves discovered image/document URLs, stylesheet links, and CSS `url(...)` assets into `assets/` and records them in `assets.jsonl`. Without `DownloadAssets`, `assets.jsonl` is still created as part of the dataset shape, but it stays empty because the crawl is page-only.
 
 When assets are downloaded, stored HTML snapshots are also rewritten to local relative paths by default, so an `<img>` can point at `../assets/...` instead of the original remote URL. Use `RewriteAssetReferencesToLocal = false` in C# or `-KeepRemoteAssetUrls` in PowerShell if you want to keep the original references.
 

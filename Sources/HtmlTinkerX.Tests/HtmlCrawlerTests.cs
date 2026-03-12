@@ -156,6 +156,33 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_FallsBackToSemanticMainAndStripsBoilerplateText() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><header id='site-header'><nav id='primary-navigation'><a href='/about'>About</a></nav></header><div id='main' role='main'><div class='entry-content post-content'><h1>Hello</h1><p>World</p><div class='sharing-popup'><a href='https://facebook.com/sharer.php'>Share</a></div></div></div><footer id='footer-nav'>Footer text</footer><div class='wpml-ls-statics-footer'><a href='https://example.pl/'>Polish</a></div></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main"
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("About", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Footer text", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Share", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_UsesSitemapsAndRespectsRobotsTxt() {
         Dictionary<string, string> responses = new();
         HttpListener server = StartServer(responses, out string rootUrl);
@@ -516,6 +543,7 @@ public class HtmlCrawlerTests {
             });
             Assert.All(result.Assets, asset => Assert.StartsWith(Path.GetFullPath(Path.Combine(outputPath, "assets")), Path.GetFullPath(asset.FilePath!), StringComparison.OrdinalIgnoreCase));
             Assert.True(File.Exists(Path.Combine(outputPath, "assets.jsonl")));
+            Assert.True(File.Exists(Path.Combine(outputPath, "skipped-assets.jsonl")));
             Assert.True(File.Exists(result.IndexHtmlPath));
             string persistedHtml = File.ReadAllText(page.HtmlPath!);
             Assert.Contains("../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
@@ -654,6 +682,11 @@ public class HtmlCrawlerTests {
             Assert.True(File.Exists(result.ChunksJsonlPath));
             Assert.True(File.Exists(result.GraphJsonPath));
             Assert.True(result.Summary.ChunkCount >= 1);
+            Assert.Equal(1, result.SkippedContentPageCount);
+            Assert.Equal(1, result.SkippedAssetCount);
+            Assert.Equal(1, result.Summary.SkippedContentPageCount);
+            Assert.Equal(1, result.Summary.SkippedAssetCount);
+            Assert.True(File.Exists(result.SkippedAssetsJsonlPath));
             Assert.Equal(4, result.GraphNodeCount);
             Assert.Equal(3, result.GraphEdgeCount);
             Assert.Equal(2, result.GraphFetchedNodeCount);
@@ -723,6 +756,8 @@ public class HtmlCrawlerTests {
             Assert.Contains("Node category", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Edge relation", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Skipped-node reason", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Skipped Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Skipped Assets", indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
             listener.Stop();
             listener.Close();

@@ -50,6 +50,9 @@ public sealed class HtmlCrawlResult {
     /// <summary>Path to the generated skipped-pages JSONL dataset file.</summary>
     public string? SkippedPagesJsonlPath { get; set; }
 
+    /// <summary>Path to the generated skipped-assets JSONL dataset file.</summary>
+    public string? SkippedAssetsJsonlPath { get; set; }
+
     /// <summary>Path to the generated discovered-links JSONL dataset file.</summary>
     public string? LinksJsonlPath { get; set; }
 
@@ -112,6 +115,12 @@ public sealed class HtmlCrawlResult {
 
     /// <summary>Number of skipped pages.</summary>
     public int SkippedPageCount => SkippedPages.Count;
+
+    /// <summary>Number of skipped content-page candidates.</summary>
+    public int SkippedContentPageCount => SkippedPages.Count(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath);
+
+    /// <summary>Number of skipped asset candidates.</summary>
+    public int SkippedAssetCount => SkippedPages.Count(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath);
 
     /// <summary>Summary information for the crawl.</summary>
     public HtmlCrawlSummary Summary => HtmlCrawlSummary.FromResult(this);
