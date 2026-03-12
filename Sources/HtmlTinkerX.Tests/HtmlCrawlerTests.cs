@@ -490,7 +490,10 @@ public class HtmlCrawlerTests {
             Assert.Equal(HtmlCrawlContentMode.Reader, page.BestContentComparisonMode);
             Assert.Equal(HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate, page.BestContentComparisonReasonCode);
             Assert.True(page.BestContentComparisonWordCount > 10);
+            Assert.Equal(HtmlCrawlContentMode.Focused, page.RunnerUpContentComparisonMode);
+            Assert.True(page.BestContentComparisonWordDelta >= 0);
             Assert.Equal(1, result.Summary.ContentComparisonWinnerCounts["Reader"]);
+            Assert.True(result.Summary.AverageBestContentComparisonWordDelta >= 0);
             Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Raw);
             Assert.Contains(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Focused);
             HtmlCrawlContentComparison reader = Assert.Single(page.ContentComparisons, comparison => comparison.Mode == HtmlCrawlContentMode.Reader);
@@ -502,6 +505,8 @@ public class HtmlCrawlerTests {
             JsonElement comparisons = manifest.RootElement.GetProperty("ContentComparisons");
             Assert.Equal(3, comparisons.GetArrayLength());
             Assert.Equal("Reader", manifest.RootElement.GetProperty("BestContentComparison").GetProperty("BestContentComparisonMode").GetString());
+            Assert.Equal("Focused", manifest.RootElement.GetProperty("BestContentComparison").GetProperty("RunnerUpContentComparisonMode").GetString());
+            Assert.True(manifest.RootElement.GetProperty("BestContentComparison").GetProperty("BestContentComparisonWordDelta").GetInt32() >= 0);
             Assert.Contains(comparisons.EnumerateArray(), item =>
                 string.Equals(item.GetProperty("Mode").GetString(), "Reader", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(item.GetProperty("ReasonCode").GetString(), HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate.ToString(), StringComparison.OrdinalIgnoreCase));

@@ -84,6 +84,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Counts of pages by the strongest extraction mode chosen from content comparisons.</summary>
     public IDictionary<string, int> ContentComparisonWinnerCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Average word-count delta between the best and runner-up extraction modes when comparison mode is enabled.</summary>
+    public double AverageBestContentComparisonWordDelta { get; set; }
+
     /// <summary>Number of fetched pages where one or more rendered interactions were applied.</summary>
     public int InteractedPageCount { get; set; }
 
@@ -161,6 +164,11 @@ public sealed class HtmlCrawlSummary {
             .GroupBy(page => page.BestContentComparisonMode!.Value.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.ContentComparisonWinnerCounts[group.Key] = group.Count();
         }
+        double[] comparisonDeltas = result.Pages
+            .Where(page => page.Status == HtmlCrawlPageStatus.Success && page.BestContentComparisonWordDelta.HasValue)
+            .Select(page => (double)page.BestContentComparisonWordDelta!.Value)
+            .ToArray();
+        summary.AverageBestContentComparisonWordDelta = comparisonDeltas.Length == 0 ? 0 : comparisonDeltas.Average();
         foreach (var group in result.Pages.SelectMany(page => page.AppliedInteractions).GroupBy(item => item, StringComparer.OrdinalIgnoreCase)) {
             summary.InteractionCounts[group.Key] = group.Count();
         }
@@ -240,6 +248,9 @@ public sealed class HtmlCrawlSummary {
             }
             foreach (var item in ContentComparisonWinnerCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 report.AppendLine($"- Best comparison mode {item.Key}: {item.Value}");
+            }
+            if (AverageBestContentComparisonWordDelta > 0) {
+                report.AppendLine($"- Average best-comparison delta: {AverageBestContentComparisonWordDelta.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} words");
             }
         }
 

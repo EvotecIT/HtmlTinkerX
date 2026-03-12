@@ -311,6 +311,7 @@ public sealed class PesterTestHttpServer : IDisposable {
 
             $page.ContentComparisons.Count | Should -Be 3
             $result.Summary.ContentComparisonWinnerCounts['Reader'] | Should -Be 1
+            $result.Summary.AverageBestContentComparisonWordDelta | Should -BeGreaterThan -1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Raw' }).Count | Should -Be 1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Focused' }).Count | Should -Be 1
             $reader = $page.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' } | Select-Object -First 1
@@ -320,6 +321,8 @@ public sealed class PesterTestHttpServer : IDisposable {
             $manifest.BestContentComparison.BestContentComparisonMode | Should -Be 'Reader'
             $manifest.BestContentComparison.BestContentComparisonReasonCode | Should -Be 'ReaderBestCandidate'
             $manifest.BestContentComparison.BestContentComparisonWordCount | Should -BeGreaterThan 10
+            $manifest.BestContentComparison.RunnerUpContentComparisonMode | Should -Be 'Focused'
+            $manifest.BestContentComparison.BestContentComparisonWordDelta | Should -BeGreaterThan -1
             $manifest.ContentComparisons.Count | Should -Be 3
             (($manifest.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' }).ReasonCode) | Should -Be 'ReaderBestCandidate'
         } finally {

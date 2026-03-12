@@ -124,6 +124,12 @@ public sealed class HtmlCrawlPage {
     /// <summary>Word count of the best extraction mode from <see cref="ContentComparisons"/> when comparison mode is enabled.</summary>
     public int? BestContentComparisonWordCount { get; set; }
 
+    /// <summary>Runner-up extraction mode from <see cref="ContentComparisons"/> when comparison mode is enabled.</summary>
+    public HtmlCrawlContentMode? RunnerUpContentComparisonMode { get; set; }
+
+    /// <summary>Word-count delta between the best and runner-up extraction modes when comparison mode is enabled.</summary>
+    public int? BestContentComparisonWordDelta { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 
