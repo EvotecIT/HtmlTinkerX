@@ -134,144 +134,148 @@ public static class HtmlCrawler {
             throw new ArgumentException("The start URL must be an absolute http or https URL.", nameof(startUrl));
         }
 
-        HtmlCrawlOptions resolvedOptions = options ?? new HtmlCrawlOptions();
+        HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
         ValidateOptions(resolvedOptions);
 
-        string persistencePath = resolvedOptions.OutputPath ?? resolvedOptions.ResumePath ?? string.Empty;
-        bool persistSnapshots = !string.IsNullOrEmpty(persistencePath);
-        HtmlCrawlResult result;
-        if (!string.IsNullOrEmpty(resolvedOptions.ResumePath)) {
-            result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.OrdinalIgnoreCase)) {
-                throw new InvalidOperationException($"Resume data was created for '{result.StartUrl}', but the current crawl starts from '{startUri.AbsoluteUri}'.");
-            }
-        } else {
-            result = new HtmlCrawlResult {
-                StartUrl = startUri.AbsoluteUri,
-                Started = DateTimeOffset.UtcNow
-            };
-        }
-
-        Queue<CrawlRequest> pending = new();
-        HashSet<string> queued = new(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, RobotsDocument?> robotsCache = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, string> contentFingerprints = new(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> downloadedAssets = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (HtmlCrawlPage page in result.Pages) {
-            if (!string.IsNullOrEmpty(page.Url)) {
-                visited.Add(page.Url);
+        try {
+            string persistencePath = resolvedOptions.OutputPath ?? resolvedOptions.ResumePath ?? string.Empty;
+            bool persistSnapshots = !string.IsNullOrEmpty(persistencePath);
+            HtmlCrawlResult result;
+            if (!string.IsNullOrEmpty(resolvedOptions.ResumePath)) {
+                result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken).ConfigureAwait(false);
+                if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.OrdinalIgnoreCase)) {
+                    throw new InvalidOperationException($"Resume data was created for '{result.StartUrl}', but the current crawl starts from '{startUri.AbsoluteUri}'.");
+                }
+            } else {
+                result = new HtmlCrawlResult {
+                    StartUrl = startUri.AbsoluteUri,
+                    Started = DateTimeOffset.UtcNow
+                };
             }
 
-            if (!string.IsNullOrWhiteSpace(page.ContentFingerprint) && !string.IsNullOrWhiteSpace(page.Url) && !contentFingerprints.ContainsKey(page.ContentFingerprint!)) {
-                contentFingerprints[page.ContentFingerprint!] = page.Url;
-            }
-        }
+            Queue<CrawlRequest> pending = new();
+            HashSet<string> queued = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, RobotsDocument?> robotsCache = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> contentFingerprints = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> downloadedAssets = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach (HtmlCrawlAsset asset in result.Assets) {
-            if (!string.IsNullOrWhiteSpace(asset.Url)) {
-                downloadedAssets.Add(asset.Url);
-            }
-        }
+            foreach (HtmlCrawlPage page in result.Pages) {
+                if (!string.IsNullOrEmpty(page.Url)) {
+                    visited.Add(page.Url);
+                }
 
-        foreach (HtmlCrawlPage page in result.SkippedPages) {
-            if (!string.IsNullOrEmpty(page.Url)) {
-                visited.Add(page.Url);
-            }
-        }
-
-        foreach (HtmlCrawlPendingItem item in result.PendingPages) {
-            if (TryResolveAbsoluteUri(startUri, item.Url, out Uri? pendingUri)) {
-                EnqueuePage(pendingUri!, item.ParentUrl, item.Depth, pending, queued, resolvedOptions);
-            }
-        }
-
-        using HttpClient client = CreateClient(resolvedOptions);
-        await using HtmlBrowserSession? session = resolvedOptions.Render
-            ? await CreateRenderSessionAsync(resolvedOptions, cancellationToken).ConfigureAwait(false)
-            : null;
-
-        if (result.PageCount == 0 && result.PendingPages.Count == 0) {
-            EnqueuePage(startUri, null, 0, pending, queued, resolvedOptions);
-        }
-
-        await DiscoverSitemapCandidatesAsync(startUri, client, resolvedOptions, robotsCache, result, pending, queued, visited, cancellationToken).ConfigureAwait(false);
-        if (persistSnapshots) {
-            await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
-        }
-
-        while (pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
-            cancellationToken.ThrowIfCancellationRequested();
-            CrawlRequest next = pending.Dequeue();
-            string normalizedUrl = NormalizeUrl(next.Uri, resolvedOptions);
-            if (!visited.Add(normalizedUrl)) {
-                continue;
+                if (!string.IsNullOrWhiteSpace(page.ContentFingerprint) && !string.IsNullOrWhiteSpace(page.Url) && !contentFingerprints.ContainsKey(page.ContentFingerprint!)) {
+                    contentFingerprints[page.ContentFingerprint!] = page.Url;
+                }
             }
 
-            if (resolvedOptions.RespectRobotsTxt) {
-                RobotsDocument? robots = await GetRobotsDocumentAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
-                if (robots != null && !IsAllowedByRobots(robots, next.Uri)) {
-                    result.SkippedPages.Add(CreateSkippedPage(next, HtmlCrawlSkipReason.DisallowedByRobots));
+            foreach (HtmlCrawlAsset asset in result.Assets) {
+                if (!string.IsNullOrWhiteSpace(asset.Url)) {
+                    downloadedAssets.Add(asset.Url);
+                }
+            }
+
+            foreach (HtmlCrawlPage page in result.SkippedPages) {
+                if (!string.IsNullOrEmpty(page.Url)) {
+                    visited.Add(page.Url);
+                }
+            }
+
+            foreach (HtmlCrawlPendingItem item in result.PendingPages) {
+                if (TryResolveAbsoluteUri(startUri, item.Url, out Uri? pendingUri)) {
+                    EnqueuePage(pendingUri!, item.ParentUrl, item.Depth, pending, queued, resolvedOptions);
+                }
+            }
+
+            using HttpClient client = CreateClient(resolvedOptions);
+            await using HtmlBrowserSession? session = resolvedOptions.Render
+                ? await CreateRenderSessionAsync(resolvedOptions, cancellationToken).ConfigureAwait(false)
+                : null;
+
+            if (result.PageCount == 0 && result.PendingPages.Count == 0) {
+                EnqueuePage(startUri, null, 0, pending, queued, resolvedOptions);
+            }
+
+            await DiscoverSitemapCandidatesAsync(startUri, client, resolvedOptions, robotsCache, result, pending, queued, visited, cancellationToken).ConfigureAwait(false);
+            if (persistSnapshots) {
+                await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+            }
+
+            while (pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
+                cancellationToken.ThrowIfCancellationRequested();
+                CrawlRequest next = pending.Dequeue();
+                string normalizedUrl = NormalizeUrl(next.Uri, resolvedOptions);
+                if (!visited.Add(normalizedUrl)) {
+                    continue;
+                }
+
+                if (resolvedOptions.RespectRobotsTxt) {
+                    RobotsDocument? robots = await GetRobotsDocumentAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                    if (robots != null && !IsAllowedByRobots(robots, next.Uri)) {
+                        result.SkippedPages.Add(CreateSkippedPage(next, HtmlCrawlSkipReason.DisallowedByRobots));
+                        if (persistSnapshots) {
+                            await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                        }
+                        continue;
+                    }
+                }
+
+                HtmlCrawlPage page = resolvedOptions.Render
+                    ? await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false)
+                    : await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+
+                if (page.Status == HtmlCrawlPageStatus.Skipped) {
+                    result.SkippedPages.Add(page);
                     if (persistSnapshots) {
                         await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
                     }
                     continue;
                 }
-            }
 
-            HtmlCrawlPage page = resolvedOptions.Render
-                ? await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false)
-                : await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                ApplyCanonicalUrlIfAllowed(page, startUri, resolvedOptions, visited);
 
-            if (page.Status == HtmlCrawlPageStatus.Skipped) {
-                result.SkippedPages.Add(page);
+                if (TrySkipDuplicateContent(page, resolvedOptions, contentFingerprints, out HtmlCrawlPage? duplicatePage)) {
+                    result.SkippedPages.Add(duplicatePage!);
+                    if (persistSnapshots) {
+                        await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                    }
+                    continue;
+                }
+
+                result.Pages.Add(page);
+
+                if (resolvedOptions.DownloadAssets && page.AssetUrls.Count > 0) {
+                    string? assetsDirectory = persistSnapshots ? ResolveArtifactPaths(persistencePath).AssetsDirectory : null;
+                    await DownloadAssetsForPageAsync(client, page, resolvedOptions, result, downloadedAssets, assetsDirectory, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (page.Status == HtmlCrawlPageStatus.Success && next.Depth < resolvedOptions.MaxDepth) {
+                    foreach (string link in page.Links) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        QueueCandidate(link, page.Url, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
+                    }
+                }
+
+                int crawlDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                if (crawlDelay > 0 && pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
+                    await Task.Delay(crawlDelay, cancellationToken).ConfigureAwait(false);
+                }
+
                 if (persistSnapshots) {
                     await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
                 }
-                continue;
             }
 
-            ApplyCanonicalUrlIfAllowed(page, startUri, resolvedOptions, visited);
-
-            if (TrySkipDuplicateContent(page, resolvedOptions, contentFingerprints, out HtmlCrawlPage? duplicatePage)) {
-                result.SkippedPages.Add(duplicatePage!);
-                if (persistSnapshots) {
-                    await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
-                }
-                continue;
-            }
-
-            result.Pages.Add(page);
-
-            if (resolvedOptions.DownloadAssets && page.AssetUrls.Count > 0) {
-                string? assetsDirectory = persistSnapshots ? ResolveArtifactPaths(persistencePath).AssetsDirectory : null;
-                await DownloadAssetsForPageAsync(client, page, resolvedOptions, result, downloadedAssets, assetsDirectory, cancellationToken).ConfigureAwait(false);
-            }
-
-            if (page.Status == HtmlCrawlPageStatus.Success && next.Depth < resolvedOptions.MaxDepth) {
-                foreach (string link in page.Links) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    QueueCandidate(link, page.Url, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
-                }
-            }
-
-            int crawlDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
-            if (crawlDelay > 0 && pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
-                await Task.Delay(crawlDelay, cancellationToken).ConfigureAwait(false);
-            }
-
+            result.PendingPages = SnapshotPendingPages(pending);
+            result.Finished = DateTimeOffset.UtcNow;
             if (persistSnapshots) {
                 await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
             }
+            return result;
+        } finally {
+            resolvedOptions.ClearSensitiveData();
         }
-
-        result.PendingPages = SnapshotPendingPages(pending);
-        result.Finished = DateTimeOffset.UtcNow;
-        if (persistSnapshots) {
-            await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
-        }
-        return result;
     }
 
     private static void ValidateOptions(HtmlCrawlOptions options) {
@@ -795,14 +799,14 @@ public static class HtmlCrawler {
             string slug = BuildPageSlug(page, prefix);
 
             if (!string.IsNullOrEmpty(page.Html)) {
-                page.HtmlPath = Path.Combine(artifactPaths.PagesDirectory, $"{slug}.html");
+                page.HtmlPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.html");
             }
 
             if (!string.IsNullOrEmpty(page.Text)) {
-                page.TextPath = Path.Combine(artifactPaths.PagesDirectory, $"{slug}.txt");
+                page.TextPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.txt");
             }
 
-            page.ManifestPath = Path.Combine(artifactPaths.PagesDirectory, $"{slug}.json");
+            page.ManifestPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.json");
         }
 
         Dictionary<string, string> localPageMap = BuildLocalPageMap(result.Pages);
@@ -1718,48 +1722,48 @@ public static class HtmlCrawler {
 
         if (treatAsDirectory) {
             Directory.CreateDirectory(fullPath);
-            string pagesDirectory = Path.Combine(fullPath, "pages");
-            string assetsDirectory = Path.Combine(fullPath, "assets");
+            string pagesDirectory = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "pages"), fullPath);
+            string assetsDirectory = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "assets"), fullPath);
             Directory.CreateDirectory(pagesDirectory);
             Directory.CreateDirectory(assetsDirectory);
             return new CrawlArtifactPaths {
-                ManifestPath = Path.Combine(fullPath, "crawl-result.json"),
+                ManifestPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "crawl-result.json"), fullPath),
                 PagesDirectory = pagesDirectory,
                 AssetsDirectory = assetsDirectory,
-                PagesJsonlPath = Path.Combine(fullPath, "pages.jsonl"),
-                PagesCsvPath = Path.Combine(fullPath, "pages.csv"),
-                SkippedPagesJsonlPath = Path.Combine(fullPath, "skipped-pages.jsonl"),
-                LinksJsonlPath = Path.Combine(fullPath, "links.jsonl"),
-                AssetsJsonlPath = Path.Combine(fullPath, "assets.jsonl"),
-                ChunksJsonlPath = Path.Combine(fullPath, "chunks.jsonl"),
-                GraphJsonPath = Path.Combine(fullPath, "graph.json"),
-                SummaryJsonPath = Path.Combine(fullPath, "summary.json"),
-                SummaryTextPath = Path.Combine(fullPath, "summary.txt"),
-                IndexHtmlPath = Path.Combine(fullPath, "index.html")
+                PagesJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "pages.jsonl"), fullPath),
+                PagesCsvPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "pages.csv"), fullPath),
+                SkippedPagesJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "skipped-pages.jsonl"), fullPath),
+                LinksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "links.jsonl"), fullPath),
+                AssetsJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "assets.jsonl"), fullPath),
+                ChunksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "chunks.jsonl"), fullPath),
+                GraphJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "graph.json"), fullPath),
+                SummaryJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "summary.json"), fullPath),
+                SummaryTextPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "summary.txt"), fullPath),
+                IndexHtmlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "index.html"), fullPath)
             };
         }
 
         string manifestPath = HtmlUtilities.EnsureDirectoryExists(fullPath);
         string baseDirectory = Path.GetDirectoryName(manifestPath) ?? Path.GetDirectoryName(fullPath) ?? fullPath;
-        string pagesDirectoryForFile = Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath) + ".pages");
-        string assetsDirectoryForFile = Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath) + ".assets");
+        string pagesDirectoryForFile = EnsurePathIsWithinDirectory(Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath) + ".pages"), baseDirectory);
+        string assetsDirectoryForFile = EnsurePathIsWithinDirectory(Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath) + ".assets"), baseDirectory);
         Directory.CreateDirectory(pagesDirectoryForFile);
         Directory.CreateDirectory(assetsDirectoryForFile);
-        string stem = Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath));
+        string stem = EnsurePathIsWithinDirectory(Path.Combine(baseDirectory, Path.GetFileNameWithoutExtension(manifestPath)), baseDirectory);
         return new CrawlArtifactPaths {
-            ManifestPath = manifestPath,
+            ManifestPath = EnsurePathIsWithinDirectory(manifestPath, baseDirectory),
             PagesDirectory = pagesDirectoryForFile,
             AssetsDirectory = assetsDirectoryForFile,
-            PagesJsonlPath = stem + ".pages.jsonl",
-            PagesCsvPath = stem + ".pages.csv",
-            SkippedPagesJsonlPath = stem + ".skipped.jsonl",
-            LinksJsonlPath = stem + ".links.jsonl",
-            AssetsJsonlPath = stem + ".assets.jsonl",
-            ChunksJsonlPath = stem + ".chunks.jsonl",
-            GraphJsonPath = stem + ".graph.json",
-            SummaryJsonPath = stem + ".summary.json",
-            SummaryTextPath = stem + ".summary.txt",
-            IndexHtmlPath = stem + ".index.html"
+            PagesJsonlPath = EnsurePathIsWithinDirectory(stem + ".pages.jsonl", baseDirectory),
+            PagesCsvPath = EnsurePathIsWithinDirectory(stem + ".pages.csv", baseDirectory),
+            SkippedPagesJsonlPath = EnsurePathIsWithinDirectory(stem + ".skipped.jsonl", baseDirectory),
+            LinksJsonlPath = EnsurePathIsWithinDirectory(stem + ".links.jsonl", baseDirectory),
+            AssetsJsonlPath = EnsurePathIsWithinDirectory(stem + ".assets.jsonl", baseDirectory),
+            ChunksJsonlPath = EnsurePathIsWithinDirectory(stem + ".chunks.jsonl", baseDirectory),
+            GraphJsonPath = EnsurePathIsWithinDirectory(stem + ".graph.json", baseDirectory),
+            SummaryJsonPath = EnsurePathIsWithinDirectory(stem + ".summary.json", baseDirectory),
+            SummaryTextPath = EnsurePathIsWithinDirectory(stem + ".summary.txt", baseDirectory),
+            IndexHtmlPath = EnsurePathIsWithinDirectory(stem + ".index.html", baseDirectory)
         };
     }
 
@@ -2749,7 +2753,7 @@ public static class HtmlCrawler {
         }
 
         string fingerprint = ComputeContentFingerprint(asset.Url).Substring(0, 12);
-        return Path.Combine(assetsDirectory, $"{safeName}-{fingerprint}{extension}");
+        return CombinePathWithinDirectory(assetsDirectory, $"{safeName}-{fingerprint}{extension}");
     }
 
     private static string GuessExtensionFromContentType(string? contentType) {
@@ -2785,6 +2789,26 @@ public static class HtmlCrawler {
         Uri toUri = new(HtmlUtilities.ResolvePath(toFilePath));
         string relative = Uri.UnescapeDataString(fromUri.MakeRelativeUri(toUri).ToString());
         return relative.Replace('/', Path.DirectorySeparatorChar).Replace('\\', '/');
+    }
+
+    private static string CombinePathWithinDirectory(string directory, string fileName) {
+        string root = HtmlUtilities.ResolvePath(directory);
+        string candidate = HtmlUtilities.ResolvePath(Path.Combine(root, fileName));
+        return EnsurePathIsWithinDirectory(candidate, root);
+    }
+
+    private static string EnsurePathIsWithinDirectory(string path, string directory) {
+        string fullPath = HtmlUtilities.ResolvePath(path);
+        string root = AppendDirectorySeparator(HtmlUtilities.ResolvePath(directory));
+        StringComparison pathComparison = Path.DirectorySeparatorChar == '\\'
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!fullPath.StartsWith(root, pathComparison)
+            && !string.Equals(fullPath, root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), pathComparison)) {
+            throw new InvalidOperationException($"Generated path '{fullPath}' escapes the crawl artifact directory '{directory}'.");
+        }
+
+        return fullPath;
     }
 
     private static string AppendDirectorySeparator(string path) {

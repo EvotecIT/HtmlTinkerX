@@ -337,8 +337,17 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             options.AssetExcludePatterns.Add(pattern);
         }
 
-        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
-        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(Url, options, linkedCts.Token).ConfigureAwait(false);
-        WriteObject(result);
+        try {
+            using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(Url, options, linkedCts.Token).ConfigureAwait(false);
+            WriteObject(result);
+        } finally {
+            options.ClearSensitiveData();
+            pass = null;
+            proxyPass = null;
+            Password = null;
+            Credential = null;
+            ProxyCredential = null;
+        }
     }
 }

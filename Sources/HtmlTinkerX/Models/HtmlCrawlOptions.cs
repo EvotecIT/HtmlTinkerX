@@ -191,4 +191,73 @@ public sealed class HtmlCrawlOptions {
 
     /// <summary>Optional Playwright route patterns to block when rendering.</summary>
     public IList<string> BlockResourcePatterns { get; set; } = new List<string>();
+
+    /// <summary>
+    /// Creates a deep copy of the crawl options so callers can safely reuse their original configuration.
+    /// </summary>
+    /// <returns>A copy of the current crawl options.</returns>
+    public HtmlCrawlOptions Clone() {
+        return new HtmlCrawlOptions {
+            MaxDepth = MaxDepth,
+            MaxPages = MaxPages,
+            Render = Render,
+            RestrictToHost = RestrictToHost,
+            IncludeSubdomains = IncludeSubdomains,
+            PathPrefix = PathPrefix,
+            UseCanonicalUrls = UseCanonicalUrls,
+            DeduplicatePages = DeduplicatePages,
+            IgnoreTrackingQueryParameters = IgnoreTrackingQueryParameters,
+            RestrictToAllowedContentTypes = RestrictToAllowedContentTypes,
+            SkipKnownAssetUrls = SkipKnownAssetUrls,
+            DownloadAssets = DownloadAssets,
+            RewriteAssetReferencesToLocal = RewriteAssetReferencesToLocal,
+            RewritePageLinksToLocal = RewritePageLinksToLocal,
+            UseSitemaps = UseSitemaps,
+            RespectRobotsTxt = RespectRobotsTxt,
+            RobotsUserAgent = RobotsUserAgent,
+            OutputPath = OutputPath,
+            ResumePath = ResumePath,
+            IncludeHtml = IncludeHtml,
+            IncludeText = IncludeText,
+            Selector = Selector,
+            WaitForSelector = WaitForSelector,
+            WaitAfterLoadMs = WaitAfterLoadMs,
+            DelayMs = DelayMs,
+            Timeout = Timeout,
+            UserAgent = UserAgent,
+            Headers = new Dictionary<string, string>(Headers, System.StringComparer.OrdinalIgnoreCase),
+            Proxy = Proxy,
+            ProxyUsername = ProxyUsername,
+            ProxyPassword = ProxyPassword,
+            Username = Username,
+            Password = Password,
+            FormLogin = FormLogin == null ? null : new HtmlFormLogin {
+                LoginUrl = FormLogin.LoginUrl,
+                UsernameSelector = FormLogin.UsernameSelector,
+                PasswordSelector = FormLogin.PasswordSelector,
+                SubmitSelector = FormLogin.SubmitSelector
+            },
+            StorageStatePath = StorageStatePath,
+            Browser = Browser,
+            Headless = Headless,
+            CleanBrowserInstall = CleanBrowserInstall,
+            IncludePatterns = new List<string>(IncludePatterns),
+            ExcludePatterns = new List<string>(ExcludePatterns),
+            SitemapUrls = new List<string>(SitemapUrls),
+            AllowedContentTypePatterns = new List<string>(AllowedContentTypePatterns),
+            IgnoredAssetPathPatterns = new List<string>(IgnoredAssetPathPatterns),
+            AssetIncludePatterns = new List<string>(AssetIncludePatterns),
+            AssetExcludePatterns = new List<string>(AssetExcludePatterns),
+            IgnoredQueryParameterPatterns = new List<string>(IgnoredQueryParameterPatterns),
+            BlockResourcePatterns = new List<string>(BlockResourcePatterns)
+        };
+    }
+
+    /// <summary>
+    /// Clears in-memory passwords after a crawl has finished using them.
+    /// </summary>
+    public void ClearSensitiveData() {
+        ProxyPassword = null;
+        Password = null;
+    }
 }

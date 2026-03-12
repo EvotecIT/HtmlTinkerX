@@ -8,6 +8,39 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlCrawlerTests {
+    [Fact]
+    public void HtmlCrawlOptions_CloneAndClearSensitiveData_WorkIndependently() {
+        HtmlCrawlOptions options = new() {
+            Username = "user",
+            Password = "secret",
+            ProxyUsername = "proxy-user",
+            ProxyPassword = "proxy-secret",
+            FormLogin = new HtmlFormLogin {
+                LoginUrl = "https://example.com/login",
+                UsernameSelector = "#user",
+                PasswordSelector = "#password",
+                SubmitSelector = "button[type=submit]"
+            }
+        };
+        options.Headers["X-Test"] = "one";
+        options.IncludePatterns.Add("*docs*");
+
+        HtmlCrawlOptions clone = options.Clone();
+        clone.Headers["X-Test"] = "two";
+        clone.IncludePatterns.Add("*blog*");
+        clone.ClearSensitiveData();
+
+        Assert.Equal("secret", options.Password);
+        Assert.Equal("proxy-secret", options.ProxyPassword);
+        Assert.Equal("one", options.Headers["X-Test"]);
+        Assert.Single(options.IncludePatterns);
+        Assert.Null(clone.Password);
+        Assert.Null(clone.ProxyPassword);
+        Assert.Equal("two", clone.Headers["X-Test"]);
+        Assert.Equal(2, clone.IncludePatterns.Count);
+        Assert.NotSame(options.FormLogin, clone.FormLogin);
+    }
+
     private static int GetFreePort() {
         var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -470,6 +503,18 @@ public class HtmlCrawlerTests {
             Assert.Equal(5, page.AssetUrls.Count);
             Assert.Equal(6, result.AssetCount);
             Assert.All(result.Assets, asset => Assert.True(File.Exists(asset.FilePath)));
+            Assert.All(result.Pages, crawledPage => {
+                if (!string.IsNullOrWhiteSpace(crawledPage.HtmlPath)) {
+                    Assert.StartsWith(Path.GetFullPath(outputPath), Path.GetFullPath(crawledPage.HtmlPath!), StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (!string.IsNullOrWhiteSpace(crawledPage.TextPath)) {
+                    Assert.StartsWith(Path.GetFullPath(outputPath), Path.GetFullPath(crawledPage.TextPath!), StringComparison.OrdinalIgnoreCase);
+                }
+
+                Assert.StartsWith(Path.GetFullPath(outputPath), Path.GetFullPath(crawledPage.ManifestPath!), StringComparison.OrdinalIgnoreCase);
+            });
+            Assert.All(result.Assets, asset => Assert.StartsWith(Path.GetFullPath(Path.Combine(outputPath, "assets")), Path.GetFullPath(asset.FilePath!), StringComparison.OrdinalIgnoreCase));
             Assert.True(File.Exists(Path.Combine(outputPath, "assets.jsonl")));
             Assert.True(File.Exists(result.IndexHtmlPath));
             string persistedHtml = File.ReadAllText(page.HtmlPath!);
