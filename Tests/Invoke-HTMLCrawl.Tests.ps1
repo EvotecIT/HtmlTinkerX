@@ -325,16 +325,24 @@ public sealed class PesterTestHttpServer : IDisposable {
             $manifest.BestContentComparison.RunnerUpContentComparisonMode | Should -Be 'Focused'
             $manifest.BestContentComparison.BestContentComparisonWordDelta | Should -BeGreaterThan -1
             $page.ContentComparisonDeltaSummary | Should -Match '^Reader 0'
+            $page.ContentComparisonPreviewSummary | Should -Match '^Reader '
             $page.ContentComparisonDeltaSummary | Should -Match 'Focused '
             $page.ContentComparisonDeltaSummary | Should -Match 'Raw '
+            $page.ContentComparisonPreviewSummary | Should -Match '@ article'
+            $page.ContentComparisonPreviewSummary | Should -Match 'Hello'
             $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match '^Reader 0'
             $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match 'Focused '
             $manifest.BestContentComparison.ContentComparisonDeltaSummary | Should -Match 'Raw '
+            $manifest.ContentComparisonPreviewSummary | Should -Match '^Reader '
+            $manifest.ContentComparisonPreviewSummary | Should -Match '@ article'
+            $manifest.ContentComparisonPreviewSummary | Should -Match 'Hello'
             $manifest.ContentComparisons.Count | Should -Be 3
             (($manifest.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' }).ReasonCode) | Should -Be 'ReaderBestCandidate'
             $indexHtml | Should -Match 'deltas: Reader 0'
             $indexHtml | Should -Match 'Focused '
             $indexHtml | Should -Match 'Raw '
+            $indexHtml | Should -Match 'preview: Reader '
+            $indexHtml | Should -Match '@ article'
         } finally {
             Stop-TestHttpServer $server
         }
