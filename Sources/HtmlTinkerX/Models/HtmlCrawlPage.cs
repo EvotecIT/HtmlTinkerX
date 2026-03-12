@@ -103,6 +103,15 @@ public sealed class HtmlCrawlPage {
     /// <summary>Compact selector-like hint for the selected content element when available.</summary>
     public string? ContentElementSelectorHint { get; set; }
 
+    /// <summary>Score of the final selected content element when reader-mode scoring was used.</summary>
+    public double? ContentSelectionScore { get; set; }
+
+    /// <summary>Number of reader-mode candidate blocks that were evaluated for this page.</summary>
+    public int ReaderCandidateCount { get; set; }
+
+    /// <summary>Compact selector-like hint for the reader root element when reader-mode scoring was used.</summary>
+    public string? ReaderRootElementSelectorHint { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 

@@ -125,6 +125,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
 
+    /// <summary>Minimum word count a reader-mode candidate must have before it is treated as article-like content.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int ReaderMinimumWordCount { get; set; } = 20;
+
+    /// <summary>Minimum score a reader-mode candidate must reach before it is preferred over the reader root element.</summary>
+    [Parameter]
+    [ValidateRange(0.01, double.MaxValue)]
+    public double ReaderMinimumScore { get; set; } = 25;
+
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     [Parameter]
     public string[] ExcludeSelector { get; set; } = System.Array.Empty<string>();
@@ -361,6 +371,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
             ContentMode = ContentMode,
+            ReaderMinimumWordCount = ReaderMinimumWordCount,
+            ReaderMinimumScore = ReaderMinimumScore,
             ExcludeSelectors = new List<string>(ExcludeSelector),
             ExcludeClasses = new List<string>(ExcludeClass),
             ExcludeIds = new List<string>(ExcludeId),

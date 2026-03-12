@@ -192,6 +192,12 @@ public static class HtmlCrawlProfiles {
         if (options.ContentMode == HtmlCrawlContentMode.Focused && profile.ContentMode.HasValue) {
             options.ContentMode = profile.ContentMode.Value;
         }
+        if (options.ReaderMinimumWordCount == defaults.ReaderMinimumWordCount && profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0) {
+            options.ReaderMinimumWordCount = profile.ReaderMinimumWordCount.Value;
+        }
+        if (Math.Abs(options.ReaderMinimumScore - defaults.ReaderMinimumScore) < 0.0001 && profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0) {
+            options.ReaderMinimumScore = profile.ReaderMinimumScore.Value;
+        }
         if (string.IsNullOrWhiteSpace(options.WaitForSelector) && !string.IsNullOrWhiteSpace(profile.WaitForSelector)) {
             options.WaitForSelector = profile.WaitForSelector;
         }
@@ -236,6 +242,8 @@ public static class HtmlCrawlProfiles {
                 .ToList(),
             Selector = string.IsNullOrWhiteSpace(profile.Selector) ? null : profile.Selector.Trim(),
             ContentMode = profile.ContentMode,
+            ReaderMinimumWordCount = profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0 ? profile.ReaderMinimumWordCount.Value : null,
+            ReaderMinimumScore = profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0 ? profile.ReaderMinimumScore.Value : null,
             WaitForSelector = string.IsNullOrWhiteSpace(profile.WaitForSelector) ? null : profile.WaitForSelector.Trim(),
             PathPrefix = string.IsNullOrWhiteSpace(profile.PathPrefix) ? null : profile.PathPrefix.Trim(),
             AutoRender = profile.AutoRender,

@@ -33,6 +33,9 @@ public static class HtmlCrawler {
         public string Reason { get; set; } = string.Empty;
         public IElement? Element { get; set; }
         public string Html { get; set; } = string.Empty;
+        public double? Score { get; set; }
+        public int ReaderCandidateCount { get; set; }
+        public string? ReaderRootElementSelectorHint { get; set; }
     }
 
     private sealed class PageSearchMetadata {
@@ -974,7 +977,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1003,6 +1006,9 @@ public static class HtmlCrawler {
                 page.ContentElementId,
                 page.ContentElementClasses,
                 page.ContentElementSelectorHint,
+                page.ContentSelectionScore,
+                page.ReaderCandidateCount,
+                page.ReaderRootElementSelectorHint,
                 page.AppliedInteractions,
                 page.Started,
                 page.Finished,
@@ -1038,6 +1044,9 @@ public static class HtmlCrawler {
                 EscapeCsv(page.ContentElementId),
                 EscapeCsv(string.Join("|", page.ContentElementClasses)),
                 EscapeCsv(page.ContentElementSelectorHint),
+                EscapeCsv(page.ContentSelectionScore?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.ReaderCandidateCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.ReaderRootElementSelectorHint),
                 EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
@@ -1215,7 +1224,10 @@ public static class HtmlCrawler {
                 page.ContentElementTag,
                 page.ContentElementId,
                 page.ContentElementClasses,
-                page.ContentElementSelectorHint
+                page.ContentElementSelectorHint,
+                page.ContentSelectionScore,
+                page.ReaderCandidateCount,
+                page.ReaderRootElementSelectorHint
             },
             page.AppliedInteractions,
             page.Started,
@@ -1870,6 +1882,20 @@ public static class HtmlCrawler {
                 builder.Append("<br>")
                     .Append(HtmlEncode(page.ContentSelectionReason));
             }
+            if (page.ContentSelectionScore.HasValue) {
+                builder.Append("<br>score: ")
+                    .Append(HtmlEncode(page.ContentSelectionScore.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)));
+                if (page.ReaderCandidateCount > 0) {
+                    builder.Append(" <span class=\"muted\">(")
+                        .Append(HtmlEncode(page.ReaderCandidateCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                        .Append(" candidates)</span>");
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(page.ReaderRootElementSelectorHint)) {
+                builder.Append("<br>reader root: <code>")
+                    .Append(HtmlEncode(page.ReaderRootElementSelectorHint))
+                    .Append("</code>");
+            }
             builder.Append("</span>");
             builder.AppendLine("</td>");
             builder.Append("          <td class=\"summary\"><strong>")
@@ -2362,6 +2388,9 @@ public static class HtmlCrawler {
         page.ContentElementId = contentSelection.Element?.Id;
         page.ContentElementClasses = GetElementClassNames(contentSelection.Element);
         page.ContentElementSelectorHint = BuildElementSelectorHint(contentSelection.Element);
+        page.ContentSelectionScore = contentSelection.Score;
+        page.ReaderCandidateCount = contentSelection.ReaderCandidateCount;
+        page.ReaderRootElementSelectorHint = contentSelection.ReaderRootElementSelectorHint;
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
     }
@@ -2606,6 +2635,9 @@ public static class HtmlCrawler {
             ContentElementId = page.ContentElementId,
             ContentElementClasses = page.ContentElementClasses.ToList(),
             ContentElementSelectorHint = page.ContentElementSelectorHint,
+            ContentSelectionScore = page.ContentSelectionScore,
+            ReaderCandidateCount = page.ReaderCandidateCount,
+            ReaderRootElementSelectorHint = page.ReaderRootElementSelectorHint,
             Started = page.Started,
             Finished = page.Finished
         };
@@ -2814,33 +2846,45 @@ public static class HtmlCrawler {
             };
         }
 
-        IElement selected = FindBestReaderCandidate(root, out bool usedRootFallback) ?? root;
+        IElement selected = FindBestReaderCandidate(root, options, out bool usedRootFallback, out int candidateCount, out double? selectedScore) ?? root;
         if (usedRootFallback) {
             return BuildContentSelectionResult(
                 HtmlCrawlContentMode.Reader,
                 HtmlCrawlContentSelectionReasonCode.ReaderRootFallback,
-                $"Reader mode started from {rootDescription} and kept {DescribeElement(selected)} because no stronger article-like candidate was found.",
-                selected);
+                $"Reader mode started from {rootDescription} and kept {DescribeElement(selected)} because no stronger article-like candidate met the minimum score of {options.ReaderMinimumScore.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}.",
+                selected,
+                selectedScore,
+                candidateCount,
+                BuildElementSelectorHint(root));
         }
 
         return BuildContentSelectionResult(
             HtmlCrawlContentMode.Reader,
             HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate,
-            $"Reader mode started from {rootDescription} and selected the best-scoring content block {DescribeElement(selected)}.",
-            selected);
+            $"Reader mode started from {rootDescription} and selected the best-scoring content block {DescribeElement(selected)} with score {selectedScore?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) ?? "n/a"}.",
+            selected,
+            selectedScore,
+            candidateCount,
+            BuildElementSelectorHint(root));
     }
 
     private static ContentSelectionResult BuildContentSelectionResult(
         HtmlCrawlContentMode mode,
         HtmlCrawlContentSelectionReasonCode reasonCode,
         string reason,
-        IElement element) {
+        IElement element,
+        double? score = null,
+        int readerCandidateCount = 0,
+        string? readerRootElementSelectorHint = null) {
         return new ContentSelectionResult {
             ModeUsed = mode,
             ReasonCode = reasonCode,
             Reason = reason,
             Element = element,
-            Html = element.OuterHtml
+            Html = element.OuterHtml,
+            Score = score,
+            ReaderCandidateCount = readerCandidateCount,
+            ReaderRootElementSelectorHint = readerRootElementSelectorHint
         };
     }
 
@@ -2877,37 +2921,53 @@ public static class HtmlCrawler {
         return $"<{BuildElementSelectorHint(element) ?? element.LocalName}>";
     }
 
-    private static IElement? FindBestReaderCandidate(IElement root, out bool usedRootFallback) {
+    private static IElement? FindBestReaderCandidate(
+        IElement root,
+        HtmlCrawlOptions options,
+        out bool usedRootFallback,
+        out int candidateCount,
+        out double? selectedScore) {
         List<IElement> candidates = new() { root };
         candidates.AddRange(root.QuerySelectorAll("article, main, section, div"));
+        List<IElement> distinctCandidates = candidates.Distinct().ToList();
+        candidateCount = distinctCandidates.Count;
 
         IElement? best = null;
         double bestScore = double.MinValue;
-        foreach (IElement candidate in candidates.Distinct()) {
-            double score = ScoreReaderCandidate(candidate);
+        foreach (IElement candidate in distinctCandidates) {
+            double score = ScoreReaderCandidate(candidate, options);
             if (score > bestScore) {
                 best = candidate;
                 bestScore = score;
             }
         }
 
+        double rootScore = ScoreReaderCandidate(root, options);
         if (best == null) {
             usedRootFallback = true;
+            selectedScore = NormalizeContentScore(rootScore);
             return root;
         }
 
-        usedRootFallback = bestScore < 25;
+        usedRootFallback = bestScore < options.ReaderMinimumScore;
+        selectedScore = usedRootFallback
+            ? NormalizeContentScore(rootScore)
+            : NormalizeContentScore(bestScore);
         return usedRootFallback ? root : best;
     }
 
-    private static double ScoreReaderCandidate(IElement element) {
+    private static double? NormalizeContentScore(double score) {
+        return double.IsNegativeInfinity(score) || score == double.MinValue ? null : score;
+    }
+
+    private static double ScoreReaderCandidate(IElement element, HtmlCrawlOptions options) {
         if (!IsReaderCandidateElement(element)) {
             return double.MinValue;
         }
 
         string text = element.TextContent ?? string.Empty;
         int wordCount = CountWords(text);
-        if (wordCount < 20) {
+        if (wordCount < options.ReaderMinimumWordCount) {
             return double.MinValue;
         }
 

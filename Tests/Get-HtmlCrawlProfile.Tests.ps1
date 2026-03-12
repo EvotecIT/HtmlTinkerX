@@ -23,7 +23,9 @@ Describe 'Get-HtmlCrawlProfile' {
     "name": "custom-docs",
     "hosts": [ "docs.example.com" ],
     "selector": "article",
-    "contentMode": "Reader"
+    "contentMode": "Reader",
+    "readerMinimumWordCount": 30,
+    "readerMinimumScore": 40
   }
 ]
 '@ | Set-Content -Path $profilePath
@@ -35,5 +37,7 @@ Describe 'Get-HtmlCrawlProfile' {
         $profile.Hosts | Should -Contain 'docs.example.com'
         $profile.Selector | Should -Be 'article'
         $profile.ContentMode | Should -Be 'Reader'
+        $profile.ReaderMinimumWordCount | Should -Be 30
+        $profile.ReaderMinimumScore | Should -Be 40
     }
 }

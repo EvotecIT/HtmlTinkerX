@@ -18,6 +18,12 @@ public sealed class HtmlCrawlProfile {
     /// <summary>Optional content mode applied when the caller does not set one explicitly.</summary>
     public HtmlCrawlContentMode? ContentMode { get; set; }
 
+    /// <summary>Optional minimum word count applied to reader-mode candidates when the caller keeps the default value.</summary>
+    public int? ReaderMinimumWordCount { get; set; }
+
+    /// <summary>Optional minimum score applied to reader-mode candidates when the caller keeps the default value.</summary>
+    public double? ReaderMinimumScore { get; set; }
+
     /// <summary>Optional selector that rendered crawls wait for before extraction.</summary>
     public string? WaitForSelector { get; set; }
 

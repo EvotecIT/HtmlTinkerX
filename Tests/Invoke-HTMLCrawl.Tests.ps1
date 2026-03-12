@@ -271,6 +271,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $raw = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector '#missing' -ContentMode Raw
             $focused = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main' -ContentMode Focused
             $reader = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -ContentMode Reader
+            $readerFallback = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main' -ContentMode Reader -ReaderMinimumScore 500
 
             $raw.Pages[0].Html | Should -BeNullOrEmpty
             $raw.Pages[0].Text | Should -BeNullOrEmpty
@@ -285,6 +286,12 @@ public sealed class PesterTestHttpServer : IDisposable {
             $reader.Pages[0].ContentModeUsed | Should -Be 'Reader'
             $reader.Pages[0].ContentSelectionReasonCode | Should -Be 'ReaderBestCandidate'
             $reader.Pages[0].ContentElementSelectorHint | Should -Match 'article'
+            $reader.Pages[0].ContentSelectionScore | Should -BeGreaterThan 25
+            $reader.Pages[0].ReaderCandidateCount | Should -BeGreaterThan 2
+            $reader.Pages[0].ReaderRootElementSelectorHint | Should -Be 'body'
+            $readerFallback.Pages[0].ContentSelectionReasonCode | Should -Be 'ReaderRootFallback'
+            $readerFallback.Pages[0].ContentElementSelectorHint | Should -Be 'main'
+            $readerFallback.Pages[0].ReaderRootElementSelectorHint | Should -Be 'main'
         } finally {
             Stop-TestHttpServer $server
         }
@@ -338,6 +345,8 @@ public sealed class PesterTestHttpServer : IDisposable {
     "name": "custom-docs",
     "hosts": [ "127.0.0.1" ],
     "selector": "article",
+    "readerMinimumWordCount": 30,
+    "readerMinimumScore": 40,
     "excludeSelectors": [ ".sidebar", ".feedback-box" ]
   }
 ]
@@ -354,6 +363,7 @@ public sealed class PesterTestHttpServer : IDisposable {
 
             $named.AppliedProfileName | Should -Be 'custom-docs'
             $automatic.AppliedProfileName | Should -Be 'custom-docs'
+            $named.Pages[0].ContentModeUsed | Should -Be 'Focused'
             $named.Pages[0].Text | Should -Not -Match 'Sidebar'
             $automatic.Pages[0].Text | Should -Not -Match 'Feedback'
         } finally {

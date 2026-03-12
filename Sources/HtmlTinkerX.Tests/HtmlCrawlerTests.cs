@@ -73,6 +73,8 @@ public class HtmlCrawlerTests {
 
         Assert.Equal("main", options.Selector);
         Assert.Equal("#main", options.WaitForSelector);
+        Assert.Equal(20, options.ReaderMinimumWordCount);
+        Assert.Equal(25, options.ReaderMinimumScore);
         Assert.Contains(".sharing-popup", options.ExcludeSelectors);
         Assert.Contains("Load more", options.ClickTexts);
         Assert.Equal(2, options.InteractionRepeatCount);
@@ -90,6 +92,8 @@ public class HtmlCrawlerTests {
                   "hosts": [ "docs.example.com" ],
                   "selector": "article",
                   "contentMode": "Reader",
+                  "readerMinimumWordCount": 30,
+                  "readerMinimumScore": 40,
                   "excludeSelectors": [ ".sidebar", ".feedback" ],
                   "clickTexts": [ "Show more" ]
                 }
@@ -103,6 +107,8 @@ public class HtmlCrawlerTests {
             Assert.Contains("docs.example.com", profile.Hosts);
             Assert.Equal("article", profile.Selector);
             Assert.Equal(HtmlCrawlContentMode.Reader, profile.ContentMode);
+            Assert.Equal(30, profile.ReaderMinimumWordCount);
+            Assert.Equal(40, profile.ReaderMinimumScore);
             Assert.Contains(".sidebar", profile.ExcludeSelectors);
             Assert.Contains("Show more", profile.ClickTexts);
         } finally {
@@ -425,6 +431,37 @@ public class HtmlCrawlerTests {
             Assert.Equal(HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate, page.ContentSelectionReasonCode);
             Assert.Equal("article", page.ContentElementTag);
             Assert.Contains("article", page.ContentElementSelectorHint, StringComparison.OrdinalIgnoreCase);
+            Assert.True(page.ContentSelectionScore > 25);
+            Assert.True(page.ReaderCandidateCount >= 3);
+            Assert.Equal("body", page.ReaderRootElementSelectorHint);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ContentMode_ReaderHonorsConfiguredThresholdsAndFallsBackToRoot() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><article><h1>Hello</h1><p>This article has enough words to be considered by the reader heuristic, but we will raise the required score high enough to force a fallback to the root container.</p><p>Second paragraph keeps the article reasonably rich.</p></article></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                ContentMode = HtmlCrawlContentMode.Reader,
+                ReaderMinimumScore = 500
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("<main", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.ReaderRootFallback, page.ContentSelectionReasonCode);
+            Assert.Equal("main", page.ContentElementSelectorHint);
+            Assert.Equal("main", page.ReaderRootElementSelectorHint);
+            Assert.True(page.ReaderCandidateCount >= 2);
         } finally {
             server.Stop();
             server.Close();

@@ -235,10 +235,13 @@ var focused = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlC
     ContentMode = HtmlCrawlContentMode.Focused
 });
 var reader = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
-    ContentMode = HtmlCrawlContentMode.Reader
+    ContentMode = HtmlCrawlContentMode.Reader,
+    ReaderMinimumWordCount = 30,
+    ReaderMinimumScore = 40
 });
 Console.WriteLine($"{reader.Pages[0].ContentModeUsed} / {reader.Pages[0].ContentSelectionReasonCode}");
 Console.WriteLine(reader.Pages[0].ContentElementSelectorHint);
+Console.WriteLine($"{reader.Pages[0].ContentSelectionScore} across {reader.Pages[0].ReaderCandidateCount} reader candidates");
 
 // Remove noisy blocks by class or id while keeping smart cleanup enabled
 var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -298,8 +301,8 @@ $clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -Excl
 # Choose how content is selected before cleanup
 $raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
 $focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ContentMode Focused
-$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader
-$reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint
+$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
+$reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
@@ -322,6 +325,8 @@ $custom.AppliedProfileName
 #     "hosts": [ "docs.example.com" ],
 #     "selector": "article",
 #     "contentMode": "Reader",
+#     "readerMinimumWordCount": 30,
+#     "readerMinimumScore": 40,
 #     "excludeClasses": [ "sidebar", "feedback-box" ]
 #   }
 # ]
@@ -347,7 +352,7 @@ Persisted crawl artifacts now include:
 - `graph.json` for page nodes and cross-page link edges with offline degree metadata
 - `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
 
-The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, and which element was ultimately used when one was selected.
+The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 
