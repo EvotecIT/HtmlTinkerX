@@ -84,7 +84,7 @@ public class HtmlCrawlerTests {
     public async Task HtmlCrawlProfiles_LoadFromPathAsync_LoadsCustomProfiles() {
         string path = Path.GetTempFileName();
         try {
-            await File.WriteAllTextAsync(path, """
+            File.WriteAllText(path, """
             {
               "profiles": [
                 {
@@ -669,7 +669,7 @@ public class HtmlCrawlerTests {
     [Fact]
     public async Task CrawlAsync_CustomProfileFile_AppliesNamedAndAutoProfiles() {
         string profilePath = Path.GetTempFileName();
-        await File.WriteAllTextAsync(profilePath, """
+        File.WriteAllText(profilePath, """
         [
           {
             "name": "custom-docs",
