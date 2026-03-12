@@ -269,6 +269,10 @@ $hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
 $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 # summary now includes interaction totals and per-interaction counts
 
+# Remove noisy blocks by class or id, and keep smart cleanup enabled by default
+$clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ExcludeClass 'promo-box', 'doc-tools' -ExcludeId 'reader-tools'
+# Use -DisableSmartContentCleanup if you want the raw selected content without heuristic pruning
+
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName

@@ -204,6 +204,8 @@ public static class HtmlCrawlProfiles {
         }
 
         AppendDistinct(options.ExcludeSelectors, profile.ExcludeSelectors);
+        AppendDistinct(options.ExcludeClasses, profile.ExcludeClasses);
+        AppendDistinct(options.ExcludeIds, profile.ExcludeIds);
         AppendDistinct(options.ClickSelectors, profile.ClickSelectors);
         AppendDistinct(options.ClickTexts, profile.ClickTexts);
         AppendDistinct(options.DismissSelectors, profile.DismissSelectors);
@@ -236,6 +238,16 @@ public static class HtmlCrawlProfiles {
             ExcludeSelectors = profile.ExcludeSelectors
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ExcludeClasses = profile.ExcludeClasses
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim().TrimStart('.'))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ExcludeIds = profile.ExcludeIds
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim().TrimStart('#'))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             ClickSelectors = profile.ClickSelectors

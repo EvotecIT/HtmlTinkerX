@@ -33,6 +33,12 @@ public sealed class HtmlCrawlProfile {
     /// <summary>Profile-specific excluded selectors.</summary>
     public IList<string> ExcludeSelectors { get; set; } = new List<string>();
 
+    /// <summary>Profile-specific excluded class names.</summary>
+    public IList<string> ExcludeClasses { get; set; } = new List<string>();
+
+    /// <summary>Profile-specific excluded element IDs.</summary>
+    public IList<string> ExcludeIds { get; set; } = new List<string>();
+
     /// <summary>Profile-specific click selectors.</summary>
     public IList<string> ClickSelectors { get; set; } = new List<string>();
 

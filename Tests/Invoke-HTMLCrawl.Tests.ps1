@@ -219,6 +219,48 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can exclude configured classes and ids from stored content and text' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><main><h1>Hello</h1><p>World</p><div class='promo-box'>Sign up</div><div id='reader-tools'>Tools</div></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main' -ExcludeClass 'promo-box' -ExcludeId 'reader-tools' -DisableSmartContentCleanup
+            $page = $result.Pages | Select-Object -First 1
+
+            $page.Html | Should -Match 'Hello'
+            $page.Text | Should -Match 'World'
+            $page.Html | Should -Not -Match 'Sign up'
+            $page.Text | Should -Not -Match 'Sign up'
+            $page.Html | Should -Not -Match 'Tools'
+            $page.Text | Should -Not -Match 'Tools'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
+    It 'Can remove low-value in-content boilerplate automatically' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><main><article><h1>Hello</h1><p>World content for the actual page body with enough text to keep.</p></article><div class='related-posts'><a href='/one'>One</a><a href='/two'>Two</a><a href='/three'>Three</a><a href='/four'>Four</a></div><div class='language-switcher'><a href='/pl'>Polish</a><a href='/de'>German</a><a href='/fr'>French</a></div></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main'
+            $page = $result.Pages | Select-Object -First 1
+
+            $page.Html | Should -Match 'Hello'
+            $page.Text | Should -Match 'World content'
+            $page.Text | Should -Not -Match 'Polish'
+            $page.Text | Should -Not -Match 'One'
+            $page.Html | Should -Not -Match 'related-posts'
+            $page.Html | Should -Not -Match 'language-switcher'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can apply a built-in crawl profile' {
         $server = Start-TestHttpServer -Responses @{
             '/' = "<html><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"

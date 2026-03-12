@@ -125,6 +125,18 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string[] ExcludeSelector { get; set; } = System.Array.Empty<string>();
 
+    /// <summary>Optional class names removed from extracted HTML and text before storage.</summary>
+    [Parameter]
+    public string[] ExcludeClass { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Optional element IDs removed from extracted HTML and text before storage.</summary>
+    [Parameter]
+    public string[] ExcludeId { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Disable the built-in cleanup heuristics that remove low-value boilerplate inside extracted content.</summary>
+    [Parameter]
+    public SwitchParameter DisableSmartContentCleanup { get; set; }
+
     /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
     [Parameter]
     public string[] ClickSelector { get; set; } = System.Array.Empty<string>();
@@ -345,6 +357,9 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
             ExcludeSelectors = new List<string>(ExcludeSelector),
+            ExcludeClasses = new List<string>(ExcludeClass),
+            ExcludeIds = new List<string>(ExcludeId),
+            SmartContentCleanup = !DisableSmartContentCleanup.IsPresent,
             ClickSelectors = new List<string>(ClickSelector),
             ClickTexts = new List<string>(ClickText),
             DismissSelectors = new List<string>(DismissSelector),

@@ -143,6 +143,41 @@ public static class HtmlCrawler {
         "article"
     };
 
+    private static readonly string[] BoilerplateSignalTokens = {
+        "site-header",
+        "primary-navigation",
+        "nav-menu",
+        "menu-item-search",
+        "footer-nav",
+        "footer-site-info",
+        "wpml-ls",
+        "sharing-popup",
+        "post-footer-sharing",
+        "socials-sharing",
+        "gem-pagination",
+        "skip-link",
+        "language-switcher",
+        "locale-switcher",
+        "related-post",
+        "related-articles",
+        "related-content",
+        "breadcrumbs",
+        "breadcrumb",
+        "comment-respond",
+        "comments-area",
+        "newsletter",
+        "subscribe",
+        "promo",
+        "cookie-banner",
+        "table-of-contents",
+        "toc",
+        "sidebar",
+        "share",
+        "social",
+        "pagination",
+        "pager"
+    };
+
     /// <summary>
     /// Crawls a site starting from the supplied URL.
     /// </summary>
@@ -2250,9 +2285,9 @@ public static class HtmlCrawler {
         page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
         page.Links = ExtractLinks(html, requestUri, options);
         page.AssetUrls = ExtractAssetUrls(html, requestUri, options);
-        page.Html = options.IncludeHtml ? ApplyExcludedSelectors(SelectHtml(html, options.Selector), options.ExcludeSelectors) : string.Empty;
+        page.Html = options.IncludeHtml ? ApplyContentCleanup(SelectHtml(html, options.Selector), options) : string.Empty;
         string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
-        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors)) : string.Empty;
+        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options)) : string.Empty;
     }
 
     private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page, IReadOnlyList<HtmlCrawlProfile> customProfiles) {
@@ -2626,15 +2661,15 @@ public static class HtmlCrawler {
         return false;
     }
 
-    private static string PrepareHtmlForTextExtraction(string html, IEnumerable<string>? excludeSelectors = null) {
+    private static string PrepareHtmlForTextExtraction(string html, HtmlCrawlOptions options) {
         if (string.IsNullOrWhiteSpace(html)) {
             return html;
         }
 
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
-            StripBoilerplateElements(document);
-            RemoveMatchingSelectors(document, excludeSelectors);
+            StripBoilerplateElements(document, options);
+            RemoveConfiguredElements(document, options);
             return document.DocumentElement?.OuterHtml ?? html;
         }
 
@@ -2644,29 +2679,27 @@ public static class HtmlCrawler {
             return html;
         }
 
-        StripBoilerplateElements(wrapper);
-        RemoveMatchingSelectors(wrapper, excludeSelectors);
+        StripBoilerplateElements(wrapper, options);
+        RemoveConfiguredElements(wrapper, options);
         return wrapper.InnerHtml;
     }
 
-    private static string ApplyExcludedSelectors(string html, IEnumerable<string>? excludeSelectors) {
+    private static string ApplyContentCleanup(string html, HtmlCrawlOptions options) {
         if (string.IsNullOrWhiteSpace(html)) {
             return html;
         }
 
-        string[] selectors = excludeSelectors?
-            .Where(selector => !string.IsNullOrWhiteSpace(selector))
-            .Select(selector => selector.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray()
-            ?? Array.Empty<string>();
-        if (selectors.Length == 0) {
+        bool hasConfiguredCleanup = options.ExcludeSelectors.Count > 0 || options.ExcludeClasses.Count > 0 || options.ExcludeIds.Count > 0;
+        if (!hasConfiguredCleanup && !options.SmartContentCleanup) {
             return html;
         }
 
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
-            RemoveMatchingSelectors(document, selectors);
+            if (options.SmartContentCleanup) {
+                StripBoilerplateElements(document, options);
+            }
+            RemoveConfiguredElements(document, options);
             return document.DocumentElement?.OuterHtml ?? html;
         }
 
@@ -2676,19 +2709,32 @@ public static class HtmlCrawler {
             return html;
         }
 
-        RemoveMatchingSelectors(wrapper, selectors);
+        if (options.SmartContentCleanup) {
+            StripBoilerplateElements(wrapper, options);
+        }
+        RemoveConfiguredElements(wrapper, options);
         return wrapper.InnerHtml;
     }
 
-    private static void StripBoilerplateElements(IParentNode container) {
+    private static void StripBoilerplateElements(IParentNode container, HtmlCrawlOptions options) {
         foreach (IElement element in container.QuerySelectorAll(
                      "script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.wpml-ls,.sharing-popup,.post-footer-sharing,.socials-sharing,.gem-pagination,.menu-toggle,.minisearch,.skip-link,.skip-link-screen-reader-text").ToArray()) {
             element.Remove();
         }
 
+        if (!options.SmartContentCleanup) {
+            return;
+        }
+
         foreach (IElement element in container.QuerySelectorAll("*").Where(ShouldRemoveBoilerplateElement).ToArray()) {
             element.Remove();
         }
+    }
+
+    private static void RemoveConfiguredElements(IParentNode container, HtmlCrawlOptions options) {
+        RemoveMatchingSelectors(container, options.ExcludeSelectors);
+        RemoveMatchingClasses(container, options.ExcludeClasses);
+        RemoveMatchingIds(container, options.ExcludeIds);
     }
 
     private static void RemoveMatchingSelectors(IParentNode container, IEnumerable<string>? selectors) {
@@ -2703,29 +2749,138 @@ public static class HtmlCrawler {
         }
     }
 
+    private static void RemoveMatchingClasses(IParentNode container, IEnumerable<string>? classNames) {
+        if (classNames == null) {
+            return;
+        }
+
+        foreach (string className in classNames.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim().TrimStart('.')).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            foreach (IElement element in container.QuerySelectorAll("." + CssEscapeIdentifier(className)).ToArray()) {
+                element.Remove();
+            }
+        }
+    }
+
+    private static void RemoveMatchingIds(IParentNode container, IEnumerable<string>? ids) {
+        if (ids == null) {
+            return;
+        }
+
+        foreach (string id in ids.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim().TrimStart('#')).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            foreach (IElement element in container.QuerySelectorAll("#" + CssEscapeIdentifier(id)).ToArray()) {
+                element.Remove();
+            }
+        }
+    }
+
     private static bool ShouldRemoveBoilerplateElement(IElement element) {
-        string combined = string.Join(" ",
-            element.Id ?? string.Empty,
-            element.ClassName ?? string.Empty,
-            element.GetAttribute("aria-label") ?? string.Empty);
+        if (!IsLowValueContainer(element)) {
+            return false;
+        }
+
+        string combined = GetBoilerplateSignalText(element);
         if (string.IsNullOrWhiteSpace(combined)) {
             return false;
         }
 
         string normalized = combined.ToLowerInvariant();
-        return normalized.Contains("site-header", StringComparison.Ordinal)
-               || normalized.Contains("primary-navigation", StringComparison.Ordinal)
-               || normalized.Contains("nav-menu", StringComparison.Ordinal)
-               || normalized.Contains("menu-item-search", StringComparison.Ordinal)
-               || normalized.Contains("footer-nav", StringComparison.Ordinal)
-               || normalized.Contains("footer-site-info", StringComparison.Ordinal)
-               || normalized.Contains("wpml-ls", StringComparison.Ordinal)
-               || normalized.Contains("sharing-popup", StringComparison.Ordinal)
-               || normalized.Contains("post-footer-sharing", StringComparison.Ordinal)
-               || normalized.Contains("socials-sharing", StringComparison.Ordinal)
-               || normalized.Contains("gem-pagination", StringComparison.Ordinal)
-               || normalized.Contains("skip-link", StringComparison.Ordinal)
-               || normalized.Contains("search", StringComparison.Ordinal) && normalized.Contains("form", StringComparison.Ordinal);
+        bool hasSignalToken = BoilerplateSignalTokens.Any(token => normalized.Contains(token, StringComparison.Ordinal));
+        if (hasSignalToken && IsLikelyLowValueContentBlock(element)) {
+            return true;
+        }
+
+        return IsLinkDenseBoilerplateBlock(element);
+    }
+
+    private static bool IsLowValueContainer(IElement element) {
+        string tagName = element.TagName.ToLowerInvariant();
+        if (tagName is "body" or "html" or "main" or "article") {
+            return false;
+        }
+
+        return tagName is "div" or "section" or "aside" or "nav" or "ul" or "ol" or "details" or "form";
+    }
+
+    private static string GetBoilerplateSignalText(IElement element) {
+        return string.Join(" ",
+            element.Id ?? string.Empty,
+            element.ClassName ?? string.Empty,
+            element.GetAttribute("aria-label") ?? string.Empty,
+            element.GetAttribute("role") ?? string.Empty,
+            element.GetAttribute("data-testid") ?? string.Empty);
+    }
+
+    private static bool IsLikelyLowValueContentBlock(IElement element) {
+        if (element.QuerySelector("pre, code, table") != null) {
+            return false;
+        }
+
+        int headingCount = element.QuerySelectorAll("h1, h2, h3").Length;
+        int paragraphCount = element.QuerySelectorAll("p").Length;
+        int linkCount = element.QuerySelectorAll("a[href]").Length;
+        int wordCount = CountWords(element.TextContent);
+        int linkWordCount = CountWords(string.Join(" ", element.QuerySelectorAll("a[href]").Select(anchor => anchor.TextContent)));
+
+        if (headingCount > 0 && wordCount >= 60) {
+            return false;
+        }
+
+        if (paragraphCount >= 2 && wordCount >= 50 && linkCount <= 6) {
+            return false;
+        }
+
+        if (wordCount <= 12) {
+            return true;
+        }
+
+        if (linkCount >= 3 && linkWordCount >= Math.Max(8, wordCount / 2)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsLinkDenseBoilerplateBlock(IElement element) {
+        if (element.QuerySelector("pre, code, table, img") != null) {
+            return false;
+        }
+
+        int wordCount = CountWords(element.TextContent);
+        if (wordCount == 0) {
+            return true;
+        }
+
+        int linkCount = element.QuerySelectorAll("a[href]").Length;
+        if (linkCount < 3) {
+            return false;
+        }
+
+        int listItemCount = element.QuerySelectorAll("li").Length;
+        int linkWordCount = CountWords(string.Join(" ", element.QuerySelectorAll("a[href]").Select(anchor => anchor.TextContent)));
+        double linkDensity = (double)linkWordCount / Math.Max(1, wordCount);
+
+        if (linkDensity >= 0.75 && wordCount <= 90) {
+            return true;
+        }
+
+        if (listItemCount >= 4 && linkDensity >= 0.55 && wordCount <= 140) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string CssEscapeIdentifier(string value) {
+        StringBuilder builder = new(value.Length);
+        foreach (char character in value) {
+            if (char.IsLetterOrDigit(character) || character is '-' or '_') {
+                builder.Append(character);
+            } else {
+                builder.Append('\\').Append(character);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static List<string> ExtractLinks(string html, Uri baseUri, HtmlCrawlOptions options) {

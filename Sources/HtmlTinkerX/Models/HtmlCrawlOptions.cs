@@ -87,6 +87,15 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     public IList<string> ExcludeSelectors { get; set; } = new List<string>();
 
+    /// <summary>Optional class names removed from extracted HTML and text before storage.</summary>
+    public IList<string> ExcludeClasses { get; set; } = new List<string>();
+
+    /// <summary>Optional element IDs removed from extracted HTML and text before storage.</summary>
+    public IList<string> ExcludeIds { get; set; } = new List<string>();
+
+    /// <summary>When true, applies conservative cleanup heuristics to remove low-value boilerplate inside the selected content area.</summary>
+    public bool SmartContentCleanup { get; set; } = true;
+
     /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
     public IList<string> ClickSelectors { get; set; } = new List<string>();
 
@@ -270,6 +279,9 @@ public sealed class HtmlCrawlOptions {
             IncludeText = IncludeText,
             Selector = Selector,
             ExcludeSelectors = new List<string>(ExcludeSelectors),
+            ExcludeClasses = new List<string>(ExcludeClasses),
+            ExcludeIds = new List<string>(ExcludeIds),
+            SmartContentCleanup = SmartContentCleanup,
             ClickSelectors = new List<string>(ClickSelectors),
             ClickTexts = new List<string>(ClickTexts),
             DismissSelectors = new List<string>(DismissSelectors),

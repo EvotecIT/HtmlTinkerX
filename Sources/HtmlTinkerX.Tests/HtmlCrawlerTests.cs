@@ -290,6 +290,63 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_ExcludeClassesAndIds_RemoveConfiguredNoiseFromStoredContentAndText() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><main><h1>Hello</h1><p>World</p><div class='promo-box'>Sign up</div><div id='reader-tools'>Tools</div></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                SmartContentCleanup = false,
+                ExcludeClasses = { "promo-box" },
+                ExcludeIds = { "reader-tools" }
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Sign up", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Sign up", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Tools", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Tools", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_SmartContentCleanup_RemovesLowValueInContentBoilerplate() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><article><h1>Hello</h1><p>World content for the actual page body with enough text to keep.</p></article><div class='related-posts'><a href='/one'>One</a><a href='/two'>Two</a><a href='/three'>Three</a><a href='/four'>Four</a></div><div class='language-switcher'><a href='/pl'>Polish</a><a href='/de'>German</a><a href='/fr'>French</a></div></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main"
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World content", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("One", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("related-posts", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("language-switcher", page.Html, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_Profile_AppliesSelectorExclusionsAndProfileMetadata() {
         Dictionary<string, string> responses = new() {
             ["/"] = "<html><head><title>Home</title></head><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"
