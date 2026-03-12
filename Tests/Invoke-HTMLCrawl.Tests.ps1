@@ -274,9 +274,17 @@ public sealed class PesterTestHttpServer : IDisposable {
 
             $raw.Pages[0].Html | Should -BeNullOrEmpty
             $raw.Pages[0].Text | Should -BeNullOrEmpty
+            $raw.Pages[0].ContentModeUsed | Should -Be 'Raw'
+            $raw.Pages[0].ContentSelectionReasonCode | Should -Be 'RawSelectorMiss'
             $focused.Pages[0].Html | Should -Match '<main'
+            $focused.Pages[0].ContentModeUsed | Should -Be 'Focused'
+            $focused.Pages[0].ContentSelectionReasonCode | Should -Be 'FocusedSelector'
+            $focused.Pages[0].ContentElementSelectorHint | Should -Be 'main'
             $reader.Pages[0].Html | Should -Match '<article'
             $reader.Pages[0].Text | Should -Match 'Second paragraph'
+            $reader.Pages[0].ContentModeUsed | Should -Be 'Reader'
+            $reader.Pages[0].ContentSelectionReasonCode | Should -Be 'ReaderBestCandidate'
+            $reader.Pages[0].ContentElementSelectorHint | Should -Match 'article'
         } finally {
             Stop-TestHttpServer $server
         }
@@ -651,6 +659,9 @@ public sealed class PesterTestHttpServer : IDisposable {
             $result.Summary.GraphEdgeRelations.external | Should -Be 1
             $result.Summary.GraphSkippedNodeReasons.AssetPath | Should -Be 1
             $manifest.PageFiles.HtmlPath | Should -Be ([System.IO.Path]::GetFileName($homePage.HtmlPath))
+            $manifest.Extraction.ContentModeUsed | Should -Be 'Focused'
+            $manifest.Extraction.ContentSelectionReasonCode | Should -Be 'FocusedFullDocumentFallback'
+            $manifest.Extraction.ContentElementSelectorHint | Should -BeNullOrEmpty
             $manifest.Search.Headings[0] | Should -Be 'Offline Home'
             $manifest.Search.WordCount | Should -BeGreaterThan 7
             $manifest.Search.ChunkCount | Should -BeGreaterThan 0
@@ -675,6 +686,8 @@ public sealed class PesterTestHttpServer : IDisposable {
             $indexHtml | Should -Match 'Useful docs for offline testing'
             $indexHtml | Should -Match 'keywords: offline'
             $indexHtml | Should -Match 'Render Summary'
+            $indexHtml | Should -Match 'Content Summary'
+            $indexHtml | Should -Match 'FocusedFullDocumentFallback'
             $indexHtml | Should -Match 'Render mode'
             $indexHtml | Should -Match 'StaticRenderDisabled'
             $indexHtml | Should -Match 'Chunks JSONL'

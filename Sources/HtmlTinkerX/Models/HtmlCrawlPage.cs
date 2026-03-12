@@ -82,6 +82,27 @@ public sealed class HtmlCrawlPage {
     /// <summary>Categorizes why the selected render mode was used for this page.</summary>
     public HtmlCrawlRenderReasonCode RenderReasonCode { get; set; }
 
+    /// <summary>Records which content-selection mode produced the stored HTML and text for this page.</summary>
+    public HtmlCrawlContentMode ContentModeUsed { get; set; } = HtmlCrawlContentMode.Focused;
+
+    /// <summary>Categorizes how the crawler chose the content region used for extraction.</summary>
+    public HtmlCrawlContentSelectionReasonCode ContentSelectionReasonCode { get; set; }
+
+    /// <summary>Explains how the crawler chose the content region used for extraction.</summary>
+    public string? ContentSelectionReason { get; set; }
+
+    /// <summary>Tag name of the selected content element when extraction targeted a specific node.</summary>
+    public string? ContentElementTag { get; set; }
+
+    /// <summary>Element ID of the selected content element when available.</summary>
+    public string? ContentElementId { get; set; }
+
+    /// <summary>Class names of the selected content element when available.</summary>
+    public IList<string> ContentElementClasses { get; set; } = new List<string>();
+
+    /// <summary>Compact selector-like hint for the selected content element when available.</summary>
+    public string? ContentElementSelectorHint { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 

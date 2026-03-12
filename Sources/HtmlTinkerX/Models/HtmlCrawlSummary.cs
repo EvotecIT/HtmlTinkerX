@@ -75,6 +75,12 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Counts of fetched pages by render-reason category.</summary>
     public IDictionary<string, int> RenderReasonCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Counts of successful pages by content-selection mode.</summary>
+    public IDictionary<string, int> ContentModeCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Counts of successful pages by content-selection reason category.</summary>
+    public IDictionary<string, int> ContentSelectionCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Number of fetched pages where one or more rendered interactions were applied.</summary>
     public int InteractedPageCount { get; set; }
 
@@ -141,6 +147,12 @@ public sealed class HtmlCrawlSummary {
         foreach (var group in result.Pages.GroupBy(page => page.RenderReasonCode.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.RenderReasonCounts[group.Key] = group.Count();
         }
+        foreach (var group in result.Pages.Where(page => page.Status == HtmlCrawlPageStatus.Success).GroupBy(page => page.ContentModeUsed.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            summary.ContentModeCounts[group.Key] = group.Count();
+        }
+        foreach (var group in result.Pages.Where(page => page.Status == HtmlCrawlPageStatus.Success).GroupBy(page => page.ContentSelectionReasonCode.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            summary.ContentSelectionCounts[group.Key] = group.Count();
+        }
         foreach (var group in result.Pages.SelectMany(page => page.AppliedInteractions).GroupBy(item => item, StringComparer.OrdinalIgnoreCase)) {
             summary.InteractionCounts[group.Key] = group.Count();
         }
@@ -206,6 +218,17 @@ public sealed class HtmlCrawlSummary {
             }
             foreach (var item in RenderReasonCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 report.AppendLine($"- Render reason {item.Key}: {item.Value}");
+            }
+        }
+
+        if (ContentModeCounts.Count > 0 || ContentSelectionCounts.Count > 0) {
+            report.AppendLine();
+            report.AppendLine("Content summary:");
+            foreach (var item in ContentModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Content mode {item.Key}: {item.Value}");
+            }
+            foreach (var item in ContentSelectionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Content selection {item.Key}: {item.Value}");
             }
         }
 

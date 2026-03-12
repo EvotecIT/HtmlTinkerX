@@ -237,6 +237,8 @@ var focused = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlC
 var reader = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
     ContentMode = HtmlCrawlContentMode.Reader
 });
+Console.WriteLine($"{reader.Pages[0].ContentModeUsed} / {reader.Pages[0].ContentSelectionReasonCode}");
+Console.WriteLine(reader.Pages[0].ContentElementSelectorHint);
 
 // Remove noisy blocks by class or id while keeping smart cleanup enabled
 var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -297,6 +299,7 @@ $clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -Excl
 $raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
 $focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ContentMode Focused
 $reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader
+$reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
@@ -334,7 +337,7 @@ $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl
 Persisted crawl artifacts now include:
 - `crawl-result.json` for the manifest and resume state
 - `index.html` as a browsable offline entry point into the saved dataset
-- `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests
+- `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests, including extraction metadata such as content mode, selection reason, and selected element hints
 - `pages.jsonl` and `pages.csv` for page-level datasets
 - `skipped-pages.jsonl` for skipped content-page candidates
 - `skipped-assets.jsonl` for discovered asset/document URLs that were intentionally not crawled as pages
@@ -343,6 +346,8 @@ Persisted crawl artifacts now include:
 - `chunks.jsonl` for deduplicated text chunks ready for local search/RAG pipelines
 - `graph.json` for page nodes and cross-page link edges with offline degree metadata
 - `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
+
+The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, and which element was ultimately used when one was selected.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

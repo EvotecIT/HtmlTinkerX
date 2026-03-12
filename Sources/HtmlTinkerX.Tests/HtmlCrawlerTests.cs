@@ -366,6 +366,9 @@ public class HtmlCrawlerTests {
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.True(string.IsNullOrWhiteSpace(page.Html));
             Assert.True(string.IsNullOrWhiteSpace(page.Text));
+            Assert.Equal(HtmlCrawlContentMode.Raw, page.ContentModeUsed);
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.RawSelectorMiss, page.ContentSelectionReasonCode);
+            Assert.Null(page.ContentElementSelectorHint);
         } finally {
             server.Stop();
             server.Close();
@@ -390,6 +393,10 @@ public class HtmlCrawlerTests {
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlContentMode.Focused, page.ContentModeUsed);
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.FocusedSemanticFallback, page.ContentSelectionReasonCode);
+            Assert.Equal("article", page.ContentElementTag);
+            Assert.Equal("article", page.ContentElementSelectorHint);
         } finally {
             server.Stop();
             server.Close();
@@ -414,6 +421,10 @@ public class HtmlCrawlerTests {
             Assert.Contains("<article", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Second paragraph", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("A B C D", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate, page.ContentSelectionReasonCode);
+            Assert.Equal("article", page.ContentElementTag);
+            Assert.Contains("article", page.ContentElementSelectorHint, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();
@@ -1135,6 +1146,9 @@ public class HtmlCrawlerTests {
             Assert.Equal(1, result.Summary.GraphEdgeRelations["external"]);
             Assert.Equal(1, result.Summary.GraphSkippedNodeReasons[HtmlCrawlSkipReason.AssetPath.ToString()]);
             Assert.Equal(Path.GetFileName(home.HtmlPath), manifest.RootElement.GetProperty("PageFiles").GetProperty("HtmlPath").GetString());
+            Assert.Equal(HtmlCrawlContentMode.Focused.ToString(), manifest.RootElement.GetProperty("Extraction").GetProperty("ContentModeUsed").GetString());
+            Assert.Equal(HtmlCrawlContentSelectionReasonCode.FocusedFullDocumentFallback.ToString(), manifest.RootElement.GetProperty("Extraction").GetProperty("ContentSelectionReasonCode").GetString());
+            Assert.True(manifest.RootElement.GetProperty("Extraction").GetProperty("ContentElementSelectorHint").ValueKind is JsonValueKind.Null or JsonValueKind.Undefined);
             Assert.Equal("Offline Home", manifest.RootElement.GetProperty("Search").GetProperty("Headings")[0].GetString());
             Assert.True(manifest.RootElement.GetProperty("Search").GetProperty("WordCount").GetInt32() >= 8);
             Assert.True(manifest.RootElement.GetProperty("Search").GetProperty("ChunkCount").GetInt32() >= 1);
@@ -1178,6 +1192,8 @@ public class HtmlCrawlerTests {
             Assert.Contains("Useful docs for offline testing", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("keywords: offline", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Render Summary", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Content Summary", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("FocusedFullDocumentFallback", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Render mode", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("StaticRenderDisabled", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Chunks JSONL", indexHtml, StringComparison.OrdinalIgnoreCase);

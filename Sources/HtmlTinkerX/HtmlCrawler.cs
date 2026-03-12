@@ -27,6 +27,14 @@ public static class HtmlCrawler {
         public HtmlCrawlRenderReasonCode ReasonCode { get; set; }
     }
 
+    private sealed class ContentSelectionResult {
+        public HtmlCrawlContentMode ModeUsed { get; set; } = HtmlCrawlContentMode.Focused;
+        public HtmlCrawlContentSelectionReasonCode ReasonCode { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public IElement? Element { get; set; }
+        public string Html { get; set; } = string.Empty;
+    }
+
     private sealed class PageSearchMetadata {
         public int WordCount { get; set; }
         public int CharacterCount { get; set; }
@@ -966,7 +974,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -988,6 +996,13 @@ public static class HtmlCrawler {
                 page.RenderMode,
                 page.RenderReasonCode,
                 page.RenderReason,
+                page.ContentModeUsed,
+                page.ContentSelectionReasonCode,
+                page.ContentSelectionReason,
+                page.ContentElementTag,
+                page.ContentElementId,
+                page.ContentElementClasses,
+                page.ContentElementSelectorHint,
                 page.AppliedInteractions,
                 page.Started,
                 page.Finished,
@@ -1016,6 +1031,13 @@ public static class HtmlCrawler {
                 EscapeCsv(page.RenderMode.ToString()),
                 EscapeCsv(page.RenderReasonCode.ToString()),
                 EscapeCsv(page.RenderReason),
+                EscapeCsv(page.ContentModeUsed.ToString()),
+                EscapeCsv(page.ContentSelectionReasonCode.ToString()),
+                EscapeCsv(page.ContentSelectionReason),
+                EscapeCsv(page.ContentElementTag),
+                EscapeCsv(page.ContentElementId),
+                EscapeCsv(string.Join("|", page.ContentElementClasses)),
+                EscapeCsv(page.ContentElementSelectorHint),
                 EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
@@ -1186,6 +1208,15 @@ public static class HtmlCrawler {
             page.RenderMode,
             page.RenderReasonCode,
             page.RenderReason,
+            Extraction = new {
+                page.ContentModeUsed,
+                page.ContentSelectionReasonCode,
+                page.ContentSelectionReason,
+                page.ContentElementTag,
+                page.ContentElementId,
+                page.ContentElementClasses,
+                page.ContentElementSelectorHint
+            },
             page.AppliedInteractions,
             page.Started,
             page.Finished,
@@ -1714,6 +1745,28 @@ public static class HtmlCrawler {
             builder.AppendLine("  </section>");
         }
 
+        if (summary.ContentModeCounts.Count > 0 || summary.ContentSelectionCounts.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Content Summary</h2>");
+            builder.AppendLine("    <ul>");
+            foreach (var item in summary.ContentModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Content mode <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            foreach (var item in summary.ContentSelectionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Content selection <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            builder.AppendLine("    </ul>");
+            builder.AppendLine("  </section>");
+        }
+
         if (summary.InteractionCounts.Count > 0) {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Interaction Summary</h2>");
@@ -1801,6 +1854,21 @@ public static class HtmlCrawler {
             if (page.AppliedInteractions.Count > 0) {
                 builder.Append("<br>interactions: ")
                     .Append(HtmlEncode(string.Join(" | ", page.AppliedInteractions)));
+            }
+            builder.Append("<br>content: ")
+                .Append(HtmlEncode(page.ContentModeUsed.ToString()));
+            if (page.ContentSelectionReasonCode != HtmlCrawlContentSelectionReasonCode.None) {
+                builder.Append(" / ")
+                    .Append(HtmlEncode(page.ContentSelectionReasonCode.ToString()));
+            }
+            if (!string.IsNullOrWhiteSpace(page.ContentElementSelectorHint)) {
+                builder.Append(" <code>")
+                    .Append(HtmlEncode(page.ContentElementSelectorHint))
+                    .Append("</code>");
+            }
+            if (!string.IsNullOrWhiteSpace(page.ContentSelectionReason)) {
+                builder.Append("<br>")
+                    .Append(HtmlEncode(page.ContentSelectionReason));
             }
             builder.Append("</span>");
             builder.AppendLine("</td>");
@@ -2285,9 +2353,17 @@ public static class HtmlCrawler {
         page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
         page.Links = ExtractLinks(html, requestUri, options);
         page.AssetUrls = ExtractAssetUrls(html, requestUri, options);
-        page.Html = options.IncludeHtml ? ApplyContentCleanup(SelectHtml(html, options), options) : string.Empty;
-        string textSourceHtml = SelectTextSourceHtml(html, options, page.Html);
-        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options)) : string.Empty;
+        ContentSelectionResult contentSelection = SelectContent(html, options);
+        string selectedHtml = ApplyContentCleanup(contentSelection.Html, options);
+        page.ContentModeUsed = contentSelection.ModeUsed;
+        page.ContentSelectionReasonCode = contentSelection.ReasonCode;
+        page.ContentSelectionReason = contentSelection.Reason;
+        page.ContentElementTag = contentSelection.Element?.LocalName;
+        page.ContentElementId = contentSelection.Element?.Id;
+        page.ContentElementClasses = GetElementClassNames(contentSelection.Element);
+        page.ContentElementSelectorHint = BuildElementSelectorHint(contentSelection.Element);
+        page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
+        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
     }
 
     private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page, IReadOnlyList<HtmlCrawlProfile> customProfiles) {
@@ -2523,6 +2599,13 @@ public static class HtmlCrawler {
             RenderMode = page.RenderMode,
             RenderReasonCode = page.RenderReasonCode,
             RenderReason = page.RenderReason,
+            ContentModeUsed = page.ContentModeUsed,
+            ContentSelectionReasonCode = page.ContentSelectionReasonCode,
+            ContentSelectionReason = page.ContentSelectionReason,
+            ContentElementTag = page.ContentElementTag,
+            ContentElementId = page.ContentElementId,
+            ContentElementClasses = page.ContentElementClasses.ToList(),
+            ContentElementSelectorHint = page.ContentElementSelectorHint,
             Started = page.Started,
             Finished = page.Finished
         };
@@ -2597,42 +2680,75 @@ public static class HtmlCrawler {
         return NormalizeUrl(resolved, options);
     }
 
-    private static string SelectHtml(string html, HtmlCrawlOptions options) {
+    private static ContentSelectionResult SelectContent(string html, HtmlCrawlOptions options) {
         if (string.IsNullOrWhiteSpace(html)) {
-            return html;
+            return new ContentSelectionResult {
+                ModeUsed = options.ContentMode,
+                ReasonCode = HtmlCrawlContentSelectionReasonCode.None,
+                Reason = "No HTML was available for content selection.",
+                Html = html
+            };
         }
 
         if (options.ContentMode == HtmlCrawlContentMode.Raw && string.IsNullOrWhiteSpace(options.Selector)) {
-            return html;
+            return new ContentSelectionResult {
+                ModeUsed = HtmlCrawlContentMode.Raw,
+                ReasonCode = HtmlCrawlContentSelectionReasonCode.RawDocument,
+                Reason = "Raw mode kept the full fetched document because no selector was configured.",
+                Html = html
+            };
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        if (TrySelectContentElement(document, options, out IElement? selected)) {
-            return selected!.OuterHtml;
+        switch (options.ContentMode) {
+            case HtmlCrawlContentMode.Raw:
+                IElement? rawElement = document.QuerySelector(options.Selector!);
+                if (rawElement != null) {
+                    return BuildContentSelectionResult(
+                        HtmlCrawlContentMode.Raw,
+                        HtmlCrawlContentSelectionReasonCode.RawSelector,
+                        $"Raw mode selected the exact configured selector '{options.Selector}'.",
+                        rawElement);
+                }
+
+                return new ContentSelectionResult {
+                    ModeUsed = HtmlCrawlContentMode.Raw,
+                    ReasonCode = HtmlCrawlContentSelectionReasonCode.RawSelectorMiss,
+                    Reason = $"Raw mode produced no stored content because selector '{options.Selector}' was not found.",
+                    Html = string.Empty
+                };
+            case HtmlCrawlContentMode.Reader:
+                return SelectReaderContent(document, html, options);
+            default:
+                if (!string.IsNullOrWhiteSpace(options.Selector)) {
+                    IElement? selected = document.QuerySelector(options.Selector!);
+                    if (selected != null) {
+                        return BuildContentSelectionResult(
+                            HtmlCrawlContentMode.Focused,
+                            HtmlCrawlContentSelectionReasonCode.FocusedSelector,
+                            $"Focused mode selected the configured selector '{options.Selector}'.",
+                            selected);
+                    }
+                }
+
+                if ((string.IsNullOrWhiteSpace(options.Selector) || LooksLikeSemanticContentSelector(options.Selector))
+                    && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+                    return BuildContentSelectionResult(
+                        HtmlCrawlContentMode.Focused,
+                        HtmlCrawlContentSelectionReasonCode.FocusedSemanticFallback,
+                        $"Focused mode fell back to semantic content element {DescribeElement(fallback!)}.",
+                        fallback!);
+                }
+
+                return new ContentSelectionResult {
+                    ModeUsed = HtmlCrawlContentMode.Focused,
+                    ReasonCode = HtmlCrawlContentSelectionReasonCode.FocusedFullDocumentFallback,
+                    Reason = string.IsNullOrWhiteSpace(options.Selector)
+                        ? "Focused mode kept the full document because no preferred content element was found."
+                        : $"Focused mode kept the full document because selector '{options.Selector}' did not match and no semantic fallback was found.",
+                    Html = html
+                };
         }
-
-        return options.ContentMode == HtmlCrawlContentMode.Raw ? string.Empty : html;
-    }
-
-    private static string SelectTextSourceHtml(string html, HtmlCrawlOptions options, string? selectedHtml) {
-        if (!string.IsNullOrWhiteSpace(selectedHtml)) {
-            return selectedHtml!;
-        }
-
-        if (string.IsNullOrWhiteSpace(html)) {
-            return html;
-        }
-
-        if (options.ContentMode == HtmlCrawlContentMode.Raw) {
-            return string.IsNullOrWhiteSpace(options.Selector) ? html : string.Empty;
-        }
-
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        if (TrySelectContentElement(document, options, out IElement? fallback)) {
-            return fallback!.OuterHtml;
-        }
-
-        return html;
     }
 
     private static bool LooksLikeSemanticContentSelector(string? selector) {
@@ -2667,58 +2783,101 @@ public static class HtmlCrawler {
         return false;
     }
 
-    private static bool TrySelectContentElement(IDocument document, HtmlCrawlOptions options, out IElement? element) {
-        switch (options.ContentMode) {
-            case HtmlCrawlContentMode.Raw:
-                if (!string.IsNullOrWhiteSpace(options.Selector)) {
-                    element = document.QuerySelector(options.Selector!);
-                    return element != null;
-                }
-
-                element = null;
-                return false;
-            case HtmlCrawlContentMode.Reader:
-                return TrySelectReaderContentElement(document, options.Selector, out element);
-            default:
-                if (!string.IsNullOrWhiteSpace(options.Selector)) {
-                    element = document.QuerySelector(options.Selector!);
-                    if (element != null) {
-                        return true;
-                    }
-                }
-
-                if ((string.IsNullOrWhiteSpace(options.Selector) || LooksLikeSemanticContentSelector(options.Selector))
-                    && TrySelectPreferredContentElement(document, out IElement? fallback)) {
-                    element = fallback;
-                    return true;
-                }
-
-                element = null;
-                return false;
-        }
-    }
-
-    private static bool TrySelectReaderContentElement(IDocument document, string? selector, out IElement? element) {
+    private static ContentSelectionResult SelectReaderContent(IDocument document, string html, HtmlCrawlOptions options) {
         IElement? root = null;
-        if (!string.IsNullOrWhiteSpace(selector)) {
-            root = document.QuerySelector(selector!);
-            if (root == null && LooksLikeSemanticContentSelector(selector) && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+        string rootDescription = "document body";
+        if (!string.IsNullOrWhiteSpace(options.Selector)) {
+            root = document.QuerySelector(options.Selector!);
+            if (root != null) {
+                rootDescription = $"configured selector '{options.Selector}'";
+            } else if (LooksLikeSemanticContentSelector(options.Selector) && TrySelectPreferredContentElement(document, out IElement? fallback)) {
                 root = fallback;
+                rootDescription = $"semantic fallback {DescribeElement(fallback!)}";
             }
         }
 
         root ??= document.Body;
-        root ??= document.DocumentElement;
+        if (root != null && rootDescription == "document body" && !ReferenceEquals(root, document.Body)) {
+            rootDescription = $"selected root {DescribeElement(root)}";
+        }
         if (root == null) {
-            element = null;
-            return false;
+            root = document.DocumentElement;
+            rootDescription = "document root";
         }
 
-        element = FindBestReaderCandidate(root);
-        return element != null;
+        if (root == null) {
+            return new ContentSelectionResult {
+                ModeUsed = HtmlCrawlContentMode.Reader,
+                ReasonCode = HtmlCrawlContentSelectionReasonCode.ReaderRootFallback,
+                Reason = "Reader mode kept the full document because no DOM root was available.",
+                Html = html
+            };
+        }
+
+        IElement selected = FindBestReaderCandidate(root, out bool usedRootFallback) ?? root;
+        if (usedRootFallback) {
+            return BuildContentSelectionResult(
+                HtmlCrawlContentMode.Reader,
+                HtmlCrawlContentSelectionReasonCode.ReaderRootFallback,
+                $"Reader mode started from {rootDescription} and kept {DescribeElement(selected)} because no stronger article-like candidate was found.",
+                selected);
+        }
+
+        return BuildContentSelectionResult(
+            HtmlCrawlContentMode.Reader,
+            HtmlCrawlContentSelectionReasonCode.ReaderBestCandidate,
+            $"Reader mode started from {rootDescription} and selected the best-scoring content block {DescribeElement(selected)}.",
+            selected);
     }
 
-    private static IElement? FindBestReaderCandidate(IElement root) {
+    private static ContentSelectionResult BuildContentSelectionResult(
+        HtmlCrawlContentMode mode,
+        HtmlCrawlContentSelectionReasonCode reasonCode,
+        string reason,
+        IElement element) {
+        return new ContentSelectionResult {
+            ModeUsed = mode,
+            ReasonCode = reasonCode,
+            Reason = reason,
+            Element = element,
+            Html = element.OuterHtml
+        };
+    }
+
+    private static IList<string> GetElementClassNames(IElement? element) {
+        if (element == null || element.ClassList.Length == 0) {
+            return new List<string>();
+        }
+
+        return element.ClassList
+            .Where(className => !string.IsNullOrWhiteSpace(className))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? BuildElementSelectorHint(IElement? element) {
+        if (element == null) {
+            return null;
+        }
+
+        StringBuilder selector = new();
+        selector.Append(element.LocalName);
+        if (!string.IsNullOrWhiteSpace(element.Id)) {
+            selector.Append('#').Append(element.Id);
+        }
+
+        foreach (string className in element.ClassList.Where(className => !string.IsNullOrWhiteSpace(className)).Take(3)) {
+            selector.Append('.').Append(className);
+        }
+
+        return selector.ToString();
+    }
+
+    private static string DescribeElement(IElement element) {
+        return $"<{BuildElementSelectorHint(element) ?? element.LocalName}>";
+    }
+
+    private static IElement? FindBestReaderCandidate(IElement root, out bool usedRootFallback) {
         List<IElement> candidates = new() { root };
         candidates.AddRange(root.QuerySelectorAll("article, main, section, div"));
 
@@ -2733,10 +2892,12 @@ public static class HtmlCrawler {
         }
 
         if (best == null) {
+            usedRootFallback = true;
             return root;
         }
 
-        return bestScore >= 25 ? best : root;
+        usedRootFallback = bestScore < 25;
+        return usedRootFallback ? root : best;
     }
 
     private static double ScoreReaderCandidate(IElement element) {
