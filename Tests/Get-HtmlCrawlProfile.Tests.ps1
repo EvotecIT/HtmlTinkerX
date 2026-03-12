@@ -22,7 +22,8 @@ Describe 'Get-HtmlCrawlProfile' {
   {
     "name": "custom-docs",
     "hosts": [ "docs.example.com" ],
-    "selector": "article"
+    "selector": "article",
+    "contentMode": "Reader"
   }
 ]
 '@ | Set-Content -Path $profilePath
@@ -33,5 +34,6 @@ Describe 'Get-HtmlCrawlProfile' {
         $profile.Name | Should -Be 'custom-docs'
         $profile.Hosts | Should -Contain 'docs.example.com'
         $profile.Selector | Should -Be 'article'
+        $profile.ContentMode | Should -Be 'Reader'
     }
 }

@@ -15,6 +15,9 @@ public sealed class HtmlCrawlProfile {
     /// <summary>Optional focused selector applied when the caller does not set one explicitly.</summary>
     public string? Selector { get; set; }
 
+    /// <summary>Optional content mode applied when the caller does not set one explicitly.</summary>
+    public HtmlCrawlContentMode? ContentMode { get; set; }
+
     /// <summary>Optional selector that rendered crawls wait for before extraction.</summary>
     public string? WaitForSelector { get; set; }
 

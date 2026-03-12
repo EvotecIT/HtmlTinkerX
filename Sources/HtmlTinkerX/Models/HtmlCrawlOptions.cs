@@ -84,6 +84,9 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional CSS selector used to extract a focused section from the page.</summary>
     public string? Selector { get; set; }
 
+    /// <summary>Controls how the crawler chooses the HTML region used for stored content and text extraction.</summary>
+    public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
+
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     public IList<string> ExcludeSelectors { get; set; } = new List<string>();
 
@@ -278,6 +281,7 @@ public sealed class HtmlCrawlOptions {
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             Selector = Selector,
+            ContentMode = ContentMode,
             ExcludeSelectors = new List<string>(ExcludeSelectors),
             ExcludeClasses = new List<string>(ExcludeClasses),
             ExcludeIds = new List<string>(ExcludeIds),

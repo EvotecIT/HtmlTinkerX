@@ -121,6 +121,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? Selector { get; set; }
 
+    /// <summary>Controls how the crawler chooses the content region for stored HTML and text extraction.</summary>
+    [Parameter]
+    public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
+
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     [Parameter]
     public string[] ExcludeSelector { get; set; } = System.Array.Empty<string>();
@@ -356,6 +360,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
+            ContentMode = ContentMode,
             ExcludeSelectors = new List<string>(ExcludeSelector),
             ExcludeClasses = new List<string>(ExcludeClass),
             ExcludeIds = new List<string>(ExcludeId),

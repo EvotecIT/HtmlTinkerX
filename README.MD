@@ -225,6 +225,26 @@ Console.WriteLine($"{hybrid.Pages[0].RenderMode}: {hybrid.Pages[0].RenderReason}
 Console.WriteLine(string.Join(", ", hybrid.Pages[0].AppliedInteractions));
 Console.WriteLine(hybrid.Summary.ToReportText(hybrid.SitemapUrls));
 
+// Choose how content is selected before cleanup
+var raw = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "#main",
+    ContentMode = HtmlCrawlContentMode.Raw
+});
+var focused = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    ContentMode = HtmlCrawlContentMode.Focused
+});
+var reader = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    ContentMode = HtmlCrawlContentMode.Reader
+});
+
+// Remove noisy blocks by class or id while keeping smart cleanup enabled
+var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    ExcludeClasses = { "promo-box", "doc-tools" },
+    ExcludeIds = { "reader-tools" }
+});
+
 // Reuse a built-in profile for a known site
 var profiled = await HtmlCrawler.CrawlAsync("https://evotec.xyz/", new HtmlCrawlOptions {
     ProfileName = "evotec-xyz"
@@ -273,6 +293,11 @@ $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 $clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ExcludeClass 'promo-box', 'doc-tools' -ExcludeId 'reader-tools'
 # Use -DisableSmartContentCleanup if you want the raw selected content without heuristic pruning
 
+# Choose how content is selected before cleanup
+$raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
+$focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ContentMode Focused
+$reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader
+
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
@@ -286,6 +311,17 @@ $wordpress.AppliedProfileName
 # Load custom profiles from JSON
 $custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
 $custom.AppliedProfileName
+
+# Example custom profile file snippet
+# [
+#   {
+#     "name": "custom-docs",
+#     "hosts": [ "docs.example.com" ],
+#     "selector": "article",
+#     "contentMode": "Reader",
+#     "excludeClasses": [ "sidebar", "feedback-box" ]
+#   }
+# ]
 
 # Inspect built-in or custom profiles
 Get-HtmlCrawlProfile

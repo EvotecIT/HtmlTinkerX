@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -101,6 +102,7 @@ public static class HtmlCrawlProfiles {
         JsonSerializerOptions options = new() {
             PropertyNameCaseInsensitive = true
         };
+        options.Converters.Add(new JsonStringEnumConverter());
 
         List<HtmlCrawlProfile>? profiles = null;
         if (document.RootElement.ValueKind == JsonValueKind.Array) {
@@ -187,6 +189,9 @@ public static class HtmlCrawlProfiles {
         if (string.IsNullOrWhiteSpace(options.Selector) && !string.IsNullOrWhiteSpace(profile.Selector)) {
             options.Selector = profile.Selector;
         }
+        if (options.ContentMode == HtmlCrawlContentMode.Focused && profile.ContentMode.HasValue) {
+            options.ContentMode = profile.ContentMode.Value;
+        }
         if (string.IsNullOrWhiteSpace(options.WaitForSelector) && !string.IsNullOrWhiteSpace(profile.WaitForSelector)) {
             options.WaitForSelector = profile.WaitForSelector;
         }
@@ -230,6 +235,7 @@ public static class HtmlCrawlProfiles {
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             Selector = string.IsNullOrWhiteSpace(profile.Selector) ? null : profile.Selector.Trim(),
+            ContentMode = profile.ContentMode,
             WaitForSelector = string.IsNullOrWhiteSpace(profile.WaitForSelector) ? null : profile.WaitForSelector.Trim(),
             PathPrefix = string.IsNullOrWhiteSpace(profile.PathPrefix) ? null : profile.PathPrefix.Trim(),
             AutoRender = profile.AutoRender,

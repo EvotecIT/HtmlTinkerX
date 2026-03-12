@@ -261,6 +261,27 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Supports raw, focused, and reader content modes' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><main><div class='sidebar'><a href='/a'>A</a><a href='/b'>B</a><a href='/c'>C</a><a href='/d'>D</a></div><article><h1>Hello</h1><p>This is the main body content with enough words to beat the sidebar links.</p><p>Second paragraph keeps the article score high.</p></article></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $raw = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector '#missing' -ContentMode Raw
+            $focused = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main' -ContentMode Focused
+            $reader = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -ContentMode Reader
+
+            $raw.Pages[0].Html | Should -BeNullOrEmpty
+            $raw.Pages[0].Text | Should -BeNullOrEmpty
+            $focused.Pages[0].Html | Should -Match '<main'
+            $reader.Pages[0].Html | Should -Match '<article'
+            $reader.Pages[0].Text | Should -Match 'Second paragraph'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can apply a built-in crawl profile' {
         $server = Start-TestHttpServer -Responses @{
             '/' = "<html><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"

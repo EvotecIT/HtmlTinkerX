@@ -2285,8 +2285,8 @@ public static class HtmlCrawler {
         page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
         page.Links = ExtractLinks(html, requestUri, options);
         page.AssetUrls = ExtractAssetUrls(html, requestUri, options);
-        page.Html = options.IncludeHtml ? ApplyContentCleanup(SelectHtml(html, options.Selector), options) : string.Empty;
-        string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
+        page.Html = options.IncludeHtml ? ApplyContentCleanup(SelectHtml(html, options), options) : string.Empty;
+        string textSourceHtml = SelectTextSourceHtml(html, options, page.Html);
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options)) : string.Empty;
     }
 
@@ -2597,32 +2597,38 @@ public static class HtmlCrawler {
         return NormalizeUrl(resolved, options);
     }
 
-    private static string SelectHtml(string html, string? selector) {
-        if (string.IsNullOrEmpty(selector)) {
+    private static string SelectHtml(string html, HtmlCrawlOptions options) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return html;
+        }
+
+        if (options.ContentMode == HtmlCrawlContentMode.Raw && string.IsNullOrWhiteSpace(options.Selector)) {
             return html;
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        IElement? selected = document.QuerySelector(selector!);
-        if (selected != null) {
-            return selected.OuterHtml;
+        if (TrySelectContentElement(document, options, out IElement? selected)) {
+            return selected!.OuterHtml;
         }
 
-        if (LooksLikeSemanticContentSelector(selector) && TrySelectPreferredContentElement(document, out IElement? fallback)) {
-            return fallback!.OuterHtml;
-        }
-
-        return string.Empty;
+        return options.ContentMode == HtmlCrawlContentMode.Raw ? string.Empty : html;
     }
 
-    private static string SelectTextSourceHtml(string html, string? selector, string? selectedHtml) {
+    private static string SelectTextSourceHtml(string html, HtmlCrawlOptions options, string? selectedHtml) {
         if (!string.IsNullOrWhiteSpace(selectedHtml)) {
             return selectedHtml!;
         }
 
+        if (string.IsNullOrWhiteSpace(html)) {
+            return html;
+        }
+
+        if (options.ContentMode == HtmlCrawlContentMode.Raw) {
+            return string.IsNullOrWhiteSpace(options.Selector) ? html : string.Empty;
+        }
+
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        if ((string.IsNullOrWhiteSpace(selector) || LooksLikeSemanticContentSelector(selector))
-            && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+        if (TrySelectContentElement(document, options, out IElement? fallback)) {
             return fallback!.OuterHtml;
         }
 
@@ -2659,6 +2665,139 @@ public static class HtmlCrawler {
 
         element = null;
         return false;
+    }
+
+    private static bool TrySelectContentElement(IDocument document, HtmlCrawlOptions options, out IElement? element) {
+        switch (options.ContentMode) {
+            case HtmlCrawlContentMode.Raw:
+                if (!string.IsNullOrWhiteSpace(options.Selector)) {
+                    element = document.QuerySelector(options.Selector!);
+                    return element != null;
+                }
+
+                element = null;
+                return false;
+            case HtmlCrawlContentMode.Reader:
+                return TrySelectReaderContentElement(document, options.Selector, out element);
+            default:
+                if (!string.IsNullOrWhiteSpace(options.Selector)) {
+                    element = document.QuerySelector(options.Selector!);
+                    if (element != null) {
+                        return true;
+                    }
+                }
+
+                if ((string.IsNullOrWhiteSpace(options.Selector) || LooksLikeSemanticContentSelector(options.Selector))
+                    && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+                    element = fallback;
+                    return true;
+                }
+
+                element = null;
+                return false;
+        }
+    }
+
+    private static bool TrySelectReaderContentElement(IDocument document, string? selector, out IElement? element) {
+        IElement? root = null;
+        if (!string.IsNullOrWhiteSpace(selector)) {
+            root = document.QuerySelector(selector!);
+            if (root == null && LooksLikeSemanticContentSelector(selector) && TrySelectPreferredContentElement(document, out IElement? fallback)) {
+                root = fallback;
+            }
+        }
+
+        root ??= document.Body;
+        root ??= document.DocumentElement;
+        if (root == null) {
+            element = null;
+            return false;
+        }
+
+        element = FindBestReaderCandidate(root);
+        return element != null;
+    }
+
+    private static IElement? FindBestReaderCandidate(IElement root) {
+        List<IElement> candidates = new() { root };
+        candidates.AddRange(root.QuerySelectorAll("article, main, section, div"));
+
+        IElement? best = null;
+        double bestScore = double.MinValue;
+        foreach (IElement candidate in candidates.Distinct()) {
+            double score = ScoreReaderCandidate(candidate);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+
+        if (best == null) {
+            return root;
+        }
+
+        return bestScore >= 25 ? best : root;
+    }
+
+    private static double ScoreReaderCandidate(IElement element) {
+        if (!IsReaderCandidateElement(element)) {
+            return double.MinValue;
+        }
+
+        string text = element.TextContent ?? string.Empty;
+        int wordCount = CountWords(text);
+        if (wordCount < 20) {
+            return double.MinValue;
+        }
+
+        int paragraphCount = element.QuerySelectorAll("p").Length;
+        int headingCount = element.QuerySelectorAll("h1, h2, h3").Length;
+        int linkCount = element.QuerySelectorAll("a[href]").Length;
+        int listItemCount = element.QuerySelectorAll("li").Length;
+        int codeBlockCount = element.QuerySelectorAll("pre, code").Length;
+        int tableCount = element.QuerySelectorAll("table").Length;
+        int linkWordCount = CountWords(string.Join(" ", element.QuerySelectorAll("a[href]").Select(anchor => anchor.TextContent)));
+        double linkDensity = (double)linkWordCount / Math.Max(1, wordCount);
+
+        double score = wordCount;
+        score += paragraphCount * 18;
+        score += headingCount * 20;
+        score += codeBlockCount * 14;
+        score += tableCount * 10;
+
+        string tagName = element.TagName.ToLowerInvariant();
+        if (tagName == "article") {
+            score += 35;
+        } else if (tagName == "main") {
+            score += 20;
+        } else if (tagName == "section") {
+            score += 10;
+        }
+
+        if (linkDensity >= 0.75) {
+            score -= 80;
+        } else if (linkDensity >= 0.55) {
+            score -= 40;
+        }
+
+        if (listItemCount >= 5 && paragraphCount == 0) {
+            score -= 45;
+        }
+
+        if (ContainsBoilerplateSignals(element)) {
+            score -= 55;
+        }
+
+        if (IsLinkDenseBoilerplateBlock(element)) {
+            score -= 80;
+        }
+
+        return score;
+    }
+
+    private static bool IsReaderCandidateElement(IElement element) {
+        string tagName = element.TagName.ToLowerInvariant();
+        return tagName is "article" or "main" or "section" or "div";
     }
 
     private static string PrepareHtmlForTextExtraction(string html, HtmlCrawlOptions options) {
@@ -2778,13 +2917,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        string combined = GetBoilerplateSignalText(element);
-        if (string.IsNullOrWhiteSpace(combined)) {
-            return false;
-        }
-
-        string normalized = combined.ToLowerInvariant();
-        bool hasSignalToken = BoilerplateSignalTokens.Any(token => normalized.Contains(token, StringComparison.Ordinal));
+        bool hasSignalToken = ContainsBoilerplateSignals(element);
         if (hasSignalToken && IsLikelyLowValueContentBlock(element)) {
             return true;
         }
@@ -2808,6 +2941,16 @@ public static class HtmlCrawler {
             element.GetAttribute("aria-label") ?? string.Empty,
             element.GetAttribute("role") ?? string.Empty,
             element.GetAttribute("data-testid") ?? string.Empty);
+    }
+
+    private static bool ContainsBoilerplateSignals(IElement element) {
+        string combined = GetBoilerplateSignalText(element);
+        if (string.IsNullOrWhiteSpace(combined)) {
+            return false;
+        }
+
+        string normalized = combined.ToLowerInvariant();
+        return BoilerplateSignalTokens.Any(token => normalized.Contains(token, StringComparison.Ordinal));
     }
 
     private static bool IsLikelyLowValueContentBlock(IElement element) {

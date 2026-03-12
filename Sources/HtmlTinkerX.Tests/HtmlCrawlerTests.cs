@@ -89,6 +89,7 @@ public class HtmlCrawlerTests {
                   "name": "custom-docs",
                   "hosts": [ "docs.example.com" ],
                   "selector": "article",
+                  "contentMode": "Reader",
                   "excludeSelectors": [ ".sidebar", ".feedback" ],
                   "clickTexts": [ "Show more" ]
                 }
@@ -101,6 +102,7 @@ public class HtmlCrawlerTests {
             Assert.Equal("custom-docs", profile.Name);
             Assert.Contains("docs.example.com", profile.Hosts);
             Assert.Equal("article", profile.Selector);
+            Assert.Equal(HtmlCrawlContentMode.Reader, profile.ContentMode);
             Assert.Contains(".sidebar", profile.ExcludeSelectors);
             Assert.Contains("Show more", profile.ClickTexts);
         } finally {
@@ -340,6 +342,78 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("related-posts", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("language-switcher", page.Html, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ContentMode_RawKeepsExactSelectionWithoutFallback() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><article><h1>Hello</h1><p>World</p></article></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                ContentMode = HtmlCrawlContentMode.Raw
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.True(string.IsNullOrWhiteSpace(page.Html));
+            Assert.True(string.IsNullOrWhiteSpace(page.Text));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ContentMode_FocusedUsesSemanticFallback() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><article><h1>Hello</h1><p>World</p></article></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                ContentMode = HtmlCrawlContentMode.Focused
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ContentMode_ReaderSelectsArticleLikeBlock() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><div class='sidebar'><a href='/a'>A</a><a href='/b'>B</a><a href='/c'>C</a><a href='/d'>D</a></div><article><h1>Hello</h1><p>This is the main body content with enough words to beat the sidebar links.</p><p>Second paragraph keeps the article score high.</p></article></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                ContentMode = HtmlCrawlContentMode.Reader
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("<article", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Second paragraph", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("A B C D", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();
