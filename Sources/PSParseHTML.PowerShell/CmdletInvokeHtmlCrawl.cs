@@ -109,6 +109,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? Profile { get; set; }
 
+    /// <summary>Optional JSON file containing custom crawl profiles.</summary>
+    [Parameter]
+    public string? ProfilePath { get; set; }
+
     /// <summary>Apply a built-in crawl profile automatically when the start host matches one.</summary>
     [Parameter]
     public SwitchParameter AutoProfile { get; set; }
@@ -296,7 +300,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        ValidateProfile(Profile);
+        ValidateProfile(Profile, ProfilePath);
 
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
@@ -335,6 +339,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             OutputPath = OutPath?.ToFullPath(),
             ResumePath = ResumePath?.ToFullPath(),
             ProfileName = Profile,
+            ProfilePath = ProfilePath?.ToFullPath(),
             AutoProfile = AutoProfile.IsPresent,
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
@@ -427,8 +432,12 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
         }
     }
 
-    private static void ValidateProfile(string? profileName) {
+    private static void ValidateProfile(string? profileName, string? profilePath) {
         if (string.IsNullOrWhiteSpace(profileName)) {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(profilePath)) {
             return;
         }
 

@@ -69,6 +69,9 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional built-in profile name used to preconfigure crawl behavior.</summary>
     public string? ProfileName { get; set; }
 
+    /// <summary>Optional JSON file containing custom crawl profiles.</summary>
+    public string? ProfilePath { get; set; }
+
     /// <summary>When true, applies a built-in profile automatically when the start host matches one.</summary>
     public bool AutoProfile { get; set; }
 
@@ -261,6 +264,7 @@ public sealed class HtmlCrawlOptions {
             OutputPath = OutputPath,
             ResumePath = ResumePath,
             ProfileName = ProfileName,
+            ProfilePath = ProfilePath,
             AutoProfile = AutoProfile,
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,

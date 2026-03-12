@@ -79,6 +79,36 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task HtmlCrawlProfiles_LoadFromPathAsync_LoadsCustomProfiles() {
+        string path = Path.GetTempFileName();
+        try {
+            await File.WriteAllTextAsync(path, """
+            {
+              "profiles": [
+                {
+                  "name": "custom-docs",
+                  "hosts": [ "docs.example.com" ],
+                  "selector": "article",
+                  "excludeSelectors": [ ".sidebar", ".feedback" ],
+                  "clickTexts": [ "Show more" ]
+                }
+              ]
+            }
+            """);
+
+            IReadOnlyList<HtmlCrawlProfile> profiles = await HtmlCrawlProfiles.LoadFromPathAsync(path);
+            HtmlCrawlProfile profile = Assert.Single(profiles);
+            Assert.Equal("custom-docs", profile.Name);
+            Assert.Contains("docs.example.com", profile.Hosts);
+            Assert.Equal("article", profile.Selector);
+            Assert.Contains(".sidebar", profile.ExcludeSelectors);
+            Assert.Contains("Show more", profile.ClickTexts);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_UnknownProfile_ThrowsHelpfulError() {
         ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() =>
             HtmlCrawler.CrawlAsync("https://example.com/", new HtmlCrawlOptions {
@@ -309,6 +339,51 @@ public class HtmlCrawlerTests {
         } finally {
             server.Stop();
             server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_CustomProfileFile_AppliesNamedAndAutoProfiles() {
+        string profilePath = Path.GetTempFileName();
+        await File.WriteAllTextAsync(profilePath, """
+        [
+          {
+            "name": "custom-docs",
+            "hosts": [ "localhost" ],
+            "selector": "article",
+            "excludeSelectors": [ ".sidebar", ".feedback-box" ]
+          }
+        ]
+        """);
+
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><article><h1>Hello</h1><p>World</p><div class='feedback-box'>Feedback</div></article><div class='sidebar'>Sidebar</div></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult named = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                ProfileName = "custom-docs",
+                ProfilePath = profilePath
+            });
+
+            HtmlCrawlResult automatic = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                AutoProfile = true,
+                ProfilePath = profilePath
+            });
+
+            Assert.Equal("custom-docs", named.AppliedProfileName, ignoreCase: true);
+            Assert.Equal("custom-docs", automatic.AppliedProfileName, ignoreCase: true);
+            Assert.DoesNotContain("Sidebar", Assert.Single(named.Pages).Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Feedback", Assert.Single(automatic.Pages).Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+            File.Delete(profilePath);
         }
     }
 

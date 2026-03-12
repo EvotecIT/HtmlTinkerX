@@ -259,6 +259,37 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can load custom crawl profiles from JSON' {
+        $profilePath = Join-Path $TestDrive 'crawl-profiles.json'
+        @'
+[
+  {
+    "name": "custom-docs",
+    "hosts": [ "127.0.0.1" ],
+    "selector": "article",
+    "excludeSelectors": [ ".sidebar", ".feedback-box" ]
+  }
+]
+'@ | Set-Content -Path $profilePath
+
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><article><h1>Hello</h1><p>World</p><div class='feedback-box'>Feedback</div></article><div class='sidebar'>Sidebar</div></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $named = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Profile 'custom-docs' -ProfilePath $profilePath
+            $automatic = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -AutoProfile -ProfilePath $profilePath
+
+            $named.AppliedProfileName | Should -Be 'custom-docs'
+            $automatic.AppliedProfileName | Should -Be 'custom-docs'
+            $named.Pages[0].Text | Should -Not -Match 'Sidebar'
+            $automatic.Pages[0].Text | Should -Not -Match 'Feedback'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Rejects unknown crawl profile names with available values' {
         $thrown = {
             Invoke-HTMLCrawl -Url 'https://example.com/' -Profile 'missing-profile'
@@ -266,6 +297,26 @@ public sealed class PesterTestHttpServer : IDisposable {
 
         $thrown.Exception.Message | Should -Match 'evotec-xyz'
         $thrown.Exception.Message | Should -Match 'wordpress-content'
+    }
+
+    It 'Reports custom profile names when a profile file is provided' {
+        $profilePath = Join-Path $TestDrive 'custom-only-profiles.json'
+        @'
+{
+  "profiles": [
+    {
+      "name": "custom-docs",
+      "selector": "article"
+    }
+  ]
+}
+'@ | Set-Content -Path $profilePath
+
+        $thrown = {
+            Invoke-HTMLCrawl -Url 'https://example.com/' -Profile 'missing-profile' -ProfilePath $profilePath
+        } | Should -Throw -PassThru
+
+        $thrown.Exception.Message | Should -Match 'custom-docs'
     }
 
     It 'Persists and resumes a crawl from disk' {

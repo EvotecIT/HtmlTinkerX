@@ -161,12 +161,15 @@ public static class HtmlCrawler {
         }
 
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
-        if (!string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && HtmlCrawlProfiles.ResolveByName(resolvedOptions.ProfileName) == null) {
-            string availableProfiles = string.Join(", ", HtmlCrawlProfiles.Names);
+        IReadOnlyList<HtmlCrawlProfile> customProfiles = string.IsNullOrWhiteSpace(resolvedOptions.ProfilePath)
+            ? Array.Empty<HtmlCrawlProfile>()
+            : await HtmlCrawlProfiles.LoadFromPathAsync(resolvedOptions.ProfilePath!, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && HtmlCrawlProfiles.ResolveByName(resolvedOptions.ProfileName, customProfiles) == null) {
+            string availableProfiles = string.Join(", ", HtmlCrawlProfiles.GetNames(customProfiles));
             throw new ArgumentException($"Unknown crawl profile '{resolvedOptions.ProfileName}'. Available profiles: {availableProfiles}.", nameof(HtmlCrawlOptions.ProfileName));
         }
 
-        HtmlCrawlProfile? appliedProfile = HtmlCrawlProfiles.Resolve(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile);
+        HtmlCrawlProfile? appliedProfile = HtmlCrawlProfiles.Resolve(resolvedOptions.ProfileName, startUri, resolvedOptions.AutoProfile, customProfiles);
         if (appliedProfile != null) {
             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
         }
@@ -272,7 +275,7 @@ public static class HtmlCrawler {
                     FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
-                        HtmlCrawlProfile? inferredProfile = InferAutoProfile(startUri, fetchedPage.RawHtml, page);
+                        HtmlCrawlProfile? inferredProfile = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
                         if (inferredProfile != null) {
                             appliedProfile = inferredProfile;
                             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
@@ -2252,12 +2255,15 @@ public static class HtmlCrawler {
         page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors)) : string.Empty;
     }
 
-    private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page) {
+    private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page, IReadOnlyList<HtmlCrawlProfile> customProfiles) {
         if (LooksLikeWordPressSite(html, page)) {
-            return HtmlCrawlProfiles.ResolveByName("wordpress-content");
+            HtmlCrawlProfile? wordpressProfile = HtmlCrawlProfiles.ResolveByName("wordpress-content", customProfiles);
+            if (wordpressProfile != null) {
+                return wordpressProfile;
+            }
         }
 
-        return HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true);
+        return HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true, customProfiles);
     }
 
     private static bool LooksLikeWordPressSite(string? html, HtmlCrawlPage page) {

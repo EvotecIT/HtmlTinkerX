@@ -279,6 +279,10 @@ $profiled.AppliedProfileName
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
 $wordpress.AppliedProfileName
 
+# Load custom profiles from JSON
+$custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
+$custom.AppliedProfileName
+
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
