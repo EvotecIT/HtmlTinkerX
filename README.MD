@@ -275,6 +275,10 @@ $profiled.AppliedProfileName
 # Available profile names: evotec-xyz, wordpress-content
 # Unknown names fail fast and report the built-in values
 
+# AutoProfile can also infer the generic WordPress profile from page markers
+$wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
+$wordpress.AppliedProfileName
+
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```

@@ -82,6 +82,11 @@ public static class HtmlCrawler {
         public int Depth { get; set; }
     }
 
+    private sealed class FetchedPageData {
+        public HtmlCrawlPage Page { get; set; } = null!;
+        public string? RawHtml { get; set; }
+    }
+
     private sealed class CrawlArtifactPaths {
         public string ManifestPath { get; set; } = string.Empty;
         public string PagesDirectory { get; set; } = string.Empty;
@@ -258,18 +263,33 @@ public static class HtmlCrawler {
 
                 HtmlCrawlPage page;
                 if (resolvedOptions.Render) {
-                    page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    FetchedPageData fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    page = fetchedPage.Page;
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
-                    page = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    page = fetchedPage.Page;
+                    if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
+                        HtmlCrawlProfile? inferredProfile = InferAutoProfile(startUri, fetchedPage.RawHtml, page);
+                        if (inferredProfile != null) {
+                            appliedProfile = inferredProfile;
+                            HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
+                            result.AppliedProfileName = appliedProfile.Name;
+                            if (!string.IsNullOrWhiteSpace(fetchedPage.RawHtml)) {
+                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, next.Uri, resolvedOptions);
+                            }
+                        }
+                    }
+
                     if (resolvedOptions.AutoRender) {
                         AutoRenderDecision decision = EvaluateAutoRender(page, resolvedOptions);
                         page.RenderReasonCode = decision.ReasonCode;
                         page.RenderReason = decision.Reason;
                         if (decision.ShouldRender) {
-                            page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                            fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                            page = fetchedPage.Page;
                             page.RenderMode = HtmlCrawlRenderMode.AutoRendered;
                             page.RenderReasonCode = decision.ReasonCode;
                             page.RenderReason = decision.Reason;
@@ -2032,7 +2052,7 @@ public static class HtmlCrawler {
         return normalized;
     }
 
-    private static async Task<HtmlCrawlPage> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -2056,16 +2076,17 @@ public static class HtmlCrawler {
                 page.Status = HtmlCrawlPageStatus.Skipped;
                 page.SkipReason = HtmlCrawlSkipReason.UnsupportedContentType;
                 page.Error = $"Skipped content type '{page.ContentType ?? "unknown"}'.";
-                return page;
+                return new FetchedPageData {
+                    Page = page,
+                    RawHtml = html
+                };
             }
 
-            page.Title = ExtractTitle(html);
-            page.CanonicalUrl = ExtractCanonicalUrl(html, request.Uri, options);
-            page.Links = ExtractLinks(html, request.Uri, options);
-            page.AssetUrls = ExtractAssetUrls(html, request.Uri, options);
-            page.Html = options.IncludeHtml ? ApplyExcludedSelectors(SelectHtml(html, options.Selector), options.ExcludeSelectors) : string.Empty;
-            string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
-            page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors)) : string.Empty;
+            PopulatePageFromHtml(page, html, request.Uri, options);
+            return new FetchedPageData {
+                Page = page,
+                RawHtml = html
+            };
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
@@ -2073,10 +2094,12 @@ public static class HtmlCrawler {
             page.Finished = DateTimeOffset.UtcNow;
         }
 
-        return page;
+        return new FetchedPageData {
+            Page = page
+        };
     }
 
-    private static async Task<HtmlCrawlPage> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+    private static async Task<FetchedPageData> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -2119,20 +2142,18 @@ public static class HtmlCrawler {
                 page.Status = HtmlCrawlPageStatus.Skipped;
                 page.SkipReason = HtmlCrawlSkipReason.UnsupportedContentType;
                 page.Error = $"Skipped content type '{page.ContentType ?? "unknown"}'.";
-                return page;
+                return new FetchedPageData {
+                    Page = page,
+                    RawHtml = fullHtml
+                };
             }
 
-            page.Title = await session.Page.TitleAsync().ConfigureAwait(false);
-            page.CanonicalUrl = ExtractCanonicalUrl(fullHtml, request.Uri, options);
-            page.Links = ExtractLinks(fullHtml, request.Uri, options);
-            page.AssetUrls = ExtractAssetUrls(fullHtml, request.Uri, options);
-            page.Html = options.IncludeHtml
-                ? ApplyExcludedSelectors(SelectHtml(fullHtml, options.Selector), options.ExcludeSelectors)
-                : string.Empty;
-            string textSourceHtml = SelectTextSourceHtml(fullHtml, options.Selector, page.Html);
-            page.Text = options.IncludeText
-                ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors))
-                : string.Empty;
+            string? title = await session.Page.TitleAsync().ConfigureAwait(false);
+            PopulatePageFromHtml(page, fullHtml, request.Uri, options, title);
+            return new FetchedPageData {
+                Page = page,
+                RawHtml = fullHtml
+            };
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
@@ -2140,7 +2161,9 @@ public static class HtmlCrawler {
             page.Finished = DateTimeOffset.UtcNow;
         }
 
-        return page;
+        return new FetchedPageData {
+            Page = page
+        };
     }
 
     private static async Task ApplyRenderedInteractionsAsync(IPage page, HtmlCrawlPage crawlPage, HtmlCrawlOptions options, CancellationToken cancellationToken) {
@@ -2217,6 +2240,52 @@ public static class HtmlCrawler {
         } catch {
             return false;
         }
+    }
+
+    private static void PopulatePageFromHtml(HtmlCrawlPage page, string html, Uri requestUri, HtmlCrawlOptions options, string? titleOverride = null) {
+        page.Title = string.IsNullOrWhiteSpace(titleOverride) ? ExtractTitle(html) : titleOverride;
+        page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
+        page.Links = ExtractLinks(html, requestUri, options);
+        page.AssetUrls = ExtractAssetUrls(html, requestUri, options);
+        page.Html = options.IncludeHtml ? ApplyExcludedSelectors(SelectHtml(html, options.Selector), options.ExcludeSelectors) : string.Empty;
+        string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
+        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors)) : string.Empty;
+    }
+
+    private static HtmlCrawlProfile? InferAutoProfile(Uri startUri, string? html, HtmlCrawlPage page) {
+        if (LooksLikeWordPressSite(html, page)) {
+            return HtmlCrawlProfiles.ResolveByName("wordpress-content");
+        }
+
+        return HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true);
+    }
+
+    private static bool LooksLikeWordPressSite(string? html, HtmlCrawlPage page) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return false;
+        }
+
+        string normalizedHtml = html.ToLowerInvariant();
+        if (normalizedHtml.Contains("content=\"wordpress", StringComparison.Ordinal)
+            || normalizedHtml.Contains("content='wordpress", StringComparison.Ordinal)
+            || normalizedHtml.Contains("/wp-content/", StringComparison.Ordinal)
+            || normalizedHtml.Contains("/wp-includes/", StringComparison.Ordinal)
+            || normalizedHtml.Contains("wp-block-", StringComparison.Ordinal)
+            || normalizedHtml.Contains("wpml-ls", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class=\"site-main", StringComparison.Ordinal)
+            || normalizedHtml.Contains("class='site-main", StringComparison.Ordinal)) {
+            return true;
+        }
+
+        if (page.AssetUrls.Any(url => url.Contains("/wp-content/", StringComparison.OrdinalIgnoreCase) || url.Contains("/wp-includes/", StringComparison.OrdinalIgnoreCase))) {
+            return true;
+        }
+
+        if (page.Links.Any(url => url.Contains("/wp-json/", StringComparison.OrdinalIgnoreCase))) {
+            return true;
+        }
+
+        return false;
     }
 
     private static async Task AutoScrollPageAsync(IPage page, HtmlCrawlOptions options, CancellationToken cancellationToken) {

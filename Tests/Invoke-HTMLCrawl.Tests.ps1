@@ -239,6 +239,26 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can auto-apply the generic WordPress profile from page markers' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><head><meta name='generator' content='WordPress 6.8' /><link rel='stylesheet' href='/wp-content/themes/site/style.css' /></head><body><main><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -AutoProfile
+            $page = $result.Pages | Select-Object -First 1
+
+            $result.AppliedProfileName | Should -Be 'wordpress-content'
+            $page.Html | Should -Match 'Hello'
+            $page.Text | Should -Match 'World'
+            $page.Html | Should -Not -Match 'Share'
+            $page.Text | Should -Not -Match 'Polish'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Rejects unknown crawl profile names with available values' {
         $thrown = {
             Invoke-HTMLCrawl -Url 'https://example.com/' -Profile 'missing-profile'

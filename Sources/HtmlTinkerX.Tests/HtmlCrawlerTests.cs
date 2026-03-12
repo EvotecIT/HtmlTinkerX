@@ -287,6 +287,32 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_AutoProfile_DetectsWordPressMarkersAndAppliesGenericProfile() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Blog</title><meta name='generator' content='WordPress 6.8' /><link rel='stylesheet' href='/wp-content/themes/site/style.css' /></head><body><main><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                AutoProfile = true
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal("wordpress-content", result.AppliedProfileName, ignoreCase: true);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public void ShouldRetryWithRendering_DetectsThinJavascriptShells() {
         HtmlCrawlPage page = new() {
             Status = HtmlCrawlPageStatus.Success,
