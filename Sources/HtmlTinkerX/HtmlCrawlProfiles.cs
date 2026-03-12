@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace HtmlTinkerX;
 
 /// <summary>
-/// Provides reusable crawl profiles for known sites and site families.
+/// Provides reusable crawl profiles for known site families.
 /// </summary>
 public static class HtmlCrawlProfiles {
     private sealed class HtmlCrawlProfileFile {
@@ -94,42 +94,6 @@ public static class HtmlCrawlProfiles {
                 ".breadcrumbs",
                 ".breadcrumb"
             }
-        },
-        new HtmlCrawlProfile {
-            Name = "evotec-xyz",
-            Hosts = {
-                "evotec.xyz",
-                "www.evotec.xyz"
-            },
-            Selector = "main",
-            ContentMode = HtmlCrawlContentMode.Reader,
-            CompareContentModes = true,
-            ReaderMinimumWordCount = 30,
-            ReaderMinimumScore = 40,
-            WaitForSelector = "#main",
-            ExcludeSelectors = {
-                ".wpml-ls",
-                ".wpml-ls-statics-footer",
-                ".sharing-popup",
-                ".post-footer-sharing",
-                ".socials-sharing",
-                ".language-switcher",
-                ".related-posts",
-                ".related-posts-list",
-                ".breadcrumbs",
-                ".breadcrumb",
-                ".comment-respond",
-                ".comments-area"
-            },
-            DismissTexts = {
-                "Accept",
-                "I agree"
-            },
-            ClickTexts = {
-                "Load more",
-                "Show more"
-            },
-            InteractionRepeatCount = 2
         }
     };
 

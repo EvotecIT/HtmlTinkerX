@@ -5,20 +5,19 @@ Describe 'Get-HtmlCrawlProfile' {
         $profiles = Get-HtmlCrawlProfile
 
         $profiles.Name | Should -Contain 'api-docs-content'
-        $profiles.Name | Should -Contain 'evotec-xyz'
         $profiles.Name | Should -Contain 'docs-content'
         $profiles.Name | Should -Contain 'wordpress-content'
     }
 
     It 'Can filter built-in crawl profiles by name' {
-        $profile = Get-HtmlCrawlProfile -Name 'evotec-xyz'
+        $profile = Get-HtmlCrawlProfile -Name 'docs-content'
 
         @($profile).Count | Should -Be 1
-        $profile.Name | Should -Be 'evotec-xyz'
+        $profile.Name | Should -Be 'docs-content'
         $profile.ContentMode | Should -Be 'Reader'
         $profile.CompareContentModes | Should -BeTrue
-        $profile.ReaderMinimumWordCount | Should -Be 30
-        $profile.ReaderMinimumScore | Should -Be 40
+        $profile.ReaderMinimumWordCount | Should -Be 35
+        $profile.ReaderMinimumScore | Should -Be 35
     }
 
     It 'Can read custom crawl profiles from JSON' {

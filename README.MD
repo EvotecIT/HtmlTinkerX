@@ -255,9 +255,9 @@ var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCra
     ExcludeIds = { "reader-tools" }
 });
 
-// Reuse a built-in profile for a known site
-var profiled = await HtmlCrawler.CrawlAsync("https://evotec.xyz/", new HtmlCrawlOptions {
-    ProfileName = "evotec-xyz"
+// Reuse a built-in profile for a common site family
+var profiled = await HtmlCrawler.CrawlAsync("https://docs.example.com/", new HtmlCrawlOptions {
+    ProfileName = "docs-content"
 });
 Console.WriteLine(profiled.AppliedProfileName);
 Console.WriteLine(profiled.AppliedProfileReasonCode);
@@ -319,14 +319,14 @@ $reader.Summary.ContentComparisonWinnerPreviewSamples
 # Reader 142w @ article: Hello main article... | Focused 130w @ main: Hello main... | Raw 118w: Menu item Hello...
 # summary/report output also includes one representative preview sample per winning mode
 
-# Reuse a built-in profile for a known site
-$profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
+# Reuse a built-in profile for a common site family
+$profiled = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'docs-content'
 $profiled.AppliedProfileName
 $profiled.AppliedProfileReasonCode
 $profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, ContentComparisonDeltaSummary
-# Available profile names: api-docs-content, docs-content, evotec-xyz, wordpress-content
+# Available profile names: api-docs-content, docs-content, wordpress-content
 # Unknown names fail fast and report the built-in values
-# evotec-xyz also defaults to Reader mode and enables comparison mode so tuning output is available immediately
+# docs-content also defaults to Reader mode and enables comparison mode so tuning output is available immediately
 
 # AutoProfile can also infer the generic WordPress profile from page markers
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
@@ -386,7 +386,7 @@ The crawl reports and per-page manifests now also expose extraction observabilit
 
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
 
-Profiles can also carry tuning defaults. The built-in `evotec-xyz`, `docs-content`, and `api-docs-content` profiles default to `Reader` mode and enable comparison mode automatically, with tuned reader thresholds for their content shapes. Custom profile JSON can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
+Profiles can also carry tuning defaults. The built-in `docs-content` and `api-docs-content` profiles default to `Reader` mode and enable comparison mode automatically, with tuned reader thresholds for their content shapes. Site-specific tuning should live in custom profile JSON loaded through `ProfilePath` / `-ProfilePath`, which can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
 
 The crawl result, summary, page manifests, `pages.jsonl/csv`, and offline `index.html` now also expose why a profile was chosen through `AppliedProfileReasonCode` and `AppliedProfileReason`, so it is easy to tell explicit selection from host matching, WordPress markers, docs markers, and API-doc markers.
 

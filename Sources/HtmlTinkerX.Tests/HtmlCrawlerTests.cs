@@ -59,14 +59,12 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
-    public void HtmlCrawlProfiles_ResolveAndApplyBuiltInProfile() {
-        Uri startUri = new("https://evotec.xyz/");
-        HtmlCrawlProfile? profile = HtmlCrawlProfiles.Resolve(null, startUri, autoProfile: true);
+    public void HtmlCrawlProfiles_ResolveByNameAndApplyBuiltInProfile() {
+        HtmlCrawlProfile? profile = HtmlCrawlProfiles.ResolveByName("docs-content");
 
         Assert.NotNull(profile);
-        Assert.Equal("evotec-xyz", profile!.Name, ignoreCase: true);
+        Assert.Equal("docs-content", profile!.Name, ignoreCase: true);
         Assert.Contains("api-docs-content", HtmlCrawlProfiles.Names);
-        Assert.Contains("evotec-xyz", HtmlCrawlProfiles.Names);
         Assert.Contains("docs-content", HtmlCrawlProfiles.Names);
         Assert.Contains("wordpress-content", HtmlCrawlProfiles.Names);
 
@@ -74,14 +72,12 @@ public class HtmlCrawlerTests {
         HtmlCrawlProfiles.Apply(options, profile);
 
         Assert.Equal("main", options.Selector);
-        Assert.Equal("#main", options.WaitForSelector);
         Assert.Equal(HtmlCrawlContentMode.Reader, options.ContentMode);
         Assert.True(options.CompareContentModes);
-        Assert.Equal(30, options.ReaderMinimumWordCount);
-        Assert.Equal(40, options.ReaderMinimumScore);
-        Assert.Contains(".sharing-popup", options.ExcludeSelectors);
-        Assert.Contains("Load more", options.ClickTexts);
-        Assert.Equal(2, options.InteractionRepeatCount);
+        Assert.Equal(35, options.ReaderMinimumWordCount);
+        Assert.Equal(35, options.ReaderMinimumScore);
+        Assert.Contains(".theme-doc-toc-desktop", options.ExcludeSelectors);
+        Assert.Contains(".feedback-box", options.ExcludeSelectors);
     }
 
     [Fact]
@@ -130,7 +126,7 @@ public class HtmlCrawlerTests {
             }));
 
         Assert.Contains("Unknown crawl profile", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("evotec-xyz", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("docs-content", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("wordpress-content", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -556,7 +552,7 @@ public class HtmlCrawlerTests {
     [Fact]
     public async Task CrawlAsync_Profile_AppliesSelectorExclusionsAndProfileMetadata() {
         Dictionary<string, string> responses = new() {
-            ["/"] = "<html><head><title>Home</title></head><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"
+            ["/"] = "<html><head><title>Home</title></head><body><main><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></main></body></html>"
         };
 
         HttpListener server = StartServer(responses, out string rootUrl);
@@ -564,22 +560,22 @@ public class HtmlCrawlerTests {
             HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
                 MaxDepth = 0,
                 MaxPages = 1,
-                ProfileName = "evotec-xyz"
+                ProfileName = "wordpress-content"
             });
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
-            Assert.Equal("evotec-xyz", result.AppliedProfileName, ignoreCase: true);
+            Assert.Equal("wordpress-content", result.AppliedProfileName, ignoreCase: true);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, result.AppliedProfileReasonCode);
             Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
-            Assert.Equal("evotec-xyz", page.AppliedProfileName, ignoreCase: true);
+            Assert.Equal("wordpress-content", page.AppliedProfileName, ignoreCase: true);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, page.AppliedProfileReasonCode);
-            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
+            Assert.Equal(HtmlCrawlContentMode.Focused, page.ContentModeUsed);
             Assert.Equal(HtmlCrawlRenderReasonCode.StaticRenderDisabled, page.RenderReasonCode);
-            Assert.Equal(3, page.ContentComparisons.Count);
-            Assert.NotNull(page.BestContentComparisonMode);
+            Assert.Empty(page.ContentComparisons);
+            Assert.Null(page.BestContentComparisonMode);
         } finally {
             server.Stop();
             server.Close();

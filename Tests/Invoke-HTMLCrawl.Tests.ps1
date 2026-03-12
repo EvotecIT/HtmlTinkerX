@@ -357,24 +357,24 @@ public sealed class PesterTestHttpServer : IDisposable {
 
     It 'Can apply a built-in crawl profile' {
         $server = Start-TestHttpServer -Responses @{
-            '/' = "<html><body><div id='main'><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></div></body></html>"
+            '/' = "<html><body><main><h1>Hello</h1><p>World</p><div class='sharing-popup'>Share</div><div class='wpml-ls-statics-footer'>Polish</div></main></body></html>"
         }
 
         try {
             $prefix = $server.Prefix
-            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Profile 'evotec-xyz'
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Profile 'wordpress-content'
             $page = $result.Pages | Select-Object -First 1
 
-            $result.AppliedProfileName | Should -Be 'evotec-xyz'
+            $result.AppliedProfileName | Should -Be 'wordpress-content'
             $result.AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
             $page.Html | Should -Match 'Hello'
             $page.Text | Should -Match 'World'
             $page.Html | Should -Not -Match 'Share'
             $page.Text | Should -Not -Match 'Polish'
             $page.AppliedProfileReasonCode | Should -Be 'ExplicitProfileName'
-            $page.ContentModeUsed | Should -Be 'Reader'
-            $page.ContentComparisons.Count | Should -Be 3
-            $page.BestContentComparisonMode | Should -Not -BeNullOrEmpty
+            $page.ContentModeUsed | Should -Be 'Focused'
+            $page.ContentComparisons.Count | Should -Be 0
+            $page.BestContentComparisonMode | Should -BeNullOrEmpty
         } finally {
             Stop-TestHttpServer $server
         }
@@ -492,7 +492,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             Invoke-HTMLCrawl -Url 'https://example.com/' -Profile 'missing-profile'
         } | Should -Throw -PassThru
 
-        $thrown.Exception.Message | Should -Match 'evotec-xyz'
+        $thrown.Exception.Message | Should -Match 'docs-content'
         $thrown.Exception.Message | Should -Match 'wordpress-content'
     }
 
