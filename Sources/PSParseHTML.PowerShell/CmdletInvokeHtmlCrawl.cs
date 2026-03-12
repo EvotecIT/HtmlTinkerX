@@ -117,6 +117,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter AutoProfile { get; set; }
 
+    /// <summary>Intent-focused scenario that applies product-style defaults before profiles and explicit options refine them.</summary>
+    [Parameter]
+    public HtmlCrawlScenario Scenario { get; set; } = HtmlCrawlScenario.Custom;
+
     /// <summary>Optional CSS selector used to focus extracted content.</summary>
     [Parameter]
     public string? Selector { get; set; }
@@ -371,6 +375,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             ProfileName = Profile,
             ProfilePath = ProfilePath?.ToFullPath(),
             AutoProfile = AutoProfile.IsPresent,
+            Scenario = Scenario,
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,

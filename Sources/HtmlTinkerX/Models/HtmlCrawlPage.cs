@@ -82,6 +82,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Categorizes why the selected render mode was used for this page.</summary>
     public HtmlCrawlRenderReasonCode RenderReasonCode { get; set; }
 
+    /// <summary>Intent-focused scenario that was active when this page was processed.</summary>
+    public HtmlCrawlScenario AppliedScenario { get; set; }
+
     /// <summary>Name of the crawl profile that was active when this page was processed, when one was used.</summary>
     public string? AppliedProfileName { get; set; }
 

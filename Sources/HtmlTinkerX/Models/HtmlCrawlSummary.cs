@@ -15,6 +15,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
     public string? AppliedProfileName { get; set; }
 
+    /// <summary>Intent-focused scenario that was applied to the crawl before profiles and explicit options refined it.</summary>
+    public HtmlCrawlScenario AppliedScenario { get; set; }
+
     /// <summary>Categorizes why the applied crawl profile was selected.</summary>
     public HtmlCrawlProfileSelectionReasonCode AppliedProfileReasonCode { get; set; }
 
@@ -130,6 +133,7 @@ public sealed class HtmlCrawlSummary {
         var summary = new HtmlCrawlSummary {
             StartUrl = result.StartUrl,
             AppliedProfileName = result.AppliedProfileName,
+            AppliedScenario = result.AppliedScenario,
             AppliedProfileReasonCode = result.AppliedProfileReasonCode,
             AppliedProfileReason = result.AppliedProfileReason,
             PageCount = result.Pages.Count,
@@ -219,6 +223,9 @@ public sealed class HtmlCrawlSummary {
         StringBuilder report = new();
         report.AppendLine("=== HTML Crawl Summary ===");
         report.AppendLine($"Start URL: {StartUrl}");
+        if (AppliedScenario != HtmlCrawlScenario.Custom) {
+            report.AppendLine($"Scenario: {AppliedScenario}");
+        }
         if (!string.IsNullOrWhiteSpace(AppliedProfileName)) {
             report.AppendLine($"Profile: {AppliedProfileName}");
             if (AppliedProfileReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {

@@ -255,6 +255,13 @@ var clean = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCra
     ExcludeIds = { "reader-tools" }
 });
 
+// Start from an intent-focused scenario instead of hand-tuning many knobs
+var docsScenario = await HtmlCrawler.CrawlAsync("https://docs.example.com/", new HtmlCrawlOptions {
+    Scenario = HtmlCrawlScenario.Docs
+});
+Console.WriteLine(docsScenario.AppliedScenario);
+Console.WriteLine(docsScenario.Pages[0].ContentModeUsed);
+
 // Reuse a built-in profile for a common site family
 var profiled = await HtmlCrawler.CrawlAsync("https://docs.example.com/", new HtmlCrawlOptions {
     ProfileName = "docs-content"
@@ -304,6 +311,11 @@ $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
 # Remove noisy blocks by class or id, and keep smart cleanup enabled by default
 $clean = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -ExcludeClass 'promo-box', 'doc-tools' -ExcludeId 'reader-tools'
 # Use -DisableSmartContentCleanup if you want the raw selected content without heuristic pruning
+
+# Start from an intent-focused scenario instead of hand-tuning many knobs
+$docsScenario = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Scenario Docs
+$docsScenario.AppliedScenario
+$docsScenario.Pages[0] | Select-Object ContentModeUsed, ContentSelectionReasonCode
 
 # Choose how content is selected before cleanup
 $raw = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector '#main' -ContentMode Raw
@@ -383,6 +395,12 @@ Persisted crawl artifacts now include:
 - `summary.json` and `summary.txt` for machine-readable and human-readable crawl reports
 
 The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
+
+If you want a simpler product-style starting point, use `Scenario` in C# or `-Scenario` in PowerShell. Scenarios apply high-level defaults first, then built-in profiles, auto-profile detection, and explicit options can refine them. For example:
+- `Content` prefers clean readable extraction and canonical/deduplicated pages.
+- `Archive` favors offline browsing by turning on asset download and disabling aggressive cleanup.
+- `Docs` applies article-first documentation defaults and docs-chrome cleanup.
+- `Dataset` enables reader-style extraction plus comparison diagnostics and deduplication for downstream pipelines.
 
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
 
