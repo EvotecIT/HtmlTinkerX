@@ -37,6 +37,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Render { get; set; }
 
+    /// <summary>Try static fetch first and fall back to Playwright when the page looks like a thin JavaScript shell.</summary>
+    [Parameter]
+    public SwitchParameter AutoRender { get; set; }
+
     /// <summary>Allow links outside the starting host.</summary>
     [Parameter]
     public SwitchParameter IncludeExternal { get; set; }
@@ -105,6 +109,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? Selector { get; set; }
 
+    /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
+    [Parameter]
+    public string[] ExcludeSelector { get; set; } = System.Array.Empty<string>();
+
     /// <summary>Optional selector to wait for on rendered pages.</summary>
     [Parameter]
     public string? WaitForSelector { get; set; }
@@ -113,6 +121,25 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int WaitAfterLoadMs { get; set; }
+
+    /// <summary>Scroll rendered pages before extraction to trigger lazy-loaded content.</summary>
+    [Parameter]
+    public SwitchParameter AutoScroll { get; set; }
+
+    /// <summary>Number of incremental scroll steps performed when AutoScroll is enabled.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int AutoScrollSteps { get; set; } = 3;
+
+    /// <summary>Delay after each auto-scroll step in milliseconds.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int AutoScrollDelayMs { get; set; } = 400;
+
+    /// <summary>Minimum extracted word count before static pages are considered rich enough to skip AutoRender fallback.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int AutoRenderTextWordThreshold { get; set; } = 40;
 
     /// <summary>Delay between pages in milliseconds.</summary>
     [Parameter]
@@ -255,6 +282,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
             Render = Render.IsPresent,
+            AutoRender = AutoRender.IsPresent,
             RestrictToHost = !IncludeExternal.IsPresent,
             IncludeSubdomains = IncludeSubdomains.IsPresent,
             PathPrefix = PathPrefix,
@@ -274,8 +302,13 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             Selector = Selector,
+            ExcludeSelectors = new List<string>(ExcludeSelector),
             WaitForSelector = WaitForSelector,
             WaitAfterLoadMs = WaitAfterLoadMs,
+            AutoScroll = AutoScroll.IsPresent,
+            AutoScrollSteps = AutoScrollSteps,
+            AutoScrollDelayMs = AutoScrollDelayMs,
+            AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,
             UserAgent = UserAgent,

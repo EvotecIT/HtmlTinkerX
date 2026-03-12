@@ -208,6 +208,14 @@ var richSnapshot = await HtmlCrawler.CrawlAsync("https://example.com/docs", new 
     OutputPath = "crawl-output"
 });
 // Stored HTML now points at local ../assets/... paths by default
+
+// Hybrid crawl for JavaScript-heavy pages with cleanup of known noisy blocks
+var hybrid = await HtmlCrawler.CrawlAsync("https://example.com/app", new HtmlCrawlOptions {
+    AutoRender = true,
+    WaitForSelector = "#main",
+    AutoScroll = true,
+    ExcludeSelectors = { ".language-switcher", ".share-links", ".related-posts" }
+});
 ```
 
 ### PowerShell Example
@@ -240,6 +248,9 @@ $permissive = Invoke-HTMLCrawl -Url 'https://example.com/docs' -AllowAssetUrls -
 $richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -DownloadAssets -OutPath '.\crawl-output'
 # Stored HTML now points at local ../assets/... paths by default
 # Internal page links are also rewritten to local saved .html files by default
+
+# Hybrid crawl for JavaScript-heavy pages with lazy loading and noisy chrome removal
+$hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
 
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'

@@ -15,6 +15,9 @@ public sealed class HtmlCrawlOptions {
     /// <summary>When true, pages are rendered through Playwright before extraction.</summary>
     public bool Render { get; set; }
 
+    /// <summary>When true, pages are first fetched statically and retried through Playwright when they look like thin JavaScript shells.</summary>
+    public bool AutoRender { get; set; }
+
     /// <summary>Restricts crawling to the starting host.</summary>
     public bool RestrictToHost { get; set; } = true;
 
@@ -72,11 +75,26 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional CSS selector used to extract a focused section from the page.</summary>
     public string? Selector { get; set; }
 
+    /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
+    public IList<string> ExcludeSelectors { get; set; } = new List<string>();
+
     /// <summary>Optional selector that must appear before rendered extraction continues.</summary>
     public string? WaitForSelector { get; set; }
 
     /// <summary>Additional delay after page load in milliseconds.</summary>
     public int WaitAfterLoadMs { get; set; }
+
+    /// <summary>When true, rendered pages are scrolled before extraction to trigger lazy-loaded content.</summary>
+    public bool AutoScroll { get; set; }
+
+    /// <summary>Number of incremental scroll steps to perform when <see cref="AutoScroll"/> is enabled.</summary>
+    public int AutoScrollSteps { get; set; } = 3;
+
+    /// <summary>Delay after each auto-scroll step in milliseconds.</summary>
+    public int AutoScrollDelayMs { get; set; } = 400;
+
+    /// <summary>Minimum extracted word count before static pages are considered rich enough to skip auto-render fallback.</summary>
+    public int AutoRenderTextWordThreshold { get; set; } = 40;
 
     /// <summary>Delay between crawled pages in milliseconds.</summary>
     public int DelayMs { get; set; }
@@ -201,6 +219,7 @@ public sealed class HtmlCrawlOptions {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
             Render = Render,
+            AutoRender = AutoRender,
             RestrictToHost = RestrictToHost,
             IncludeSubdomains = IncludeSubdomains,
             PathPrefix = PathPrefix,
@@ -220,8 +239,13 @@ public sealed class HtmlCrawlOptions {
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             Selector = Selector,
+            ExcludeSelectors = new List<string>(ExcludeSelectors),
             WaitForSelector = WaitForSelector,
             WaitAfterLoadMs = WaitAfterLoadMs,
+            AutoScroll = AutoScroll,
+            AutoScrollSteps = AutoScrollSteps,
+            AutoScrollDelayMs = AutoScrollDelayMs,
+            AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,
             UserAgent = UserAgent,

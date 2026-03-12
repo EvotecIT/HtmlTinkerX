@@ -204,7 +204,7 @@ public static class HtmlCrawler {
             }
 
             using HttpClient client = CreateClient(resolvedOptions);
-            await using HtmlBrowserSession? session = resolvedOptions.Render
+            await using HtmlBrowserSession? session = (resolvedOptions.Render || resolvedOptions.AutoRender)
                 ? await CreateRenderSessionAsync(resolvedOptions, cancellationToken).ConfigureAwait(false)
                 : null;
 
@@ -236,9 +236,15 @@ public static class HtmlCrawler {
                     }
                 }
 
-                HtmlCrawlPage page = resolvedOptions.Render
-                    ? await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false)
-                    : await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                HtmlCrawlPage page;
+                if (resolvedOptions.Render) {
+                    page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                } else {
+                    page = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    if (resolvedOptions.AutoRender && ShouldRetryWithRendering(page, resolvedOptions)) {
+                        page = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    }
+                }
 
                 if (page.Status == HtmlCrawlPageStatus.Skipped) {
                     result.SkippedPages.Add(page);
@@ -308,6 +314,15 @@ public static class HtmlCrawler {
         }
         if (options.WaitAfterLoadMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(options.WaitAfterLoadMs), "WaitAfterLoadMs must be zero or greater.");
+        }
+        if (options.AutoScrollSteps <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.AutoScrollSteps), "AutoScrollSteps must be greater than zero.");
+        }
+        if (options.AutoScrollDelayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.AutoScrollDelayMs), "AutoScrollDelayMs must be zero or greater.");
+        }
+        if (options.AutoRenderTextWordThreshold <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.AutoRenderTextWordThreshold), "AutoRenderTextWordThreshold must be greater than zero.");
         }
         if (!string.IsNullOrEmpty(options.PathPrefix) && !options.PathPrefix!.StartsWith("/", StringComparison.Ordinal)) {
             throw new ArgumentException("PathPrefix must start with '/'.", nameof(options.PathPrefix));
@@ -1423,7 +1438,7 @@ public static class HtmlCrawler {
         return normalized;
     }
 
-    private static int CountWords(string text) {
+    internal static int CountWords(string? text) {
         if (string.IsNullOrWhiteSpace(text)) {
             return 0;
         }
@@ -1930,9 +1945,9 @@ public static class HtmlCrawler {
             page.CanonicalUrl = ExtractCanonicalUrl(html, request.Uri, options);
             page.Links = ExtractLinks(html, request.Uri, options);
             page.AssetUrls = ExtractAssetUrls(html, request.Uri, options);
-            page.Html = options.IncludeHtml ? SelectHtml(html, options.Selector) : string.Empty;
+            page.Html = options.IncludeHtml ? ApplyExcludedSelectors(SelectHtml(html, options.Selector), options.ExcludeSelectors) : string.Empty;
             string textSourceHtml = SelectTextSourceHtml(html, options.Selector, page.Html);
-            page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml)) : string.Empty;
+            page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors)) : string.Empty;
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
@@ -1971,6 +1986,10 @@ public static class HtmlCrawler {
                 await session.Page.WaitForTimeoutAsync(options.WaitAfterLoadMs).ConfigureAwait(false);
             }
 
+            if (options.AutoScroll) {
+                await AutoScrollPageAsync(session.Page, options, cancellationToken).ConfigureAwait(false);
+            }
+
             string fullHtml = await session.Page.ContentAsync().ConfigureAwait(false);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
@@ -1987,11 +2006,11 @@ public static class HtmlCrawler {
             page.Links = ExtractLinks(fullHtml, request.Uri, options);
             page.AssetUrls = ExtractAssetUrls(fullHtml, request.Uri, options);
             page.Html = options.IncludeHtml
-                ? SelectHtml(fullHtml, options.Selector)
+                ? ApplyExcludedSelectors(SelectHtml(fullHtml, options.Selector), options.ExcludeSelectors)
                 : string.Empty;
             string textSourceHtml = SelectTextSourceHtml(fullHtml, options.Selector, page.Html);
             page.Text = options.IncludeText
-                ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml))
+                ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(textSourceHtml, options.ExcludeSelectors))
                 : string.Empty;
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
@@ -2002,6 +2021,66 @@ public static class HtmlCrawler {
 
         return page;
     }
+
+    private static async Task AutoScrollPageAsync(IPage page, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        for (int i = 0; i < options.AutoScrollSteps; i++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
+            if (options.AutoScrollDelayMs > 0) {
+                await page.WaitForTimeoutAsync(options.AutoScrollDelayMs).ConfigureAwait(false);
+            }
+        }
+
+        await page.EvaluateAsync("() => window.scrollTo(0, 0)").ConfigureAwait(false);
+    }
+
+    internal static bool ShouldRetryWithRendering(HtmlCrawlPage page, HtmlCrawlOptions options) {
+        if (page == null) {
+            throw new ArgumentNullException(nameof(page));
+        }
+        if (options == null) {
+            throw new ArgumentNullException(nameof(options));
+        }
+        if (page.Status != HtmlCrawlPageStatus.Success) {
+            return false;
+        }
+
+        bool selectorMissed = !string.IsNullOrWhiteSpace(options.Selector)
+                              && string.IsNullOrWhiteSpace(page.Html)
+                              && string.IsNullOrWhiteSpace(page.Text);
+        if (selectorMissed) {
+            return true;
+        }
+
+        int wordCount = CountWords(page.Text);
+        if (!string.IsNullOrWhiteSpace(options.WaitForSelector) && wordCount < options.AutoRenderTextWordThreshold) {
+            return true;
+        }
+
+        if (wordCount >= options.AutoRenderTextWordThreshold) {
+            return false;
+        }
+
+        string html = page.Html ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(html)) {
+            return true;
+        }
+
+        string normalizedHtml = html.ToLowerInvariant();
+        bool hasShellMarker =
+            normalizedHtml.Contains("id=\"__next\"", StringComparison.Ordinal)
+            || normalizedHtml.Contains("id=\"app\"", StringComparison.Ordinal)
+            || normalizedHtml.Contains("id=\"root\"", StringComparison.Ordinal)
+            || normalizedHtml.Contains("data-reactroot", StringComparison.Ordinal)
+            || normalizedHtml.Contains("ng-version", StringComparison.Ordinal)
+            || normalizedHtml.Contains("window.__next_data__", StringComparison.Ordinal)
+            || normalizedHtml.Contains("type=\"module\"", StringComparison.Ordinal);
+        int scriptCount = Regex.Matches(html, "<script\\b", RegexOptions.IgnoreCase).Count;
+        int headingCount = Regex.Matches(html, "<h[1-6]\\b", RegexOptions.IgnoreCase).Count;
+
+        return hasShellMarker || scriptCount >= 6 || headingCount == 0;
+    }
+
 
     private static bool IsAllowedPageContent(string? contentType, string content, HtmlCrawlOptions options) {
         if (!options.RestrictToAllowedContentTypes) {
@@ -2220,7 +2299,7 @@ public static class HtmlCrawler {
         return false;
     }
 
-    private static string PrepareHtmlForTextExtraction(string html) {
+    private static string PrepareHtmlForTextExtraction(string html, IEnumerable<string>? excludeSelectors = null) {
         if (string.IsNullOrWhiteSpace(html)) {
             return html;
         }
@@ -2228,6 +2307,7 @@ public static class HtmlCrawler {
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
             StripBoilerplateElements(document);
+            RemoveMatchingSelectors(document, excludeSelectors);
             return document.DocumentElement?.OuterHtml ?? html;
         }
 
@@ -2238,6 +2318,38 @@ public static class HtmlCrawler {
         }
 
         StripBoilerplateElements(wrapper);
+        RemoveMatchingSelectors(wrapper, excludeSelectors);
+        return wrapper.InnerHtml;
+    }
+
+    private static string ApplyExcludedSelectors(string html, IEnumerable<string>? excludeSelectors) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return html;
+        }
+
+        string[] selectors = excludeSelectors?
+            .Where(selector => !string.IsNullOrWhiteSpace(selector))
+            .Select(selector => selector.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? Array.Empty<string>();
+        if (selectors.Length == 0) {
+            return html;
+        }
+
+        if (LooksLikeFullHtmlDocument(html)) {
+            IDocument document = HtmlParser.ParseWithAngleSharp(html);
+            RemoveMatchingSelectors(document, selectors);
+            return document.DocumentElement?.OuterHtml ?? html;
+        }
+
+        IDocument fragment = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_exclude\">{html}</div>");
+        IElement? wrapper = fragment.QuerySelector("#__htmltinkerx_exclude");
+        if (wrapper == null) {
+            return html;
+        }
+
+        RemoveMatchingSelectors(wrapper, selectors);
         return wrapper.InnerHtml;
     }
 
@@ -2249,6 +2361,18 @@ public static class HtmlCrawler {
 
         foreach (IElement element in container.QuerySelectorAll("*").Where(ShouldRemoveBoilerplateElement).ToArray()) {
             element.Remove();
+        }
+    }
+
+    private static void RemoveMatchingSelectors(IParentNode container, IEnumerable<string>? selectors) {
+        if (selectors == null) {
+            return;
+        }
+
+        foreach (string selector in selectors.Where(selector => !string.IsNullOrWhiteSpace(selector)).Select(selector => selector.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            foreach (IElement element in container.QuerySelectorAll(selector).ToArray()) {
+                element.Remove();
+            }
         }
     }
 

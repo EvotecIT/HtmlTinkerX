@@ -34,6 +34,7 @@ public class HtmlCrawlerTests {
         Assert.Equal("proxy-secret", options.ProxyPassword);
         Assert.Equal("one", options.Headers["X-Test"]);
         Assert.Single(options.IncludePatterns);
+        Assert.Empty(options.ExcludeSelectors);
         Assert.Null(clone.Password);
         Assert.Null(clone.ProxyPassword);
         Assert.Equal("two", clone.Headers["X-Test"]);
@@ -180,6 +181,64 @@ public class HtmlCrawlerTests {
             server.Stop();
             server.Close();
         }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ExcludeSelectors_RemoveConfiguredNoiseFromStoredContentAndText() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><main><h1>Hello</h1><p>World</p><div class='blog-grid'><a href='/post'>Read More</a></div><div class='language-switcher'>Polish</div></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                ExcludeSelectors = { ".blog-grid", ".language-switcher" }
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("Hello", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Read More", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Read More", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public void ShouldRetryWithRendering_DetectsThinJavascriptShells() {
+        HtmlCrawlPage page = new() {
+            Status = HtmlCrawlPageStatus.Success,
+            Html = "<html><body><div id='app'></div><script src='/runtime.js'></script><script src='/main.js'></script><script src='/vendor.js'></script><script src='/chunk-a.js'></script><script src='/chunk-b.js'></script><script src='/chunk-c.js'></script></body></html>",
+            Text = string.Empty
+        };
+
+        HtmlCrawlOptions options = new() {
+            AutoRenderTextWordThreshold = 20
+        };
+
+        Assert.True(HtmlCrawler.ShouldRetryWithRendering(page, options));
+    }
+
+    [Fact]
+    public void ShouldRetryWithRendering_KeepsRichStaticPagesStatic() {
+        HtmlCrawlPage page = new() {
+            Status = HtmlCrawlPageStatus.Success,
+            Html = "<html><body><main><h1>Hello</h1><p>This page already contains enough static content to avoid a browser fallback.</p></main></body></html>",
+            Text = "Hello This page already contains enough static content to avoid a browser fallback."
+        };
+
+        HtmlCrawlOptions options = new() {
+            AutoRenderTextWordThreshold = 8
+        };
+
+        Assert.False(HtmlCrawler.ShouldRetryWithRendering(page, options));
     }
 
     [Fact]

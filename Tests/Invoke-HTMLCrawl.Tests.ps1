@@ -198,6 +198,27 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Can exclude configured selectors from stored content and text' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body><main><h1>Hello</h1><p>World</p><div class='blog-grid'>Read More</div><div class='language-switcher'>Polish</div></main></body></html>"
+        }
+
+        try {
+            $prefix = $server.Prefix
+            $result = Invoke-HTMLCrawl -Url $prefix -MaxDepth 0 -MaxPages 1 -Selector 'main' -ExcludeSelector '.blog-grid', '.language-switcher'
+            $page = $result.Pages | Select-Object -First 1
+
+            $page.Html | Should -Match 'Hello'
+            $page.Text | Should -Match 'World'
+            $page.Html | Should -Not -Match 'Read More'
+            $page.Text | Should -Not -Match 'Read More'
+            $page.Html | Should -Not -Match 'Polish'
+            $page.Text | Should -Not -Match 'Polish'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Persists and resumes a crawl from disk' {
         $outputPath = Join-Path $TestDrive 'crawl-artifacts'
         $prefix = New-TestServerPrefix
