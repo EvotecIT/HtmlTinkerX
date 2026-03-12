@@ -279,6 +279,7 @@ public class HtmlCrawlerTests {
                     RenderMode = HtmlCrawlRenderMode.Static,
                     RenderReasonCode = HtmlCrawlRenderReasonCode.StaticRenderDisabled,
                     RenderReason = "Kept static because browser rendering was not enabled.",
+                    AppliedInteractions = { "Dismissed text: Accept" },
                     Text = "Hello world",
                     Started = DateTimeOffset.UtcNow.AddSeconds(-2),
                     Finished = DateTimeOffset.UtcNow.AddSeconds(-1)
@@ -290,6 +291,7 @@ public class HtmlCrawlerTests {
                     RenderMode = HtmlCrawlRenderMode.AutoRendered,
                     RenderReasonCode = HtmlCrawlRenderReasonCode.AutoRenderJavaScriptShell,
                     RenderReason = "Auto-render triggered because the static HTML looked like a JavaScript shell container.",
+                    AppliedInteractions = { "Clicked text [1]: Load more", "Clicked text [2]: Load more" },
                     Text = "Rendered content",
                     Started = DateTimeOffset.UtcNow.AddSeconds(-1),
                     Finished = DateTimeOffset.UtcNow
@@ -304,10 +306,16 @@ public class HtmlCrawlerTests {
         Assert.Equal(1, summary.RenderReasonCounts["StaticRenderDisabled"]);
         Assert.Equal(1, summary.RenderReasonCounts["AutoRenderJavaScriptShell"]);
         Assert.Equal(1, summary.AutoRenderedPageCount);
+        Assert.Equal(2, summary.InteractedPageCount);
+        Assert.Equal(3, summary.InteractionCount);
+        Assert.Equal(1, summary.InteractionCounts["Dismissed text: Accept"]);
+        Assert.Equal(1, summary.InteractionCounts["Clicked text [1]: Load more"]);
         string report = summary.ToReportText(result.SitemapUrls);
         Assert.Contains("Render summary:", report, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Render mode AutoRendered: 1", report, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Render reason AutoRenderJavaScriptShell: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Interaction summary:", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Applied interactions: 3", report, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

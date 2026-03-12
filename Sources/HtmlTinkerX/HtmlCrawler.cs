@@ -1576,6 +1576,7 @@ public static class HtmlCrawler {
         AppendStatCard(builder, "Skipped Assets", summary.SkippedAssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Assets", summary.AssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Chunks", summary.ChunkCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "Interactions", summary.InteractionCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Graph Edges", summary.GraphEdgeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "External Nodes", summary.GraphExternalNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Links", summary.TotalDiscoveredLinks.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -1627,6 +1628,27 @@ public static class HtmlCrawler {
             }
             foreach (var item in summary.RenderReasonCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 builder.Append("      <li>Render reason <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            builder.AppendLine("    </ul>");
+            builder.AppendLine("  </section>");
+        }
+
+        if (summary.InteractionCounts.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Interaction Summary</h2>");
+            builder.AppendLine("    <ul>");
+            builder.Append("      <li>Pages with interactions: ")
+                .Append(HtmlEncode(summary.InteractedPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                .AppendLine("</li>");
+            builder.Append("      <li>Applied interactions: ")
+                .Append(HtmlEncode(summary.InteractionCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                .AppendLine("</li>");
+            foreach (var item in summary.InteractionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li><code>")
                     .Append(HtmlEncode(item.Key))
                     .Append("</code>: ")
                     .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))

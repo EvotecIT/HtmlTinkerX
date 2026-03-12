@@ -72,6 +72,15 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Counts of fetched pages by render-reason category.</summary>
     public IDictionary<string, int> RenderReasonCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Number of fetched pages where one or more rendered interactions were applied.</summary>
+    public int InteractedPageCount { get; set; }
+
+    /// <summary>Total number of rendered interactions applied across fetched pages.</summary>
+    public int InteractionCount { get; set; }
+
+    /// <summary>Counts of applied rendered interactions by label.</summary>
+    public IDictionary<string, int> InteractionCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Counts of graph nodes by category.</summary>
     public IDictionary<string, int> GraphNodeCategories { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -120,11 +129,16 @@ public sealed class HtmlCrawlSummary {
         summary.GraphFetchedNodeCount = result.GraphFetchedNodeCount;
         summary.GraphSkippedNodeCount = result.GraphSkippedNodeCount;
         summary.GraphExternalNodeCount = result.GraphExternalNodeCount;
+        summary.InteractedPageCount = result.Pages.Count(page => page.AppliedInteractions.Count > 0);
+        summary.InteractionCount = result.Pages.Sum(page => page.AppliedInteractions.Count);
         foreach (var group in result.Pages.GroupBy(page => page.RenderMode.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.RenderModeCounts[group.Key] = group.Count();
         }
         foreach (var group in result.Pages.GroupBy(page => page.RenderReasonCode.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.RenderReasonCounts[group.Key] = group.Count();
+        }
+        foreach (var group in result.Pages.SelectMany(page => page.AppliedInteractions).GroupBy(item => item, StringComparer.OrdinalIgnoreCase)) {
+            summary.InteractionCounts[group.Key] = group.Count();
         }
         foreach (var item in result.GraphNodeCategories) {
             summary.GraphNodeCategories[item.Key] = item.Value;
@@ -173,6 +187,8 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Skipped graph nodes: {GraphSkippedNodeCount}");
         report.AppendLine($"External graph nodes: {GraphExternalNodeCount}");
         report.AppendLine($"Discovered links: {TotalDiscoveredLinks}");
+        report.AppendLine($"Pages with interactions: {InteractedPageCount}");
+        report.AppendLine($"Applied interactions: {InteractionCount}");
         report.AppendLine($"Duration: {DurationMs} ms");
 
         if (RenderModeCounts.Count > 0 || RenderReasonCounts.Count > 0) {
@@ -183,6 +199,14 @@ public sealed class HtmlCrawlSummary {
             }
             foreach (var item in RenderReasonCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 report.AppendLine($"- Render reason {item.Key}: {item.Value}");
+            }
+        }
+
+        if (InteractionCounts.Count > 0) {
+            report.AppendLine();
+            report.AppendLine("Interaction summary:");
+            foreach (var item in InteractionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- {item.Key}: {item.Value}");
             }
         }
 

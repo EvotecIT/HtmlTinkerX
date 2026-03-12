@@ -261,6 +261,7 @@ $richSnapshot = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -Do
 $hybrid = Invoke-HTMLCrawl -Url 'https://example.com/app' -AutoRender -WaitForSelector '#main' -DismissSelector '.cookie-banner button', '#consent-accept' -DismissText 'Accept', 'I agree' -ClickSelector '.load-more', '.expand-details' -ClickText 'Load more', 'Show more' -InteractionRepeatCount 2 -AutoScroll -ExcludeSelector '.language-switcher', '.share-links', '.related-posts'
 $hybrid.Pages | Select-Object Url, RenderMode, RenderReason, AppliedInteractions
 $hybrid.Summary.ToReportText($hybrid.SitemapUrls)
+# summary now includes interaction totals and per-interaction counts
 
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
