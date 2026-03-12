@@ -283,6 +283,10 @@ $wordpress.AppliedProfileName
 $custom = Invoke-HTMLCrawl -Url 'https://docs.example.com/' -Profile 'custom-docs' -ProfilePath '.\crawl-profiles.json'
 $custom.AppliedProfileName
 
+# Inspect built-in or custom profiles
+Get-HtmlCrawlProfile
+Get-HtmlCrawlProfile -Path '.\crawl-profiles.json' -Name 'custom-docs'
+
 # Resume a previous crawl snapshot
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
