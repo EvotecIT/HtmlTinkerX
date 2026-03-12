@@ -73,9 +73,10 @@ public class HtmlCrawlerTests {
 
         Assert.Equal("main", options.Selector);
         Assert.Equal("#main", options.WaitForSelector);
+        Assert.Equal(HtmlCrawlContentMode.Reader, options.ContentMode);
         Assert.True(options.CompareContentModes);
-        Assert.Equal(20, options.ReaderMinimumWordCount);
-        Assert.Equal(25, options.ReaderMinimumScore);
+        Assert.Equal(30, options.ReaderMinimumWordCount);
+        Assert.Equal(40, options.ReaderMinimumScore);
         Assert.Contains(".sharing-popup", options.ExcludeSelectors);
         Assert.Contains("Load more", options.ClickTexts);
         Assert.Equal(2, options.InteractionRepeatCount);
@@ -570,6 +571,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("World", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
             Assert.Equal(HtmlCrawlRenderReasonCode.StaticRenderDisabled, page.RenderReasonCode);
             Assert.Equal(3, page.ContentComparisons.Count);
             Assert.NotNull(page.BestContentComparisonMode);

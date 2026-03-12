@@ -321,10 +321,10 @@ $reader.Summary.ContentComparisonWinnerPreviewSamples
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
 $profiled.AppliedProfileName
-$profiled.Pages[0] | Select-Object BestContentComparisonMode, ContentComparisonDeltaSummary
+$profiled.Pages[0] | Select-Object ContentModeUsed, BestContentComparisonMode, ContentComparisonDeltaSummary
 # Available profile names: evotec-xyz, wordpress-content
 # Unknown names fail fast and report the built-in values
-# evotec-xyz also enables comparison mode by default so tuning output is available immediately
+# evotec-xyz also defaults to Reader mode and enables comparison mode so tuning output is available immediately
 
 # AutoProfile can also infer the generic WordPress profile from page markers
 $wordpress = Invoke-HTMLCrawl -Url 'https://example-blog.com/' -AutoProfile
@@ -372,7 +372,7 @@ The crawl reports and per-page manifests now also expose extraction observabilit
 
 If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. The persisted manifests and offline index now also show the runner-up mode and the word-count delta between them, which makes it much easier to see whether the winning mode was a clear improvement or only a marginal cleanup win.
 
-Profiles can also enable comparison mode automatically. The built-in `evotec-xyz` profile now does this by default, and custom profile JSON can opt in with `"compareContentModes": true`.
+Profiles can also carry tuning defaults. The built-in `evotec-xyz` profile now defaults to `Reader` mode, sets reader thresholds, and enables comparison mode automatically. Custom profile JSON can opt in with `"contentMode": "Reader"`, `"readerMinimumWordCount": 30`, `"readerMinimumScore": 40`, and `"compareContentModes": true`.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

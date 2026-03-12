@@ -13,7 +13,10 @@ Describe 'Get-HtmlCrawlProfile' {
 
         @($profile).Count | Should -Be 1
         $profile.Name | Should -Be 'evotec-xyz'
+        $profile.ContentMode | Should -Be 'Reader'
         $profile.CompareContentModes | Should -BeTrue
+        $profile.ReaderMinimumWordCount | Should -Be 30
+        $profile.ReaderMinimumScore | Should -Be 40
     }
 
     It 'Can read custom crawl profiles from JSON' {

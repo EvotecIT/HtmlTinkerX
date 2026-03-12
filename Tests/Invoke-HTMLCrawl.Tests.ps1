@@ -370,6 +370,7 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page.Text | Should -Match 'World'
             $page.Html | Should -Not -Match 'Share'
             $page.Text | Should -Not -Match 'Polish'
+            $page.ContentModeUsed | Should -Be 'Reader'
             $page.ContentComparisons.Count | Should -Be 3
             $page.BestContentComparisonMode | Should -Not -BeNullOrEmpty
         } finally {

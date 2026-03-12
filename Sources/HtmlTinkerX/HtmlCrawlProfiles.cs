@@ -54,7 +54,10 @@ public static class HtmlCrawlProfiles {
                 "www.evotec.xyz"
             },
             Selector = "main",
+            ContentMode = HtmlCrawlContentMode.Reader,
             CompareContentModes = true,
+            ReaderMinimumWordCount = 30,
+            ReaderMinimumScore = 40,
             WaitForSelector = "#main",
             ExcludeSelectors = {
                 ".wpml-ls",
