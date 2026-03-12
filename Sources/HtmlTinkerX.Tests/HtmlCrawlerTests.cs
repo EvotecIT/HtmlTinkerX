@@ -223,6 +223,9 @@ public class HtmlCrawlerTests {
             AutoRenderTextWordThreshold = 20
         };
 
+        HtmlCrawler.AutoRenderDecision decision = HtmlCrawler.EvaluateAutoRender(page, options);
+        Assert.True(decision.ShouldRender);
+        Assert.Contains("JavaScript shell", decision.Reason, StringComparison.OrdinalIgnoreCase);
         Assert.True(HtmlCrawler.ShouldRetryWithRendering(page, options));
     }
 
@@ -238,6 +241,9 @@ public class HtmlCrawlerTests {
             AutoRenderTextWordThreshold = 8
         };
 
+        HtmlCrawler.AutoRenderDecision decision = HtmlCrawler.EvaluateAutoRender(page, options);
+        Assert.False(decision.ShouldRender);
+        Assert.Contains("meeting", decision.Reason, StringComparison.OrdinalIgnoreCase);
         Assert.False(HtmlCrawler.ShouldRetryWithRendering(page, options));
     }
 

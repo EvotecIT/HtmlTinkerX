@@ -24,6 +24,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Number of rendered pages.</summary>
     public int RenderedPageCount { get; set; }
 
+    /// <summary>Number of pages rendered only after auto-render fallback heuristics triggered.</summary>
+    public int AutoRenderedPageCount { get; set; }
+
     /// <summary>Number of skipped candidates.</summary>
     public int SkippedPageCount { get; set; }
 
@@ -91,6 +94,7 @@ public sealed class HtmlCrawlSummary {
             SuccessfulPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Success),
             FailedPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Failed),
             RenderedPageCount = result.Pages.Count(page => page.Rendered),
+            AutoRenderedPageCount = result.Pages.Count(page => page.RenderMode == HtmlCrawlRenderMode.AutoRendered),
             SkippedPageCount = result.SkippedPages.Count,
             SkippedContentPageCount = result.SkippedPages.Count(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath),
             SkippedAssetCount = result.SkippedPages.Count(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath),
@@ -142,6 +146,7 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Successful pages: {SuccessfulPageCount}");
         report.AppendLine($"Failed pages: {FailedPageCount}");
         report.AppendLine($"Rendered pages: {RenderedPageCount}");
+        report.AppendLine($"Auto-rendered pages: {AutoRenderedPageCount}");
         report.AppendLine($"Skipped candidates: {SkippedPageCount}");
         report.AppendLine($"Skipped page candidates: {SkippedContentPageCount}");
         report.AppendLine($"Skipped asset candidates: {SkippedAssetCount}");

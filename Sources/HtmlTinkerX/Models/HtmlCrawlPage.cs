@@ -70,6 +70,12 @@ public sealed class HtmlCrawlPage {
     /// <summary>Indicates whether the page was rendered in a browser.</summary>
     public bool Rendered { get; set; }
 
+    /// <summary>Describes whether the page stayed static, was rendered directly, or was auto-rendered after a static pass.</summary>
+    public HtmlCrawlRenderMode RenderMode { get; set; } = HtmlCrawlRenderMode.Static;
+
+    /// <summary>Explains why the selected render mode was used for this page.</summary>
+    public string? RenderReason { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 
