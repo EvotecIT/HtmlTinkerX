@@ -306,6 +306,7 @@ $focused = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -Co
 $reader = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ContentMode Reader -CompareContentModes -ReaderMinimumWordCount 30 -ReaderMinimumScore 40
 $reader.Pages | Select-Object Url, ContentModeUsed, ContentSelectionReasonCode, ContentElementSelectorHint, ContentSelectionScore, ReaderCandidateCount, ReaderRootElementSelectorHint
 $reader.Pages[0].ContentComparisons | Select-Object Mode, ReasonCode, ElementSelectorHint, WordCount, Summary
+$reader.Pages[0] | Select-Object BestContentComparisonMode, BestContentComparisonReasonCode, BestContentComparisonWordCount
 
 # Reuse a built-in profile for a known site
 $profiled = Invoke-HTMLCrawl -Url 'https://evotec.xyz/' -Profile 'evotec-xyz'
@@ -357,7 +358,7 @@ Persisted crawl artifacts now include:
 
 The crawl reports and per-page manifests now also expose extraction observability data, so you can tell whether a page used `Raw`, `Focused`, or `Reader` mode, whether it matched an exact selector or fell back to semantic/full-document selection, which element was ultimately used, and in reader mode what score/candidate count led to that decision.
 
-If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction. That is useful when tuning selectors, cleanup rules, or reader thresholds for a specific site family without running three separate crawls.
+If you enable `CompareContentModes` in C# or `-CompareContentModes` in PowerShell, each page also gets a compact side-by-side comparison for `Raw`, `Focused`, and `Reader` extraction, plus a computed best mode winner based on extracted text size with a slight preference for cleaner modes when the results are close. That is useful when tuning selectors, cleanup rules, or reader thresholds for a specific site family without running three separate crawls.
 
 By default the crawler also normalizes away common tracking query parameters such as `utm_*`, `fbclid`, and `gclid` so the dataset does not fill up with duplicate tracked URLs. Use `IgnoreTrackingQueryParameters = false` in C# or `-KeepTrackingQueryParameters` in PowerShell to opt out.
 

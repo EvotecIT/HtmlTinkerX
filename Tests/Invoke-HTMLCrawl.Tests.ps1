@@ -310,12 +310,16 @@ public sealed class PesterTestHttpServer : IDisposable {
             $manifest = Get-Content $page.ManifestPath -Raw | ConvertFrom-Json
 
             $page.ContentComparisons.Count | Should -Be 3
+            $result.Summary.ContentComparisonWinnerCounts['Reader'] | Should -Be 1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Raw' }).Count | Should -Be 1
             ($page.ContentComparisons | Where-Object { $_.Mode -eq 'Focused' }).Count | Should -Be 1
             $reader = $page.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' } | Select-Object -First 1
             $reader.ReasonCode | Should -Be 'ReaderBestCandidate'
             $reader.ElementSelectorHint | Should -Be 'article'
             $reader.WordCount | Should -BeGreaterThan 10
+            $manifest.BestContentComparison.BestContentComparisonMode | Should -Be 'Reader'
+            $manifest.BestContentComparison.BestContentComparisonReasonCode | Should -Be 'ReaderBestCandidate'
+            $manifest.BestContentComparison.BestContentComparisonWordCount | Should -BeGreaterThan 10
             $manifest.ContentComparisons.Count | Should -Be 3
             (($manifest.ContentComparisons | Where-Object { $_.Mode -eq 'Reader' }).ReasonCode) | Should -Be 'ReaderBestCandidate'
         } finally {

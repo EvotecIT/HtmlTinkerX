@@ -81,6 +81,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Counts of successful pages by content-selection reason category.</summary>
     public IDictionary<string, int> ContentSelectionCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Counts of pages by the strongest extraction mode chosen from content comparisons.</summary>
+    public IDictionary<string, int> ContentComparisonWinnerCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Number of fetched pages where one or more rendered interactions were applied.</summary>
     public int InteractedPageCount { get; set; }
 
@@ -153,6 +156,11 @@ public sealed class HtmlCrawlSummary {
         foreach (var group in result.Pages.Where(page => page.Status == HtmlCrawlPageStatus.Success).GroupBy(page => page.ContentSelectionReasonCode.ToString(), StringComparer.OrdinalIgnoreCase)) {
             summary.ContentSelectionCounts[group.Key] = group.Count();
         }
+        foreach (var group in result.Pages
+            .Where(page => page.Status == HtmlCrawlPageStatus.Success && page.BestContentComparisonMode.HasValue)
+            .GroupBy(page => page.BestContentComparisonMode!.Value.ToString(), StringComparer.OrdinalIgnoreCase)) {
+            summary.ContentComparisonWinnerCounts[group.Key] = group.Count();
+        }
         foreach (var group in result.Pages.SelectMany(page => page.AppliedInteractions).GroupBy(item => item, StringComparer.OrdinalIgnoreCase)) {
             summary.InteractionCounts[group.Key] = group.Count();
         }
@@ -221,7 +229,7 @@ public sealed class HtmlCrawlSummary {
             }
         }
 
-        if (ContentModeCounts.Count > 0 || ContentSelectionCounts.Count > 0) {
+        if (ContentModeCounts.Count > 0 || ContentSelectionCounts.Count > 0 || ContentComparisonWinnerCounts.Count > 0) {
             report.AppendLine();
             report.AppendLine("Content summary:");
             foreach (var item in ContentModeCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
@@ -229,6 +237,9 @@ public sealed class HtmlCrawlSummary {
             }
             foreach (var item in ContentSelectionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 report.AppendLine($"- Content selection {item.Key}: {item.Value}");
+            }
+            foreach (var item in ContentComparisonWinnerCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Best comparison mode {item.Key}: {item.Value}");
             }
         }
 

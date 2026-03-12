@@ -115,6 +115,15 @@ public sealed class HtmlCrawlPage {
     /// <summary>Optional side-by-side extraction diagnostics for raw, focused, and reader modes.</summary>
     public IList<HtmlCrawlContentComparison> ContentComparisons { get; set; } = new List<HtmlCrawlContentComparison>();
 
+    /// <summary>Best extraction mode from <see cref="ContentComparisons"/> when comparison mode is enabled.</summary>
+    public HtmlCrawlContentMode? BestContentComparisonMode { get; set; }
+
+    /// <summary>Selection category of the best extraction mode from <see cref="ContentComparisons"/> when comparison mode is enabled.</summary>
+    public HtmlCrawlContentSelectionReasonCode? BestContentComparisonReasonCode { get; set; }
+
+    /// <summary>Word count of the best extraction mode from <see cref="ContentComparisons"/> when comparison mode is enabled.</summary>
+    public int? BestContentComparisonWordCount { get; set; }
+
     /// <summary>Timestamp when fetching started.</summary>
     public DateTimeOffset Started { get; set; }
 
