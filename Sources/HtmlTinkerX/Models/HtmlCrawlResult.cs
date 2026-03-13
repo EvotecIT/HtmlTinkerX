@@ -35,6 +35,9 @@ public sealed class HtmlCrawlResult {
     /// <summary>Name of the crawl profile that was applied, when one was used.</summary>
     public string? AppliedProfileName { get; set; }
 
+    /// <summary>Intent-focused scenario that was applied to the crawl before profiles and explicit options refined it.</summary>
+    public HtmlCrawlScenario AppliedScenario { get; set; }
+
     /// <summary>Categorizes why the applied crawl profile was selected.</summary>
     public HtmlCrawlProfileSelectionReasonCode AppliedProfileReasonCode { get; set; }
 

@@ -75,6 +75,9 @@ public sealed class HtmlCrawlOptions {
     /// <summary>When true, applies a built-in profile automatically when the start host matches one.</summary>
     public bool AutoProfile { get; set; }
 
+    /// <summary>Optional intent-focused scenario that applies product-style defaults before profiles and explicit options refine them.</summary>
+    public HtmlCrawlScenario Scenario { get; set; } = HtmlCrawlScenario.Custom;
+
     /// <summary>Stores the fetched HTML in the result.</summary>
     public bool IncludeHtml { get; set; } = true;
 
@@ -287,6 +290,7 @@ public sealed class HtmlCrawlOptions {
             ProfileName = ProfileName,
             ProfilePath = ProfilePath,
             AutoProfile = AutoProfile,
+            Scenario = Scenario,
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             Selector = Selector,

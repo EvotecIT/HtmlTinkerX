@@ -81,6 +81,22 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
+    public void HtmlCrawlScenarios_ApplyArchiveAndDocsScenarios_UseIntentDefaults() {
+        HtmlCrawlOptions archive = new();
+        HtmlCrawlScenarios.Apply(archive, HtmlCrawlScenario.Archive);
+        Assert.True(archive.DownloadAssets);
+        Assert.True(archive.UseCanonicalUrls);
+        Assert.False(archive.SmartContentCleanup);
+
+        HtmlCrawlOptions docs = new();
+        HtmlCrawlScenarios.Apply(docs, HtmlCrawlScenario.Docs);
+        Assert.Equal(HtmlCrawlContentMode.Reader, docs.ContentMode);
+        Assert.True(docs.CompareContentModes);
+        Assert.True(docs.DeduplicatePages);
+        Assert.Contains(".theme-doc-toc-desktop", docs.ExcludeSelectors);
+    }
+
+    [Fact]
     public async Task HtmlCrawlProfiles_LoadFromPathAsync_LoadsCustomProfiles() {
         string path = Path.GetTempFileName();
         try {
@@ -632,6 +648,33 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileDocumentationMarkers, page.AppliedProfileReasonCode);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Scenario_Docs_AppliesScenarioDefaultsAndMetadata() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Docs</title></head><body><main><aside class='sidebar'><a href='/docs/start'>Start</a></aside><article><h1>Install</h1><nav aria-label='Table of contents'>On this page</nav><p>Documentation body with enough words to keep reader mode active and useful for extraction testing.</p></article></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Scenario = HtmlCrawlScenario.Docs
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(HtmlCrawlScenario.Docs, result.AppliedScenario);
+            Assert.Equal(HtmlCrawlScenario.Docs, page.AppliedScenario);
+            Assert.Equal(HtmlCrawlContentMode.Reader, page.ContentModeUsed);
+            Assert.Equal(3, page.ContentComparisons.Count);
+            Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
             server.Stop();
             server.Close();

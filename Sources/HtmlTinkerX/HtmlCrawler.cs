@@ -213,6 +213,7 @@ public static class HtmlCrawler {
         }
 
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
+        HtmlCrawlScenarios.Apply(resolvedOptions, resolvedOptions.Scenario);
         IReadOnlyList<HtmlCrawlProfile> customProfiles = string.IsNullOrWhiteSpace(resolvedOptions.ProfilePath)
             ? Array.Empty<HtmlCrawlProfile>()
             : await HtmlCrawlProfiles.LoadFromPathAsync(resolvedOptions.ProfilePath!, cancellationToken).ConfigureAwait(false);
@@ -240,6 +241,7 @@ public static class HtmlCrawler {
             } else {
                 result = new HtmlCrawlResult {
                     StartUrl = startUri.AbsoluteUri,
+                    AppliedScenario = resolvedOptions.Scenario,
                     AppliedProfileName = appliedProfile?.Name,
                     AppliedProfileReasonCode = profileDecision.ReasonCode,
                     AppliedProfileReason = profileDecision.Reason,
@@ -249,6 +251,9 @@ public static class HtmlCrawler {
 
             if (string.IsNullOrWhiteSpace(result.AppliedProfileName) && appliedProfile != null) {
                 result.AppliedProfileName = appliedProfile.Name;
+            }
+            if (result.AppliedScenario == HtmlCrawlScenario.Custom && resolvedOptions.Scenario != HtmlCrawlScenario.Custom) {
+                result.AppliedScenario = resolvedOptions.Scenario;
             }
             if (result.AppliedProfileReasonCode == HtmlCrawlProfileSelectionReasonCode.None && profileDecision.ReasonCode != HtmlCrawlProfileSelectionReasonCode.None) {
                 result.AppliedProfileReasonCode = profileDecision.ReasonCode;
@@ -366,7 +371,7 @@ public static class HtmlCrawler {
                     }
                 }
 
-                ApplyProfileMetadata(page, result);
+                ApplyRunMetadata(page, result);
 
                 if (page.Status == HtmlCrawlPageStatus.Skipped) {
                     result.SkippedPages.Add(page);
@@ -996,7 +1001,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1018,6 +1023,7 @@ public static class HtmlCrawler {
                 page.RenderMode,
                 page.RenderReasonCode,
                 page.RenderReason,
+                page.AppliedScenario,
                 page.AppliedProfileName,
                 page.AppliedProfileReasonCode,
                 page.AppliedProfileReason,
@@ -1067,6 +1073,7 @@ public static class HtmlCrawler {
                 EscapeCsv(page.RenderMode.ToString()),
                 EscapeCsv(page.RenderReasonCode.ToString()),
                 EscapeCsv(page.RenderReason),
+                EscapeCsv(page.AppliedScenario.ToString()),
                 EscapeCsv(page.AppliedProfileName),
                 EscapeCsv(page.AppliedProfileReasonCode.ToString()),
                 EscapeCsv(page.AppliedProfileReason),
@@ -1258,6 +1265,7 @@ public static class HtmlCrawler {
             page.RenderMode,
             page.RenderReasonCode,
             page.RenderReason,
+            page.AppliedScenario,
             page.AppliedProfileName,
             page.AppliedProfileReasonCode,
             page.AppliedProfileReason,
@@ -1747,6 +1755,11 @@ public static class HtmlCrawler {
             .Append("\">")
             .Append(HtmlEncode(result.StartUrl))
             .AppendLine("</a></p>");
+        if (result.AppliedScenario != HtmlCrawlScenario.Custom) {
+            builder.Append("  <p class=\"meta\">Scenario: <code>")
+                .Append(HtmlEncode(result.AppliedScenario.ToString()))
+                .AppendLine("</code></p>");
+        }
         if (!string.IsNullOrWhiteSpace(result.AppliedProfileName)) {
             builder.Append("  <p class=\"meta\">Profile: <code>")
                 .Append(HtmlEncode(result.AppliedProfileName))
@@ -1960,6 +1973,11 @@ public static class HtmlCrawler {
             if (!string.IsNullOrWhiteSpace(page.RenderReason)) {
                 builder.Append(": ")
                     .Append(HtmlEncode(page.RenderReason));
+            }
+            if (page.AppliedScenario != HtmlCrawlScenario.Custom) {
+                builder.Append("<br>scenario: <code>")
+                    .Append(HtmlEncode(page.AppliedScenario.ToString()))
+                    .Append("</code>");
             }
             if (!string.IsNullOrWhiteSpace(page.AppliedProfileName)) {
                 builder.Append("<br>profile: <code>")
@@ -2583,7 +2601,8 @@ public static class HtmlCrawler {
         return new ProfileSelectionDecision();
     }
 
-    private static void ApplyProfileMetadata(HtmlCrawlPage page, HtmlCrawlResult result) {
+    private static void ApplyRunMetadata(HtmlCrawlPage page, HtmlCrawlResult result) {
+        page.AppliedScenario = result.AppliedScenario;
         page.AppliedProfileName = result.AppliedProfileName;
         page.AppliedProfileReasonCode = result.AppliedProfileReasonCode;
         page.AppliedProfileReason = result.AppliedProfileReason;
@@ -2901,6 +2920,7 @@ public static class HtmlCrawler {
             RenderMode = page.RenderMode,
             RenderReasonCode = page.RenderReasonCode,
             RenderReason = page.RenderReason,
+            AppliedScenario = page.AppliedScenario,
             AppliedProfileName = page.AppliedProfileName,
             AppliedProfileReasonCode = page.AppliedProfileReasonCode,
             AppliedProfileReason = page.AppliedProfileReason,
