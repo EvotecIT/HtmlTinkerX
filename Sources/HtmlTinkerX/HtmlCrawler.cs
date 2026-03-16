@@ -1,6 +1,5 @@
 using AngleSharp.Dom;
 using Microsoft.Playwright;
-using OfficeIMO.Markdown.Html;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1486,6 +1485,7 @@ public static class HtmlCrawler {
 
     private static List<object> BuildStrictOpenApiParameters(HtmlCrawlStructuredOpenApiOperation operation) {
         return operation.Parameters
+            .Where(parameter => !string.Equals(NormalizeWhitespace(parameter.Location), "body", StringComparison.OrdinalIgnoreCase))
             .OrderBy(parameter => parameter.Location, StringComparer.OrdinalIgnoreCase)
             .ThenBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
             .Select(parameter => {
@@ -7727,12 +7727,7 @@ public static class HtmlCrawler {
     }
 
     private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl) {
-        HtmlToMarkdownOptions markdownOptions = HtmlToMarkdownOptions.CreatePortableProfile();
-        if (!string.IsNullOrWhiteSpace(pageUrl) && Uri.TryCreate(pageUrl, UriKind.Absolute, out Uri? baseUri)) {
-            markdownOptions.BaseUri = baseUri;
-        }
-
-        return html.ToMarkdown(markdownOptions);
+        return HtmlMarkdownConverterAdapter.ConvertToMarkdown(html, pageUrl);
     }
 
     private static ProfileSelectionDecision ResolveInitialProfileDecision(

@@ -805,6 +805,15 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("3.1.0", Assert.IsType<string>(result.OpenApiDocument["openapi"]));
             Assert.True(result.OpenApiDocument.ContainsKey("components"));
             Assert.True(result.OpenApiDocument.ContainsKey("x-htmltinkerx-promotion"));
+            IDictionary<string, object?> strictPaths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> strictWidgetsPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(strictPaths["/v1/widgets"]);
+            IDictionary<string, object?> strictPostOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(strictWidgetsPath["post"]);
+            Assert.True(strictPostOperation.ContainsKey("requestBody"));
+            List<object> strictParameters = Assert.IsAssignableFrom<List<object>>(strictPostOperation["parameters"]);
+            Assert.DoesNotContain(strictParameters, parameter =>
+                parameter is IDictionary<string, object?> parameterDictionary
+                && string.Equals(parameterDictionary["name"] as string, "name", StringComparison.Ordinal)
+                && string.Equals(parameterDictionary["in"] as string, "query", StringComparison.OrdinalIgnoreCase));
             string openApiJson = File.ReadAllText(result.OpenApiPath!);
             Assert.Contains("\"openapi\": \"3.1.0\"", openApiJson, StringComparison.Ordinal);
             Assert.Contains("\"/v1/widgets\"", openApiJson, StringComparison.Ordinal);
