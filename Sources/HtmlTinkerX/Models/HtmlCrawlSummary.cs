@@ -60,6 +60,81 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Number of downloaded assets.</summary>
     public int AssetCount { get; set; }
 
+    /// <summary>Number of pages that include structured extracted data.</summary>
+    public int StructuredPageCount { get; set; }
+
+    /// <summary>Total structured code blocks captured across fetched pages.</summary>
+    public int StructuredCodeBlockCount { get; set; }
+
+    /// <summary>Total structured code samples captured across fetched pages.</summary>
+    public int StructuredCodeSampleCount { get; set; }
+
+    /// <summary>Total structured API endpoints captured across fetched pages.</summary>
+    public int StructuredApiEndpointCount { get; set; }
+
+    /// <summary>Total distinct structured API paths merged across fetched pages.</summary>
+    public int StructuredApiPathCount { get; set; }
+
+    /// <summary>Total distinct structured API resources merged across fetched pages.</summary>
+    public int StructuredApiResourceCount { get; set; }
+
+    /// <summary>Total structured API operations strong enough to be promoted into the strict OpenAPI export.</summary>
+    public int StructuredOpenApiPromotedOperationCount { get; set; }
+
+    /// <summary>Total structured API operations retained only in the OpenAPI-like export because they were too weak for strict promotion.</summary>
+    public int StructuredOpenApiSkippedOperationCount { get; set; }
+
+    /// <summary>Average promotion score across inferred structured API operations.</summary>
+    public double StructuredOpenApiAveragePromotionScore { get; set; }
+
+    /// <summary>Total reusable structured API schema components merged across fetched pages.</summary>
+    public int StructuredApiSchemaComponentCount { get; set; }
+
+    /// <summary>Total reusable structured API field-set components merged across fetched pages.</summary>
+    public int StructuredApiFieldSetComponentCount { get; set; }
+
+    /// <summary>Total reusable structured API authentication profile components merged across fetched pages.</summary>
+    public int StructuredApiAuthProfileCount { get; set; }
+
+    /// <summary>Total reusable structured API rate-limit profile components merged across fetched pages.</summary>
+    public int StructuredApiRateLimitProfileCount { get; set; }
+
+    /// <summary>Total reusable structured API parameter-set components merged across fetched pages.</summary>
+    public int StructuredApiParameterSetCount { get; set; }
+
+    /// <summary>Total reusable structured API header-set components merged across fetched pages.</summary>
+    public int StructuredApiHeaderSetCount { get; set; }
+
+    /// <summary>Total reusable structured API example-set components merged across fetched pages.</summary>
+    public int StructuredApiExampleSetCount { get; set; }
+
+    /// <summary>Total reusable structured API error-catalog components merged across fetched pages.</summary>
+    public int StructuredApiErrorCatalogComponentCount { get; set; }
+
+    /// <summary>Total structured API endpoints with authentication hints across fetched pages.</summary>
+    public int StructuredAuthenticatedApiEndpointCount { get; set; }
+
+    /// <summary>Total structured API endpoints with rate-limit hints across fetched pages.</summary>
+    public int StructuredRateLimitedApiEndpointCount { get; set; }
+
+    /// <summary>Total structured API error responses captured across fetched pages.</summary>
+    public int StructuredApiErrorResponseCount { get; set; }
+
+    /// <summary>Total structured breadcrumb trails captured across fetched pages.</summary>
+    public int StructuredBreadcrumbCount { get; set; }
+
+    /// <summary>Total structured FAQ items captured across fetched pages.</summary>
+    public int StructuredFaqCount { get; set; }
+
+    /// <summary>Total structured specification tables captured across fetched pages.</summary>
+    public int StructuredSpecTableCount { get; set; }
+
+    /// <summary>Total structured callouts captured across fetched pages.</summary>
+    public int StructuredCalloutCount { get; set; }
+
+    /// <summary>Total structured primary actions captured across fetched pages.</summary>
+    public int StructuredPrimaryActionCount { get; set; }
+
     /// <summary>Number of exported text chunks.</summary>
     public int ChunkCount { get; set; }
 
@@ -148,6 +223,31 @@ public sealed class HtmlCrawlSummary {
             PendingPageCount = result.PendingPages.Count,
             SitemapCount = result.SitemapUrls.Count,
             AssetCount = result.Assets.Count,
+            StructuredPageCount = result.Pages.Count(page => page.StructuredJson != null),
+            StructuredCodeBlockCount = result.Pages.Sum(page => page.StructuredJson?.CodeBlocks.Count ?? 0),
+            StructuredCodeSampleCount = result.Pages.Sum(page => page.StructuredJson?.CodeSamples.Count ?? 0),
+            StructuredApiEndpointCount = result.Pages.Sum(page => page.StructuredJson?.ApiEndpoints.Count ?? 0),
+            StructuredApiPathCount = result.OpenApiLike.Paths.Count,
+            StructuredApiResourceCount = result.OpenApiLike.Resources.Count,
+            StructuredOpenApiPromotedOperationCount = result.OpenApiLike.StrictOpenApiEligibleOperationCount,
+            StructuredOpenApiSkippedOperationCount = result.OpenApiLike.StrictOpenApiSkippedOperationCount,
+            StructuredOpenApiAveragePromotionScore = result.OpenApiLike.StrictOpenApiAverageScore,
+            StructuredApiSchemaComponentCount = result.OpenApiLike.Components.Schemas.Count,
+            StructuredApiFieldSetComponentCount = result.OpenApiLike.Components.FieldSets.Count,
+            StructuredApiAuthProfileCount = result.OpenApiLike.Components.AuthProfiles.Count,
+            StructuredApiRateLimitProfileCount = result.OpenApiLike.Components.RateLimitProfiles.Count,
+            StructuredApiParameterSetCount = result.OpenApiLike.Components.ParameterSets.Count,
+            StructuredApiHeaderSetCount = result.OpenApiLike.Components.RequestHeaderSets.Count + result.OpenApiLike.Components.ResponseHeaderSets.Count,
+            StructuredApiExampleSetCount = result.OpenApiLike.Components.RequestExampleSets.Count + result.OpenApiLike.Components.ResponseExampleSets.Count,
+            StructuredApiErrorCatalogComponentCount = result.OpenApiLike.Components.ErrorCatalogs.Count,
+            StructuredAuthenticatedApiEndpointCount = result.Pages.Sum(page => HtmlCrawler.GetStructuredAuthenticatedApiEndpointCount(page.StructuredJson)),
+            StructuredRateLimitedApiEndpointCount = result.Pages.Sum(page => HtmlCrawler.GetStructuredRateLimitedApiEndpointCount(page.StructuredJson)),
+            StructuredApiErrorResponseCount = result.Pages.Sum(page => HtmlCrawler.GetStructuredApiErrorResponseCount(page.StructuredJson)),
+            StructuredBreadcrumbCount = result.Pages.Sum(page => page.StructuredJson?.Breadcrumbs.Count ?? 0),
+            StructuredFaqCount = result.Pages.Sum(page => page.StructuredJson?.FaqItems.Count ?? 0),
+            StructuredSpecTableCount = result.Pages.Sum(page => page.StructuredJson?.SpecTables.Count ?? 0),
+            StructuredCalloutCount = result.Pages.Sum(page => page.StructuredJson?.Callouts.Count ?? 0),
+            StructuredPrimaryActionCount = result.Pages.Sum(page => page.StructuredJson?.PrimaryActions.Count ?? 0),
             DurationMs = result.Finished > result.Started ? (long)(result.Finished - result.Started).TotalMilliseconds : 0,
             TotalDiscoveredLinks = result.Pages.Sum(page => page.Links?.Count ?? 0)
         };
@@ -247,6 +347,31 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Pending candidates: {PendingPageCount}");
         report.AppendLine($"Sitemaps used: {SitemapCount}");
         report.AppendLine($"Downloaded assets: {AssetCount}");
+        report.AppendLine($"Structured pages: {StructuredPageCount}");
+        report.AppendLine($"Structured code blocks: {StructuredCodeBlockCount}");
+        report.AppendLine($"Structured code samples: {StructuredCodeSampleCount}");
+        report.AppendLine($"Structured API endpoints: {StructuredApiEndpointCount}");
+        report.AppendLine($"Structured API paths: {StructuredApiPathCount}");
+        report.AppendLine($"Structured API resources: {StructuredApiResourceCount}");
+        report.AppendLine($"Structured OpenAPI promoted operations: {StructuredOpenApiPromotedOperationCount}");
+        report.AppendLine($"Structured OpenAPI skipped operations: {StructuredOpenApiSkippedOperationCount}");
+        report.AppendLine($"Structured OpenAPI average promotion score: {StructuredOpenApiAveragePromotionScore:0.##}");
+        report.AppendLine($"Structured API schema components: {StructuredApiSchemaComponentCount}");
+        report.AppendLine($"Structured API field-set components: {StructuredApiFieldSetComponentCount}");
+        report.AppendLine($"Structured API auth profiles: {StructuredApiAuthProfileCount}");
+        report.AppendLine($"Structured API rate-limit profiles: {StructuredApiRateLimitProfileCount}");
+        report.AppendLine($"Structured API parameter sets: {StructuredApiParameterSetCount}");
+        report.AppendLine($"Structured API header sets: {StructuredApiHeaderSetCount}");
+        report.AppendLine($"Structured API example sets: {StructuredApiExampleSetCount}");
+        report.AppendLine($"Structured API error catalogs: {StructuredApiErrorCatalogComponentCount}");
+        report.AppendLine($"Structured authenticated endpoints: {StructuredAuthenticatedApiEndpointCount}");
+        report.AppendLine($"Structured rate-limited endpoints: {StructuredRateLimitedApiEndpointCount}");
+        report.AppendLine($"Structured API error responses: {StructuredApiErrorResponseCount}");
+        report.AppendLine($"Structured breadcrumbs: {StructuredBreadcrumbCount}");
+        report.AppendLine($"Structured FAQ items: {StructuredFaqCount}");
+        report.AppendLine($"Structured spec tables: {StructuredSpecTableCount}");
+        report.AppendLine($"Structured callouts: {StructuredCalloutCount}");
+        report.AppendLine($"Structured primary actions: {StructuredPrimaryActionCount}");
         report.AppendLine($"Exported chunks: {ChunkCount}");
         report.AppendLine($"Graph nodes: {GraphNodeCount}");
         report.AppendLine($"Graph edges: {GraphEdgeCount}");

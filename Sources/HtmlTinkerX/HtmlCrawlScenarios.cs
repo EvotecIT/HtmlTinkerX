@@ -27,6 +27,9 @@ public static class HtmlCrawlScenarios {
                 if (options.ContentMode == defaults.ContentMode) {
                     options.ContentMode = HtmlCrawlContentMode.Reader;
                 }
+                if (options.StructuredJsonPreset == defaults.StructuredJsonPreset) {
+                    options.StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Article;
+                }
                 if (!options.UseCanonicalUrls && options.UseCanonicalUrls == defaults.UseCanonicalUrls) {
                     options.UseCanonicalUrls = true;
                 }
@@ -64,11 +67,23 @@ public static class HtmlCrawlScenarios {
                 if (!options.DeduplicatePages && options.DeduplicatePages == defaults.DeduplicatePages) {
                     options.DeduplicatePages = true;
                 }
+                if (options.StructuredJsonPreset == defaults.StructuredJsonPreset) {
+                    options.StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs;
+                }
                 break;
 
             case HtmlCrawlScenario.Dataset:
                 if (options.ContentMode == defaults.ContentMode) {
                     options.ContentMode = HtmlCrawlContentMode.Reader;
+                }
+                if (!options.IncludeMarkdown && options.IncludeMarkdown == defaults.IncludeMarkdown) {
+                    options.IncludeMarkdown = true;
+                }
+                if (!options.IncludeStructuredJson && options.IncludeStructuredJson == defaults.IncludeStructuredJson) {
+                    options.IncludeStructuredJson = true;
+                }
+                if (options.StructuredJsonPreset == defaults.StructuredJsonPreset) {
+                    options.StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Auto;
                 }
                 if (!options.CompareContentModes && options.CompareContentModes == defaults.CompareContentModes) {
                     options.CompareContentModes = true;

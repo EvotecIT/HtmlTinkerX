@@ -190,6 +190,150 @@ var crawl = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCra
 Console.WriteLine(crawl.Summary.ToReportText(crawl.SitemapUrls));
 Console.WriteLine(crawl.PagesCsvPath);
 
+// AI-ready offline dataset with Markdown alongside HTML/text
+var aiReady = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    IncludeMarkdown = true,
+    OutputPath = "crawl-output"
+});
+Console.WriteLine(aiReady.Pages[0].MarkdownPath);
+
+// Self-contained JSON document export for downstream automation
+var structured = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    IncludeStructuredJson = true,
+    OutputPath = "crawl-output"
+});
+Console.WriteLine(structured.StructuredJsonPagesJsonlPath);
+Console.WriteLine(structured.OpenApiLikePath);
+Console.WriteLine(structured.OpenApiPath);
+Console.WriteLine(structured.OpenApiDocument["openapi"]);
+Console.WriteLine(structured.OpenApiLike.StrictOpenApiEligibleOperationCount);
+Console.WriteLine(structured.OpenApiLike.StrictOpenApiSkippedOperationCount);
+Console.WriteLine(structured.OpenApiDocument.ContainsKey("x-htmltinkerx-promotion"));
+Console.WriteLine(structured.Pages[0].StructuredJson!.Document.Summary);
+Console.WriteLine(structured.Pages[0].StructuredJson!.Document.Markdown);
+Console.WriteLine(structured.Pages[0].StructuredJson!.Metadata.Description);
+Console.WriteLine(structured.Pages[0].StructuredJson!.Layout.NavigationCount);
+Console.WriteLine(structured.Pages[0].StructuredJson!.CodeBlocks.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.CodeSamples.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.ApiEndpoints.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.Breadcrumbs.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.FaqItems.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.SpecTables.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.Callouts.Count);
+Console.WriteLine(structured.Pages[0].StructuredJson!.PrimaryActions.Count);
+
+// Built-in preset fields for docs/article/product pages, with auto mode available too
+var docsJson = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    IncludeStructuredJson = true,
+    StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs,
+    OutputPath = "crawl-output"
+});
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ResolvedPreset);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["mainHeading"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["navigationLinks"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["codeSamples"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["apiEndpoints"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["apiCatalog"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["apiTags"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["apiResources"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["operationIds"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["openApiLike"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["openApiPaths"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["openApiServers"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["authenticationSchemes"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["rateLimitHeaders"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["operationId"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["resource"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["tags"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["requestExamples"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["requestHeaders"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["responseHeaders"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["errorResponses"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["errorCatalog"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["successResponseSchema"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["errorResponseSchema"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["requestBodyFields"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["successResponseFields"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["errorResponseFields"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].Parameters.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].OperationId);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].Resource);
+Console.WriteLine(string.Join(", ", docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].Tags));
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].BodyParameters.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].HeaderParameters.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestBodySchema["name"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestBodyFields[0].Path);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestBodyFields[0].Provenance[0].Kind);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestBodyFields[0].ConfidenceScore);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].BodyParameters[0].Format);
+Console.WriteLine(string.Join(", ", docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].BodyParameters[0].EnumValues));
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].BodyParameters[0].ExampleValue);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].Authentication.Required);
+Console.WriteLine(string.Join(", ", docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].Authentication.Schemes));
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RateLimit.Limit);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestExamples.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].RequestHeaders.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ResponseHeaders.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ErrorResponses.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ErrorCatalog.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseSchema["id"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ErrorResponseSchema["error"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseFields[0].Path);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseFields[0].Provenance[0].Kind);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseFields[0].ConfidenceScore);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ErrorResponseFields[0].Path);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseFields[0].Kind);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].SuccessResponseFields[0].ChildPaths.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiEndpoints[0].ResponseExamples.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.ApiCatalog.OperationCount);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.OpenApiLike.Paths["/v1/widgets"].Operations["post"].OperationId);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].OperationId);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].AuthenticationRef);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].ParametersRef);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].RequestHeadersRef);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].ResponseExamplesRef);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].StrictOpenApiScore);
+Console.WriteLine(docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].StrictOpenApiEligible);
+Console.WriteLine(string.Join(", ", docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].Provenance.PageUrls));
+Console.WriteLine(string.Join(", ", docsJson.OpenApiLike.Paths["/v1/widgets"].Operations["post"].Provenance.SourceKinds));
+Console.WriteLine(docsJson.OpenApiLike.Components.AuthProfiles.Count);
+Console.WriteLine(docsJson.OpenApiLike.Components.FieldSets.Count);
+Console.WriteLine(docsJson.OpenApiLike.Components.ParameterSets.Count);
+Console.WriteLine(docsJson.OpenApiLike.Components.RequestHeaderSets.Count);
+Console.WriteLine(docsJson.OpenApiLike.Components.ResponseExampleSets.Count);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["breadcrumbs"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["faqItems"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["callouts"]);
+Console.WriteLine(docsJson.Pages[0].StructuredJson!.Extracted["primaryActions"]);
+
+// Caller-defined JSON fields layered on top of the built-in structured model
+var extracted = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Selector = "main",
+    StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs,
+    StructuredJsonSchema = """
+    {
+      "title": "Metadata.Title",
+      "description": "Metadata.Description",
+      "navLinks": { "selector": "nav a", "source": "page", "mode": "text", "all": true },
+      "mainHeading": { "selector": "h1", "source": "selected", "mode": "text" }
+    }
+    """
+});
+Console.WriteLine(extracted.Pages[0].StructuredJson!.Extracted["title"]);
+Console.WriteLine(extracted.Pages[0].StructuredJson!.Extracted["mainHeading"]);
+
+// One-call dataset mode turns on Markdown + structured JSON defaults
+var dataset = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
+    Scenario = HtmlCrawlScenario.Dataset,
+    OutputPath = "crawl-output"
+});
+Console.WriteLine(dataset.Pages[0].MarkdownPath);
+Console.WriteLine(dataset.Pages[0].StructuredJsonPath);
+Console.WriteLine(dataset.Pages[0].StructuredJson!.ResolvedPreset);
+
 // Keep full tracking query strings when a site uses them as real page identity
 var exactUrls = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
     IgnoreTrackingQueryParameters = false
@@ -291,6 +435,70 @@ $crawl.Pages | Select-Object Url, Title, Depth
 $crawl.SkippedPages | Select-Object Url, SkipReason
 $crawl.Summary.ToReportText($crawl.SitemapUrls)
 
+# AI-ready offline dataset with Markdown alongside HTML/text
+$aiReady = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -IncludeMarkdown -OutPath '.\crawl-output'
+$aiReady.Pages | Select-Object Url, MarkdownPath
+
+# Self-contained JSON document export for downstream automation
+$structured = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -IncludeStructuredJson -OutPath '.\crawl-output'
+$structured.StructuredJsonPagesJsonlPath
+$structured.OpenApiLikePath
+$structured.OpenApiPath
+$structured.OpenApiDocument["openapi"]
+$structured.OpenApiLike.StrictOpenApiEligibleOperationCount
+$structured.OpenApiLike.StrictOpenApiSkippedOperationCount
+$structured.OpenApiDocument.ContainsKey("x-htmltinkerx-promotion")
+$structured.Pages | Select-Object Url, StructuredJsonPath, @{ N = 'Summary'; E = { $_.StructuredJson.Document.Summary } }
+$structured.Pages | Select-Object Url, @{ N = 'Description'; E = { $_.StructuredJson.Metadata.Description } }, @{ N = 'NavigationCount'; E = { $_.StructuredJson.Layout.NavigationCount } }
+$structured.Pages | Select-Object Url, @{ N = 'CodeBlocks'; E = { $_.StructuredJson.CodeBlocks.Count } }, @{ N = 'Breadcrumbs'; E = { $_.StructuredJson.Breadcrumbs.Count } }, @{ N = 'FaqItems'; E = { $_.StructuredJson.FaqItems.Count } }
+$structured.Pages | Select-Object Url, @{ N = 'CodeSamples'; E = { $_.StructuredJson.CodeSamples.Count } }, @{ N = 'ApiEndpoints'; E = { $_.StructuredJson.ApiEndpoints.Count } }
+$structured.Pages | Select-Object Url, @{ N = 'AuthenticatedEndpoints'; E = { $_.StructuredJson.ApiEndpoints.Where({ $_.Authentication.Required -ne $null -or $_.Authentication.Schemes.Count -gt 0 -or $_.Authentication.Headers.Count -gt 0 }).Count } }, @{ N = 'RateLimitedEndpoints'; E = { $_.StructuredJson.ApiEndpoints.Where({ $_.RateLimit.Mentioned -or $_.RateLimit.StatusCode -ne $null }).Count } }
+$structured.Pages | Select-Object Url, @{ N = 'ApiErrorResponses'; E = { $_.StructuredJson.ApiEndpoints.ForEach({ $_.ErrorResponses.Count }) | Measure-Object -Sum | Select-Object -ExpandProperty Sum } }
+$structured.Pages | Select-Object Url, @{ N = 'SpecTables'; E = { $_.StructuredJson.SpecTables.Count } }, @{ N = 'Callouts'; E = { $_.StructuredJson.Callouts.Count } }, @{ N = 'PrimaryActions'; E = { $_.StructuredJson.PrimaryActions.Count } }
+
+# Built-in preset fields for common page types
+$docs = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -IncludeStructuredJson -StructuredJsonPreset Docs -OutPath '.\crawl-output'
+$docs.Pages | Select-Object Url, @{ N = 'Preset'; E = { $_.StructuredJson.ResolvedPreset } }, @{ N = 'MainHeading'; E = { $_.StructuredJson.Extracted["mainHeading"] } }, @{ N = 'ApiEndpoints'; E = { $_.StructuredJson.Extracted["apiEndpoints"] } }, @{ N = 'Breadcrumbs'; E = { $_.StructuredJson.Extracted["breadcrumbs"] } }, @{ N = 'PrimaryActions'; E = { $_.StructuredJson.Extracted["primaryActions"] } }
+$docs.Pages | Select-Object Url, @{ N = 'ApiCatalog'; E = { $_.StructuredJson.Extracted["apiCatalog"] } }, @{ N = 'ApiTags'; E = { $_.StructuredJson.Extracted["apiTags"] } }, @{ N = 'ApiResources'; E = { $_.StructuredJson.Extracted["apiResources"] } }, @{ N = 'OperationIds'; E = { $_.StructuredJson.Extracted["operationIds"] } }
+$docs.Pages | Select-Object Url, @{ N = 'OpenApiLike'; E = { $_.StructuredJson.Extracted["openApiLike"] } }, @{ N = 'OpenApiPaths'; E = { $_.StructuredJson.Extracted["openApiPaths"] } }, @{ N = 'OpenApiServers'; E = { $_.StructuredJson.Extracted["openApiServers"] } }
+$docs.Pages | Select-Object Url, @{ N = 'ApiParameterCount'; E = { $_.StructuredJson.ApiEndpoints[0].Parameters.Count } }, @{ N = 'OperationId'; E = { $_.StructuredJson.ApiEndpoints[0].OperationId } }, @{ N = 'Resource'; E = { $_.StructuredJson.ApiEndpoints[0].Resource } }, @{ N = 'Tags'; E = { $_.StructuredJson.ApiEndpoints[0].Tags -join ', ' } }, @{ N = 'ResponseExampleCount'; E = { $_.StructuredJson.ApiEndpoints[0].ResponseExamples.Count } }
+$docs.OpenApiLike.Paths['/v1/widgets'].Operations['post']
+$docs.OpenApiLike.Paths['/v1/widgets'].Operations['post'].StrictOpenApiScore
+$docs.OpenApiLike.Paths['/v1/widgets'].Operations['post'].StrictOpenApiEligible
+$docs.OpenApiLike.Paths['/v1/widgets'].Operations['post'].Provenance.PageUrls
+$docs.OpenApiLike.Paths['/v1/widgets'].Operations['post'].Provenance.SourceKinds
+$docs.OpenApiLike.Components.AuthProfiles
+$docs.OpenApiLike.Components.FieldSets
+$docs.OpenApiLike.Components.ParameterSets
+$docs.OpenApiLike.Components.RequestHeaderSets
+$docs.OpenApiLike.Components.ResponseExampleSets
+$docs.Pages | Select-Object Url, @{ N = 'BodyParameterCount'; E = { $_.StructuredJson.ApiEndpoints[0].BodyParameters.Count } }, @{ N = 'HeaderParameterCount'; E = { $_.StructuredJson.ApiEndpoints[0].HeaderParameters.Count } }, @{ N = 'BodySchemaNameType'; E = { $_.StructuredJson.ApiEndpoints[0].RequestBodySchema["name"] } }
+$docs.Pages | Select-Object Url, @{ N = 'BodyParameterFormat'; E = { $_.StructuredJson.ApiEndpoints[0].BodyParameters[0].Format } }, @{ N = 'BodyParameterEnum'; E = { $_.StructuredJson.ApiEndpoints[0].BodyParameters[0].EnumValues -join ', ' } }, @{ N = 'BodyParameterExample'; E = { $_.StructuredJson.ApiEndpoints[0].BodyParameters[0].ExampleValue } }
+$docs.Pages | Select-Object Url, @{ N = 'RequestFieldSource'; E = { $_.StructuredJson.ApiEndpoints[0].RequestBodyFields[0].Provenance[0].Kind } }, @{ N = 'SuccessFieldSource'; E = { $_.StructuredJson.ApiEndpoints[0].SuccessResponseFields[0].Provenance[0].Kind } }
+$docs.Pages | Select-Object Url, @{ N = 'RequestFieldConfidence'; E = { $_.StructuredJson.ApiEndpoints[0].RequestBodyFields[0].ConfidenceScore } }, @{ N = 'SuccessFieldConfidence'; E = { $_.StructuredJson.ApiEndpoints[0].SuccessResponseFields[0].ConfidenceScore } }
+$docs.Pages | Select-Object Url, @{ N = 'RequestBodyFields'; E = { $_.StructuredJson.Extracted["requestBodyFields"] } }, @{ N = 'SuccessResponseFields'; E = { $_.StructuredJson.Extracted["successResponseFields"] } }, @{ N = 'ErrorResponseFields'; E = { $_.StructuredJson.Extracted["errorResponseFields"] } }
+$docs.Pages | Select-Object Url, @{ N = 'SuccessFieldKind'; E = { $_.StructuredJson.ApiEndpoints[0].SuccessResponseFields[0].Kind } }, @{ N = 'SuccessFieldChildren'; E = { $_.StructuredJson.ApiEndpoints[0].SuccessResponseFields[0].ChildPaths -join ', ' } }
+$docs.Pages | Select-Object Url, @{ N = 'AuthRequired'; E = { $_.StructuredJson.ApiEndpoints[0].Authentication.Required } }, @{ N = 'AuthSchemes'; E = { $_.StructuredJson.Extracted["authenticationSchemes"] } }, @{ N = 'RateLimit'; E = { $_.StructuredJson.ApiEndpoints[0].RateLimit.Limit } }, @{ N = 'RateLimitHeaders'; E = { $_.StructuredJson.Extracted["rateLimitHeaders"] } }
+$docs.Pages | Select-Object Url, @{ N = 'RequestExamples'; E = { $_.StructuredJson.Extracted["requestExamples"] } }, @{ N = 'RequestHeaders'; E = { $_.StructuredJson.Extracted["requestHeaders"] } }, @{ N = 'RequestExampleCount'; E = { $_.StructuredJson.Extracted["requestExampleCount"] } }
+$docs.Pages | Select-Object Url, @{ N = 'ResponseHeaders'; E = { $_.StructuredJson.Extracted["responseHeaders"] } }, @{ N = 'ErrorResponses'; E = { $_.StructuredJson.Extracted["errorResponses"] } }, @{ N = 'ErrorResponseCount'; E = { $_.StructuredJson.Extracted["errorResponseCount"] } }, @{ N = 'ErrorCatalog'; E = { $_.StructuredJson.Extracted["errorCatalog"] } }
+$docs.Pages | Select-Object Url, @{ N = 'SuccessResponseSchema'; E = { $_.StructuredJson.Extracted["successResponseSchema"] } }, @{ N = 'ErrorResponseSchema'; E = { $_.StructuredJson.Extracted["errorResponseSchema"] } }
+
+# Caller-defined JSON fields layered on top of the built-in structured model
+$schema = @'
+{
+  "title": "Metadata.Title",
+  "description": "Metadata.Description",
+  "navLinks": { "selector": "nav a", "source": "page", "mode": "text", "all": true },
+  "mainHeading": { "selector": "h1", "source": "selected", "mode": "text" }
+}
+'@
+$extracted = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Selector 'main' -StructuredJsonPreset Docs -StructuredJsonSchema $schema
+$extracted.Pages | Select-Object Url, @{ N = 'Title'; E = { $_.StructuredJson.Extracted["title"] } }, @{ N = 'MainHeading'; E = { $_.StructuredJson.Extracted["mainHeading"] } }
+
+# One-call dataset mode turns on Markdown + structured JSON defaults
+$dataset = Invoke-HTMLCrawl -Url 'https://example.com/docs' -Scenario Dataset -OutPath '.\crawl-output'
+$dataset.Pages | Select-Object Url, MarkdownPath, StructuredJsonPath, @{ N = 'Preset'; E = { $_.StructuredJson.ResolvedPreset } }
+
 # Preserve full tracked URLs when query strings are meaningful
 $exactUrls = Invoke-HTMLCrawl -Url 'https://example.com/docs' -KeepTrackingQueryParameters
 
@@ -384,7 +592,7 @@ $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl
 Persisted crawl artifacts now include:
 - `crawl-result.json` for the manifest and resume state
 - `index.html` as a browsable offline entry point into the saved dataset
-- `pages/` with per-page `.html`, `.txt`, and `.json` sidecar manifests, including extraction metadata such as content mode, selection reason, and selected element hints
+- `pages/` with per-page `.html`, `.txt`, optional `.md`, and `.json` sidecar manifests, including extraction metadata such as content mode, selection reason, and selected element hints
 - `pages.jsonl` and `pages.csv` for page-level datasets
 - `skipped-pages.jsonl` for skipped content-page candidates
 - `skipped-assets.jsonl` for discovered asset/document URLs that were intentionally not crawled as pages

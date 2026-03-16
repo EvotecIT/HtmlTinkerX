@@ -71,6 +71,15 @@ public sealed class HtmlCrawlResult {
     /// <summary>Path to the generated downloaded-assets JSONL dataset file.</summary>
     public string? AssetsJsonlPath { get; set; }
 
+    /// <summary>Path to the generated structured-pages JSONL dataset file.</summary>
+    public string? StructuredJsonPagesJsonlPath { get; set; }
+
+    /// <summary>Path to the generated crawl-level OpenAPI-like JSON artifact.</summary>
+    public string? OpenApiLikePath { get; set; }
+
+    /// <summary>Path to the generated crawl-level strict OpenAPI JSON artifact.</summary>
+    public string? OpenApiPath { get; set; }
+
     /// <summary>Path to the generated deduplicated text chunks JSONL dataset file.</summary>
     public string? ChunksJsonlPath { get; set; }
 
@@ -112,6 +121,12 @@ public sealed class HtmlCrawlResult {
 
     /// <summary>Path to the generated browsable HTML index report.</summary>
     public string? IndexHtmlPath { get; set; }
+
+    /// <summary>Merged crawl-level OpenAPI-like snapshot derived from all structured endpoints.</summary>
+    public HtmlCrawlStructuredOpenApiLike OpenApiLike { get; set; } = new();
+
+    /// <summary>Merged crawl-level strict OpenAPI document derived from the offline contract when possible.</summary>
+    public IDictionary<string, object?> OpenApiDocument { get; set; } = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Total crawl duration.</summary>
     public TimeSpan Duration => Finished - Started;

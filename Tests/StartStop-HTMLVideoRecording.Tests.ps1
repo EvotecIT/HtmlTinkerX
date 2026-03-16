@@ -6,8 +6,7 @@ describe 'HTML Video Recording' {
         $session = Start-HtmlBrowserVideoCapture -Url $uri -OutFile $out -Width 320 -Height 240
         Invoke-HTMLNavigation -Session $session -Url $uri
         $null = $session.Page.WaitForSelectorAsync('#loaded').GetAwaiter().GetResult()
-        $delay = if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) { 1000 } else { 250 }
-        $null = $session.Page.WaitForTimeoutAsync($delay).GetAwaiter().GetResult()
+        $null = $session.Page.WaitForTimeoutAsync(1000).GetAwaiter().GetResult()
         Stop-HtmlBrowserVideoCapture -Session $session
         (Test-Path $out) | Should -BeTrue
     }

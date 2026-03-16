@@ -148,6 +148,13 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (session.Video != null) {
+            try {
+                await session.Page.WaitForTimeoutAsync(500).ConfigureAwait(false);
+            } catch (PlaywrightException) {
+                // Ignore cases where the page is already closed while stopping the recording.
+            }
+        }
         await session.DisposeAsync().ConfigureAwait(false);
     }
 }
