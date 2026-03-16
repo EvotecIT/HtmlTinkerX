@@ -11,6 +11,13 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <OfficeImoMarkdownHtmlVersion>0.1.2</OfficeImoMarkdownHtmlVersion>
+        <OfficeImoRepoCandidate1>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\\..\\..\\OfficeIMO\\'))</OfficeImoRepoCandidate1>
+        <OfficeImoRepoCandidate2>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\\..\\..\\..\\OfficeIMO\\'))</OfficeImoRepoCandidate2>
+        <OfficeImoMarkdownHtmlProjectCandidate1>$([System.IO.Path]::Combine('$(OfficeImoRepoCandidate1)', 'OfficeIMO.Markdown.Html', 'OfficeIMO.Markdown.Html.csproj'))</OfficeImoMarkdownHtmlProjectCandidate1>
+        <OfficeImoMarkdownHtmlProjectCandidate2>$([System.IO.Path]::Combine('$(OfficeImoRepoCandidate2)', 'OfficeIMO.Markdown.Html', 'OfficeIMO.Markdown.Html.csproj'))</OfficeImoMarkdownHtmlProjectCandidate2>
+        <OfficeImoMarkdownHtmlProject Condition="Exists('$(OfficeImoMarkdownHtmlProjectCandidate1)')">$(OfficeImoMarkdownHtmlProjectCandidate1)</OfficeImoMarkdownHtmlProject>
+        <OfficeImoMarkdownHtmlProject Condition="'$(OfficeImoMarkdownHtmlProject)' == '' and Exists('$(OfficeImoMarkdownHtmlProjectCandidate2)')">$(OfficeImoMarkdownHtmlProjectCandidate2)</OfficeImoMarkdownHtmlProject>
     </PropertyGroup>
 
     <ItemGroup>
@@ -35,6 +42,11 @@
 
     <ItemGroup>
         <Using Include="System.Net.Http" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(OfficeImoMarkdownHtmlProject)" Condition="'$(OfficeImoMarkdownHtmlProject)' != ''" />
+        <PackageReference Include="OfficeIMO.Markdown.Html" Version="$(OfficeImoMarkdownHtmlVersion)" Condition="'$(OfficeImoMarkdownHtmlProject)' == ''" />
     </ItemGroup>
 
     <ItemGroup>

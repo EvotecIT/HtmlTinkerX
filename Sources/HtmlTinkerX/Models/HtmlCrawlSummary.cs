@@ -283,8 +283,9 @@ public sealed class HtmlCrawlSummary {
                 .OrderByDescending(page => page.BestContentComparisonWordCount ?? 0)
                 .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(representativePage?.ContentComparisonPreviewSummary)) {
-                summary.ContentComparisonWinnerPreviewSamples[group.Key] = representativePage.ContentComparisonPreviewSummary!;
+            string previewSample = representativePage?.ContentComparisonPreviewSummary ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(previewSample)) {
+                summary.ContentComparisonWinnerPreviewSamples[group.Key] = previewSample;
             }
         }
         double[] comparisonDeltas = result.Pages

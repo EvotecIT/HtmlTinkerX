@@ -164,7 +164,7 @@ public static class HtmlCrawlProfiles {
             return null;
         }
 
-        string normalizedName = profileName.Trim();
+        string normalizedName = profileName!.Trim();
         if (additionalProfiles != null) {
             HtmlCrawlProfile? custom = additionalProfiles.FirstOrDefault(profile =>
                 string.Equals(profile.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
@@ -256,16 +256,16 @@ public static class HtmlCrawlProfiles {
             Name = profile.Name?.Trim() ?? string.Empty,
             Hosts = profile.Hosts
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
+                .Select(value => value!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            Selector = string.IsNullOrWhiteSpace(profile.Selector) ? null : profile.Selector.Trim(),
+            Selector = string.IsNullOrWhiteSpace(profile.Selector) ? null : profile.Selector!.Trim(),
             ContentMode = profile.ContentMode,
             ReaderMinimumWordCount = profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0 ? profile.ReaderMinimumWordCount.Value : null,
             ReaderMinimumScore = profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0 ? profile.ReaderMinimumScore.Value : null,
             CompareContentModes = profile.CompareContentModes,
-            WaitForSelector = string.IsNullOrWhiteSpace(profile.WaitForSelector) ? null : profile.WaitForSelector.Trim(),
-            PathPrefix = string.IsNullOrWhiteSpace(profile.PathPrefix) ? null : profile.PathPrefix.Trim(),
+            WaitForSelector = string.IsNullOrWhiteSpace(profile.WaitForSelector) ? null : profile.WaitForSelector!.Trim(),
+            PathPrefix = string.IsNullOrWhiteSpace(profile.PathPrefix) ? null : profile.PathPrefix!.Trim(),
             AutoRender = profile.AutoRender,
             AutoScroll = profile.AutoScroll,
             InteractionRepeatCount = profile.InteractionRepeatCount,
