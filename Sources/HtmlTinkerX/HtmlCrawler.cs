@@ -5989,7 +5989,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        Match requestLine = Regex.Match(lines[0].Trim(), @"^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)(?:\s+HTTP/\d(?:\.\d)?)?$", RegexOptions.IgnoreCase);
+        Match requestLine = Regex.Match(lines[0].Trim(), @"^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/(?:[^\s'""]*)?)(?:\s+HTTP/\d(?:\.\d)?)?$", RegexOptions.IgnoreCase);
         if (!requestLine.Success) {
             return false;
         }

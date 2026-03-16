@@ -1036,6 +1036,10 @@ public class HtmlCrawlerStructuredJsonTests {
             HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
             Assert.Equal("GET", endpoint.Method);
             Assert.Equal("/", endpoint.Path);
+            HtmlCrawlStructuredRequestExample requestExample = Assert.Single(endpoint.RequestExamples);
+            Assert.Equal("GET", requestExample.Method);
+            Assert.Equal("/", requestExample.Path);
+            Assert.True(string.IsNullOrWhiteSpace(requestExample.Body));
 
             Assert.True(structuredJson.OpenApiLike.Paths.ContainsKey("/"));
             Assert.True(result.OpenApiLike.Paths.ContainsKey("/"));
