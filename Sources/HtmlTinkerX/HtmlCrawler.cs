@@ -6487,7 +6487,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        Match directMatch = Regex.Match(input, @"(?im)\b(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)");
+        Match directMatch = Regex.Match(input, @"(?im)\b(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/(?:[^\s'""]*)?)");
         if (!directMatch.Success) {
             return TryParseCurlMethodAndPath(input, out method, out path);
         }

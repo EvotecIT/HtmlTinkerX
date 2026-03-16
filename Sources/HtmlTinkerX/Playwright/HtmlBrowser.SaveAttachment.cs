@@ -12,6 +12,8 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private const int DownloadDiscoveryTimeoutMs = 30000;
+
     /// <summary>
     /// Saves any files downloaded while loading the specified URL.
     /// </summary>
@@ -105,7 +107,7 @@ public static partial class HtmlBrowser {
                 : $"a[href*=\"{filter}\"]";
 
             cancellationToken.ThrowIfCancellationRequested();
-            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 }).ConfigureAwait(false);
+            await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = DownloadDiscoveryTimeoutMs }).ConfigureAwait(false);
             var anchors = await page.QuerySelectorAllAsync(selector).ConfigureAwait(false);
             foreach (var anchor in anchors) {
                 cancellationToken.ThrowIfCancellationRequested();

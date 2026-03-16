@@ -999,6 +999,56 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_DetectsRootPathEndpoints() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/root"] = """
+            <html>
+              <head>
+                <title>Root endpoint</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Root endpoint</h1>
+                  <h2>GET /</h2>
+                  <p>Returns API root metadata.</p>
+                  <pre><code class="language-http">GET / HTTP/1.1
+                  Host: api.example.com
+
+                  </code></pre>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">{ "name": "Example API" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/root", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            Assert.Equal("GET", endpoint.Method);
+            Assert.Equal("/", endpoint.Path);
+
+            Assert.True(structuredJson.OpenApiLike.Paths.ContainsKey("/"));
+            Assert.True(result.OpenApiLike.Paths.ContainsKey("/"));
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            Assert.True(paths.ContainsKey("/"));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_DatasetScenario_AutoPreset_ResolvesProductPages() {
         Dictionary<string, string> responses = new() {
             ["/products/widget"] = """
