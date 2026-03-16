@@ -55,6 +55,18 @@ public sealed class HtmlCrawlPage {
     /// <summary>Optional persisted file path for the stored text.</summary>
     public string? TextPath { get; set; }
 
+    /// <summary>Stored Markdown content converted from the selected HTML.</summary>
+    public string Markdown { get; set; } = string.Empty;
+
+    /// <summary>Optional persisted file path for the stored Markdown.</summary>
+    public string? MarkdownPath { get; set; }
+
+    /// <summary>Structured JSON-friendly data extracted from the page.</summary>
+    public HtmlCrawlStructuredJson? StructuredJson { get; set; }
+
+    /// <summary>Optional persisted file path for the structured page JSON.</summary>
+    public string? StructuredJsonPath { get; set; }
+
     /// <summary>Optional persisted file path for the page-level manifest sidecar.</summary>
     public string? ManifestPath { get; set; }
 

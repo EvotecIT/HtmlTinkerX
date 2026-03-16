@@ -34,6 +34,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\OfficeIMO\OfficeIMO.Markdown.Html\OfficeIMO.Markdown.Html.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <Using Include="System.Net.Http" />
     </ItemGroup>
 

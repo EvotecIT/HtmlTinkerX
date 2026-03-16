@@ -15,6 +15,7 @@ public class HtmlCrawlerTests {
             Password = "secret",
             ProxyUsername = "proxy-user",
             ProxyPassword = "proxy-secret",
+            StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs,
             FormLogin = new HtmlFormLogin {
                 LoginUrl = "https://example.com/login",
                 UsernameSelector = "#user",
@@ -55,6 +56,7 @@ public class HtmlCrawlerTests {
         Assert.Equal(2, clone.ClickTexts.Count);
         Assert.Equal(2, clone.DismissSelectors.Count);
         Assert.Equal(2, clone.DismissTexts.Count);
+        Assert.Equal(HtmlCrawlStructuredJsonPreset.Docs, clone.StructuredJsonPreset);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
     }
 
@@ -81,7 +83,7 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
-    public void HtmlCrawlScenarios_ApplyArchiveAndDocsScenarios_UseIntentDefaults() {
+    public void HtmlCrawlScenarios_ApplyArchiveDocsAndDatasetScenarios_UseIntentDefaults() {
         HtmlCrawlOptions archive = new();
         HtmlCrawlScenarios.Apply(archive, HtmlCrawlScenario.Archive);
         Assert.True(archive.DownloadAssets);
@@ -93,7 +95,19 @@ public class HtmlCrawlerTests {
         Assert.Equal(HtmlCrawlContentMode.Reader, docs.ContentMode);
         Assert.True(docs.CompareContentModes);
         Assert.True(docs.DeduplicatePages);
+        Assert.Equal(HtmlCrawlStructuredJsonPreset.Docs, docs.StructuredJsonPreset);
         Assert.Contains(".theme-doc-toc-desktop", docs.ExcludeSelectors);
+
+        HtmlCrawlOptions dataset = new();
+        HtmlCrawlScenarios.Apply(dataset, HtmlCrawlScenario.Dataset);
+        Assert.Equal(HtmlCrawlContentMode.Reader, dataset.ContentMode);
+        Assert.True(dataset.IncludeMarkdown);
+        Assert.True(dataset.IncludeStructuredJson);
+        Assert.Equal(HtmlCrawlStructuredJsonPreset.Auto, dataset.StructuredJsonPreset);
+        Assert.True(dataset.CompareContentModes);
+        Assert.True(dataset.UseCanonicalUrls);
+        Assert.True(dataset.DeduplicatePages);
+        Assert.Contains(".breadcrumbs", dataset.ExcludeSelectors);
     }
 
     [Fact]

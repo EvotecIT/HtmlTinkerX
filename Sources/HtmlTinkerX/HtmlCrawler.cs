@@ -1,11 +1,14 @@
 using AngleSharp.Dom;
 using Microsoft.Playwright;
+using OfficeIMO.Markdown.Html;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -114,6 +117,9 @@ public static class HtmlCrawler {
         public string SkippedAssetsJsonlPath { get; set; } = string.Empty;
         public string LinksJsonlPath { get; set; } = string.Empty;
         public string AssetsJsonlPath { get; set; } = string.Empty;
+        public string StructuredJsonPagesJsonlPath { get; set; } = string.Empty;
+        public string OpenApiLikeJsonPath { get; set; } = string.Empty;
+        public string OpenApiJsonPath { get; set; } = string.Empty;
         public string ChunksJsonlPath { get; set; } = string.Empty;
         public string GraphJsonPath { get; set; } = string.Empty;
         public string SummaryJsonPath { get; set; } = string.Empty;
@@ -195,6 +201,17 @@ public static class HtmlCrawler {
         "pager"
     };
 
+    private static readonly (string Kind, string Selector)[] StructuredRegionSelectors = {
+        ("Header", "header,[role='banner'],.site-header,.page-header,#header"),
+        ("Navigation", "nav,[role='navigation'],.navbar,.navigation,.site-nav,.site-navigation,.menu,#nav,#menu"),
+        ("Main", "main,[role='main'],#main,#main-content,.main-content,.site-main,#content,.content"),
+        ("Article", "article,[itemtype*='Article'],[itemtype*='BlogPosting']"),
+        ("Aside", "aside,[role='complementary'],.sidebar,.side-nav,.toc,.table-of-contents,.on-this-page"),
+        ("Footer", "footer,[role='contentinfo'],.site-footer,.page-footer,#footer")
+    };
+
+    private const int StrictOpenApiPromotionThreshold = 45;
+
     /// <summary>
     /// Crawls a site starting from the supplied URL.
     /// </summary>
@@ -214,6 +231,10 @@ public static class HtmlCrawler {
 
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
         HtmlCrawlScenarios.Apply(resolvedOptions, resolvedOptions.Scenario);
+        IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema = await LoadStructuredSchemaAsync(resolvedOptions, cancellationToken).ConfigureAwait(false);
+        if (structuredSchema.Count > 0 || resolvedOptions.StructuredJsonPreset != HtmlCrawlStructuredJsonPreset.None) {
+            resolvedOptions.IncludeStructuredJson = true;
+        }
         IReadOnlyList<HtmlCrawlProfile> customProfiles = string.IsNullOrWhiteSpace(resolvedOptions.ProfilePath)
             ? Array.Empty<HtmlCrawlProfile>()
             : await HtmlCrawlProfiles.LoadFromPathAsync(resolvedOptions.ProfilePath!, cancellationToken).ConfigureAwait(false);
@@ -332,13 +353,13 @@ public static class HtmlCrawler {
 
                 HtmlCrawlPage page;
                 if (resolvedOptions.Render) {
-                    FetchedPageData fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    FetchedPageData fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
-                    FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                    FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
                         ProfileSelectionDecision inferredProfileDecision = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
@@ -349,7 +370,7 @@ public static class HtmlCrawler {
                             result.AppliedProfileReasonCode = inferredProfileDecision.ReasonCode;
                             result.AppliedProfileReason = inferredProfileDecision.Reason;
                             if (!string.IsNullOrWhiteSpace(fetchedPage.RawHtml)) {
-                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, next.Uri, resolvedOptions);
+                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, next.Uri, resolvedOptions, structuredSchema);
                             }
                         }
                     }
@@ -359,7 +380,7 @@ public static class HtmlCrawler {
                         page.RenderReasonCode = decision.ReasonCode;
                         page.RenderReason = decision.Reason;
                         if (decision.ShouldRender) {
-                            fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, cancellationToken).ConfigureAwait(false);
+                            fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                             page = fetchedPage.Page;
                             page.RenderMode = HtmlCrawlRenderMode.AutoRendered;
                             page.RenderReasonCode = decision.ReasonCode;
@@ -417,6 +438,7 @@ public static class HtmlCrawler {
 
             result.PendingPages = SnapshotPendingPages(pending);
             result.Finished = DateTimeOffset.UtcNow;
+            UpdateDerivedResultData(result);
             if (persistSnapshots) {
                 await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
             }
@@ -950,11 +972,15 @@ public static class HtmlCrawler {
         result.SkippedAssetsJsonlPath = artifactPaths.SkippedAssetsJsonlPath;
         result.LinksJsonlPath = artifactPaths.LinksJsonlPath;
         result.AssetsJsonlPath = artifactPaths.AssetsJsonlPath;
+        result.StructuredJsonPagesJsonlPath = artifactPaths.StructuredJsonPagesJsonlPath;
+        result.OpenApiLikePath = artifactPaths.OpenApiLikeJsonPath;
+        result.OpenApiPath = artifactPaths.OpenApiJsonPath;
         result.ChunksJsonlPath = artifactPaths.ChunksJsonlPath;
         result.GraphJsonPath = artifactPaths.GraphJsonPath;
         result.SummaryPath = artifactPaths.SummaryJsonPath;
         result.SummaryTextPath = artifactPaths.SummaryTextPath;
         result.IndexHtmlPath = artifactPaths.IndexHtmlPath;
+        UpdateDerivedResultData(result);
 
         for (int i = 0; i < result.Pages.Count; i++) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -968,6 +994,14 @@ public static class HtmlCrawler {
 
             if (!string.IsNullOrEmpty(page.Text)) {
                 page.TextPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.txt");
+            }
+
+            if (!string.IsNullOrEmpty(page.Markdown)) {
+                page.MarkdownPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.md");
+            }
+
+            if (page.StructuredJson != null) {
+                page.StructuredJsonPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.structured.json");
             }
 
             page.ManifestPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.json");
@@ -994,6 +1028,14 @@ public static class HtmlCrawler {
                 await WriteTextAsync(page.TextPath!, page.Text, cancellationToken).ConfigureAwait(false);
             }
 
+            if (!string.IsNullOrEmpty(page.Markdown)) {
+                await WriteTextAsync(page.MarkdownPath!, page.Markdown, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (page.StructuredJson != null) {
+                await WriteTextAsync(page.StructuredJsonPath!, JsonSerializer.Serialize(page.StructuredJson, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
+            }
+
             await WriteTextAsync(page.ManifestPath!, BuildPageManifestJson(page, result.Assets, localPageMap, assetMap), cancellationToken).ConfigureAwait(false);
         }
 
@@ -1001,7 +1043,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1016,6 +1058,8 @@ public static class HtmlCrawler {
                 page.Title,
                 page.HtmlPath,
                 page.TextPath,
+                page.MarkdownPath,
+                page.StructuredJsonPath,
                 page.ManifestPath,
                 page.ContentFingerprint,
                 page.DuplicateOfUrl,
@@ -1051,6 +1095,28 @@ public static class HtmlCrawler {
                 DurationMs = (long)page.Duration.TotalMilliseconds,
                 LinkCount = page.Links.Count,
                 AssetCount = page.AssetUrls.Count,
+                StructuredTableCount = page.StructuredJson?.Tables.Count ?? 0,
+                StructuredListCount = page.StructuredJson?.Lists.Count ?? 0,
+                StructuredFormCount = page.StructuredJson?.Forms.Count ?? 0,
+                StructuredMicrodataCount = page.StructuredJson?.MicrodataItems.Count ?? 0,
+                StructuredMetaTagCount = page.StructuredJson?.MetaTags.Count ?? 0,
+                StructuredCodeBlockCount = page.StructuredJson?.CodeBlocks.Count ?? 0,
+                StructuredCodeSampleCount = page.StructuredJson?.CodeSamples.Count ?? 0,
+                StructuredApiEndpointCount = page.StructuredJson?.ApiEndpoints.Count ?? 0,
+                StructuredAuthenticatedApiEndpointCount = GetStructuredAuthenticatedApiEndpointCount(page.StructuredJson),
+                StructuredRateLimitedApiEndpointCount = GetStructuredRateLimitedApiEndpointCount(page.StructuredJson),
+                StructuredApiErrorResponseCount = GetStructuredApiErrorResponseCount(page.StructuredJson),
+                StructuredBreadcrumbCount = page.StructuredJson?.Breadcrumbs.Count ?? 0,
+                StructuredFaqCount = page.StructuredJson?.FaqItems.Count ?? 0,
+                StructuredSpecTableCount = page.StructuredJson?.SpecTables.Count ?? 0,
+                StructuredCalloutCount = page.StructuredJson?.Callouts.Count ?? 0,
+                StructuredPrimaryActionCount = page.StructuredJson?.PrimaryActions.Count ?? 0,
+                StructuredHeaderCount = page.StructuredJson?.Layout.HeaderCount ?? 0,
+                StructuredNavigationCount = page.StructuredJson?.Layout.NavigationCount ?? 0,
+                StructuredMainCount = page.StructuredJson?.Layout.MainCount ?? 0,
+                StructuredArticleCount = page.StructuredJson?.Layout.ArticleCount ?? 0,
+                StructuredAsideCount = page.StructuredJson?.Layout.AsideCount ?? 0,
+                StructuredFooterCount = page.StructuredJson?.Layout.FooterCount ?? 0,
                 page.Error
             }));
 
@@ -1066,6 +1132,8 @@ public static class HtmlCrawler {
                 EscapeCsv(page.Title),
                 EscapeCsv(page.HtmlPath),
                 EscapeCsv(page.TextPath),
+                EscapeCsv(page.MarkdownPath),
+                EscapeCsv(page.StructuredJsonPath),
                 EscapeCsv(page.ManifestPath),
                 EscapeCsv(page.ContentFingerprint),
                 EscapeCsv(page.DuplicateOfUrl),
@@ -1101,6 +1169,28 @@ public static class HtmlCrawler {
                 EscapeCsv(page.Links.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.AssetUrls.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.AppliedInteractions.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Tables.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Lists.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Forms.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.MicrodataItems.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.MetaTags.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.CodeBlocks.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.CodeSamples.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.ApiEndpoints.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(GetStructuredAuthenticatedApiEndpointCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(GetStructuredRateLimitedApiEndpointCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(GetStructuredApiErrorResponseCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Breadcrumbs.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.FaqItems.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.SpecTables.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Callouts.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.PrimaryActions.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.HeaderCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.NavigationCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.MainCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.ArticleCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.AsideCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv((page.StructuredJson?.Layout.FooterCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.Error)));
         }
 
@@ -1178,6 +1268,18 @@ public static class HtmlCrawler {
             }));
         }
 
+        StringBuilder structuredPagesJsonl = new();
+        foreach (HtmlCrawlPage page in result.Pages.Where(page => page.StructuredJson != null)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            structuredPagesJsonl.AppendLine(JsonSerializer.Serialize(new {
+                page.Url,
+                page.Title,
+                page.Depth,
+                page.StructuredJsonPath,
+                page.StructuredJson
+            }, CreateJsonOptions()));
+        }
+
         List<PageChunkRecord> chunkRecords = BuildChunkRecords(result.Pages);
         result.ChunkCount = chunkRecords.Count;
         StringBuilder chunksJsonl = new();
@@ -1220,6 +1322,9 @@ public static class HtmlCrawler {
         await WriteTextAsync(artifactPaths.SkippedAssetsJsonlPath, skippedAssetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.LinksJsonlPath, linksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.AssetsJsonlPath, assetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
+        await WriteTextAsync(artifactPaths.StructuredJsonPagesJsonlPath, structuredPagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
+        await WriteTextAsync(artifactPaths.OpenApiLikeJsonPath, JsonSerializer.Serialize(result.OpenApiLike, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
+        await WriteTextAsync(artifactPaths.OpenApiJsonPath, JsonSerializer.Serialize(result.OpenApiDocument, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.ChunksJsonlPath, chunksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.GraphJsonPath, JsonSerializer.Serialize(graphDocument, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.SummaryJsonPath, JsonSerializer.Serialize(summary, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
@@ -1241,6 +1346,345 @@ public static class HtmlCrawler {
         }
 
         return snapshot;
+    }
+
+    private static void UpdateDerivedResultData(HtmlCrawlResult result) {
+        result.OpenApiLike = BuildResultOpenApiLike(result);
+        result.OpenApiDocument = BuildResultOpenApiDocument(result.OpenApiLike, result);
+    }
+
+    private static Dictionary<string, object?> BuildResultOpenApiDocument(HtmlCrawlStructuredOpenApiLike openApiLike, HtmlCrawlResult result) {
+        Dictionary<string, object?> paths = BuildStrictOpenApiPaths(openApiLike);
+        Dictionary<string, object?> document = new(StringComparer.OrdinalIgnoreCase) {
+            ["openapi"] = "3.1.0",
+            ["info"] = new Dictionary<string, object?> {
+                ["title"] = openApiLike.Title ?? "Offline API",
+                ["description"] = openApiLike.Description,
+                ["version"] = "0.0.0-offline"
+            },
+            ["servers"] = openApiLike.Servers.Select(server => new Dictionary<string, object?> {
+                ["url"] = server
+            }).ToList(),
+            ["paths"] = paths
+        };
+
+        Dictionary<string, object?> components = BuildStrictOpenApiComponents(openApiLike);
+        if (components.Count > 0) {
+            document["components"] = components;
+        }
+
+        document["x-htmltinkerx-openApiLikePath"] = result.OpenApiLikePath;
+        document["x-htmltinkerx-startUrl"] = result.StartUrl;
+        document["x-htmltinkerx-operationCount"] = openApiLike.Paths.Values.Sum(path => path.Operations.Count);
+        document["x-htmltinkerx-promotion"] = BuildStrictOpenApiPromotionMetadata(openApiLike, paths);
+        return document;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiPaths(HtmlCrawlStructuredOpenApiLike openApiLike) {
+        Dictionary<string, object?> paths = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, HtmlCrawlStructuredOpenApiPathItem> pathItem in openApiLike.Paths.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            Dictionary<string, object?> operations = new(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, HtmlCrawlStructuredOpenApiOperation> operationItem in pathItem.Value.Operations.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                if (!operationItem.Value.StrictOpenApiEligible) {
+                    continue;
+                }
+
+                operations[operationItem.Key] = BuildStrictOpenApiOperation(operationItem.Value);
+            }
+
+            if (operations.Count > 0) {
+                paths[pathItem.Key] = operations;
+            }
+        }
+
+        return paths;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiOperation(HtmlCrawlStructuredOpenApiOperation operation) {
+        Dictionary<string, object?> value = new(StringComparer.OrdinalIgnoreCase) {
+            ["operationId"] = operation.OperationId,
+            ["summary"] = operation.Summary,
+            ["description"] = operation.Description,
+            ["tags"] = operation.Tags
+        };
+
+        List<object> parameters = BuildStrictOpenApiParameters(operation);
+        if (parameters.Count > 0) {
+            value["parameters"] = parameters;
+        }
+
+        object? requestBody = BuildStrictOpenApiRequestBody(operation);
+        if (requestBody != null) {
+            value["requestBody"] = requestBody;
+        }
+
+        value["responses"] = BuildStrictOpenApiResponses(operation);
+
+        if (operation.Authentication.Required != false && !string.IsNullOrWhiteSpace(operation.AuthenticationRef)) {
+            value["security"] = new List<object> {
+                new Dictionary<string, object?> {
+                    [operation.AuthenticationRef!] = Array.Empty<string>()
+                }
+            };
+        }
+
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-resource", operation.Resource);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-rateLimitRef", operation.RateLimitRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-parametersRef", operation.ParametersRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-requestHeadersRef", operation.RequestHeadersRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-responseHeadersRef", operation.ResponseHeadersRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-requestExamplesRef", operation.RequestExamplesRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-responseExamplesRef", operation.ResponseExamplesRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-errorCatalogRef", operation.ErrorCatalogRef);
+        AddStrictOpenApiExtension(value, "x-htmltinkerx-promotionScore", operation.StrictOpenApiScore);
+        if (operation.StrictOpenApiWarnings.Count > 0) {
+            value["x-htmltinkerx-promotionWarnings"] = operation.StrictOpenApiWarnings.ToList();
+        }
+        if (operation.Provenance.PageUrls.Count > 0) {
+            value["x-htmltinkerx-sourcePages"] = operation.Provenance.PageUrls.ToList();
+        }
+        if (operation.Provenance.Entries.Count > 0) {
+            value["x-htmltinkerx-provenance"] = operation.Provenance.Entries
+                .Select(entry => new Dictionary<string, object?> {
+                    ["pageUrl"] = entry.PageUrl,
+                    ["kind"] = entry.Kind,
+                    ["selectorHint"] = entry.SelectorHint,
+                    ["label"] = entry.Label
+                })
+                .ToList();
+        }
+        return value;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiPromotionMetadata(
+        HtmlCrawlStructuredOpenApiLike openApiLike,
+        IReadOnlyDictionary<string, object?> strictPaths) {
+        List<Dictionary<string, object?>> skippedOperations = openApiLike.Paths
+            .SelectMany(path => path.Value.Operations.Values)
+            .Where(operation => !operation.StrictOpenApiEligible)
+            .OrderByDescending(operation => operation.StrictOpenApiScore)
+            .ThenBy(operation => operation.Path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(operation => operation.Method, StringComparer.OrdinalIgnoreCase)
+            .Select(operation => new Dictionary<string, object?> {
+                ["operationId"] = operation.OperationId,
+                ["method"] = operation.Method,
+                ["path"] = operation.Path,
+                ["score"] = operation.StrictOpenApiScore,
+                ["warnings"] = operation.StrictOpenApiWarnings.ToList()
+            })
+            .ToList();
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) {
+            ["threshold"] = openApiLike.StrictOpenApiPromotionThreshold,
+            ["eligibleOperationCount"] = openApiLike.StrictOpenApiEligibleOperationCount,
+            ["skippedOperationCount"] = openApiLike.StrictOpenApiSkippedOperationCount,
+            ["promotedPathCount"] = strictPaths.Count,
+            ["averageScore"] = openApiLike.StrictOpenApiAverageScore,
+            ["skippedOperations"] = skippedOperations
+        };
+    }
+
+    private static List<object> BuildStrictOpenApiParameters(HtmlCrawlStructuredOpenApiOperation operation) {
+        return operation.Parameters
+            .OrderBy(parameter => parameter.Location, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(parameter => {
+                Dictionary<string, object?> value = new(StringComparer.OrdinalIgnoreCase) {
+                    ["name"] = parameter.Name,
+                    ["in"] = NormalizeStrictOpenApiParameterLocation(parameter.Location),
+                    ["required"] = string.Equals(parameter.Location, "path", StringComparison.OrdinalIgnoreCase) || parameter.Required == true,
+                    ["description"] = parameter.Description,
+                    ["schema"] = BuildStrictOpenApiParameterSchema(parameter)
+                };
+
+                if (!string.IsNullOrWhiteSpace(parameter.ExampleValue)) {
+                    value["example"] = ParseStrictOpenApiExampleValue(parameter.ExampleValue);
+                }
+                if (!string.IsNullOrWhiteSpace(parameter.DefaultValue)) {
+                    value["x-htmltinkerx-default"] = parameter.DefaultValue;
+                }
+                return (object)value;
+            })
+            .ToList();
+    }
+
+    private static object BuildStrictOpenApiParameterSchema(HtmlCrawlStructuredApiParameter parameter) {
+        Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase);
+        ApplyStrictOpenApiType(schema, parameter.Type, parameter.Format);
+        if (parameter.Nullable == true) {
+            schema["nullable"] = true;
+        }
+        if (!string.IsNullOrWhiteSpace(parameter.Pattern)) {
+            schema["pattern"] = parameter.Pattern;
+        }
+        if (parameter.EnumValues.Count > 0) {
+            schema["enum"] = parameter.EnumValues.Cast<object>().ToList();
+        }
+
+        return schema;
+    }
+
+    private static object? BuildStrictOpenApiRequestBody(HtmlCrawlStructuredOpenApiOperation operation) {
+        bool hasSchema = !string.IsNullOrWhiteSpace(operation.RequestBodyFieldsRef) || !string.IsNullOrWhiteSpace(operation.RequestBodySchemaRef);
+        bool hasExamples = operation.RequestExamples.Count > 0;
+        if (!hasSchema && !hasExamples) {
+            return null;
+        }
+
+        string contentType = operation.RequestHeaders
+            .FirstOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            ?? operation.RequestExamples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+            ?? "application/json";
+
+        Dictionary<string, object?> mediaType = new(StringComparer.OrdinalIgnoreCase);
+        object? schema = BuildStrictOpenApiSchemaReference(operation.RequestBodyFieldsRef, operation.RequestBodySchemaRef);
+        if (schema != null) {
+            mediaType["schema"] = schema;
+        }
+
+        Dictionary<string, object?> examples = BuildStrictOpenApiRequestExamples(operation.RequestExamples);
+        if (examples.Count > 0) {
+            mediaType["examples"] = examples;
+        }
+
+        return new Dictionary<string, object?> {
+            ["required"] = operation.Parameters.Any(parameter => string.Equals(parameter.Location, "body", StringComparison.OrdinalIgnoreCase) && parameter.Required == true),
+            ["content"] = new Dictionary<string, object?> {
+                [contentType] = mediaType
+            }
+        };
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiResponses(HtmlCrawlStructuredOpenApiOperation operation) {
+        Dictionary<string, object?> responses = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (IGrouping<string, HtmlCrawlStructuredResponseExample> group in operation.ResponseExamples
+                     .GroupBy(example => GetStrictOpenApiResponseCode(example.StatusCode), StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)) {
+            bool isError = group.Any(example => example.IsError);
+            responses[group.Key] = BuildStrictOpenApiResponse(group.ToList(), isError, operation);
+        }
+
+        if (responses.Count == 0) {
+            responses["default"] = new Dictionary<string, object?> {
+                ["description"] = operation.Description ?? "Documented response"
+            };
+        }
+
+        return responses;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiResponse(
+        IReadOnlyList<HtmlCrawlStructuredResponseExample> examples,
+        bool isError,
+        HtmlCrawlStructuredOpenApiOperation operation) {
+        HtmlCrawlStructuredResponseExample primary = examples[0];
+        Dictionary<string, object?> response = new(StringComparer.OrdinalIgnoreCase) {
+            ["description"] = primary.StatusText ?? primary.Title ?? primary.Description ?? (isError ? "Error response" : "Successful response")
+        };
+
+        Dictionary<string, object?> headers = BuildStrictOpenApiHeaderDefinitions(examples.SelectMany(example => example.Headers));
+        if (headers.Count > 0) {
+            response["headers"] = headers;
+        }
+
+        string? contentType = examples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        object? schema = BuildStrictOpenApiSchemaReference(
+            isError ? operation.ErrorResponseFieldsRef : operation.SuccessResponseFieldsRef,
+            isError ? operation.ErrorResponseSchemaRef : operation.SuccessResponseSchemaRef);
+        Dictionary<string, object?> exampleEntries = BuildStrictOpenApiResponseExamples(examples);
+        if (schema != null || exampleEntries.Count > 0) {
+            Dictionary<string, object?> mediaType = new(StringComparer.OrdinalIgnoreCase);
+            if (schema != null) {
+                mediaType["schema"] = schema;
+            }
+            if (exampleEntries.Count > 0) {
+                mediaType["examples"] = exampleEntries;
+            }
+
+            response["content"] = new Dictionary<string, object?> {
+                [contentType ?? "application/json"] = mediaType
+            };
+        }
+
+        return response;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiComponents(HtmlCrawlStructuredOpenApiLike openApiLike) {
+        Dictionary<string, object?> components = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, object?> securitySchemes = BuildStrictOpenApiSecuritySchemes(openApiLike.Components.AuthProfiles);
+        if (securitySchemes.Count > 0) {
+            components["securitySchemes"] = securitySchemes;
+        }
+
+        Dictionary<string, object?> schemas = BuildStrictOpenApiSchemas(openApiLike.Components);
+        if (schemas.Count > 0) {
+            components["schemas"] = schemas;
+        }
+
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-rateLimitProfiles", openApiLike.Components.RateLimitProfiles);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-parameterSets", openApiLike.Components.ParameterSets);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-requestHeaderSets", openApiLike.Components.RequestHeaderSets);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-responseHeaderSets", openApiLike.Components.ResponseHeaderSets);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-requestExampleSets", openApiLike.Components.RequestExampleSets);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-responseExampleSets", openApiLike.Components.ResponseExampleSets);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-errorCatalogs", openApiLike.Components.ErrorCatalogs);
+        AddStrictOpenApiComponentExtension(components, "x-htmltinkerx-schemaProvenance", BuildStrictOpenApiSchemaComponentProvenance(openApiLike.Components.FieldSets));
+        return components;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiSecuritySchemes(IDictionary<string, HtmlCrawlStructuredApiAuthentication> authProfiles) {
+        Dictionary<string, object?> securitySchemes = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, HtmlCrawlStructuredApiAuthentication> item in authProfiles.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            Dictionary<string, object?> scheme = new(StringComparer.OrdinalIgnoreCase);
+            string? primaryHeader = item.Value.Headers.FirstOrDefault();
+            if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "bearer", StringComparison.OrdinalIgnoreCase))) {
+                scheme["type"] = "http";
+                scheme["scheme"] = "bearer";
+            } else if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "basic", StringComparison.OrdinalIgnoreCase))) {
+                scheme["type"] = "http";
+                scheme["scheme"] = "basic";
+            } else {
+                scheme["type"] = "apiKey";
+                scheme["in"] = "header";
+                scheme["name"] = primaryHeader ?? "Authorization";
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Value.Summary)) {
+                scheme["description"] = item.Value.Summary;
+            }
+            securitySchemes[item.Key] = scheme;
+        }
+
+        return securitySchemes;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiSchemas(HtmlCrawlStructuredOpenApiComponents components) {
+        Dictionary<string, object?> schemas = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, IList<HtmlCrawlStructuredField>> item in components.FieldSets.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            schemas[item.Key] = BuildStrictOpenApiSchemaFromFields(item.Value);
+        }
+
+        foreach (KeyValuePair<string, IDictionary<string, string?>> item in components.Schemas.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            if (!schemas.ContainsKey(item.Key)) {
+                schemas[item.Key] = BuildStrictOpenApiSchemaFromFlatMap(item.Value);
+            }
+        }
+
+        return schemas;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiSchemaComponentProvenance(IDictionary<string, IList<HtmlCrawlStructuredField>> fieldSets) {
+        Dictionary<string, object?> provenance = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, IList<HtmlCrawlStructuredField>> item in fieldSets.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            List<Dictionary<string, object?>> entries = BuildStrictOpenApiFieldProvenance(item.Value.SelectMany(field => field.Provenance));
+            if (entries.Count > 0) {
+                provenance[item.Key] = entries;
+            }
+        }
+
+        return provenance;
     }
 
     private static string BuildPageManifestJson(
@@ -1311,8 +1755,11 @@ public static class HtmlCrawler {
             DurationMs = (long)page.Duration.TotalMilliseconds,
             PageFiles = new {
                 HtmlPath = BuildRelativeOptionalPath(manifestPath, page.HtmlPath),
-                TextPath = BuildRelativeOptionalPath(manifestPath, page.TextPath)
+                TextPath = BuildRelativeOptionalPath(manifestPath, page.TextPath),
+                MarkdownPath = BuildRelativeOptionalPath(manifestPath, page.MarkdownPath),
+                StructuredJsonPath = BuildRelativeOptionalPath(manifestPath, page.StructuredJsonPath)
             },
+            page.StructuredJson,
             Search = new {
                 searchMetadata.WordCount,
                 searchMetadata.CharacterCount,
@@ -1358,10 +1805,290 @@ public static class HtmlCrawler {
         return JsonSerializer.Serialize(manifest, CreateJsonOptions());
     }
 
+    private static HtmlCrawlStructuredJson BuildStructuredJson(
+        HtmlCrawlPage page,
+        string fullHtml,
+        string selectedHtml,
+        string structuredText,
+        string structuredMarkdown,
+        IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema,
+        HtmlCrawlStructuredJsonPreset structuredPreset) {
+        IDocument document = HtmlParser.ParseWithAngleSharp(fullHtml);
+        IDocument selectedDocument = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_structured_selected\">{selectedHtml}</div>");
+        List<HtmlMetaTag> metaTags = HtmlParser.ParseMetaTags(fullHtml);
+        HtmlOpenGraph openGraph = HtmlParser.ParseOpenGraph(fullHtml);
+        HtmlCrawlStructuredMetadata metadata = BuildStructuredMetadata(page, document, metaTags, openGraph);
+        PageSearchMetadata searchMetadata = BuildPageSearchMetadata(selectedHtml, structuredText, structuredMarkdown);
+        List<HtmlTableResult> tables = HtmlParser.ParseTablesWithAngleSharpDetailed(selectedHtml);
+        List<HtmlCrawlStructuredCodeBlock> codeBlocks = BuildStructuredCodeBlocks(selectedDocument);
+        List<HtmlCrawlStructuredCodeSample> codeSamples = BuildStructuredCodeSamples(selectedDocument);
+        List<HtmlCrawlStructuredBreadcrumbTrail> breadcrumbs = BuildStructuredBreadcrumbs(document, page.Url);
+        List<HtmlCrawlStructuredFaqItem> faqItems = BuildStructuredFaqItems(selectedDocument);
+        List<HtmlCrawlStructuredSpecTable> specTables = BuildStructuredSpecTables(selectedDocument, tables);
+        List<HtmlCrawlStructuredCallout> callouts = BuildStructuredCallouts(selectedDocument);
+        List<HtmlCrawlStructuredPrimaryAction> primaryActions = BuildStructuredPrimaryActions(selectedDocument, page.Url);
+        List<HtmlCrawlStructuredApiEndpoint> apiEndpoints = BuildStructuredApiEndpoints(selectedDocument, codeSamples, page.Url);
+        HtmlCrawlStructuredJson structuredJson = new() {
+            Document = BuildStructuredDocument(page, searchMetadata, structuredText, structuredMarkdown),
+            Content = new HtmlCrawlStructuredContent {
+                WordCount = searchMetadata.WordCount,
+                CharacterCount = searchMetadata.CharacterCount,
+                ChunkCount = searchMetadata.ChunkCount,
+                Summary = searchMetadata.Summary,
+                Headings = new List<string>(searchMetadata.Headings),
+                Keywords = new List<string>(searchMetadata.Keywords)
+            },
+            Metadata = metadata,
+            Layout = BuildStructuredLayout(document),
+            MetaTags = metaTags,
+            OpenGraph = openGraph,
+            MicrodataItems = HtmlParser.ParseMicrodataItems(fullHtml),
+            Forms = HtmlParser.ParseFormsWithAngleSharp(fullHtml),
+            Lists = HtmlParser.ParseListsWithAngleSharpDetailed(selectedHtml),
+            Tables = tables,
+            CodeBlocks = codeBlocks,
+            CodeSamples = codeSamples,
+            Breadcrumbs = breadcrumbs,
+            FaqItems = faqItems,
+            SpecTables = specTables,
+            Callouts = callouts,
+            PrimaryActions = primaryActions,
+            ApiEndpoints = apiEndpoints,
+            ApiCatalog = BuildStructuredApiCatalog(metadata, apiEndpoints),
+            OpenApiLike = BuildStructuredOpenApiLike(page, metadata, apiEndpoints)
+        };
+
+        HtmlCrawlStructuredJsonPreset resolvedPreset = ResolveStructuredJsonPreset(structuredJson, document, selectedDocument, structuredPreset);
+        structuredJson.ResolvedPreset = resolvedPreset;
+        IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> effectiveStructuredSchema = BuildEffectiveStructuredSchema(resolvedPreset, structuredSchema);
+        if (effectiveStructuredSchema.Count > 0) {
+            structuredJson.Extracted = BuildStructuredSchemaExtraction(structuredJson, document, selectedDocument, effectiveStructuredSchema);
+        }
+
+        return structuredJson;
+    }
+
+    private static IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> BuildEffectiveStructuredSchema(
+        HtmlCrawlStructuredJsonPreset structuredPreset,
+        IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema) {
+        Dictionary<string, HtmlCrawlJsonSchemaField> effectiveSchema = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, HtmlCrawlJsonSchemaField> field in GetPresetStructuredSchema(structuredPreset)) {
+            effectiveSchema[field.Key] = field.Value;
+        }
+
+        foreach (KeyValuePair<string, HtmlCrawlJsonSchemaField> field in structuredSchema) {
+            effectiveSchema[field.Key] = field.Value;
+        }
+
+        return effectiveSchema;
+    }
+
+    private static IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> GetPresetStructuredSchema(HtmlCrawlStructuredJsonPreset structuredPreset) {
+        Dictionary<string, HtmlCrawlJsonSchemaField> schema = new(StringComparer.OrdinalIgnoreCase);
+        if (structuredPreset == HtmlCrawlStructuredJsonPreset.None) {
+            return schema;
+        }
+
+        void AddPath(string name, string path) {
+            schema[name] = new HtmlCrawlJsonSchemaField {
+                Path = path
+            };
+        }
+
+        void AddSelector(string name, string selector, string source = "selected", string mode = "Text", string? attribute = null, bool all = false) {
+            schema[name] = new HtmlCrawlJsonSchemaField {
+                Selector = selector,
+                Source = source,
+                Mode = mode,
+                Attribute = attribute,
+                All = all
+            };
+        }
+
+        switch (structuredPreset) {
+            case HtmlCrawlStructuredJsonPreset.Docs:
+                AddPath("title", "Metadata.Title");
+                AddPath("description", "Metadata.Description");
+                AddPath("canonicalUrl", "Metadata.CanonicalUrl");
+                AddPath("language", "Metadata.Language");
+                AddPath("siteName", "Metadata.SiteName");
+                AddPath("summary", "Document.Summary");
+                AddPath("content", "Document.Text");
+                AddPath("markdown", "Document.Markdown");
+                AddPath("headings", "Document.Headings");
+                AddPath("keywords", "Document.Keywords");
+                AddPath("codeBlocks", "CodeBlocks");
+                AddPath("codeSamples", "CodeSamples");
+                AddPath("apiEndpoints", "ApiEndpoints");
+                AddPath("apiCatalog", "ApiCatalog");
+                AddPath("apiTags", "ApiCatalog.Tags");
+                AddPath("apiResources", "ApiCatalog.Resources");
+                AddPath("operationIds", "ApiCatalog.OperationIds");
+                AddPath("openApiLike", "OpenApiLike");
+                AddPath("openApiPaths", "OpenApiLike.Paths");
+                AddPath("openApiServers", "OpenApiLike.Servers");
+                AddPath("authentication", "ApiEndpoints.0.Authentication");
+                AddPath("authRequired", "ApiEndpoints.0.Authentication.Required");
+                AddPath("authenticationSchemes", "ApiEndpoints.0.Authentication.Schemes");
+                AddPath("authenticationHeaders", "ApiEndpoints.0.Authentication.Headers");
+                AddPath("rateLimit", "ApiEndpoints.0.RateLimit");
+                AddPath("rateLimitHeaders", "ApiEndpoints.0.RateLimit.Headers");
+                AddPath("rateLimitStatusCode", "ApiEndpoints.0.RateLimit.StatusCode");
+                AddPath("operationId", "ApiEndpoints.0.OperationId");
+                AddPath("resource", "ApiEndpoints.0.Resource");
+                AddPath("tags", "ApiEndpoints.0.Tags");
+                AddPath("requestExamples", "ApiEndpoints.0.RequestExamples");
+                AddPath("requestExampleCount", "ApiEndpoints.0.RequestExamples.Count");
+                AddPath("requestHeaders", "ApiEndpoints.0.RequestHeaders");
+                AddPath("responseHeaders", "ApiEndpoints.0.ResponseHeaders");
+                AddPath("errorResponses", "ApiEndpoints.0.ErrorResponses");
+                AddPath("errorResponseCount", "ApiEndpoints.0.ErrorResponses.Count");
+                AddPath("errorCatalog", "ApiEndpoints.0.ErrorCatalog");
+                AddPath("errorCatalogCount", "ApiEndpoints.0.ErrorCatalog.Count");
+                AddPath("successResponseSchema", "ApiEndpoints.0.SuccessResponseSchema");
+                AddPath("errorResponseSchema", "ApiEndpoints.0.ErrorResponseSchema");
+                AddPath("requestBodyFields", "ApiEndpoints.0.RequestBodyFields");
+                AddPath("successResponseFields", "ApiEndpoints.0.SuccessResponseFields");
+                AddPath("errorResponseFields", "ApiEndpoints.0.ErrorResponseFields");
+                AddPath("faqItems", "FaqItems");
+                AddPath("callouts", "Callouts");
+                AddPath("primaryActions", "PrimaryActions");
+                AddSelector("mainHeading", "h1, h2");
+                AddSelector("sectionHeadings", "h2, h3", all: true);
+                AddSelector("navigationLinks", "header nav a, nav a, [role='navigation'] a", source: "page", all: true);
+                AddSelector("navigationHrefs", "header nav a, nav a, [role='navigation'] a", source: "page", mode: "Attribute", attribute: "href", all: true);
+                AddPath("breadcrumbs", "Breadcrumbs.0.Labels");
+                AddPath("codeBlockCount", "CodeBlocks.Count");
+                AddPath("codeSampleCount", "CodeSamples.Count");
+                AddPath("apiEndpointCount", "ApiEndpoints.Count");
+                AddSelector("faqCount", "details, [itemscope][itemtype*='Question' i], [itemprop='mainEntity'][itemscope]", mode: "Count");
+                AddPath("calloutCount", "Callouts.Count");
+                AddPath("primaryActionLabels", "PrimaryActions");
+                AddSelector("tableCount", "table", mode: "Count");
+                break;
+
+            case HtmlCrawlStructuredJsonPreset.Article:
+                AddPath("title", "Metadata.Title");
+                AddPath("description", "Metadata.Description");
+                AddPath("canonicalUrl", "Metadata.CanonicalUrl");
+                AddPath("language", "Metadata.Language");
+                AddPath("author", "Metadata.Author");
+                AddPath("publishedTime", "Metadata.PublishedTime");
+                AddPath("modifiedTime", "Metadata.ModifiedTime");
+                AddPath("imageUrl", "Metadata.ImageUrl");
+                AddPath("summary", "Document.Summary");
+                AddPath("content", "Document.Text");
+                AddPath("markdown", "Document.Markdown");
+                AddPath("headings", "Document.Headings");
+                AddPath("keywords", "Document.Keywords");
+                AddPath("links", "Document.Links");
+                AddPath("faqItems", "FaqItems");
+                AddPath("callouts", "Callouts");
+                AddPath("primaryActions", "PrimaryActions");
+                AddSelector("mainHeading", "h1");
+                AddSelector("lead", "p");
+                AddSelector("sectionHeadings", "h2, h3", all: true);
+                AddSelector("imageUrls", "article img[src], main img[src], img[src]", source: "page", mode: "Attribute", attribute: "src", all: true);
+                break;
+
+            case HtmlCrawlStructuredJsonPreset.Product:
+                AddPath("title", "Metadata.Title");
+                AddPath("description", "Metadata.Description");
+                AddPath("canonicalUrl", "Metadata.CanonicalUrl");
+                AddPath("language", "Metadata.Language");
+                AddPath("siteName", "Metadata.SiteName");
+                AddPath("imageUrl", "Metadata.ImageUrl");
+                AddPath("summary", "Document.Summary");
+                AddPath("content", "Document.Text");
+                AddPath("markdown", "Document.Markdown");
+                AddPath("headings", "Document.Headings");
+                AddPath("breadcrumbs", "Breadcrumbs.0.Labels");
+                AddPath("faqItems", "FaqItems");
+                AddPath("specTables", "SpecTables");
+                AddPath("primaryActions", "PrimaryActions");
+                AddSelector("name", "[itemprop='name'], h1", source: "page");
+                AddSelector("price", "[itemprop='price'], .price, .product-price, [data-price], [class*='price']", source: "page");
+                AddSelector("priceMeta", "meta[property='product:price:amount'], meta[itemprop='price']", source: "page", mode: "Attribute", attribute: "content");
+                AddSelector("currency", "meta[property='product:price:currency'], meta[itemprop='priceCurrency']", source: "page", mode: "Attribute", attribute: "content");
+                AddSelector("sku", "[itemprop='sku'], [data-sku], .sku, [class*='sku']", source: "page");
+                AddSelector("availability", "[itemprop='availability'], .availability, [data-stock-status], [class*='stock']", source: "page");
+                AddSelector("imageUrls", "img[src]", source: "page", mode: "Attribute", attribute: "src", all: true);
+                AddSelector("specTableCount", "table", mode: "Count");
+                break;
+        }
+
+        return schema;
+    }
+
+    private static HtmlCrawlStructuredJsonPreset ResolveStructuredJsonPreset(
+        HtmlCrawlStructuredJson structuredJson,
+        IDocument document,
+        IDocument selectedDocument,
+        HtmlCrawlStructuredJsonPreset structuredPreset) {
+        if (structuredPreset == HtmlCrawlStructuredJsonPreset.None) {
+            return HtmlCrawlStructuredJsonPreset.None;
+        }
+
+        if (structuredPreset != HtmlCrawlStructuredJsonPreset.Auto) {
+            return structuredPreset;
+        }
+
+        if (LooksLikeProductPage(document, structuredJson)) {
+            return HtmlCrawlStructuredJsonPreset.Product;
+        }
+
+        if (LooksLikeDocsPage(document, selectedDocument, structuredJson)) {
+            return HtmlCrawlStructuredJsonPreset.Docs;
+        }
+
+        return HtmlCrawlStructuredJsonPreset.Article;
+    }
+
+    private static bool LooksLikeDocsPage(IDocument document, IDocument selectedDocument, HtmlCrawlStructuredJson structuredJson) {
+        string url = structuredJson.Document.Url ?? string.Empty;
+        string title = structuredJson.Metadata.Title ?? structuredJson.Document.Title ?? string.Empty;
+        bool docsUrl = url.IndexOf("/docs", StringComparison.OrdinalIgnoreCase) >= 0
+            || url.IndexOf("/documentation", StringComparison.OrdinalIgnoreCase) >= 0
+            || url.IndexOf("/reference", StringComparison.OrdinalIgnoreCase) >= 0
+            || url.IndexOf("/api", StringComparison.OrdinalIgnoreCase) >= 0
+            || url.IndexOf("/manual", StringComparison.OrdinalIgnoreCase) >= 0
+            || url.IndexOf("/guide", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool docsTitle = title.IndexOf("docs", StringComparison.OrdinalIgnoreCase) >= 0
+            || title.IndexOf("documentation", StringComparison.OrdinalIgnoreCase) >= 0
+            || title.IndexOf("reference", StringComparison.OrdinalIgnoreCase) >= 0
+            || title.IndexOf("api", StringComparison.OrdinalIgnoreCase) >= 0;
+        int codeBlockCount = selectedDocument.QuerySelectorAll("pre, code, samp, kbd").Length;
+        int tocCount = document.QuerySelectorAll("[aria-label*='table of contents' i], nav.toc, .toc, .table-of-contents, [data-toc]").Length;
+        bool strongNavigation = structuredJson.Layout.Regions.Any(region =>
+            string.Equals(region.Kind, "Navigation", StringComparison.OrdinalIgnoreCase) &&
+            region.LinkCount >= 4);
+        return docsUrl || docsTitle || codeBlockCount > 0 || tocCount > 0 || (strongNavigation && structuredJson.Document.Headings.Count >= 2);
+    }
+
+    private static bool LooksLikeProductPage(IDocument document, HtmlCrawlStructuredJson structuredJson) {
+        bool hasProductMicrodata = structuredJson.MicrodataItems.Any(item =>
+            !string.IsNullOrWhiteSpace(item.Type) &&
+            item.Type.IndexOf("Product", StringComparison.OrdinalIgnoreCase) >= 0);
+        bool hasPrice = document.QuerySelectorAll("[itemprop='price'], meta[property='product:price:amount'], .price, .product-price, [data-price], [class*='price']").Length > 0;
+        bool hasSku = document.QuerySelectorAll("[itemprop='sku'], [data-sku], .sku, [class*='sku']").Length > 0;
+        bool hasAvailability = document.QuerySelectorAll("[itemprop='availability'], .availability, [data-stock-status], [class*='stock']").Length > 0;
+        bool hasCommerceAction = document.QuerySelectorAll("button, a")
+            .Select(element => NormalizeWhitespace(element.TextContent))
+            .Any(text =>
+                text.IndexOf("add to cart", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("buy now", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("checkout", StringComparison.OrdinalIgnoreCase) >= 0);
+        return hasProductMicrodata || (hasPrice && (hasSku || hasAvailability || hasCommerceAction));
+    }
+
     private static PageSearchMetadata BuildPageSearchMetadata(HtmlCrawlPage page) {
-        string sourceText = GetSearchText(page);
-        string[] headings = ExtractHeadings(page.Html);
-        List<string> chunkTexts = BuildPageChunkTexts(page);
+        return BuildPageSearchMetadata(page.Html, page.Text, page.Markdown);
+    }
+
+    private static PageSearchMetadata BuildPageSearchMetadata(string html, string text, string markdown) {
+        string sourceText = GetSearchText(text, markdown, html);
+        string[] headings = ExtractHeadings(html);
+        List<string> chunkTexts = BuildPageChunkTexts(sourceText);
         return new PageSearchMetadata {
             WordCount = CountWords(sourceText),
             CharacterCount = sourceText.Length,
@@ -1374,6 +2101,24 @@ public static class HtmlCrawler {
 
     internal static int GetChunkCountForSummary(IEnumerable<HtmlCrawlPage> pages) =>
         BuildChunkRecords(pages).Count;
+
+    internal static int GetStructuredAuthenticatedApiEndpointCount(HtmlCrawlStructuredJson? structuredJson) =>
+        structuredJson?.ApiEndpoints.Count(endpoint =>
+            endpoint.Authentication.Required.HasValue
+            || endpoint.Authentication.Schemes.Count > 0
+            || endpoint.Authentication.Headers.Count > 0
+            || !string.IsNullOrWhiteSpace(endpoint.Authentication.Summary)) ?? 0;
+
+    internal static int GetStructuredRateLimitedApiEndpointCount(HtmlCrawlStructuredJson? structuredJson) =>
+        structuredJson?.ApiEndpoints.Count(endpoint =>
+            endpoint.RateLimit.Mentioned
+            || endpoint.RateLimit.StatusCode.HasValue
+            || endpoint.RateLimit.Headers.Count > 0
+            || !string.IsNullOrWhiteSpace(endpoint.RateLimit.Limit)
+            || !string.IsNullOrWhiteSpace(endpoint.RateLimit.Summary)) ?? 0;
+
+    internal static int GetStructuredApiErrorResponseCount(HtmlCrawlStructuredJson? structuredJson) =>
+        structuredJson?.ApiEndpoints.Sum(endpoint => endpoint.ErrorResponses.Count) ?? 0;
 
     private static (object GraphDocument, int NodeCount, int EdgeCount, int FetchedNodeCount, int SkippedNodeCount, int ExternalNodeCount, Dictionary<string, int> NodeCategories, Dictionary<string, int> EdgeRelations, Dictionary<string, int> SkippedNodeReasons) BuildGraphDocument(
         IEnumerable<HtmlCrawlPage> pages,
@@ -1541,7 +2286,7 @@ public static class HtmlCrawler {
 
         foreach (HtmlCrawlPage page in pages.Where(page => page.Status == HtmlCrawlPageStatus.Success)) {
             PageSearchMetadata searchMetadata = BuildPageSearchMetadata(page);
-            List<string> pageChunks = BuildPageChunkTexts(page);
+            List<string> pageChunks = BuildPageChunkTexts(page.Text, page.Markdown, page.Html);
             int chunkIndex = 1;
             foreach (string chunkText in pageChunks) {
                 string fingerprint = ComputeContentFingerprint(chunkText);
@@ -1573,8 +2318,15 @@ public static class HtmlCrawler {
         return chunks;
     }
 
-    private static List<string> BuildPageChunkTexts(HtmlCrawlPage page) {
-        string sourceText = GetSearchText(page);
+    private static List<string> BuildPageChunkTexts(HtmlCrawlPage page) =>
+        BuildPageChunkTexts(page.Text, page.Markdown, page.Html);
+
+    private static List<string> BuildPageChunkTexts(string text, string markdown, string html) {
+        string sourceText = GetSearchText(text, markdown, html);
+        return BuildPageChunkTexts(sourceText);
+    }
+
+    private static List<string> BuildPageChunkTexts(string sourceText) {
         if (string.IsNullOrWhiteSpace(sourceText)) {
             return new List<string>();
         }
@@ -1609,16 +2361,4353 @@ public static class HtmlCrawler {
         return chunks;
     }
 
-    private static string GetSearchText(HtmlCrawlPage page) {
-        if (!string.IsNullOrWhiteSpace(page.Text)) {
-            return NormalizeWhitespace(page.Text);
+    private static string GetSearchText(HtmlCrawlPage page) =>
+        GetSearchText(page.Text, page.Markdown, page.Html);
+
+    private static string GetSearchText(string text, string markdown, string html) {
+        if (!string.IsNullOrWhiteSpace(text)) {
+            return NormalizeWhitespace(text);
         }
 
-        if (!string.IsNullOrWhiteSpace(page.Html)) {
-            return NormalizeWhitespace(HtmlParserToText.ConvertToText(page.Html));
+        if (!string.IsNullOrWhiteSpace(markdown)) {
+            return NormalizeWhitespace(markdown);
+        }
+
+        if (!string.IsNullOrWhiteSpace(html)) {
+            return NormalizeWhitespace(HtmlParserToText.ConvertToText(html));
         }
 
         return string.Empty;
+    }
+
+    private static HtmlCrawlStructuredDocument BuildStructuredDocument(
+        HtmlCrawlPage page,
+        PageSearchMetadata searchMetadata,
+        string text,
+        string markdown) {
+        return new HtmlCrawlStructuredDocument {
+            Url = page.Url,
+            RequestedUrl = page.RequestedUrl,
+            ParentUrl = page.ParentUrl,
+            CanonicalUrl = page.CanonicalUrl,
+            Depth = page.Depth,
+            Title = page.Title,
+            ContentType = page.ContentType,
+            Rendered = page.Rendered,
+            RenderMode = page.RenderMode,
+            RenderReasonCode = page.RenderReasonCode,
+            ContentModeUsed = page.ContentModeUsed,
+            ContentSelectionReasonCode = page.ContentSelectionReasonCode,
+            ContentSelectionReason = page.ContentSelectionReason,
+            ContentElementSelectorHint = page.ContentElementSelectorHint,
+            WordCount = searchMetadata.WordCount,
+            CharacterCount = searchMetadata.CharacterCount,
+            ChunkCount = searchMetadata.ChunkCount,
+            LinkCount = page.Links.Count,
+            AssetCount = page.AssetUrls.Count,
+            InteractionCount = page.AppliedInteractions.Count,
+            Summary = searchMetadata.Summary,
+            Headings = new List<string>(searchMetadata.Headings),
+            Keywords = new List<string>(searchMetadata.Keywords),
+            Links = page.Links
+                .Where(link => !string.IsNullOrWhiteSpace(link))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(link => link, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            AppliedInteractions = new List<string>(page.AppliedInteractions),
+            Text = text,
+            Markdown = markdown
+        };
+    }
+
+    private static HtmlCrawlStructuredMetadata BuildStructuredMetadata(
+        HtmlCrawlPage page,
+        IDocument document,
+        IReadOnlyCollection<HtmlMetaTag> metaTags,
+        HtmlOpenGraph openGraph) {
+        return new HtmlCrawlStructuredMetadata {
+            Title = page.Title ?? FindOpenGraphValue(openGraph, "title"),
+            Description = FindMetaContent(metaTags, "description")
+                ?? FindOpenGraphValue(openGraph, "description"),
+            CanonicalUrl = page.CanonicalUrl,
+            Language = document.DocumentElement?.GetAttribute("lang"),
+            SiteName = FindOpenGraphValue(openGraph, "site_name")
+                ?? FindMetaContent(metaTags, "application-name"),
+            Type = FindOpenGraphValue(openGraph, "type"),
+            Author = FindMetaContent(metaTags, "author", "article:author"),
+            PublishedTime = FindMetaContent(metaTags, "article:published_time", "published_time", "pubdate"),
+            ModifiedTime = FindMetaContent(metaTags, "article:modified_time", "last-modified", "modified_time"),
+            Robots = FindMetaContent(metaTags, "robots"),
+            Generator = FindMetaContent(metaTags, "generator"),
+            ImageUrl = FindOpenGraphValue(openGraph, "image"),
+            Keywords = SplitMetadataKeywords(FindMetaContent(metaTags, "keywords")),
+            MetaTagCount = metaTags.Count,
+            OpenGraphPropertyCount = openGraph.Properties.Count
+        };
+    }
+
+    private static HtmlCrawlStructuredLayout BuildStructuredLayout(IDocument document) {
+        List<HtmlCrawlStructuredRegion> regions = new();
+        HashSet<IElement> seenElements = new();
+
+        foreach ((string kind, string selector) in StructuredRegionSelectors) {
+            IEnumerable<IElement> matches = document.QuerySelectorAll(selector)
+                .Where(element => element != null && seenElements.Add(element))
+                .Where(element => !string.Equals(kind, "Navigation", StringComparison.OrdinalIgnoreCase) || !LooksLikeBreadcrumbElement(element))
+                .Where(ShouldIncludeStructuredRegion)
+                .OrderByDescending(element => CountWords(element.TextContent))
+                .ThenBy(element => BuildElementSelectorHint(element), StringComparer.OrdinalIgnoreCase)
+                .Take(4);
+
+            foreach (IElement element in matches) {
+                regions.Add(BuildStructuredRegion(kind, element));
+            }
+        }
+
+        return new HtmlCrawlStructuredLayout {
+            Regions = regions
+                .OrderBy(region => GetStructuredRegionKindOrder(region.Kind))
+                .ThenByDescending(region => region.WordCount)
+                .ThenBy(region => region.SelectorHint, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            HeaderCount = regions.Count(region => string.Equals(region.Kind, "Header", StringComparison.OrdinalIgnoreCase)),
+            NavigationCount = regions.Count(region => string.Equals(region.Kind, "Navigation", StringComparison.OrdinalIgnoreCase)),
+            MainCount = regions.Count(region => string.Equals(region.Kind, "Main", StringComparison.OrdinalIgnoreCase)),
+            ArticleCount = regions.Count(region => string.Equals(region.Kind, "Article", StringComparison.OrdinalIgnoreCase)),
+            AsideCount = regions.Count(region => string.Equals(region.Kind, "Aside", StringComparison.OrdinalIgnoreCase)),
+            FooterCount = regions.Count(region => string.Equals(region.Kind, "Footer", StringComparison.OrdinalIgnoreCase))
+        };
+    }
+
+    private static HtmlCrawlStructuredRegion BuildStructuredRegion(string kind, IElement element) {
+        string text = NormalizeWhitespace(element.TextContent);
+        return new HtmlCrawlStructuredRegion {
+            Kind = kind,
+            Tag = element.LocalName,
+            Id = string.IsNullOrWhiteSpace(element.Id) ? null : element.Id,
+            Classes = GetElementClassNames(element),
+            SelectorHint = BuildElementSelectorHint(element),
+            Role = element.GetAttribute("role"),
+            AriaLabel = element.GetAttribute("aria-label"),
+            Summary = BuildSummary(text),
+            WordCount = CountWords(text),
+            LinkCount = element.QuerySelectorAll("a[href]").Length,
+            HeadingCount = element.QuerySelectorAll("h1, h2, h3, h4, h5, h6").Length,
+            LinkLabels = element.QuerySelectorAll("a[href]")
+                .Select(anchor => NormalizeWhitespace(anchor.TextContent))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal)
+                .Take(12)
+                .ToList(),
+            IsLikelyBoilerplate = ContainsBoilerplateSignals(element) || IsLinkDenseBoilerplateBlock(element)
+        };
+    }
+
+    private static bool ShouldIncludeStructuredRegion(IElement element) {
+        if (element == null) {
+            return false;
+        }
+
+        string text = NormalizeWhitespace(element.TextContent);
+        int wordCount = CountWords(text);
+        int linkCount = element.QuerySelectorAll("a[href]").Length;
+        int headingCount = element.QuerySelectorAll("h1, h2, h3, h4, h5, h6").Length;
+        return wordCount > 0 || linkCount > 0 || headingCount > 0;
+    }
+
+    private static bool LooksLikeBreadcrumbElement(IElement element) {
+        if (element == null) {
+            return false;
+        }
+
+        string selectorHint = BuildElementSelectorHint(element) ?? string.Empty;
+        string ariaLabel = element.GetAttribute("aria-label") ?? string.Empty;
+        string itemType = element.GetAttribute("itemtype") ?? string.Empty;
+        return selectorHint.IndexOf("breadcrumb", StringComparison.OrdinalIgnoreCase) >= 0
+            || ariaLabel.IndexOf("breadcrumb", StringComparison.OrdinalIgnoreCase) >= 0
+            || itemType.IndexOf("BreadcrumbList", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static int GetStructuredRegionKindOrder(string? kind) {
+        return kind?.ToLowerInvariant() switch {
+            "header" => 0,
+            "navigation" => 1,
+            "main" => 2,
+            "article" => 3,
+            "aside" => 4,
+            "footer" => 5,
+            _ => 6
+        };
+    }
+
+    private static List<HtmlCrawlStructuredCodeBlock> BuildStructuredCodeBlocks(IDocument selectedDocument) {
+        List<HtmlCrawlStructuredCodeBlock> blocks = new();
+        HashSet<IElement> seen = new();
+        IEnumerable<IElement> elements = selectedDocument.QuerySelectorAll("pre")
+            .Concat(selectedDocument.QuerySelectorAll("code[class*='language'], code[class*='lang-'], code[data-language], code[lang], code[type], samp, kbd")
+                .Where(element => element.Closest("pre") == null));
+
+        foreach (IElement element in elements) {
+            if (element == null || !seen.Add(element)) {
+                continue;
+            }
+
+            IElement sourceElement = string.Equals(element.LocalName, "pre", StringComparison.OrdinalIgnoreCase)
+                ? element.QuerySelector("code") ?? element
+                : element;
+            string code = NormalizeCodeBlockText(sourceElement.TextContent);
+            if (string.IsNullOrWhiteSpace(code)) {
+                continue;
+            }
+
+            string[] lines = code.Split(new[] { '\n' }, StringSplitOptions.None);
+            blocks.Add(new HtmlCrawlStructuredCodeBlock {
+                Language = DetectCodeBlockLanguage(sourceElement),
+                Code = code,
+                LineCount = lines.Length,
+                CharacterCount = code.Length,
+                SelectorHint = BuildElementSelectorHint(element)
+            });
+        }
+
+        return blocks;
+    }
+
+    private static List<HtmlCrawlStructuredCodeSample> BuildStructuredCodeSamples(IDocument selectedDocument) {
+        List<HtmlCrawlStructuredCodeSample> samples = new();
+        HashSet<IElement> seen = new();
+        foreach (IElement element in selectedDocument.QuerySelectorAll("pre")
+                     .Concat(selectedDocument.QuerySelectorAll("code[class*='language'], code[class*='lang-'], code[data-language], code[lang], code[type], samp, kbd")
+                         .Where(item => item.Closest("pre") == null))) {
+            if (element == null || !seen.Add(element)) {
+                continue;
+            }
+
+            IElement sourceElement = string.Equals(element.LocalName, "pre", StringComparison.OrdinalIgnoreCase)
+                ? element.QuerySelector("code") ?? element
+                : element;
+            string code = NormalizeCodeBlockText(sourceElement.TextContent);
+            if (string.IsNullOrWhiteSpace(code)) {
+                continue;
+            }
+
+            string? heading = FindNearbyHeadingText(element);
+            string? language = DetectCodeBlockLanguage(sourceElement);
+            string kind = DetectStructuredCodeSampleKind(code, language);
+            string? method = null;
+            string? path = null;
+            if (!TryParseApiMethodAndPath(code, out method, out path) && !string.IsNullOrWhiteSpace(heading)) {
+                TryParseApiMethodAndPath(heading!, out method, out path);
+            }
+
+            samples.Add(new HtmlCrawlStructuredCodeSample {
+                Title = BuildStructuredCodeSampleTitle(heading, kind, method, path, language),
+                Heading = heading,
+                Language = language,
+                Kind = kind,
+                Code = code,
+                Method = method,
+                Path = path,
+                SelectorHint = BuildElementSelectorHint(element)
+            });
+        }
+
+        return samples;
+    }
+
+    private static List<HtmlCrawlStructuredBreadcrumbTrail> BuildStructuredBreadcrumbs(IDocument document, string? pageUrl) {
+        List<HtmlCrawlStructuredBreadcrumbTrail> trails = new();
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        Uri? baseUri = Uri.TryCreate(pageUrl, UriKind.Absolute, out Uri? resolvedBaseUri) ? resolvedBaseUri : null;
+
+        foreach (IElement container in document.QuerySelectorAll("[aria-label*='breadcrumb' i], nav.breadcrumb, .breadcrumb, .breadcrumbs, [data-breadcrumb], [data-breadcrumbs], ol[itemtype*='BreadcrumbList' i], ul[itemtype*='BreadcrumbList' i]")) {
+            HtmlCrawlStructuredBreadcrumbTrail? trail = BuildStructuredBreadcrumbTrail(container, baseUri);
+            if (trail == null || trail.Items.Count == 0) {
+                continue;
+            }
+
+            string key = string.Join(">", trail.Labels);
+            if (!seen.Add(key)) {
+                continue;
+            }
+
+            trails.Add(trail);
+        }
+
+        return trails;
+    }
+
+    private static HtmlCrawlStructuredBreadcrumbTrail? BuildStructuredBreadcrumbTrail(IElement container, Uri? baseUri) {
+        IEnumerable<IElement> candidates = container.QuerySelectorAll("li").Length > 0
+            ? container.QuerySelectorAll("li")
+            : container.QuerySelectorAll("a[href], [aria-current='page'], span[itemprop='name'], strong, span");
+
+        List<HtmlCrawlStructuredBreadcrumbItem> items = new();
+        foreach (IElement candidate in candidates) {
+            IElement? anchor = string.Equals(candidate.LocalName, "a", StringComparison.OrdinalIgnoreCase)
+                ? candidate
+                : candidate.QuerySelector("a[href]");
+            string label = NormalizeWhitespace(anchor?.TextContent ?? candidate.TextContent);
+            if (string.IsNullOrWhiteSpace(label)) {
+                continue;
+            }
+
+            if (items.Count > 0 && string.Equals(items[^1].Label, label, StringComparison.OrdinalIgnoreCase)) {
+                continue;
+            }
+
+            string? url = TryResolveStructuredHref(baseUri, anchor?.GetAttribute("href"));
+            bool isCurrent = string.Equals(candidate.GetAttribute("aria-current"), "page", StringComparison.OrdinalIgnoreCase)
+                || (anchor == null && candidates.Count() > 1)
+                || (string.IsNullOrWhiteSpace(url) && items.Count > 0);
+            items.Add(new HtmlCrawlStructuredBreadcrumbItem {
+                Label = label,
+                Url = url,
+                IsCurrent = isCurrent
+            });
+        }
+
+        if (items.Count < 2) {
+            return null;
+        }
+
+        return new HtmlCrawlStructuredBreadcrumbTrail {
+            Items = items,
+            Labels = items.Select(item => item.Label).ToList(),
+            Urls = items.Where(item => !string.IsNullOrWhiteSpace(item.Url))
+                .Select(item => item.Url!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            CurrentLabel = items.LastOrDefault(item => item.IsCurrent)?.Label ?? items[^1].Label,
+            SelectorHint = BuildElementSelectorHint(container)
+        };
+    }
+
+    private static List<HtmlCrawlStructuredFaqItem> BuildStructuredFaqItems(IDocument selectedDocument) {
+        List<HtmlCrawlStructuredFaqItem> items = new();
+        HashSet<string> seenQuestions = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (IElement questionElement in selectedDocument.QuerySelectorAll("[itemscope][itemtype*='Question' i], [itemprop='mainEntity'][itemscope]")) {
+            string question = NormalizeWhitespace(questionElement.QuerySelector("[itemprop='name']")?.TextContent);
+            IElement? answerElement = questionElement.QuerySelector("[itemprop='acceptedAnswer'] [itemprop='text'], [itemprop='acceptedAnswer']");
+            string answer = NormalizeWhitespace(answerElement?.TextContent);
+            string answerMarkdown = answerElement == null ? string.Empty : ConvertSelectedHtmlToMarkdown(answerElement.InnerHtml, null);
+            AddStructuredFaqItem(items, seenQuestions, question, answer, answerMarkdown, "Microdata", questionElement);
+        }
+
+        foreach (IElement details in selectedDocument.QuerySelectorAll("details")) {
+            string question = NormalizeWhitespace(details.QuerySelector("summary")?.TextContent);
+            IElement clone = (IElement)details.Clone(true);
+            foreach (IElement summary in clone.QuerySelectorAll("summary").ToArray()) {
+                summary.Remove();
+            }
+
+            string answer = NormalizeWhitespace(clone.TextContent);
+            string answerMarkdown = string.IsNullOrWhiteSpace(clone.InnerHtml) ? string.Empty : ConvertSelectedHtmlToMarkdown(clone.InnerHtml, null);
+            AddStructuredFaqItem(items, seenQuestions, question, answer, answerMarkdown, "Details", details);
+        }
+
+        return items;
+    }
+
+    private static void AddStructuredFaqItem(
+        IList<HtmlCrawlStructuredFaqItem> items,
+        ISet<string> seenQuestions,
+        string question,
+        string answer,
+        string answerMarkdown,
+        string source,
+        IElement element) {
+        if (string.IsNullOrWhiteSpace(question) || string.IsNullOrWhiteSpace(answer) || !seenQuestions.Add(question)) {
+            return;
+        }
+
+        items.Add(new HtmlCrawlStructuredFaqItem {
+            Question = question,
+            Answer = answer,
+            AnswerMarkdown = answerMarkdown,
+            Source = source,
+            SelectorHint = BuildElementSelectorHint(element)
+        });
+    }
+
+    private static List<HtmlCrawlStructuredSpecTable> BuildStructuredSpecTables(IDocument selectedDocument, IReadOnlyList<HtmlTableResult> tables) {
+        List<HtmlCrawlStructuredSpecTable> specTables = new();
+        IHtmlCollection<IElement> tableElements = selectedDocument.QuerySelectorAll("table");
+        for (int index = 0; index < Math.Min(tableElements.Length, tables.Count); index++) {
+            IElement tableElement = tableElements[index];
+            HtmlTableResult table = tables[index];
+            if (!LooksLikeStructuredSpecTable(tableElement, table)) {
+                continue;
+            }
+
+            string? title = NormalizeWhitespace(tableElement.QuerySelector("caption")?.TextContent);
+            if (string.IsNullOrWhiteSpace(title)) {
+                title = FindNearbyHeadingText(tableElement);
+            }
+
+            List<HtmlCrawlStructuredSpecItem> entries = BuildStructuredSpecEntries(table);
+            if (entries.Count == 0) {
+                continue;
+            }
+
+            HtmlCrawlStructuredSpecTable specTable = new() {
+                TableIndex = index,
+                Title = title,
+                Headers = new List<string>(table.Metadata.Headers),
+                Entries = entries,
+                SelectorHint = BuildElementSelectorHint(tableElement)
+            };
+            foreach (HtmlCrawlStructuredSpecItem entry in entries) {
+                if (!specTable.Properties.ContainsKey(entry.Name)) {
+                    specTable.Properties[entry.Name] = entry.Value;
+                }
+            }
+
+            specTables.Add(specTable);
+        }
+
+        return specTables;
+    }
+
+    private static List<HtmlCrawlStructuredSpecItem> BuildStructuredSpecEntries(HtmlTableResult table) {
+        List<HtmlCrawlStructuredSpecItem> entries = new();
+        foreach (Dictionary<string, string?> row in table.Data) {
+            List<KeyValuePair<string, string?>> populated = row
+                .Where(item => !string.IsNullOrWhiteSpace(item.Key) && !string.IsNullOrWhiteSpace(item.Value))
+                .ToList();
+            if (populated.Count < 2) {
+                continue;
+            }
+
+            HtmlCrawlStructuredSpecItem item = new() {
+                Name = NormalizeWhitespace(populated[0].Value ?? populated[0].Key),
+                Value = NormalizeWhitespace(populated[1].Value)
+            };
+            if (string.IsNullOrWhiteSpace(item.Name) || string.IsNullOrWhiteSpace(item.Value)) {
+                continue;
+            }
+
+            entries.Add(item);
+        }
+
+        return entries;
+    }
+
+    private static bool LooksLikeStructuredSpecTable(IElement tableElement, HtmlTableResult table) {
+        string selectorHint = BuildElementSelectorHint(tableElement) ?? string.Empty;
+        string classes = table.Metadata.Classes ?? string.Empty;
+        string headers = string.Join(" ", table.Metadata.Headers);
+        string nearbyHeading = FindNearbyHeadingText(tableElement) ?? string.Empty;
+        bool looksLikeParameterTable = ContainsAnyToken(headers, "parameter", "required", "description", "default", "location")
+            || ContainsAnyToken(nearbyHeading, "parameter", "request body", "query parameter", "path parameter", "header");
+        if (looksLikeParameterTable) {
+            return false;
+        }
+
+        bool classSignal = ContainsAnyToken(selectorHint, "spec", "feature", "attribute", "property", "parameter", "option", "config")
+            || ContainsAnyToken(classes, "spec", "feature", "attribute", "property", "parameter", "option", "config");
+        bool headerSignal = ContainsAnyToken(headers, "name", "property", "attribute", "setting", "option", "parameter", "value", "description", "details");
+        bool twoColumn = table.Metadata.ColumnCount > 0 && table.Metadata.ColumnCount <= 2;
+        bool rowShapeLooksLikePairs = table.Data.Count > 0 && table.Data.All(row => row.Count(item => !string.IsNullOrWhiteSpace(item.Value)) <= 2);
+        return classSignal || (twoColumn && (headerSignal || rowShapeLooksLikePairs));
+    }
+
+    private static List<HtmlCrawlStructuredCallout> BuildStructuredCallouts(IDocument selectedDocument) {
+        List<HtmlCrawlStructuredCallout> callouts = new();
+        HashSet<IElement> seen = new();
+        foreach (IElement element in selectedDocument.QuerySelectorAll("aside, blockquote, div, section").Where(LooksLikeStructuredCalloutElement)) {
+            if (element == null || !seen.Add(element) || element.Closest("details") != null) {
+                continue;
+            }
+
+            string text = NormalizeWhitespace(element.TextContent);
+            if (string.IsNullOrWhiteSpace(text)) {
+                continue;
+            }
+
+            string? title = NormalizeWhitespace(element.QuerySelector("strong, b, h1, h2, h3, h4, h5, h6, .title, .heading")?.TextContent);
+            callouts.Add(new HtmlCrawlStructuredCallout {
+                Kind = DetectStructuredCalloutKind(element),
+                Title = title,
+                Text = text,
+                Markdown = string.IsNullOrWhiteSpace(element.InnerHtml) ? string.Empty : ConvertSelectedHtmlToMarkdown(element.InnerHtml, null),
+                SelectorHint = BuildElementSelectorHint(element)
+            });
+        }
+
+        return callouts;
+    }
+
+    private static bool LooksLikeStructuredCalloutElement(IElement element) {
+        if (element == null) {
+            return false;
+        }
+
+        string role = element.GetAttribute("role") ?? string.Empty;
+        string hint = BuildElementSelectorHint(element) ?? string.Empty;
+        return role.Equals("alert", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("note", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("status", StringComparison.OrdinalIgnoreCase)
+            || ContainsAnyToken(hint, "note", "warning", "warn", "tip", "info", "danger", "error", "success", "important", "callout", "admonition", "caution");
+    }
+
+    private static string DetectStructuredCalloutKind(IElement element) {
+        string hint = BuildElementSelectorHint(element) ?? string.Empty;
+        string role = element.GetAttribute("role") ?? string.Empty;
+        if (ContainsAnyToken(hint, "warning", "warn", "caution")) {
+            return "warning";
+        }
+        if (ContainsAnyToken(hint, "danger", "error")) {
+            return "danger";
+        }
+        if (ContainsAnyToken(hint, "tip", "success")) {
+            return "tip";
+        }
+        if (ContainsAnyToken(hint, "important")) {
+            return "important";
+        }
+        if (role.Equals("alert", StringComparison.OrdinalIgnoreCase)) {
+            return "warning";
+        }
+        return "note";
+    }
+
+    private static List<HtmlCrawlStructuredPrimaryAction> BuildStructuredPrimaryActions(IDocument selectedDocument, string? pageUrl) {
+        List<(int Score, HtmlCrawlStructuredPrimaryAction Action)> scored = new();
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        Uri? baseUri = Uri.TryCreate(pageUrl, UriKind.Absolute, out Uri? baseUriResolved) ? baseUriResolved : null;
+
+        foreach (IElement element in selectedDocument.QuerySelectorAll("a[href], button, input[type='submit'], input[type='button'], [role='button']")) {
+            string label = GetStructuredActionLabel(element);
+            if (string.IsNullOrWhiteSpace(label)) {
+                continue;
+            }
+
+            int score = ScoreStructuredPrimaryAction(element, label);
+            if (score <= 0) {
+                continue;
+            }
+
+            string? url = string.Equals(element.LocalName, "a", StringComparison.OrdinalIgnoreCase)
+                ? TryResolveStructuredHref(baseUri, element.GetAttribute("href"))
+                : null;
+            string key = $"{label}|{url}|{element.LocalName}";
+            if (!seen.Add(key)) {
+                continue;
+            }
+
+            scored.Add((score, new HtmlCrawlStructuredPrimaryAction {
+                Label = label,
+                Url = url,
+                Type = DetectStructuredActionType(element),
+                Intent = DetectStructuredActionIntent(label, element),
+                SelectorHint = BuildElementSelectorHint(element)
+            }));
+        }
+
+        return scored
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.Action.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(item => item.Action)
+            .Take(8)
+            .ToList();
+    }
+
+    private static string GetStructuredActionLabel(IElement element) {
+        string? inputValue = element.GetAttribute("value");
+        return NormalizeWhitespace(inputValue ?? element.TextContent);
+    }
+
+    private static int ScoreStructuredPrimaryAction(IElement element, string label) {
+        string hint = BuildElementSelectorHint(element) ?? string.Empty;
+        int score = 0;
+        if (ContainsAnyToken(hint, "primary", "cta", "button", "btn", "action")) {
+            score += 3;
+        }
+        if (element.GetAttribute("role")?.Equals("button", StringComparison.OrdinalIgnoreCase) == true
+            || string.Equals(element.LocalName, "button", StringComparison.OrdinalIgnoreCase)) {
+            score += 2;
+        }
+        if (ContainsAnyToken(label, "install", "download", "start", "get started", "try", "buy", "add to cart", "checkout", "contact sales", "sign up", "create account")) {
+            score += 4;
+        }
+        if (label.Length <= 40) {
+            score += 1;
+        }
+        if (ContainsAnyToken(label, "learn more", "read more", "home", "docs", "privacy")) {
+            score -= 2;
+        }
+        if (element.Closest("nav, header, footer") != null) {
+            score -= 2;
+        }
+        return score;
+    }
+
+    private static string DetectStructuredActionType(IElement element) {
+        if (string.Equals(element.LocalName, "a", StringComparison.OrdinalIgnoreCase)) {
+            return "link";
+        }
+        if (string.Equals(element.LocalName, "button", StringComparison.OrdinalIgnoreCase)) {
+            return "button";
+        }
+
+        return string.Equals(element.GetAttribute("type"), "submit", StringComparison.OrdinalIgnoreCase)
+            ? "submit"
+            : "button";
+    }
+
+    private static string DetectStructuredActionIntent(string label, IElement element) {
+        if (ContainsAnyToken(label, "install")) {
+            return "install";
+        }
+        if (ContainsAnyToken(label, "download")) {
+            return "download";
+        }
+        if (ContainsAnyToken(label, "buy", "add to cart", "checkout")) {
+            return "buy";
+        }
+        if (ContainsAnyToken(label, "start", "get started", "try")) {
+            return "start";
+        }
+        if (ContainsAnyToken(label, "contact sales")) {
+            return "contact-sales";
+        }
+        return string.Equals(element.LocalName, "a", StringComparison.OrdinalIgnoreCase) ? "navigate" : "action";
+    }
+
+    private static List<HtmlCrawlStructuredApiEndpoint> BuildStructuredApiEndpoints(
+        IDocument selectedDocument,
+        IReadOnlyList<HtmlCrawlStructuredCodeSample> codeSamples,
+        string pageUrl) {
+        Dictionary<string, HtmlCrawlStructuredApiEndpoint> endpoints = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (IElement heading in selectedDocument.QuerySelectorAll("h1, h2, h3, h4, h5, h6")) {
+            string text = NormalizeWhitespace(heading.TextContent);
+            if (!TryParseApiMethodAndPath(text, out string? method, out string? path)) {
+                continue;
+            }
+
+            HtmlCrawlStructuredApiEndpoint endpoint = GetOrCreateStructuredApiEndpoint(endpoints, method!, path!);
+            endpoint.Title ??= text;
+            endpoint.Description ??= FindFollowingParagraphText(heading);
+            endpoint.SelectorHint ??= BuildElementSelectorHint(heading);
+            AppendDistinct(endpoint.Sources, "Heading");
+
+            IDocument sectionDocument = BuildStructuredSectionDocument(heading);
+            List<HtmlCrawlStructuredCodeSample> sectionCodeSamples = BuildStructuredCodeSamples(sectionDocument);
+            foreach (HtmlCrawlStructuredApiParameter parameter in BuildStructuredApiParameters(sectionDocument)) {
+                if (!endpoint.Parameters.Any(existing =>
+                        string.Equals(existing.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(existing.Location, parameter.Location, StringComparison.OrdinalIgnoreCase))) {
+                    endpoint.Parameters.Add(parameter);
+                }
+            }
+
+            foreach (HtmlCrawlStructuredRequestExample requestExample in BuildStructuredRequestExamples(sectionCodeSamples)) {
+                if (!endpoint.RequestExamples.Any(existing =>
+                        string.Equals(existing.Method, requestExample.Method, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(existing.Path, requestExample.Path, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(existing.Body, requestExample.Body, StringComparison.Ordinal)
+                        && string.Equals(existing.Title, requestExample.Title, StringComparison.OrdinalIgnoreCase))) {
+                    endpoint.RequestExamples.Add(requestExample);
+                }
+            }
+
+            foreach (HtmlCrawlStructuredResponseExample responseExample in BuildStructuredResponseExamples(sectionDocument, sectionCodeSamples, pageUrl)) {
+                if (!endpoint.ResponseExamples.Any(existing =>
+                        string.Equals(existing.Body, responseExample.Body, StringComparison.Ordinal)
+                        && string.Equals(existing.Title, responseExample.Title, StringComparison.OrdinalIgnoreCase)
+                        && existing.StatusCode == responseExample.StatusCode)) {
+                    endpoint.ResponseExamples.Add(responseExample);
+                }
+            }
+
+            MergeStructuredApiAuthentication(endpoint.Authentication, BuildStructuredApiAuthentication(sectionDocument, sectionCodeSamples, endpoint.Parameters));
+            MergeStructuredApiRateLimit(endpoint.RateLimit, BuildStructuredApiRateLimit(sectionDocument, sectionCodeSamples, endpoint.ResponseExamples));
+        }
+
+        foreach (HtmlCrawlStructuredCodeSample sample in codeSamples.Where(sample => !string.IsNullOrWhiteSpace(sample.Method) && !string.IsNullOrWhiteSpace(sample.Path))) {
+            HtmlCrawlStructuredApiEndpoint endpoint = GetOrCreateStructuredApiEndpoint(endpoints, sample.Method!, sample.Path!);
+            endpoint.Title ??= sample.Title;
+            endpoint.SelectorHint ??= sample.SelectorHint;
+            if (!string.IsNullOrWhiteSpace(sample.Language)) {
+                AppendDistinct(endpoint.ExampleLanguages, sample.Language!);
+            }
+            AppendDistinct(endpoint.Sources, "CodeSample");
+
+            HtmlCrawlStructuredRequestExample? requestExample = BuildStructuredRequestExample(sample);
+            if (requestExample != null
+                && !endpoint.RequestExamples.Any(existing =>
+                    string.Equals(existing.Method, requestExample.Method, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Path, requestExample.Path, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Body, requestExample.Body, StringComparison.Ordinal)
+                    && string.Equals(existing.Title, requestExample.Title, StringComparison.OrdinalIgnoreCase))) {
+                endpoint.RequestExamples.Add(requestExample);
+            }
+        }
+
+        foreach (HtmlCrawlStructuredApiEndpoint endpoint in endpoints.Values) {
+            endpoint.Resource ??= BuildStructuredApiPrimaryResource(endpoint.Path);
+            foreach (string tag in BuildStructuredApiTags(endpoint.Path, endpoint.Title, endpoint.Description)) {
+                AppendDistinct(endpoint.Tags, tag);
+            }
+            endpoint.OperationId ??= BuildStructuredApiOperationId(endpoint.Method, endpoint.Path, endpoint.Title);
+            ApplyStructuredApiParameterGrouping(endpoint, pageUrl);
+            if (!endpoint.Authentication.Required.HasValue
+                && (endpoint.Authentication.Schemes.Count > 0 || endpoint.Authentication.Headers.Count > 0)) {
+                endpoint.Authentication.Required = true;
+            }
+            endpoint.RequestHeaders = BuildStructuredEndpointRequestHeaders(endpoint);
+            endpoint.ResponseHeaders = BuildStructuredEndpointResponseHeaders(endpoint);
+            endpoint.ErrorResponses = endpoint.ResponseExamples
+                .Where(response => response.IsError)
+                .OrderBy(response => response.StatusCode ?? int.MaxValue)
+                .ThenBy(response => response.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            endpoint.ErrorCatalog = BuildStructuredEndpointErrorCatalog(endpoint.ErrorResponses);
+            endpoint.SuccessResponseSchema = BuildStructuredEndpointResponseSchema(endpoint.ResponseExamples.Where(response => !response.IsError));
+            endpoint.ErrorResponseSchema = BuildStructuredEndpointResponseSchema(endpoint.ErrorResponses);
+            endpoint.SuccessResponseFields = BuildStructuredEndpointResponseFields(endpoint.ResponseExamples.Where(response => !response.IsError));
+            endpoint.ErrorResponseFields = BuildStructuredEndpointResponseFields(endpoint.ErrorResponses);
+        }
+
+        return endpoints.Values
+            .OrderBy(endpoint => endpoint.Path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(endpoint => endpoint.Method, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static HtmlCrawlStructuredApiCatalog BuildStructuredApiCatalog(
+        HtmlCrawlStructuredMetadata metadata,
+        IReadOnlyList<HtmlCrawlStructuredApiEndpoint> endpoints) {
+        List<HtmlCrawlStructuredApiEndpoint> endpointList = endpoints
+            .Where(endpoint => !string.IsNullOrWhiteSpace(endpoint.Method) && !string.IsNullOrWhiteSpace(endpoint.Path))
+            .ToList();
+        return new HtmlCrawlStructuredApiCatalog {
+            Title = metadata.Title,
+            Description = metadata.Description,
+            OperationCount = endpointList.Count,
+            PathCount = endpointList.Select(endpoint => endpoint.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            AuthenticatedOperationCount = endpointList.Count(endpoint =>
+                endpoint.Authentication.Required == true
+                || endpoint.Authentication.Schemes.Count > 0
+                || endpoint.Authentication.Headers.Count > 0),
+            RateLimitedOperationCount = endpointList.Count(endpoint =>
+                endpoint.RateLimit.Mentioned
+                || endpoint.RateLimit.StatusCode.HasValue
+                || endpoint.RateLimit.Headers.Count > 0
+                || !string.IsNullOrWhiteSpace(endpoint.RateLimit.Limit)),
+            ErrorCatalogCount = endpointList.Sum(endpoint => endpoint.ErrorCatalog.Count),
+            Resources = endpointList.Select(endpoint => endpoint.Resource)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList(),
+            Tags = endpointList.SelectMany(endpoint => endpoint.Tags)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            OperationIds = endpointList.Select(endpoint => endpoint.OperationId)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList(),
+            Paths = endpointList.Select(endpoint => endpoint.Path)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        };
+    }
+
+    private static HtmlCrawlStructuredOpenApiLike BuildStructuredOpenApiLike(
+        HtmlCrawlPage page,
+        HtmlCrawlStructuredMetadata metadata,
+        IReadOnlyList<HtmlCrawlStructuredApiEndpoint> endpoints) {
+        Dictionary<string, HtmlCrawlStructuredOpenApiPathItem> paths = new(StringComparer.OrdinalIgnoreCase);
+        foreach (HtmlCrawlStructuredApiEndpoint endpoint in endpoints
+                     .Where(endpoint => !string.IsNullOrWhiteSpace(endpoint.Method) && !string.IsNullOrWhiteSpace(endpoint.Path))
+                     .OrderBy(endpoint => endpoint.Path, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(endpoint => endpoint.Method, StringComparer.OrdinalIgnoreCase)) {
+            if (!paths.TryGetValue(endpoint.Path, out HtmlCrawlStructuredOpenApiPathItem? pathItem)) {
+                pathItem = new HtmlCrawlStructuredOpenApiPathItem {
+                    Path = endpoint.Path
+                };
+                paths[endpoint.Path] = pathItem;
+            }
+
+            if (!string.IsNullOrWhiteSpace(endpoint.Resource)) {
+                AppendDistinct(pathItem.Resources, endpoint.Resource!);
+            }
+
+            pathItem.Operations[endpoint.Method.ToLowerInvariant()] = BuildStructuredOpenApiOperation(endpoint, page.Url);
+        }
+
+        HtmlCrawlStructuredOpenApiLike openApiLike = new() {
+            Title = metadata.Title,
+            Description = metadata.Description,
+            Servers = BuildStructuredOpenApiServers(page, metadata),
+            Tags = endpoints.SelectMany(endpoint => endpoint.Tags)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Resources = endpoints.Select(endpoint => endpoint.Resource)
+                .Where(resource => !string.IsNullOrWhiteSpace(resource))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(resource => resource, StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList(),
+            Paths = paths
+        };
+        ApplyStructuredOpenApiComponents(openApiLike);
+        AnnotateStructuredOpenApiPromotion(openApiLike);
+        return openApiLike;
+    }
+
+    private static HtmlCrawlStructuredOpenApiLike BuildResultOpenApiLike(HtmlCrawlResult result) {
+        List<(HtmlCrawlPage Page, HtmlCrawlStructuredApiEndpoint Endpoint)> endpointEntries = result.Pages
+            .Where(page => page.StructuredJson != null)
+            .SelectMany(page => (page.StructuredJson?.ApiEndpoints ?? Array.Empty<HtmlCrawlStructuredApiEndpoint>())
+                .Where(endpoint => !string.IsNullOrWhiteSpace(endpoint.Method) && !string.IsNullOrWhiteSpace(endpoint.Path))
+                .Select(endpoint => (Page: page, Endpoint: endpoint)))
+            .ToList();
+
+        Dictionary<string, HtmlCrawlStructuredOpenApiPathItem> paths = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((HtmlCrawlPage Page, HtmlCrawlStructuredApiEndpoint Endpoint) entry in endpointEntries
+                     .OrderBy(item => item.Endpoint.Path, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(item => item.Endpoint.Method, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(item => item.Page.Url, StringComparer.OrdinalIgnoreCase)) {
+            if (!paths.TryGetValue(entry.Endpoint.Path, out HtmlCrawlStructuredOpenApiPathItem? pathItem)) {
+                pathItem = new HtmlCrawlStructuredOpenApiPathItem {
+                    Path = entry.Endpoint.Path
+                };
+                paths[entry.Endpoint.Path] = pathItem;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Endpoint.Resource)) {
+                AppendDistinct(pathItem.Resources, entry.Endpoint.Resource!);
+            }
+
+            string methodKey = entry.Endpoint.Method.ToLowerInvariant();
+            if (!pathItem.Operations.TryGetValue(methodKey, out HtmlCrawlStructuredOpenApiOperation? operation)) {
+                operation = BuildStructuredOpenApiOperation(entry.Endpoint, entry.Page.Url);
+                pathItem.Operations[methodKey] = operation;
+                continue;
+            }
+
+            MergeStructuredOpenApiOperation(operation, entry.Endpoint, entry.Page.Url);
+        }
+
+        HtmlCrawlStructuredMetadata? primaryMetadata = result.Pages
+            .Select(page => page.StructuredJson?.Metadata)
+            .FirstOrDefault(metadata => metadata != null && (!string.IsNullOrWhiteSpace(metadata.Title) || !string.IsNullOrWhiteSpace(metadata.Description)));
+
+        HtmlCrawlStructuredOpenApiLike openApiLike = new() {
+            Title = primaryMetadata?.Title,
+            Description = primaryMetadata?.Description,
+            Servers = BuildStructuredOpenApiServers(result.Pages.Select(page => page.Url)),
+            Tags = endpointEntries.SelectMany(item => item.Endpoint.Tags)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Resources = endpointEntries.Select(item => item.Endpoint.Resource)
+                .Where(resource => !string.IsNullOrWhiteSpace(resource))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(resource => resource, StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList(),
+            Paths = paths
+        };
+        ApplyStructuredOpenApiComponents(openApiLike);
+        AnnotateStructuredOpenApiPromotion(openApiLike);
+        return openApiLike;
+    }
+
+    private static HtmlCrawlStructuredOpenApiOperation BuildStructuredOpenApiOperation(HtmlCrawlStructuredApiEndpoint endpoint, string pageUrl) {
+        return new HtmlCrawlStructuredOpenApiOperation {
+            OperationId = endpoint.OperationId,
+            Method = endpoint.Method.ToLowerInvariant(),
+            Path = endpoint.Path,
+            Summary = endpoint.Title,
+            Description = endpoint.Description,
+            Resource = endpoint.Resource,
+            Tags = new List<string>(endpoint.Tags),
+            Authentication = CloneStructuredApiAuthentication(endpoint.Authentication),
+            RateLimit = CloneStructuredApiRateLimit(endpoint.RateLimit),
+            Parameters = endpoint.Parameters.Select(CloneStructuredApiParameter).ToList(),
+            RequestHeaders = endpoint.RequestHeaders.Select(CloneStructuredHttpHeader).ToList(),
+            ResponseHeaders = endpoint.ResponseHeaders.Select(CloneStructuredHttpHeader).ToList(),
+            RequestExamples = endpoint.RequestExamples.Select(CloneStructuredRequestExample).ToList(),
+            ResponseExamples = endpoint.ResponseExamples.Select(CloneStructuredResponseExample).ToList(),
+            ErrorCatalog = endpoint.ErrorCatalog.Select(CloneStructuredApiError).ToList(),
+            RequestBodySchema = new Dictionary<string, string?>(endpoint.RequestBodySchema, StringComparer.OrdinalIgnoreCase),
+            RequestBodyFields = endpoint.RequestBodyFields.Select(CloneStructuredField).ToList(),
+            SuccessResponseSchema = new Dictionary<string, string?>(endpoint.SuccessResponseSchema, StringComparer.OrdinalIgnoreCase),
+            SuccessResponseFields = endpoint.SuccessResponseFields.Select(CloneStructuredField).ToList(),
+            ErrorResponseSchema = new Dictionary<string, string?>(endpoint.ErrorResponseSchema, StringComparer.OrdinalIgnoreCase),
+            ErrorResponseFields = endpoint.ErrorResponseFields.Select(CloneStructuredField).ToList(),
+            Provenance = BuildStructuredOpenApiProvenance(endpoint, pageUrl)
+        };
+    }
+
+    private static void AnnotateStructuredOpenApiPromotion(HtmlCrawlStructuredOpenApiLike openApiLike) {
+        List<HtmlCrawlStructuredOpenApiOperation> operations = openApiLike.Paths.Values
+            .SelectMany(path => path.Operations.Values)
+            .ToList();
+
+        foreach (HtmlCrawlStructuredOpenApiOperation operation in operations) {
+            AnnotateStructuredOpenApiPromotion(operation);
+        }
+
+        openApiLike.StrictOpenApiPromotionThreshold = StrictOpenApiPromotionThreshold;
+        openApiLike.StrictOpenApiEligibleOperationCount = operations.Count(operation => operation.StrictOpenApiEligible);
+        openApiLike.StrictOpenApiSkippedOperationCount = operations.Count - openApiLike.StrictOpenApiEligibleOperationCount;
+        openApiLike.StrictOpenApiAverageScore = operations.Count == 0
+            ? 0
+            : Math.Round(operations.Average(operation => operation.StrictOpenApiScore), 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static void AnnotateStructuredOpenApiPromotion(HtmlCrawlStructuredOpenApiOperation operation) {
+        List<string> warnings = new();
+        int score = 0;
+
+        bool hasMethod = !string.IsNullOrWhiteSpace(operation.Method);
+        bool hasPath = !string.IsNullOrWhiteSpace(operation.Path);
+        bool hasOperationId = !string.IsNullOrWhiteSpace(operation.OperationId);
+        bool hasSummary = !string.IsNullOrWhiteSpace(operation.Summary);
+        bool hasDescription = !string.IsNullOrWhiteSpace(operation.Description);
+        bool hasGrouping = !string.IsNullOrWhiteSpace(operation.Resource) || operation.Tags.Count > 0;
+        bool hasRequestContract = operation.Parameters.Count > 0
+            || operation.RequestBodyFields.Count > 0
+            || operation.RequestBodySchema.Count > 0
+            || operation.RequestExamples.Count > 0;
+        bool hasResponseContract = operation.ResponseExamples.Count > 0
+            || operation.SuccessResponseFields.Count > 0
+            || operation.SuccessResponseSchema.Count > 0
+            || operation.ErrorResponseFields.Count > 0
+            || operation.ErrorResponseSchema.Count > 0;
+        bool hasSuccessfulResponse = operation.ResponseExamples.Any(example => !example.IsError && example.StatusCode.GetValueOrDefault() < 400)
+            || operation.SuccessResponseFields.Count > 0
+            || operation.SuccessResponseSchema.Count > 0;
+        bool hasErrorCoverage = operation.ResponseExamples.Any(example => example.IsError)
+            || operation.ErrorCatalog.Count > 0
+            || operation.ErrorResponseFields.Count > 0
+            || operation.ErrorResponseSchema.Count > 0;
+        bool hasAuthentication = operation.Authentication.Required != false
+            || operation.Authentication.Headers.Count > 0
+            || operation.Authentication.Schemes.Count > 0;
+        bool hasRateLimit = operation.RateLimit.Mentioned
+            || operation.RateLimit.StatusCode != null
+            || operation.RateLimit.Headers.Count > 0;
+        bool hasHeaders = operation.RequestHeaders.Count > 0 || operation.ResponseHeaders.Count > 0;
+
+        if (hasMethod) {
+            score += 10;
+        } else {
+            warnings.Add("missing method");
+        }
+
+        if (hasPath) {
+            score += 10;
+        } else {
+            warnings.Add("missing path");
+        }
+
+        if (hasOperationId) {
+            score += 10;
+        } else {
+            warnings.Add("missing operationId");
+        }
+
+        if (hasSummary) {
+            score += 10;
+        } else {
+            warnings.Add("missing summary");
+        }
+
+        if (hasDescription) {
+            score += 5;
+        } else {
+            warnings.Add("missing description");
+        }
+
+        if (hasGrouping) {
+            score += 5;
+        }
+
+        if (operation.Parameters.Count > 0) {
+            score += 8;
+        }
+        if (operation.RequestBodyFields.Count > 0 || operation.RequestBodySchema.Count > 0) {
+            score += 8;
+        }
+        if (operation.RequestExamples.Count > 0) {
+            score += 8;
+        }
+        if (!hasRequestContract) {
+            warnings.Add("missing request contract");
+        }
+
+        if (hasSuccessfulResponse) {
+            score += 20;
+        } else {
+            warnings.Add("missing success response contract");
+        }
+
+        if (hasResponseContract) {
+            score += 8;
+        } else {
+            warnings.Add("missing response contract");
+        }
+
+        if (hasErrorCoverage) {
+            score += 4;
+        }
+        if (hasAuthentication) {
+            score += 4;
+        }
+        if (hasRateLimit) {
+            score += 2;
+        }
+        if (hasHeaders) {
+            score += 2;
+        }
+
+        operation.StrictOpenApiScore = Math.Min(score, 100);
+        operation.StrictOpenApiEligible = hasMethod
+            && hasPath
+            && hasSummary
+            && hasSuccessfulResponse
+            && operation.StrictOpenApiScore >= StrictOpenApiPromotionThreshold;
+
+        if (!operation.StrictOpenApiEligible && operation.StrictOpenApiScore < StrictOpenApiPromotionThreshold) {
+            warnings.Add("promotion score below threshold");
+        }
+
+        operation.StrictOpenApiWarnings = warnings
+            .Where(warning => !string.IsNullOrWhiteSpace(warning))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(warning => warning, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static HtmlCrawlStructuredOpenApiProvenance BuildStructuredOpenApiProvenance(HtmlCrawlStructuredApiEndpoint endpoint, string pageUrl) {
+        HtmlCrawlStructuredOpenApiProvenance provenance = new();
+        AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, "Endpoint", endpoint.SelectorHint, endpoint.Title);
+
+        foreach (string sourceKind in endpoint.Sources) {
+            AppendDistinct(provenance.SourceKinds, sourceKind);
+            AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, sourceKind, endpoint.SelectorHint, endpoint.Title);
+        }
+
+        foreach (HtmlCrawlStructuredRequestExample example in endpoint.RequestExamples) {
+            AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, "RequestExample", example.SelectorHint, example.Title ?? example.Method ?? example.Path);
+        }
+
+        foreach (HtmlCrawlStructuredResponseExample example in endpoint.ResponseExamples) {
+            string? label = example.Title
+                ?? (example.StatusCode.HasValue ? $"Response {example.StatusCode.Value}" : null)
+                ?? example.Description;
+            AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, "ResponseExample", example.SelectorHint, label);
+        }
+
+        foreach (HtmlCrawlStructuredApiError error in endpoint.ErrorCatalog) {
+            string? label = error.Summary
+                ?? (error.StatusCode.HasValue ? $"Error {error.StatusCode.Value}" : null)
+                ?? error.StatusText;
+            AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, "ErrorCatalog", error.SelectorHint, label);
+        }
+
+        if (endpoint.Parameters.Count > 0) {
+            string? parameterSource = endpoint.Parameters
+                .Select(parameter => parameter.Location)
+                .FirstOrDefault(location => !string.IsNullOrWhiteSpace(location));
+            AppendStructuredOpenApiProvenanceEntry(provenance, pageUrl, "ParameterTable", endpoint.SelectorHint, parameterSource);
+        }
+
+        return provenance;
+    }
+
+    private static void MergeStructuredOpenApiProvenance(HtmlCrawlStructuredOpenApiProvenance target, HtmlCrawlStructuredOpenApiProvenance source) {
+        foreach (string pageUrl in source.PageUrls) {
+            AppendDistinct(target.PageUrls, pageUrl);
+        }
+
+        foreach (string kind in source.SourceKinds) {
+            AppendDistinct(target.SourceKinds, kind);
+        }
+
+        foreach (HtmlCrawlStructuredOpenApiProvenanceEntry entry in source.Entries) {
+            if (target.Entries.Any(existing =>
+                    string.Equals(existing.PageUrl, entry.PageUrl, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Kind, entry.Kind, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.SelectorHint, entry.SelectorHint, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Label, entry.Label, StringComparison.OrdinalIgnoreCase))) {
+                continue;
+            }
+
+            target.Entries.Add(CloneStructuredOpenApiProvenanceEntry(entry));
+        }
+    }
+
+    private static void AppendStructuredOpenApiProvenanceEntry(
+        HtmlCrawlStructuredOpenApiProvenance provenance,
+        string pageUrl,
+        string kind,
+        string? selectorHint,
+        string? label) {
+        if (string.IsNullOrWhiteSpace(pageUrl) || string.IsNullOrWhiteSpace(kind)) {
+            return;
+        }
+
+        AppendDistinct(provenance.PageUrls, pageUrl);
+        AppendDistinct(provenance.SourceKinds, kind);
+
+        if (provenance.Entries.Any(existing =>
+                string.Equals(existing.PageUrl, pageUrl, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Kind, kind, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.SelectorHint, selectorHint, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Label, label, StringComparison.OrdinalIgnoreCase))) {
+            return;
+        }
+
+        provenance.Entries.Add(new HtmlCrawlStructuredOpenApiProvenanceEntry {
+            PageUrl = pageUrl,
+            Kind = kind,
+            SelectorHint = selectorHint,
+            Label = label
+        });
+    }
+
+    private static void MergeStructuredOpenApiOperation(HtmlCrawlStructuredOpenApiOperation target, HtmlCrawlStructuredApiEndpoint source, string pageUrl) {
+        target.OperationId ??= source.OperationId;
+        target.Summary ??= source.Title;
+        target.Description ??= source.Description;
+        target.Resource ??= source.Resource;
+        foreach (string tag in source.Tags) {
+            AppendDistinct(target.Tags, tag);
+        }
+
+        MergeStructuredApiAuthentication(target.Authentication, source.Authentication);
+        MergeStructuredApiRateLimit(target.RateLimit, source.RateLimit);
+
+        foreach (HtmlCrawlStructuredApiParameter parameter in source.Parameters) {
+            if (!target.Parameters.Any(existing =>
+                    string.Equals(existing.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Location, parameter.Location, StringComparison.OrdinalIgnoreCase))) {
+                target.Parameters.Add(CloneStructuredApiParameter(parameter));
+            }
+        }
+
+        foreach (HtmlCrawlStructuredHttpHeader header in source.RequestHeaders) {
+            AppendStructuredHeader(target.RequestHeaders, header.Name, header.Value);
+        }
+        foreach (HtmlCrawlStructuredHttpHeader header in source.ResponseHeaders) {
+            AppendStructuredHeader(target.ResponseHeaders, header.Name, header.Value);
+        }
+
+        foreach (HtmlCrawlStructuredRequestExample example in source.RequestExamples) {
+            if (!target.RequestExamples.Any(existing =>
+                    string.Equals(existing.Method, example.Method, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Path, example.Path, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(existing.Body, example.Body, StringComparison.Ordinal)
+                    && string.Equals(existing.Title, example.Title, StringComparison.OrdinalIgnoreCase))) {
+                target.RequestExamples.Add(CloneStructuredRequestExample(example));
+            }
+        }
+
+        foreach (HtmlCrawlStructuredResponseExample example in source.ResponseExamples) {
+            if (!target.ResponseExamples.Any(existing =>
+                    existing.StatusCode == example.StatusCode
+                    && string.Equals(existing.Body, example.Body, StringComparison.Ordinal)
+                    && string.Equals(existing.Title, example.Title, StringComparison.OrdinalIgnoreCase))) {
+                target.ResponseExamples.Add(CloneStructuredResponseExample(example));
+            }
+        }
+
+        foreach (HtmlCrawlStructuredApiError error in source.ErrorCatalog) {
+            HtmlCrawlStructuredApiError? existing = target.ErrorCatalog.FirstOrDefault(item =>
+                item.StatusCode == error.StatusCode
+                && string.Equals(item.StatusText, error.StatusText, StringComparison.OrdinalIgnoreCase));
+            if (existing == null) {
+                target.ErrorCatalog.Add(CloneStructuredApiError(error));
+                continue;
+            }
+
+            existing.Summary ??= error.Summary;
+            existing.ContentType ??= error.ContentType;
+            existing.SelectorHint ??= error.SelectorHint;
+            existing.SampleCount += error.SampleCount;
+            foreach (HtmlCrawlStructuredHttpHeader header in error.Headers) {
+                AppendStructuredHeader(existing.Headers, header.Name, header.Value);
+            }
+            MergeStructuredSchemaMaps(existing.Schema, error.Schema);
+            existing.Fields = MergeStructuredFieldCollections(existing.Fields, error.Fields);
+        }
+
+        MergeStructuredSchemaMaps(target.RequestBodySchema, source.RequestBodySchema);
+        MergeStructuredSchemaMaps(target.SuccessResponseSchema, source.SuccessResponseSchema);
+        MergeStructuredSchemaMaps(target.ErrorResponseSchema, source.ErrorResponseSchema);
+        target.RequestBodyFields = MergeStructuredFieldCollections(target.RequestBodyFields, source.RequestBodyFields);
+        target.SuccessResponseFields = MergeStructuredFieldCollections(target.SuccessResponseFields, source.SuccessResponseFields);
+        target.ErrorResponseFields = MergeStructuredFieldCollections(target.ErrorResponseFields, source.ErrorResponseFields);
+        MergeStructuredOpenApiProvenance(target.Provenance, BuildStructuredOpenApiProvenance(source, pageUrl));
+    }
+
+    private static IList<HtmlCrawlStructuredField> MergeStructuredFieldCollections(
+        IEnumerable<HtmlCrawlStructuredField> first,
+        IEnumerable<HtmlCrawlStructuredField> second) {
+        Dictionary<string, HtmlCrawlStructuredField> fields = new(StringComparer.OrdinalIgnoreCase);
+        foreach (HtmlCrawlStructuredField field in first.Concat(second)) {
+            if (!fields.TryGetValue(field.Path, out HtmlCrawlStructuredField? existing)) {
+                fields[field.Path] = CloneStructuredField(field);
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.Name) && !string.IsNullOrWhiteSpace(field.Name)) {
+                existing.Name = field.Name;
+            }
+            existing.ParentPath ??= field.ParentPath;
+            existing.Kind = MergeStructuredFieldKinds(existing.Kind, field.Kind);
+            existing.Depth = Math.Min(existing.Depth, field.Depth);
+            existing.Type = MergeStructuredTypeValues(existing.Type, field.Type);
+            existing.Format ??= field.Format;
+            existing.Required = existing.Required == true && field.Required == true
+                ? true
+                : existing.Required ?? field.Required;
+            existing.Nullable = existing.Nullable == true || field.Nullable == true
+                ? true
+                : existing.Nullable ?? field.Nullable;
+            existing.ExampleValue ??= field.ExampleValue;
+            existing.Source ??= field.Source;
+            MergeStructuredFieldProvenance(existing, field);
+            existing.EvidenceCount = Math.Max(existing.EvidenceCount, field.EvidenceCount);
+            existing.ConfidenceScore = Math.Max(existing.ConfidenceScore, field.ConfidenceScore);
+            foreach (string enumValue in field.EnumValues) {
+                AppendDistinct(existing.EnumValues, enumValue);
+            }
+            foreach (string childPath in field.ChildPaths) {
+                AppendDistinct(existing.ChildPaths, childPath);
+            }
+        }
+
+        return FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(fields.Values))
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void AppendStructuredFieldProvenance(
+        HtmlCrawlStructuredField field,
+        string pageUrl,
+        string kind,
+        string? selectorHint,
+        string? label) {
+        if (field == null || string.IsNullOrWhiteSpace(pageUrl) || string.IsNullOrWhiteSpace(kind)) {
+            return;
+        }
+
+        if (field.Provenance.Any(existing =>
+                string.Equals(existing.PageUrl, pageUrl, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Kind, kind, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.SelectorHint, selectorHint, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Label, label, StringComparison.OrdinalIgnoreCase))) {
+            return;
+        }
+
+        field.Provenance.Add(new HtmlCrawlStructuredFieldProvenanceEntry {
+            PageUrl = pageUrl,
+            Kind = kind,
+            SelectorHint = selectorHint,
+            Label = label
+        });
+    }
+
+    private static void MergeStructuredFieldProvenance(HtmlCrawlStructuredField target, HtmlCrawlStructuredField source) {
+        foreach (HtmlCrawlStructuredFieldProvenanceEntry provenance in source.Provenance) {
+            AppendStructuredFieldProvenance(target, provenance.PageUrl, provenance.Kind, provenance.SelectorHint, provenance.Label);
+        }
+    }
+
+    private static IList<HtmlCrawlStructuredField> FinalizeStructuredFieldConfidence(IEnumerable<HtmlCrawlStructuredField> fields) {
+        List<HtmlCrawlStructuredField> fieldList = fields.ToList();
+        foreach (HtmlCrawlStructuredField field in fieldList) {
+            field.EvidenceCount = field.Provenance
+                .Select(entry => string.Join("|",
+                    entry.PageUrl ?? string.Empty,
+                    entry.Kind ?? string.Empty,
+                    entry.SelectorHint ?? string.Empty,
+                    entry.Label ?? string.Empty))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            field.ConfidenceScore = ComputeStructuredFieldConfidence(field);
+        }
+
+        return fieldList;
+    }
+
+    private static int ComputeStructuredFieldConfidence(HtmlCrawlStructuredField field) {
+        int score = 20;
+        int evidenceCount = field.EvidenceCount > 0 ? field.EvidenceCount : field.Provenance.Count;
+        int sourceKindCount = field.Provenance
+            .Select(entry => entry.Kind)
+            .Where(kind => !string.IsNullOrWhiteSpace(kind))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        if (field.Provenance.Any(entry => string.Equals(entry.Kind, "ParameterTable", StringComparison.OrdinalIgnoreCase))) {
+            score += 40;
+        }
+        if (field.Provenance.Any(entry => string.Equals(entry.Kind, "JsonResponse", StringComparison.OrdinalIgnoreCase))) {
+            score += 25;
+        }
+        if (field.Provenance.Any(entry => string.Equals(entry.Kind, "JsonSchemaMap", StringComparison.OrdinalIgnoreCase))) {
+            score += 10;
+        }
+        if (field.Required == true) {
+            score += 10;
+        }
+        if (!string.IsNullOrWhiteSpace(field.Type)) {
+            score += 5;
+        }
+        if (!string.IsNullOrWhiteSpace(field.Format)) {
+            score += 5;
+        }
+        if (!string.IsNullOrWhiteSpace(field.ExampleValue)) {
+            score += 5;
+        }
+        if (field.EnumValues.Count > 0) {
+            score += 5;
+        }
+        if (field.ChildPaths.Count > 0) {
+            score += 5;
+        }
+
+        score += Math.Min(evidenceCount * 5, 15);
+        score += Math.Min(sourceKindCount * 5, 10);
+
+        return Math.Min(score, 100);
+    }
+
+    private static void ApplyStructuredOpenApiComponents(HtmlCrawlStructuredOpenApiLike openApiLike) {
+        HtmlCrawlStructuredOpenApiComponents components = new();
+        Dictionary<string, string> schemaRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> fieldSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> authRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> rateLimitRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> parameterSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> requestHeaderSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> responseHeaderSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> requestExampleSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> responseExampleSetRefs = new(StringComparer.Ordinal);
+        Dictionary<string, string> errorCatalogRefs = new(StringComparer.Ordinal);
+
+        foreach (HtmlCrawlStructuredOpenApiOperation operation in openApiLike.Paths.Values
+                     .SelectMany(path => path.Operations.Values)
+                     .OrderBy(operation => operation.Path, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(operation => operation.Method, StringComparer.OrdinalIgnoreCase)) {
+            if (HasStructuredAuthProfile(operation.Authentication)) {
+                operation.AuthenticationRef = GetOrAddStructuredAuthProfileComponent(components, authRefs, operation.Authentication);
+            }
+            if (HasStructuredRateLimitProfile(operation.RateLimit)) {
+                operation.RateLimitRef = GetOrAddStructuredRateLimitProfileComponent(components, rateLimitRefs, operation.RateLimit);
+            }
+            if (operation.Parameters.Count > 0) {
+                operation.ParametersRef = GetOrAddStructuredParameterSetComponent(components, parameterSetRefs, operation.Parameters);
+            }
+            if (operation.RequestHeaders.Count > 0) {
+                operation.RequestHeadersRef = GetOrAddStructuredHeaderSetComponent(components, requestHeaderSetRefs, "requestHeaderSet", operation.RequestHeaders);
+            }
+            if (operation.ResponseHeaders.Count > 0) {
+                operation.ResponseHeadersRef = GetOrAddStructuredHeaderSetComponent(components, responseHeaderSetRefs, "responseHeaderSet", operation.ResponseHeaders);
+            }
+            if (operation.RequestExamples.Count > 0) {
+                operation.RequestExamplesRef = GetOrAddStructuredRequestExampleSetComponent(components, requestExampleSetRefs, operation.RequestExamples);
+            }
+            if (operation.ResponseExamples.Count > 0) {
+                operation.ResponseExamplesRef = GetOrAddStructuredResponseExampleSetComponent(components, responseExampleSetRefs, operation.ResponseExamples);
+            }
+            if (operation.ErrorCatalog.Count > 0) {
+                operation.ErrorCatalogRef = GetOrAddStructuredErrorCatalogComponent(components, errorCatalogRefs, operation.ErrorCatalog);
+            }
+            if (operation.RequestBodySchema.Count > 0) {
+                operation.RequestBodySchemaRef = GetOrAddStructuredSchemaComponent(components, schemaRefs, "requestBodySchema", operation.RequestBodySchema);
+            }
+            if (operation.SuccessResponseSchema.Count > 0) {
+                operation.SuccessResponseSchemaRef = GetOrAddStructuredSchemaComponent(components, schemaRefs, "successResponseSchema", operation.SuccessResponseSchema);
+            }
+            if (operation.ErrorResponseSchema.Count > 0) {
+                operation.ErrorResponseSchemaRef = GetOrAddStructuredSchemaComponent(components, schemaRefs, "errorResponseSchema", operation.ErrorResponseSchema);
+            }
+            if (operation.RequestBodyFields.Count > 0) {
+                operation.RequestBodyFieldsRef = GetOrAddStructuredFieldSetComponent(components, fieldSetRefs, "requestBodyFields", operation.RequestBodyFields);
+            }
+            if (operation.SuccessResponseFields.Count > 0) {
+                operation.SuccessResponseFieldsRef = GetOrAddStructuredFieldSetComponent(components, fieldSetRefs, "successResponseFields", operation.SuccessResponseFields);
+            }
+            if (operation.ErrorResponseFields.Count > 0) {
+                operation.ErrorResponseFieldsRef = GetOrAddStructuredFieldSetComponent(components, fieldSetRefs, "errorResponseFields", operation.ErrorResponseFields);
+            }
+        }
+
+        openApiLike.Components = components;
+    }
+
+    private static bool HasStructuredAuthProfile(HtmlCrawlStructuredApiAuthentication value) =>
+        value.Required.HasValue
+        || value.Schemes.Count > 0
+        || value.Headers.Count > 0
+        || !string.IsNullOrWhiteSpace(value.Summary);
+
+    private static bool HasStructuredRateLimitProfile(HtmlCrawlStructuredApiRateLimit value) =>
+        value.Mentioned
+        || value.StatusCode.HasValue
+        || value.Headers.Count > 0
+        || !string.IsNullOrWhiteSpace(value.Limit)
+        || !string.IsNullOrWhiteSpace(value.Window)
+        || !string.IsNullOrWhiteSpace(value.Summary);
+
+    private static string GetOrAddStructuredSchemaComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        string prefix,
+        IDictionary<string, string?> schema) {
+        string signature = BuildStructuredSchemaSignature(schema);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey(prefix, components.Schemas.Keys);
+        components.Schemas[key] = new Dictionary<string, string?>(schema, StringComparer.OrdinalIgnoreCase);
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredFieldSetComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        string prefix,
+        IEnumerable<HtmlCrawlStructuredField> fields) {
+        List<HtmlCrawlStructuredField> clonedFields = fields.Select(CloneStructuredField).ToList();
+        string signature = BuildStructuredFieldSetSignature(clonedFields);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey(prefix, components.FieldSets.Keys);
+        components.FieldSets[key] = clonedFields;
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredAuthProfileComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        HtmlCrawlStructuredApiAuthentication auth) {
+        string signature = BuildStructuredAuthProfileSignature(auth);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("authProfile", components.AuthProfiles.Keys);
+        components.AuthProfiles[key] = CloneStructuredApiAuthentication(auth);
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredRateLimitProfileComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        HtmlCrawlStructuredApiRateLimit rateLimit) {
+        string signature = BuildStructuredRateLimitProfileSignature(rateLimit);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("rateLimitProfile", components.RateLimitProfiles.Keys);
+        components.RateLimitProfiles[key] = CloneStructuredApiRateLimit(rateLimit);
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredParameterSetComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        IEnumerable<HtmlCrawlStructuredApiParameter> parameters) {
+        List<HtmlCrawlStructuredApiParameter> clonedParameters = parameters.Select(CloneStructuredApiParameter).ToList();
+        string signature = BuildStructuredParameterSetSignature(clonedParameters);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("parameterSet", components.ParameterSets.Keys);
+        components.ParameterSets[key] = clonedParameters;
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredHeaderSetComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        string prefix,
+        IEnumerable<HtmlCrawlStructuredHttpHeader> headers) {
+        List<HtmlCrawlStructuredHttpHeader> clonedHeaders = headers.Select(CloneStructuredHttpHeader).ToList();
+        string signature = BuildStructuredHeaderSetSignature(clonedHeaders);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey(prefix, prefix.StartsWith("request", StringComparison.OrdinalIgnoreCase)
+            ? components.RequestHeaderSets.Keys
+            : components.ResponseHeaderSets.Keys);
+        if (prefix.StartsWith("request", StringComparison.OrdinalIgnoreCase)) {
+            components.RequestHeaderSets[key] = clonedHeaders;
+        } else {
+            components.ResponseHeaderSets[key] = clonedHeaders;
+        }
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredRequestExampleSetComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        IEnumerable<HtmlCrawlStructuredRequestExample> examples) {
+        List<HtmlCrawlStructuredRequestExample> clonedExamples = examples.Select(CloneStructuredRequestExample).ToList();
+        string signature = BuildStructuredRequestExampleSetSignature(clonedExamples);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("requestExampleSet", components.RequestExampleSets.Keys);
+        components.RequestExampleSets[key] = clonedExamples;
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredResponseExampleSetComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        IEnumerable<HtmlCrawlStructuredResponseExample> examples) {
+        List<HtmlCrawlStructuredResponseExample> clonedExamples = examples.Select(CloneStructuredResponseExample).ToList();
+        string signature = BuildStructuredResponseExampleSetSignature(clonedExamples);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("responseExampleSet", components.ResponseExampleSets.Keys);
+        components.ResponseExampleSets[key] = clonedExamples;
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string GetOrAddStructuredErrorCatalogComponent(
+        HtmlCrawlStructuredOpenApiComponents components,
+        IDictionary<string, string> refs,
+        IEnumerable<HtmlCrawlStructuredApiError> errors) {
+        List<HtmlCrawlStructuredApiError> clonedErrors = errors.Select(CloneStructuredApiError).ToList();
+        string signature = BuildStructuredErrorCatalogSignature(clonedErrors);
+        if (refs.TryGetValue(signature, out string? existingRef)) {
+            return existingRef;
+        }
+
+        string key = BuildStructuredComponentKey("errorCatalog", components.ErrorCatalogs.Keys);
+        components.ErrorCatalogs[key] = clonedErrors;
+        refs[signature] = key;
+        return key;
+    }
+
+    private static string BuildStructuredComponentKey(string prefix, IEnumerable<string> existingKeys) {
+        HashSet<string> keys = new(existingKeys, StringComparer.OrdinalIgnoreCase);
+        int index = 1;
+        string candidate;
+        do {
+            candidate = prefix + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            index++;
+        } while (keys.Contains(candidate));
+
+        return candidate;
+    }
+
+    private static string BuildStructuredSchemaSignature(IEnumerable<KeyValuePair<string, string?>> schema) {
+        return string.Join("|", schema
+            .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(item => $"{item.Key}={item.Value ?? string.Empty}"));
+    }
+
+    private static string BuildStructuredFieldSetSignature(IEnumerable<HtmlCrawlStructuredField> fields) {
+        return string.Join("|", fields
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(field => string.Join("~", new[] {
+                field.Path,
+                field.ParentPath ?? string.Empty,
+                field.Kind ?? string.Empty,
+                field.Type ?? string.Empty,
+                field.Format ?? string.Empty,
+                field.Required?.ToString() ?? string.Empty,
+                field.Nullable?.ToString() ?? string.Empty,
+                string.Join(",", field.ChildPaths.OrderBy(item => item, StringComparer.OrdinalIgnoreCase)),
+                string.Join(",", field.EnumValues.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
+            })));
+    }
+
+    private static string BuildStructuredAuthProfileSignature(HtmlCrawlStructuredApiAuthentication auth) {
+        return string.Join("|", new[] {
+            auth.Required?.ToString() ?? string.Empty,
+            string.Join(",", auth.Schemes.OrderBy(item => item, StringComparer.OrdinalIgnoreCase)),
+            string.Join(",", auth.Headers.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
+        });
+    }
+
+    private static string BuildStructuredRateLimitProfileSignature(HtmlCrawlStructuredApiRateLimit rateLimit) {
+        return string.Join("|", new[] {
+            rateLimit.Mentioned.ToString(),
+            rateLimit.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            rateLimit.Limit ?? string.Empty,
+            rateLimit.Window ?? string.Empty,
+            string.Join(",", rateLimit.Headers.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
+        });
+    }
+
+    private static string BuildStructuredParameterSetSignature(IEnumerable<HtmlCrawlStructuredApiParameter> parameters) {
+        return string.Join("|", parameters
+            .OrderBy(parameter => parameter.Location, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(parameter => string.Join("~", new[] {
+                parameter.Name,
+                parameter.Type ?? string.Empty,
+                parameter.Format ?? string.Empty,
+                parameter.Location ?? string.Empty,
+                parameter.Required?.ToString() ?? string.Empty,
+                parameter.Nullable?.ToString() ?? string.Empty,
+                parameter.Pattern ?? string.Empty,
+                parameter.DefaultValue ?? string.Empty,
+                parameter.ExampleValue ?? string.Empty,
+                string.Join(",", parameter.EnumValues.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
+            })));
+    }
+
+    private static string BuildStructuredHeaderSetSignature(IEnumerable<HtmlCrawlStructuredHttpHeader> headers) {
+        return string.Join("|", headers
+            .OrderBy(header => header.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(header => $"{header.Name}={header.Value ?? string.Empty}"));
+    }
+
+    private static string BuildStructuredRequestExampleSetSignature(IEnumerable<HtmlCrawlStructuredRequestExample> examples) {
+        return string.Join("|", examples
+            .OrderBy(example => example.Method, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(example => example.Path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(example => example.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(example => string.Join("~", new[] {
+                example.Method ?? string.Empty,
+                example.Path ?? string.Empty,
+                example.ContentType ?? string.Empty,
+                example.Kind,
+                BuildStructuredHeaderSetSignature(example.Headers),
+                example.Body
+            })));
+    }
+
+    private static string BuildStructuredResponseExampleSetSignature(IEnumerable<HtmlCrawlStructuredResponseExample> examples) {
+        return string.Join("|", examples
+            .OrderBy(example => example.StatusCode ?? int.MaxValue)
+            .ThenBy(example => example.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(example => string.Join("~", new[] {
+                example.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                example.StatusText ?? string.Empty,
+                example.ContentType ?? string.Empty,
+                example.Kind,
+                BuildStructuredHeaderSetSignature(example.Headers),
+                example.Body
+            })));
+    }
+
+    private static string BuildStructuredErrorCatalogSignature(IEnumerable<HtmlCrawlStructuredApiError> errors) {
+        return string.Join("|", errors
+            .OrderBy(error => error.StatusCode ?? int.MaxValue)
+            .ThenBy(error => error.StatusText, StringComparer.OrdinalIgnoreCase)
+            .Select(error => string.Join("~", new[] {
+                error.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                error.StatusText ?? string.Empty,
+                error.ContentType ?? string.Empty,
+                BuildStructuredHeaderSetSignature(error.Headers),
+                BuildStructuredSchemaSignature(error.Schema),
+                BuildStructuredFieldSetSignature(error.Fields)
+            })));
+    }
+
+    private static string NormalizeStrictOpenApiParameterLocation(string? location) {
+        string normalized = NormalizeWhitespace(location)?.ToLowerInvariant() ?? string.Empty;
+        return normalized is "path" or "query" or "header" or "cookie" ? normalized : "query";
+    }
+
+    private static object? BuildStrictOpenApiSchemaReference(string? fieldSetRef, string? schemaRef) {
+        string? reference = !string.IsNullOrWhiteSpace(fieldSetRef) ? fieldSetRef : schemaRef;
+        if (string.IsNullOrWhiteSpace(reference)) {
+            return null;
+        }
+
+        return new Dictionary<string, object?> {
+            ["$ref"] = $"#/components/schemas/{reference}"
+        };
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiRequestExamples(IEnumerable<HtmlCrawlStructuredRequestExample> examples) {
+        Dictionary<string, object?> values = new(StringComparer.OrdinalIgnoreCase);
+        int index = 1;
+        foreach (HtmlCrawlStructuredRequestExample example in examples) {
+            values["example" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)] = new Dictionary<string, object?> {
+                ["summary"] = example.Title ?? example.Description,
+                ["value"] = ParseStrictOpenApiExampleValue(example.Body)
+            };
+            index++;
+        }
+
+        return values;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiResponseExamples(IEnumerable<HtmlCrawlStructuredResponseExample> examples) {
+        Dictionary<string, object?> values = new(StringComparer.OrdinalIgnoreCase);
+        int index = 1;
+        foreach (HtmlCrawlStructuredResponseExample example in examples) {
+            values["example" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)] = new Dictionary<string, object?> {
+                ["summary"] = example.Title ?? example.Description ?? example.StatusText,
+                ["value"] = ParseStrictOpenApiExampleValue(example.Body)
+            };
+            index++;
+        }
+
+        return values;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiHeaderDefinitions(IEnumerable<HtmlCrawlStructuredHttpHeader> headers) {
+        Dictionary<string, object?> values = new(StringComparer.OrdinalIgnoreCase);
+        foreach (HtmlCrawlStructuredHttpHeader header in headers.Where(header => !string.IsNullOrWhiteSpace(header.Name)).GroupBy(header => header.Name, StringComparer.OrdinalIgnoreCase).Select(group => group.First())) {
+            Dictionary<string, object?> headerDefinition = new(StringComparer.OrdinalIgnoreCase) {
+                ["schema"] = new Dictionary<string, object?> {
+                    ["type"] = "string"
+                }
+            };
+            if (!string.IsNullOrWhiteSpace(header.Value)) {
+                headerDefinition["example"] = header.Value;
+            }
+            values[header.Name] = headerDefinition;
+        }
+
+        return values;
+    }
+
+    private static object? ParseStrictOpenApiExampleValue(string? body) {
+        if (string.IsNullOrWhiteSpace(body)) {
+            return null;
+        }
+
+        if (TryParseStructuredJsonPayload(body, out object? jsonBody, out _, out _)) {
+            return jsonBody;
+        }
+
+        return body;
+    }
+
+    private static object BuildStrictOpenApiSchemaFromFields(IList<HtmlCrawlStructuredField> fields) {
+        Dictionary<string, HtmlCrawlStructuredField> byPath = fields
+            .Where(field => !string.IsNullOrWhiteSpace(field.Path))
+            .GroupBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        bool rootArray = byPath.Keys.Any(path => path.StartsWith("$[]", StringComparison.Ordinal));
+        Dictionary<string, object?> schema = rootArray
+            ? BuildStrictOpenApiArraySchema(byPath, "$[]", null)
+            : BuildStrictOpenApiObjectSchema(byPath, null);
+        AddStrictOpenApiSchemaProvenance(schema, fields);
+        AddStrictOpenApiSchemaConfidenceSummary(schema, fields);
+        return schema;
+    }
+
+    private static object BuildStrictOpenApiSchemaFromFlatMap(IDictionary<string, string?> schemaMap) {
+        IList<HtmlCrawlStructuredField> fields = BuildStructuredFieldsFromSchemaMap(schemaMap);
+        return fields.Count > 0 ? BuildStrictOpenApiSchemaFromFields(fields) : new Dictionary<string, object?> {
+            ["type"] = "object"
+        };
+    }
+
+    private static IList<HtmlCrawlStructuredField> BuildStructuredFieldsFromSchemaMap(IDictionary<string, string?> schemaMap) {
+        List<HtmlCrawlStructuredField> fields = new();
+        foreach (KeyValuePair<string, string?> item in schemaMap.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+            if (string.IsNullOrWhiteSpace(item.Key) || string.Equals(item.Key, "$", StringComparison.Ordinal)) {
+                continue;
+            }
+
+            fields.Add(new HtmlCrawlStructuredField {
+                Name = ExtractStructuredFieldName(item.Key),
+                Path = item.Key,
+                ParentPath = GetStructuredParentPath(item.Key),
+                Kind = item.Key.EndsWith("[]", StringComparison.Ordinal)
+                    ? "array-item"
+                    : string.Equals(item.Value, "object", StringComparison.OrdinalIgnoreCase)
+                        ? "object"
+                        : string.Equals(item.Value, "array", StringComparison.OrdinalIgnoreCase)
+                            ? "array"
+                            : "field",
+                Depth = GetStructuredFieldDepth(item.Key),
+                Type = item.Value,
+                Source = "JsonSchemaMap"
+            });
+        }
+
+        return FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(fields))
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiObjectSchema(
+        IDictionary<string, HtmlCrawlStructuredField> byPath,
+        string? path) {
+        Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase) {
+            ["type"] = "object"
+        };
+
+        IEnumerable<HtmlCrawlStructuredField> children = byPath.Values
+            .Where(field => string.Equals(field.ParentPath, path, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Dictionary<string, object?> properties = new(StringComparer.OrdinalIgnoreCase);
+        List<string> required = new();
+
+        foreach (HtmlCrawlStructuredField child in children) {
+            string propertyName = child.Name;
+            if (string.IsNullOrWhiteSpace(propertyName) || string.Equals(propertyName, "$[]", StringComparison.Ordinal)) {
+                propertyName = ExtractStructuredFieldName(child.Path);
+            }
+
+            properties[propertyName] = BuildStrictOpenApiSchemaNode(byPath, child.Path, child);
+            if (child.Required == true) {
+                required.Add(propertyName);
+            }
+        }
+
+        schema["properties"] = properties;
+        if (required.Count > 0) {
+            schema["required"] = required;
+        }
+
+        if (!string.IsNullOrWhiteSpace(path) && byPath.TryGetValue(path, out HtmlCrawlStructuredField? field)) {
+            AddStrictOpenApiFieldProvenance(schema, field);
+            AddStrictOpenApiFieldConfidence(schema, field);
+        }
+
+        return schema;
+    }
+
+    private static Dictionary<string, object?> BuildStrictOpenApiArraySchema(
+        IDictionary<string, HtmlCrawlStructuredField> byPath,
+        string path,
+        HtmlCrawlStructuredField? ownerField) {
+        Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase) {
+            ["type"] = "array"
+        };
+
+        if (ownerField != null) {
+            AddStrictOpenApiFieldProvenance(schema, ownerField);
+            AddStrictOpenApiFieldConfidence(schema, ownerField);
+        }
+
+        if (byPath.TryGetValue(path, out HtmlCrawlStructuredField? itemField)) {
+            schema["items"] = BuildStrictOpenApiSchemaNode(byPath, path, itemField);
+        } else {
+            IEnumerable<HtmlCrawlStructuredField> children = byPath.Values
+                .Where(field => string.Equals(field.ParentPath, path, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (children.Any()) {
+                schema["items"] = BuildStrictOpenApiObjectSchema(byPath, path);
+            } else {
+                schema["items"] = new Dictionary<string, object?> {
+                    ["type"] = "string"
+                };
+            }
+        }
+
+        return schema;
+    }
+
+    private static object BuildStrictOpenApiSchemaNode(
+        IDictionary<string, HtmlCrawlStructuredField> byPath,
+        string path,
+        HtmlCrawlStructuredField field) {
+        if (string.Equals(field.Kind, "array", StringComparison.OrdinalIgnoreCase)) {
+            return BuildStrictOpenApiArraySchema(byPath, path + "[]", field);
+        }
+        if (string.Equals(field.Kind, "object", StringComparison.OrdinalIgnoreCase)) {
+            return BuildStrictOpenApiObjectSchema(byPath, path);
+        }
+        if (string.Equals(field.Kind, "array-item", StringComparison.OrdinalIgnoreCase)
+            && byPath.Values.Any(candidate => string.Equals(candidate.ParentPath, path, StringComparison.OrdinalIgnoreCase))) {
+            return BuildStrictOpenApiObjectSchema(byPath, path);
+        }
+
+        Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase);
+        ApplyStrictOpenApiType(schema, field.Type, field.Format);
+        if (field.Nullable == true) {
+            schema["nullable"] = true;
+        }
+        if (field.EnumValues.Count > 0) {
+            schema["enum"] = field.EnumValues.Cast<object>().ToList();
+        }
+        if (!string.IsNullOrWhiteSpace(field.ExampleValue)) {
+            schema["example"] = ParseStrictOpenApiExampleValue(field.ExampleValue);
+        }
+        AddStrictOpenApiFieldProvenance(schema, field);
+        AddStrictOpenApiFieldConfidence(schema, field);
+
+        return schema;
+    }
+
+    private static void AddStrictOpenApiSchemaProvenance(IDictionary<string, object?> schema, IEnumerable<HtmlCrawlStructuredField> fields) {
+        List<Dictionary<string, object?>> provenance = BuildStrictOpenApiFieldProvenance(fields.SelectMany(field => field.Provenance));
+        if (provenance.Count > 0) {
+            schema["x-htmltinkerx-schemaProvenance"] = provenance;
+        }
+    }
+
+    private static void AddStrictOpenApiFieldProvenance(IDictionary<string, object?> schema, HtmlCrawlStructuredField field) {
+        List<Dictionary<string, object?>> provenance = BuildStrictOpenApiFieldProvenance(field.Provenance);
+        if (provenance.Count > 0) {
+            schema["x-htmltinkerx-fieldProvenance"] = provenance;
+        }
+    }
+
+    private static void AddStrictOpenApiFieldConfidence(IDictionary<string, object?> schema, HtmlCrawlStructuredField field) {
+        if (field.ConfidenceScore > 0) {
+            schema["x-htmltinkerx-confidence"] = field.ConfidenceScore;
+        }
+        if (field.EvidenceCount > 0) {
+            schema["x-htmltinkerx-evidenceCount"] = field.EvidenceCount;
+        }
+    }
+
+    private static void AddStrictOpenApiSchemaConfidenceSummary(IDictionary<string, object?> schema, IEnumerable<HtmlCrawlStructuredField> fields) {
+        List<HtmlCrawlStructuredField> scoredFields = fields
+            .Where(field => field.ConfidenceScore > 0)
+            .ToList();
+        if (scoredFields.Count == 0) {
+            return;
+        }
+
+        schema["x-htmltinkerx-confidenceSummary"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) {
+            ["average"] = Math.Round(scoredFields.Average(field => field.ConfidenceScore), 2, MidpointRounding.AwayFromZero),
+            ["min"] = scoredFields.Min(field => field.ConfidenceScore),
+            ["max"] = scoredFields.Max(field => field.ConfidenceScore),
+            ["fieldCount"] = scoredFields.Count,
+            ["evidenceCount"] = scoredFields.Sum(field => field.EvidenceCount)
+        };
+    }
+
+    private static List<Dictionary<string, object?>> BuildStrictOpenApiFieldProvenance(IEnumerable<HtmlCrawlStructuredFieldProvenanceEntry> entries) {
+        return entries
+            .GroupBy(entry => string.Join("|",
+                entry.PageUrl ?? string.Empty,
+                entry.Kind ?? string.Empty,
+                entry.SelectorHint ?? string.Empty,
+                entry.Label ?? string.Empty), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(entry => entry.PageUrl, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Kind, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(entry => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) {
+                ["pageUrl"] = entry.PageUrl,
+                ["kind"] = entry.Kind,
+                ["selectorHint"] = entry.SelectorHint,
+                ["label"] = entry.Label
+            })
+            .ToList();
+    }
+
+    private static void ApplyStrictOpenApiType(Dictionary<string, object?> schema, string? type, string? format) {
+        string normalizedType = NormalizeWhitespace(type)?.ToLowerInvariant() ?? string.Empty;
+        switch (normalizedType) {
+            case "integer":
+                schema["type"] = "integer";
+                break;
+            case "number":
+                schema["type"] = "number";
+                break;
+            case "boolean":
+                schema["type"] = "boolean";
+                break;
+            case "array":
+                schema["type"] = "array";
+                schema["items"] = new Dictionary<string, object?> {
+                    ["type"] = "string"
+                };
+                break;
+            case "object":
+                schema["type"] = "object";
+                break;
+            default:
+                schema["type"] = "string";
+                break;
+        }
+
+        if (!string.IsNullOrWhiteSpace(format)) {
+            schema["format"] = format;
+        }
+    }
+
+    private static string GetStrictOpenApiResponseCode(int? statusCode) =>
+        statusCode.HasValue
+            ? statusCode.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : "default";
+
+    private static void AddStrictOpenApiExtension(IDictionary<string, object?> value, string key, object? extensionValue) {
+        if (extensionValue == null) {
+            return;
+        }
+
+        if (extensionValue is string stringValue && string.IsNullOrWhiteSpace(stringValue)) {
+            return;
+        }
+
+        value[key] = extensionValue;
+    }
+
+    private static void AddStrictOpenApiComponentExtension(IDictionary<string, object?> components, string key, object? extensionValue) {
+        if (extensionValue == null) {
+            return;
+        }
+
+        switch (extensionValue) {
+            case IDictionary<string, object?> objectDictionary when objectDictionary.Count == 0:
+                return;
+            case System.Collections.IDictionary dictionary when dictionary.Count == 0:
+                return;
+            case System.Collections.ICollection collection when collection.Count == 0:
+                return;
+        }
+
+        components[key] = extensionValue;
+    }
+
+    private static IList<string> BuildStructuredOpenApiServers(HtmlCrawlPage page, HtmlCrawlStructuredMetadata metadata) =>
+        BuildStructuredOpenApiServers(new[] { page.Url, metadata.CanonicalUrl, metadata.ImageUrl });
+
+    private static IList<string> BuildStructuredOpenApiServers(IEnumerable<string?> values) {
+        List<string> servers = new();
+
+        foreach (string? value in values) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                continue;
+            }
+
+            if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)) {
+                string origin = uri.GetLeftPart(UriPartial.Authority);
+                if (!string.IsNullOrWhiteSpace(origin)) {
+                    AppendDistinct(servers, origin);
+                }
+            }
+        }
+
+        return servers;
+    }
+
+    private static IDocument BuildStructuredSectionDocument(IElement heading) {
+        int headingLevel = GetHeadingLevel(heading);
+        StringBuilder builder = new();
+        builder.Append("<div>")
+            .Append(heading.OuterHtml);
+        IElement? sibling = heading.NextElementSibling;
+        while (sibling != null) {
+            if (GetHeadingLevel(sibling) is int siblingLevel && siblingLevel <= headingLevel) {
+                break;
+            }
+
+            builder.Append(sibling.OuterHtml);
+            sibling = sibling.NextElementSibling;
+        }
+
+        builder.Append("</div>");
+        return HtmlParser.ParseWithAngleSharp(builder.ToString());
+    }
+
+    private static int GetHeadingLevel(IElement element) {
+        if (element == null || element.LocalName.Length != 2 || element.LocalName[0] != 'h' || !char.IsDigit(element.LocalName[1])) {
+            return int.MaxValue;
+        }
+
+        return element.LocalName[1] - '0';
+    }
+
+    private static List<HtmlCrawlStructuredApiParameter> BuildStructuredApiParameters(IDocument sectionDocument) {
+        List<HtmlCrawlStructuredApiParameter> parameters = new();
+        foreach (IElement table in sectionDocument.QuerySelectorAll("table")) {
+            List<HtmlTableResult> parsedTables = HtmlParser.ParseTablesWithAngleSharpDetailed(table.OuterHtml);
+            HtmlTableResult? parsed = parsedTables.FirstOrDefault();
+            if (parsed == null || !LooksLikeApiParameterTable(parsed, table)) {
+                continue;
+            }
+
+            string? location = DetectApiParameterLocation(table, parsed);
+            foreach (Dictionary<string, string?> row in parsed.Data) {
+                HtmlCrawlStructuredApiParameter? parameter = BuildStructuredApiParameter(row, location, BuildElementSelectorHint(table));
+                if (parameter != null) {
+                    parameters.Add(parameter);
+                }
+            }
+        }
+
+        return parameters;
+    }
+
+    private static bool LooksLikeApiParameterTable(HtmlTableResult table, IElement tableElement) {
+        string headers = string.Join(" ", table.Metadata.Headers);
+        string nearbyHeading = FindNearbyHeadingText(tableElement) ?? string.Empty;
+        bool hasNameColumn = ContainsAnyToken(headers, "parameter", "name", "field");
+        bool hasDetailColumn = ContainsAnyToken(headers, "type", "required", "description", "default", "location");
+        bool headingSignal = ContainsAnyToken(nearbyHeading, "parameter", "request body", "query parameter", "path parameter", "header");
+        return hasNameColumn && (hasDetailColumn || headingSignal);
+    }
+
+    private static List<HtmlCrawlStructuredRequestExample> BuildStructuredRequestExamples(
+        IReadOnlyList<HtmlCrawlStructuredCodeSample> codeSamples) {
+        List<HtmlCrawlStructuredRequestExample> requestExamples = new();
+        foreach (HtmlCrawlStructuredCodeSample sample in codeSamples) {
+            HtmlCrawlStructuredRequestExample? requestExample = BuildStructuredRequestExample(sample);
+            if (requestExample == null) {
+                continue;
+            }
+
+            requestExamples.Add(requestExample);
+        }
+
+        return requestExamples;
+    }
+
+    private static HtmlCrawlStructuredApiParameter? BuildStructuredApiParameter(Dictionary<string, string?> row, string? fallbackLocation, string? selectorHint) {
+        string? name = GetStructuredRowValue(row, "parameter", "name", "field");
+        if (string.IsNullOrWhiteSpace(name)) {
+            return null;
+        }
+
+        string? type = GetStructuredRowValue(row, "type", "data type");
+        string? description = GetStructuredRowValue(row, "description", "details", "summary");
+        string? format = NormalizeStructuredApiParameterFormat(
+            GetStructuredRowValue(row, "format", "data format"),
+            type,
+            name,
+            description,
+            GetStructuredRowValue(row, "example", "example value", "sample", "sample value"));
+        string? exampleValue = GetStructuredRowValue(row, "example", "example value", "sample", "sample value");
+        string? pattern = GetStructuredRowValue(row, "pattern", "regex", "regexp");
+        IList<string> enumValues = ParseStructuredApiEnumValues(
+            GetStructuredRowValue(row, "enum", "allowed values", "allowed", "values"),
+            description);
+        string? defaultValue = GetStructuredRowValue(row, "default", "default value");
+        string? location = GetStructuredRowValue(row, "location", "in") ?? fallbackLocation;
+        bool? required = ParseNullableBoolean(GetStructuredRowValue(row, "required", "mandatory"));
+        bool? nullable = ParseNullableBoolean(GetStructuredRowValue(row, "nullable", "allow null", "allows null", "null"));
+        nullable ??= InferStructuredApiNullable(description);
+
+        return new HtmlCrawlStructuredApiParameter {
+            Name = NormalizeWhitespace(name),
+            Type = NormalizeWhitespace(type),
+            Format = NormalizeWhitespace(format),
+            Location = NormalizeWhitespace(location),
+            Required = required,
+            Nullable = nullable,
+            Description = NormalizeWhitespace(description),
+            DefaultValue = NormalizeWhitespace(defaultValue),
+            ExampleValue = NormalizeWhitespace(exampleValue),
+            Pattern = NormalizeWhitespace(pattern),
+            EnumValues = enumValues,
+            SelectorHint = selectorHint
+        };
+    }
+
+    private static HtmlCrawlStructuredApiAuthentication BuildStructuredApiAuthentication(
+        IDocument sectionDocument,
+        IReadOnlyList<HtmlCrawlStructuredCodeSample> codeSamples,
+        IEnumerable<HtmlCrawlStructuredApiParameter> parameters) {
+        HtmlCrawlStructuredApiAuthentication authentication = new();
+        string sectionText = NormalizeWhitespace(sectionDocument.DocumentElement?.TextContent);
+
+        foreach (HtmlCrawlStructuredApiParameter parameter in parameters) {
+            AppendStructuredApiAuthenticationSignals(authentication, parameter.Name);
+            AppendStructuredApiAuthenticationSignals(authentication, parameter.Description);
+            AppendStructuredApiAuthenticationSignals(authentication, parameter.DefaultValue);
+
+            string? headerName = NormalizeStructuredAuthenticationHeader(parameter.Name);
+            if (string.Equals(parameter.Location, "header", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(headerName)) {
+                AppendDistinct(authentication.Headers, headerName);
+                authentication.Required ??= parameter.Required;
+            }
+        }
+
+        foreach (HtmlCrawlStructuredCodeSample sample in codeSamples) {
+            AppendStructuredApiAuthenticationSignals(authentication, sample.Heading);
+            AppendStructuredApiAuthenticationSignals(authentication, sample.Title);
+            AppendStructuredApiAuthenticationSignals(authentication, sample.Code);
+        }
+
+        AppendStructuredApiAuthenticationSignals(authentication, sectionText);
+
+        if (!authentication.Required.HasValue
+            && (authentication.Schemes.Count > 0 || authentication.Headers.Count > 0)) {
+            authentication.Required = true;
+        }
+
+        authentication.Summary = FindFirstStructuredSignalText(sectionDocument,
+            "authentication",
+            "authorization",
+            "bearer",
+            "api key",
+            "x-api-key",
+            "oauth",
+            "jwt",
+            "basic auth",
+            "token");
+
+        if (string.IsNullOrWhiteSpace(authentication.Summary)
+            && (authentication.Required.HasValue || authentication.Schemes.Count > 0 || authentication.Headers.Count > 0)) {
+            List<string> parts = new();
+            if (authentication.Required == true) {
+                parts.Add("Authentication required");
+            } else if (authentication.Required == false) {
+                parts.Add("No authentication required");
+            }
+
+            if (authentication.Schemes.Count > 0) {
+                parts.Add("schemes: " + string.Join(", ", authentication.Schemes));
+            }
+            if (authentication.Headers.Count > 0) {
+                parts.Add("headers: " + string.Join(", ", authentication.Headers));
+            }
+
+            authentication.Summary = string.Join("; ", parts);
+        }
+
+        return authentication;
+    }
+
+    private static void MergeStructuredApiAuthentication(
+        HtmlCrawlStructuredApiAuthentication target,
+        HtmlCrawlStructuredApiAuthentication source) {
+        if (!target.Required.HasValue && source.Required.HasValue) {
+            target.Required = source.Required;
+        }
+
+        foreach (string scheme in source.Schemes) {
+            AppendDistinct(target.Schemes, scheme);
+        }
+        foreach (string header in source.Headers) {
+            AppendDistinct(target.Headers, header);
+        }
+
+        target.Summary ??= source.Summary;
+    }
+
+    private static void ApplyStructuredApiParameterGrouping(HtmlCrawlStructuredApiEndpoint endpoint, string pageUrl) {
+        endpoint.PathParameters = endpoint.Parameters
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "path", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        endpoint.QueryParameters = endpoint.Parameters
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "query", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        endpoint.HeaderParameters = endpoint.Parameters
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "header", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        endpoint.BodyParameters = endpoint.Parameters
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "body", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        endpoint.RequestBodySchema = endpoint.BodyParameters
+            .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Name))
+            .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(parameter => parameter.Type).FirstOrDefault(type => !string.IsNullOrWhiteSpace(type)),
+                StringComparer.OrdinalIgnoreCase);
+        endpoint.RequestBodyFields = FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(endpoint.BodyParameters
+            .Select(parameter => BuildStructuredRequestBodyField(parameter, pageUrl)))
+            )
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (HtmlCrawlStructuredApiParameter parameter in endpoint.HeaderParameters) {
+            string? headerName = NormalizeStructuredAuthenticationHeader(parameter.Name);
+            if (!string.IsNullOrWhiteSpace(headerName)) {
+                AppendDistinct(endpoint.Authentication.Headers, headerName);
+                endpoint.Authentication.Required ??= parameter.Required;
+            }
+
+            AppendStructuredApiAuthenticationSignals(endpoint.Authentication, parameter.Name);
+            AppendStructuredApiAuthenticationSignals(endpoint.Authentication, parameter.Description);
+        }
+
+        if (!endpoint.Authentication.Required.HasValue
+            && (endpoint.Authentication.Schemes.Count > 0 || endpoint.Authentication.Headers.Count > 0)) {
+            endpoint.Authentication.Required = true;
+        }
+    }
+
+    private static string ResolveStructuredApiParameterLocation(string endpointPath, HtmlCrawlStructuredApiParameter parameter) {
+        if (!string.IsNullOrWhiteSpace(parameter.Location)) {
+            string explicitLocation = parameter.Location!.Trim().ToLowerInvariant();
+            if (explicitLocation is "path" or "query" or "header" or "body") {
+                return explicitLocation;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(parameter.Name)
+            && endpointPath.IndexOf("{" + parameter.Name + "}", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return "path";
+        }
+
+        return "body";
+    }
+
+    private static string? DetectApiParameterLocation(IElement tableElement, HtmlTableResult table) {
+        string heading = FindNearbyHeadingText(tableElement) ?? string.Empty;
+        string headers = string.Join(" ", table.Metadata.Headers);
+        string combined = heading + " " + headers;
+        if (ContainsAnyToken(combined, "path")) {
+            return "path";
+        }
+        if (ContainsAnyToken(combined, "query")) {
+            return "query";
+        }
+        if (ContainsAnyToken(combined, "header")) {
+            return "header";
+        }
+        if (ContainsAnyToken(combined, "body", "request")) {
+            return "body";
+        }
+
+        return null;
+    }
+
+    private static string? GetStructuredRowValue(Dictionary<string, string?> row, params string[] names) {
+        foreach (string name in names) {
+            foreach (KeyValuePair<string, string?> item in row) {
+                if (string.Equals(item.Key, name, StringComparison.OrdinalIgnoreCase)) {
+                    return item.Value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool? ParseNullableBoolean(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        string normalized = value.Trim();
+        if (normalized.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("required", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+        if (normalized.Equals("false", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("no", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("optional", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private static bool? InferStructuredApiNullable(string? description) {
+        if (string.IsNullOrWhiteSpace(description)) {
+            return null;
+        }
+
+        string normalized = NormalizeWhitespace(description);
+        if (Regex.IsMatch(normalized, @"\b(nullable|may be null|can be null|or null)\b", RegexOptions.IgnoreCase)) {
+            return true;
+        }
+        if (Regex.IsMatch(normalized, @"\b(not null|non-null|must not be null|cannot be null)\b", RegexOptions.IgnoreCase)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeStructuredApiParameterFormat(
+        string? explicitFormat,
+        string? type,
+        string? name,
+        string? description,
+        string? exampleValue) {
+        foreach (string? candidate in new[] { explicitFormat, type, name, description, exampleValue }) {
+            string? normalized = MapStructuredApiParameterFormat(candidate);
+            if (!string.IsNullOrWhiteSpace(normalized)) {
+                return normalized;
+            }
+        }
+
+        return NormalizeWhitespace(explicitFormat);
+    }
+
+    private static string? MapStructuredApiParameterFormat(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        string normalized = NormalizeWhitespace(value).ToLowerInvariant();
+        if (normalized.Contains("uuid") || normalized.Contains("guid")) {
+            return "uuid";
+        }
+        if (normalized.Contains("date-time") || normalized.Contains("datetime") || normalized.Contains("timestamp")) {
+            return "date-time";
+        }
+        if (Regex.IsMatch(normalized, @"\bdate\b", RegexOptions.IgnoreCase)) {
+            return "date";
+        }
+        if (normalized.Contains("email") || Regex.IsMatch(normalized, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")) {
+            return "email";
+        }
+        if (normalized.Contains("uri") || normalized.Contains("url") || Uri.TryCreate(value.Trim(), UriKind.Absolute, out _)) {
+            return "uri";
+        }
+        if (normalized.Contains("hostname")) {
+            return "hostname";
+        }
+        if (normalized.Contains("ipv4")) {
+            return "ipv4";
+        }
+        if (normalized.Contains("ipv6")) {
+            return "ipv6";
+        }
+        if (normalized.Contains("slug")) {
+            return "slug";
+        }
+        if (normalized.Contains("base64")) {
+            return "base64";
+        }
+
+        return null;
+    }
+
+    private static IList<string> ParseStructuredApiEnumValues(string? rawValues, string? description) {
+        List<string> values = new();
+
+        void AppendCandidates(string? input, bool prose) {
+            if (string.IsNullOrWhiteSpace(input)) {
+                return;
+            }
+
+            string normalized = NormalizeWhitespace(input);
+            if (string.IsNullOrWhiteSpace(normalized)) {
+                return;
+            }
+
+            if (prose) {
+                Match match = Regex.Match(normalized, @"\b(?:one of|allowed values?|valid values?)\s*[:\-]\s*(.+)$", RegexOptions.IgnoreCase);
+                if (match.Success) {
+                    normalized = match.Groups[1].Value;
+                } else {
+                    return;
+                }
+            }
+
+            normalized = normalized.Trim('[', ']', '(', ')');
+            foreach (string part in Regex.Split(normalized, @"\s*(?:,|\||/|;)\s*")) {
+                string candidate = NormalizeWhitespace(part.Trim('\"', '\'', '`'));
+                if (!string.IsNullOrWhiteSpace(candidate) && !candidate.Contains(' ')) {
+                    AppendDistinct(values, candidate);
+                }
+            }
+        }
+
+        AppendCandidates(rawValues, prose: false);
+        if (values.Count == 0) {
+            AppendCandidates(description, prose: true);
+        }
+
+        return values;
+    }
+
+    private static HtmlCrawlStructuredApiRateLimit BuildStructuredApiRateLimit(
+        IDocument sectionDocument,
+        IReadOnlyList<HtmlCrawlStructuredCodeSample> codeSamples,
+        IEnumerable<HtmlCrawlStructuredResponseExample> responseExamples) {
+        HtmlCrawlStructuredApiRateLimit rateLimit = new();
+        string sectionText = NormalizeWhitespace(sectionDocument.DocumentElement?.TextContent);
+
+        foreach (HtmlCrawlStructuredCodeSample sample in codeSamples) {
+            AppendStructuredApiRateLimitSignals(rateLimit, sample.Heading);
+            AppendStructuredApiRateLimitSignals(rateLimit, sample.Title);
+            AppendStructuredApiRateLimitSignals(rateLimit, sample.Code);
+        }
+
+        foreach (HtmlCrawlStructuredResponseExample responseExample in responseExamples) {
+            if (responseExample.StatusCode == 429) {
+                rateLimit.Mentioned = true;
+                rateLimit.StatusCode ??= 429;
+            }
+
+            AppendStructuredApiRateLimitSignals(rateLimit, responseExample.Title);
+            AppendStructuredApiRateLimitSignals(rateLimit, responseExample.Body);
+        }
+
+        AppendStructuredApiRateLimitSignals(rateLimit, sectionText);
+        rateLimit.Summary = FindFirstStructuredSignalText(sectionDocument,
+            "rate limit",
+            "rate-limit",
+            "quota",
+            "throttle",
+            "throttling",
+            "retry-after",
+            "too many requests",
+            "x-ratelimit",
+            "ratelimit");
+
+        if (string.IsNullOrWhiteSpace(rateLimit.Summary)
+            && (rateLimit.Mentioned || rateLimit.StatusCode.HasValue || rateLimit.Headers.Count > 0 || !string.IsNullOrWhiteSpace(rateLimit.Limit))) {
+            List<string> parts = new();
+            if (!string.IsNullOrWhiteSpace(rateLimit.Limit)) {
+                parts.Add(rateLimit.Limit!);
+            }
+            if (rateLimit.StatusCode.HasValue) {
+                parts.Add("status " + rateLimit.StatusCode.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            if (rateLimit.Headers.Count > 0) {
+                parts.Add("headers: " + string.Join(", ", rateLimit.Headers));
+            }
+
+            rateLimit.Summary = string.Join("; ", parts);
+        }
+
+        return rateLimit;
+    }
+
+    private static void MergeStructuredApiRateLimit(
+        HtmlCrawlStructuredApiRateLimit target,
+        HtmlCrawlStructuredApiRateLimit source) {
+        target.Mentioned |= source.Mentioned;
+        target.StatusCode ??= source.StatusCode;
+        target.Limit ??= source.Limit;
+        target.Window ??= source.Window;
+        foreach (string header in source.Headers) {
+            AppendDistinct(target.Headers, header);
+        }
+
+        target.Summary ??= source.Summary;
+    }
+
+    private static List<HtmlCrawlStructuredResponseExample> BuildStructuredResponseExamples(
+        IDocument sectionDocument,
+        IReadOnlyList<HtmlCrawlStructuredCodeSample> codeSamples,
+        string pageUrl) {
+        List<HtmlCrawlStructuredResponseExample> responseExamples = new();
+        foreach (HtmlCrawlStructuredCodeSample sample in codeSamples) {
+            if (!LooksLikeResponseExample(sample)) {
+                continue;
+            }
+
+            List<HtmlCrawlStructuredHttpHeader> headers = new();
+            string body = sample.Code;
+            int? parsedStatusCode = null;
+            string? parsedStatusText = null;
+            string? contentType = null;
+            if (TryParseStructuredHttpResponseSample(sample.Code, out int? sampleStatusCode, out string? sampleStatusText, out List<HtmlCrawlStructuredHttpHeader> sampleHeaders, out string sampleBody)) {
+                parsedStatusCode = sampleStatusCode;
+                parsedStatusText = sampleStatusText;
+                headers = sampleHeaders;
+                body = sampleBody;
+                contentType = sampleHeaders
+                    .FirstOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                    ?.Value;
+            }
+
+            int? statusCode = parsedStatusCode ?? ExtractStatusCode(sample.Heading) ?? ExtractStatusCode(sample.Title);
+            string? statusText = parsedStatusText
+                ?? ExtractStatusText(sample.Heading)
+                ?? ExtractStatusText(sample.Title)
+                ?? (statusCode.HasValue ? GetDefaultHttpStatusText(statusCode.Value) : null);
+            object? jsonBody = null;
+            Dictionary<string, string?> bodySchema = new(StringComparer.OrdinalIgnoreCase);
+            List<string> topLevelKeys = new();
+            List<HtmlCrawlStructuredField> bodyFields = new();
+            if (TryParseStructuredJsonPayload(body, out object? parsedJsonBody, out Dictionary<string, string?> parsedBodySchema, out List<string> parsedTopLevelKeys)) {
+                jsonBody = parsedJsonBody;
+                bodySchema = parsedBodySchema;
+                topLevelKeys = parsedTopLevelKeys;
+                bodyFields = BuildStructuredFieldsFromJsonPayload(
+                    parsedJsonBody,
+                    "JsonResponse",
+                    pageUrl,
+                    sample.SelectorHint,
+                    sample.Title ?? sample.Heading ?? (statusCode.HasValue ? "Response " + statusCode.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null));
+            }
+
+            responseExamples.Add(new HtmlCrawlStructuredResponseExample {
+                Title = sample.Title,
+                Description = sample.Heading,
+                Language = sample.Language,
+                Kind = sample.Kind,
+                StatusCode = statusCode,
+                StatusText = statusText,
+                Headers = headers,
+                ContentType = contentType ?? InferStructuredResponseContentType(sample.Language, sample.Kind, body),
+                IsError = statusCode is >= 400,
+                Body = body,
+                BodySchema = bodySchema,
+                TopLevelKeys = topLevelKeys,
+                JsonBody = jsonBody,
+                BodyFields = bodyFields,
+                SelectorHint = sample.SelectorHint
+            });
+        }
+
+        foreach (HtmlCrawlStructuredResponseExample response in BuildStructuredDocumentedErrorResponses(sectionDocument, responseExamples)) {
+            if (!responseExamples.Any(existing =>
+                    existing.StatusCode == response.StatusCode
+                    && string.Equals(existing.Description, response.Description, StringComparison.OrdinalIgnoreCase))) {
+                responseExamples.Add(response);
+            }
+        }
+
+        return responseExamples;
+    }
+
+    private static List<HtmlCrawlStructuredHttpHeader> BuildStructuredEndpointRequestHeaders(HtmlCrawlStructuredApiEndpoint endpoint) {
+        List<HtmlCrawlStructuredHttpHeader> headers = new();
+        foreach (HtmlCrawlStructuredRequestExample requestExample in endpoint.RequestExamples) {
+            foreach (HtmlCrawlStructuredHttpHeader header in requestExample.Headers) {
+                AppendStructuredHeader(headers, header.Name, header.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(requestExample.ContentType)) {
+                AppendStructuredHeader(headers, "Content-Type", requestExample.ContentType);
+            }
+        }
+
+        foreach (HtmlCrawlStructuredApiParameter parameter in endpoint.HeaderParameters) {
+            AppendStructuredHeader(headers, parameter.Name, parameter.ExampleValue ?? parameter.DefaultValue);
+        }
+
+        foreach (string headerName in endpoint.Authentication.Headers) {
+            HtmlCrawlStructuredApiParameter? parameter = endpoint.HeaderParameters
+                .FirstOrDefault(item => string.Equals(item.Name, headerName, StringComparison.OrdinalIgnoreCase));
+            AppendStructuredHeader(headers, headerName, parameter?.ExampleValue ?? parameter?.DefaultValue);
+        }
+
+        if (endpoint.RequestBodySchema.Count > 0
+            && !headers.Any(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))) {
+            AppendStructuredHeader(headers, "Content-Type", "application/json");
+        }
+
+        return headers;
+    }
+
+    private static List<HtmlCrawlStructuredHttpHeader> BuildStructuredEndpointResponseHeaders(HtmlCrawlStructuredApiEndpoint endpoint) {
+        List<HtmlCrawlStructuredHttpHeader> headers = new();
+        foreach (HtmlCrawlStructuredResponseExample response in endpoint.ResponseExamples) {
+            foreach (HtmlCrawlStructuredHttpHeader header in response.Headers) {
+                AppendStructuredHeader(headers, header.Name, header.Value);
+            }
+        }
+
+        foreach (string headerName in endpoint.RateLimit.Headers) {
+            AppendStructuredHeader(headers, headerName, null);
+        }
+
+        return headers;
+    }
+
+    private static IDictionary<string, string?> BuildStructuredEndpointResponseSchema(IEnumerable<HtmlCrawlStructuredResponseExample> responses) {
+        Dictionary<string, string?> schema = new(StringComparer.OrdinalIgnoreCase);
+        foreach (HtmlCrawlStructuredResponseExample response in responses) {
+            MergeStructuredSchemaMaps(schema, response.BodySchema);
+        }
+
+        return schema;
+    }
+
+    private static IList<HtmlCrawlStructuredField> BuildStructuredEndpointResponseFields(IEnumerable<HtmlCrawlStructuredResponseExample> responses) {
+        List<HtmlCrawlStructuredResponseExample> responseList = responses.ToList();
+        Dictionary<string, HtmlCrawlStructuredField> fields = new(StringComparer.OrdinalIgnoreCase);
+        foreach (HtmlCrawlStructuredResponseExample response in responseList) {
+            foreach (HtmlCrawlStructuredField field in response.BodyFields) {
+                if (!fields.TryGetValue(field.Path, out HtmlCrawlStructuredField? existing)) {
+                    existing = new HtmlCrawlStructuredField {
+                        Name = field.Name,
+                        Path = field.Path,
+                        ParentPath = field.ParentPath,
+                        ChildPaths = new List<string>(field.ChildPaths),
+                        Kind = field.Kind,
+                        Depth = field.Depth,
+                        Type = field.Type,
+                        Format = field.Format,
+                        Required = true,
+                        Nullable = field.Nullable,
+                        ExampleValue = field.ExampleValue,
+                        EnumValues = new List<string>(field.EnumValues),
+                        Source = field.Source,
+                        Provenance = field.Provenance.Select(CloneStructuredFieldProvenanceEntry).ToList(),
+                        EvidenceCount = field.EvidenceCount,
+                        ConfidenceScore = field.ConfidenceScore
+                    };
+                    fields[field.Path] = existing;
+                    continue;
+                }
+
+                existing.Type = MergeStructuredTypeValues(existing.Type, field.Type);
+                existing.Format ??= field.Format;
+                existing.ParentPath ??= field.ParentPath;
+                existing.Kind = MergeStructuredFieldKinds(existing.Kind, field.Kind);
+                existing.Depth = Math.Min(existing.Depth, field.Depth);
+                existing.Nullable = existing.Nullable == true || field.Nullable == true
+                    ? true
+                    : existing.Nullable ?? field.Nullable;
+                existing.ExampleValue ??= field.ExampleValue;
+                existing.Source ??= field.Source;
+                MergeStructuredFieldProvenance(existing, field);
+                existing.EvidenceCount = Math.Max(existing.EvidenceCount, field.EvidenceCount);
+                existing.ConfidenceScore = Math.Max(existing.ConfidenceScore, field.ConfidenceScore);
+                foreach (string enumValue in field.EnumValues) {
+                    AppendDistinct(existing.EnumValues, enumValue);
+                }
+                foreach (string childPath in field.ChildPaths) {
+                    AppendDistinct(existing.ChildPaths, childPath);
+                }
+            }
+        }
+
+        foreach (HtmlCrawlStructuredField field in fields.Values) {
+            field.Required = responseList.Count > 0 && responseList.All(response =>
+                response.BodyFields.Any(candidate => string.Equals(candidate.Path, field.Path, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        return FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(fields.Values))
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IList<HtmlCrawlStructuredApiError> BuildStructuredEndpointErrorCatalog(IEnumerable<HtmlCrawlStructuredResponseExample> errorResponses) {
+        return errorResponses
+            .GroupBy(response => $"{response.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unknown"}|{NormalizeWhitespace(response.StatusText) ?? string.Empty}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => {
+                List<HtmlCrawlStructuredResponseExample> groupedResponses = group.ToList();
+                HtmlCrawlStructuredResponseExample primary = groupedResponses[0];
+                List<HtmlCrawlStructuredHttpHeader> headers = new();
+                foreach (HtmlCrawlStructuredResponseExample response in groupedResponses) {
+                    foreach (HtmlCrawlStructuredHttpHeader header in response.Headers) {
+                        AppendStructuredHeader(headers, header.Name, header.Value);
+                    }
+                }
+
+                return new HtmlCrawlStructuredApiError {
+                    StatusCode = primary.StatusCode,
+                    StatusText = primary.StatusText,
+                    Summary = groupedResponses
+                        .Select(response => NormalizeWhitespace(response.Description) ?? NormalizeWhitespace(response.Title))
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+                        ?? primary.StatusText
+                        ?? "Error response",
+                    Headers = headers,
+                    ContentType = groupedResponses
+                        .Select(response => response.ContentType)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+                    Schema = new Dictionary<string, string?>(BuildStructuredEndpointResponseSchema(groupedResponses), StringComparer.OrdinalIgnoreCase),
+                    Fields = BuildStructuredEndpointResponseFields(groupedResponses),
+                    SampleCount = groupedResponses.Count,
+                    SelectorHint = groupedResponses
+                        .Select(response => response.SelectorHint)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+                };
+            })
+            .OrderBy(error => error.StatusCode ?? int.MaxValue)
+            .ThenBy(error => error.StatusText, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static HtmlCrawlStructuredField BuildStructuredRequestBodyField(HtmlCrawlStructuredApiParameter parameter, string pageUrl) {
+        HtmlCrawlStructuredField field = new() {
+            Name = parameter.Name,
+            Path = parameter.Name,
+            ParentPath = GetStructuredParentPath(parameter.Name),
+            Kind = "field",
+            Depth = GetStructuredFieldDepth(parameter.Name),
+            Type = parameter.Type,
+            Format = parameter.Format,
+            Required = parameter.Required,
+            Nullable = parameter.Nullable,
+            ExampleValue = parameter.ExampleValue ?? parameter.DefaultValue,
+            EnumValues = new List<string>(parameter.EnumValues),
+            Source = "ParameterTable"
+        };
+        AppendStructuredFieldProvenance(field, pageUrl, "ParameterTable", parameter.SelectorHint, parameter.Name);
+        return field;
+    }
+
+    private static List<HtmlCrawlStructuredField> FinalizeStructuredFieldRelationships(IEnumerable<HtmlCrawlStructuredField> fields) {
+        Dictionary<string, HtmlCrawlStructuredField> byPath = fields
+            .GroupBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (HtmlCrawlStructuredField field in byPath.Values) {
+            field.ParentPath ??= GetStructuredParentPath(field.Path);
+            field.Depth = field.Depth > 0 ? field.Depth : GetStructuredFieldDepth(field.Path);
+        }
+
+        foreach (HtmlCrawlStructuredField field in byPath.Values) {
+            if (string.IsNullOrWhiteSpace(field.ParentPath)) {
+                continue;
+            }
+
+            if (byPath.TryGetValue(field.ParentPath, out HtmlCrawlStructuredField? parent)) {
+                AppendDistinct(parent.ChildPaths, field.Path);
+            }
+        }
+
+        return byPath.Values.ToList();
+    }
+
+    private static string? GetStructuredParentPath(string? path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            return null;
+        }
+
+        string normalized = path!;
+        if (normalized.EndsWith("[]", StringComparison.Ordinal)) {
+            return normalized.Substring(0, normalized.Length - 2);
+        }
+
+        int separatorIndex = normalized.LastIndexOf('.');
+        if (separatorIndex < 0) {
+            return null;
+        }
+
+        return normalized.Substring(0, separatorIndex);
+    }
+
+    private static int GetStructuredFieldDepth(string? path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            return 0;
+        }
+
+        int depth = 0;
+        foreach (string segment in path!.Split('.')) {
+            if (string.IsNullOrWhiteSpace(segment)) {
+                continue;
+            }
+
+            depth++;
+        }
+
+        return depth;
+    }
+
+    private static string MergeStructuredFieldKinds(string current, string incoming) {
+        if (string.IsNullOrWhiteSpace(current)) {
+            return string.IsNullOrWhiteSpace(incoming) ? "field" : incoming;
+        }
+        if (string.IsNullOrWhiteSpace(incoming) || string.Equals(current, incoming, StringComparison.OrdinalIgnoreCase)) {
+            return current;
+        }
+
+        if (string.Equals(current, "field", StringComparison.OrdinalIgnoreCase)) {
+            return incoming;
+        }
+        if (string.Equals(incoming, "field", StringComparison.OrdinalIgnoreCase)) {
+            return current;
+        }
+
+        return current;
+    }
+
+    private static List<HtmlCrawlStructuredResponseExample> BuildStructuredDocumentedErrorResponses(
+        IDocument sectionDocument,
+        IReadOnlyList<HtmlCrawlStructuredResponseExample> existingResponses) {
+        List<HtmlCrawlStructuredResponseExample> responses = new();
+        foreach (IElement element in sectionDocument.QuerySelectorAll("p, li, td, th, dd, dt, aside, [class*='callout' i], [class*='notice' i], [class*='warning' i], [class*='alert' i]")) {
+            string text = NormalizeWhitespace(element.TextContent);
+            if (string.IsNullOrWhiteSpace(text)) {
+                continue;
+            }
+
+            int? statusCode = ExtractStatusCode(text);
+            if (statusCode is not >= 400) {
+                continue;
+            }
+
+            if (!LooksLikeDocumentedErrorText(text)) {
+                continue;
+            }
+
+            if (existingResponses.Any(response => response.StatusCode == statusCode && response.IsError)) {
+                continue;
+            }
+
+            List<HtmlCrawlStructuredHttpHeader> headers = BuildStructuredHeadersFromText(text);
+            responses.Add(new HtmlCrawlStructuredResponseExample {
+                Title = "Error " + statusCode.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Description = text,
+                Kind = "text",
+                StatusCode = statusCode,
+                StatusText = ExtractStatusText(text) ?? GetDefaultHttpStatusText(statusCode.Value),
+                Headers = headers,
+                ContentType = "text/plain",
+                IsError = true,
+                Body = string.Empty,
+                SelectorHint = BuildElementSelectorHint(element)
+            });
+        }
+
+        return responses;
+    }
+
+    private static void AppendStructuredApiAuthenticationSignals(HtmlCrawlStructuredApiAuthentication authentication, string? text) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return;
+        }
+
+        string normalized = NormalizeWhitespace(text);
+        if (string.IsNullOrWhiteSpace(normalized)) {
+            return;
+        }
+
+        if (Regex.IsMatch(normalized, @"\b(no authentication required|without authentication|public endpoint|anonymous access)\b", RegexOptions.IgnoreCase)) {
+            authentication.Required ??= false;
+        }
+
+        if (ContainsAnyToken(normalized, "authorization")) {
+            AppendDistinct(authentication.Headers, "Authorization");
+        }
+        if (ContainsAnyToken(normalized, "x-api-key", "api-key", "api key")) {
+            AppendDistinct(authentication.Headers, "X-API-Key");
+            AppendDistinct(authentication.Schemes, "api-key");
+        }
+        if (ContainsAnyToken(normalized, "x-auth-token")) {
+            AppendDistinct(authentication.Headers, "X-Auth-Token");
+            AppendDistinct(authentication.Schemes, "token");
+        }
+        if (Regex.IsMatch(normalized, @"\bbearer\b|\bjwt\b", RegexOptions.IgnoreCase)) {
+            AppendDistinct(authentication.Schemes, "bearer");
+        }
+        if (Regex.IsMatch(normalized, @"\boauth\s*2(?:\.0)?\b|\boauth2\b", RegexOptions.IgnoreCase)) {
+            AppendDistinct(authentication.Schemes, "oauth2");
+        }
+        if (Regex.IsMatch(normalized, @"\bbasic auth\b|\bauthorization\s*:\s*basic\b", RegexOptions.IgnoreCase)) {
+            AppendDistinct(authentication.Schemes, "basic");
+            AppendDistinct(authentication.Headers, "Authorization");
+        }
+
+        foreach (Match match in Regex.Matches(normalized, @"(?im)^\s*(Authorization|X-API-Key|Api-Key|X-Auth-Token|X-Access-Token)\s*:", RegexOptions.IgnoreCase)) {
+            string? header = NormalizeStructuredAuthenticationHeader(match.Groups[1].Value);
+            if (!string.IsNullOrWhiteSpace(header)) {
+                AppendDistinct(authentication.Headers, header);
+            }
+        }
+
+        if (!authentication.Required.HasValue
+            && (Regex.IsMatch(normalized, @"\b(auth(?:entication)? required|requires authentication|authenticated requests?|authorization required|include (?:your|an?) api key|provide (?:your|an?) api key|send (?:your|an?) api key|set the authorization header|bearer token required)\b", RegexOptions.IgnoreCase)
+                || authentication.Schemes.Count > 0
+                || authentication.Headers.Count > 0)) {
+            authentication.Required = true;
+        }
+    }
+
+    private static string? NormalizeStructuredAuthenticationHeader(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+
+        string normalized = NormalizeWhitespace(value);
+        if (normalized.Equals("authorization", StringComparison.OrdinalIgnoreCase)) {
+            return "Authorization";
+        }
+        if (normalized.Equals("x-api-key", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("api-key", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("api key", StringComparison.OrdinalIgnoreCase)) {
+            return "X-API-Key";
+        }
+        if (normalized.Equals("x-auth-token", StringComparison.OrdinalIgnoreCase)) {
+            return "X-Auth-Token";
+        }
+        if (normalized.Equals("x-access-token", StringComparison.OrdinalIgnoreCase)) {
+            return "X-Access-Token";
+        }
+
+        return null;
+    }
+
+    private static void AppendStructuredApiRateLimitSignals(HtmlCrawlStructuredApiRateLimit rateLimit, string? text) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return;
+        }
+
+        string normalized = NormalizeWhitespace(text);
+        if (string.IsNullOrWhiteSpace(normalized)) {
+            return;
+        }
+
+        if (ContainsAnyToken(normalized, "rate limit", "rate-limit", "quota", "throttle", "throttling", "retry-after", "too many requests", "x-ratelimit", "ratelimit")) {
+            rateLimit.Mentioned = true;
+        }
+
+        if (!rateLimit.StatusCode.HasValue
+            && (ContainsAnyToken(normalized, "too many requests")
+                || Regex.IsMatch(normalized, @"\b429\b", RegexOptions.IgnoreCase))) {
+            rateLimit.StatusCode = 429;
+        }
+
+        foreach (string header in new[] { "Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset" }) {
+            if (normalized.IndexOf(header, StringComparison.OrdinalIgnoreCase) >= 0) {
+                AppendDistinct(rateLimit.Headers, header);
+                rateLimit.Mentioned = true;
+            }
+        }
+
+        Match requestsPerWindow = Regex.Match(normalized, @"\b(\d[\d,]*)\s+requests?\s+per\s+(second|minute|hour|day|month)\b", RegexOptions.IgnoreCase);
+        if (!requestsPerWindow.Success) {
+            requestsPerWindow = Regex.Match(normalized, @"\b(\d[\d,]*)\s*/\s*(second|minute|hour|day|month)\b", RegexOptions.IgnoreCase);
+        }
+
+        if (requestsPerWindow.Success) {
+            string amount = requestsPerWindow.Groups[1].Value;
+            string window = requestsPerWindow.Groups[2].Value.ToLowerInvariant();
+            rateLimit.Mentioned = true;
+            rateLimit.Window ??= window;
+            rateLimit.Limit ??= amount + " requests per " + window;
+        }
+    }
+
+    private static string? FindFirstStructuredSignalText(IDocument sectionDocument, params string[] tokens) {
+        foreach (IElement element in sectionDocument.QuerySelectorAll("p, li, td, th, dd, dt, aside, [class*='callout' i], [class*='notice' i], [class*='warning' i], [class*='alert' i], pre, code")) {
+            string text = NormalizeWhitespace(element.TextContent);
+            if (!string.IsNullOrWhiteSpace(text) && ContainsAnyToken(text, tokens)) {
+                return text;
+            }
+        }
+
+        string fallback = NormalizeWhitespace(sectionDocument.DocumentElement?.TextContent);
+        return ContainsAnyToken(fallback, tokens) ? fallback : null;
+    }
+
+    private static bool LooksLikeResponseExample(HtmlCrawlStructuredCodeSample sample) {
+        string heading = sample.Heading ?? sample.Title ?? string.Empty;
+        if (ContainsAnyToken(heading, "response", "example response", "success response", "error response")) {
+            return true;
+        }
+        if (ExtractStatusCode(heading).HasValue) {
+            return true;
+        }
+
+        return sample.Method == null && (string.Equals(sample.Kind, "json", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(sample.Kind, "http", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool LooksLikeRequestExample(HtmlCrawlStructuredCodeSample sample) {
+        if (LooksLikeResponseExample(sample)) {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sample.Method) && !string.IsNullOrWhiteSpace(sample.Path)) {
+            return true;
+        }
+
+        return string.Equals(sample.Kind, "curl", StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(sample.Kind, "http", StringComparison.OrdinalIgnoreCase)
+                && Regex.IsMatch(sample.Code, @"(?im)^\s*(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)(?:\s+HTTP/\d(?:\.\d)?)?\s*$"));
+    }
+
+    private static HtmlCrawlStructuredRequestExample? BuildStructuredRequestExample(HtmlCrawlStructuredCodeSample sample) {
+        if (!LooksLikeRequestExample(sample)) {
+            return null;
+        }
+
+        List<HtmlCrawlStructuredHttpHeader> headers = new();
+        string body = string.Empty;
+        string? method = sample.Method;
+        string? path = sample.Path;
+        string? contentType = null;
+
+        if (TryParseStructuredHttpRequestSample(sample.Code, out string? parsedMethod, out string? parsedPath, out List<HtmlCrawlStructuredHttpHeader> parsedHeaders, out string parsedBody)) {
+            method = parsedMethod ?? method;
+            path = parsedPath ?? path;
+            headers = parsedHeaders;
+            body = parsedBody;
+            contentType = parsedHeaders
+                .FirstOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                ?.Value;
+        } else if (TryParseStructuredCurlRequestSample(sample.Code, out parsedMethod, out parsedPath, out parsedHeaders, out parsedBody)) {
+            method = parsedMethod ?? method;
+            path = parsedPath ?? path;
+            headers = parsedHeaders;
+            body = parsedBody;
+            contentType = parsedHeaders
+                .FirstOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                ?.Value;
+        } else {
+            body = sample.Code;
+        }
+
+        if (string.IsNullOrWhiteSpace(method) || string.IsNullOrWhiteSpace(path)) {
+            return null;
+        }
+
+        return new HtmlCrawlStructuredRequestExample {
+            Title = sample.Title,
+            Description = sample.Heading,
+            Language = sample.Language,
+            Kind = sample.Kind,
+            Method = method,
+            Path = path,
+            Headers = headers,
+            ContentType = contentType ?? InferStructuredRequestContentType(sample.Language, sample.Kind, body),
+            Body = body,
+            SelectorHint = sample.SelectorHint
+        };
+    }
+
+    private static bool LooksLikeDocumentedErrorText(string text) =>
+        ContainsAnyToken(text,
+            "error",
+            "returns",
+            "response",
+            "too many requests",
+            "unauthorized",
+            "forbidden",
+            "not found",
+            "invalid",
+            "failed");
+
+    private static List<HtmlCrawlStructuredHttpHeader> BuildStructuredHeadersFromText(string text) {
+        List<HtmlCrawlStructuredHttpHeader> headers = new();
+        foreach (string headerName in BuildStructuredDocumentedResponseHeaderNames(text)) {
+            AppendStructuredHeader(headers, headerName, null);
+        }
+
+        return headers;
+    }
+
+    private static bool TryParseStructuredJsonPayload(
+        string body,
+        out object? jsonBody,
+        out Dictionary<string, string?> bodySchema,
+        out List<string> topLevelKeys) {
+        jsonBody = null;
+        bodySchema = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        topLevelKeys = new List<string>();
+
+        if (!LooksLikeJson(body)) {
+            return false;
+        }
+
+        try {
+            using JsonDocument document = JsonDocument.Parse(body);
+            jsonBody = ConvertStructuredJsonElement(document.RootElement);
+            if (document.RootElement.ValueKind == JsonValueKind.Object) {
+                foreach (JsonProperty property in document.RootElement.EnumerateObject()) {
+                    topLevelKeys.Add(property.Name);
+                }
+            }
+
+            BuildStructuredJsonSchema(bodySchema, jsonBody, null);
+            return true;
+        } catch (JsonException) {
+            return false;
+        }
+    }
+
+    private static List<HtmlCrawlStructuredField> BuildStructuredFieldsFromJsonPayload(
+        object? jsonBody,
+        string source,
+        string pageUrl,
+        string? selectorHint,
+        string? label) {
+        List<HtmlCrawlStructuredField> fields = new();
+        AppendStructuredFieldsFromJsonValue(fields, jsonBody, null, source, pageUrl, selectorHint, label);
+        return FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(fields))
+            .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void AppendStructuredFieldsFromJsonValue(
+        IList<HtmlCrawlStructuredField> fields,
+        object? value,
+        string? path,
+        string source,
+        string pageUrl,
+        string? selectorHint,
+        string? label) {
+        if (value is IDictionary<string, object?> dictionary) {
+            if (!string.IsNullOrWhiteSpace(path)) {
+                HtmlCrawlStructuredField field = new() {
+                    Name = ExtractStructuredFieldName(path),
+                    Path = path,
+                    ParentPath = GetStructuredParentPath(path),
+                    Kind = "object",
+                    Depth = GetStructuredFieldDepth(path),
+                    Type = "object",
+                    Nullable = false,
+                    Source = source
+                };
+                AppendStructuredFieldProvenance(field, pageUrl, source, selectorHint, label);
+                fields.Add(field);
+            }
+
+            foreach (KeyValuePair<string, object?> item in dictionary) {
+                string childPath = string.IsNullOrWhiteSpace(path) ? item.Key : path + "." + item.Key;
+                AppendStructuredFieldsFromJsonValue(fields, item.Value, childPath, source, pageUrl, selectorHint, label);
+            }
+            return;
+        }
+
+        if (value is IList list) {
+            string arrayPath = string.IsNullOrWhiteSpace(path) ? "$" : path!;
+            if (!string.IsNullOrWhiteSpace(path)) {
+                HtmlCrawlStructuredField field = new() {
+                    Name = ExtractStructuredFieldName(arrayPath),
+                    Path = arrayPath,
+                    ParentPath = GetStructuredParentPath(arrayPath),
+                    Kind = "array",
+                    Depth = GetStructuredFieldDepth(arrayPath),
+                    Type = "array",
+                    Nullable = false,
+                    Source = source
+                };
+                AppendStructuredFieldProvenance(field, pageUrl, source, selectorHint, label);
+                fields.Add(field);
+            }
+
+            foreach (object? item in list) {
+                AppendStructuredFieldsFromJsonValue(fields, item, arrayPath + "[]", source, pageUrl, selectorHint, label);
+            }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(path)) {
+            return;
+        }
+
+        string? exampleValue = value switch {
+            null => null,
+            string text => text,
+            bool boolean => boolean ? "true" : "false",
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)
+        };
+
+        HtmlCrawlStructuredField valueField = new() {
+            Name = ExtractStructuredFieldName(path),
+            Path = path,
+            ParentPath = GetStructuredParentPath(path),
+            Kind = path.EndsWith("[]", StringComparison.Ordinal) ? "array-item" : "field",
+            Depth = GetStructuredFieldDepth(path),
+            Type = GetStructuredSchemaTypeName(value),
+            Format = NormalizeStructuredApiParameterFormat(null, null, path, null, exampleValue),
+            Required = true,
+            Nullable = value == null,
+            ExampleValue = exampleValue,
+            Source = source
+        };
+        AppendStructuredFieldProvenance(valueField, pageUrl, source, selectorHint, label);
+        fields.Add(valueField);
+    }
+
+    private static string ExtractStructuredFieldName(string path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            return string.Empty;
+        }
+
+        string normalized = path.EndsWith("[]", StringComparison.Ordinal) ? path.Substring(0, path.Length - 2) : path;
+        int separatorIndex = normalized.LastIndexOf('.');
+        return separatorIndex >= 0 ? normalized.Substring(separatorIndex + 1) : normalized;
+    }
+
+    private static object? ConvertStructuredJsonElement(JsonElement element) {
+        switch (element.ValueKind) {
+            case JsonValueKind.Object:
+                Dictionary<string, object?> obj = new(StringComparer.OrdinalIgnoreCase);
+                foreach (JsonProperty property in element.EnumerateObject()) {
+                    obj[property.Name] = ConvertStructuredJsonElement(property.Value);
+                }
+                return obj;
+            case JsonValueKind.Array:
+                return element.EnumerateArray()
+                    .Select(ConvertStructuredJsonElement)
+                    .ToList();
+            case JsonValueKind.String:
+                return element.GetString();
+            case JsonValueKind.Number:
+                if (element.TryGetInt64(out long longValue)) {
+                    return longValue;
+                }
+                if (element.TryGetDecimal(out decimal decimalValue)) {
+                    return decimalValue;
+                }
+                return element.GetDouble();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+                return null;
+            default:
+                return element.GetRawText();
+        }
+    }
+
+    private static void BuildStructuredJsonSchema(
+        IDictionary<string, string?> schema,
+        object? value,
+        string? path) {
+        if (value is IDictionary<string, object?> dictionary) {
+            if (!string.IsNullOrWhiteSpace(path)) {
+                MergeStructuredSchemaValue(schema, path!, "object");
+            }
+
+            foreach (KeyValuePair<string, object?> item in dictionary) {
+                string childPath = string.IsNullOrWhiteSpace(path) ? item.Key : path + "." + item.Key;
+                BuildStructuredJsonSchema(schema, item.Value, childPath);
+            }
+            return;
+        }
+
+        if (value is IList list) {
+            string arrayPath = string.IsNullOrWhiteSpace(path) ? "$" : path!;
+            MergeStructuredSchemaValue(schema, arrayPath, "array");
+            if (list.Count == 0) {
+                return;
+            }
+
+            foreach (object? item in list) {
+                BuildStructuredJsonSchema(schema, item, arrayPath + "[]");
+            }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(path)) {
+            return;
+        }
+
+        MergeStructuredSchemaValue(schema, path!, GetStructuredSchemaTypeName(value));
+    }
+
+    private static string GetStructuredSchemaTypeName(object? value) {
+        return value switch {
+            null => "null",
+            string => "string",
+            bool => "boolean",
+            byte or sbyte or short or ushort or int or uint or long or ulong => "integer",
+            float or double or decimal => "number",
+            IDictionary<string, object?> => "object",
+            IList => "array",
+            _ => "string"
+        };
+    }
+
+    private static void MergeStructuredSchemaMaps(
+        IDictionary<string, string?> target,
+        IEnumerable<KeyValuePair<string, string?>> source) {
+        foreach (KeyValuePair<string, string?> item in source) {
+            if (string.IsNullOrWhiteSpace(item.Key)) {
+                continue;
+            }
+
+            MergeStructuredSchemaValue(target, item.Key, item.Value);
+        }
+    }
+
+    private static void MergeStructuredSchemaValue(
+        IDictionary<string, string?> target,
+        string key,
+        string? value) {
+        if (!target.TryGetValue(key, out string? existing) || string.IsNullOrWhiteSpace(existing)) {
+            target[key] = value;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        HashSet<string> types = new(existing.Split('|'), StringComparer.OrdinalIgnoreCase);
+        types.Add(value);
+        target[key] = string.Join("|", types.OrderBy(type => type, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string? MergeStructuredTypeValues(string? first, string? second) {
+        if (string.IsNullOrWhiteSpace(first)) {
+            return second;
+        }
+        if (string.IsNullOrWhiteSpace(second) || string.Equals(first, second, StringComparison.OrdinalIgnoreCase)) {
+            return first;
+        }
+
+        HashSet<string> types = new(first.Split('|'), StringComparer.OrdinalIgnoreCase);
+        foreach (string type in second.Split('|')) {
+            if (!string.IsNullOrWhiteSpace(type)) {
+                types.Add(type);
+            }
+        }
+
+        return string.Join("|", types.OrderBy(type => type, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static HtmlCrawlStructuredApiAuthentication CloneStructuredApiAuthentication(HtmlCrawlStructuredApiAuthentication value) {
+        return new HtmlCrawlStructuredApiAuthentication {
+            Required = value.Required,
+            Schemes = new List<string>(value.Schemes),
+            Headers = new List<string>(value.Headers),
+            Summary = value.Summary
+        };
+    }
+
+    private static HtmlCrawlStructuredApiRateLimit CloneStructuredApiRateLimit(HtmlCrawlStructuredApiRateLimit value) {
+        return new HtmlCrawlStructuredApiRateLimit {
+            Mentioned = value.Mentioned,
+            Limit = value.Limit,
+            Window = value.Window,
+            Headers = new List<string>(value.Headers),
+            StatusCode = value.StatusCode,
+            Summary = value.Summary
+        };
+    }
+
+    private static HtmlCrawlStructuredApiParameter CloneStructuredApiParameter(HtmlCrawlStructuredApiParameter value) {
+        return new HtmlCrawlStructuredApiParameter {
+            Name = value.Name,
+            Type = value.Type,
+            Format = value.Format,
+            Location = value.Location,
+            Required = value.Required,
+            Nullable = value.Nullable,
+            Description = value.Description,
+            DefaultValue = value.DefaultValue,
+            ExampleValue = value.ExampleValue,
+            Pattern = value.Pattern,
+            EnumValues = new List<string>(value.EnumValues),
+            SelectorHint = value.SelectorHint
+        };
+    }
+
+    private static HtmlCrawlStructuredHttpHeader CloneStructuredHttpHeader(HtmlCrawlStructuredHttpHeader value) {
+        return new HtmlCrawlStructuredHttpHeader {
+            Name = value.Name,
+            Value = value.Value
+        };
+    }
+
+    private static HtmlCrawlStructuredRequestExample CloneStructuredRequestExample(HtmlCrawlStructuredRequestExample value) {
+        return new HtmlCrawlStructuredRequestExample {
+            Title = value.Title,
+            Description = value.Description,
+            Language = value.Language,
+            Kind = value.Kind,
+            Method = value.Method,
+            Path = value.Path,
+            Headers = value.Headers.Select(CloneStructuredHttpHeader).ToList(),
+            ContentType = value.ContentType,
+            Body = value.Body,
+            SelectorHint = value.SelectorHint
+        };
+    }
+
+    private static HtmlCrawlStructuredResponseExample CloneStructuredResponseExample(HtmlCrawlStructuredResponseExample value) {
+        return new HtmlCrawlStructuredResponseExample {
+            Title = value.Title,
+            Description = value.Description,
+            Language = value.Language,
+            Kind = value.Kind,
+            StatusCode = value.StatusCode,
+            StatusText = value.StatusText,
+            Headers = value.Headers.Select(CloneStructuredHttpHeader).ToList(),
+            ContentType = value.ContentType,
+            IsError = value.IsError,
+            Body = value.Body,
+            BodySchema = new Dictionary<string, string?>(value.BodySchema, StringComparer.OrdinalIgnoreCase),
+            TopLevelKeys = new List<string>(value.TopLevelKeys),
+            JsonBody = value.JsonBody,
+            BodyFields = value.BodyFields.Select(CloneStructuredField).ToList(),
+            SelectorHint = value.SelectorHint
+        };
+    }
+
+    private static HtmlCrawlStructuredApiError CloneStructuredApiError(HtmlCrawlStructuredApiError value) {
+        return new HtmlCrawlStructuredApiError {
+            StatusCode = value.StatusCode,
+            StatusText = value.StatusText,
+            Summary = value.Summary,
+            Headers = value.Headers.Select(CloneStructuredHttpHeader).ToList(),
+            ContentType = value.ContentType,
+            Schema = new Dictionary<string, string?>(value.Schema, StringComparer.OrdinalIgnoreCase),
+            Fields = value.Fields.Select(CloneStructuredField).ToList(),
+            SampleCount = value.SampleCount,
+            SelectorHint = value.SelectorHint
+        };
+    }
+
+    private static HtmlCrawlStructuredOpenApiProvenance CloneStructuredOpenApiProvenance(HtmlCrawlStructuredOpenApiProvenance value) {
+        return new HtmlCrawlStructuredOpenApiProvenance {
+            PageUrls = new List<string>(value.PageUrls),
+            SourceKinds = new List<string>(value.SourceKinds),
+            Entries = value.Entries.Select(CloneStructuredOpenApiProvenanceEntry).ToList()
+        };
+    }
+
+    private static HtmlCrawlStructuredOpenApiProvenanceEntry CloneStructuredOpenApiProvenanceEntry(HtmlCrawlStructuredOpenApiProvenanceEntry value) {
+        return new HtmlCrawlStructuredOpenApiProvenanceEntry {
+            PageUrl = value.PageUrl,
+            Kind = value.Kind,
+            SelectorHint = value.SelectorHint,
+            Label = value.Label
+        };
+    }
+
+    private static HtmlCrawlStructuredField CloneStructuredField(HtmlCrawlStructuredField value) {
+        return new HtmlCrawlStructuredField {
+            Name = value.Name,
+            Path = value.Path,
+            ParentPath = value.ParentPath,
+            ChildPaths = new List<string>(value.ChildPaths),
+            Kind = value.Kind,
+            Depth = value.Depth,
+            Type = value.Type,
+            Format = value.Format,
+            Required = value.Required,
+            Nullable = value.Nullable,
+            ExampleValue = value.ExampleValue,
+            EnumValues = new List<string>(value.EnumValues),
+            Source = value.Source,
+            Provenance = value.Provenance.Select(CloneStructuredFieldProvenanceEntry).ToList(),
+            EvidenceCount = value.EvidenceCount,
+            ConfidenceScore = value.ConfidenceScore
+        };
+    }
+
+    private static HtmlCrawlStructuredFieldProvenanceEntry CloneStructuredFieldProvenanceEntry(HtmlCrawlStructuredFieldProvenanceEntry value) {
+        return new HtmlCrawlStructuredFieldProvenanceEntry {
+            PageUrl = value.PageUrl,
+            Kind = value.Kind,
+            SelectorHint = value.SelectorHint,
+            Label = value.Label
+        };
+    }
+
+    private static IEnumerable<string> BuildStructuredDocumentedResponseHeaderNames(IDocument sectionDocument) =>
+        BuildStructuredDocumentedResponseHeaderNames(NormalizeWhitespace(sectionDocument.DocumentElement?.TextContent));
+
+    private static IEnumerable<string> BuildStructuredDocumentedResponseHeaderNames(string? text) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return Array.Empty<string>();
+        }
+
+        List<string> names = new();
+        foreach (string headerName in new[] { "Retry-After", "WWW-Authenticate", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "Content-Type" }) {
+            if (text.IndexOf(headerName, StringComparison.OrdinalIgnoreCase) >= 0) {
+                AppendDistinct(names, headerName);
+            }
+        }
+
+        return names;
+    }
+
+    private static void AppendStructuredHeader(IList<HtmlCrawlStructuredHttpHeader> headers, string? name, string? value) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            return;
+        }
+
+        HtmlCrawlStructuredHttpHeader? existing = headers.FirstOrDefault(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing == null) {
+            headers.Add(new HtmlCrawlStructuredHttpHeader {
+                Name = NormalizeWhitespace(name),
+                Value = string.IsNullOrWhiteSpace(value) ? null : NormalizeWhitespace(value)
+            });
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(existing.Value) && !string.IsNullOrWhiteSpace(value)) {
+            existing.Value = NormalizeWhitespace(value);
+        }
+    }
+
+    private static string? InferStructuredRequestContentType(string? language, string kind, string body) {
+        if (LooksLikeJson(body) || string.Equals(language, "json", StringComparison.OrdinalIgnoreCase)) {
+            return "application/json";
+        }
+        if (string.Equals(kind, "http", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(kind, "curl", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(kind, "command", StringComparison.OrdinalIgnoreCase)) {
+            return LooksLikeJson(body) ? "application/json" : null;
+        }
+
+        return null;
+    }
+
+    private static string? InferStructuredResponseContentType(string? language, string kind, string body) {
+        if (LooksLikeJson(body) || string.Equals(language, "json", StringComparison.OrdinalIgnoreCase) || string.Equals(kind, "json", StringComparison.OrdinalIgnoreCase)) {
+            return "application/json";
+        }
+        if (string.Equals(language, "html", StringComparison.OrdinalIgnoreCase) || body.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0) {
+            return "text/html";
+        }
+        if (string.Equals(kind, "http", StringComparison.OrdinalIgnoreCase)) {
+            return "message/http";
+        }
+
+        return null;
+    }
+
+    private static bool TryParseStructuredHttpRequestSample(
+        string code,
+        out string? method,
+        out string? path,
+        out List<HtmlCrawlStructuredHttpHeader> headers,
+        out string body) {
+        method = null;
+        path = null;
+        headers = new List<HtmlCrawlStructuredHttpHeader>();
+        body = code;
+
+        if (string.IsNullOrWhiteSpace(code)) {
+            return false;
+        }
+
+        string normalizedNewlines = code.Replace("\r\n", "\n");
+        string[] lines = normalizedNewlines.Split('\n');
+        if (lines.Length == 0) {
+            return false;
+        }
+
+        Match requestLine = Regex.Match(lines[0].Trim(), @"^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)(?:\s+HTTP/\d(?:\.\d)?)?$", RegexOptions.IgnoreCase);
+        if (!requestLine.Success) {
+            return false;
+        }
+
+        method = requestLine.Groups[1].Value.ToUpperInvariant();
+        path = NormalizeStructuredApiPath(requestLine.Groups[2].Value);
+
+        int index = 1;
+        while (index < lines.Length) {
+            string line = lines[index].Trim();
+            index++;
+            if (line.Length == 0) {
+                break;
+            }
+
+            int separatorIndex = line.IndexOf(':');
+            if (separatorIndex <= 0) {
+                continue;
+            }
+
+            string name = NormalizeWhitespace(line.Substring(0, separatorIndex));
+            string value = NormalizeWhitespace(line.Substring(separatorIndex + 1));
+            AppendStructuredHeader(headers, name, value);
+        }
+
+        body = string.Join("\n", lines.Skip(index)).Trim();
+        return true;
+    }
+
+    private static bool TryParseStructuredCurlRequestSample(
+        string code,
+        out string? method,
+        out string? path,
+        out List<HtmlCrawlStructuredHttpHeader> headers,
+        out string body) {
+        method = null;
+        path = null;
+        headers = new List<HtmlCrawlStructuredHttpHeader>();
+        body = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(code) || !Regex.IsMatch(code, @"(?im)^\s*curl\b")) {
+            return false;
+        }
+
+        Match methodMatch = Regex.Match(code, @"(?is)\b(?:-X|--request)\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b");
+        if (methodMatch.Success) {
+            method = methodMatch.Groups[1].Value.ToUpperInvariant();
+        }
+
+        Match urlMatch = Regex.Match(code, @"(?is)\b(https?://[^\s'""]+|/[^\s'""]+)");
+        if (urlMatch.Success) {
+            path = NormalizeStructuredApiPath(urlMatch.Groups[1].Value);
+        }
+
+        foreach (Match headerMatch in Regex.Matches(code, @"(?is)\b(?:-H|--header)\s+(?:""([^""]+)""|'([^']+)'|([^\s]+))")) {
+            string rawHeader = NormalizeWhitespace(headerMatch.Groups[1].Value);
+            if (string.IsNullOrWhiteSpace(rawHeader)) {
+                rawHeader = NormalizeWhitespace(headerMatch.Groups[2].Value);
+            }
+            if (string.IsNullOrWhiteSpace(rawHeader)) {
+                rawHeader = NormalizeWhitespace(headerMatch.Groups[3].Value);
+            }
+            if (string.IsNullOrWhiteSpace(rawHeader)) {
+                continue;
+            }
+
+            int separatorIndex = rawHeader.IndexOf(':');
+            if (separatorIndex <= 0) {
+                continue;
+            }
+
+            AppendStructuredHeader(headers,
+                rawHeader.Substring(0, separatorIndex),
+                rawHeader.Substring(separatorIndex + 1));
+        }
+
+        Match bodyMatch = Regex.Match(code, @"(?is)\b(?:--data-raw|--data-binary|--data|-d)\s+(?:""([\s\S]*?)""|'([\s\S]*?)'|([^\s]+))");
+        if (bodyMatch.Success) {
+            body = NormalizeWhitespace(bodyMatch.Groups[1].Value);
+            if (string.IsNullOrWhiteSpace(body)) {
+                body = NormalizeWhitespace(bodyMatch.Groups[2].Value);
+            }
+            if (string.IsNullOrWhiteSpace(body)) {
+                body = NormalizeWhitespace(bodyMatch.Groups[3].Value);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(method)) {
+            method = string.IsNullOrWhiteSpace(body) ? "GET" : "POST";
+        }
+
+        return !string.IsNullOrWhiteSpace(method) && !string.IsNullOrWhiteSpace(path);
+    }
+
+    private static bool TryParseStructuredHttpResponseSample(
+        string code,
+        out int? statusCode,
+        out string? statusText,
+        out List<HtmlCrawlStructuredHttpHeader> headers,
+        out string body) {
+        statusCode = null;
+        statusText = null;
+        headers = new List<HtmlCrawlStructuredHttpHeader>();
+        body = code;
+
+        if (string.IsNullOrWhiteSpace(code)) {
+            return false;
+        }
+
+        string normalizedNewlines = code.Replace("\r\n", "\n");
+        string[] lines = normalizedNewlines.Split('\n');
+        if (lines.Length == 0) {
+            return false;
+        }
+
+        Match statusLine = Regex.Match(lines[0].Trim(), @"^HTTP/\d(?:\.\d)?\s+([1-5][0-9]{2})(?:\s+(.+))?$", RegexOptions.IgnoreCase);
+        if (!statusLine.Success) {
+            return false;
+        }
+
+        if (int.TryParse(statusLine.Groups[1].Value, out int parsedStatusCode)) {
+            statusCode = parsedStatusCode;
+        }
+        statusText = NormalizeWhitespace(statusLine.Groups[2].Value);
+
+        int index = 1;
+        while (index < lines.Length) {
+            string line = lines[index].Trim();
+            index++;
+            if (line.Length == 0) {
+                break;
+            }
+
+            int separatorIndex = line.IndexOf(':');
+            if (separatorIndex <= 0) {
+                continue;
+            }
+
+            string name = NormalizeWhitespace(line.Substring(0, separatorIndex));
+            string value = NormalizeWhitespace(line.Substring(separatorIndex + 1));
+            AppendStructuredHeader(headers, name, value);
+        }
+
+        body = string.Join("\n", lines.Skip(index)).Trim();
+        return true;
+    }
+
+    private static int? ExtractStatusCode(string? text) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return null;
+        }
+
+        Match match = Regex.Match(text, @"\b([1-5][0-9]{2})\b");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out int statusCode)) {
+            return statusCode;
+        }
+
+        return null;
+    }
+
+    private static string? ExtractStatusText(string? text) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return null;
+        }
+
+        Match httpStatusMatch = Regex.Match(text, @"\b(?:HTTP/\d(?:\.\d)?\s+)?[1-5][0-9]{2}\s+([A-Za-z][A-Za-z0-9 _-]+)", RegexOptions.IgnoreCase);
+        if (httpStatusMatch.Success) {
+            return NormalizeWhitespace(httpStatusMatch.Groups[1].Value);
+        }
+
+        return null;
+    }
+
+    private static string? GetDefaultHttpStatusText(int statusCode) {
+        return statusCode switch {
+            200 => "OK",
+            201 => "Created",
+            202 => "Accepted",
+            204 => "No Content",
+            400 => "Bad Request",
+            401 => "Unauthorized",
+            403 => "Forbidden",
+            404 => "Not Found",
+            409 => "Conflict",
+            422 => "Unprocessable Entity",
+            429 => "Too Many Requests",
+            500 => "Internal Server Error",
+            502 => "Bad Gateway",
+            503 => "Service Unavailable",
+            504 => "Gateway Timeout",
+            _ => null
+        };
+    }
+
+    private static HtmlCrawlStructuredApiEndpoint GetOrCreateStructuredApiEndpoint(
+        IDictionary<string, HtmlCrawlStructuredApiEndpoint> endpoints,
+        string method,
+        string path) {
+        string key = method.ToUpperInvariant() + " " + path;
+        if (endpoints.TryGetValue(key, out HtmlCrawlStructuredApiEndpoint? existing)) {
+            return existing;
+        }
+
+        HtmlCrawlStructuredApiEndpoint created = new() {
+            Method = method.ToUpperInvariant(),
+            Path = path
+        };
+        endpoints[key] = created;
+        return created;
+    }
+
+    private static string DetectStructuredCodeSampleKind(string code, string? language) {
+        if (TryParseApiMethodAndPath(code, out _, out _)) {
+            return "http";
+        }
+        if (string.Equals(language, "http", StringComparison.OrdinalIgnoreCase)) {
+            return "http";
+        }
+        if (Regex.IsMatch(code, @"(?im)^\s*curl\b")) {
+            return "curl";
+        }
+        if (string.Equals(language, "powershell", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "ps1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "bash", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "sh", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "shell", StringComparison.OrdinalIgnoreCase)) {
+            return "command";
+        }
+        if (LooksLikeJson(code)) {
+            return "json";
+        }
+
+        return string.IsNullOrWhiteSpace(language) ? "text" : "code";
+    }
+
+    private static string? BuildStructuredCodeSampleTitle(string? heading, string kind, string? method, string? path, string? language) {
+        if (!string.IsNullOrWhiteSpace(heading)) {
+            return heading;
+        }
+        if (!string.IsNullOrWhiteSpace(method) && !string.IsNullOrWhiteSpace(path)) {
+            return method + " " + path;
+        }
+        if (!string.IsNullOrWhiteSpace(language)) {
+            return CultureInfoInvariantTitle(language) + " sample";
+        }
+
+        return kind switch {
+            "curl" => "cURL example",
+            "http" => "HTTP example",
+            "json" => "JSON example",
+            "command" => "Command example",
+            _ => "Code sample"
+        };
+    }
+
+    private static string? FindNearbyHeadingText(IElement element) {
+        IElement? sibling = element.PreviousElementSibling;
+        while (sibling != null) {
+            if (Regex.IsMatch(sibling.LocalName, "^h[1-6]$", RegexOptions.IgnoreCase)) {
+                return NormalizeWhitespace(sibling.TextContent);
+            }
+
+            sibling = sibling.PreviousElementSibling;
+        }
+
+        return null;
+    }
+
+    private static string? FindFollowingParagraphText(IElement element) {
+        IElement? sibling = element.NextElementSibling;
+        while (sibling != null) {
+            if (string.Equals(sibling.LocalName, "p", StringComparison.OrdinalIgnoreCase)) {
+                return NormalizeWhitespace(sibling.TextContent);
+            }
+            if (Regex.IsMatch(sibling.LocalName, "^h[1-6]$", RegexOptions.IgnoreCase)) {
+                break;
+            }
+
+            sibling = sibling.NextElementSibling;
+        }
+
+        return null;
+    }
+
+    private static string? BuildStructuredApiPrimaryResource(string? path) {
+        return GetStructuredApiLiteralPathSegments(path).FirstOrDefault();
+    }
+
+    private static IList<string> BuildStructuredApiTags(string? path, string? title, string? description) {
+        List<string> tags = new();
+        foreach (string segment in GetStructuredApiLiteralPathSegments(path)) {
+            AppendDistinct(tags, segment);
+        }
+
+        if (tags.Count == 0) {
+            foreach (string token in ExtractStructuredTitleTokens(title)) {
+                AppendDistinct(tags, token);
+            }
+        }
+
+        if (tags.Count == 0 && !string.IsNullOrWhiteSpace(description)) {
+            foreach (string token in ExtractStructuredTitleTokens(description).Take(2)) {
+                AppendDistinct(tags, token);
+            }
+        }
+
+        return tags;
+    }
+
+    private static string BuildStructuredApiOperationId(string method, string path, string? title) {
+        List<string> tokens = new();
+        tokens.Add(method.ToLowerInvariant());
+
+        List<string> segments = GetStructuredApiPathSegments(path);
+        foreach (string segment in segments) {
+            if (segment.StartsWith("{", StringComparison.Ordinal) && segment.EndsWith("}", StringComparison.Ordinal)) {
+                string parameterName = segment.Substring(1, segment.Length - 2);
+                tokens.Add("by");
+                tokens.Add(parameterName);
+                continue;
+            }
+
+            if (!IsStructuredApiVersionSegment(segment)) {
+                tokens.Add(segment);
+            }
+        }
+
+        if (tokens.Count <= 1) {
+            foreach (string token in ExtractStructuredTitleTokens(title)) {
+                tokens.Add(token);
+            }
+        }
+
+        if (tokens.Count <= 1) {
+            tokens.Add("operation");
+        }
+
+        return BuildStructuredCamelIdentifier(tokens);
+    }
+
+    private static List<string> GetStructuredApiLiteralPathSegments(string? path) {
+        return GetStructuredApiPathSegments(path)
+            .Where(segment => !segment.StartsWith("{", StringComparison.Ordinal) || !segment.EndsWith("}", StringComparison.Ordinal))
+            .Where(segment => !IsStructuredApiVersionSegment(segment))
+            .ToList();
+    }
+
+    private static List<string> GetStructuredApiPathSegments(string? path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            return new List<string>();
+        }
+
+        string normalized = path!;
+        int queryIndex = normalized.IndexOf('?');
+        if (queryIndex >= 0) {
+            normalized = normalized.Substring(0, queryIndex);
+        }
+
+        return normalized.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => NormalizeWhitespace(segment))
+            .Where(segment => !string.IsNullOrWhiteSpace(segment))
+            .ToList();
+    }
+
+    private static bool IsStructuredApiVersionSegment(string segment) =>
+        Regex.IsMatch(segment, @"^v\d+(?:\.\d+)?$", RegexOptions.IgnoreCase);
+
+    private static IEnumerable<string> ExtractStructuredTitleTokens(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return Array.Empty<string>();
+        }
+
+        return Regex.Matches(value, @"[A-Za-z][A-Za-z0-9]*")
+            .Cast<Match>()
+            .Select(match => match.Value)
+            .Where(token => !IsStructuredStopWord(token))
+            .Select(token => token.ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool IsStructuredStopWord(string token) =>
+        token.Equals("a", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("an", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("the", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("and", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("or", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("for", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("from", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("with", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("your", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("endpoint", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("api", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("request", StringComparison.OrdinalIgnoreCase)
+        || token.Equals("response", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildStructuredCamelIdentifier(IEnumerable<string> tokens) {
+        List<string> parts = tokens
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .SelectMany(token => Regex.Matches(token, @"[A-Za-z0-9]+").Cast<Match>().Select(match => match.Value))
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .ToList();
+        if (parts.Count == 0) {
+            return "operation";
+        }
+
+        StringBuilder builder = new(parts[0].ToLowerInvariant());
+        for (int index = 1; index < parts.Count; index++) {
+            string part = parts[index].ToLowerInvariant();
+            builder.Append(char.ToUpperInvariant(part[0]));
+            if (part.Length > 1) {
+                builder.Append(part.Substring(1));
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool ContainsAnyToken(string text, params string[] tokens) {
+        if (string.IsNullOrWhiteSpace(text)) {
+            return false;
+        }
+
+        return tokens.Any(token => text.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    private static void AppendDistinct(IList<string> values, string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return;
+        }
+
+        if (!values.Contains(value, StringComparer.OrdinalIgnoreCase)) {
+            values.Add(value);
+        }
+    }
+
+    private static string? DetectCodeBlockLanguage(IElement element) {
+        foreach (IElement candidate in new[] { element, element.ParentElement }.Where(item => item != null)!) {
+            string? attributeLanguage = candidate.GetAttribute("data-language")
+                ?? candidate.GetAttribute("data-lang")
+                ?? candidate.GetAttribute("language")
+                ?? candidate.GetAttribute("lang");
+            if (!string.IsNullOrWhiteSpace(attributeLanguage)) {
+                return NormalizeStructuredLanguage(attributeLanguage);
+            }
+
+            foreach (string className in candidate.ClassList) {
+                if (className.StartsWith("language-", StringComparison.OrdinalIgnoreCase)) {
+                    return NormalizeStructuredLanguage(className.Substring("language-".Length));
+                }
+                if (className.StartsWith("lang-", StringComparison.OrdinalIgnoreCase)) {
+                    return NormalizeStructuredLanguage(className.Substring("lang-".Length));
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeCodeBlockText(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        string normalized = value!.Replace("\r\n", "\n").Replace('\r', '\n');
+        string[] lines = normalized.Split(new[] { '\n' }, StringSplitOptions.None);
+        int start = 0;
+        int end = lines.Length - 1;
+        while (start <= end && string.IsNullOrWhiteSpace(lines[start])) {
+            start++;
+        }
+        while (end >= start && string.IsNullOrWhiteSpace(lines[end])) {
+            end--;
+        }
+
+        if (start > end) {
+            return string.Empty;
+        }
+
+        return string.Join("\n", lines.Skip(start).Take(end - start + 1));
+    }
+
+    private static string NormalizeStructuredLanguage(string language) {
+        return language.Trim().Trim('.', ':').ToLowerInvariant();
+    }
+
+    private static string CultureInfoInvariantTitle(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        string normalized = value.Trim().ToLowerInvariant();
+        return char.ToUpperInvariant(normalized[0]) + normalized.Substring(1);
+    }
+
+    private static bool TryParseApiMethodAndPath(string input, out string? method, out string? path) {
+        method = null;
+        path = null;
+        if (string.IsNullOrWhiteSpace(input)) {
+            return false;
+        }
+
+        Match directMatch = Regex.Match(input, @"(?im)\b(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)");
+        if (!directMatch.Success) {
+            directMatch = Regex.Match(input, @"(?im)\bcurl\b[\s\S]*?\b-X\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b[\s\S]*?((?:https?://[^\s'""]+)?/[^\s'""]+)");
+        }
+
+        if (!directMatch.Success) {
+            return false;
+        }
+
+        method = directMatch.Groups[1].Value.ToUpperInvariant();
+        path = NormalizeStructuredApiPath(directMatch.Groups[2].Value);
+        return !string.IsNullOrWhiteSpace(path);
+    }
+
+    private static string NormalizeStructuredApiPath(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)) {
+            return uri.PathAndQuery;
+        }
+
+        return value.Trim();
+    }
+
+    private static bool LooksLikeJson(string code) {
+        string trimmed = code.Trim();
+        return (trimmed.StartsWith("{", StringComparison.Ordinal) && trimmed.EndsWith("}", StringComparison.Ordinal))
+            || (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal));
+    }
+
+    private static string? TryResolveStructuredHref(Uri? baseUri, string? href) {
+        if (string.IsNullOrWhiteSpace(href)) {
+            return null;
+        }
+
+        if (baseUri == null) {
+            return href;
+        }
+
+        return TryResolveAbsoluteUri(baseUri, href!, out Uri? resolved) && resolved != null ? resolved.AbsoluteUri : href;
+    }
+
+    private static string? FindMetaContent(IEnumerable<HtmlMetaTag> metaTags, params string[] names) {
+        foreach (string name in names) {
+            HtmlMetaTag? match = metaTags.FirstOrDefault(tag =>
+                string.Equals(tag.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(tag.Content));
+            if (match != null) {
+                return match.Content;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindOpenGraphValue(HtmlOpenGraph openGraph, string propertyName) {
+        OpenGraphProperty? match = openGraph.Properties.FirstOrDefault(property =>
+            string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase));
+        return match?.Values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static IList<string> SplitMetadataKeywords(string? keywords) {
+        if (string.IsNullOrWhiteSpace(keywords)) {
+            return new List<string>();
+        }
+
+        return keywords.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IDictionary<string, object?> BuildStructuredSchemaExtraction(
+        HtmlCrawlStructuredJson structuredJson,
+        IDocument document,
+        IDocument selectedDocument,
+        IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema) {
+        Dictionary<string, object?> extracted = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, HtmlCrawlJsonSchemaField> field in structuredSchema) {
+            extracted[field.Key] = ExtractStructuredSchemaFieldValue(structuredJson, document, selectedDocument, field.Value);
+        }
+
+        return extracted;
+    }
+
+    private static object? ExtractStructuredSchemaFieldValue(
+        HtmlCrawlStructuredJson structuredJson,
+        IDocument document,
+        IDocument selectedDocument,
+        HtmlCrawlJsonSchemaField field) {
+        if (!string.IsNullOrWhiteSpace(field.Path)) {
+            return ResolveStructuredPath(structuredJson, field.Path!);
+        }
+
+        if (string.IsNullOrWhiteSpace(field.Selector)) {
+            return null;
+        }
+
+        IDocument sourceDocument = ResolveStructuredSchemaSourceDocument(document, selectedDocument, field.Source);
+        IHtmlCollection<IElement> elements = sourceDocument.QuerySelectorAll(field.Selector!);
+        string mode = string.IsNullOrWhiteSpace(field.Mode) ? "Text" : field.Mode!.Trim();
+        if (string.Equals(mode, "Exists", StringComparison.OrdinalIgnoreCase)) {
+            return elements.Length > 0;
+        }
+
+        if (string.Equals(mode, "Count", StringComparison.OrdinalIgnoreCase)) {
+            return elements.Length;
+        }
+
+        if (field.All) {
+            return elements
+                .Select(element => ExtractStructuredSchemaElementValue(element, mode, field.Attribute))
+                .Where(value => value != null)
+                .ToList();
+        }
+
+        IElement? first = elements.FirstOrDefault();
+        return first == null ? null : ExtractStructuredSchemaElementValue(first, mode, field.Attribute);
+    }
+
+    private static IDocument ResolveStructuredSchemaSourceDocument(IDocument document, IDocument selectedDocument, string? source) {
+        if (string.IsNullOrWhiteSpace(source)) {
+            return selectedDocument;
+        }
+
+        return source.Trim().ToLowerInvariant() switch {
+            "page" or "document" or "full" => document,
+            _ => selectedDocument
+        };
+    }
+
+    private static object? ExtractStructuredSchemaElementValue(IElement element, string mode, string? attribute) {
+        if (string.Equals(mode, "Html", StringComparison.OrdinalIgnoreCase)) {
+            return element.OuterHtml;
+        }
+
+        if (string.Equals(mode, "Markdown", StringComparison.OrdinalIgnoreCase)) {
+            return ConvertSelectedHtmlToMarkdown(element.OuterHtml, null);
+        }
+
+        if (string.Equals(mode, "Attribute", StringComparison.OrdinalIgnoreCase)) {
+            return string.IsNullOrWhiteSpace(attribute) ? null : element.GetAttribute(attribute);
+        }
+
+        return NormalizeWhitespace(element.TextContent);
+    }
+
+    private static object? ResolveStructuredPath(object? current, string path) {
+        if (current == null || string.IsNullOrWhiteSpace(path)) {
+            return null;
+        }
+
+        object? value = current;
+        foreach (string segment in path.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)) {
+            if (value == null) {
+                return null;
+            }
+
+            if (value is IDictionary<string, object?> dictionary) {
+                if (!TryGetDictionaryValue(dictionary, segment, out value)) {
+                    return null;
+                }
+                continue;
+            }
+
+            if (value is IDictionary nonGenericDictionary) {
+                if (!TryGetDictionaryValue(nonGenericDictionary, segment, out value)) {
+                    return null;
+                }
+                continue;
+            }
+
+            if (value is IList list) {
+                if (string.Equals(segment, "Count", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(segment, "Length", StringComparison.OrdinalIgnoreCase)) {
+                    value = list.Count;
+                    continue;
+                }
+
+                if (!int.TryParse(segment, out int index) || index < 0 || index >= list.Count) {
+                    return null;
+                }
+
+                value = list[index];
+                continue;
+            }
+
+            PropertyInfo? property = value.GetType()
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .FirstOrDefault(item => string.Equals(item.Name, segment, StringComparison.OrdinalIgnoreCase));
+            if (property == null) {
+                return null;
+            }
+
+            value = property.GetValue(value);
+        }
+
+        return value;
+    }
+
+    private static bool TryGetDictionaryValue(IDictionary<string, object?> dictionary, string key, out object? value) {
+        foreach (KeyValuePair<string, object?> item in dictionary) {
+            if (string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase)) {
+                value = item.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryGetDictionaryValue(IDictionary dictionary, string key, out object? value) {
+        foreach (DictionaryEntry item in dictionary) {
+            string? itemKey = Convert.ToString(item.Key, System.Globalization.CultureInfo.InvariantCulture);
+            if (string.Equals(itemKey, key, StringComparison.OrdinalIgnoreCase)) {
+                value = item.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 
     private static string[] ExtractHeadings(string? html) {
@@ -1805,6 +6894,9 @@ public static class HtmlCrawler {
         AppendArtifactLink(builder, indexHtmlPath, "Skipped Assets JSONL", result.SkippedAssetsJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Links JSONL", result.LinksJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Assets JSONL", result.AssetsJsonlPath);
+        AppendArtifactLink(builder, indexHtmlPath, "Structured Pages JSONL", result.StructuredJsonPagesJsonlPath);
+        AppendArtifactLink(builder, indexHtmlPath, "OpenAPI-Like JSON", result.OpenApiLikePath);
+        AppendArtifactLink(builder, indexHtmlPath, "OpenAPI JSON", result.OpenApiPath);
         AppendArtifactLink(builder, indexHtmlPath, "Chunks JSONL", result.ChunksJsonlPath);
         AppendArtifactLink(builder, indexHtmlPath, "Graph JSON", result.GraphJsonPath);
         AppendArtifactLink(builder, indexHtmlPath, "Summary JSON", result.SummaryPath);
@@ -2085,11 +7177,19 @@ public static class HtmlCrawler {
             builder.AppendLine("</td>");
             builder.Append("          <td>");
             AppendOptionalFileLink(builder, indexHtmlPath, "HTML", page.HtmlPath);
-            if (!string.IsNullOrWhiteSpace(page.HtmlPath) && HasAnyFollowingFile(page.TextPath, page.ManifestPath)) {
+            if (!string.IsNullOrWhiteSpace(page.HtmlPath) && HasAnyFollowingFile(page.TextPath, page.MarkdownPath, page.StructuredJsonPath, page.ManifestPath)) {
                 builder.Append(" | ");
             }
             AppendOptionalFileLink(builder, indexHtmlPath, "Text", page.TextPath);
-            if (!string.IsNullOrWhiteSpace(page.TextPath) && HasAnyFollowingFile(page.ManifestPath)) {
+            if (!string.IsNullOrWhiteSpace(page.TextPath) && HasAnyFollowingFile(page.MarkdownPath, page.StructuredJsonPath, page.ManifestPath)) {
+                builder.Append(" | ");
+            }
+            AppendOptionalFileLink(builder, indexHtmlPath, "Markdown", page.MarkdownPath);
+            if (!string.IsNullOrWhiteSpace(page.MarkdownPath) && HasAnyFollowingFile(page.StructuredJsonPath, page.ManifestPath)) {
+                builder.Append(" | ");
+            }
+            AppendOptionalFileLink(builder, indexHtmlPath, "Structured JSON", page.StructuredJsonPath);
+            if (!string.IsNullOrWhiteSpace(page.StructuredJsonPath) && HasAnyFollowingFile(page.ManifestPath)) {
                 builder.Append(" | ");
             }
             AppendOptionalFileLink(builder, indexHtmlPath, "Manifest", page.ManifestPath);
@@ -2266,6 +7366,9 @@ public static class HtmlCrawler {
                 SkippedAssetsJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "skipped-assets.jsonl"), fullPath),
                 LinksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "links.jsonl"), fullPath),
                 AssetsJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "assets.jsonl"), fullPath),
+                StructuredJsonPagesJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "structured-pages.jsonl"), fullPath),
+                OpenApiLikeJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "openapi-like.json"), fullPath),
+                OpenApiJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "openapi.json"), fullPath),
                 ChunksJsonlPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "chunks.jsonl"), fullPath),
                 GraphJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "graph.json"), fullPath),
                 SummaryJsonPath = EnsurePathIsWithinDirectory(Path.Combine(fullPath, "summary.json"), fullPath),
@@ -2291,6 +7394,9 @@ public static class HtmlCrawler {
             SkippedAssetsJsonlPath = EnsurePathIsWithinDirectory(stem + ".skipped-assets.jsonl", baseDirectory),
             LinksJsonlPath = EnsurePathIsWithinDirectory(stem + ".links.jsonl", baseDirectory),
             AssetsJsonlPath = EnsurePathIsWithinDirectory(stem + ".assets.jsonl", baseDirectory),
+            StructuredJsonPagesJsonlPath = EnsurePathIsWithinDirectory(stem + ".structured-pages.jsonl", baseDirectory),
+            OpenApiLikeJsonPath = EnsurePathIsWithinDirectory(stem + ".openapi-like.json", baseDirectory),
+            OpenApiJsonPath = EnsurePathIsWithinDirectory(stem + ".openapi.json", baseDirectory),
             ChunksJsonlPath = EnsurePathIsWithinDirectory(stem + ".chunks.jsonl", baseDirectory),
             GraphJsonPath = EnsurePathIsWithinDirectory(stem + ".graph.json", baseDirectory),
             SummaryJsonPath = EnsurePathIsWithinDirectory(stem + ".summary.json", baseDirectory),
@@ -2306,6 +7412,47 @@ public static class HtmlCrawler {
         }
 
         return fullPath;
+    }
+
+    private static async Task<IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField>> LoadStructuredSchemaAsync(HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        string? schemaJson = options.StructuredJsonSchema;
+        if (string.IsNullOrWhiteSpace(schemaJson) && !string.IsNullOrWhiteSpace(options.StructuredJsonSchemaPath)) {
+            schemaJson = await HtmlUtilities.ReadFileCheckedAsync(options.StructuredJsonSchemaPath!, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (string.IsNullOrWhiteSpace(schemaJson)) {
+            return new Dictionary<string, HtmlCrawlJsonSchemaField>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return ParseStructuredSchema(schemaJson);
+    }
+
+    private static IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> ParseStructuredSchema(string schemaJson) {
+        using JsonDocument document = JsonDocument.Parse(schemaJson);
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) {
+            throw new ArgumentException("Structured JSON schema must be an object.", nameof(schemaJson));
+        }
+
+        if (root.TryGetProperty("fields", out JsonElement fieldsElement) && fieldsElement.ValueKind == JsonValueKind.Object) {
+            root = fieldsElement;
+        }
+
+        Dictionary<string, HtmlCrawlJsonSchemaField> fields = new(StringComparer.OrdinalIgnoreCase);
+        JsonSerializerOptions options = new() {
+            PropertyNameCaseInsensitive = true
+        };
+        foreach (JsonProperty property in root.EnumerateObject()) {
+            fields[property.Name] = property.Value.ValueKind switch {
+                JsonValueKind.String => new HtmlCrawlJsonSchemaField {
+                    Path = property.Value.GetString()
+                },
+                JsonValueKind.Object => JsonSerializer.Deserialize<HtmlCrawlJsonSchemaField>(property.Value.GetRawText(), options) ?? new HtmlCrawlJsonSchemaField(),
+                _ => throw new ArgumentException($"Structured JSON schema field '{property.Name}' must be a string path or an object rule.", nameof(schemaJson))
+            };
+        }
+
+        return fields;
     }
 
     private static JsonSerializerOptions CreateJsonOptions() {
@@ -2348,7 +7495,7 @@ public static class HtmlCrawler {
         return normalized;
     }
 
-    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -2378,7 +7525,7 @@ public static class HtmlCrawler {
                 };
             }
 
-            PopulatePageFromHtml(page, html, request.Uri, options);
+            PopulatePageFromHtml(page, html, request.Uri, options, structuredSchema);
             return new FetchedPageData {
                 Page = page,
                 RawHtml = html
@@ -2395,7 +7542,7 @@ public static class HtmlCrawler {
         };
     }
 
-    private static async Task<FetchedPageData> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+    private static async Task<FetchedPageData> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -2445,7 +7592,7 @@ public static class HtmlCrawler {
             }
 
             string? title = await session.Page.TitleAsync().ConfigureAwait(false);
-            PopulatePageFromHtml(page, fullHtml, request.Uri, options, title);
+            PopulatePageFromHtml(page, fullHtml, request.Uri, options, structuredSchema, title);
             return new FetchedPageData {
                 Page = page,
                 RawHtml = fullHtml
@@ -2538,7 +7685,7 @@ public static class HtmlCrawler {
         }
     }
 
-    private static void PopulatePageFromHtml(HtmlCrawlPage page, string html, Uri requestUri, HtmlCrawlOptions options, string? titleOverride = null) {
+    private static void PopulatePageFromHtml(HtmlCrawlPage page, string html, Uri requestUri, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, string? titleOverride = null) {
         page.Title = string.IsNullOrWhiteSpace(titleOverride) ? ExtractTitle(html) : titleOverride;
         page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
         page.Links = ExtractLinks(html, requestUri, options);
@@ -2569,8 +7716,23 @@ public static class HtmlCrawler {
             : null;
         page.ContentComparisonDeltaSummary = BuildContentComparisonDeltaSummary(page.ContentComparisons, bestComparison);
         page.ContentComparisonPreviewSummary = BuildContentComparisonPreviewSummary(page.ContentComparisons, bestComparison);
+        string selectedText = HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options));
+        string selectedMarkdown = options.IncludeMarkdown || options.IncludeStructuredJson
+            ? ConvertSelectedHtmlToMarkdown(selectedHtml, page.Url)
+            : string.Empty;
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
-        page.Text = options.IncludeText ? HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options)) : string.Empty;
+        page.Text = options.IncludeText ? selectedText : string.Empty;
+        page.Markdown = options.IncludeMarkdown ? selectedMarkdown : string.Empty;
+        page.StructuredJson = options.IncludeStructuredJson ? BuildStructuredJson(page, html, selectedHtml, selectedText, selectedMarkdown, structuredSchema, options.StructuredJsonPreset) : null;
+    }
+
+    private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl) {
+        HtmlToMarkdownOptions markdownOptions = HtmlToMarkdownOptions.CreatePortableProfile();
+        if (!string.IsNullOrWhiteSpace(pageUrl) && Uri.TryCreate(pageUrl, UriKind.Absolute, out Uri? baseUri)) {
+            markdownOptions.BaseUri = baseUri;
+        }
+
+        return html.ToMarkdown(markdownOptions);
     }
 
     private static ProfileSelectionDecision ResolveInitialProfileDecision(
@@ -3530,6 +8692,10 @@ public static class HtmlCrawler {
     private static void StripBoilerplateElements(IParentNode container, HtmlCrawlOptions options) {
         foreach (IElement element in container.QuerySelectorAll(
                      "script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.wpml-ls,.sharing-popup,.post-footer-sharing,.socials-sharing,.gem-pagination,.menu-toggle,.minisearch,.skip-link,.skip-link-screen-reader-text").ToArray()) {
+            if (ShouldPreserveStructuredContentElement(element)) {
+                continue;
+            }
+
             element.Remove();
         }
 
@@ -3540,6 +8706,14 @@ public static class HtmlCrawler {
         foreach (IElement element in container.QuerySelectorAll("*").Where(ShouldRemoveBoilerplateElement).ToArray()) {
             element.Remove();
         }
+    }
+
+    private static bool ShouldPreserveStructuredContentElement(IElement element) {
+        if (element == null) {
+            return false;
+        }
+
+        return LooksLikeStructuredCalloutElement(element);
     }
 
     private static void RemoveConfiguredElements(IParentNode container, HtmlCrawlOptions options) {

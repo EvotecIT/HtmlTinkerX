@@ -327,6 +327,26 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeText { get; set; } = true;
 
+    /// <summary>Include Markdown converted from the selected content in the result.</summary>
+    [Parameter]
+    public SwitchParameter IncludeMarkdown { get; set; }
+
+    /// <summary>Include structured JSON-friendly data extracted from each crawled page.</summary>
+    [Parameter]
+    public SwitchParameter IncludeStructuredJson { get; set; }
+
+    /// <summary>Optional built-in structured JSON preset used to flatten common page types.</summary>
+    [Parameter]
+    public HtmlCrawlStructuredJsonPreset StructuredJsonPreset { get; set; }
+
+    /// <summary>Optional inline JSON schema describing caller-defined extracted structured fields.</summary>
+    [Parameter]
+    public string? StructuredJsonSchema { get; set; }
+
+    /// <summary>Optional JSON file path containing a structured extraction schema.</summary>
+    [Parameter]
+    public string? StructuredJsonSchemaPath { get; set; }
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -378,6 +398,11 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Scenario = Scenario,
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
+            IncludeMarkdown = IncludeMarkdown.IsPresent,
+            IncludeStructuredJson = IncludeStructuredJson.IsPresent,
+            StructuredJsonPreset = StructuredJsonPreset,
+            StructuredJsonSchema = StructuredJsonSchema,
+            StructuredJsonSchemaPath = StructuredJsonSchemaPath?.ToFullPath(),
             Selector = Selector,
             ContentMode = ContentMode,
             CompareContentModes = CompareContentModes.IsPresent,

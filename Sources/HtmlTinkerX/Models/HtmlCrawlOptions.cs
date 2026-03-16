@@ -84,6 +84,21 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Stores plain text extracted from the page in the result.</summary>
     public bool IncludeText { get; set; } = true;
 
+    /// <summary>Stores Markdown converted from the selected page content in the result.</summary>
+    public bool IncludeMarkdown { get; set; }
+
+    /// <summary>Stores structured JSON-friendly page data extracted from the crawl.</summary>
+    public bool IncludeStructuredJson { get; set; }
+
+    /// <summary>Optional built-in structured JSON preset that adds flattened extracted fields for common page types.</summary>
+    public HtmlCrawlStructuredJsonPreset StructuredJsonPreset { get; set; }
+
+    /// <summary>Optional inline JSON schema describing caller-defined extracted fields for structured crawl output.</summary>
+    public string? StructuredJsonSchema { get; set; }
+
+    /// <summary>Optional JSON file path containing a structured crawl extraction schema.</summary>
+    public string? StructuredJsonSchemaPath { get; set; }
+
     /// <summary>Optional CSS selector used to extract a focused section from the page.</summary>
     public string? Selector { get; set; }
 
@@ -293,6 +308,11 @@ public sealed class HtmlCrawlOptions {
             Scenario = Scenario,
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
+            IncludeMarkdown = IncludeMarkdown,
+            IncludeStructuredJson = IncludeStructuredJson,
+            StructuredJsonPreset = StructuredJsonPreset,
+            StructuredJsonSchema = StructuredJsonSchema,
+            StructuredJsonSchemaPath = StructuredJsonSchemaPath,
             Selector = Selector,
             ContentMode = ContentMode,
             CompareContentModes = CompareContentModes,
