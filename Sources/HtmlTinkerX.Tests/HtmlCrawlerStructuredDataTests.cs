@@ -897,6 +897,62 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_StrictOpenApiInfersPathParametersAndOauth2Schemes() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/widgets/get-widget"] = """
+            <html>
+              <head>
+                <title>Get widget</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Get widget</h1>
+                  <h2>GET /v1/widgets/{id}</h2>
+                  <p>Use OAuth2 access tokens to call this endpoint.</p>
+                  <h3>Parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>id</td><td>string</td><td>Yes</td><td>Widget identifier.</td></tr>
+                  </table>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">{ "id": "wid_123", "name": "Alpha" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/widgets/get-widget", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> widgetsPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/widgets/{id}"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(widgetsPath["get"]);
+            Assert.False(getOperation.ContainsKey("requestBody"));
+            List<object> parameters = Assert.IsAssignableFrom<List<object>>(getOperation["parameters"]);
+            IDictionary<string, object?> idParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
+            Assert.Equal("id", idParameter["name"] as string);
+            Assert.Equal("path", idParameter["in"] as string);
+            Assert.True((bool)idParameter["required"]!);
+
+            IDictionary<string, object?> components = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["components"]);
+            IDictionary<string, object?> securitySchemes = Assert.IsAssignableFrom<IDictionary<string, object?>>(components["securitySchemes"]);
+            IDictionary<string, object?> securityScheme = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(securitySchemes).Value);
+            Assert.Equal("oauth2", securityScheme["type"] as string);
+            Assert.True(securityScheme.ContainsKey("flows"));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_DatasetScenario_AutoPreset_ResolvesProductPages() {
         Dictionary<string, string> responses = new() {
             ["/products/widget"] = """

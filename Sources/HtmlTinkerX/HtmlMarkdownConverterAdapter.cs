@@ -196,7 +196,7 @@ internal static class HtmlMarkdownConverterAdapter {
         StringBuilder builder = new();
         foreach (INode child in item.ChildNodes) {
             if (child is IElement childElement && (string.Equals(childElement.LocalName, "ul", StringComparison.OrdinalIgnoreCase) || string.Equals(childElement.LocalName, "ol", StringComparison.OrdinalIgnoreCase))) {
-                if (builder.Length > 0 && builder[^1] != '\n') {
+                if (builder.Length > 0 && builder[builder.Length - 1] != '\n') {
                     builder.AppendLine();
                 }
                 AppendList(builder, childElement.Children.Where(element => string.Equals(element.LocalName, "li", StringComparison.OrdinalIgnoreCase)), baseUri, listDepth + 1, ordered: string.Equals(childElement.LocalName, "ol", StringComparison.OrdinalIgnoreCase));
@@ -218,7 +218,7 @@ internal static class HtmlMarkdownConverterAdapter {
                     : null)
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
             ?? string.Empty;
-        string code = element.TextContent?.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd() ?? string.Empty;
+        string code = (element.TextContent ?? string.Empty).Replace("\r\n", "\n").TrimEnd();
         if (string.IsNullOrWhiteSpace(code)) {
             return;
         }
@@ -385,11 +385,11 @@ internal static class HtmlMarkdownConverterAdapter {
             return string.Empty;
         }
 
-        return WhitespaceRegex.Replace(value.Replace("\r\n", "\n", StringComparison.Ordinal), " ").Trim();
+        return WhitespaceRegex.Replace(value.Replace("\r\n", "\n"), " ").Trim();
     }
 
     private static string NormalizeMarkdown(string value) {
-        string normalized = value.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
+        string normalized = value.Replace("\r\n", "\n").Trim();
         return ConsecutiveBlankLinesRegex.Replace(normalized, "\n\n");
     }
 }

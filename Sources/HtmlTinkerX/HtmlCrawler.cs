@@ -1485,14 +1485,15 @@ public static class HtmlCrawler {
 
     private static List<object> BuildStrictOpenApiParameters(HtmlCrawlStructuredOpenApiOperation operation) {
         return operation.Parameters
-            .Where(parameter => !string.Equals(NormalizeWhitespace(parameter.Location), "body", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(parameter => parameter.Location, StringComparer.OrdinalIgnoreCase)
+            .Where(parameter => !string.Equals(ResolveStructuredApiParameterLocation(operation.Path, parameter), "body", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(parameter => ResolveStructuredApiParameterLocation(operation.Path, parameter), StringComparer.OrdinalIgnoreCase)
             .ThenBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
             .Select(parameter => {
+                string location = ResolveStructuredApiParameterLocation(operation.Path, parameter);
                 Dictionary<string, object?> value = new(StringComparer.OrdinalIgnoreCase) {
                     ["name"] = parameter.Name,
-                    ["in"] = NormalizeStrictOpenApiParameterLocation(parameter.Location),
-                    ["required"] = string.Equals(parameter.Location, "path", StringComparison.OrdinalIgnoreCase) || parameter.Required == true,
+                    ["in"] = NormalizeStrictOpenApiParameterLocation(location),
+                    ["required"] = string.Equals(location, "path", StringComparison.OrdinalIgnoreCase) || parameter.Required == true,
                     ["description"] = parameter.Description,
                     ["schema"] = BuildStrictOpenApiParameterSchema(parameter)
                 };
@@ -1549,7 +1550,7 @@ public static class HtmlCrawler {
         }
 
         return new Dictionary<string, object?> {
-            ["required"] = operation.Parameters.Any(parameter => string.Equals(parameter.Location, "body", StringComparison.OrdinalIgnoreCase) && parameter.Required == true),
+            ["required"] = operation.Parameters.Any(parameter => string.Equals(ResolveStructuredApiParameterLocation(operation.Path, parameter), "body", StringComparison.OrdinalIgnoreCase) && parameter.Required == true),
             ["content"] = new Dictionary<string, object?> {
                 [contentType] = mediaType
             }
@@ -1639,7 +1640,16 @@ public static class HtmlCrawler {
         foreach (KeyValuePair<string, HtmlCrawlStructuredApiAuthentication> item in authProfiles.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
             Dictionary<string, object?> scheme = new(StringComparer.OrdinalIgnoreCase);
             string? primaryHeader = item.Value.Headers.FirstOrDefault();
-            if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "bearer", StringComparison.OrdinalIgnoreCase))) {
+            if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "oauth2", StringComparison.OrdinalIgnoreCase))) {
+                scheme["type"] = "oauth2";
+                scheme["flows"] = new Dictionary<string, object?> {
+                    ["clientCredentials"] = new Dictionary<string, object?> {
+                        ["tokenUrl"] = "https://example.invalid/token",
+                        ["scopes"] = new Dictionary<string, object?>()
+                    }
+                };
+                scheme["x-htmltinkerx-oauth2FlowPlaceholder"] = true;
+            } else if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "bearer", StringComparison.OrdinalIgnoreCase))) {
                 scheme["type"] = "http";
                 scheme["scheme"] = "bearer";
             } else if (item.Value.Schemes.Any(schemeName => string.Equals(schemeName, "basic", StringComparison.OrdinalIgnoreCase))) {
@@ -2652,7 +2662,7 @@ public static class HtmlCrawler {
                 continue;
             }
 
-            if (items.Count > 0 && string.Equals(items[^1].Label, label, StringComparison.OrdinalIgnoreCase)) {
+            if (items.Count > 0 && string.Equals(items[items.Count - 1].Label, label, StringComparison.OrdinalIgnoreCase)) {
                 continue;
             }
 
@@ -2678,7 +2688,7 @@ public static class HtmlCrawler {
                 .Select(item => item.Url!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            CurrentLabel = items.LastOrDefault(item => item.IsCurrent)?.Label ?? items[^1].Label,
+            CurrentLabel = items.LastOrDefault(item => item.IsCurrent)?.Label ?? items[items.Count - 1].Label,
             SelectorHint = BuildElementSelectorHint(container)
         };
     }
