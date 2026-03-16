@@ -1,11 +1,9 @@
-$script:Python3Path = $null
 $script:Python3Available = $false
 $pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
 if ($pythonCommand) {
     try {
-        & $pythonCommand.Source --version *> $null
+        & python3 --version *> $null
         if ($LASTEXITCODE -eq 0) {
-            $script:Python3Path = $pythonCommand.Source
             $script:Python3Available = $true
         }
     } catch {
@@ -15,7 +13,7 @@ if ($pythonCommand) {
 
 Describe 'Save-HTMLAttachment' {
     It 'Saves downloads on the page by filter' -Skip:(-not $script:Python3Available) {
-        $server = Start-Process -FilePath $script:Python3Path -ArgumentList '-u', '-m', 'http.server', '8011', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        $server = Start-Process -FilePath 'python3' -ArgumentList '-u', '-m', 'http.server', '8011', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
         Start-Sleep -Seconds 1
         $timeout = [System.Diagnostics.Stopwatch]::StartNew()
         while ($true) {
@@ -44,7 +42,7 @@ Describe 'Save-HTMLAttachment' {
     }
 
     It 'Downloads are fully written to disk' -Skip:(-not $script:Python3Available) {
-        $server = Start-Process -FilePath $script:Python3Path -ArgumentList '-u', '-m', 'http.server', '8012', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        $server = Start-Process -FilePath 'python3' -ArgumentList '-u', '-m', 'http.server', '8012', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
         Start-Sleep -Seconds 1
         $timeout = [System.Diagnostics.Stopwatch]::StartNew()
         while ($true) {
