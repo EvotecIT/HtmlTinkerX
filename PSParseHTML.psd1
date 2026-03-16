@@ -6,20 +6,20 @@
     CompatiblePSEditions   = @('Desktop', 'Core')
     Copyright              = '(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description            = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
-    DotNetFrameworkVersion = '4.7.2'
     FunctionsToExport      = @()
     GUID                   = 'f0387960-7034-4918-a1e1-d5847cbf90df'
     ModuleVersion          = '2.0.6'
     PowerShellVersion      = '5.1'
     PrivateData            = @{
         PSData = @{
-            ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
+            ExternalModuleDependencies = @()
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
             ProjectUri                 = 'https://github.com/EvotecIT/PSParseHTML'
             RequireLicenseAcceptance   = $false
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
         }
     }
-    RequiredModules        = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')
+    RequiredModules        = @()
     RootModule             = 'PSParseHTML.psm1'
+    ScriptsToProcess     = @()
 }
