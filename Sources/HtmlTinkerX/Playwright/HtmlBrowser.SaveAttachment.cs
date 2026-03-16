@@ -13,6 +13,7 @@ namespace HtmlTinkerX;
 /// </summary>
 public static partial class HtmlBrowser {
     private const int DownloadDiscoveryTimeoutMs = 30000;
+    private const int DownloadNavigationTimeoutMs = 30000;
 
     /// <summary>
     /// Saves any files downloaded while loading the specified URL.
@@ -37,6 +38,7 @@ public static partial class HtmlBrowser {
             headless,
             slowMo,
             null,
+            timeout: DownloadNavigationTimeoutMs,
             cancellationToken: cancellationToken).ConfigureAwait(false);
         var page = session.Page;
         string dir = directory.ToFullPath();
@@ -100,7 +102,7 @@ public static partial class HtmlBrowser {
         Task producer = Task.Run(async () => {
             cancellationToken.ThrowIfCancellationRequested();
             await page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle).ConfigureAwait(false);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = DownloadDiscoveryTimeoutMs }).ConfigureAwait(false);
 
             string selector = string.IsNullOrEmpty(filter)
                 ? "a[download],a[href*='/download/'],a[href*='/archive/']"
@@ -111,7 +113,7 @@ public static partial class HtmlBrowser {
             var anchors = await page.QuerySelectorAllAsync(selector).ConfigureAwait(false);
             foreach (var anchor in anchors) {
                 cancellationToken.ThrowIfCancellationRequested();
-                await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync()).ConfigureAwait(false);
+                await page.RunAndWaitForDownloadAsync(() => anchor.ClickAsync(), new PageRunAndWaitForDownloadOptions { Timeout = DownloadDiscoveryTimeoutMs }).ConfigureAwait(false);
             }
 
             await Task.WhenAll(saveTasks).ConfigureAwait(false);

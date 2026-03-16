@@ -1,25 +1,74 @@
+$script:Python3Path = $null
+$script:Python3Available = $false
+$pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+if ($pythonCommand) {
+    try {
+        & $pythonCommand.Source --version *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $script:Python3Path = $pythonCommand.Source
+            $script:Python3Available = $true
+        }
+    } catch {
+        $script:Python3Available = $false
+    }
+}
+
 Describe 'Save-HTMLAttachment' {
-    It 'Saves downloads on the page by filter' {
-        $Dest = Join-Path $TestDrive 'dl\DnsClientX-PowerShellModule.v0.4.0.zip'
-        [Array] $File = Save-HTMLAttachment -Url 'https://github.com/EvotecIT/DnsClientX/releases/tag/DnsClientX-PowerShellModule.v0.4.0' -Path "$Dest" -Filter 'DnsClientX-PowerShellModule.v0.4.0.zip'
-        $File.Count | Should -BeGreaterOrEqual 2
-        $Item1 = Get-Item -Path $File[0]
-        $Item2 = Get-Item -Path $File[1]
+    It 'Saves downloads on the page by filter' -Skip:(-not $script:Python3Available) {
+        $server = Start-Process -FilePath $script:Python3Path -ArgumentList '-u', '-m', 'http.server', '8011', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        Start-Sleep -Seconds 1
+        $timeout = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($true) {
+            try {
+                $socket = New-Object Net.Sockets.TcpClient
+                $socket.Connect('127.0.0.1', 8011)
+                $socket.Dispose()
+                break
+            } catch {
+                if ($timeout.Elapsed -gt [TimeSpan]::FromSeconds(10)) {
+                    throw 'HTTP server failed to start.'
+                }
+                Start-Sleep -Milliseconds 500
+            }
+        }
 
-        $List = @(
-            'DnsClientX-PowerShellModule.v0.4.0.zip',
-            'DnsClientX-DnsClientX-PowerShellModule.v0.4.0.zip'
-        )
-
-        $List | Should -Contain $Item1.Name
-        $List | Should -Contain $Item2.Name
+        try {
+            $dest = Join-Path $TestDrive 'dl'
+            [array] $files = Save-HTMLAttachment -Url 'http://127.0.0.1:8011/multi_manual_download.html' -Path $dest -Filter 'download'
+            $files.Count | Should -Be 2
+            (Get-Item -Path $files[0]).Name | Should -BeIn @('download1.txt', 'download2.txt')
+            (Get-Item -Path $files[1]).Name | Should -BeIn @('download1.txt', 'download2.txt')
+        } finally {
+            $server | Stop-Process
+        }
     }
 
-    It 'Downloads are fully written to disk' {
-        $Dest = Join-Path $TestDrive 'dl-full'
-        [array] $File = Save-HTMLAttachment -Url 'https://github.com/EvotecIT/DnsClientX/releases/tag/DnsClientX-PowerShellModule.v0.4.0' -Path "$Dest" -Filter 'DnsClientX-PowerShellModule.v0.4.0.zip'
-        foreach ($path in $File) {
-            (Get-Item $path).Length | Should -BeGreaterThan 0
+    It 'Downloads are fully written to disk' -Skip:(-not $script:Python3Available) {
+        $server = Start-Process -FilePath $script:Python3Path -ArgumentList '-u', '-m', 'http.server', '8012', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        Start-Sleep -Seconds 1
+        $timeout = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($true) {
+            try {
+                $socket = New-Object Net.Sockets.TcpClient
+                $socket.Connect('127.0.0.1', 8012)
+                $socket.Dispose()
+                break
+            } catch {
+                if ($timeout.Elapsed -gt [TimeSpan]::FromSeconds(10)) {
+                    throw 'HTTP server failed to start.'
+                }
+                Start-Sleep -Milliseconds 500
+            }
+        }
+
+        try {
+            $dest = Join-Path $TestDrive 'dl-full'
+            [array] $files = Save-HTMLAttachment -Url 'http://127.0.0.1:8012/multi_manual_download.html' -Path $dest -Filter 'download'
+            foreach ($path in $files) {
+                (Get-Item $path).Length | Should -BeGreaterThan 0
+            }
+        } finally {
+            $server | Stop-Process
         }
     }
 }
