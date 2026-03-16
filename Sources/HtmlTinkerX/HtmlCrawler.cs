@@ -2610,6 +2610,14 @@ public static class HtmlCrawler {
             string? method = null;
             string? path = null;
             TryParseApiMethodAndPath(code, out method, out path);
+            if (string.IsNullOrWhiteSpace(method)
+                && string.IsNullOrWhiteSpace(path)
+                && LooksLikeRequestPayloadHeading(heading)) {
+                string? apiHeading = FindNearbyApiHeadingText(element);
+                if (!string.IsNullOrWhiteSpace(apiHeading)) {
+                    TryParseApiMethodAndPath(apiHeading, out method, out path);
+                }
+            }
 
             samples.Add(new HtmlCrawlStructuredCodeSample {
                 Title = BuildStructuredCodeSampleTitle(heading, kind, method, path, language),
@@ -4720,6 +4728,9 @@ public static class HtmlCrawler {
         if (ContainsAnyToken(combined, "query")) {
             return "query";
         }
+        if (ContainsAnyToken(combined, "cookie")) {
+            return "cookie";
+        }
         if (ContainsAnyToken(combined, "header")) {
             return "header";
         }
@@ -6271,11 +6282,40 @@ public static class HtmlCrawler {
         };
     }
 
+    private static bool LooksLikeRequestPayloadHeading(string? heading) {
+        if (string.IsNullOrWhiteSpace(heading)) {
+            return false;
+        }
+
+        return ContainsAnyToken(heading,
+            "request body",
+            "request payload",
+            "payload",
+            "example request",
+            "request example");
+    }
+
     private static string? FindNearbyHeadingText(IElement element) {
         IElement? sibling = element.PreviousElementSibling;
         while (sibling != null) {
             if (Regex.IsMatch(sibling.LocalName, "^h[1-6]$", RegexOptions.IgnoreCase)) {
                 return NormalizeWhitespace(sibling.TextContent);
+            }
+
+            sibling = sibling.PreviousElementSibling;
+        }
+
+        return null;
+    }
+
+    private static string? FindNearbyApiHeadingText(IElement element) {
+        IElement? sibling = element.PreviousElementSibling;
+        while (sibling != null) {
+            if (Regex.IsMatch(sibling.LocalName, "^h[1-6]$", RegexOptions.IgnoreCase)) {
+                string heading = NormalizeWhitespace(sibling.TextContent);
+                if (TryParseApiMethodAndPath(heading, out _, out _)) {
+                    return heading;
+                }
             }
 
             sibling = sibling.PreviousElementSibling;

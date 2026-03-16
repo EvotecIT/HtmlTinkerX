@@ -1107,6 +1107,61 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_ClassifiesJsonRequestBodySamplesUnderRequestHeadingsAsRequests() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/widgets/create"] = """
+            <html>
+              <head>
+                <title>Create widget</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Create widget</h1>
+                  <h2>POST /v1/widgets</h2>
+                  <h3>Request body</h3>
+                  <pre><code class="language-json">{ "name": "Alpha" }</code></pre>
+                  <h3>Response 201</h3>
+                  <pre><code class="language-json">{ "id": "wid_123", "name": "Alpha" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/widgets/create", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredCodeSample requestSample = Assert.Single(structuredJson.CodeSamples,
+                sample => string.Equals(sample.Heading, "Request body", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal("POST", requestSample.Method);
+            Assert.Equal("/v1/widgets", requestSample.Path);
+
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            HtmlCrawlStructuredRequestExample requestExample = Assert.Single(endpoint.RequestExamples);
+            Assert.Equal("POST", requestExample.Method);
+            Assert.Equal("/v1/widgets", requestExample.Path);
+            Assert.Contains("\"name\": \"Alpha\"", requestExample.Body, StringComparison.Ordinal);
+            HtmlCrawlStructuredResponseExample responseExample = Assert.Single(endpoint.ResponseExamples);
+            Assert.Equal(201, responseExample.StatusCode);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> widgetsPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/widgets"]);
+            IDictionary<string, object?> postOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(widgetsPath["post"]);
+            Assert.True(postOperation.ContainsKey("requestBody"));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_IncludeStructuredJson_StripsQueryStringsAndPreservesCookieParameters() {
         Dictionary<string, string> responses = new() {
             ["/docs/session/get"] = """
@@ -1154,6 +1209,57 @@ public class HtmlCrawlerStructuredJsonTests {
             List<object> parameters = Assert.IsAssignableFrom<List<object>>(getOperation["parameters"]);
             IDictionary<string, object?> strictCookieParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
             Assert.Equal("session_id", strictCookieParameter["name"] as string);
+            Assert.Equal("cookie", strictCookieParameter["in"] as string);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_InfersCookieLocationFromTableHeading() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/session/delete"] = """
+            <html>
+              <head>
+                <title>Delete session</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Delete session</h1>
+                  <h2>DELETE /v1/session</h2>
+                  <h3>Cookie parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>session_id</td><td>string</td><td>Yes</td><td>Session cookie.</td></tr>
+                  </table>
+                  <h3>Response 204</h3>
+                  <pre><code class="language-http">HTTP/1.1 204 No Content</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/session/delete", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            HtmlCrawlStructuredApiParameter cookieParameter = Assert.Single(endpoint.Parameters);
+            Assert.Equal("cookie", cookieParameter.Location);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> sessionPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/session"]);
+            IDictionary<string, object?> deleteOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(sessionPath["delete"]);
+            List<object> parameters = Assert.IsAssignableFrom<List<object>>(deleteOperation["parameters"]);
+            IDictionary<string, object?> strictCookieParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
             Assert.Equal("cookie", strictCookieParameter["in"] as string);
         } finally {
             server.Stop();
