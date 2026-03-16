@@ -1053,6 +1053,237 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_DoesNotTreatJsonResponsesUnderMethodHeadingsAsRequests() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/users/list"] = """
+            <html>
+              <head>
+                <title>List users</title>
+              </head>
+              <body>
+                <main>
+                  <h1>List users</h1>
+                  <h2>GET /v1/users</h2>
+                  <p>Returns all users.</p>
+                  <pre><code class="language-json">[
+                    { "id": "usr_123", "name": "Ada" }
+                  ]</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/users/list", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredCodeSample sample = Assert.Single(structuredJson.CodeSamples);
+            Assert.Null(sample.Method);
+            Assert.Null(sample.Path);
+
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            Assert.Equal("GET", endpoint.Method);
+            Assert.Equal("/v1/users", endpoint.Path);
+            Assert.Empty(endpoint.RequestExamples);
+            HtmlCrawlStructuredResponseExample responseExample = Assert.Single(endpoint.ResponseExamples);
+            Assert.False(responseExample.IsError);
+            Assert.NotNull(responseExample.JsonBody);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> usersPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/users"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(usersPath["get"]);
+            Assert.False(getOperation.ContainsKey("requestBody"));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_StripsQueryStringsAndPreservesCookieParameters() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/session/get"] = """
+            <html>
+              <head>
+                <title>Get session</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Get session</h1>
+                  <h2>GET https://api.example.com/v1/session?expand=user</h2>
+                  <h3>Parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>session_id</td><td>cookie</td><td>string</td><td>Yes</td><td>Session cookie.</td></tr>
+                  </table>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">{ "id": "sess_123" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/session/get", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            Assert.Equal("/v1/session", endpoint.Path);
+            HtmlCrawlStructuredApiParameter cookieParameter = Assert.Single(endpoint.Parameters);
+            Assert.Equal("cookie", cookieParameter.Location);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            Assert.True(paths.ContainsKey("/v1/session"));
+            Assert.False(paths.ContainsKey("/v1/session?expand=user"));
+            IDictionary<string, object?> sessionPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/session"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(sessionPath["get"]);
+            List<object> parameters = Assert.IsAssignableFrom<List<object>>(getOperation["parameters"]);
+            IDictionary<string, object?> strictCookieParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
+            Assert.Equal("session_id", strictCookieParameter["name"] as string);
+            Assert.Equal("cookie", strictCookieParameter["in"] as string);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_MergesResolvedParameterLocationsAndAuthEvidenceAcrossPages() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/widgets/reference"] = """
+            <html>
+              <head>
+                <title>Widget reference</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Widget reference</h1>
+                  <a href="/docs/widgets/auth">Authentication details</a>
+                  <h2>GET /v1/widgets/{id}</h2>
+                  <p>No authentication required.</p>
+                  <h3>Parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>id</td><td>string</td><td>Yes</td><td>Widget identifier.</td></tr>
+                  </table>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">{ "id": "wid_123" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """,
+            ["/docs/widgets/auth"] = """
+            <html>
+              <head>
+                <title>Widget auth</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Widget auth</h1>
+                  <h2>GET /v1/widgets/{id}</h2>
+                  <p>Bearer token required for all requests.</p>
+                  <h3>Parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>id</td><td>path</td><td>string</td><td>Yes</td><td>Widget identifier.</td></tr>
+                  </table>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">{ "id": "wid_123", "name": "Alpha" }</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/widgets/reference", new HtmlCrawlOptions {
+                MaxDepth = 1,
+                MaxPages = 3,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredOpenApiOperation operation = result.OpenApiLike.Paths["/v1/widgets/{id}"].Operations["get"];
+            Assert.True(operation.Authentication.Required);
+            Assert.Contains("bearer", operation.Authentication.Schemes, StringComparer.OrdinalIgnoreCase);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> widgetsPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/widgets/{id}"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(widgetsPath["get"]);
+            Assert.True(getOperation.ContainsKey("security"));
+            List<object> parameters = Assert.IsAssignableFrom<List<object>>(getOperation["parameters"]);
+            IDictionary<string, object?> idParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
+            Assert.Equal("id", idParameter["name"] as string);
+            Assert.Equal("path", idParameter["in"] as string);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_DoesNotCreateStrictRequestBodyForBodylessRequestExamples() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/items/list"] = """
+            <html>
+              <head>
+                <title>List items</title>
+              </head>
+              <body>
+                <main>
+                  <h1>List items</h1>
+                  <h2>GET /v1/items</h2>
+                  <pre><code class="language-http">GET /v1/items HTTP/1.1
+                  Host: api.example.com
+                  Accept: application/json</code></pre>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">[{ "id": "itm_123" }]</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/items/list", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            HtmlCrawlStructuredRequestExample requestExample = Assert.Single(endpoint.RequestExamples);
+            Assert.True(string.IsNullOrWhiteSpace(requestExample.Body));
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> itemsPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/items"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(itemsPath["get"]);
+            Assert.False(getOperation.ContainsKey("requestBody"));
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_DatasetScenario_AutoPreset_ResolvesProductPages() {
         Dictionary<string, string> responses = new() {
             ["/products/widget"] = """

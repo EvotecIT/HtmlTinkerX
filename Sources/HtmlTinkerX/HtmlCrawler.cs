@@ -1526,8 +1526,11 @@ public static class HtmlCrawler {
     }
 
     private static object? BuildStrictOpenApiRequestBody(HtmlCrawlStructuredOpenApiOperation operation) {
+        List<HtmlCrawlStructuredRequestExample> bodyExamples = operation.RequestExamples
+            .Where(example => !string.IsNullOrWhiteSpace(example.Body))
+            .ToList();
         bool hasSchema = !string.IsNullOrWhiteSpace(operation.RequestBodyFieldsRef) || !string.IsNullOrWhiteSpace(operation.RequestBodySchemaRef);
-        bool hasExamples = operation.RequestExamples.Count > 0;
+        bool hasExamples = bodyExamples.Count > 0;
         if (!hasSchema && !hasExamples) {
             return null;
         }
@@ -1535,7 +1538,7 @@ public static class HtmlCrawler {
         string contentType = operation.RequestHeaders
             .FirstOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))
             ?.Value
-            ?? operation.RequestExamples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+            ?? bodyExamples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
             ?? "application/json";
 
         Dictionary<string, object?> mediaType = new(StringComparer.OrdinalIgnoreCase);
@@ -1544,7 +1547,7 @@ public static class HtmlCrawler {
             mediaType["schema"] = schema;
         }
 
-        Dictionary<string, object?> examples = BuildStrictOpenApiRequestExamples(operation.RequestExamples);
+        Dictionary<string, object?> examples = BuildStrictOpenApiRequestExamples(bodyExamples);
         if (examples.Count > 0) {
             mediaType["examples"] = examples;
         }
@@ -2606,9 +2609,7 @@ public static class HtmlCrawler {
             string kind = DetectStructuredCodeSampleKind(code, language);
             string? method = null;
             string? path = null;
-            if (!TryParseApiMethodAndPath(code, out method, out path) && !string.IsNullOrWhiteSpace(heading)) {
-                TryParseApiMethodAndPath(heading!, out method, out path);
-            }
+            TryParseApiMethodAndPath(code, out method, out path);
 
             samples.Add(new HtmlCrawlStructuredCodeSample {
                 Title = BuildStructuredCodeSampleTitle(heading, kind, method, path, language),
@@ -3508,11 +3509,16 @@ public static class HtmlCrawler {
         MergeStructuredApiRateLimit(target.RateLimit, source.RateLimit);
 
         foreach (HtmlCrawlStructuredApiParameter parameter in source.Parameters) {
-            if (!target.Parameters.Any(existing =>
-                    string.Equals(existing.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(existing.Location, parameter.Location, StringComparison.OrdinalIgnoreCase))) {
+            string incomingLocation = ResolveStructuredApiParameterLocation(target.Path, parameter);
+            HtmlCrawlStructuredApiParameter? existing = target.Parameters.FirstOrDefault(current =>
+                string.Equals(current.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ResolveStructuredApiParameterLocation(target.Path, current), incomingLocation, StringComparison.OrdinalIgnoreCase));
+            if (existing == null) {
                 target.Parameters.Add(CloneStructuredApiParameter(parameter));
+                continue;
             }
+
+            MergeStructuredApiParameter(existing, parameter);
         }
 
         foreach (HtmlCrawlStructuredHttpHeader header in source.RequestHeaders) {
@@ -4605,7 +4611,10 @@ public static class HtmlCrawler {
     private static void MergeStructuredApiAuthentication(
         HtmlCrawlStructuredApiAuthentication target,
         HtmlCrawlStructuredApiAuthentication source) {
-        if (!target.Required.HasValue && source.Required.HasValue) {
+        bool sourceIndicatesRequired = source.Required == true || source.Schemes.Count > 0 || source.Headers.Count > 0;
+        if (sourceIndicatesRequired) {
+            target.Required = true;
+        } else if (!target.Required.HasValue && source.Required.HasValue) {
             target.Required = source.Required;
         }
 
@@ -4617,6 +4626,28 @@ public static class HtmlCrawler {
         }
 
         target.Summary ??= source.Summary;
+    }
+
+    private static void MergeStructuredApiParameter(
+        HtmlCrawlStructuredApiParameter target,
+        HtmlCrawlStructuredApiParameter source) {
+        target.Type = MergeStructuredTypeValues(target.Type, source.Type);
+        target.Format ??= source.Format;
+        target.Location ??= source.Location;
+        target.Required = target.Required == true || source.Required == true
+            ? true
+            : target.Required ?? source.Required;
+        target.Nullable = target.Nullable == true || source.Nullable == true
+            ? true
+            : target.Nullable ?? source.Nullable;
+        target.Description ??= source.Description;
+        target.DefaultValue ??= source.DefaultValue;
+        target.ExampleValue ??= source.ExampleValue;
+        target.Pattern ??= source.Pattern;
+        target.SelectorHint ??= source.SelectorHint;
+        foreach (string enumValue in source.EnumValues) {
+            AppendDistinct(target.EnumValues, enumValue);
+        }
     }
 
     private static void ApplyStructuredApiParameterGrouping(HtmlCrawlStructuredApiEndpoint endpoint, string pageUrl) {
@@ -4666,7 +4697,7 @@ public static class HtmlCrawler {
     private static string ResolveStructuredApiParameterLocation(string endpointPath, HtmlCrawlStructuredApiParameter parameter) {
         if (!string.IsNullOrWhiteSpace(parameter.Location)) {
             string explicitLocation = parameter.Location!.Trim().ToLowerInvariant();
-            if (explicitLocation is "path" or "query" or "header" or "body") {
+            if (explicitLocation is "path" or "query" or "header" or "cookie" or "body") {
                 return explicitLocation;
             }
         }
@@ -6668,15 +6699,15 @@ public static class HtmlCrawler {
         if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                 || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))) {
-            int authorityLength = uri.GetLeftPart(UriPartial.Authority).Length;
-            if (trimmed.Length > authorityLength) {
-                return trimmed.Substring(authorityLength);
-            }
-
-            return "/";
+            return string.IsNullOrWhiteSpace(uri.AbsolutePath) ? "/" : uri.AbsolutePath;
         }
 
-        return trimmed;
+        int queryIndex = trimmed.IndexOfAny(new[] { '?', '#' });
+        if (queryIndex >= 0) {
+            trimmed = trimmed.Substring(0, queryIndex);
+        }
+
+        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
     private static bool LooksLikeJson(string code) {
