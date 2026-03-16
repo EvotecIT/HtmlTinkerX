@@ -953,6 +953,52 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_IncludeStructuredJson_CurlSamplesPreferCommandTargetOverPayloadUrls() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/webhooks/create"] = """
+            <html>
+              <head>
+                <title>Create webhook</title>
+              </head>
+              <body>
+                <main>
+                  <h1>Create webhook</h1>
+                  <pre><code class="language-bash">curl -X POST -H 'Referer: https://docs.example.com/reference' -H 'Content-Type: application/json' -d '{"callback":"https://hooks.example.com/incoming"}' https://api.example.com/v1/webhooks</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/webhooks/create", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredJson structuredJson = Assert.Single(result.Pages).StructuredJson!;
+            HtmlCrawlStructuredCodeSample sample = Assert.Single(structuredJson.CodeSamples);
+            Assert.Equal("POST", sample.Method);
+            Assert.Equal("/v1/webhooks", sample.Path);
+
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(structuredJson.ApiEndpoints);
+            Assert.Equal("POST", endpoint.Method);
+            Assert.Equal("/v1/webhooks", endpoint.Path);
+
+            HtmlCrawlStructuredRequestExample requestExample = Assert.Single(endpoint.RequestExamples);
+            Assert.Equal("POST", requestExample.Method);
+            Assert.Equal("/v1/webhooks", requestExample.Path);
+            Assert.Contains("https://hooks.example.com/incoming", requestExample.Body, StringComparison.Ordinal);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_DatasetScenario_AutoPreset_ResolvesProductPages() {
         Dictionary<string, string> responses = new() {
             ["/products/widget"] = """

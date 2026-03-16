@@ -6034,17 +6034,12 @@ public static class HtmlCrawler {
             return false;
         }
 
-        Match methodMatch = Regex.Match(code, @"(?is)\b(?:-X|--request)\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b");
-        if (methodMatch.Success) {
-            method = methodMatch.Groups[1].Value.ToUpperInvariant();
+        TryExtractCurlMethod(code, out method);
+        if (TryExtractCurlTarget(code, out string? target)) {
+            path = NormalizeStructuredApiPath(target!);
         }
 
-        Match urlMatch = Regex.Match(code, @"(?is)\b(https?://[^\s'""]+|/[^\s'""]+)");
-        if (urlMatch.Success) {
-            path = NormalizeStructuredApiPath(urlMatch.Groups[1].Value);
-        }
-
-        foreach (Match headerMatch in Regex.Matches(code, @"(?is)\b(?:-H|--header)\s+(?:""([^""]+)""|'([^']+)'|([^\s]+))")) {
+        foreach (Match headerMatch in Regex.Matches(code, @"(?is)(?<!\S)(?:-H|--header)\s+(?:""([^""]+)""|'([^']+)'|([^\s]+))")) {
             string rawHeader = NormalizeWhitespace(headerMatch.Groups[1].Value);
             if (string.IsNullOrWhiteSpace(rawHeader)) {
                 rawHeader = NormalizeWhitespace(headerMatch.Groups[2].Value);
@@ -6066,7 +6061,7 @@ public static class HtmlCrawler {
                 rawHeader.Substring(separatorIndex + 1));
         }
 
-        Match bodyMatch = Regex.Match(code, @"(?is)\b(?:--data-raw|--data-binary|--data|-d)\s+(?:""([\s\S]*?)""|'([\s\S]*?)'|([^\s]+))");
+        Match bodyMatch = Regex.Match(code, @"(?is)(?<!\S)(?:--data-raw|--data-binary|--data|-d)\s+(?:""([\s\S]*?)""|'([\s\S]*?)'|([^\s]+))");
         if (bodyMatch.Success) {
             body = NormalizeWhitespace(bodyMatch.Groups[1].Value);
             if (string.IsNullOrWhiteSpace(body)) {
@@ -6494,17 +6489,175 @@ public static class HtmlCrawler {
 
         Match directMatch = Regex.Match(input, @"(?im)\b(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+((?:https?://[^\s'""]+)?/[^\s'""]+)");
         if (!directMatch.Success) {
-            directMatch = Regex.Match(input, @"(?im)\bcurl\b[\s\S]*?\b-X\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b[\s\S]*?((?:https?://[^\s'""]+)?/[^\s'""]+)");
-        }
-
-        if (!directMatch.Success) {
-            return false;
+            return TryParseCurlMethodAndPath(input, out method, out path);
         }
 
         method = directMatch.Groups[1].Value.ToUpperInvariant();
         path = NormalizeStructuredApiPath(directMatch.Groups[2].Value);
         return !string.IsNullOrWhiteSpace(path);
     }
+
+    private static bool TryParseCurlMethodAndPath(string input, out string? method, out string? path) {
+        method = null;
+        path = null;
+        if (string.IsNullOrWhiteSpace(input) || !Regex.IsMatch(input, @"(?im)^\s*curl\b")) {
+            return false;
+        }
+
+        if (TryExtractCurlMethod(input, out string? parsedMethod)) {
+            method = parsedMethod;
+        }
+
+        if (TryExtractCurlTarget(input, out string? target)) {
+            path = NormalizeStructuredApiPath(target!);
+        }
+
+        if (string.IsNullOrWhiteSpace(method)) {
+            method = Regex.IsMatch(input, @"(?is)(?<!\S)(?:--data-raw|--data-binary|--data|--data-urlencode|-d)(?:\s|$)")
+                ? "POST"
+                : "GET";
+        }
+
+        return !string.IsNullOrWhiteSpace(method) && !string.IsNullOrWhiteSpace(path);
+    }
+
+    private static bool TryExtractCurlMethod(string code, out string? method) {
+        method = null;
+        if (string.IsNullOrWhiteSpace(code)) {
+            return false;
+        }
+
+        Match methodMatch = Regex.Match(code, @"(?is)(?<!\S)(?:-X|--request)(?:\s+|=)(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b");
+        if (!methodMatch.Success) {
+            return false;
+        }
+
+        method = methodMatch.Groups[1].Value.ToUpperInvariant();
+        return true;
+    }
+
+    private static bool TryExtractCurlTarget(string code, out string? target) {
+        target = null;
+        if (string.IsNullOrWhiteSpace(code) || !Regex.IsMatch(code, @"(?im)^\s*curl\b")) {
+            return false;
+        }
+
+        Match urlOptionMatch = Regex.Match(code, @"(?is)(?<!\S)--url(?:\s+|=)(?:""([^""]+)""|'([^']+)'|([^\s]+))");
+        if (urlOptionMatch.Success) {
+            target = FirstNonEmptyValue(
+                urlOptionMatch.Groups[1].Value,
+                urlOptionMatch.Groups[2].Value,
+                urlOptionMatch.Groups[3].Value);
+            return !string.IsNullOrWhiteSpace(target);
+        }
+
+        List<string> tokens = TokenizeShellLikeArguments(code);
+        if (tokens.Count == 0 || !string.Equals(tokens[0], "curl", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        HashSet<string> optionsWithSeparateValue = new(StringComparer.OrdinalIgnoreCase) {
+            "-X",
+            "--request",
+            "-H",
+            "--header",
+            "-d",
+            "--data",
+            "--data-raw",
+            "--data-binary",
+            "--data-urlencode",
+            "-e",
+            "--referer",
+            "-A",
+            "--user-agent",
+            "-u",
+            "--user",
+            "-F",
+            "--form",
+            "-o",
+            "--output",
+            "--url",
+            "--cookie",
+            "-b",
+            "--proxy",
+            "-x",
+            "--cacert",
+            "--cert",
+            "--key"
+        };
+
+        for (int index = 1; index < tokens.Count; index++) {
+            string token = tokens[index];
+            if (string.IsNullOrWhiteSpace(token)) {
+                continue;
+            }
+
+            if (token == "--") {
+                continue;
+            }
+
+            if (optionsWithSeparateValue.Contains(token)) {
+                index++;
+                continue;
+            }
+
+            if (LooksLikeCurlOptionWithInlineValue(token)) {
+                continue;
+            }
+
+            if (LooksLikeCurlTargetToken(token)) {
+                target = token;
+            }
+        }
+
+        return !string.IsNullOrWhiteSpace(target);
+    }
+
+    private static bool LooksLikeCurlOptionWithInlineValue(string token) {
+        if (string.IsNullOrWhiteSpace(token) || !token.StartsWith("-", StringComparison.Ordinal)) {
+            return false;
+        }
+
+        return token.StartsWith("--request=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--header=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--data=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--data-raw=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--data-binary=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--data-urlencode=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--url=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("--referer=", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-X", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-H", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-d", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-e", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-A", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-u", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-F", StringComparison.OrdinalIgnoreCase)
+            || token.StartsWith("-o", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeCurlTargetToken(string token) =>
+        !string.IsNullOrWhiteSpace(token)
+        && (Regex.IsMatch(token, @"^https?://", RegexOptions.IgnoreCase)
+            || token.StartsWith("/", StringComparison.Ordinal));
+
+    private static List<string> TokenizeShellLikeArguments(string command) {
+        List<string> tokens = new();
+        foreach (Match match in Regex.Matches(command, @"(?:""((?:\\""|[^""])*)""|'((?:\\'|[^'])*)'|(\S+))")) {
+            string? value = FirstNonEmptyValue(
+                match.Groups[1].Value.Replace("\\\"", "\""),
+                match.Groups[2].Value.Replace("\\'", "'"),
+                match.Groups[3].Value);
+            if (!string.IsNullOrWhiteSpace(value)) {
+                tokens.Add(value);
+            }
+        }
+
+        return tokens;
+    }
+
+    private static string? FirstNonEmptyValue(params string[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static string NormalizeStructuredApiPath(string value) {
         if (string.IsNullOrWhiteSpace(value)) {
