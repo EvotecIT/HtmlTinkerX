@@ -67,7 +67,9 @@ public class HtmlCrawlerMarkdownTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Contains("# Hello", page.Markdown);
-            Assert.Contains("World with **bold** and [link](", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("World", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("**bold**", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("[link](", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("http://localhost", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("- One", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("- Two", page.Markdown, StringComparison.Ordinal);

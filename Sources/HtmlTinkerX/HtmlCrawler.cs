@@ -6511,11 +6511,19 @@ public static class HtmlCrawler {
             return string.Empty;
         }
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)) {
-            return uri.PathAndQuery;
+        string trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))) {
+            int authorityLength = uri.GetLeftPart(UriPartial.Authority).Length;
+            if (trimmed.Length > authorityLength) {
+                return trimmed.Substring(authorityLength);
+            }
+
+            return "/";
         }
 
-        return value.Trim();
+        return trimmed;
     }
 
     private static bool LooksLikeJson(string code) {
