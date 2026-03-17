@@ -7958,14 +7958,24 @@ public static class HtmlCrawler {
             : null;
         page.ContentComparisonDeltaSummary = BuildContentComparisonDeltaSummary(page.ContentComparisons, bestComparison);
         page.ContentComparisonPreviewSummary = BuildContentComparisonPreviewSummary(page.ContentComparisons, bestComparison);
+        string markdownBaseUrl = ResolveMarkdownBaseUrl(html, requestUri);
         string selectedText = HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options));
         string selectedMarkdown = options.IncludeMarkdown || options.IncludeStructuredJson
-            ? ConvertSelectedHtmlToMarkdown(selectedHtml, page.Url)
+            ? ConvertSelectedHtmlToMarkdown(selectedHtml, markdownBaseUrl)
             : string.Empty;
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? selectedText : string.Empty;
         page.Markdown = options.IncludeMarkdown ? selectedMarkdown : string.Empty;
         page.StructuredJson = options.IncludeStructuredJson ? BuildStructuredJson(page, html, selectedHtml, selectedText, selectedMarkdown, structuredSchema, options.StructuredJsonPreset) : null;
+    }
+
+    private static string ResolveMarkdownBaseUrl(string html, Uri requestUri) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return requestUri.AbsoluteUri;
+        }
+
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return GetDocumentBaseUri(document, requestUri).AbsoluteUri;
     }
 
     private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl) {
@@ -8950,7 +8960,35 @@ public static class HtmlCrawler {
             return false;
         }
 
-        return LooksLikeStructuredCalloutElement(element);
+        return LooksLikeStructuredCalloutElement(element) || LooksLikeMediaNoscriptFallbackElement(element);
+    }
+
+    private static bool LooksLikeMediaNoscriptFallbackElement(IElement element) {
+        if (element == null || !element.TagName.Equals("NOSCRIPT", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        foreach (string html in EnumerateNoscriptHtmlCandidates(element)) {
+            IDocument document = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_noscript_media\">{html}</div>");
+            IElement? wrapper = document.QuerySelector("#__htmltinkerx_noscript_media");
+            if (wrapper?.QuerySelector("img,picture,source") != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> EnumerateNoscriptHtmlCandidates(IElement element) {
+        string innerHtml = element.InnerHtml;
+        if (!string.IsNullOrWhiteSpace(innerHtml)) {
+            yield return innerHtml;
+        }
+
+        string textContent = element.TextContent;
+        if (!string.IsNullOrWhiteSpace(textContent) && !string.Equals(textContent, innerHtml, StringComparison.Ordinal)) {
+            yield return textContent;
+        }
     }
 
     private static void RemoveConfiguredElements(IParentNode container, HtmlCrawlOptions options) {
