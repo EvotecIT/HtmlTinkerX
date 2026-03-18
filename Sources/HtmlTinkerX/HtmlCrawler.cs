@@ -2081,7 +2081,7 @@ public static class HtmlCrawler {
     private static bool LooksLikeProductPage(IDocument document, HtmlCrawlStructuredJson structuredJson) {
         bool hasProductMicrodata = structuredJson.MicrodataItems.Any(item =>
             !string.IsNullOrWhiteSpace(item.Type) &&
-            item.Type.IndexOf("Product", StringComparison.OrdinalIgnoreCase) >= 0);
+            item.Type!.IndexOf("Product", StringComparison.OrdinalIgnoreCase) >= 0);
         bool hasPrice = document.QuerySelectorAll("[itemprop='price'], meta[property='product:price:amount'], .price, .product-price, [data-price], [class*='price']").Length > 0;
         bool hasSku = document.QuerySelectorAll("[itemprop='sku'], [data-sku], .sku, [class*='sku']").Length > 0;
         bool hasAvailability = document.QuerySelectorAll("[itemprop='availability'], .availability, [data-stock-status], [class*='stock']").Length > 0;
@@ -2615,7 +2615,7 @@ public static class HtmlCrawler {
                 && LooksLikeRequestPayloadHeading(heading)) {
                 string? apiHeading = FindNearbyApiHeadingText(element);
                 if (!string.IsNullOrWhiteSpace(apiHeading)) {
-                    TryParseApiMethodAndPath(apiHeading, out method, out path);
+                    TryParseApiMethodAndPath(apiHeading!, out method, out path);
                 }
             }
 
@@ -4131,7 +4131,7 @@ public static class HtmlCrawler {
             return null;
         }
 
-        if (TryParseStructuredJsonPayload(body, out object? jsonBody, out _, out _)) {
+        if (TryParseStructuredJsonPayload(body!, out object? jsonBody, out _, out _)) {
             return jsonBody;
         }
 
@@ -4219,7 +4219,7 @@ public static class HtmlCrawler {
             schema["required"] = required;
         }
 
-        if (!string.IsNullOrWhiteSpace(path) && byPath.TryGetValue(path, out HtmlCrawlStructuredField? field)) {
+        if (!string.IsNullOrWhiteSpace(path) && byPath.TryGetValue(path!, out HtmlCrawlStructuredField? field)) {
             AddStrictOpenApiFieldProvenance(schema, field);
             AddStrictOpenApiFieldConfidence(schema, field);
         }
@@ -4565,7 +4565,7 @@ public static class HtmlCrawler {
             string? headerName = NormalizeStructuredAuthenticationHeader(parameter.Name);
             if (string.Equals(parameter.Location, "header", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(headerName)) {
-                AppendDistinct(authentication.Headers, headerName);
+                AppendDistinct(authentication.Headers, headerName!);
                 authentication.Required ??= parameter.Required;
             }
         }
@@ -4688,7 +4688,7 @@ public static class HtmlCrawler {
         foreach (HtmlCrawlStructuredApiParameter parameter in endpoint.HeaderParameters) {
             string? headerName = NormalizeStructuredAuthenticationHeader(parameter.Name);
             if (!string.IsNullOrWhiteSpace(headerName)) {
-                AppendDistinct(endpoint.Authentication.Headers, headerName);
+                AppendDistinct(endpoint.Authentication.Headers, headerName!);
                 endpoint.Authentication.Required ??= parameter.Required;
             }
 
@@ -4758,7 +4758,7 @@ public static class HtmlCrawler {
             return null;
         }
 
-        string normalized = value.Trim();
+        string normalized = value!.Trim();
         if (normalized.Equals("true", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("required", StringComparison.OrdinalIgnoreCase)) {
@@ -4823,7 +4823,7 @@ public static class HtmlCrawler {
         if (normalized.Contains("email") || Regex.IsMatch(normalized, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")) {
             return "email";
         }
-        if (normalized.Contains("uri") || normalized.Contains("url") || Uri.TryCreate(value.Trim(), UriKind.Absolute, out _)) {
+        if (normalized.Contains("uri") || normalized.Contains("url") || Uri.TryCreate(value!.Trim(), UriKind.Absolute, out _)) {
             return "uri";
         }
         if (normalized.Contains("hostname")) {
@@ -5214,7 +5214,7 @@ public static class HtmlCrawler {
                 continue;
             }
 
-            if (byPath.TryGetValue(field.ParentPath, out HtmlCrawlStructuredField? parent)) {
+            if (byPath.TryGetValue(field.ParentPath!, out HtmlCrawlStructuredField? parent)) {
                 AppendDistinct(parent.ChildPaths, field.Path);
             }
         }
@@ -5355,7 +5355,7 @@ public static class HtmlCrawler {
         foreach (Match match in Regex.Matches(normalized, @"(?im)^\s*(Authorization|X-API-Key|Api-Key|X-Auth-Token|X-Access-Token)\s*:", RegexOptions.IgnoreCase)) {
             string? header = NormalizeStructuredAuthenticationHeader(match.Groups[1].Value);
             if (!string.IsNullOrWhiteSpace(header)) {
-                AppendDistinct(authentication.Headers, header);
+                AppendDistinct(authentication.Headers, header!);
             }
         }
 
@@ -5594,8 +5594,8 @@ public static class HtmlCrawler {
         if (value is IDictionary<string, object?> dictionary) {
             if (!string.IsNullOrWhiteSpace(path)) {
                 HtmlCrawlStructuredField field = new() {
-                    Name = ExtractStructuredFieldName(path),
-                    Path = path,
+                    Name = ExtractStructuredFieldName(path!),
+                    Path = path!,
                     ParentPath = GetStructuredParentPath(path),
                     Kind = "object",
                     Depth = GetStructuredFieldDepth(path),
@@ -5649,10 +5649,10 @@ public static class HtmlCrawler {
         };
 
         HtmlCrawlStructuredField valueField = new() {
-            Name = ExtractStructuredFieldName(path),
-            Path = path,
+            Name = ExtractStructuredFieldName(path!),
+            Path = path!,
             ParentPath = GetStructuredParentPath(path),
-            Kind = path.EndsWith("[]", StringComparison.Ordinal) ? "array-item" : "field",
+            Kind = path!.EndsWith("[]", StringComparison.Ordinal) ? "array-item" : "field",
             Depth = GetStructuredFieldDepth(path),
             Type = GetStructuredSchemaTypeName(value),
             Format = NormalizeStructuredApiParameterFormat(null, null, path, null, exampleValue),
@@ -5783,8 +5783,8 @@ public static class HtmlCrawler {
             return;
         }
 
-        HashSet<string> types = new(existing.Split('|'), StringComparer.OrdinalIgnoreCase);
-        types.Add(value);
+        HashSet<string> types = new(existing!.Split('|'), StringComparer.OrdinalIgnoreCase);
+        types.Add(value!);
         target[key] = string.Join("|", types.OrderBy(type => type, StringComparer.OrdinalIgnoreCase));
     }
 
@@ -5796,8 +5796,8 @@ public static class HtmlCrawler {
             return first;
         }
 
-        HashSet<string> types = new(first.Split('|'), StringComparer.OrdinalIgnoreCase);
-        foreach (string type in second.Split('|')) {
+        HashSet<string> types = new(first!.Split('|'), StringComparer.OrdinalIgnoreCase);
+        foreach (string type in second!.Split('|')) {
             if (!string.IsNullOrWhiteSpace(type)) {
                 types.Add(type);
             }
@@ -5956,7 +5956,7 @@ public static class HtmlCrawler {
 
         List<string> names = new();
         foreach (string headerName in new[] { "Retry-After", "WWW-Authenticate", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "Content-Type" }) {
-            if (text.IndexOf(headerName, StringComparison.OrdinalIgnoreCase) >= 0) {
+            if (text!.IndexOf(headerName, StringComparison.OrdinalIgnoreCase) >= 0) {
                 AppendDistinct(names, headerName);
             }
         }
@@ -6270,7 +6270,7 @@ public static class HtmlCrawler {
             return method + " " + path;
         }
         if (!string.IsNullOrWhiteSpace(language)) {
-            return CultureInfoInvariantTitle(language) + " sample";
+            return CultureInfoInvariantTitle(language!) + " sample";
         }
 
         return kind switch {
@@ -6287,7 +6287,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        return ContainsAnyToken(heading,
+        return ContainsAnyToken(heading!,
             "request body",
             "request payload",
             "payload",
@@ -6499,7 +6499,7 @@ public static class HtmlCrawler {
                 ?? candidate.GetAttribute("language")
                 ?? candidate.GetAttribute("lang");
             if (!string.IsNullOrWhiteSpace(attributeLanguage)) {
-                return NormalizeStructuredLanguage(attributeLanguage);
+                return NormalizeStructuredLanguage(attributeLanguage!);
             }
 
             foreach (string className in candidate.ClassList) {
@@ -6720,7 +6720,7 @@ public static class HtmlCrawler {
                 match.Groups[2].Value.Replace("\\'", "'"),
                 match.Groups[3].Value);
             if (!string.IsNullOrWhiteSpace(value)) {
-                tokens.Add(value);
+                tokens.Add(value!);
             }
         }
 
@@ -6792,7 +6792,7 @@ public static class HtmlCrawler {
             return new List<string>();
         }
 
-        return keywords.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+        return keywords!.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(value => value.Trim())
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -6852,7 +6852,7 @@ public static class HtmlCrawler {
             return selectedDocument;
         }
 
-        return source.Trim().ToLowerInvariant() switch {
+        return source!.Trim().ToLowerInvariant() switch {
             "page" or "document" or "full" => document,
             _ => selectedDocument
         };
@@ -6868,7 +6868,7 @@ public static class HtmlCrawler {
         }
 
         if (string.Equals(mode, "Attribute", StringComparison.OrdinalIgnoreCase)) {
-            return string.IsNullOrWhiteSpace(attribute) ? null : element.GetAttribute(attribute);
+            return string.IsNullOrWhiteSpace(attribute) ? null : element.GetAttribute(attribute!);
         }
 
         return NormalizeWhitespace(element.TextContent);
@@ -7038,7 +7038,7 @@ public static class HtmlCrawler {
             return null;
         }
 
-        return BuildRelativePath(fromFilePath, toFilePath);
+        return BuildRelativePath(fromFilePath!, toFilePath!);
     }
 
     private static string BuildIndexHtml(HtmlCrawlResult result, HtmlCrawlSummary summary, string indexHtmlPath) {
@@ -7561,7 +7561,7 @@ public static class HtmlCrawler {
             return;
         }
 
-        string relative = BuildRelativePath(indexHtmlPath, path);
+        string relative = BuildRelativePath(indexHtmlPath, path!);
         builder.Append("<a href=\"")
             .Append(HtmlEncode(relative))
             .Append("\">")
@@ -7666,7 +7666,7 @@ public static class HtmlCrawler {
             return new Dictionary<string, HtmlCrawlJsonSchemaField>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return ParseStructuredSchema(schemaJson);
+        return ParseStructuredSchema(schemaJson!);
     }
 
     private static IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> ParseStructuredSchema(string schemaJson) {
@@ -7729,7 +7729,7 @@ public static class HtmlCrawler {
             return string.Empty;
         }
 
-        string normalized = value.Replace("\r\n", "\n").Replace('\r', '\n');
+        string normalized = value!.Replace("\r\n", "\n").Replace('\r', '\n');
         if (normalized.IndexOfAny(new[] { ',', '"', '\n' }) >= 0) {
             return "\"" + normalized.Replace("\"", "\"\"") + "\"";
         }
@@ -7958,14 +7958,24 @@ public static class HtmlCrawler {
             : null;
         page.ContentComparisonDeltaSummary = BuildContentComparisonDeltaSummary(page.ContentComparisons, bestComparison);
         page.ContentComparisonPreviewSummary = BuildContentComparisonPreviewSummary(page.ContentComparisons, bestComparison);
+        string markdownBaseUrl = ResolveMarkdownBaseUrl(html, requestUri);
         string selectedText = HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options));
         string selectedMarkdown = options.IncludeMarkdown || options.IncludeStructuredJson
-            ? ConvertSelectedHtmlToMarkdown(selectedHtml, page.Url)
+            ? ConvertSelectedHtmlToMarkdown(selectedHtml, markdownBaseUrl)
             : string.Empty;
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? selectedText : string.Empty;
         page.Markdown = options.IncludeMarkdown ? selectedMarkdown : string.Empty;
         page.StructuredJson = options.IncludeStructuredJson ? BuildStructuredJson(page, html, selectedHtml, selectedText, selectedMarkdown, structuredSchema, options.StructuredJsonPreset) : null;
+    }
+
+    private static string ResolveMarkdownBaseUrl(string html, Uri requestUri) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return requestUri.AbsoluteUri;
+        }
+
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return GetDocumentBaseUri(document, requestUri).AbsoluteUri;
     }
 
     private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl) {
@@ -8049,7 +8059,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        string normalizedHtml = html.ToLowerInvariant();
+        string normalizedHtml = html!.ToLowerInvariant();
         if (normalizedHtml.Contains("content=\"wordpress", StringComparison.Ordinal)
             || normalizedHtml.Contains("content='wordpress", StringComparison.Ordinal)
             || normalizedHtml.Contains("/wp-content/", StringComparison.Ordinal)
@@ -8077,7 +8087,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        string normalizedHtml = html.ToLowerInvariant();
+        string normalizedHtml = html!.ToLowerInvariant();
         bool hasApiUiMarkers = normalizedHtml.Contains("swagger-ui", StringComparison.Ordinal)
             || normalizedHtml.Contains("redoc-wrap", StringComparison.Ordinal)
             || normalizedHtml.Contains("<rapi-doc", StringComparison.Ordinal)
@@ -8102,7 +8112,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        string normalizedHtml = html.ToLowerInvariant();
+        string normalizedHtml = html!.ToLowerInvariant();
         bool hasArticle = normalizedHtml.Contains("<article", StringComparison.Ordinal)
             || normalizedHtml.Contains("role=\"main\"", StringComparison.Ordinal)
             || normalizedHtml.Contains("role='main'", StringComparison.Ordinal);
@@ -8242,7 +8252,7 @@ public static class HtmlCrawler {
             return true;
         }
 
-        if (!string.IsNullOrWhiteSpace(contentType) && MatchesParameterPattern(contentType.Trim(), options.AllowedContentTypePatterns)) {
+        if (!string.IsNullOrWhiteSpace(contentType) && MatchesParameterPattern(contentType!.Trim(), options.AllowedContentTypePatterns)) {
             return true;
         }
 
@@ -8491,7 +8501,7 @@ public static class HtmlCrawler {
             return false;
         }
 
-        string normalized = selector.Trim().ToLowerInvariant();
+        string normalized = selector!.Trim().ToLowerInvariant();
         return normalized is "main"
             or "[role='main']"
             or "[role=\"main\"]"
@@ -8950,7 +8960,35 @@ public static class HtmlCrawler {
             return false;
         }
 
-        return LooksLikeStructuredCalloutElement(element);
+        return LooksLikeStructuredCalloutElement(element) || LooksLikeMediaNoscriptFallbackElement(element);
+    }
+
+    private static bool LooksLikeMediaNoscriptFallbackElement(IElement element) {
+        if (element == null || !element.TagName.Equals("NOSCRIPT", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        foreach (string html in EnumerateNoscriptHtmlCandidates(element)) {
+            IDocument document = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_noscript_media\">{html}</div>");
+            IElement? wrapper = document.QuerySelector("#__htmltinkerx_noscript_media");
+            if (wrapper?.QuerySelector("img,picture,source") != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> EnumerateNoscriptHtmlCandidates(IElement element) {
+        string innerHtml = element.InnerHtml;
+        if (!string.IsNullOrWhiteSpace(innerHtml)) {
+            yield return innerHtml;
+        }
+
+        string textContent = element.TextContent;
+        if (!string.IsNullOrWhiteSpace(textContent) && !string.Equals(textContent, innerHtml, StringComparison.Ordinal)) {
+            yield return textContent;
+        }
     }
 
     private static void RemoveConfiguredElements(IParentNode container, HtmlCrawlOptions options) {
@@ -9416,7 +9454,7 @@ public static class HtmlCrawler {
         IDictionary<string, string> assetMap,
         HtmlCrawlOptions options) {
         List<string> rewritten = new();
-        foreach (string entry in srcSet.Split(',')) {
+        foreach (string entry in srcSet!.Split(',')) {
             string trimmed = entry.Trim();
             if (trimmed.Length == 0) {
                 continue;
@@ -9520,7 +9558,8 @@ public static class HtmlCrawler {
             yield break;
         }
 
-        foreach (string entry in srcSet.Split(',')) {
+        string normalizedSrcSet = srcSet!;
+        foreach (string entry in normalizedSrcSet.Split(',')) {
             string trimmed = entry.Trim();
             if (trimmed.Length == 0) {
                 continue;
@@ -9657,7 +9696,7 @@ public static class HtmlCrawler {
             asset.ContentLength = bytes.LongLength;
 
             if (!string.IsNullOrEmpty(assetsDirectory)) {
-                string assetPath = BuildAssetPath(asset, assetsDirectory);
+                string assetPath = BuildAssetPath(asset, assetsDirectory!);
                 await WriteBytesAsync(assetPath, bytes, cancellationToken).ConfigureAwait(false);
                 asset.FilePath = assetPath;
             }
@@ -9697,9 +9736,9 @@ public static class HtmlCrawler {
 #else
             string css = await File.ReadAllTextAsync(asset.FilePath, cancellationToken).ConfigureAwait(false);
 #endif
-            string rewritten = RewriteCssUrlsToLocal(css, assetUri, asset.FilePath, assetMap, options);
+            string rewritten = RewriteCssUrlsToLocal(css, assetUri, asset.FilePath!, assetMap, options);
             if (!string.Equals(css, rewritten, StringComparison.Ordinal)) {
-                await WriteTextAsync(asset.FilePath, rewritten, cancellationToken).ConfigureAwait(false);
+                await WriteTextAsync(asset.FilePath!, rewritten, cancellationToken).ConfigureAwait(false);
             }
         }
     }

@@ -508,8 +508,9 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             return;
         }
 
+        string normalizedProfileName = profileName!.Trim();
         foreach (string knownProfile in HtmlCrawlProfiles.Names) {
-            if (string.Equals(knownProfile, profileName.Trim(), System.StringComparison.OrdinalIgnoreCase)) {
+            if (string.Equals(knownProfile, normalizedProfileName, System.StringComparison.OrdinalIgnoreCase)) {
                 return;
             }
         }
