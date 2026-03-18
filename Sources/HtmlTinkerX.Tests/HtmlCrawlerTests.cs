@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -88,7 +89,7 @@ public class HtmlCrawlerTests {
 """
         };
 
-        using var server = StartServer(responses, out string rootUrl, host: "127.0.0.1");
+        using var server = StartServer(responses, out string rootUrl);
         HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
             MaxDepth = 0,
             MaxPages = 1,
@@ -152,9 +153,14 @@ public class HtmlCrawlerTests {
     }
 
     [Fact]
-    public async Task CrawlAsync_Render_RespectsComputedHiddenContentFromStylesheets() {
-        var responses = new System.Collections.Generic.Dictionary<string, string> {
-            ["/"] = """
+    public async Task MarkRenderedHiddenElementsAsync_MarksComputedHiddenContentFromStylesheets() {
+        await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+        using IPlaywright playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions {
+            Headless = true
+        });
+        IPage page = await browser.NewPageAsync();
+        await page.SetContentAsync("""
 <html>
   <head>
     <style>
@@ -168,22 +174,37 @@ public class HtmlCrawlerTests {
     </main>
   </body>
 </html>
+""");
+
+        await HtmlCrawler.MarkRenderedHiddenElementsAsync(page);
+
+        Assert.Equal("true", await page.Locator(".theme-hidden").GetAttributeAsync("data-htmltinkerx-hidden"));
+        Assert.Null(await page.Locator("main > p:first-of-type").GetAttributeAsync("data-htmltinkerx-hidden"));
+    }
+
+    [Fact]
+    public async Task CrawlAsync_RespectsRenderedHiddenMarkerByDefault() {
+        var responses = new System.Collections.Generic.Dictionary<string, string> {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <p>Visible text</p>
+      <p data-htmltinkerx-hidden="true">Hidden by stylesheet</p>
+    </main>
+  </body>
+</html>
 """
         };
 
-        await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
         using var server = StartServer(responses, out string rootUrl);
         HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
             MaxDepth = 0,
             MaxPages = 1,
             Selector = "main",
-            Render = true,
             IncludeHtml = true,
             IncludeText = true,
-            IncludeMarkdown = true,
-            Browser = HtmlBrowserEngine.Chromium,
-            Headless = true,
-            Timeout = 15000
+            IncludeMarkdown = true
         });
 
         HtmlCrawlPage page = Assert.Single(result.Pages);

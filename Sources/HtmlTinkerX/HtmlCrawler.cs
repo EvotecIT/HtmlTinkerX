@@ -9412,7 +9412,7 @@ public static class HtmlCrawler {
                || normalizedStyle.Contains("content-visibility:hidden", StringComparison.Ordinal);
     }
 
-    private static Task MarkRenderedHiddenElementsAsync(IPage page) {
+    internal static Task MarkRenderedHiddenElementsAsync(IPage page) {
         return page.EvaluateAsync(
             """
             () => {
