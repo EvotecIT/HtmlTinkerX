@@ -353,6 +353,20 @@ public class HtmlCrawlerTests {
         return listener;
     }
 
+    private static void DisposeListenerSafely(HttpListener listener) {
+        try {
+            listener.Stop();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+
+        try {
+            listener.Close();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_FollowsSameHostLinksUpToDepth() {
         Dictionary<string, string> responses = new() {
@@ -374,8 +388,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain(result.Pages, page => page.Url.Contains("/team", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(result.Pages, page => page.Url.Contains("example.com", StringComparison.OrdinalIgnoreCase));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -399,8 +412,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.Pages, page => page.Url.EndsWith("/keep", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(result.Pages, page => page.Url.EndsWith("/skip-me", StringComparison.OrdinalIgnoreCase));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
