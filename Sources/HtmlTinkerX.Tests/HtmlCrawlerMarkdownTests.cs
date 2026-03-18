@@ -53,6 +53,20 @@ public class HtmlCrawlerMarkdownTests {
         return listener;
     }
 
+    private static void DisposeListenerSafely(HttpListener listener) {
+        try {
+            listener.Stop();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+
+        try {
+            listener.Close();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_IncludeMarkdown_PopulatesMarkdownAndPersistsFile() {
         Dictionary<string, string> responses = new() {
@@ -84,8 +98,7 @@ public class HtmlCrawlerMarkdownTests {
             string manifest = File.ReadAllText(page.ManifestPath!);
             Assert.Contains("MarkdownPath", manifest, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -159,8 +172,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("![Hero](http://localhost", page.Markdown, StringComparison.Ordinal);
             Assert.DoesNotContain("{width=", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -194,8 +206,7 @@ public class HtmlCrawlerMarkdownTests {
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Contains("{width=256 height=128}", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -287,8 +298,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("[15 Jun: First post](", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("First summary.", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -340,8 +350,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("By Przemyslaw Klys", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("[Read More](", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -623,8 +632,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("hero.webp", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("_Hero image_", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -668,8 +676,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("![Hero](http://localhost", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("/assets/img/hero.png", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -712,8 +719,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("_Hero image_", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("Photo credit: Team", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -759,8 +765,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("\"Hero page\")", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("_Hero image_", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -813,8 +818,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("_Hero image_", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("Photo credit: Team", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -864,8 +868,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("_Hero image_", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("Photo credit: Team", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -903,8 +906,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("[flood map](http://localhost", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("/news/maps/flood-zones.html", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -935,8 +937,7 @@ public class HtmlCrawlerMarkdownTests {
             HtmlCrawlPage page = Assert.Single(result.Pages);
             AssertMarkdownSnapshot(snapshotFileName, page.Markdown);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -971,8 +972,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("Photo credit: City Desk", page.Markdown, StringComparison.Ordinal);
             Assert.DoesNotContain("data:image/gif", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -1003,8 +1003,7 @@ public class HtmlCrawlerMarkdownTests {
             Assert.Contains("_Residents navigate floodwater after the overnight storm._", page.Markdown, StringComparison.Ordinal);
             Assert.DoesNotContain("data:image/gif", page.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
