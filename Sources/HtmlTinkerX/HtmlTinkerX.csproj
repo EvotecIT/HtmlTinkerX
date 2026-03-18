@@ -11,7 +11,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoMarkdownHtmlVersion>0.1.2</OfficeImoMarkdownHtmlVersion>
+        <OfficeImoMarkdownHtmlVersion>0.1.3</OfficeImoMarkdownHtmlVersion>
         <OfficeImoRepoCandidate1>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\\..\\..\\OfficeIMO\\'))</OfficeImoRepoCandidate1>
         <OfficeImoRepoCandidate2>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\\..\\..\\..\\OfficeIMO\\'))</OfficeImoRepoCandidate2>
         <OfficeImoMarkdownHtmlProjectCandidate1>$([System.IO.Path]::Combine('$(OfficeImoRepoCandidate1)', 'OfficeIMO.Markdown.Html', 'OfficeIMO.Markdown.Html.csproj'))</OfficeImoMarkdownHtmlProjectCandidate1>
