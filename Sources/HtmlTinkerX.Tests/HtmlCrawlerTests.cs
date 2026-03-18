@@ -88,7 +88,7 @@ public class HtmlCrawlerTests {
 """
         };
 
-        using var server = StartServer(responses, out string rootUrl);
+        using var server = StartServer(responses, out string rootUrl, host: "127.0.0.1");
         HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
             MaxDepth = 0,
             MaxPages = 1,
@@ -301,9 +301,9 @@ public class HtmlCrawlerTests {
         return port;
     }
 
-    private static HttpListener StartServer(Dictionary<string, string> responses, out string rootUrl) {
+    private static HttpListener StartServer(Dictionary<string, string> responses, out string rootUrl, string host = "localhost") {
         int port = GetFreePort();
-        rootUrl = $"http://localhost:{port}/";
+        rootUrl = $"http://{host}:{port}/";
         HttpListener listener = new();
         listener.Prefixes.Add(rootUrl);
         listener.Start();
