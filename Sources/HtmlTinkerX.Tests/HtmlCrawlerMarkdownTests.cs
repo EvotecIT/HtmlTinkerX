@@ -276,24 +276,13 @@ public class HtmlCrawlerMarkdownTests {
         Assert.DoesNotContain("%20", renderedHtml, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void ConvertToMarkdownDocument_RendersPublisherLinkedFigureFixtureToStableHtmlSnapshot() {
-        AssertRenderedHtmlSnapshot("publisher-linked-picture-article.html", "publisher-linked-picture-article.html.snapshot.txt");
-    }
-
-    [Fact]
-    public void ConvertToMarkdownDocument_RendersPublisherNoscriptFigureFixtureToStableHtmlSnapshot() {
-        AssertRenderedHtmlSnapshot("publisher-noscript-linked-picture-article.html", "publisher-noscript-linked-picture-article.html.snapshot.txt");
-    }
-
-    [Fact]
-    public void ConvertToMarkdownDocument_RendersPublisherArtDirectionFigureFixtureToStableHtmlSnapshot() {
-        AssertRenderedHtmlSnapshot("publisher-art-direction-picture-article.html", "publisher-art-direction-picture-article.html.snapshot.txt");
-    }
-
-    [Fact]
-    public void ConvertToMarkdownDocument_RendersPublisherWidthDescriptorFigureFixtureToStableHtmlSnapshot() {
-        AssertRenderedHtmlSnapshot("publisher-width-descriptor-picture-article.html", "publisher-width-descriptor-picture-article.html.snapshot.txt");
+    [Theory]
+    [InlineData("publisher-linked-picture-article.html", "publisher-linked-picture-article.html.snapshot.txt")]
+    [InlineData("publisher-noscript-linked-picture-article.html", "publisher-noscript-linked-picture-article.html.snapshot.txt")]
+    [InlineData("publisher-art-direction-picture-article.html", "publisher-art-direction-picture-article.html.snapshot.txt")]
+    [InlineData("publisher-width-descriptor-picture-article.html", "publisher-width-descriptor-picture-article.html.snapshot.txt")]
+    public void ConvertToMarkdownDocument_RendersPublisherFigureFixtureToStableHtmlSnapshot(string fixtureFileName, string snapshotFileName) {
+        AssertRenderedHtmlSnapshot(fixtureFileName, snapshotFileName);
     }
 
     [Fact]
@@ -319,6 +308,27 @@ public class HtmlCrawlerMarkdownTests {
         var image = Assert.IsType<ImageBlock>(document.Blocks[1]);
         Assert.Equal("https://example.com/static/docs/img/hero.png", image.Path);
         Assert.Equal("Hero", image.Alt);
+    }
+
+    [Fact]
+    public void ConvertToMarkdownDocument_HandlesMalformedFigureMarkupWithoutThrowing() {
+        const string html = """
+<main>
+  <figure>
+    <picture>
+      <source srcset="/img/hero.webp 1x, /img/hero@2x.webp 2x"
+      <img src="/img/hero-fallback.png" alt="Hero"
+    </picture>
+    <figcaption>Hero image
+  </figure>
+</main>
+""";
+
+        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
+
+        var image = Assert.IsType<ImageBlock>(Assert.Single(document.Blocks));
+        Assert.Equal("https://example.com/img/hero.webp", image.Path);
+        Assert.Contains("https://example.com/img/hero.webp", document.ToMarkdown(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -647,10 +657,14 @@ public class HtmlCrawlerMarkdownTests {
         }
     }
 
-    [Fact]
-    public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherLinkedFigureFixtureThroughArticleSelectorSnapshot() {
+    [Theory]
+    [InlineData("publisher-linked-picture-article.html", "publisher-linked-picture-article.markdown.snapshot.txt")]
+    [InlineData("publisher-noscript-linked-picture-article.html", "publisher-noscript-linked-picture-article.markdown.snapshot.txt")]
+    [InlineData("publisher-art-direction-picture-article.html", "publisher-art-direction-picture-article.markdown.snapshot.txt")]
+    [InlineData("publisher-width-descriptor-picture-article.html", "publisher-width-descriptor-picture-article.markdown.snapshot.txt")]
+    public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherFixtureThroughArticleSelectorSnapshot(string fixtureFileName, string snapshotFileName) {
         Dictionary<string, string> responses = new() {
-            ["/"] = ReadFixture("publisher-linked-picture-article.html")
+            ["/"] = ReadFixture(fixtureFileName)
         };
 
         HttpListener server = StartServer(responses, out string rootUrl);
@@ -665,7 +679,7 @@ public class HtmlCrawlerMarkdownTests {
             });
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
-            AssertMarkdownSnapshot("publisher-linked-picture-article.markdown.snapshot.txt", page.Markdown);
+            AssertMarkdownSnapshot(snapshotFileName, page.Markdown);
         } finally {
             server.Stop();
             server.Close();
@@ -711,89 +725,6 @@ public class HtmlCrawlerMarkdownTests {
         }
     }
 
-    [Fact]
-    public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherNoscriptFixtureThroughArticleSelectorSnapshot() {
-        Dictionary<string, string> responses = new() {
-            ["/"] = ReadFixture("publisher-noscript-linked-picture-article.html")
-        };
-
-        HttpListener server = StartServer(responses, out string rootUrl);
-        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        try {
-            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
-                MaxDepth = 0,
-                MaxPages = 1,
-                Selector = "article.story",
-                IncludeMarkdown = true,
-                OutputPath = outputPath
-            });
-
-            HtmlCrawlPage page = Assert.Single(result.Pages);
-            AssertMarkdownSnapshot("publisher-noscript-linked-picture-article.markdown.snapshot.txt", page.Markdown);
-        } finally {
-            server.Stop();
-            server.Close();
-            if (Directory.Exists(outputPath)) {
-                Directory.Delete(outputPath, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
-    public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherArtDirectionFixtureThroughArticleSelectorSnapshot() {
-        Dictionary<string, string> responses = new() {
-            ["/"] = ReadFixture("publisher-art-direction-picture-article.html")
-        };
-
-        HttpListener server = StartServer(responses, out string rootUrl);
-        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        try {
-            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
-                MaxDepth = 0,
-                MaxPages = 1,
-                Selector = "article.story",
-                IncludeMarkdown = true,
-                OutputPath = outputPath
-            });
-
-            HtmlCrawlPage page = Assert.Single(result.Pages);
-            AssertMarkdownSnapshot("publisher-art-direction-picture-article.markdown.snapshot.txt", page.Markdown);
-        } finally {
-            server.Stop();
-            server.Close();
-            if (Directory.Exists(outputPath)) {
-                Directory.Delete(outputPath, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
-    public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherWidthDescriptorFixtureThroughArticleSelectorSnapshot() {
-        Dictionary<string, string> responses = new() {
-            ["/"] = ReadFixture("publisher-width-descriptor-picture-article.html")
-        };
-
-        HttpListener server = StartServer(responses, out string rootUrl);
-        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        try {
-            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
-                MaxDepth = 0,
-                MaxPages = 1,
-                Selector = "article.story",
-                IncludeMarkdown = true,
-                OutputPath = outputPath
-            });
-
-            HtmlCrawlPage page = Assert.Single(result.Pages);
-            AssertMarkdownSnapshot("publisher-width-descriptor-picture-article.markdown.snapshot.txt", page.Markdown);
-        } finally {
-            server.Stop();
-            server.Close();
-            if (Directory.Exists(outputPath)) {
-                Directory.Delete(outputPath, recursive: true);
-            }
-        }
-    }
 
     [Fact]
     public async Task CrawlAsync_IncludeMarkdown_ProcessesPublisherCdnLazyPictureFixtureThroughArticleSelector() {
@@ -831,6 +762,7 @@ public class HtmlCrawlerMarkdownTests {
         return File.ReadAllText(path);
     }
 
+    // Set HTMLTINKERX_UPDATE_SNAPSHOTS=1 to rewrite checked-in baselines after an intentional renderer change.
     private static void AssertMarkdownSnapshot(string fileName, string actualMarkdown) {
         string path = Path.Combine(GetTestsProjectRoot(), "Fixtures", "Expected", fileName);
         string normalized = NormalizeMarkdown(actualMarkdown);
@@ -845,6 +777,7 @@ public class HtmlCrawlerMarkdownTests {
         Assert.Equal(NormalizeMarkdown(expected), normalized);
     }
 
+    // HTML snapshots use the same update switch so markdown and rendered-output baselines stay in sync.
     private static void AssertRenderedHtmlSnapshot(string fixtureFileName, string snapshotFileName) {
         string html = ReadFixture(fixtureFileName);
         MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
