@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HtmlTinkerX;
 
@@ -75,6 +76,56 @@ public sealed class HtmlCrawlPage {
 
     /// <summary>Discovered asset URLs referenced from the page.</summary>
     public IList<string> AssetUrls { get; set; } = new List<string>();
+
+    /// <summary>Likely runtime dependencies that may still require live network behavior even after assets are mirrored locally.</summary>
+    public IList<HtmlCrawlOfflineDependencyDiagnostic> OfflineDependencyDiagnostics { get; set; } = new List<HtmlCrawlOfflineDependencyDiagnostic>();
+
+    /// <summary>Count of recorded offline-runtime dependency diagnostics for this page.</summary>
+    public int OfflineDependencyDiagnosticCount => OfflineDependencyDiagnostics.Count;
+
+    /// <summary>Distinct offline-runtime dependency kinds recorded for this page.</summary>
+    public IList<string> OfflineDependencyKinds => OfflineDependencyDiagnostics
+        .Where(diagnostic => !string.IsNullOrWhiteSpace(diagnostic?.Kind))
+        .Select(diagnostic => diagnostic.Kind!.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(kind => kind, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    /// <summary>Compact summary of distinct offline-runtime dependency kinds for this page.</summary>
+    public string OfflineDependencyKindsSummary => string.Join(", ", OfflineDependencyKinds);
+
+    /// <summary>Overall offline readiness grade for this page derived from its runtime-risk diagnostics.</summary>
+    public string OfflineReadinessGrade {
+        get {
+            if (Status != HtmlCrawlPageStatus.Success) {
+                return "not-assessed";
+            }
+
+            if (OfflineDependencyDiagnostics.Count == 0) {
+                return "ready";
+            }
+
+            return string.Equals(HighestOfflineRiskSeverity, "high", StringComparison.OrdinalIgnoreCase)
+                ? "live-dependent"
+                : "partial";
+        }
+    }
+
+    /// <summary>Highest offline-runtime risk severity recorded for this page.</summary>
+    public string HighestOfflineRiskSeverity {
+        get {
+            if (Status != HtmlCrawlPageStatus.Success) {
+                return "none";
+            }
+
+            string? highestSeverity = OfflineDependencyDiagnostics
+                .Select(ResolveOfflineSeverity)
+                .OrderByDescending(GetSeverityRank)
+                .ThenBy(severity => severity, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            return string.IsNullOrWhiteSpace(highestSeverity) ? "none" : highestSeverity!;
+        }
+    }
 
     /// <summary>Rendered interactions that were successfully applied before extraction.</summary>
     public IList<string> AppliedInteractions { get; set; } = new List<string>();
@@ -168,4 +219,18 @@ public sealed class HtmlCrawlPage {
 
     /// <summary>Total fetch duration.</summary>
     public TimeSpan Duration => Finished - Started;
+
+    private static string ResolveOfflineSeverity(HtmlCrawlOfflineDependencyDiagnostic diagnostic) {
+        string inferredSeverity = HtmlCrawler.GetOfflineDependencySeverity(diagnostic?.Kind);
+        string explicitSeverity = string.IsNullOrWhiteSpace(diagnostic?.Severity) ? inferredSeverity : diagnostic!.Severity!;
+        return string.Equals(inferredSeverity, "high", StringComparison.OrdinalIgnoreCase)
+            ? "high"
+            : explicitSeverity;
+    }
+
+    private static int GetSeverityRank(string? severity) => severity?.ToLowerInvariant() switch {
+        "high" => 2,
+        "warning" => 1,
+        _ => 0
+    };
 }

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 
 namespace HtmlTinkerX;
 
@@ -198,19 +200,82 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Total discovered outbound links across fetched pages.</summary>
     public int TotalDiscoveredLinks { get; set; }
 
+    /// <summary>Number of fetched pages that still show likely offline runtime risk signals.</summary>
+    public int OfflineRiskPageCount { get; set; }
+
+    /// <summary>Total number of offline runtime risk diagnostics recorded across fetched pages.</summary>
+    public int OfflineRiskDiagnosticCount { get; set; }
+
+    /// <summary>Number of fetched pages with at least one high-severity offline runtime risk diagnostic.</summary>
+    public int HighOfflineRiskPageCount { get; set; }
+
+    /// <summary>Counts of offline runtime risk diagnostics by kind.</summary>
+    public IDictionary<string, int> OfflineDependencyKinds { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Counts of offline runtime risk diagnostics by severity.</summary>
+    public IDictionary<string, int> OfflineDependencySeverityCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Overall offline readiness grade derived from the recorded runtime-risk diagnostics.</summary>
+    public string OfflineReadinessGrade { get; set; } = "ready";
+
+    /// <summary>Counts of offline readiness grades across all fetched, skipped, failed, and pending candidates.</summary>
+    public IDictionary<string, int> OfflineReadinessCounts { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Counts of offline readiness grades grouped by candidate state, for example <c>Success:ready</c>.</summary>
+    public IDictionary<string, int> OfflineReadinessCountsByState { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Counts of skipped pages by reason.</summary>
     public IDictionary<string, int> SkipReasons { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Counts of fetched pages by HTTP status code.</summary>
     public IDictionary<string, int> StatusCodes { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Whether full browser rendering was enabled for the crawl.</summary>
+    public bool RenderEnabled { get; set; }
+
+    /// <summary>Whether auto-render fallback was enabled for the crawl.</summary>
+    public bool AutoRenderEnabled { get; set; }
+
+    /// <summary>Controls whether extraction respects or includes hidden DOM content.</summary>
+    public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
+
+    /// <summary>Controls how images are emitted when page HTML is converted to markdown.</summary>
+    public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
+
+    /// <summary>Controls whether low-value metadata inside repeated listing cards is preserved or suppressed in markdown output.</summary>
+    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+
+    /// <summary>Optional crawl guidance notes derived from the run configuration and observed behavior.</summary>
+    public IList<string> GuidanceNotes { get; set; } = new List<string>();
+
     internal static HtmlCrawlSummary FromResult(HtmlCrawlResult result) {
+        static string ResolveOfflineSeverity(HtmlCrawlOfflineDependencyDiagnostic diagnostic) {
+            string inferredSeverity = HtmlCrawler.GetOfflineDependencySeverity(diagnostic?.Kind);
+            string explicitSeverity = string.IsNullOrWhiteSpace(diagnostic?.Severity) ? inferredSeverity : diagnostic!.Severity!;
+            return string.Equals(inferredSeverity, "high", StringComparison.OrdinalIgnoreCase)
+                ? "high"
+                : explicitSeverity;
+        }
+
+        static void Increment(IDictionary<string, int> counts, string key) {
+            if (counts.TryGetValue(key, out int existing)) {
+                counts[key] = existing + 1;
+            } else {
+                counts[key] = 1;
+            }
+        }
+
         var summary = new HtmlCrawlSummary {
             StartUrl = result.StartUrl,
             AppliedProfileName = result.AppliedProfileName,
             AppliedScenario = result.AppliedScenario,
             AppliedProfileReasonCode = result.AppliedProfileReasonCode,
             AppliedProfileReason = result.AppliedProfileReason,
+            RenderEnabled = result.RenderEnabled,
+            AutoRenderEnabled = result.AutoRenderEnabled,
+            HiddenContentMode = result.HiddenContentMode,
+            MarkdownImageMode = result.MarkdownImageMode,
+            ListingCardMetadataMode = result.ListingCardMetadataMode,
             PageCount = result.Pages.Count,
             SuccessfulPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Success),
             FailedPageCount = result.Pages.Count(page => page.Status == HtmlCrawlPageStatus.Failed),
@@ -249,7 +314,10 @@ public sealed class HtmlCrawlSummary {
             StructuredCalloutCount = result.Pages.Sum(page => page.StructuredJson?.Callouts.Count ?? 0),
             StructuredPrimaryActionCount = result.Pages.Sum(page => page.StructuredJson?.PrimaryActions.Count ?? 0),
             DurationMs = result.Finished > result.Started ? (long)(result.Finished - result.Started).TotalMilliseconds : 0,
-            TotalDiscoveredLinks = result.Pages.Sum(page => page.Links?.Count ?? 0)
+            TotalDiscoveredLinks = result.Pages.Sum(page => page.Links?.Count ?? 0),
+            OfflineRiskPageCount = result.Pages.Count(page => page.OfflineDependencyDiagnostics.Count > 0),
+            OfflineRiskDiagnosticCount = result.Pages.Sum(page => page.OfflineDependencyDiagnostics.Count),
+            HighOfflineRiskPageCount = result.Pages.Count(page => page.OfflineDependencyDiagnostics.Any(diagnostic => string.Equals(ResolveOfflineSeverity(diagnostic), "high", StringComparison.OrdinalIgnoreCase)))
         };
 
         summary.ChunkCount = result.ChunkCount > 0
@@ -312,6 +380,49 @@ public sealed class HtmlCrawlSummary {
 
         foreach (var group in result.Pages.Where(page => page.StatusCode.HasValue).GroupBy(page => page.StatusCode!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparer.OrdinalIgnoreCase)) {
             summary.StatusCodes[group.Key] = group.Count();
+        }
+        foreach (var group in result.Pages
+            .SelectMany(page => page.OfflineDependencyDiagnostics)
+            .Where(diagnostic => !string.IsNullOrWhiteSpace(diagnostic.Kind))
+            .GroupBy(diagnostic => diagnostic.Kind, StringComparer.OrdinalIgnoreCase)) {
+            summary.OfflineDependencyKinds[group.Key] = group.Count();
+        }
+        foreach (var group in result.Pages
+            .SelectMany(page => page.OfflineDependencyDiagnostics)
+            .Select(ResolveOfflineSeverity)
+            .GroupBy(severity => severity, StringComparer.OrdinalIgnoreCase)) {
+            summary.OfflineDependencySeverityCounts[group.Key] = group.Count();
+        }
+        summary.OfflineReadinessGrade = summary.HighOfflineRiskPageCount > 0
+            ? "live-dependent"
+            : summary.OfflineRiskDiagnosticCount > 0
+                ? "partial"
+                : "ready";
+        foreach (HtmlCrawlPage page in result.Pages) {
+            Increment(summary.OfflineReadinessCounts, page.OfflineReadinessGrade);
+            Increment(summary.OfflineReadinessCountsByState, $"{page.Status}:{page.OfflineReadinessGrade}");
+        }
+        foreach (HtmlCrawlPage page in result.SkippedPages) {
+            Increment(summary.OfflineReadinessCounts, page.OfflineReadinessGrade);
+            Increment(summary.OfflineReadinessCountsByState, $"{page.Status}:{page.OfflineReadinessGrade}");
+        }
+        foreach (HtmlCrawlPendingItem page in result.PendingPages) {
+            Increment(summary.OfflineReadinessCounts, page.OfflineReadinessGrade);
+            Increment(summary.OfflineReadinessCountsByState, $"Pending:{page.OfflineReadinessGrade}");
+        }
+
+        if (summary.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden
+            && !summary.RenderEnabled
+            && !summary.AutoRenderEnabled) {
+            summary.GuidanceNotes.Add("Hidden-content filtering ran in static mode. Elements hidden only by external CSS may still require rendering to be excluded.");
+        }
+
+        if (summary.MarkdownImageMode == MarkdownImageRenderingMode.PortableMarkdown) {
+            summary.GuidanceNotes.Add("Markdown images used portable output. Image size hints stay in HTML/manifests unless a richer markdown mode is selected.");
+        }
+
+        if (summary.ListingCardMetadataMode == HtmlListingCardMetadataMode.SuppressInRepeatedCards) {
+            summary.GuidanceNotes.Add("Repeated listing-card chrome like date/time/byline/read-more blocks was suppressed in markdown output. Switch the listing-card metadata mode to Preserve when you want raw teaser metadata retained.");
         }
 
         return summary;
@@ -380,8 +491,21 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"Skipped graph nodes: {GraphSkippedNodeCount}");
         report.AppendLine($"External graph nodes: {GraphExternalNodeCount}");
         report.AppendLine($"Discovered links: {TotalDiscoveredLinks}");
+        report.AppendLine($"Offline-risk pages: {OfflineRiskPageCount}");
+        report.AppendLine($"Offline-risk diagnostics: {OfflineRiskDiagnosticCount}");
+        report.AppendLine($"High offline-risk pages: {HighOfflineRiskPageCount}");
+        report.AppendLine($"Offline readiness grade: {OfflineReadinessGrade}");
+        report.AppendLine($"Hidden-content mode: {HiddenContentMode}");
+        report.AppendLine($"Markdown image mode: {MarkdownImageMode}");
+        report.AppendLine($"Listing-card metadata mode: {ListingCardMetadataMode}");
         report.AppendLine($"Pages with interactions: {InteractedPageCount}");
         report.AppendLine($"Applied interactions: {InteractionCount}");
+        if (GuidanceNotes.Count > 0) {
+            report.AppendLine("Guidance:");
+            foreach (string note in GuidanceNotes.Where(note => !string.IsNullOrWhiteSpace(note))) {
+                report.AppendLine($"- {note}");
+            }
+        }
         report.AppendLine($"Duration: {DurationMs} ms");
 
         if (RenderModeCounts.Count > 0 || RenderReasonCounts.Count > 0) {
@@ -420,6 +544,23 @@ public sealed class HtmlCrawlSummary {
             report.AppendLine("Interaction summary:");
             foreach (var item in InteractionCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
                 report.AppendLine($"- {item.Key}: {item.Value}");
+            }
+        }
+
+        if (OfflineDependencyKinds.Count > 0) {
+            report.AppendLine();
+            report.AppendLine("Offline readiness:");
+            foreach (var item in OfflineReadinessCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Offline grade {item.Key}: {item.Value}");
+            }
+            foreach (var item in OfflineReadinessCountsByState.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Offline state {item.Key}: {item.Value}");
+            }
+            foreach (var item in OfflineDependencySeverityCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Offline severity {item.Key}: {item.Value}");
+            }
+            foreach (var item in OfflineDependencyKinds.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                report.AppendLine($"- Offline dependency {item.Key}: {item.Value}");
             }
         }
 

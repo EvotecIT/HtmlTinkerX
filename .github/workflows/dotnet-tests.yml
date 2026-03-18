@@ -49,9 +49,15 @@ jobs:
       - name: Build solution
         run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
-      - name: Run tests for ${{ matrix.framework }}
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework ${{ matrix.framework }} --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+      - name: Run tests for net8.0
+        if: matrix.framework == 'net8.0'
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
+
+      - name: Run tests for net472
+        if: matrix.framework == 'net472'
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        timeout-minutes: 20
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'

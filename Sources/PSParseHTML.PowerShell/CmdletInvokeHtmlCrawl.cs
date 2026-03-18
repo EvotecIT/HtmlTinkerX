@@ -1,4 +1,6 @@
 using HtmlTinkerX;
+using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -158,6 +160,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Disable the built-in cleanup heuristics that remove low-value boilerplate inside extracted content.</summary>
     [Parameter]
     public SwitchParameter DisableSmartContentCleanup { get; set; }
+
+    /// <summary>Controls whether extraction should respect or include hidden DOM content. Static crawls only detect explicit DOM-hidden markers; use Render or AutoRender when you need stylesheet-hidden content filtered by computed visibility.</summary>
+    [Parameter]
+    public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
 
     /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
     [Parameter]
@@ -331,6 +337,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeMarkdown { get; set; }
 
+    /// <summary>Controls how images are emitted when selected HTML is converted to markdown. Use PortableMarkdown for broad renderer compatibility, RichMarkdown for OfficeIMO-style size suffixes, or Html for exact width and height fidelity.</summary>
+    [Parameter]
+    public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
+
+    /// <summary>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.</summary>
+    [Parameter]
+    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+
     /// <summary>Include structured JSON-friendly data extracted from each crawled page.</summary>
     [Parameter]
     public SwitchParameter IncludeStructuredJson { get; set; }
@@ -399,6 +413,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             IncludeMarkdown = IncludeMarkdown.IsPresent,
+            MarkdownImageMode = MarkdownImageMode,
+            ListingCardMetadataMode = ListingCardMetadataMode,
             IncludeStructuredJson = IncludeStructuredJson.IsPresent,
             StructuredJsonPreset = StructuredJsonPreset,
             StructuredJsonSchema = StructuredJsonSchema,
@@ -412,6 +428,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             ExcludeClasses = new List<string>(ExcludeClass),
             ExcludeIds = new List<string>(ExcludeId),
             SmartContentCleanup = !DisableSmartContentCleanup.IsPresent,
+            HiddenContentMode = HiddenContentMode,
             ClickSelectors = new List<string>(ClickSelector),
             ClickTexts = new List<string>(ClickText),
             DismissSelectors = new List<string>(DismissSelector),

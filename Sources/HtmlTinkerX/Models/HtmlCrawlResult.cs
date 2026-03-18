@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 
 namespace HtmlTinkerX;
 
@@ -43,6 +45,21 @@ public sealed class HtmlCrawlResult {
 
     /// <summary>Explains why the applied crawl profile was selected.</summary>
     public string? AppliedProfileReason { get; set; }
+
+    /// <summary>Whether full browser rendering was enabled for the crawl.</summary>
+    public bool RenderEnabled { get; set; }
+
+    /// <summary>Whether auto-render fallback was enabled for the crawl.</summary>
+    public bool AutoRenderEnabled { get; set; }
+
+    /// <summary>Controls whether extraction respects or includes hidden DOM content.</summary>
+    public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
+
+    /// <summary>Controls how images are emitted when page HTML is converted to markdown.</summary>
+    public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
+
+    /// <summary>Controls whether low-value metadata inside repeated listing cards is preserved or suppressed in markdown output.</summary>
+    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Manifest path used when crawl artifacts were persisted.</summary>
     public string? ManifestPath { get; set; }

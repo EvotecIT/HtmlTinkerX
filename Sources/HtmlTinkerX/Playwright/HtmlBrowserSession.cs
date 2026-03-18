@@ -123,6 +123,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 Url = req.Url,
                 Method = HtmlEnumParser.ParseHttpMethod(req.Method),
                 RequestHeaders = new Dictionary<string, string>(req.Headers),
+                ResourceType = HtmlEnumParser.ParseNetworkResourceType(req.ResourceType),
                 Started = System.DateTimeOffset.UtcNow
             };
 
@@ -140,6 +141,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 Url = r.Url,
                 Method = HtmlEnumParser.ParseHttpMethod(r.Method),
                 RequestHeaders = new Dictionary<string, string>(r.Headers),
+                ResourceType = HtmlEnumParser.ParseNetworkResourceType(r.ResourceType),
                 Started = System.DateTimeOffset.UtcNow
             });
             entry.Status = (System.Net.HttpStatusCode)res.Status;

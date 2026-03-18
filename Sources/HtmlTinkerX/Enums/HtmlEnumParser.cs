@@ -46,4 +46,23 @@ public static class HtmlEnumParser {
         "PATCH" => HtmlHttpMethod.Patch,
         _ => HtmlHttpMethod.Other
     };
+
+    /// <summary>
+    /// Converts a browser resource type string to <see cref="HtmlNetworkResourceType"/>.
+    /// </summary>
+    public static HtmlNetworkResourceType ParseNetworkResourceType(string? resourceType) => resourceType?.ToLowerInvariant() switch {
+        "document" => HtmlNetworkResourceType.Document,
+        "stylesheet" => HtmlNetworkResourceType.Stylesheet,
+        "image" => HtmlNetworkResourceType.Image,
+        "media" => HtmlNetworkResourceType.Media,
+        "font" => HtmlNetworkResourceType.Font,
+        "script" => HtmlNetworkResourceType.Script,
+        "texttrack" => HtmlNetworkResourceType.TextTrack,
+        "xhr" => HtmlNetworkResourceType.XHR,
+        "fetch" => HtmlNetworkResourceType.Fetch,
+        "eventsource" => HtmlNetworkResourceType.EventSource,
+        "websocket" => HtmlNetworkResourceType.WebSocket,
+        "manifest" => HtmlNetworkResourceType.Manifest,
+        _ => HtmlNetworkResourceType.Other
+    };
 }

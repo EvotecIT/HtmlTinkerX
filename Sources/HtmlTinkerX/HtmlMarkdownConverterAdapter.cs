@@ -5,26 +5,40 @@ using OfficeIMO.Markdown.Html;
 namespace HtmlTinkerX;
 
 internal static class HtmlMarkdownConverterAdapter {
-    public static MarkdownDoc ConvertToMarkdownDocument(string html, string? pageUrl) {
+    public static MarkdownDoc ConvertToMarkdownDocument(
+        string html,
+        string? pageUrl,
+        MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
+        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards) {
         if (string.IsNullOrWhiteSpace(html)) {
             return MarkdownDoc.Create();
         }
 
-        var options = CreateOptions(pageUrl);
+        var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode);
         return html.LoadFromHtml(options);
     }
 
-    public static string ConvertToMarkdown(string html, string? pageUrl) {
+    public static string ConvertToMarkdown(
+        string html,
+        string? pageUrl,
+        MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
+        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards) {
         if (string.IsNullOrWhiteSpace(html)) {
             return string.Empty;
         }
 
-        var options = CreateOptions(pageUrl);
+        var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode);
         return html.LoadFromHtml(options).ToMarkdown(options.MarkdownWriteOptions);
     }
 
-    internal static HtmlToMarkdownOptions CreateOptions(string? pageUrl) {
+    internal static HtmlToMarkdownOptions CreateOptions(
+        string? pageUrl,
+        MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
+        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards) {
         var options = HtmlToMarkdownOptions.CreatePortableProfile();
+        options.MarkdownWriteOptions ??= MarkdownWriteOptions.CreatePortableProfile();
+        options.MarkdownWriteOptions.ImageRenderingMode = imageMode;
+        options.ListingCardMetadataMode = listingCardMetadataMode;
         if (!string.IsNullOrWhiteSpace(pageUrl) && Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri)) {
             options.BaseUri = baseUri;
         }

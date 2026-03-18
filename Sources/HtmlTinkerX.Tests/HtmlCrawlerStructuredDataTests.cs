@@ -48,6 +48,20 @@ public class HtmlCrawlerStructuredJsonTests {
         return listener;
     }
 
+    private static void DisposeListenerSafely(HttpListener listener) {
+        try {
+            listener.Stop();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+
+        try {
+            listener.Close();
+        } catch (HttpListenerException) {
+        } catch (ObjectDisposedException) {
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_IncludeStructuredJson_PopulatesStructuredJsonAndPersistsFiles() {
         Dictionary<string, string> responses = new() {
@@ -947,8 +961,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("oauth2", securityScheme["type"] as string);
             Assert.True(securityScheme.ContainsKey("flows"));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 

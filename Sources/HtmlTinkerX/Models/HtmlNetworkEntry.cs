@@ -15,6 +15,9 @@ public sealed class HtmlNetworkEntry {
     /// <summary>Request headers.</summary>
     public IDictionary<string, string> RequestHeaders { get; set; } = new Dictionary<string, string>();
 
+    /// <summary>Browser-reported resource type when available.</summary>
+    public HtmlNetworkResourceType ResourceType { get; set; } = HtmlNetworkResourceType.Other;
+
     /// <summary>Response status code.</summary>
     public System.Net.HttpStatusCode? Status { get; set; }
 

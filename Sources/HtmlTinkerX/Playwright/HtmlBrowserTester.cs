@@ -293,24 +293,7 @@ public static class HtmlBrowserTester {
     }
     
     private static HtmlNetworkResourceType DetermineResourceType(IRequest request) {
-        var url = request.Url.ToLowerInvariant();
-        var resourceType = request.ResourceType.ToLowerInvariant();
-        
-        return resourceType switch {
-            "document" => HtmlNetworkResourceType.Document,
-            "stylesheet" => HtmlNetworkResourceType.Stylesheet,
-            "image" => HtmlNetworkResourceType.Image,
-            "media" => HtmlNetworkResourceType.Media,
-            "font" => HtmlNetworkResourceType.Font,
-            "script" => HtmlNetworkResourceType.Script,
-            "texttrack" => HtmlNetworkResourceType.TextTrack,
-            "xhr" => HtmlNetworkResourceType.XHR,
-            "fetch" => HtmlNetworkResourceType.Fetch,
-            "eventsource" => HtmlNetworkResourceType.EventSource,
-            "websocket" => HtmlNetworkResourceType.WebSocket,
-            "manifest" => HtmlNetworkResourceType.Manifest,
-            _ => HtmlNetworkResourceType.Other
-        };
+        return HtmlEnumParser.ParseNetworkResourceType(request.ResourceType);
     }
     
     private static HtmlNetworkErrorType ParseNetworkError(string? error) {

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 
 namespace HtmlTinkerX;
 
@@ -87,6 +89,16 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Stores Markdown converted from the selected page content in the result.</summary>
     public bool IncludeMarkdown { get; set; }
 
+    /// <summary>
+    /// Controls how images are emitted when selected HTML is converted to markdown.
+    /// </summary>
+    public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
+
+    /// <summary>
+    /// Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.
+    /// </summary>
+    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+
     /// <summary>Stores structured JSON-friendly page data extracted from the crawl.</summary>
     public bool IncludeStructuredJson { get; set; }
 
@@ -125,6 +137,11 @@ public sealed class HtmlCrawlOptions {
 
     /// <summary>When true, applies conservative cleanup heuristics to remove low-value boilerplate inside the selected content area.</summary>
     public bool SmartContentCleanup { get; set; } = true;
+
+    /// <summary>
+    /// Controls whether extraction should respect or include obviously hidden DOM content.
+    /// </summary>
+    public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
 
     /// <summary>Optional selectors to click once on rendered pages before extraction.</summary>
     public IList<string> ClickSelectors { get; set; } = new List<string>();
@@ -309,6 +326,8 @@ public sealed class HtmlCrawlOptions {
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             IncludeMarkdown = IncludeMarkdown,
+            MarkdownImageMode = MarkdownImageMode,
+            ListingCardMetadataMode = ListingCardMetadataMode,
             IncludeStructuredJson = IncludeStructuredJson,
             StructuredJsonPreset = StructuredJsonPreset,
             StructuredJsonSchema = StructuredJsonSchema,
@@ -322,6 +341,7 @@ public sealed class HtmlCrawlOptions {
             ExcludeClasses = new List<string>(ExcludeClasses),
             ExcludeIds = new List<string>(ExcludeIds),
             SmartContentCleanup = SmartContentCleanup,
+            HiddenContentMode = HiddenContentMode,
             ClickSelectors = new List<string>(ClickSelectors),
             ClickTexts = new List<string>(ClickTexts),
             DismissSelectors = new List<string>(DismissSelectors),
