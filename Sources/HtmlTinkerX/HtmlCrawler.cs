@@ -1,5 +1,7 @@
 using AngleSharp.Dom;
 using Microsoft.Playwright;
+using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -70,6 +72,10 @@ public static class HtmlCrawler {
         public string? HtmlPath { get; set; }
         public string? TextPath { get; set; }
         public string? ManifestPath { get; set; }
+        public string OfflineReadinessGrade { get; set; } = "ready";
+        public string HighestOfflineRiskSeverity { get; set; } = "none";
+        public int OfflineDependencyDiagnosticCount { get; set; }
+        public string OfflineDependencyKindsSummary { get; set; } = string.Empty;
         public string Fingerprint { get; set; } = string.Empty;
     }
 
@@ -80,6 +86,10 @@ public static class HtmlCrawler {
         public string Status { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public string? SkipReason { get; set; }
+        public string OfflineReadinessGrade { get; set; } = "not-assessed";
+        public string HighestOfflineRiskSeverity { get; set; } = "none";
+        public int OfflineDependencyDiagnosticCount { get; set; }
+        public string OfflineDependencyKindsSummary { get; set; } = string.Empty;
         public int InDegree { get; set; }
         public int OutDegree { get; set; }
         public int InternalOutDegree { get; set; }
@@ -265,6 +275,11 @@ public static class HtmlCrawler {
                     AppliedProfileName = appliedProfile?.Name,
                     AppliedProfileReasonCode = profileDecision.ReasonCode,
                     AppliedProfileReason = profileDecision.Reason,
+                    RenderEnabled = resolvedOptions.Render,
+                    AutoRenderEnabled = resolvedOptions.AutoRender,
+                    HiddenContentMode = resolvedOptions.HiddenContentMode,
+                    MarkdownImageMode = resolvedOptions.MarkdownImageMode,
+                    ListingCardMetadataMode = resolvedOptions.ListingCardMetadataMode,
                     Started = DateTimeOffset.UtcNow
                 };
             }
@@ -281,6 +296,11 @@ public static class HtmlCrawler {
             if (string.IsNullOrWhiteSpace(result.AppliedProfileReason) && !string.IsNullOrWhiteSpace(profileDecision.Reason)) {
                 result.AppliedProfileReason = profileDecision.Reason;
             }
+            result.RenderEnabled = resolvedOptions.Render;
+            result.AutoRenderEnabled = resolvedOptions.AutoRender;
+            result.HiddenContentMode = resolvedOptions.HiddenContentMode;
+            result.MarkdownImageMode = resolvedOptions.MarkdownImageMode;
+            result.ListingCardMetadataMode = resolvedOptions.ListingCardMetadataMode;
 
             Queue<CrawlRequest> pending = new();
             HashSet<string> queued = new(StringComparer.OrdinalIgnoreCase);
@@ -1042,7 +1062,7 @@ public static class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,OfflineReadinessGrade,HighestOfflineRiskSeverity,OfflineDependencyDiagnosticCount,OfflineDependencyKindsSummary,Error");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -1116,6 +1136,12 @@ public static class HtmlCrawler {
                 StructuredArticleCount = page.StructuredJson?.Layout.ArticleCount ?? 0,
                 StructuredAsideCount = page.StructuredJson?.Layout.AsideCount ?? 0,
                 StructuredFooterCount = page.StructuredJson?.Layout.FooterCount ?? 0,
+                page.OfflineReadinessGrade,
+                page.HighestOfflineRiskSeverity,
+                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+                page.OfflineDependencyKinds,
+                page.OfflineDependencyKindsSummary,
+                OfflineDependencyDiagnostics = page.OfflineDependencyDiagnostics,
                 page.Error
             }));
 
@@ -1190,6 +1216,10 @@ public static class HtmlCrawler {
                 EscapeCsv((page.StructuredJson?.Layout.ArticleCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv((page.StructuredJson?.Layout.AsideCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv((page.StructuredJson?.Layout.FooterCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.OfflineReadinessGrade),
+                EscapeCsv(page.HighestOfflineRiskSeverity),
+                EscapeCsv(page.OfflineDependencyDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                EscapeCsv(page.OfflineDependencyKindsSummary),
                 EscapeCsv(page.Error)));
         }
 
@@ -1214,6 +1244,10 @@ public static class HtmlCrawler {
                 page.ContentType,
                 page.ContentFingerprint,
                 page.DuplicateOfUrl,
+                page.OfflineReadinessGrade,
+                page.HighestOfflineRiskSeverity,
+                page.OfflineDependencyDiagnosticCount,
+                page.OfflineDependencyKindsSummary,
                 page.Error
             }));
         }
@@ -1232,6 +1266,10 @@ public static class HtmlCrawler {
                 page.ContentType,
                 page.ContentFingerprint,
                 page.DuplicateOfUrl,
+                page.OfflineReadinessGrade,
+                page.HighestOfflineRiskSeverity,
+                page.OfflineDependencyDiagnosticCount,
+                page.OfflineDependencyKindsSummary,
                 page.Error
             }));
         }
@@ -1299,6 +1337,10 @@ public static class HtmlCrawler {
                 HtmlPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.HtmlPath),
                 TextPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.TextPath),
                 ManifestPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.ManifestPath),
+                chunk.OfflineReadinessGrade,
+                chunk.HighestOfflineRiskSeverity,
+                chunk.OfflineDependencyDiagnosticCount,
+                chunk.OfflineDependencyKindsSummary,
                 chunk.Fingerprint
             }));
         }
@@ -1812,6 +1854,14 @@ public static class HtmlCrawler {
                     asset.ContentLength
                 })
                 .ToArray(),
+            page.OfflineReadinessGrade,
+            page.HighestOfflineRiskSeverity,
+            page.OfflineDependencyDiagnosticCount,
+            page.OfflineDependencyKinds,
+            page.OfflineDependencyKindsSummary,
+            OfflineDependencyDiagnostics = page.OfflineDependencyDiagnostics
+                .OrderBy(diagnostic => diagnostic.Kind, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
             page.Error
         };
 
@@ -2208,6 +2258,10 @@ public static class HtmlCrawler {
             Depth = page.Depth,
             Status = page.Status.ToString(),
             Category = "Fetched",
+            OfflineReadinessGrade = page.OfflineReadinessGrade,
+            HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
+            OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+            OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
             InDegree = incomingTotal.TryGetValue(page.Url, out int inDegree) ? inDegree : 0,
             OutDegree = outgoingTotal.TryGetValue(page.Url, out int outDegree) ? outDegree : 0,
             InternalOutDegree = outgoingInternal.TryGetValue(page.Url, out int internalOutDegree) ? internalOutDegree : 0,
@@ -2224,6 +2278,10 @@ public static class HtmlCrawler {
                 Status = page.Status.ToString(),
                 Category = "Skipped",
                 SkipReason = page.SkipReason.ToString(),
+                OfflineReadinessGrade = page.OfflineReadinessGrade,
+                HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
+                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+                OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
                 InDegree = incomingTotal.TryGetValue(page.Url, out int inDegree) ? inDegree : 0,
                 OutDegree = 0,
                 InternalOutDegree = 0
@@ -2238,6 +2296,10 @@ public static class HtmlCrawler {
                 Status = page.Status.ToString(),
                 Category = "External",
                 SkipReason = page.SkipReason.ToString(),
+                OfflineReadinessGrade = page.OfflineReadinessGrade,
+                HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
+                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+                OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
                 InDegree = incomingTotal.TryGetValue(page.Url, out int inDegree) ? inDegree : 0,
                 OutDegree = 0,
                 InternalOutDegree = 0
@@ -2256,7 +2318,52 @@ public static class HtmlCrawler {
                 InternalOutDegree = 0
             }));
 
+        int fetchedNodeCount = nodes.Count(node => string.Equals(node.Category, "Fetched", StringComparison.OrdinalIgnoreCase));
+        int skippedNodeCount = nodes.Count(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase));
+        int externalNodeCount = nodes.Count(node => string.Equals(node.Category, "External", StringComparison.OrdinalIgnoreCase));
+        Dictionary<string, int> nodeCategories = nodes
+            .GroupBy(node => node.Category, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> edgeRelations = edges
+            .GroupBy(edge => edge.Relation, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> skippedNodeReasons = nodes
+            .Where(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(node.SkipReason))
+            .GroupBy(node => node.SkipReason!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> offlineReadinessCounts = nodes
+            .GroupBy(node => node.OfflineReadinessGrade, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> offlineSeverityCounts = nodes
+            .GroupBy(node => node.HighestOfflineRiskSeverity, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> offlineDependencyKindCounts = nodes
+            .SelectMany(node => string.IsNullOrWhiteSpace(node.OfflineDependencyKindsSummary)
+                ? Array.Empty<string>()
+                : node.OfflineDependencyKindsSummary.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(kind => kind.Trim())
+                    .Where(kind => !string.IsNullOrWhiteSpace(kind)))
+            .GroupBy(kind => kind, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        int offlineRiskNodeCount = nodes.Count(node => node.OfflineDependencyDiagnosticCount > 0);
+        int highOfflineRiskNodeCount = nodes.Count(node => string.Equals(node.HighestOfflineRiskSeverity, "high", StringComparison.OrdinalIgnoreCase));
+
         object graphDocument = new {
+            Summary = new {
+                NodeCount = nodes.Count,
+                EdgeCount = edges.Count,
+                FetchedNodeCount = fetchedNodeCount,
+                SkippedNodeCount = skippedNodeCount,
+                ExternalNodeCount = externalNodeCount,
+                OfflineRiskNodeCount = offlineRiskNodeCount,
+                HighOfflineRiskNodeCount = highOfflineRiskNodeCount,
+                OfflineReadinessCounts = offlineReadinessCounts,
+                OfflineSeverityCounts = offlineSeverityCounts,
+                OfflineDependencyKindCounts = offlineDependencyKindCounts,
+                NodeCategories = nodeCategories,
+                EdgeRelations = edgeRelations,
+                SkippedNodeReasons = skippedNodeReasons
+            },
             Nodes = nodes.OrderBy(node => node.Category, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(node => node.Depth)
                 .ThenBy(node => node.Url, StringComparer.OrdinalIgnoreCase)
@@ -2272,20 +2379,6 @@ public static class HtmlCrawler {
                 })
                 .ToArray()
         };
-
-        int fetchedNodeCount = nodes.Count(node => string.Equals(node.Category, "Fetched", StringComparison.OrdinalIgnoreCase));
-        int skippedNodeCount = nodes.Count(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase));
-        int externalNodeCount = nodes.Count(node => string.Equals(node.Category, "External", StringComparison.OrdinalIgnoreCase));
-        Dictionary<string, int> nodeCategories = nodes
-            .GroupBy(node => node.Category, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, int> edgeRelations = edges
-            .GroupBy(edge => edge.Relation, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, int> skippedNodeReasons = nodes
-            .Where(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(node.SkipReason))
-            .GroupBy(node => node.SkipReason!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         return (graphDocument, nodes.Count, edges.Count, fetchedNodeCount, skippedNodeCount, externalNodeCount, nodeCategories, edgeRelations, skippedNodeReasons);
     }
 
@@ -2310,20 +2403,24 @@ public static class HtmlCrawler {
                 chunks.Add(new PageChunkRecord {
                     ChunkId = $"chunk-{nextChunkId:D5}",
                     Url = page.Url,
-                    Title = page.Title,
-                    Depth = page.Depth,
-                    ChunkIndex = chunkIndex++,
-                    WordCount = CountWords(chunkText),
-                    CharacterCount = chunkText.Length,
+                Title = page.Title,
+                Depth = page.Depth,
+                ChunkIndex = chunkIndex++,
+                WordCount = CountWords(chunkText),
+                CharacterCount = chunkText.Length,
                     Summary = BuildSummary(chunkText),
                     Headings = searchMetadata.Headings,
                     Keywords = ExtractKeywords(chunkText),
-                    Text = chunkText,
-                    HtmlPath = page.HtmlPath,
-                    TextPath = page.TextPath,
-                    ManifestPath = page.ManifestPath,
-                    Fingerprint = fingerprint
-                });
+                Text = chunkText,
+                HtmlPath = page.HtmlPath,
+                TextPath = page.TextPath,
+                ManifestPath = page.ManifestPath,
+                OfflineReadinessGrade = page.OfflineReadinessGrade,
+                HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
+                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+                OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
+                Fingerprint = fingerprint
+            });
                 nextChunkId++;
             }
         }
@@ -7119,12 +7216,44 @@ public static class HtmlCrawler {
         AppendStatCard(builder, "Skipped Assets", summary.SkippedAssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Assets", summary.AssetCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Chunks", summary.ChunkCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "Offline Grade", summary.OfflineReadinessGrade);
+        AppendStatCard(builder, "Offline-Risk Pages", summary.OfflineRiskPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "High-Risk Pages", summary.HighOfflineRiskPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AppendStatCard(builder, "Offline Findings", summary.OfflineRiskDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Interactions", summary.InteractionCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Graph Edges", summary.GraphEdgeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "External Nodes", summary.GraphExternalNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         AppendStatCard(builder, "Links", summary.TotalDiscoveredLinks.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.AppendLine("    </div>");
         builder.AppendLine("  </section>");
+
+        builder.AppendLine("  <section>");
+        builder.AppendLine("    <h2>Extraction Settings</h2>");
+        builder.AppendLine("    <ul>");
+        builder.Append("      <li>Hidden-content mode: <code>")
+            .Append(HtmlEncode(summary.HiddenContentMode.ToString()))
+            .AppendLine("</code></li>");
+        builder.Append("      <li>Markdown image mode: <code>")
+            .Append(HtmlEncode(summary.MarkdownImageMode.ToString()))
+            .AppendLine("</code></li>");
+        builder.Append("      <li>Listing-card metadata mode: <code>")
+            .Append(HtmlEncode(summary.ListingCardMetadataMode.ToString()))
+            .AppendLine("</code></li>");
+        builder.AppendLine("    </ul>");
+        builder.AppendLine("  </section>");
+
+        if (summary.GuidanceNotes.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Guidance</h2>");
+            builder.AppendLine("    <ul>");
+            foreach (string note in summary.GuidanceNotes.Where(note => !string.IsNullOrWhiteSpace(note))) {
+                builder.Append("      <li>")
+                    .Append(HtmlEncode(note))
+                    .AppendLine("</li>");
+            }
+            builder.AppendLine("    </ul>");
+            builder.AppendLine("  </section>");
+        }
 
         builder.AppendLine("  <section>");
         builder.AppendLine("    <h2>Artifacts</h2>");
@@ -7245,6 +7374,54 @@ public static class HtmlCrawler {
             builder.AppendLine("  </section>");
         }
 
+        if (summary.OfflineReadinessCounts.Count > 0 || summary.OfflineDependencyKinds.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Offline Readiness</h2>");
+            builder.AppendLine("    <ul>");
+            builder.Append("      <li>Pages with offline-runtime risk signals: ")
+                .Append(HtmlEncode(summary.OfflineRiskPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                .AppendLine("</li>");
+            builder.Append("      <li>Offline readiness grade: <code>")
+                .Append(HtmlEncode(summary.OfflineReadinessGrade))
+                .AppendLine("</code></li>");
+            builder.Append("      <li>Total offline-runtime diagnostics: ")
+                .Append(HtmlEncode(summary.OfflineRiskDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                .AppendLine("</li>");
+            builder.Append("      <li>Pages with high-severity offline-runtime signals: ")
+                .Append(HtmlEncode(summary.HighOfflineRiskPageCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                .AppendLine("</li>");
+            foreach (var item in summary.OfflineReadinessCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Offline grade <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            foreach (var item in summary.OfflineReadinessCountsByState.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Offline state <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            foreach (var item in summary.OfflineDependencySeverityCounts.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Offline severity <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            foreach (var item in summary.OfflineDependencyKinds.OrderByDescending(item => item.Value).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)) {
+                builder.Append("      <li>Offline dependency <code>")
+                    .Append(HtmlEncode(item.Key))
+                    .Append("</code>: ")
+                    .Append(HtmlEncode(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</li>");
+            }
+            builder.AppendLine("    </ul>");
+            builder.AppendLine("  </section>");
+        }
+
         if (summary.GraphNodeCategories.Count > 0 || summary.GraphEdgeRelations.Count > 0 || summary.GraphSkippedNodeReasons.Count > 0) {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Graph Summary</h2>");
@@ -7330,6 +7507,17 @@ public static class HtmlCrawler {
             if (page.AppliedInteractions.Count > 0) {
                 builder.Append("<br>interactions: ")
                     .Append(HtmlEncode(string.Join(" | ", page.AppliedInteractions)));
+            }
+            if (page.OfflineDependencyDiagnostics.Count > 0) {
+                builder.Append("<br>offline risk: ")
+                    .Append(HtmlEncode(page.OfflineDependencyDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .Append(" <span class=\"muted\">(")
+                    .Append(HtmlEncode(page.OfflineReadinessGrade))
+                    .Append("; ")
+                    .Append(HtmlEncode(page.HighestOfflineRiskSeverity))
+                    .Append("; ")
+                    .Append(HtmlEncode(page.OfflineDependencyKindsSummary))
+                    .Append(")</span>");
             }
             builder.Append("<br>content: ")
                 .Append(HtmlEncode(page.ContentModeUsed.ToString()));
@@ -7483,7 +7671,7 @@ public static class HtmlCrawler {
             builder.AppendLine("  <section>");
             builder.AppendLine("    <h2>Skipped Pages</h2>");
             builder.AppendLine("    <table>");
-            builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Depth</th></tr></thead>");
+            builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Offline</th><th>Depth</th></tr></thead>");
             builder.AppendLine("      <tbody>");
             foreach (HtmlCrawlPage page in skippedContentPages) {
                 builder.AppendLine("        <tr>");
@@ -7495,6 +7683,11 @@ public static class HtmlCrawler {
                 builder.Append("          <td><code>")
                     .Append(HtmlEncode(page.SkipReason.ToString()))
                     .AppendLine("</code></td>");
+                builder.Append("          <td><code>")
+                    .Append(HtmlEncode(page.OfflineReadinessGrade))
+                    .Append("</code> <span class=\"muted\">(")
+                    .Append(HtmlEncode(page.HighestOfflineRiskSeverity))
+                    .AppendLine(")</span></td>");
                 builder.Append("          <td>")
                     .Append(HtmlEncode(page.Depth.ToString(System.Globalization.CultureInfo.InvariantCulture)))
                     .AppendLine("</td>");
@@ -7510,7 +7703,7 @@ public static class HtmlCrawler {
             builder.AppendLine("    <h2>Skipped Assets</h2>");
             builder.AppendLine("    <p class=\"muted\">These URLs were discovered as asset candidates and intentionally not crawled as content pages.</p>");
             builder.AppendLine("    <table>");
-            builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Depth</th></tr></thead>");
+            builder.AppendLine("      <thead><tr><th>URL</th><th>Reason</th><th>Offline</th><th>Depth</th></tr></thead>");
             builder.AppendLine("      <tbody>");
             foreach (HtmlCrawlPage page in skippedAssetPages) {
                 builder.AppendLine("        <tr>");
@@ -7522,6 +7715,50 @@ public static class HtmlCrawler {
                 builder.Append("          <td><code>")
                     .Append(HtmlEncode(page.SkipReason.ToString()))
                     .AppendLine("</code></td>");
+                builder.Append("          <td><code>")
+                    .Append(HtmlEncode(page.OfflineReadinessGrade))
+                    .Append("</code> <span class=\"muted\">(")
+                    .Append(HtmlEncode(page.HighestOfflineRiskSeverity))
+                    .AppendLine(")</span></td>");
+                builder.Append("          <td>")
+                    .Append(HtmlEncode(page.Depth.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                    .AppendLine("</td>");
+                builder.AppendLine("        </tr>");
+            }
+            builder.AppendLine("      </tbody>");
+            builder.AppendLine("    </table>");
+            builder.AppendLine("  </section>");
+        }
+
+        if (result.PendingPages.Count > 0) {
+            builder.AppendLine("  <section>");
+            builder.AppendLine("    <h2>Pending Pages</h2>");
+            builder.AppendLine("    <table>");
+            builder.AppendLine("      <thead><tr><th>URL</th><th>Parent</th><th>Offline</th><th>Depth</th></tr></thead>");
+            builder.AppendLine("      <tbody>");
+            foreach (HtmlCrawlPendingItem page in result.PendingPages.OrderBy(page => page.Depth).ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)) {
+                builder.AppendLine("        <tr>");
+                builder.Append("          <td><a href=\"")
+                    .Append(HtmlEncode(page.Url))
+                    .Append("\">")
+                    .Append(HtmlEncode(page.Url))
+                    .AppendLine("</a></td>");
+                builder.Append("          <td>");
+                if (!string.IsNullOrWhiteSpace(page.ParentUrl)) {
+                    builder.Append("<a href=\"")
+                        .Append(HtmlEncode(page.ParentUrl))
+                        .Append("\">")
+                        .Append(HtmlEncode(page.ParentUrl))
+                        .Append("</a>");
+                } else {
+                    builder.Append("&nbsp;");
+                }
+                builder.AppendLine("</td>");
+                builder.Append("          <td><code>")
+                    .Append(HtmlEncode(page.OfflineReadinessGrade))
+                    .Append("</code> <span class=\"muted\">(")
+                    .Append(HtmlEncode(page.HighestOfflineRiskSeverity))
+                    .AppendLine(")</span></td>");
                 builder.Append("          <td>")
                     .Append(HtmlEncode(page.Depth.ToString(System.Globalization.CultureInfo.InvariantCulture)))
                     .AppendLine("</td>");
@@ -7798,6 +8035,7 @@ public static class HtmlCrawler {
 
         try {
             cancellationToken.ThrowIfCancellationRequested();
+            int networkLogStart = session.NetworkLog.Count();
             IResponse? response = await session.Page.GotoAsync(request.Uri.AbsoluteUri, new PageGotoOptions {
                 Timeout = options.Timeout,
                 WaitUntil = WaitUntilState.NetworkIdle
@@ -7819,6 +8057,10 @@ public static class HtmlCrawler {
                 await AutoScrollPageAsync(session.Page, options, cancellationToken).ConfigureAwait(false);
             }
 
+            if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
+                await MarkRenderedHiddenElementsAsync(session.Page).ConfigureAwait(false);
+            }
+
             string fullHtml = await session.Page.ContentAsync().ConfigureAwait(false);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
@@ -7835,6 +8077,8 @@ public static class HtmlCrawler {
 
             string? title = await session.Page.TitleAsync().ConfigureAwait(false);
             PopulatePageFromHtml(page, fullHtml, request.Uri, options, structuredSchema, title);
+            Uri runtimeDiagnosticsUri = TryGetAbsoluteUri(session.Page.Url, out Uri? renderedUri) ? renderedUri! : request.Uri;
+            MergeOfflineDependencyDiagnostics(page.OfflineDependencyDiagnostics, DetectRenderedNetworkDependencyDiagnostics(session.NetworkLog.Skip(networkLogStart), runtimeDiagnosticsUri));
             return new FetchedPageData {
                 Page = page,
                 RawHtml = fullHtml
@@ -7932,6 +8176,7 @@ public static class HtmlCrawler {
         page.CanonicalUrl = ExtractCanonicalUrl(html, requestUri, options);
         page.Links = ExtractLinks(html, requestUri, options);
         page.AssetUrls = ExtractAssetUrls(html, requestUri, options);
+        page.OfflineDependencyDiagnostics = DetectOfflineDependencyDiagnostics(html);
         ContentSelectionResult contentSelection = SelectContent(html, options);
         string selectedHtml = ApplyContentCleanup(contentSelection.Html, options);
         page.ContentModeUsed = contentSelection.ModeUsed;
@@ -7961,7 +8206,7 @@ public static class HtmlCrawler {
         string markdownBaseUrl = ResolveMarkdownBaseUrl(html, requestUri);
         string selectedText = HtmlParserToText.ConvertToText(PrepareHtmlForTextExtraction(selectedHtml, options));
         string selectedMarkdown = options.IncludeMarkdown || options.IncludeStructuredJson
-            ? ConvertSelectedHtmlToMarkdown(selectedHtml, markdownBaseUrl)
+            ? ConvertSelectedHtmlToMarkdown(selectedHtml, markdownBaseUrl, options)
             : string.Empty;
         page.Html = options.IncludeHtml ? selectedHtml : string.Empty;
         page.Text = options.IncludeText ? selectedText : string.Empty;
@@ -7978,8 +8223,186 @@ public static class HtmlCrawler {
         return GetDocumentBaseUri(document, requestUri).AbsoluteUri;
     }
 
-    private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl) {
-        return HtmlMarkdownConverterAdapter.ConvertToMarkdown(html, pageUrl);
+    private static string ConvertSelectedHtmlToMarkdown(string html, string? pageUrl, HtmlCrawlOptions? options = null) {
+        return HtmlMarkdownConverterAdapter.ConvertToMarkdown(
+            html,
+            pageUrl,
+            options?.MarkdownImageMode ?? MarkdownImageRenderingMode.PortableMarkdown,
+            options?.ListingCardMetadataMode ?? HtmlListingCardMetadataMode.SuppressInRepeatedCards);
+    }
+
+    private static IList<HtmlCrawlOfflineDependencyDiagnostic> DetectOfflineDependencyDiagnostics(string html) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return new List<HtmlCrawlOfflineDependencyDiagnostic>();
+        }
+
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        List<string> scriptBodies = document.QuerySelectorAll("script")
+            .Where(script => string.IsNullOrWhiteSpace(script.GetAttribute("src")))
+            .Select(script => script.TextContent ?? string.Empty)
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .ToList();
+        List<string> handlerBodies = document.QuerySelectorAll("*")
+            .SelectMany(element => element.Attributes
+                .Where(attribute => attribute != null
+                    && attribute.Name.StartsWith("on", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(attribute.Value))
+                .Select(attribute => attribute.Value))
+            .ToList();
+        List<string> sources = new(scriptBodies.Count + handlerBodies.Count);
+        sources.AddRange(scriptBodies);
+        sources.AddRange(handlerBodies);
+        if (sources.Count == 0) {
+            return new List<HtmlCrawlOfflineDependencyDiagnostic>();
+        }
+
+        List<HtmlCrawlOfflineDependencyDiagnostic> diagnostics = new();
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "fetch-api", "Inline JavaScript calls fetch(), so the saved page may still require live API responses.", @"(?<![\w$])fetch\s*\(");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "xml-http-request", "Inline JavaScript uses XMLHttpRequest, so the saved page may still request live network data.", @"\bXMLHttpRequest\b");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "axios", "Inline JavaScript references axios, which often means the saved page still depends on live HTTP requests.", @"(?<![\w$])axios(?:\s*\(|\s*\.)");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "websocket", "Inline JavaScript opens a WebSocket connection, so the saved page may still require a live server session.", @"\bWebSocket\s*\(");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "event-source", "Inline JavaScript opens an EventSource stream, so the saved page may still require live server-sent events.", @"\bEventSource\s*\(");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "service-worker", "Inline JavaScript references navigator.serviceWorker, which can keep runtime behavior tied to a live browsing context.", @"navigator\s*\.\s*serviceWorker");
+        AddOfflineDependencyDiagnosticIfMatched(diagnostics, sources, "dynamic-import", "Inline JavaScript uses dynamic import(), which can keep additional modules or routes loaded at runtime.", @"(?<![\w$])import\s*\(");
+        return diagnostics;
+    }
+
+    internal static IList<HtmlCrawlOfflineDependencyDiagnostic> DetectRenderedNetworkDependencyDiagnostics(IEnumerable<HtmlNetworkEntry>? entries, Uri pageUri) {
+        List<HtmlCrawlOfflineDependencyDiagnostic> diagnostics = new();
+        if (entries == null) {
+            return diagnostics;
+        }
+
+        bool observedCrossOriginRuntime = false;
+        foreach (HtmlNetworkEntry entry in entries.Where(static entry => entry != null && !string.IsNullOrWhiteSpace(entry.Url))) {
+            string? kind = entry.ResourceType switch {
+                HtmlNetworkResourceType.Fetch => "observed-fetch-api",
+                HtmlNetworkResourceType.XHR => "observed-xml-http-request",
+                HtmlNetworkResourceType.WebSocket => "observed-websocket",
+                HtmlNetworkResourceType.EventSource => "observed-event-source",
+                _ => null
+            };
+            if (kind == null) {
+                continue;
+            }
+
+            string summary = entry.ResourceType switch {
+                HtmlNetworkResourceType.Fetch => "Rendered browsing observed a fetch() request, so the saved page may still depend on live API responses.",
+                HtmlNetworkResourceType.XHR => "Rendered browsing observed an XMLHttpRequest call, so the saved page may still request live network data.",
+                HtmlNetworkResourceType.WebSocket => "Rendered browsing observed a WebSocket connection, so the saved page may still require a live server session.",
+                HtmlNetworkResourceType.EventSource => "Rendered browsing observed a server-sent events stream, so the saved page may still require a live event feed.",
+                _ => string.Empty
+            };
+            AddOfflineDependencyDiagnosticIfMissing(diagnostics, new HtmlCrawlOfflineDependencyDiagnostic {
+                Kind = kind,
+                Severity = GetOfflineDependencySeverity(kind),
+                Summary = summary,
+                Evidence = entry.Url
+            });
+
+            if (!observedCrossOriginRuntime
+                && TryGetAbsoluteUri(entry.Url, out Uri? resourceUri)
+                && !string.Equals(resourceUri!.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase)) {
+                observedCrossOriginRuntime = true;
+                AddOfflineDependencyDiagnosticIfMissing(diagnostics, new HtmlCrawlOfflineDependencyDiagnostic {
+                    Kind = "observed-cross-origin-runtime",
+                    Severity = GetOfflineDependencySeverity("observed-cross-origin-runtime"),
+                    Summary = "Rendered browsing observed runtime network traffic to another host, so the saved page may still depend on live cross-origin services.",
+                    Evidence = entry.Url
+                });
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private static void AddOfflineDependencyDiagnosticIfMatched(
+        ICollection<HtmlCrawlOfflineDependencyDiagnostic> diagnostics,
+        IEnumerable<string> sources,
+        string kind,
+        string summary,
+        string pattern) {
+        Regex regex = new(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        foreach (string source in sources) {
+            Match match = regex.Match(source);
+            if (!match.Success) {
+                continue;
+            }
+
+            diagnostics.Add(new HtmlCrawlOfflineDependencyDiagnostic {
+                Kind = kind,
+                Severity = GetOfflineDependencySeverity(kind),
+                Summary = summary,
+                Evidence = ExtractOfflineDependencyEvidence(source, match)
+            });
+            return;
+        }
+    }
+
+    internal static string GetOfflineDependencySeverity(string? kind) => kind?.ToLowerInvariant() switch {
+        "websocket" => "high",
+        "event-source" => "high",
+        "observed-websocket" => "high",
+        "observed-event-source" => "high",
+        "observed-cross-origin-runtime" => "high",
+        _ => "warning"
+    };
+
+    private static void MergeOfflineDependencyDiagnostics(
+        IList<HtmlCrawlOfflineDependencyDiagnostic> target,
+        IEnumerable<HtmlCrawlOfflineDependencyDiagnostic> additions) {
+        if (target == null) {
+            throw new ArgumentNullException(nameof(target));
+        }
+
+        foreach (HtmlCrawlOfflineDependencyDiagnostic diagnostic in additions ?? Enumerable.Empty<HtmlCrawlOfflineDependencyDiagnostic>()) {
+            AddOfflineDependencyDiagnosticIfMissing(target, diagnostic);
+        }
+    }
+
+    private static void AddOfflineDependencyDiagnosticIfMissing(
+        ICollection<HtmlCrawlOfflineDependencyDiagnostic> diagnostics,
+        HtmlCrawlOfflineDependencyDiagnostic? diagnostic) {
+        if (diagnostics == null) {
+            throw new ArgumentNullException(nameof(diagnostics));
+        }
+
+        if (diagnostic == null || string.IsNullOrWhiteSpace(diagnostic.Kind)) {
+            return;
+        }
+
+        if (diagnostics.Any(existing =>
+                string.Equals(existing.Kind, diagnostic.Kind, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Evidence, diagnostic.Evidence, StringComparison.OrdinalIgnoreCase))) {
+            return;
+        }
+
+        diagnostics.Add(diagnostic);
+    }
+
+    private static string ExtractOfflineDependencyEvidence(string source, Match match) {
+        if (string.IsNullOrWhiteSpace(source) || match == null || !match.Success) {
+            return string.Empty;
+        }
+
+        int start = Math.Max(0, match.Index - 30);
+        int end = Math.Min(source.Length, match.Index + match.Length + 50);
+        string snippet = source.Substring(start, end - start).Replace("\r", " ").Replace("\n", " ").Trim();
+        return Regex.Replace(snippet, @"\s+", " ");
+    }
+
+    private static bool TryGetAbsoluteUri(string? value, out Uri? uri) {
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absoluteUri)
+            && (absoluteUri.Scheme == Uri.UriSchemeHttp
+                || absoluteUri.Scheme == Uri.UriSchemeHttps
+                || string.Equals(absoluteUri.Scheme, "ws", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(absoluteUri.Scheme, "wss", StringComparison.OrdinalIgnoreCase))) {
+            uri = absoluteUri;
+            return true;
+        }
+
+        uri = null;
+        return false;
     }
 
     private static ProfileSelectionDecision ResolveInitialProfileDecision(
@@ -8888,6 +9311,9 @@ public static class HtmlCrawler {
 
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
+            if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
+                RemoveHiddenElements(document);
+            }
             StripBoilerplateElements(document, options);
             RemoveConfiguredElements(document, options);
             return document.DocumentElement?.OuterHtml ?? html;
@@ -8899,6 +9325,9 @@ public static class HtmlCrawler {
             return html;
         }
 
+        if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
+            RemoveHiddenElements(wrapper);
+        }
         StripBoilerplateElements(wrapper, options);
         RemoveConfiguredElements(wrapper, options);
         return wrapper.InnerHtml;
@@ -8916,6 +9345,9 @@ public static class HtmlCrawler {
 
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
+            if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
+                RemoveHiddenElements(document);
+            }
             if (options.SmartContentCleanup) {
                 StripBoilerplateElements(document, options);
             }
@@ -8929,6 +9361,9 @@ public static class HtmlCrawler {
             return html;
         }
 
+        if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
+            RemoveHiddenElements(wrapper);
+        }
         if (options.SmartContentCleanup) {
             StripBoilerplateElements(wrapper, options);
         }
@@ -8936,10 +9371,103 @@ public static class HtmlCrawler {
         return wrapper.InnerHtml;
     }
 
+    private static void RemoveHiddenElements(IParentNode container) {
+        foreach (IElement element in container.QuerySelectorAll("[hidden],[aria-hidden],[style],input[type='hidden'],[data-htmltinkerx-hidden='true']").ToArray()) {
+            if (ShouldRemoveHiddenElement(element)) {
+                element.Remove();
+            }
+        }
+    }
+
+    private static bool ShouldRemoveHiddenElement(IElement element) {
+        if (element == null) {
+            return false;
+        }
+
+        if (element.HasAttribute("hidden")) {
+            return true;
+        }
+
+        if (string.Equals(element.GetAttribute("data-htmltinkerx-hidden"), "true", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        if (string.Equals(element.GetAttribute("aria-hidden"), "true", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        if (element.TagName.Equals("INPUT", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(element.GetAttribute("type"), "hidden", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        string? style = element.GetAttribute("style");
+        if (string.IsNullOrWhiteSpace(style)) {
+            return false;
+        }
+
+        string normalizedStyle = Regex.Replace(style, @"\s+", string.Empty).ToLowerInvariant();
+        return normalizedStyle.Contains("display:none", StringComparison.Ordinal)
+               || normalizedStyle.Contains("visibility:hidden", StringComparison.Ordinal)
+               || normalizedStyle.Contains("content-visibility:hidden", StringComparison.Ordinal);
+    }
+
+    private static Task MarkRenderedHiddenElementsAsync(IPage page) {
+        return page.EvaluateAsync(
+            """
+            () => {
+                const hiddenAttributeName = 'data-htmltinkerx-hidden';
+                for (const element of document.querySelectorAll(`[${hiddenAttributeName}]`)) {
+                    element.removeAttribute(hiddenAttributeName);
+                }
+
+                const shouldMarkHidden = (element) => {
+                    if (!(element instanceof Element)) {
+                        return false;
+                    }
+
+                    const tagName = (element.tagName || '').toLowerCase();
+                    if (tagName === 'html' || tagName === 'head' || tagName === 'body') {
+                        return false;
+                    }
+
+                    if (element.hasAttribute('hidden')) {
+                        return true;
+                    }
+
+                    if ((element.getAttribute('aria-hidden') || '').toLowerCase() === 'true') {
+                        return true;
+                    }
+
+                    if (tagName === 'input' && (element.getAttribute('type') || '').toLowerCase() === 'hidden') {
+                        return true;
+                    }
+
+                    const style = window.getComputedStyle(element);
+                    if (!style) {
+                        return false;
+                    }
+
+                    return style.display === 'none'
+                        || style.visibility === 'hidden'
+                        || style.visibility === 'collapse'
+                        || style.contentVisibility === 'hidden';
+                };
+
+                for (const element of document.querySelectorAll('*')) {
+                    if (shouldMarkHidden(element)) {
+                        element.setAttribute(hiddenAttributeName, 'true');
+                    }
+                }
+            }
+            """);
+    }
+
     private static void StripBoilerplateElements(IParentNode container, HtmlCrawlOptions options) {
         foreach (IElement element in container.QuerySelectorAll(
                      "script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.wpml-ls,.sharing-popup,.post-footer-sharing,.socials-sharing,.gem-pagination,.menu-toggle,.minisearch,.skip-link,.skip-link-screen-reader-text").ToArray()) {
-            if (ShouldPreserveStructuredContentElement(element)) {
+            if (ShouldPreserveStructuredContentElement(element)
+                || ShouldPreserveOfflineExecutableElement(element, options)) {
                 continue;
             }
 
@@ -8963,20 +9491,22 @@ public static class HtmlCrawler {
         return LooksLikeStructuredCalloutElement(element) || LooksLikeMediaNoscriptFallbackElement(element);
     }
 
-    private static bool LooksLikeMediaNoscriptFallbackElement(IElement element) {
-        if (element == null || !element.TagName.Equals("NOSCRIPT", StringComparison.OrdinalIgnoreCase)) {
+    private static bool ShouldPreserveOfflineExecutableElement(IElement element, HtmlCrawlOptions options) {
+        if (element == null || options == null) {
             return false;
         }
 
-        foreach (string html in EnumerateNoscriptHtmlCandidates(element)) {
-            IDocument document = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_noscript_media\">{html}</div>");
-            IElement? wrapper = document.QuerySelector("#__htmltinkerx_noscript_media");
-            if (wrapper?.QuerySelector("img,picture,source") != null) {
-                return true;
-            }
+        if (!options.DownloadAssets || !options.RewriteAssetReferencesToLocal) {
+            return false;
         }
 
-        return false;
+        return element.TagName.Equals("SCRIPT", StringComparison.OrdinalIgnoreCase)
+               || element.TagName.Equals("STYLE", StringComparison.OrdinalIgnoreCase)
+               || element.TagName.Equals("LINK", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeMediaNoscriptFallbackElement(IElement element) {
+        return TryGetNoscriptFallbackWrapper(element, out _);
     }
 
     private static IEnumerable<string> EnumerateNoscriptHtmlCandidates(IElement element) {
@@ -9184,23 +9714,57 @@ public static class HtmlCrawler {
         Uri effectiveBaseUri = GetDocumentBaseUri(document, baseUri);
         HashSet<string> assets = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach (IElement element in document.QuerySelectorAll("img[src], source[src], video[src], audio[src], link[href], a[href], img[srcset], source[srcset], style, [style]")) {
+        CollectAssetUrlsFromContainer(document, effectiveBaseUri, options, assets);
+        foreach (IElement noscript in document.QuerySelectorAll("noscript")) {
+            if (!TryGetNoscriptFallbackWrapper(noscript, out IElement wrapper)) {
+                continue;
+            }
+
+            CollectAssetUrlsFromContainer(wrapper, effectiveBaseUri, options, assets);
+        }
+
+        return assets.ToList();
+    }
+
+    private static void CollectAssetUrlsFromContainer(
+        IParentNode container,
+        Uri effectiveBaseUri,
+        HtmlCrawlOptions options,
+        ISet<string> assets) {
+        foreach (IElement element in container.QuerySelectorAll("img, source, video, audio, track, script, iframe, embed, object[data], link[href], a[href], style, [style]")) {
             switch (element.TagName.ToUpperInvariant()) {
                 case "IMG":
                 case "SOURCE":
                 case "VIDEO":
                 case "AUDIO":
+                case "TRACK":
+                case "SCRIPT":
+                case "IFRAME":
+                case "EMBED":
                     AddAssetCandidate(element.GetAttribute("src"), effectiveBaseUri, options, assets);
-                    foreach (string srcSetCandidate in ExtractSrcSetUrls(element.GetAttribute("srcset"))) {
+                    AddAssetCandidate(element.GetAttribute("data-src"), effectiveBaseUri, options, assets);
+                    AddAssetCandidate(element.GetAttribute("data-lazy-src"), effectiveBaseUri, options, assets);
+                    AddAssetCandidate(element.GetAttribute("data-original-src"), effectiveBaseUri, options, assets);
+                    if (element.TagName.Equals("VIDEO", StringComparison.OrdinalIgnoreCase)) {
+                        AddAssetCandidate(element.GetAttribute("poster"), effectiveBaseUri, options, assets);
+                    }
+                    foreach (string srcSetCandidate in ExtractSrcSetUrls(
+                                 element.GetAttribute("srcset"),
+                                 element.GetAttribute("data-srcset"),
+                                 element.GetAttribute("data-lazy-srcset"),
+                                 element.GetAttribute("data-original-srcset"))) {
                         AddAssetCandidate(srcSetCandidate, effectiveBaseUri, options, assets);
                     }
                     break;
+                case "OBJECT":
+                    AddAssetCandidate(element.GetAttribute("data"), effectiveBaseUri, options, assets);
+                    break;
                 case "LINK":
-                    string rel = element.GetAttribute("rel") ?? string.Empty;
-                    if (rel.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0
-                        || rel.IndexOf("image", StringComparison.OrdinalIgnoreCase) >= 0
-                        || rel.IndexOf("stylesheet", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    if (ShouldTreatLinkAsOfflineAsset(element)) {
                         AddAssetCandidate(element.GetAttribute("href"), effectiveBaseUri, options, assets);
+                        foreach (string srcSetCandidate in ExtractSrcSetUrls(element.GetAttribute("imagesrcset"))) {
+                            AddAssetCandidate(srcSetCandidate, effectiveBaseUri, options, assets);
+                        }
                     }
                     break;
                 case "A":
@@ -9224,8 +9788,6 @@ public static class HtmlCrawler {
                     break;
             }
         }
-
-        return assets.ToList();
     }
 
     private static Dictionary<string, string> BuildLocalPageMap(IEnumerable<HtmlCrawlPage> pages) {
@@ -9313,20 +9875,31 @@ public static class HtmlCrawler {
         IDictionary<string, string> assetMap,
         IDictionary<string, string> localPageMap,
         HtmlCrawlOptions options) {
-        foreach (IElement element in container.QuerySelectorAll("img[src], source[src], video[src], audio[src], link[href], a[href]")) {
+        foreach (IElement element in container.QuerySelectorAll("img, source, video, audio, track, script, iframe, embed, object[data], link[href], a[href]")) {
             switch (element.TagName.ToUpperInvariant()) {
                 case "IMG":
                 case "SOURCE":
                 case "VIDEO":
                 case "AUDIO":
+                case "TRACK":
+                case "SCRIPT":
+                case "IFRAME":
+                case "EMBED":
                     RewriteAssetAttribute(element, "src", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                    RewriteAssetAttribute(element, "data-src", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                    RewriteAssetAttribute(element, "data-lazy-src", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                    RewriteAssetAttribute(element, "data-original-src", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                    if (element.TagName.Equals("VIDEO", StringComparison.OrdinalIgnoreCase)) {
+                        RewriteAssetAttribute(element, "poster", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                    }
+                    break;
+                case "OBJECT":
+                    RewriteAssetAttribute(element, "data", resolutionBaseUri, pageHtmlPath, assetMap, options);
                     break;
                 case "LINK":
-                    string rel = element.GetAttribute("rel") ?? string.Empty;
-                    if (rel.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0
-                        || rel.IndexOf("image", StringComparison.OrdinalIgnoreCase) >= 0
-                        || rel.IndexOf("stylesheet", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    if (ShouldTreatLinkAsOfflineAsset(element)) {
                         RewriteAssetAttribute(element, "href", resolutionBaseUri, pageHtmlPath, assetMap, options);
+                        RewriteSrcSetAttribute(element, "imagesrcset", resolutionBaseUri, pageHtmlPath, assetMap, options);
                     }
                     break;
                 case "A":
@@ -9361,17 +9934,14 @@ public static class HtmlCrawler {
             }
         }
 
-        foreach (IElement element in container.QuerySelectorAll("img[srcset], source[srcset]")) {
-            string? srcSet = element.GetAttribute("srcset");
-            if (string.IsNullOrWhiteSpace(srcSet)) {
-                continue;
-            }
-
-            string rewritten = RewriteSrcSetToLocal(srcSet!, resolutionBaseUri, pageHtmlPath, assetMap, options);
-            if (!string.Equals(rewritten, srcSet, StringComparison.Ordinal)) {
-                element.SetAttribute("srcset", rewritten);
-            }
+        foreach (IElement element in container.QuerySelectorAll("img, source")) {
+            RewriteSrcSetAttribute(element, "srcset", resolutionBaseUri, pageHtmlPath, assetMap, options);
+            RewriteSrcSetAttribute(element, "data-srcset", resolutionBaseUri, pageHtmlPath, assetMap, options);
+            RewriteSrcSetAttribute(element, "data-lazy-srcset", resolutionBaseUri, pageHtmlPath, assetMap, options);
+            RewriteSrcSetAttribute(element, "data-original-srcset", resolutionBaseUri, pageHtmlPath, assetMap, options);
         }
+
+        RewriteNoscriptFallbackReferences(container, resolutionBaseUri, pageHtmlPath, assetMap, localPageMap, options);
     }
 
     private static Uri GetDocumentBaseUri(IParentNode container, Uri fallbackBaseUri) {
@@ -9388,6 +9958,56 @@ public static class HtmlCrawler {
         foreach (IElement baseElement in container.QuerySelectorAll("base[href]").ToArray()) {
             baseElement.Remove();
         }
+    }
+
+    private static void RewriteNoscriptFallbackReferences(
+        IParentNode container,
+        Uri resolutionBaseUri,
+        string pageHtmlPath,
+        IDictionary<string, string> assetMap,
+        IDictionary<string, string> localPageMap,
+        HtmlCrawlOptions options) {
+        foreach (IElement noscript in container.QuerySelectorAll("noscript")) {
+            if (!TryGetNoscriptFallbackWrapper(noscript, out IElement wrapper)) {
+                continue;
+            }
+
+            RewriteStoredReferencesInContainer(wrapper, resolutionBaseUri, pageHtmlPath, assetMap, localPageMap, options);
+            RemoveBaseElements(wrapper);
+            noscript.InnerHtml = wrapper.InnerHtml;
+        }
+    }
+
+    private static bool TryGetNoscriptFallbackWrapper(IElement element, out IElement wrapper) {
+        wrapper = null!;
+        if (element == null || !element.TagName.Equals("NOSCRIPT", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        foreach (string html in EnumerateNoscriptHtmlCandidates(element)) {
+            IDocument document = HtmlParser.ParseWithAngleSharp($"<div id=\"__htmltinkerx_noscript_media\">{html}</div>");
+            IElement? parsedWrapper = document.QuerySelector("#__htmltinkerx_noscript_media");
+            if (parsedWrapper?.QuerySelector("img,picture,source,video,audio") == null) {
+                continue;
+            }
+
+            wrapper = parsedWrapper;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldTreatLinkAsOfflineAsset(IElement element) {
+        if (element == null || !element.TagName.Equals("LINK", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        string rel = element.GetAttribute("rel") ?? string.Empty;
+        return rel.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0
+               || rel.IndexOf("image", StringComparison.OrdinalIgnoreCase) >= 0
+               || rel.IndexOf("stylesheet", StringComparison.OrdinalIgnoreCase) >= 0
+               || rel.IndexOf("preload", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static void RewriteAssetAttribute(
@@ -9412,6 +10032,24 @@ public static class HtmlCrawler {
         }
 
         element.SetAttribute(attributeName, BuildRelativePath(pageHtmlPath, localPath));
+    }
+
+    private static void RewriteSrcSetAttribute(
+        IElement element,
+        string attributeName,
+        Uri pageUri,
+        string pageHtmlPath,
+        IDictionary<string, string> assetMap,
+        HtmlCrawlOptions options) {
+        string? value = element.GetAttribute(attributeName);
+        if (string.IsNullOrWhiteSpace(value)) {
+            return;
+        }
+
+        string rewritten = RewriteSrcSetToLocal(value!, pageUri, pageHtmlPath, assetMap, options);
+        if (!string.Equals(rewritten, value, StringComparison.Ordinal)) {
+            element.SetAttribute(attributeName, rewritten);
+        }
     }
 
     private static void RewritePageAttribute(
@@ -9553,20 +10191,22 @@ public static class HtmlCrawler {
         return BuildRelativePath(pageHtmlPath, localPath);
     }
 
-    private static IEnumerable<string> ExtractSrcSetUrls(string? srcSet) {
-        if (string.IsNullOrWhiteSpace(srcSet)) {
-            yield break;
-        }
-
-        string normalizedSrcSet = srcSet!;
-        foreach (string entry in normalizedSrcSet.Split(',')) {
-            string trimmed = entry.Trim();
-            if (trimmed.Length == 0) {
+    private static IEnumerable<string> ExtractSrcSetUrls(params string?[] srcSets) {
+        foreach (string? srcSet in srcSets) {
+            if (string.IsNullOrWhiteSpace(srcSet)) {
                 continue;
             }
 
-            int separatorIndex = trimmed.IndexOf(' ');
-            yield return separatorIndex > 0 ? trimmed.Substring(0, separatorIndex) : trimmed;
+            string normalizedSrcSet = srcSet!;
+            foreach (string entry in normalizedSrcSet.Split(',')) {
+                string trimmed = entry.Trim();
+                if (trimmed.Length == 0) {
+                    continue;
+                }
+
+                int separatorIndex = trimmed.IndexOf(' ');
+                yield return separatorIndex > 0 ? trimmed.Substring(0, separatorIndex) : trimmed;
+            }
         }
     }
 

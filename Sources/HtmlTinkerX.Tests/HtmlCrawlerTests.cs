@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -37,6 +38,9 @@ public class HtmlCrawlerTests {
         clone.ClickTexts.Add("Show more");
         clone.DismissSelectors.Add(".newsletter");
         clone.DismissTexts.Add("Dismiss");
+        clone.MarkdownImageMode = OfficeIMO.Markdown.MarkdownImageRenderingMode.Html;
+        clone.HiddenContentMode = HtmlCrawlHiddenContentMode.IncludeHidden;
+        clone.ListingCardMetadataMode = OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.Preserve;
         clone.ClearSensitiveData();
 
         Assert.Equal("secret", options.Password);
@@ -57,7 +61,136 @@ public class HtmlCrawlerTests {
         Assert.Equal(2, clone.DismissSelectors.Count);
         Assert.Equal(2, clone.DismissTexts.Count);
         Assert.Equal(HtmlCrawlStructuredJsonPreset.Docs, clone.StructuredJsonPreset);
+        Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown, options.MarkdownImageMode);
+        Assert.Equal(HtmlCrawlHiddenContentMode.RespectHidden, options.HiddenContentMode);
+        Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards, options.ListingCardMetadataMode);
+        Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.Html, clone.MarkdownImageMode);
+        Assert.Equal(HtmlCrawlHiddenContentMode.IncludeHidden, clone.HiddenContentMode);
+        Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.Preserve, clone.ListingCardMetadataMode);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_RespectsHiddenContentByDefault() {
+        var responses = new System.Collections.Generic.Dictionary<string, string> {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <p>Visible text</p>
+      <div hidden>Hidden attribute text</div>
+      <p style="display:none">Display none text</p>
+      <span aria-hidden="true">Aria hidden text</span>
+      <input type="hidden" value="secret" />
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        using var server = StartServer(responses, out string rootUrl);
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+            MaxDepth = 0,
+            MaxPages = 1,
+            Selector = "main",
+            IncludeHtml = true,
+            IncludeText = true,
+            IncludeMarkdown = true
+        });
+
+        HtmlCrawlPage page = Assert.Single(result.Pages);
+        Assert.Contains("Visible text", page.Text, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Hidden attribute text", page.Html, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Display none text", page.Html, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Aria hidden text", page.Html, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Hidden attribute text", page.Text, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Display none text", page.Text, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Aria hidden text", page.Text, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Hidden attribute text", page.Markdown, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Display none text", page.Markdown, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Aria hidden text", page.Markdown, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_CanIncludeHiddenContentWhenRequested() {
+        var responses = new System.Collections.Generic.Dictionary<string, string> {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <p>Visible text</p>
+      <div hidden>Hidden attribute text</div>
+      <p style="display:none">Display none text</p>
+      <span aria-hidden="true">Aria hidden text</span>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        using var server = StartServer(responses, out string rootUrl);
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+            MaxDepth = 0,
+            MaxPages = 1,
+            Selector = "main",
+            IncludeHtml = true,
+            IncludeText = true,
+            IncludeMarkdown = true,
+            HiddenContentMode = HtmlCrawlHiddenContentMode.IncludeHidden
+        });
+
+        HtmlCrawlPage page = Assert.Single(result.Pages);
+        Assert.Contains("Hidden attribute text", page.Html, System.StringComparison.Ordinal);
+        Assert.Contains("Display none text", page.Html, System.StringComparison.Ordinal);
+        Assert.Contains("Aria hidden text", page.Html, System.StringComparison.Ordinal);
+        Assert.Contains("Hidden attribute text", page.Text, System.StringComparison.Ordinal);
+        Assert.Contains("Display none text", page.Text, System.StringComparison.Ordinal);
+        Assert.Contains("Aria hidden text", page.Text, System.StringComparison.Ordinal);
+        Assert.Contains("Hidden attribute text", page.Markdown, System.StringComparison.Ordinal);
+        Assert.Contains("Display none text", page.Markdown, System.StringComparison.Ordinal);
+        Assert.Contains("Aria hidden text", page.Markdown, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Render_RespectsComputedHiddenContentFromStylesheets() {
+        var responses = new System.Collections.Generic.Dictionary<string, string> {
+            ["/"] = """
+<html>
+  <head>
+    <style>
+      .theme-hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>Visible text</p>
+      <p class="theme-hidden">Hidden by stylesheet</p>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+        using var server = StartServer(responses, out string rootUrl);
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+            MaxDepth = 0,
+            MaxPages = 1,
+            Selector = "main",
+            Render = true,
+            IncludeHtml = true,
+            IncludeText = true,
+            IncludeMarkdown = true,
+            Browser = HtmlBrowserEngine.Chromium,
+            Headless = true,
+            Timeout = 15000
+        });
+
+        HtmlCrawlPage page = Assert.Single(result.Pages);
+        Assert.DoesNotContain("Hidden by stylesheet", page.Html, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Hidden by stylesheet", page.Text, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Hidden by stylesheet", page.Markdown, System.StringComparison.Ordinal);
+        Assert.Contains("Visible text", page.Text, System.StringComparison.Ordinal);
     }
 
     [Fact]
@@ -830,6 +963,12 @@ public class HtmlCrawlerTests {
                     RenderReasonCode = HtmlCrawlRenderReasonCode.StaticRenderDisabled,
                     RenderReason = "Kept static because browser rendering was not enabled.",
                     AppliedInteractions = { "Dismissed text: Accept" },
+                    OfflineDependencyDiagnostics = {
+                        new HtmlCrawlOfflineDependencyDiagnostic {
+                            Kind = "fetch-api",
+                            Evidence = "fetch('/api/status')"
+                        }
+                    },
                     Text = "Hello world",
                     Started = DateTimeOffset.UtcNow.AddSeconds(-2),
                     Finished = DateTimeOffset.UtcNow.AddSeconds(-1)
@@ -842,6 +981,16 @@ public class HtmlCrawlerTests {
                     RenderReasonCode = HtmlCrawlRenderReasonCode.AutoRenderJavaScriptShell,
                     RenderReason = "Auto-render triggered because the static HTML looked like a JavaScript shell container.",
                     AppliedInteractions = { "Clicked text [1]: Load more", "Clicked text [2]: Load more" },
+                    OfflineDependencyDiagnostics = {
+                        new HtmlCrawlOfflineDependencyDiagnostic {
+                            Kind = "observed-fetch-api",
+                            Evidence = "https://example.com/api/items"
+                        },
+                        new HtmlCrawlOfflineDependencyDiagnostic {
+                            Kind = "observed-cross-origin-runtime",
+                            Evidence = "https://api.example.net/v1/items"
+                        }
+                    },
                     Text = "Rendered content",
                     Started = DateTimeOffset.UtcNow.AddSeconds(-1),
                     Finished = DateTimeOffset.UtcNow
@@ -858,6 +1007,19 @@ public class HtmlCrawlerTests {
         Assert.Equal(1, summary.AutoRenderedPageCount);
         Assert.Equal(2, summary.InteractedPageCount);
         Assert.Equal(3, summary.InteractionCount);
+        Assert.Equal(2, summary.OfflineRiskPageCount);
+        Assert.Equal(3, summary.OfflineRiskDiagnosticCount);
+        Assert.Equal(1, summary.HighOfflineRiskPageCount);
+        Assert.Equal("live-dependent", summary.OfflineReadinessGrade);
+        Assert.Equal(1, summary.OfflineReadinessCounts["partial"]);
+        Assert.Equal(1, summary.OfflineReadinessCounts["live-dependent"]);
+        Assert.Equal(1, summary.OfflineReadinessCountsByState["Success:partial"]);
+        Assert.Equal(1, summary.OfflineReadinessCountsByState["Success:live-dependent"]);
+        Assert.Equal(1, summary.OfflineDependencyKinds["fetch-api"]);
+        Assert.Equal(1, summary.OfflineDependencyKinds["observed-fetch-api"]);
+        Assert.Equal(1, summary.OfflineDependencyKinds["observed-cross-origin-runtime"]);
+        Assert.Equal(2, summary.OfflineDependencySeverityCounts["warning"]);
+        Assert.Equal(1, summary.OfflineDependencySeverityCounts["high"]);
         Assert.Equal(1, summary.InteractionCounts["Dismissed text: Accept"]);
         Assert.Equal(1, summary.InteractionCounts["Clicked text [1]: Load more"]);
         string report = summary.ToReportText(result.SitemapUrls);
@@ -866,6 +1028,66 @@ public class HtmlCrawlerTests {
         Assert.Contains("Render reason AutoRenderJavaScriptShell: 1", report, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Interaction summary:", report, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Applied interactions: 3", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline-risk pages: 2", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("High offline-risk pages: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline readiness grade: live-dependent", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline readiness:", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline grade partial: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline state Success:live-dependent: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline severity high: 1", report, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Offline dependency observed-fetch-api: 1", report, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_SummaryAndIndex_ExposeHiddenContentAndMarkdownGuidance() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerGuidanceTests", Guid.NewGuid().ToString("N"));
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><main><h1>Hello</h1><p>World</p></main></body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true,
+                OutputPath = outputPath,
+                HiddenContentMode = HtmlCrawlHiddenContentMode.RespectHidden,
+                MarkdownImageMode = OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown,
+                ListingCardMetadataMode = OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards
+            });
+
+            HtmlCrawlSummary summary = result.Summary;
+            Assert.Equal(HtmlCrawlHiddenContentMode.RespectHidden, summary.HiddenContentMode);
+            Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown, summary.MarkdownImageMode);
+            Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards, summary.ListingCardMetadataMode);
+            Assert.Contains(summary.GuidanceNotes, note => note.Contains("static mode", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(summary.GuidanceNotes, note => note.Contains("portable output", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(summary.GuidanceNotes, note => note.Contains("listing-card", StringComparison.OrdinalIgnoreCase));
+
+            string summaryText = File.ReadAllText(result.SummaryTextPath!);
+            Assert.Contains("Hidden-content mode: RespectHidden", summaryText, StringComparison.Ordinal);
+            Assert.Contains("Markdown image mode: PortableMarkdown", summaryText, StringComparison.Ordinal);
+            Assert.Contains("Listing-card metadata mode: SuppressInRepeatedCards", summaryText, StringComparison.Ordinal);
+            Assert.Contains("static mode", summaryText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("portable output", summaryText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("listing-card", summaryText, StringComparison.OrdinalIgnoreCase);
+
+            string indexHtml = File.ReadAllText(result.IndexHtmlPath!);
+            Assert.Contains("Extraction Settings", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Hidden-content mode: <code>RespectHidden</code>", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Markdown image mode: <code>PortableMarkdown</code>", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Listing-card metadata mode: <code>SuppressInRepeatedCards</code>", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Guidance", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("external CSS", indexHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -1209,6 +1431,7 @@ public class HtmlCrawlerTests {
                 MaxDepth = 0,
                 MaxPages = 5,
                 DownloadAssets = true,
+                ContentMode = HtmlCrawlContentMode.Raw,
                 OutputPath = outputPath
             });
 
@@ -1307,7 +1530,7 @@ public class HtmlCrawlerTests {
                     string contentType;
                     switch (key) {
                         case "/":
-                            body = "<html><head><title>Offline Home</title><base href='/docs/' /><link rel='stylesheet' href='css/site.css' /></head><body><h1>Offline Home</h1><p>Useful docs for offline testing and local search metadata.</p><a href='guide'>Guide</a><a href='manual.pdf'>Manual</a><a href='https://example.com/offsite'>Offsite</a><img src='images/logo.png' alt='Logo' /></body></html>";
+                            body = "<html><head><title>Offline Home</title><base href='/docs/' /><link rel='stylesheet' href='css/site.css' /></head><body><h1>Offline Home</h1><p>Useful docs for offline testing and local search metadata.</p><a href='guide'>Guide</a><a href='manual.pdf'>Manual</a><a href='https://example.com/offsite'>Offsite</a><img src='images/logo.png' alt='Logo' /><script>fetch('/api/status')</script></body></html>";
                             contentType = "text/html; charset=utf-8";
                             break;
                         case "/docs/guide":
@@ -1405,6 +1628,10 @@ public class HtmlCrawlerTests {
                 string.Equals(item.GetString(), "offline", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(manifest.RootElement.GetProperty("Search").GetProperty("Keywords").EnumerateArray(), item =>
                 string.Equals(item.GetString(), "testing", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal("partial", manifest.RootElement.GetProperty("OfflineReadinessGrade").GetString());
+            Assert.Equal("warning", manifest.RootElement.GetProperty("HighestOfflineRiskSeverity").GetString());
+            Assert.Equal(1, manifest.RootElement.GetProperty("OfflineDependencyDiagnosticCount").GetInt32());
+            Assert.Equal("fetch-api", manifest.RootElement.GetProperty("OfflineDependencyKindsSummary").GetString());
             Assert.Contains(manifest.RootElement.GetProperty("Links").EnumerateArray(), item =>
                 string.Equals(item.GetProperty("Url").GetString(), rootUrl + "docs/guide", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(item.GetProperty("LocalPagePath").GetString(), Path.GetFileName(guide.HtmlPath), StringComparison.OrdinalIgnoreCase));
@@ -1414,18 +1641,33 @@ public class HtmlCrawlerTests {
             Assert.Contains("\"ChunkId\"", chunksJson, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("\"ManifestPath\":\"pages/", chunksJson.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
             Assert.Contains("\"Keywords\":[\"offline\"", chunksJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"OfflineReadinessGrade\":\"partial\"", chunksJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"OfflineDependencyKindsSummary\":\"fetch-api\"", chunksJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(4, graph.RootElement.GetProperty("Summary").GetProperty("NodeCount").GetInt32());
+            Assert.Equal(3, graph.RootElement.GetProperty("Summary").GetProperty("EdgeCount").GetInt32());
+            Assert.Equal(1, graph.RootElement.GetProperty("Summary").GetProperty("OfflineRiskNodeCount").GetInt32());
+            Assert.Equal(0, graph.RootElement.GetProperty("Summary").GetProperty("HighOfflineRiskNodeCount").GetInt32());
+            Assert.Equal(1, graph.RootElement.GetProperty("Summary").GetProperty("OfflineReadinessCounts").GetProperty("partial").GetInt32());
+            Assert.Equal(1, graph.RootElement.GetProperty("Summary").GetProperty("OfflineReadinessCounts").GetProperty("ready").GetInt32());
+            Assert.Equal(2, graph.RootElement.GetProperty("Summary").GetProperty("OfflineReadinessCounts").GetProperty("not-assessed").GetInt32());
+            Assert.Equal(1, graph.RootElement.GetProperty("Summary").GetProperty("OfflineSeverityCounts").GetProperty("warning").GetInt32());
+            Assert.Equal(1, graph.RootElement.GetProperty("Summary").GetProperty("OfflineDependencyKindCounts").GetProperty("fetch-api").GetInt32());
             Assert.Equal(4, graph.RootElement.GetProperty("Nodes").GetArrayLength());
             Assert.Equal(3, graph.RootElement.GetProperty("Edges").GetArrayLength());
             Assert.Contains(graph.RootElement.GetProperty("Nodes").EnumerateArray(), node =>
                 string.Equals(node.GetProperty("Url").GetString(), rootUrl, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(node.GetProperty("Category").GetString(), "Fetched", StringComparison.OrdinalIgnoreCase));
+                && string.Equals(node.GetProperty("Category").GetString(), "Fetched", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(node.GetProperty("OfflineReadinessGrade").GetString(), "partial", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(node.GetProperty("OfflineDependencyKindsSummary").GetString(), "fetch-api", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(graph.RootElement.GetProperty("Nodes").EnumerateArray(), node =>
                 string.Equals(node.GetProperty("Url").GetString(), rootUrl + "docs/manual.pdf", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(node.GetProperty("Category").GetString(), "Skipped", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(node.GetProperty("SkipReason").GetString(), HtmlCrawlSkipReason.AssetPath.ToString(), StringComparison.OrdinalIgnoreCase));
+                && string.Equals(node.GetProperty("SkipReason").GetString(), HtmlCrawlSkipReason.AssetPath.ToString(), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(node.GetProperty("OfflineReadinessGrade").GetString(), "not-assessed", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(graph.RootElement.GetProperty("Nodes").EnumerateArray(), node =>
                 string.Equals(node.GetProperty("Url").GetString(), "https://example.com/offsite", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(node.GetProperty("Category").GetString(), "External", StringComparison.OrdinalIgnoreCase));
+                && string.Equals(node.GetProperty("Category").GetString(), "External", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(node.GetProperty("OfflineReadinessGrade").GetString(), "not-assessed", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(graph.RootElement.GetProperty("Edges").EnumerateArray(), edge =>
                 string.Equals(edge.GetProperty("SourceUrl").GetString(), rootUrl, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(edge.GetProperty("TargetUrl").GetString(), rootUrl + "docs/guide", StringComparison.OrdinalIgnoreCase)
@@ -1450,11 +1692,842 @@ public class HtmlCrawlerTests {
             Assert.Contains("Node category", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Edge relation", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Skipped-node reason", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline Readiness", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Skipped Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Skipped Assets", indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
             listener.Stop();
             listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_Script_Assets_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerScriptAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    string body;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            body = "<html><head><title>Offline App</title></head><body><main><h1>Offline App</h1><p>Scripts should be mirrored locally.</p><script src='/app/runtime.js'></script><script src='/app/main.js'></script></main></body></html>";
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/app/runtime.js":
+                            body = "window.__runtimeLoaded = true;";
+                            contentType = "application/javascript";
+                            break;
+                        case "/app/main.js":
+                            body = "window.__mainLoaded = (window.__runtimeLoaded === true);";
+                            contentType = "application/javascript";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    byte[] data = Encoding.UTF8.GetBytes(body);
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "app/runtime.js", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "app/main.js", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "app/runtime.js", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "app/main.js", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("<script src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/app/runtime.js", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/app/main.js", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_Lazy_Image_Attributes_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerLazyAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    byte[] data;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            data = Encoding.UTF8.GetBytes("""
+                                <html>
+                                <head><title>Offline Lazy Media</title></head>
+                                <body>
+                                  <main>
+                                    <picture>
+                                      <source data-srcset="/media/hero.webp 1x, /media/hero@2x.webp 2x" type="image/webp" />
+                                      <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20320%20180'%3E%3C/svg%3E"
+                                           data-src="/media/hero.jpg"
+                                           data-srcset="/media/hero-small.jpg 1x, /media/hero.jpg 2x"
+                                           alt="Lazy hero" />
+                                    </picture>
+                                  </main>
+                                </body>
+                                </html>
+                                """);
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/media/hero.webp":
+                        case "/media/hero@2x.webp":
+                            data = Encoding.UTF8.GetBytes("fake-webp");
+                            contentType = "image/webp";
+                            break;
+                        case "/media/hero-small.jpg":
+                        case "/media/hero.jpg":
+                            data = Encoding.UTF8.GetBytes("fake-jpg");
+                            contentType = "image/jpeg";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/hero.webp", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/hero@2x.webp", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/hero-small.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/hero.jpg", StringComparison.OrdinalIgnoreCase));
+
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/hero.webp", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/hero@2x.webp", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/hero-small.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/hero.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("data-src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("data-srcset=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<source data-srcset=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/hero.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/hero-small.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/hero.webp", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/hero@2x.webp", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_Noscript_Media_Fallbacks_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerNoscriptAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    byte[] data;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            data = Encoding.UTF8.GetBytes("""
+                                <html>
+                                <head><title>Offline Noscript Media</title></head>
+                                <body>
+                                  <main>
+                                    <a href="/story">
+                                      <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20320%20180'%3E%3C/svg%3E" alt="Fallback teaser" />
+                                      <noscript><img src="/media/fallback.jpg" alt="Fallback teaser" srcset="/media/fallback.jpg 1x, /media/fallback@2x.jpg 2x" /></noscript>
+                                    </a>
+                                  </main>
+                                </body>
+                                </html>
+                                """);
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/media/fallback.jpg":
+                        case "/media/fallback@2x.jpg":
+                            data = Encoding.UTF8.GetBytes("fake-fallback");
+                            contentType = "image/jpeg";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/fallback.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/fallback@2x.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/fallback.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/fallback@2x.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("<noscript><img src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("srcset=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/fallback.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/fallback@2x.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_Preload_Assets_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerPreloadAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    string body;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            body = """
+                                <html>
+                                <head>
+                                  <title>Offline Preload</title>
+                                </head>
+                                <body><main><link rel="preload" href="/assets/site.css" as="style" /><link rel="modulepreload" href="/assets/app.mjs" /><link rel="preload" as="image" href="/assets/poster.jpg" imagesrcset="/assets/poster-small.jpg 1x, /assets/poster.jpg 2x" imagesizes="100vw" /><h1>Offline Preload</h1></main></body>
+                                </html>
+                                """;
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/assets/site.css":
+                            body = "body{background:#fff;}";
+                            contentType = "text/css";
+                            break;
+                        case "/assets/app.mjs":
+                            body = "export const boot = true;";
+                            contentType = "application/javascript";
+                            break;
+                        case "/assets/poster-small.jpg":
+                        case "/assets/poster.jpg":
+                            body = "fake-image";
+                            contentType = "image/jpeg";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    byte[] data = Encoding.UTF8.GetBytes(body);
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "assets/site.css", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "assets/app.mjs", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "assets/poster-small.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "assets/poster.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "assets/site.css", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "assets/app.mjs", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "assets/poster-small.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "assets/poster.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("<link rel=\"preload\" href=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<link rel=\"modulepreload\" href=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("imagesrcset=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/assets/site.css", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/assets/app.mjs", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/assets/poster-small.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/assets/poster.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_VideoPoster_And_Track_Assets_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerVideoAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    byte[] data;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            data = Encoding.UTF8.GetBytes("""
+                                <html>
+                                <head><title>Offline Video</title></head>
+                                <body>
+                                  <main>
+                                    <video controls poster="/media/poster.jpg">
+                                      <source src="/media/story.mp4" type="video/mp4" />
+                                      <track kind="captions" srclang="en" src="/media/story.en.vtt" default />
+                                    </video>
+                                  </main>
+                                </body>
+                                </html>
+                                """);
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/media/poster.jpg":
+                            data = Encoding.UTF8.GetBytes("fake-poster");
+                            contentType = "image/jpeg";
+                            break;
+                        case "/media/story.mp4":
+                            data = Encoding.UTF8.GetBytes("fake-video");
+                            contentType = "video/mp4";
+                            break;
+                        case "/media/story.en.vtt":
+                            data = Encoding.UTF8.GetBytes("""
+                                WEBVTT
+
+                                00:00.000 --> 00:02.000
+                                Story intro
+                                """);
+                            contentType = "text/vtt";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/poster.jpg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/story.mp4", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "media/story.en.vtt", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/poster.jpg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/story.mp4", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "media/story.en.vtt", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("poster=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<source src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<track kind=\"captions\" srclang=\"en\" src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/poster.jpg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/story.mp4", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/media/story.en.vtt", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Downloads_And_Rewrites_Embedded_Resource_Assets_To_LocalPaths() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerEmbeddedAssetTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    byte[] data;
+                    string contentType;
+                    switch (key) {
+                        case "/":
+                            data = Encoding.UTF8.GetBytes("""
+                                <html>
+                                <head><title>Offline Embedded Resources</title></head>
+                                <body>
+                                  <main>
+                                    <iframe src="/frames/report.html" title="Report"></iframe>
+                                    <embed src="/widgets/chart.svg" type="image/svg+xml" />
+                                    <object data="/docs/guide.pdf" type="application/pdf"></object>
+                                  </main>
+                                </body>
+                                </html>
+                                """);
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/frames/report.html":
+                            data = Encoding.UTF8.GetBytes("<html><body><h1>Embedded report</h1></body></html>");
+                            contentType = "text/html; charset=utf-8";
+                            break;
+                        case "/widgets/chart.svg":
+                            data = Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\" /></svg>");
+                            contentType = "image/svg+xml";
+                            break;
+                        case "/docs/guide.pdf":
+                            data = Encoding.UTF8.GetBytes("%PDF-1.4 fake pdf");
+                            contentType = "application/pdf";
+                            break;
+                        default:
+                            context.Response.StatusCode = 404;
+                            context.Response.OutputStream.Close();
+                            continue;
+                    }
+
+                    context.Response.ContentType = contentType;
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                DownloadAssets = true,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "frames/report.html", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "widgets/chart.svg", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.AssetUrls, asset => string.Equals(asset, rootUrl + "docs/guide.pdf", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "frames/report.html", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "widgets/chart.svg", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+            Assert.Contains(result.Assets, asset => string.Equals(asset.Url, rootUrl + "docs/guide.pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(asset.FilePath));
+
+            string persistedHtml = File.ReadAllText(page.HtmlPath!);
+            Assert.Contains("<iframe src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<embed src=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("<object data=\"../assets/", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/frames/report.html", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/widgets/chart.svg", persistedHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/docs/guide.pdf", persistedHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_Reports_Offline_Runtime_Dependency_Diagnostics_In_Page_And_Manifest() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerOfflineDiagnosticTests", Guid.NewGuid().ToString("N"));
+        HttpListener listener = new();
+        string rootUrl;
+        {
+            int port = GetFreePort();
+            rootUrl = $"http://localhost:{port}/";
+            listener.Prefixes.Add(rootUrl);
+        }
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            try {
+                while (listener.IsListening) {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    string key = context.Request.RawUrl ?? "/";
+                    if (!string.Equals(key, "/", StringComparison.Ordinal)) {
+                        context.Response.StatusCode = 404;
+                        context.Response.OutputStream.Close();
+                        continue;
+                    }
+
+                    byte[] data = Encoding.UTF8.GetBytes("""
+                        <html>
+                        <head><title>Offline Diagnostics</title></head>
+                        <body>
+                          <main>
+                            <h1>Offline Diagnostics</h1>
+                            <button onclick="fetch('/api/status').then(r => r.json())">Refresh</button>
+                            <script>
+                              const socket = new WebSocket('wss://example.test/socket');
+                              navigator.serviceWorker.register('/sw.js');
+                            </script>
+                          </main>
+                        </body>
+                        </html>
+                        """);
+                    context.Response.ContentType = "text/html; charset=utf-8";
+                    context.Response.ContentLength64 = data.Length;
+                    await context.Response.OutputStream.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    context.Response.OutputStream.Close();
+                }
+            } catch (HttpListenerException) {
+            } catch (ObjectDisposedException) {
+            }
+        });
+
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 5,
+                OutputPath = outputPath
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains(page.OfflineDependencyDiagnostics, diagnostic => string.Equals(diagnostic.Kind, "fetch-api", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.OfflineDependencyDiagnostics, diagnostic => string.Equals(diagnostic.Kind, "websocket", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(page.OfflineDependencyDiagnostics, diagnostic => string.Equals(diagnostic.Kind, "service-worker", StringComparison.OrdinalIgnoreCase));
+            Assert.All(page.OfflineDependencyDiagnostics, diagnostic => Assert.False(string.IsNullOrWhiteSpace(diagnostic.Evidence)));
+            Assert.Equal("live-dependent", page.OfflineReadinessGrade);
+            Assert.Equal("high", page.HighestOfflineRiskSeverity);
+            Assert.Equal(3, page.OfflineDependencyDiagnosticCount);
+            Assert.Equal("fetch-api, service-worker, websocket", page.OfflineDependencyKindsSummary);
+            Assert.True(result.Summary.OfflineRiskPageCount >= 1);
+            Assert.True(result.Summary.OfflineRiskDiagnosticCount >= 3);
+            Assert.True(result.Summary.HighOfflineRiskPageCount >= 1);
+            Assert.Equal("live-dependent", result.Summary.OfflineReadinessGrade);
+            Assert.Contains("fetch-api", result.Summary.OfflineDependencyKinds.Keys, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("high", result.Summary.OfflineDependencySeverityCounts.Keys, StringComparer.OrdinalIgnoreCase);
+
+            string report = result.Summary.ToReportText(result.SitemapUrls);
+            Assert.Contains("Offline-risk pages:", report, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("High offline-risk pages:", report, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline readiness grade: live-dependent", report, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline readiness:", report, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline severity", report, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline dependency fetch-api:", report, StringComparison.OrdinalIgnoreCase);
+
+            string indexHtml = File.ReadAllText(Path.Combine(outputPath, "index.html"));
+            Assert.Contains("Offline Readiness", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline Grade", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline-Risk Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("High-Risk Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline readiness grade: <code>live-dependent</code>", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("offline risk:", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("fetch-api", indexHtml, StringComparison.OrdinalIgnoreCase);
+
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(page.ManifestPath!));
+            Assert.Equal("live-dependent", manifest.RootElement.GetProperty("OfflineReadinessGrade").GetString());
+            Assert.Equal("high", manifest.RootElement.GetProperty("HighestOfflineRiskSeverity").GetString());
+            JsonElement diagnostics = manifest.RootElement.GetProperty("OfflineDependencyDiagnostics");
+            Assert.True(diagnostics.ValueKind == JsonValueKind.Array);
+            Assert.Contains(diagnostics.EnumerateArray().Select(item => item.GetProperty("Kind").GetString()), kind => string.Equals(kind, "fetch-api", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(diagnostics.EnumerateArray().Select(item => item.GetProperty("Kind").GetString()), kind => string.Equals(kind, "websocket", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(diagnostics.EnumerateArray().Select(item => item.GetProperty("Kind").GetString()), kind => string.Equals(kind, "service-worker", StringComparison.OrdinalIgnoreCase));
+
+            using JsonDocument pagesJsonl = JsonDocument.Parse(File.ReadAllLines(result.PagesJsonlPath!).Single());
+            Assert.Equal("live-dependent", pagesJsonl.RootElement.GetProperty("OfflineReadinessGrade").GetString());
+            Assert.Equal("high", pagesJsonl.RootElement.GetProperty("HighestOfflineRiskSeverity").GetString());
+            Assert.Equal(3, pagesJsonl.RootElement.GetProperty("OfflineDependencyDiagnosticCount").GetInt32());
+            Assert.Equal("fetch-api, service-worker, websocket", pagesJsonl.RootElement.GetProperty("OfflineDependencyKindsSummary").GetString());
+            Assert.Contains(pagesJsonl.RootElement.GetProperty("OfflineDependencyKinds").EnumerateArray().Select(item => item.GetString()), kind => string.Equals(kind, "fetch-api", StringComparison.OrdinalIgnoreCase));
+
+            string[] csvLines = File.ReadAllLines(result.PagesCsvPath!);
+            Assert.Contains("OfflineReadinessGrade", csvLines[0], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("HighestOfflineRiskSeverity", csvLines[0], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("OfflineDependencyKindsSummary", csvLines[0], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("live-dependent", csvLines[1], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("high", csvLines[1], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("fetch-api, service-worker, websocket", csvLines[1], StringComparison.OrdinalIgnoreCase);
+        } finally {
+            listener.Stop();
+            listener.Close();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void DetectRenderedNetworkDependencyDiagnostics_Reports_Runtime_And_CrossOrigin_Findings() {
+        List<HtmlNetworkEntry> entries = new() {
+            new() {
+                Url = "https://app.example.test/api/status",
+                ResourceType = HtmlNetworkResourceType.Fetch
+            },
+            new() {
+                Url = "https://api.example.test/v1/data",
+                ResourceType = HtmlNetworkResourceType.XHR
+            },
+            new() {
+                Url = "wss://stream.example.test/live",
+                ResourceType = HtmlNetworkResourceType.WebSocket
+            },
+            new() {
+                Url = "https://app.example.test/assets/app.js",
+                ResourceType = HtmlNetworkResourceType.Script
+            }
+        };
+
+        IList<HtmlCrawlOfflineDependencyDiagnostic> diagnostics = HtmlCrawler.DetectRenderedNetworkDependencyDiagnostics(
+            entries,
+            new Uri("https://app.example.test/dashboard"));
+
+        Assert.Contains(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "observed-fetch-api", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Evidence, "https://app.example.test/api/status", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "observed-xml-http-request", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Evidence, "https://api.example.test/v1/data", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "observed-websocket", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Evidence, "wss://stream.example.test/live", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Severity, "high", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "observed-cross-origin-runtime", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(diagnostic.Evidence)
+            && string.Equals(diagnostic.Severity, "high", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "observed-fetch-api", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Severity, "warning", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(diagnostics, diagnostic => string.Equals(diagnostic.Kind, "script", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void HtmlCrawlSummary_OfflineReadinessGrade_IsReadyWithoutDiagnostics() {
+        HtmlCrawlResult result = new() {
+            StartUrl = "https://example.com/",
+            Started = DateTimeOffset.UtcNow.AddSeconds(-1),
+            Finished = DateTimeOffset.UtcNow,
+            Pages = {
+                new HtmlCrawlPage {
+                    Url = "https://example.com/",
+                    Status = HtmlCrawlPageStatus.Success
+                }
+            }
+        };
+
+        HtmlCrawlSummary summary = result.Summary;
+
+        Assert.Equal("ready", summary.OfflineReadinessGrade);
+        Assert.Equal(0, summary.OfflineRiskDiagnosticCount);
+        Assert.Equal(0, summary.HighOfflineRiskPageCount);
+        Assert.Equal("ready", Assert.Single(result.Pages).OfflineReadinessGrade);
+        Assert.Equal("none", Assert.Single(result.Pages).HighestOfflineRiskSeverity);
+    }
+
+    [Fact]
+    public void HtmlCrawlSummary_OfflineReadinessGrade_IsPartialForWarningsOnly() {
+        HtmlCrawlResult result = new() {
+            StartUrl = "https://example.com/",
+            Started = DateTimeOffset.UtcNow.AddSeconds(-1),
+            Finished = DateTimeOffset.UtcNow,
+            Pages = {
+                new HtmlCrawlPage {
+                    Url = "https://example.com/",
+                    Status = HtmlCrawlPageStatus.Success,
+                    OfflineDependencyDiagnostics = {
+                        new HtmlCrawlOfflineDependencyDiagnostic {
+                            Kind = "fetch-api",
+                            Severity = "warning",
+                            Evidence = "fetch('/api/status')"
+                        }
+                    }
+                }
+            }
+        };
+
+        HtmlCrawlSummary summary = result.Summary;
+
+            Assert.Equal("partial", summary.OfflineReadinessGrade);
+            Assert.Equal(1, summary.OfflineRiskDiagnosticCount);
+            Assert.Equal(0, summary.HighOfflineRiskPageCount);
+            Assert.Equal("partial", Assert.Single(result.Pages).OfflineReadinessGrade);
+            Assert.Equal("warning", Assert.Single(result.Pages).HighestOfflineRiskSeverity);
+            Assert.Equal(1, summary.OfflineReadinessCounts["partial"]);
+            Assert.Equal(1, summary.OfflineReadinessCountsByState["Success:partial"]);
+        }
+
+    [Fact]
+    public async Task CrawlAsync_Exports_NotAssessed_OfflineReadiness_For_Skipped_And_Pending_Candidates() {
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerPendingSkippedOfflineTests", Guid.NewGuid().ToString("N"));
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><head><title>Home</title></head><body><a href='/allowed'>Allowed</a><a href='/blocked'>Blocked</a></body></html>",
+            ["/allowed"] = "<html><head><title>Allowed</title></head><body>Allowed</body></html>",
+            ["/blocked"] = "<html><head><title>Blocked</title></head><body>Blocked</body></html>"
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 1,
+                MaxPages = 1,
+                OutputPath = outputPath,
+                ExcludePatterns = { "*blocked" }
+            });
+
+            HtmlCrawlPendingItem pending = Assert.Single(result.PendingPages);
+            Assert.Equal("not-assessed", pending.OfflineReadinessGrade);
+            Assert.Equal("none", pending.HighestOfflineRiskSeverity);
+
+            HtmlCrawlPage skipped = Assert.Single(result.SkippedPages);
+            Assert.Equal(HtmlCrawlSkipReason.ExcludedByPattern, skipped.SkipReason);
+            Assert.Equal("not-assessed", skipped.OfflineReadinessGrade);
+            Assert.Equal("none", skipped.HighestOfflineRiskSeverity);
+
+            HtmlCrawlSummary summary = result.Summary;
+            Assert.Equal(1, summary.OfflineReadinessCounts["ready"]);
+            Assert.Equal(2, summary.OfflineReadinessCounts["not-assessed"]);
+            Assert.Equal(1, summary.OfflineReadinessCountsByState["Success:ready"]);
+            Assert.Equal(1, summary.OfflineReadinessCountsByState["Skipped:not-assessed"]);
+            Assert.Equal(1, summary.OfflineReadinessCountsByState["Pending:not-assessed"]);
+
+            using JsonDocument skippedJsonl = JsonDocument.Parse(File.ReadAllLines(result.SkippedPagesJsonlPath!).Single());
+            Assert.Equal("not-assessed", skippedJsonl.RootElement.GetProperty("OfflineReadinessGrade").GetString());
+            Assert.Equal("none", skippedJsonl.RootElement.GetProperty("HighestOfflineRiskSeverity").GetString());
+            Assert.Equal(0, skippedJsonl.RootElement.GetProperty("OfflineDependencyDiagnosticCount").GetInt32());
+            Assert.Equal(string.Empty, skippedJsonl.RootElement.GetProperty("OfflineDependencyKindsSummary").GetString());
+
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath!));
+            JsonElement pendingJson = Assert.Single(manifest.RootElement.GetProperty("PendingPages").EnumerateArray());
+            Assert.Equal("not-assessed", pendingJson.GetProperty("OfflineReadinessGrade").GetString());
+            Assert.Equal("none", pendingJson.GetProperty("HighestOfflineRiskSeverity").GetString());
+            Assert.Equal(0, pendingJson.GetProperty("OfflineDependencyDiagnosticCount").GetInt32());
+            Assert.Equal(string.Empty, pendingJson.GetProperty("OfflineDependencyKindsSummary").GetString());
+
+            string indexHtml = File.ReadAllText(result.IndexHtmlPath!);
+            Assert.Contains("Pending Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Skipped Pages", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("not-assessed", indexHtml, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Offline state <code>Pending:not-assessed</code>: 1", indexHtml, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            server.Stop();
+            server.Close();
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading.Tasks;
 using OfficeIMO.Markdown;
+using OfficeIMO.Markdown.Html;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -88,6 +89,259 @@ public class HtmlCrawlerMarkdownTests {
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
+        }
+    }
+
+    [Theory]
+    [InlineData(MarkdownImageRenderingMode.PortableMarkdown)]
+    [InlineData(MarkdownImageRenderingMode.RichMarkdown)]
+    [InlineData(MarkdownImageRenderingMode.Html)]
+    public void ConvertToMarkdown_CanSwitchImageRenderingModes(MarkdownImageRenderingMode imageMode) {
+        const string html = """
+<main>
+  <figure>
+    <a href="/gallery/hero" title="Open photo">
+      <img src="/img/hero.png" alt="Hero" title="View hero" width="256" height="128" />
+    </a>
+    <figcaption>Hero image</figcaption>
+  </figure>
+</main>
+""";
+
+        string markdown = HtmlMarkdownConverterAdapter.ConvertToMarkdown(html, "https://example.com/docs/start", imageMode);
+
+        switch (imageMode) {
+            case MarkdownImageRenderingMode.PortableMarkdown:
+                Assert.Contains("[![Hero](https://example.com/img/hero.png \"View hero\")](https://example.com/gallery/hero \"Open photo\")", markdown, StringComparison.Ordinal);
+                Assert.DoesNotContain("{width=", markdown, StringComparison.Ordinal);
+                Assert.DoesNotContain("<img ", markdown, StringComparison.Ordinal);
+                break;
+            case MarkdownImageRenderingMode.RichMarkdown:
+                Assert.Contains("[![Hero](https://example.com/img/hero.png \"View hero\")](https://example.com/gallery/hero \"Open photo\"){width=256 height=128}", markdown, StringComparison.Ordinal);
+                break;
+            case MarkdownImageRenderingMode.Html:
+                Assert.Contains("<a href=\"https://example.com/gallery/hero\" title=\"Open photo\">", markdown, StringComparison.Ordinal);
+                Assert.Contains("<img src=\"https://example.com/img/hero.png\" alt=\"Hero\" title=\"View hero\" width=\"256\" height=\"128\"", markdown, StringComparison.Ordinal);
+                Assert.DoesNotContain("{width=", markdown, StringComparison.Ordinal);
+                break;
+        }
+
+        Assert.Contains("Hero image", markdown, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_DefaultPortableMode_OmitsImageSizeSuffixes() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <figure>
+        <img src="/img/hero.png" alt="Hero" title="View hero" width="256" height="128" />
+        <figcaption>Hero image</figcaption>
+      </figure>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("![Hero](http://localhost", page.Markdown, StringComparison.Ordinal);
+            Assert.DoesNotContain("{width=", page.Markdown, StringComparison.Ordinal);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_CanEmitRichMarkdownImageSizes() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <figure>
+        <img src="/img/hero.png" alt="Hero" title="View hero" width="256" height="128" />
+        <figcaption>Hero image</figcaption>
+      </figure>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true,
+                MarkdownImageMode = MarkdownImageRenderingMode.RichMarkdown
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Contains("{width=256 height=128}", page.Markdown, StringComparison.Ordinal);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public void ConvertToMarkdown_CanSuppress_Repeated_Listing_Card_Metadata() {
+        const string html = """
+<main>
+  <div class="blog-feed">
+    <article class="post-card">
+      <div class="post-date">15 June</div>
+      <div class="post-time">21:52</div>
+      <div class="entry-meta"><span class="post-meta-author">By Przemyslaw Klys</span></div>
+      <div class="post-title"><h3><a href="/post-one" rel="bookmark">15 Jun: First post</a></h3></div>
+      <div class="summary"><p>First summary.</p></div>
+      <div class="post-read-more"><a href="/post-one">Read More</a></div>
+    </article>
+    <article class="post-card">
+      <div class="post-date">14 June</div>
+      <div class="post-time">19:20</div>
+      <div class="entry-meta"><span class="post-meta-author">By Another Author</span></div>
+      <div class="post-title"><h3><a href="/post-two" rel="bookmark">14 Jun: Second post</a></h3></div>
+      <div class="summary"><p>Second summary.</p></div>
+      <div class="post-read-more"><a href="/post-two">Read More</a></div>
+    </article>
+  </div>
+</main>
+""";
+
+        string markdown = HtmlMarkdownConverterAdapter.ConvertToMarkdown(
+            html,
+            "https://example.com/",
+            MarkdownImageRenderingMode.PortableMarkdown,
+            HtmlListingCardMetadataMode.SuppressInRepeatedCards);
+
+        Assert.DoesNotContain("15 June", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("21:52", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("By Przemyslaw Klys", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Read More](https://example.com/post-one)", markdown, StringComparison.Ordinal);
+        Assert.Contains("[15 Jun: First post](https://example.com/post-one)", markdown, StringComparison.Ordinal);
+        Assert.Contains("First summary.", markdown, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_DefaultSuppression_Removes_Repeated_Listing_Card_Metadata() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <div class="blog-feed">
+        <article class="post-card">
+          <div class="post-date">15 June</div>
+          <div class="post-time">21:52</div>
+          <div class="entry-meta"><span class="post-meta-author">By Przemyslaw Klys</span></div>
+          <div class="post-title"><h3><a href="/post-one" rel="bookmark">15 Jun: First post</a></h3></div>
+          <div class="summary"><p>First summary.</p></div>
+          <div class="post-read-more"><a href="/post-one">Read More</a></div>
+        </article>
+        <article class="post-card">
+          <div class="post-date">14 June</div>
+          <div class="post-time">19:20</div>
+          <div class="entry-meta"><span class="post-meta-author">By Another Author</span></div>
+          <div class="post-title"><h3><a href="/post-two" rel="bookmark">14 Jun: Second post</a></h3></div>
+          <div class="summary"><p>Second summary.</p></div>
+          <div class="post-read-more"><a href="/post-two">Read More</a></div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(HtmlListingCardMetadataMode.SuppressInRepeatedCards, result.ListingCardMetadataMode);
+            Assert.DoesNotContain("15 June", page.Markdown, StringComparison.Ordinal);
+            Assert.DoesNotContain("21:52", page.Markdown, StringComparison.Ordinal);
+            Assert.DoesNotContain("By Przemyslaw Klys", page.Markdown, StringComparison.Ordinal);
+            Assert.DoesNotContain("[Read More](", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("[15 Jun: First post](", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("First summary.", page.Markdown, StringComparison.Ordinal);
+        } finally {
+            server.Stop();
+            server.Close();
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_CanPreserve_Repeated_Listing_Card_Metadata_WhenRequested() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <div class="blog-feed">
+        <article class="post-card">
+          <div class="post-date">15 June</div>
+          <div class="post-time">21:52</div>
+          <div class="entry-meta"><span class="post-meta-author">By Przemyslaw Klys</span></div>
+          <div class="post-title"><h3><a href="/post-one" rel="bookmark">15 Jun: First post</a></h3></div>
+          <div class="summary"><p>First summary.</p></div>
+          <div class="post-read-more"><a href="/post-one">Read More</a></div>
+        </article>
+        <article class="post-card">
+          <div class="post-date">14 June</div>
+          <div class="post-time">19:20</div>
+          <div class="entry-meta"><span class="post-meta-author">By Another Author</span></div>
+          <div class="post-title"><h3><a href="/post-two" rel="bookmark">14 Jun: Second post</a></h3></div>
+          <div class="summary"><p>Second summary.</p></div>
+          <div class="post-read-more"><a href="/post-two">Read More</a></div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true,
+                ListingCardMetadataMode = HtmlListingCardMetadataMode.Preserve
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(HtmlListingCardMetadataMode.Preserve, result.ListingCardMetadataMode);
+            Assert.Contains("15 June", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("21:52", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("By Przemyslaw Klys", page.Markdown, StringComparison.Ordinal);
+            Assert.Contains("[Read More](", page.Markdown, StringComparison.Ordinal);
+        } finally {
+            server.Stop();
+            server.Close();
         }
     }
 
