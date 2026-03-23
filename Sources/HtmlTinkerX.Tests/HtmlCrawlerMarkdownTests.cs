@@ -283,7 +283,7 @@ public class HtmlCrawlerMarkdownTests {
     [Fact]
     public async Task CrawlAsync_IncludeMarkdown_OfficeImoProfile_RoundTrips_SharedVisualHostsFixture_Into_GenericSemanticFences() {
         Dictionary<string, string> responses = new() {
-            ["/"] = ReadOfficeImoFixture("shared-visual-hosts.html")
+            ["/"] = ReadFixture("officeimo-shared-visual-hosts.html")
         };
 
         HttpListener server = StartServer(responses, out string rootUrl);
@@ -1110,11 +1110,6 @@ public class HtmlCrawlerMarkdownTests {
         return File.ReadAllText(path);
     }
 
-    private static string ReadOfficeImoFixture(string fileName) {
-        string path = Path.Combine(GetOfficeImoTestsRoot(), "Markdown", "Fixtures", fileName);
-        return File.ReadAllText(path);
-    }
-
     // Set HTMLTINKERX_UPDATE_SNAPSHOTS=1 to rewrite checked-in baselines after an intentional renderer change.
     private static void AssertMarkdownSnapshot(string fileName, string actualMarkdown) {
         string path = Path.Combine(GetTestsProjectRoot(), "Fixtures", "Expected", fileName);
@@ -1223,21 +1218,5 @@ public class HtmlCrawlerMarkdownTests {
         }
 
         throw new DirectoryNotFoundException("Could not locate HtmlTinkerX.Tests project root from test runtime base directory.");
-    }
-
-    private static string GetOfficeImoTestsRoot() {
-        string testsProjectRoot = GetTestsProjectRoot();
-        string[] candidates = new[] {
-            Path.GetFullPath(Path.Combine(testsProjectRoot, "..", "..", "..", "OfficeIMO", "OfficeIMO.Tests")),
-            Path.GetFullPath(Path.Combine(testsProjectRoot, "..", "..", "..", "..", "OfficeIMO", "OfficeIMO.Tests"))
-        };
-
-        foreach (string candidate in candidates) {
-            if (File.Exists(Path.Combine(candidate, "OfficeIMO.Tests.csproj"))) {
-                return candidate;
-            }
-        }
-
-        throw new DirectoryNotFoundException("Could not locate OfficeIMO.Tests project root from HtmlTinkerX.Tests.");
     }
 }
