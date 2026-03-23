@@ -142,6 +142,37 @@ public class HtmlCrawlerMarkdownTests {
         Assert.Contains("Hero image", markdown, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(HtmlMarkdownProfile.Portable)]
+    [InlineData(HtmlMarkdownProfile.OfficeIMO)]
+    public void ConvertToMarkdown_CanSwitchMarkdownProfiles(HtmlMarkdownProfile markdownProfile) {
+        const string html = """
+<main>
+  <blockquote class="callout note">
+    <p><strong>Important</strong></p>
+    <p>Body</p>
+  </blockquote>
+</main>
+""";
+
+        string markdown = HtmlMarkdownConverterAdapter.ConvertToMarkdown(
+            html,
+            "https://example.com/docs/start",
+            MarkdownImageRenderingMode.PortableMarkdown,
+            HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+            markdownProfile);
+
+        if (markdownProfile == HtmlMarkdownProfile.OfficeIMO) {
+            Assert.Contains("[!NOTE] Important", markdown, StringComparison.Ordinal);
+        } else {
+            Assert.DoesNotContain("[!NOTE]", markdown, StringComparison.Ordinal);
+            Assert.Contains("Important", markdown, StringComparison.Ordinal);
+            Assert.Contains("> Body", markdown, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Body", markdown, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task CrawlAsync_IncludeMarkdown_DefaultPortableMode_OmitsImageSizeSuffixes() {
         Dictionary<string, string> responses = new() {
@@ -205,6 +236,70 @@ public class HtmlCrawlerMarkdownTests {
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Contains("{width=256 height=128}", page.Markdown, StringComparison.Ordinal);
+        } finally {
+            DisposeListenerSafely(server);
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_CanOptIntoOfficeImoMarkdownProfile() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = """
+<html>
+  <body>
+    <main>
+      <blockquote class="callout note">
+        <p><strong>Important</strong></p>
+        <p>Body</p>
+      </blockquote>
+    </main>
+  </body>
+</html>
+"""
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true,
+                MarkdownProfile = HtmlMarkdownProfile.OfficeIMO
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(HtmlMarkdownProfile.OfficeIMO, result.MarkdownProfile);
+            Assert.Equal(HtmlMarkdownProfile.OfficeIMO, result.Summary.MarkdownProfile);
+            Assert.Contains("[!NOTE] Important", page.Markdown, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                result.Summary.GuidanceNotes,
+                note => note.Contains("portable profile", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            DisposeListenerSafely(server);
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_IncludeMarkdown_OfficeImoProfile_RoundTrips_SharedVisualHostsFixture_Into_GenericSemanticFences() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = ReadFixture("officeimo-shared-visual-hosts.html")
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeMarkdown = true,
+                MarkdownProfile = HtmlMarkdownProfile.OfficeIMO
+            });
+
+            HtmlCrawlPage page = Assert.Single(result.Pages);
+            Assert.Equal(HtmlMarkdownProfile.OfficeIMO, result.MarkdownProfile);
+            Assert.Equal(HtmlMarkdownProfile.OfficeIMO, result.Summary.MarkdownProfile);
+            AssertMarkdownSnapshot("officeimo-shared-visual-hosts.markdown.snapshot.txt", page.Markdown);
         } finally {
             DisposeListenerSafely(server);
         }

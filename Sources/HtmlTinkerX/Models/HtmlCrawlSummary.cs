@@ -239,6 +239,9 @@ public sealed class HtmlCrawlSummary {
     /// <summary>Controls whether extraction respects or includes hidden DOM content.</summary>
     public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
 
+    /// <summary>Controls which markdown dialect profile is used when page HTML is converted to markdown.</summary>
+    public HtmlMarkdownProfile MarkdownProfile { get; set; } = HtmlMarkdownProfile.Portable;
+
     /// <summary>Controls how images are emitted when page HTML is converted to markdown.</summary>
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
 
@@ -274,6 +277,7 @@ public sealed class HtmlCrawlSummary {
             RenderEnabled = result.RenderEnabled,
             AutoRenderEnabled = result.AutoRenderEnabled,
             HiddenContentMode = result.HiddenContentMode,
+            MarkdownProfile = result.MarkdownProfile,
             MarkdownImageMode = result.MarkdownImageMode,
             ListingCardMetadataMode = result.ListingCardMetadataMode,
             PageCount = result.Pages.Count,
@@ -417,6 +421,10 @@ public sealed class HtmlCrawlSummary {
             summary.GuidanceNotes.Add("Hidden-content filtering ran in static mode. Elements hidden only by external CSS may still require rendering to be excluded.");
         }
 
+        if (summary.MarkdownProfile == HtmlMarkdownProfile.Portable) {
+            summary.GuidanceNotes.Add("Markdown used the portable profile for broad renderer compatibility. Switch the markdown profile to OfficeIMO when downstream consumers can benefit from richer OfficeIMO syntax.");
+        }
+
         if (summary.MarkdownImageMode == MarkdownImageRenderingMode.PortableMarkdown) {
             summary.GuidanceNotes.Add("Markdown images used portable output. Image size hints stay in HTML/manifests unless a richer markdown mode is selected.");
         }
@@ -496,6 +504,7 @@ public sealed class HtmlCrawlSummary {
         report.AppendLine($"High offline-risk pages: {HighOfflineRiskPageCount}");
         report.AppendLine($"Offline readiness grade: {OfflineReadinessGrade}");
         report.AppendLine($"Hidden-content mode: {HiddenContentMode}");
+        report.AppendLine($"Markdown profile: {MarkdownProfile}");
         report.AppendLine($"Markdown image mode: {MarkdownImageMode}");
         report.AppendLine($"Listing-card metadata mode: {ListingCardMetadataMode}");
         report.AppendLine($"Pages with interactions: {InteractedPageCount}");

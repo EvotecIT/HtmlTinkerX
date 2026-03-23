@@ -55,6 +55,9 @@ public sealed class HtmlCrawlResult {
     /// <summary>Controls whether extraction respects or includes hidden DOM content.</summary>
     public HtmlCrawlHiddenContentMode HiddenContentMode { get; set; } = HtmlCrawlHiddenContentMode.RespectHidden;
 
+    /// <summary>Controls which markdown dialect profile is used when page HTML is converted to markdown.</summary>
+    public HtmlMarkdownProfile MarkdownProfile { get; set; } = HtmlMarkdownProfile.Portable;
+
     /// <summary>Controls how images are emitted when page HTML is converted to markdown.</summary>
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
 
