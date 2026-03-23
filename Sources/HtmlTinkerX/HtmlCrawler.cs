@@ -278,6 +278,7 @@ public static class HtmlCrawler {
                     RenderEnabled = resolvedOptions.Render,
                     AutoRenderEnabled = resolvedOptions.AutoRender,
                     HiddenContentMode = resolvedOptions.HiddenContentMode,
+                    MarkdownProfile = resolvedOptions.MarkdownProfile,
                     MarkdownImageMode = resolvedOptions.MarkdownImageMode,
                     ListingCardMetadataMode = resolvedOptions.ListingCardMetadataMode,
                     Started = DateTimeOffset.UtcNow
@@ -299,6 +300,7 @@ public static class HtmlCrawler {
             result.RenderEnabled = resolvedOptions.Render;
             result.AutoRenderEnabled = resolvedOptions.AutoRender;
             result.HiddenContentMode = resolvedOptions.HiddenContentMode;
+            result.MarkdownProfile = resolvedOptions.MarkdownProfile;
             result.MarkdownImageMode = resolvedOptions.MarkdownImageMode;
             result.ListingCardMetadataMode = resolvedOptions.ListingCardMetadataMode;
 
@@ -7233,6 +7235,9 @@ public static class HtmlCrawler {
         builder.Append("      <li>Hidden-content mode: <code>")
             .Append(HtmlEncode(summary.HiddenContentMode.ToString()))
             .AppendLine("</code></li>");
+        builder.Append("      <li>Markdown profile: <code>")
+            .Append(HtmlEncode(summary.MarkdownProfile.ToString()))
+            .AppendLine("</code></li>");
         builder.Append("      <li>Markdown image mode: <code>")
             .Append(HtmlEncode(summary.MarkdownImageMode.ToString()))
             .AppendLine("</code></li>");
@@ -8228,7 +8233,8 @@ public static class HtmlCrawler {
             html,
             pageUrl,
             options?.MarkdownImageMode ?? MarkdownImageRenderingMode.PortableMarkdown,
-            options?.ListingCardMetadataMode ?? HtmlListingCardMetadataMode.SuppressInRepeatedCards);
+            options?.ListingCardMetadataMode ?? HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+            options?.MarkdownProfile ?? HtmlMarkdownProfile.Portable);
     }
 
     private static IList<HtmlCrawlOfflineDependencyDiagnostic> DetectOfflineDependencyDiagnostics(string html) {

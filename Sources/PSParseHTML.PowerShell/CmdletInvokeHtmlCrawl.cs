@@ -337,6 +337,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeMarkdown { get; set; }
 
+    /// <summary>Controls which markdown dialect profile is used when selected HTML is converted to markdown. Use Portable for broad compatibility or OfficeIMO when downstream consumers can benefit from richer OfficeIMO syntax.</summary>
+    [Parameter]
+    public HtmlMarkdownProfile MarkdownProfile { get; set; } = HtmlMarkdownProfile.Portable;
+
     /// <summary>Controls how images are emitted when selected HTML is converted to markdown. Use PortableMarkdown for broad renderer compatibility, RichMarkdown for OfficeIMO-style size suffixes, or Html for exact width and height fidelity.</summary>
     [Parameter]
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
@@ -413,6 +417,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
             IncludeMarkdown = IncludeMarkdown.IsPresent,
+            MarkdownProfile = MarkdownProfile,
             MarkdownImageMode = MarkdownImageMode,
             ListingCardMetadataMode = ListingCardMetadataMode,
             IncludeStructuredJson = IncludeStructuredJson.IsPresent,

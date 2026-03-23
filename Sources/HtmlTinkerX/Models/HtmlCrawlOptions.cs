@@ -90,6 +90,11 @@ public sealed class HtmlCrawlOptions {
     public bool IncludeMarkdown { get; set; }
 
     /// <summary>
+    /// Controls which markdown dialect profile is used when selected HTML is converted to markdown.
+    /// </summary>
+    public HtmlMarkdownProfile MarkdownProfile { get; set; } = HtmlMarkdownProfile.Portable;
+
+    /// <summary>
     /// Controls how images are emitted when selected HTML is converted to markdown.
     /// </summary>
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
@@ -326,6 +331,7 @@ public sealed class HtmlCrawlOptions {
             IncludeHtml = IncludeHtml,
             IncludeText = IncludeText,
             IncludeMarkdown = IncludeMarkdown,
+            MarkdownProfile = MarkdownProfile,
             MarkdownImageMode = MarkdownImageMode,
             ListingCardMetadataMode = ListingCardMetadataMode,
             IncludeStructuredJson = IncludeStructuredJson,
