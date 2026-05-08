@@ -12,6 +12,13 @@ namespace HtmlTinkerX;
 public static class HtmlUtilities {
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TagWhitespaceRegex = new(@">\s+<", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    static HtmlUtilities() {
+#if !NETFRAMEWORK
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+#endif
+    }
+
     /// <summary>
     /// Resolves the provided path to an absolute file system path.
     /// Environment variables are expanded and relative paths are

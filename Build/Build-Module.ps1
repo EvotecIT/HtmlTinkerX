@@ -83,9 +83,23 @@ Build-Module -ModuleName 'PSParseHTML' {
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
     $refreshPSD1Only = $false
-    if ($Env:RefreshPSD1Only) {
-        $refreshPSD1Only = [System.Convert]::ToBoolean($Env:RefreshPSD1Only)
+    if (-not [string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) {
+        switch -Regex ($Env:RefreshPSD1Only.Trim()) {
+            '^(1|true|yes|on)$' {
+                $refreshPSD1Only = $true
+                break
+            }
+            '^(0|false|no|off)$' {
+                $refreshPSD1Only = $false
+                break
+            }
+            default {
+                throw "RefreshPSD1Only must be a boolean value or numeric flag, but received '$Env:RefreshPSD1Only'."
+            }
+        }
     }
+
+    $netProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
@@ -97,16 +111,19 @@ Build-Module -ModuleName 'PSParseHTML' {
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
-        NETProjectPath                    = 'Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj'
+        NETProjectPath                    = $netProjectPath
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
-        NETAssemblyLoadContext            = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         RefreshPSD1Only                   = $refreshPSD1Only
         NETBinaryModuleDocumentation      = $true
+    }
+
+    if (-not $refreshPSD1Only) {
+        $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat

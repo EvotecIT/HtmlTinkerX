@@ -105,10 +105,11 @@ public class HtmlParserTableAdvancedTests {
 //         // The test relies on external URL encoding detection which behaves differently in .NET Framework
 //         return;
 // #else
-        // This test validates our encoding fix for URL downloads
-        var url = "https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm";
+        // This test validates our encoding fix for URL downloads without depending on an external site.
+        using var server = PolishEncodingFixture.CreateServer();
+        using var client = PolishEncodingFixture.CreateClient(server);
+        var url = "/polish";
 
-        using var client = new HttpClient();
         var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client);
         var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, false, null, null, false, false, false, null);
 

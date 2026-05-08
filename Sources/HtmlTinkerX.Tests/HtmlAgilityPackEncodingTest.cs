@@ -18,8 +18,9 @@ public class HtmlAgilityPackEncodingTest
     [Fact]
     public async Task TestHtmlAgilityPackEncodingIssue()
     {
-        var url = "https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm";
-        using var client = new HttpClient();
+        using var server = PolishEncodingFixture.CreateServer();
+        using var client = PolishEncodingFixture.CreateClient(server);
+        var url = "/polish";
         
         // Download with proper encoding
         var content = await HtmlUtilities.GetStringWithProperEncodingAsync(client, url);
