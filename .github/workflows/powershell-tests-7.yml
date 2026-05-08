@@ -98,6 +98,51 @@ jobs:
         run: .\PSParseHTML.Tests.ps1
         timeout-minutes: 10
 
+  test-windows-packaged-alc:
+    needs: refresh-psd1
+    name: 'Windows Packaged ALC conflict'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: psd1
+          path: .
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.4 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PwshSpectreConsole -Repository PSGallery -RequiredVersion 2.6.3 -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build packaged module
+        shell: pwsh
+        env:
+          RefreshPSD1Only: 'false'
+        run: .\Build\Build-Module.ps1
+        timeout-minutes: 15
+
+      - name: Run packaged ALC conflict smoke test
+        shell: pwsh
+        run: |
+          $config = [PesterConfiguration]::Default
+          $config.Run.Path = 'Tests/AssemblyLoadContext.Conflict.Tests.ps1'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+        timeout-minutes: 5
+
   test-ubuntu:
     needs: refresh-psd1
     name: 'Ubuntu PowerShell 7'
