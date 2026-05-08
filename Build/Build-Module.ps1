@@ -82,6 +82,11 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
+    $refreshPSD1Only = $false
+    if ($Env:RefreshPSD1Only) {
+        $refreshPSD1Only = [System.Convert]::ToBoolean($Env:RefreshPSD1Only)
+    }
+
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
@@ -92,13 +97,15 @@ Build-Module -ModuleName 'PSParseHTML' {
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
+        NETProjectPath                    = 'Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
+        NETAssemblyLoadContext            = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = $refreshPSD1Only
         NETBinaryModuleDocumentation      = $true
     }
 
