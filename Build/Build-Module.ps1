@@ -1,4 +1,4 @@
-Import-Module PSPublishModule -Force -ErrorAction Stop
+Import-Module PSPublishModule -MinimumVersion 3.0.4 -Force -ErrorAction Stop
 
 Build-Module -ModuleName 'PSParseHTML' {
     # Usual defaults as per standard module
