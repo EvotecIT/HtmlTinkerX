@@ -136,6 +136,7 @@ jobs:
       - name: Run packaged ALC conflict smoke test
         shell: pwsh
         run: |
+          Import-Module Pester -Force
           $config = [PesterConfiguration]::Default
           $config.Run.Path = 'Tests/AssemblyLoadContext.Conflict.Tests.ps1'
           $config.Run.Exit = $true
