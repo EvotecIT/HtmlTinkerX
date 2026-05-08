@@ -1,4 +1,4 @@
-Import-Module PSPublishModule -MinimumVersion 3.0.4 -Force -ErrorAction Stop
+Import-Module PSPublishModule -Force -ErrorAction Stop
 
 Build-Module -ModuleName 'PSParseHTML' {
     # Usual defaults as per standard module
@@ -82,7 +82,7 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
-    $refreshPSD1Only = $false
+    $refreshPSD1Only = $true
     if (-not [string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) {
         switch -Regex ($Env:RefreshPSD1Only.Trim()) {
             '^(1|true|yes|on)$' {
