@@ -99,8 +99,6 @@ Build-Module -ModuleName 'PSParseHTML' {
         }
     }
 
-    $netProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
-
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
@@ -111,7 +109,6 @@ Build-Module -ModuleName 'PSParseHTML' {
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
-        NETProjectPath                    = $netProjectPath
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
@@ -123,6 +120,7 @@ Build-Module -ModuleName 'PSParseHTML' {
     }
 
     if (-not $refreshPSD1Only) {
+        $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
         $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
     }
 
