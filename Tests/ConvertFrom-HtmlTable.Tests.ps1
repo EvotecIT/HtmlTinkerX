@@ -1,8 +1,30 @@
 ﻿Describe -Name 'ConvertFrom-HtmlTable' {
-    It 'Given a HTML table online with polish chars - Should convert it to a PowerShell object' {
-        $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
+    BeforeAll {
+        function New-PolishTableHtml {
+            $ignoredTables = for ($i = 0; $i -lt 12; $i++) {
+                "<table><tr><td>Ignored $i</td></tr></table>"
+            }
 
-        $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
+            @"
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Polish table encoding fixture</title></head>
+<body>
+$($ignoredTables -join "`n")
+<table>
+    <tr><td>Komórka a1</td><td>Komórka a2</td></tr>
+    <tr><td>Komórka a3</td><td>Komórka a4</td></tr>
+</table>
+</body>
+</html>
+"@
+        }
+
+    }
+
+    It 'Given a HTML table fixture with polish chars - Should convert it to a PowerShell object' {
+        $AllTables = ConvertFrom-HtmlTable -Content (New-PolishTableHtml) -Engine AgilityPack
+
         $AllTables.Count | Should -BeGreaterThan 0
     }
 
@@ -34,42 +56,36 @@
         $Table[1].Column2 | Should -Be 'Komórka a4'
     }
 
-    It 'Parses URL with Polish characters correctly - AgilityPack' {
-        $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
+    It 'Parses generated HTML with Polish characters correctly - AgilityPack' {
+        $AllTables = ConvertFrom-HtmlTable -Content (New-PolishTableHtml) -Engine AgilityPack
 
-        $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AgilityPack
         $AllTables.Count | Should -BeGreaterThan 0
 
         # Find the specific table we're testing (should be table index 12)
-        if ($AllTables.Count -gt 12) {
-            $Table = $AllTables[12]
-            $Table.Count | Should -BeGreaterOrEqual 2
+        $Table = $AllTables[12]
+        $Table.Count | Should -BeGreaterOrEqual 2
 
-            # Check that Polish characters are preserved correctly
-            $Table[0].Column1 | Should -Be 'Komórka a1'
-            $Table[0].Column2 | Should -Be 'Komórka a2'
-            $Table[1].Column1 | Should -Be 'Komórka a3'
-            $Table[1].Column2 | Should -Be 'Komórka a4'
-        }
+        # Check that Polish characters are preserved correctly
+        $Table[0].Column1 | Should -Be 'Komórka a1'
+        $Table[0].Column2 | Should -Be 'Komórka a2'
+        $Table[1].Column1 | Should -Be 'Komórka a3'
+        $Table[1].Column2 | Should -Be 'Komórka a4'
     }
 
-    It 'Parses URL with Polish characters correctly - AngleSharp' {
-        $Url = 'https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm'
+    It 'Parses generated HTML with Polish characters correctly - AngleSharp' {
+        $AllTables = ConvertFrom-HtmlTable -Content (New-PolishTableHtml) -Engine AngleSharp
 
-        $AllTables = ConvertFrom-HtmlTable -Url $Url -Engine AngleSharp
         $AllTables.Count | Should -BeGreaterThan 0
 
         # Find the specific table we're testing (should be table index 12)
-        if ($AllTables.Count -gt 12) {
-            $Table = $AllTables[12]
-            $Table.Count | Should -BeGreaterOrEqual 2
+        $Table = $AllTables[12]
+        $Table.Count | Should -BeGreaterOrEqual 2
 
-            # Check that Polish characters are preserved correctly
-            $Table[0].Column1 | Should -Be 'Komórka a1'
-            $Table[0].Column2 | Should -Be 'Komórka a2'
-            $Table[1].Column1 | Should -Be 'Komórka a3'
-            $Table[1].Column2 | Should -Be 'Komórka a4'
-        }
+        # Check that Polish characters are preserved correctly
+        $Table[0].Column1 | Should -Be 'Komórka a1'
+        $Table[0].Column2 | Should -Be 'Komórka a2'
+        $Table[1].Column1 | Should -Be 'Komórka a3'
+        $Table[1].Column2 | Should -Be 'Komórka a4'
     }
     It 'Given a HTML Page with Tables' {
         $AllTables = ConvertFrom-HtmlTable -Url 'https://docs.microsoft.com/en-us/azure/active-directory/enterprise-users/licensing-service-plan-reference'

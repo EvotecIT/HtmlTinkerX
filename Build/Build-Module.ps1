@@ -82,6 +82,23 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
+    $refreshPSD1Only = $true
+    if (-not [string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) {
+        switch -Regex ($Env:RefreshPSD1Only.Trim()) {
+            '^(1|true|yes|on)$' {
+                $refreshPSD1Only = $true
+                break
+            }
+            '^(0|false|no|off)$' {
+                $refreshPSD1Only = $false
+                break
+            }
+            default {
+                throw "RefreshPSD1Only must be a boolean value or numeric flag, but received '$Env:RefreshPSD1Only'."
+            }
+        }
+    }
+
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
@@ -98,8 +115,13 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = $refreshPSD1Only
         NETBinaryModuleDocumentation      = $true
+    }
+
+    if (-not $refreshPSD1Only) {
+        $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
+        $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat

@@ -12,6 +12,10 @@ namespace HtmlTinkerX;
 public static class HtmlUtilities {
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TagWhitespaceRegex = new(@">\s+<", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+#if !NETFRAMEWORK
+    private static int CodePagesEncodingProviderRegistered;
+#endif
+
     /// <summary>
     /// Resolves the provided path to an absolute file system path.
     /// Environment variables are expanded and relative paths are
@@ -105,7 +109,7 @@ public static class HtmlUtilities {
         if (contentType?.CharSet != null) {
             try {
                 string charset = contentType.CharSet.Trim().Trim('"').Trim('\'');
-                var encoding = System.Text.Encoding.GetEncoding(charset);
+                var encoding = GetEncodingWithCodePagesFallback(charset);
                 return encoding.GetString(bytes);
             } catch {
                 // If the specified encoding is not supported, fall through to detection
@@ -132,7 +136,7 @@ public static class HtmlUtilities {
 
         if (metaMatch.Success) {
             try {
-                var encoding = System.Text.Encoding.GetEncoding(metaMatch.Groups["charset"].Value);
+                var encoding = GetEncodingWithCodePagesFallback(metaMatch.Groups["charset"].Value);
                 return encoding.GetString(bytes);
             } catch {
                 // If the detected encoding is not supported, fall through to UTF-8
@@ -141,6 +145,23 @@ public static class HtmlUtilities {
 
         // Default to UTF-8 if no encoding could be determined
         return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    private static System.Text.Encoding GetEncodingWithCodePagesFallback(string charset) {
+        try {
+            return System.Text.Encoding.GetEncoding(charset);
+        } catch (ArgumentException) {
+            EnsureCodePagesEncodingProvider();
+            return System.Text.Encoding.GetEncoding(charset);
+        }
+    }
+
+    private static void EnsureCodePagesEncodingProvider() {
+#if !NETFRAMEWORK
+        if (Interlocked.Exchange(ref CodePagesEncodingProviderRegistered, 1) == 0) {
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        }
+#endif
     }
 
     /// <summary>

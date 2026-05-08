@@ -20,8 +20,9 @@ public class EncodingDebugTest
     [Fact]
     public async Task DebugPolishEncodingIssue()
     {
-        var url = "https://ifj.edu.pl/private/krawczyk/kurshtml/tabele/tabele.htm";
-        using var client = new HttpClient();
+        using var server = PolishEncodingFixture.CreateServer();
+        using var client = PolishEncodingFixture.CreateClient(server);
+        var url = "/polish";
         
         // Test with GetStringWithProperEncodingAsync
         var content = await HtmlUtilities.GetStringWithProperEncodingAsync(client, url);

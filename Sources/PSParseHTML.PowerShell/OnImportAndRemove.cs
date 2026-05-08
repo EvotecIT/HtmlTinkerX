@@ -22,7 +22,9 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         }
 #if NET5_0_OR_GREATER
         else {
-            AssemblyLoadContext.Default.Resolving += ResolveAlc;
+            if (IsLoadedInDefaultContext()) {
+                AssemblyLoadContext.Default.Resolving += ResolveAlc;
+            }
         }
 #endif
     }
@@ -37,7 +39,9 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         }
 #if NET5_0_OR_GREATER
         else {
-            AssemblyLoadContext.Default.Resolving -= ResolveAlc;
+            if (IsLoadedInDefaultContext()) {
+                AssemblyLoadContext.Default.Resolving -= ResolveAlc;
+            }
         }
 #endif
     }
@@ -99,6 +103,10 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location)!;
 
     private static readonly LoadContext _alc = new LoadContext(_assemblyDir);
+
+    private static bool IsLoadedInDefaultContext() {
+        return AssemblyLoadContext.GetLoadContext(typeof(OnModuleImportAndRemove).Assembly) == AssemblyLoadContext.Default;
+    }
 
     private static Assembly? ResolveAlc(AssemblyLoadContext defaultAlc, AssemblyName assemblyToResolve) {
         string asmPath = Path.Join(_assemblyDir, $"{assemblyToResolve.Name}.dll");
