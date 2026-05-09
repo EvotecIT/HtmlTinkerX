@@ -18,7 +18,9 @@ on:
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '8.x'
+  DOTNET_VERSION: |
+    8.x
+    10.x
   BUILD_CONFIGURATION: 'Release'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
@@ -29,7 +31,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        framework: [net8.0, net472]
+        framework: [net8.0, net10.0, net472]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,9 +56,14 @@ jobs:
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
+      - name: Run tests for net10.0
+        if: matrix.framework == 'net10.0'
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        timeout-minutes: 10
+
       - name: Run tests for net472
         if: matrix.framework == 'net472'
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
         timeout-minutes: 20
 
       - name: Summarize failing tests
@@ -133,6 +140,10 @@ jobs:
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
+      - name: Run tests for net10.0
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        timeout-minutes: 10
+
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
         shell: pwsh
@@ -198,6 +209,10 @@ jobs:
 
       - name: Run tests
         run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        timeout-minutes: 10
+
+      - name: Run tests for net10.0
+        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
         timeout-minutes: 10
 
       - name: Summarize failing tests

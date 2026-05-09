@@ -4,10 +4,10 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.0.6</VersionPrefix>
-        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+        <TargetFrameworks>net472;net8.0</TargetFrameworks>
         <AssemblyName>PSParseHTML.PowerShell</AssemblyName>
         <AssemblyTitle>PSParseHTML.PowerShell</AssemblyTitle>
-        <Copyright>(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+        <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
     </PropertyGroup>

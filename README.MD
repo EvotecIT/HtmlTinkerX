@@ -8,7 +8,7 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 
 ## 💻 PowerShell Module
 [![powershell gallery version](https://img.shields.io/powershellgallery/v/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
-[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/PSParseHTML.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/PSParseHTML)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/v/PSParseHTML.svg?include_prereleases&label=powershell%20gallery%20preview&color=yellow)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery platforms](https://img.shields.io/powershellgallery/p/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 
@@ -17,6 +17,8 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 [![PowerShell Tests](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/powershell-tests-7.yml/badge.svg)](https://github.com/EvotecIT/HtmlTinkerX/actions/workflows/powershell-tests-7.yml)
 [![top language](https://img.shields.io/github/languages/top/evotecit/HtmlTinkerX.svg)](https://github.com/EvotecIT/HtmlTinkerX)
 [![codecov](https://codecov.io/gh/EvotecIT/HtmlTinkerX/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/HtmlTinkerX)
+
+Dependency guardrails, including the intentional SixLabors 2.x-compatible pin, are documented in [Docs/Dependencies.md](Docs/Dependencies.md).
 
 ## 👨‍💻 Author & Social
 [![Twitter Follow](https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social)](https://twitter.com/PrzemyslawKlys)
@@ -36,7 +38,7 @@ Whether you're working in C# or PowerShell, you get access to:
 - 📧 **Email Processing** - CSS inlining for email compatibility
 - 🔧 **Network Tools** - HAR export, request interception, console logging
 - 🍪 **State Management** - Cookie handling, session persistence
-- 📱 **Multi-Platform** - .NET Framework 4.7.2, .NET Standard 2.0, .NET 8.0
+- 📱 **Multi-Platform** - .NET Framework 4.7.2, .NET 8.0, .NET 10.0
 
 ## 🔄 PowerShell to C# Method Mapping
 
@@ -1716,6 +1718,8 @@ HtmlTinkerX utilizes several high-quality open-source libraries:
 - **[SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp)** - Apache 2.0 License - Image processing
 - **[SixLabors.ImageSharp.Drawing](https://github.com/SixLabors/ImageSharp.Drawing)** - Apache 2.0 License - Image drawing
 - **[SixLabors.Fonts](https://github.com/SixLabors/Fonts)** - Apache 2.0 License - Font handling
+
+SixLabors packages are intentionally pinned to the 2.x-compatible line. See [Docs/Dependencies.md](Docs/Dependencies.md) before changing those versions.
 
 ### 🔧 System Libraries
 - **[System.Net.Http](https://learn.microsoft.com/dotnet/api/system.net.http)** - MIT License - HTTP client
