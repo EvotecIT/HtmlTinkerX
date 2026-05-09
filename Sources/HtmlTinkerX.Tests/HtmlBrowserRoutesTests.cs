@@ -19,7 +19,7 @@ public class HtmlBrowserRoutesTests {
         var page = new Mock<IPage>();
         Func<IRoute, Task> handler = _ => Task.CompletedTask;
         const string pattern = "**/data.json";
-        page.Setup(p => p.RouteAsync(pattern, handler, null)).Returns(Task.CompletedTask).Verifiable();
+        page.Setup(p => p.RouteAsync(pattern, handler, null)).Returns(CompletedRouteRegistration()).Verifiable();
 
         await HtmlBrowser.RegisterRouteAsync(page.Object, pattern, handler);
 
@@ -31,7 +31,7 @@ public class HtmlBrowserRoutesTests {
         var page = new Mock<IPage>();
         Func<IRoute, Task> handler = _ => Task.CompletedTask;
         const string pattern = "**/data.json";
-        page.Setup(p => p.RouteAsync(pattern, handler, null)).Returns(Task.CompletedTask).Verifiable();
+        page.Setup(p => p.RouteAsync(pattern, handler, null)).Returns(CompletedRouteRegistration()).Verifiable();
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));
         typeof(HtmlBrowserSession)
             .GetField("<Page>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -105,4 +105,7 @@ public class HtmlBrowserRoutesTests {
 
         page.Verify();
     }
+
+    private static Task<IAsyncDisposable> CompletedRouteRegistration() =>
+        Task.FromResult(Mock.Of<IAsyncDisposable>());
 }

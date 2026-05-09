@@ -21,7 +21,9 @@ on:
 #       - v2-speedygonzales
 
 env:
-  DOTNET_VERSION: '8.x'
+  DOTNET_VERSION: |
+    8.x
+    10.x
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:

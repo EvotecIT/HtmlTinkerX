@@ -26,6 +26,13 @@ alwaysApply: true
 - They should be rendered as markdown tables in markdown files
 ---
 
+# 📦 Dependency Guardrails
+
+- Do not upgrade `SixLabors.ImageSharp` to 3.x or `SixLabors.ImageSharp.Drawing` to 2.x during routine dependency cleanup. The project intentionally stays on the SixLabors 2.x-compatible stack because the newer line changed licensing.
+- The expected pins are documented in `Docs/Dependencies.md`. `dotnet list package --outdated` reporting these SixLabors packages is expected and should not be treated as cleanup work unless the project explicitly accepts the newer license model.
+
+---
+
 # ⚙️ PowerShell Rules
 
 ## 📁 Structure

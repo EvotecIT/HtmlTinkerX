@@ -7,7 +7,9 @@ on:
   workflow_dispatch:  # Manual trigger only
 
 env:
-  DOTNET_VERSION: '8.x'
+  DOTNET_VERSION: |
+    8.x
+    10.x
   BUILD_CONFIGURATION: 'Release'
 
 jobs:
@@ -38,7 +40,7 @@ jobs:
           }
 
           # Copy built .NET assemblies to Libraries directory
-          $SourcePath = "Sources\PSParseHTML\bin\Release"
+          $SourcePath = "Sources\PSParseHTML.PowerShell\bin\Release"
           if (Test-Path $SourcePath) {
               Copy-Item -Path "$SourcePath\*" -Destination "Libraries" -Recurse -Force
               Write-Host "Copied .NET assemblies to Libraries directory"

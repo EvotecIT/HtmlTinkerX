@@ -4,35 +4,45 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.0.7</VersionPrefix>
-        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+        <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <AssemblyName>HtmlTinkerX</AssemblyName>
         <AssemblyTitle>HtmlTinkerX</AssemblyTitle>
-        <Copyright>(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+        <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoMarkdownHtmlVersion>0.1.6</OfficeImoMarkdownHtmlVersion>
+        <OfficeImoMarkdownHtmlVersion>0.1.13</OfficeImoMarkdownHtmlVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.4.1-beta.506" />
-        <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.167" />
+        <PackageReference Include="AngleSharp" Version="1.4.1-beta.523" />
+        <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.213" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
         <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.47" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+        <PackageReference Include="Jint" Version="4.8.0" />
         <PackageReference Include="NUglify" Version="1.21.17" />
         <PackageReference Include="PreMailer.Net" Version="2.7.2" />
-        <PackageReference Include="System.IO.Compression" Version="4.3.0" />
-        <PackageReference Include="System.Net.Http" Version="4.3.4" />
-        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" Condition=" '$(TargetFramework)' != 'net472' " />
-        <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
+        <PackageReference Include="System.IO.Compression" Version="4.3.0" Condition=" '$(TargetFramework)' == 'net472' " />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" Condition=" '$(TargetFramework)' == 'net472' " />
+        <PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
+
+        <!--
+            Keep the SixLabors stack on the 2.x-compatible line.
+            ImageSharp 3.x changed licensing; do not upgrade these packages to 3.x/2.x Drawing
+            unless the project intentionally accepts the new license terms.
+            See Docs/Dependencies.md for the dependency policy.
+        -->
         <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
         <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
         <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
-        <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="System.Threading.Channels" Version="10.0.7" />
     </ItemGroup>
 
     <ItemGroup>
