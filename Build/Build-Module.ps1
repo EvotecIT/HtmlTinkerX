@@ -119,10 +119,10 @@ Build-Module -ModuleName 'PSParseHTML' {
         NETBinaryModuleDocumentation      = $true
     }
 
-    if (-not $refreshPSD1Only) {
-        $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
-        $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
-    }
+    #if (-not $refreshPSD1Only) {
+    $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
+    $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
+    #}
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
@@ -150,6 +150,6 @@ Build-Module -ModuleName 'PSParseHTML' {
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
     # global options for publishing to github/psgallery
-    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -RepositoryName "HtmlTinkerX" -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
+    New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -RepositoryName "HtmlTinkerX" -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
 } -ExitCode
