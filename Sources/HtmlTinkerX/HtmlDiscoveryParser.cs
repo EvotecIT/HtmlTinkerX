@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using AngleSharp.Dom;
 using AngleSharpHtmlParser = AngleSharp.Html.Parser.HtmlParser;
 
 namespace HtmlTinkerX;
@@ -28,7 +29,7 @@ public static class HtmlDiscoveryParser {
                 string resolved = ResolveUrl(href, baseUri);
                 string text = NormalizeWhitespace(anchor.TextContent);
                 string title = NormalizeWhitespace(anchor.GetAttribute("title") ?? string.Empty);
-                string context = NormalizeWhitespace(anchor.ParentElement?.TextContent ?? text);
+                string context = ExtractCleanContext(anchor, text);
                 if (context.Length > maxContextLength) {
                     context = context.Substring(0, maxContextLength);
                 }
@@ -181,6 +182,17 @@ public static class HtmlDiscoveryParser {
         }
 
         return null;
+    }
+
+    private static string ExtractCleanContext(IElement anchor, string fallbackText) {
+        IElement? source = anchor.ParentElement ?? anchor;
+        IElement clone = (IElement)source.Clone(deep: true);
+        foreach (IElement noise in clone.QuerySelectorAll("script,style,noscript,template,svg").ToArray()) {
+            noise.Remove();
+        }
+
+        string context = NormalizeWhitespace(clone.TextContent);
+        return string.IsNullOrWhiteSpace(context) ? fallbackText : context;
     }
 
     private static string NormalizeWhitespace(string value) =>

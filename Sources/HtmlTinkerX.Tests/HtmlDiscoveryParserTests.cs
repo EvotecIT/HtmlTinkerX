@@ -28,6 +28,33 @@ public class HtmlDiscoveryParserTests {
     }
 
     [Fact]
+    public void ParseLinks_RemovesStyleScriptAndSvgTextFromContext() {
+        const string html = """
+<html>
+  <body>
+    <article>
+      <p>
+        <style>.attachment-cls-1{fill:none;stroke-width:1.5px;}</style>
+        <svg><title>Decorative icon</title><path d="M0 0" /></svg>
+        <script>console.log("noise")</script>
+        <a href="/api/attachments/18" title="Regulamin.pdf">Regulamin monitoringu.pdf</a>
+        658.52 KB
+      </p>
+    </article>
+  </body>
+</html>
+""";
+
+        HtmlDiscoveredLink link = Assert.Single(HtmlDiscoveryParser.ParseLinks(html, new Uri("https://bip.example.org/articles/1")));
+
+        Assert.Equal("Regulamin monitoringu.pdf", link.Text);
+        Assert.Contains("658.52 KB", link.Context);
+        Assert.DoesNotContain("attachment-cls", link.Context);
+        Assert.DoesNotContain("Decorative icon", link.Context);
+        Assert.DoesNotContain("console.log", link.Context);
+    }
+
+    [Fact]
     public void ParseSitemapUrls_ReturnsUrlsetAndSitemapIndexLocations() {
         const string xml = """
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
