@@ -9,7 +9,7 @@ public class HtmlDiscoveryParserTests {
 <html>
   <body>
     <article>
-      <p>Resolution attachment <a href="/files/resolution.pdf">Download PDF</a></p>
+      <p>Resolution attachment <a href="/files/resolution.pdf" title="Budget resolution.pdf">Download PDF</a></p>
       <p><a href="https://external.example.org/info">External info</a></p>
     </article>
   </body>
@@ -21,6 +21,7 @@ public class HtmlDiscoveryParserTests {
         Assert.Equal(2, links.Count);
         Assert.Equal("https://bip.example.org/files/resolution.pdf", links[0].Url);
         Assert.Equal("Download PDF", links[0].Text);
+        Assert.Equal("Budget resolution.pdf", links[0].Title);
         Assert.Contains("Resolution attachment", links[0].Context);
         Assert.False(links[0].IsExternal);
         Assert.True(links[1].IsExternal);

@@ -13,6 +13,9 @@ public sealed class HtmlDiscoveredLink {
     /// <summary>Anchor text.</summary>
     public string Text { get; set; } = string.Empty;
 
+    /// <summary>Anchor title attribute when provided.</summary>
+    public string Title { get; set; } = string.Empty;
+
     /// <summary>Nearby parent text useful for attachment context.</summary>
     public string Context { get; set; } = string.Empty;
 

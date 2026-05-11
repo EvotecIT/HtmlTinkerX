@@ -27,6 +27,7 @@ public static class HtmlDiscoveryParser {
                 string href = anchor.GetAttribute("href") ?? string.Empty;
                 string resolved = ResolveUrl(href, baseUri);
                 string text = NormalizeWhitespace(anchor.TextContent);
+                string title = NormalizeWhitespace(anchor.GetAttribute("title") ?? string.Empty);
                 string context = NormalizeWhitespace(anchor.ParentElement?.TextContent ?? text);
                 if (context.Length > maxContextLength) {
                     context = context.Substring(0, maxContextLength);
@@ -40,6 +41,7 @@ public static class HtmlDiscoveryParser {
                     Url = resolved,
                     Href = href.Trim(),
                     Text = text,
+                    Title = title,
                     Context = context,
                     IsExternal = isExternal
                 };
