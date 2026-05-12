@@ -29,6 +29,7 @@ Import-Module PSParseHTML -Force
 `$href = `$link | Select-HtmlAttributeValue -AttributeName href
 `$text = `$link | Select-HtmlInnerText -DeEntitize
 `$variable = ConvertFrom-JavaScriptAst -Content 'const reportToken = "abc";' | Select-JavaScriptVariable -Name reportToken
+`$objectExpression = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };' | Select-JavaScriptAstNode -Type ObjectExpression | Select-Object -First 1
 `$htmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
 `$acornimaAccelerator = [Acornima.Parser].FullName
 `$command = Get-Command ConvertFrom-HtmlTable -ErrorAction Stop
@@ -62,6 +63,7 @@ Import-Module PSParseHTML -Force
     SelectedText = `$text
     JavaScriptVariableName = `$variable.Name
     JavaScriptVariableValue = `$variable.Value
+    JavaScriptAstNodeType = `$objectExpression.TypeText
     HtmlNodeAccelerator = `$htmlNodeAccelerator
     AcornimaParserAccelerator = `$acornimaAccelerator
     LoadedAssemblies = @(`$loadedAssemblies)
@@ -84,6 +86,7 @@ Import-Module PSParseHTML -Force
         $result.SelectedText | Should -Be 'Report & Status'
         $result.JavaScriptVariableName | Should -Be 'reportToken'
         $result.JavaScriptVariableValue | Should -Be 'abc'
+        $result.JavaScriptAstNodeType | Should -Be 'ObjectExpression'
         $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
         $result.AcornimaParserAccelerator | Should -Be 'Acornima.Parser'
         $result.ConvertFromHtmlTableAssembly | Should -BeLike '*\Artefacts\Unpacked\Modules\PSParseHTML\Lib\Core\PSParseHTML.PowerShell.dll'

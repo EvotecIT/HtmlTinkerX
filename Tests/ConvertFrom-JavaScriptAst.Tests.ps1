@@ -24,4 +24,19 @@ Describe 'JavaScript AST cmdlets' {
         $variable.Name | Should -Be 'tokenValue'
         $variable.Value | Should -Be 'abc'
     }
+
+    It 'selects descendant AST nodes by Acornima type' {
+        $nodes = ConvertFrom-JavaScriptAst -Content 'class App { run() { const answer = 42; } }' |
+            Select-JavaScriptAstNode -Type ClassBody, VariableDeclaration
+
+        $nodes.TypeText | Should -Contain 'ClassBody'
+        $nodes.TypeText | Should -Contain 'VariableDeclaration'
+    }
+
+    It 'can parse source directly when selecting AST nodes' {
+        $node = Select-JavaScriptAstNode -Source 'const settings = { apiKey: "abc" };' -Type ObjectExpression |
+            Select-Object -First 1
+
+        $node.TypeText | Should -Be 'ObjectExpression'
+    }
 }

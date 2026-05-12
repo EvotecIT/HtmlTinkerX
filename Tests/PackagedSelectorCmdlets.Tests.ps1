@@ -21,16 +21,18 @@ Import-Module PSParseHTML -Force
 `$href = `$link | Select-HtmlAttributeValue -AttributeName href
 `$text = `$link | Select-HtmlInnerText -DeEntitize
 `$variable = ConvertFrom-JavaScriptAst -Content 'const reportToken = "abc";' | Select-JavaScriptVariable -Name reportToken
+`$objectExpression = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };' | Select-JavaScriptAstNode -Type ObjectExpression | Select-Object -First 1
 
 [pscustomobject]@{
     Commands = @(
-        Get-Command Select-HtmlNode, Select-HtmlAttributeValue, Select-HtmlInnerText, ConvertFrom-JavaScriptAst, Select-JavaScriptVariable |
+        Get-Command Select-HtmlNode, Select-HtmlAttributeValue, Select-HtmlInnerText, ConvertFrom-JavaScriptAst, Select-JavaScriptAstNode, Select-JavaScriptVariable |
             Select-Object -ExpandProperty Name
     )
     Href = `$href
     Text = `$text
     JavaScriptVariableName = `$variable.Name
     JavaScriptVariableValue = `$variable.Value
+    JavaScriptAstNodeType = `$objectExpression.TypeText
     HtmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
     AcornimaParserAccelerator = [Acornima.Parser].FullName
 } | ConvertTo-Json -Depth 4 -Compress
@@ -47,11 +49,13 @@ Import-Module PSParseHTML -Force
         $result.Commands | Should -Contain 'Select-HtmlAttributeValue'
         $result.Commands | Should -Contain 'Select-HtmlInnerText'
         $result.Commands | Should -Contain 'ConvertFrom-JavaScriptAst'
+        $result.Commands | Should -Contain 'Select-JavaScriptAstNode'
         $result.Commands | Should -Contain 'Select-JavaScriptVariable'
         $result.Href | Should -Be '/reports/42'
         $result.Text | Should -Be 'Report & Status'
         $result.JavaScriptVariableName | Should -Be 'reportToken'
         $result.JavaScriptVariableValue | Should -Be 'abc'
+        $result.JavaScriptAstNodeType | Should -Be 'ObjectExpression'
         $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
         $result.AcornimaParserAccelerator | Should -Be 'Acornima.Parser'
     }

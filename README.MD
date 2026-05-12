@@ -652,6 +652,12 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **ConvertFrom-HtmlMeta** - Extract name/content pairs from meta tags
 - **ConvertFrom-HtmlMicrodata** - Extract structured data items (schema.org types)
 - **ConvertFrom-HtmlOpenGraph** - Extract Open Graph metadata
+- **Select-HtmlNode** - Select HtmlAgilityPack nodes with XPath or common tag/attribute predicates
+- **Select-HtmlAttributeValue** - Read HTML attribute values with fallback defaults
+- **Select-HtmlInnerText** - Read node text with optional HTML entity decoding
+- **ConvertFrom-JavaScriptAst** - Parse JavaScript into an Acornima AST
+- **Select-JavaScriptAstNode** - Traverse Acornima AST descendants by node type
+- **Select-JavaScriptVariable** - Find JavaScript variable declarations by name or prefix
 - **Format-CSS** - Pretty-print style sheets
 - **Format-HTML** - Tidy up HTML markup
 - **Format-JavaScript** - Beautify JavaScript with customizable options
@@ -705,8 +711,27 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Export-HTMLOutline** - Generate document outlines
 - **Show-HTMLHar** - Visualize HAR files
 - **Compare-HTML** - Compare HTML documents
-- **Measure-HTMLDocument** - Analyze document metrics##
- 🎯 C# API Reference
+- **Measure-HTMLDocument** - Analyze document metrics
+
+### JavaScript AST parsing
+
+HtmlTinkerX currently uses Jint 4.x, which uses Acornima for JavaScript parsing. Older Jint 3.x builds used Esprima, so older examples that referenced `[Esprima.JavaScriptParser]` should be translated to the Acornima surface:
+
+```powershell
+$ast = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };'
+$ast | Select-JavaScriptAstNode -Type ObjectExpression
+$ast | Select-JavaScriptVariable -Name api -Contains
+```
+
+For lower-level exploration, the packaged PowerShell module exposes selected dependency type accelerators through its AssemblyLoadContext boundary, including `[Acornima.Parser]`, `[Acornima.ParserOptions]`, and common `[Acornima.Ast.*]` node types.
+
+```powershell
+$parser = [Acornima.Parser]::new()
+$script = $parser.ParseScript('const answer = 42;')
+$script | Select-JavaScriptAstNode -Type VariableDeclaration
+```
+
+## 🎯 C# API Reference
 
 ### Core Classes
 
@@ -1751,7 +1776,9 @@ dotnet add package HtmlTinkerX --version latest
 
 ## 🔧 Troubleshooting
 
-### Jint Version Conflict Warning
+### Jint and JavaScript Parser Notes
+
+HtmlTinkerX uses Jint for JavaScript execution support. Jint 4.x uses Acornima as its parser; older Jint 3.x builds used Esprima. Use Acornima examples and type names when working with JavaScript AST objects in current HtmlTinkerX builds.
 
 You may see warnings about conflicting Jint versions when building for .NET Framework 4.7.2:
 
@@ -1761,14 +1788,14 @@ There was a conflict between "Jint, Version=3.1.6.0" and "Jint, Version=4.1.0.0"
 ```
 
 **Why this happens:**
-- HtmlTinkerX references Jint 3.1.6 directly
+- HtmlTinkerX references Jint directly
 - AngleSharp.Js 1.0.0-beta.43 (a dependency) was compiled against a different version
 - This is a known issue with prerelease packages
 
 **Impact:**
 - The warning only affects .NET Framework 4.7.2 builds
 - .NET 8.0 and .NET Standard 2.0 builds are not affected
-- The library will still work correctly as the older Jint version (3.1.6) is used
+- The library will still work correctly when binding redirects resolve the runtime version consistently
 
 **Solutions:**
 1. **Ignore the warning** - It doesn't affect functionality
