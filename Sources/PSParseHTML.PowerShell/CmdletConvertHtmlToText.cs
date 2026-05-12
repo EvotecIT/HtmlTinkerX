@@ -54,6 +54,18 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     [Parameter]
     public string? OutputFile { get; set; }
 
+    /// <summary>Select the most readable article-like content region before converting to text.</summary>
+    [Parameter]
+    public SwitchParameter Readable { get; set; }
+
+    /// <summary>Preferred CSS selector for the readable content container.</summary>
+    [Parameter]
+    public string? Selector { get; set; }
+
+    /// <summary>Return readable extraction metadata instead of only the extracted text.</summary>
+    [Parameter]
+    public SwitchParameter IncludeMetadata { get; set; }
+
     /// <summary>
     /// Proxy server address used when downloading from <see cref="Url"/>.
     /// Include the protocol and port if necessary.
@@ -70,15 +82,30 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        string text = ParameterSetName switch {
-            ParameterSetFile => HtmlParserToText.ConvertFileToText(Path.ToFullPath()),
-            ParameterSetUrl => HtmlParserToText.ConvertToText(
-                await HtmlUtilities.GetStringWithProperEncodingAsync(
-                    HttpClientHelper.Create(Proxy, ProxyCredential),
-                    Url.ToString()).ConfigureAwait(false)),
-            _ => HtmlParserToText.ConvertToText(Content)
+        string html = ParameterSetName switch {
+            ParameterSetFile => HtmlUtilities.ReadFileChecked(Path.ToFullPath()),
+            ParameterSetUrl => await HtmlUtilities.GetStringWithProperEncodingAsync(
+                HttpClientHelper.Create(Proxy, ProxyCredential),
+                Url.ToString()).ConfigureAwait(false),
+            _ => Content
         };
 
+        if (Readable.IsPresent || IncludeMetadata.IsPresent || !string.IsNullOrWhiteSpace(Selector)) {
+            HtmlReadableTextResult result = HtmlParserToText.ExtractReadableText(html, Selector);
+            if (IncludeMetadata.IsPresent) {
+                WriteObject(result);
+                return;
+            }
+
+            await WriteOutputAsync(result.Text).ConfigureAwait(false);
+            return;
+        }
+
+        string text = HtmlParserToText.ConvertToText(html);
+        await WriteOutputAsync(text).ConfigureAwait(false);
+    }
+
+    private async Task WriteOutputAsync(string text) {
         if (!string.IsNullOrEmpty(OutputFile)) {
             string outPath = OutputFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK
