@@ -120,8 +120,21 @@ Build-Module -ModuleName 'PSParseHTML' {
     }
 
     #if (-not $refreshPSD1Only) {
-    $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
-    $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
+        $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
+        $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
+        $configurationBuildCommand = Get-Command -Name New-ConfigurationBuild -ErrorAction SilentlyContinue
+        if ($configurationBuildCommand -and $configurationBuildCommand.Parameters.ContainsKey('NETAssemblyTypeAccelerators')) {
+            $newConfigurationBuildSplat.NETAssemblyTypeAcceleratorMode = 'AllowList'
+            $newConfigurationBuildSplat.NETAssemblyTypeAccelerators = @(
+                'HtmlAgilityPack.HtmlDocument'
+                'HtmlAgilityPack.HtmlEntity'
+                'HtmlAgilityPack.HtmlNode'
+                'HtmlAgilityPack.HtmlNodeType'
+                'HtmlAgilityPack.HtmlAttribute'
+            )
+        } else {
+            Write-Warning 'Installed PSPublishModule does not support NETAssemblyTypeAccelerators yet; skipping HtmlAgilityPack type accelerator exposure for this build.'
+        }
     #}
 
     New-ConfigurationBuild @newConfigurationBuildSplat
