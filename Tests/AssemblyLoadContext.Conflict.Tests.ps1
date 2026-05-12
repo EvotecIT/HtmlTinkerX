@@ -24,6 +24,13 @@ Import-Module PwshSpectreConsole -RequiredVersion 2.6.3 -Force
 
 Import-Module PSParseHTML -Force
 `$table = ConvertFrom-HtmlTable -Content '<table><tr><th>Name</th></tr><tr><td>42</td></tr></table>' -Engine AngleSharp
+`$doc = ConvertFrom-HTML -Content '<main><a href="/reports/42" data-kind="report">Report &amp; Status</a></main>'
+`$link = `$doc | Select-HtmlNode -Tag a -AttributeName data-kind -AttributeValue report -Single
+`$href = `$link | Select-HtmlAttributeValue -AttributeName href
+`$text = `$link | Select-HtmlInnerText -DeEntitize
+`$variable = ConvertFrom-JavaScriptAst -Content 'const reportToken = "abc";' | Select-JavaScriptVariable -Name reportToken
+`$htmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
+`$acornimaAccelerator = [Acornima.Parser].FullName
 `$command = Get-Command ConvertFrom-HtmlTable -ErrorAction Stop
 `$commandAssembly = `$command.ImplementingType.Assembly
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
@@ -51,6 +58,12 @@ Import-Module PSParseHTML -Force
     ConvertFromHtmlTableAssembly = `$commandAssembly.Location
     ConvertFromHtmlTableALC = `$commandAlc.Name
     ConvertFromHtmlTableALCIsDefault = [object]::ReferenceEquals(`$commandAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
+    SelectedHref = `$href
+    SelectedText = `$text
+    JavaScriptVariableName = `$variable.Name
+    JavaScriptVariableValue = `$variable.Value
+    HtmlNodeAccelerator = `$htmlNodeAccelerator
+    AcornimaParserAccelerator = `$acornimaAccelerator
     LoadedAssemblies = @(`$loadedAssemblies)
 } | ConvertTo-Json -Depth 6 -Compress
 "@
@@ -67,6 +80,12 @@ Import-Module PSParseHTML -Force
         $result.TextMateCommandAfter | Should -BeGreaterOrEqual 1
         $result.SpectreCommandAfter | Should -BeGreaterOrEqual 1
         $result.TableValue | Should -Be '42'
+        $result.SelectedHref | Should -Be '/reports/42'
+        $result.SelectedText | Should -Be 'Report & Status'
+        $result.JavaScriptVariableName | Should -Be 'reportToken'
+        $result.JavaScriptVariableValue | Should -Be 'abc'
+        $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
+        $result.AcornimaParserAccelerator | Should -Be 'Acornima.Parser'
         $result.ConvertFromHtmlTableAssembly | Should -BeLike '*\Artefacts\Unpacked\Modules\PSParseHTML\Lib\Core\PSParseHTML.PowerShell.dll'
         $result.ConvertFromHtmlTableALC | Should -Be 'PSParseHTML'
         $result.ConvertFromHtmlTableALCIsDefault | Should -BeFalse
