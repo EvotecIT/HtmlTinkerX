@@ -161,12 +161,20 @@ public static class HtmlDiscoveryParser {
             return string.Empty;
         }
 
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute)) {
-            return absolute.AbsoluteUri;
+        bool isRootRelativeReference = trimmed[0] == '/' || trimmed[0] == '\\';
+        if (baseUri != null && (isRootRelativeReference || !Uri.TryCreate(trimmed, UriKind.Absolute, out _))) {
+            string normalized = trimmed.Replace('\\', '/');
+            if (Uri.TryCreate(baseUri, normalized, out Uri? resolved)) {
+                return resolved.AbsoluteUri;
+            }
         }
 
-        if (baseUri != null && Uri.TryCreate(baseUri, trimmed, out Uri? resolved)) {
-            return resolved.AbsoluteUri;
+        if (isRootRelativeReference) {
+            return trimmed.Replace('\\', '/');
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute)) {
+            return absolute.AbsoluteUri;
         }
 
         return trimmed;
