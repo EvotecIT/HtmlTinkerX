@@ -19,14 +19,17 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
     /// <summary>JavaScript content to parse and inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSource, ValueFromPipeline = true, Position = 0)]
     [Alias("Content")]
+    [ValidateNotNullOrEmpty]
     public string Source { get; set; } = string.Empty;
 
     /// <summary>Acornima AST node to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetAst, ValueFromPipeline = true, Position = 0)]
+    [ValidateNotNull]
     public Node Ast { get; set; } = null!;
 
     /// <summary>Variable names to return.</summary>
     [Parameter]
+    [ValidateNotNullOrEmpty]
     public string[]? Name { get; set; }
 
     /// <summary>Matches variable names that contain the provided Name values.</summary>
@@ -48,8 +51,12 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
             : new Acornima.Parser().ParseScript(Source, sourceFile: null, strict: false);
 
         foreach (VariableDeclaration declaration in FindNodes<VariableDeclaration>(root)) {
+            ThrowIfStopped();
             foreach (VariableDeclarator declarator in declaration.Declarations) {
-                if (declarator.Id is not Identifier identifier || !IsMatch(identifier.Name)) {
+                ThrowIfStopped();
+                if (declarator.Id is not Identifier identifier ||
+                    string.IsNullOrEmpty(identifier.Name) ||
+                    !IsMatch(identifier.Name)) {
                     continue;
                 }
 
@@ -72,6 +79,7 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
         }
 
         foreach (string name in Name) {
+            ThrowIfStopped();
             if (Contains.IsPresent && variableName.Contains(name)) {
                 return true;
             }
@@ -88,10 +96,11 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
         return false;
     }
 
-    private static IEnumerable<T> FindNodes<T>(Node root) where T : Node {
+    private IEnumerable<T> FindNodes<T>(Node root) where T : Node {
         Stack<Node> stack = new();
         stack.Push(root);
         while (stack.Count > 0) {
+            ThrowIfStopped();
             Node node = stack.Pop();
             if (node is T matched) {
                 yield return matched;

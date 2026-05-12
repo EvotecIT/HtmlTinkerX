@@ -1,6 +1,7 @@
 using Acornima;
 using Acornima.Ast;
 using HtmlTinkerX;
+using System;
 using System.IO;
 using System.Management.Automation;
 using System.Threading.Tasks;
@@ -22,11 +23,13 @@ public sealed class CmdletConvertFromJavaScriptAst : AsyncPSCmdlet {
     /// <summary>JavaScript content to parse.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     [Alias("FileContent")]
+    [ValidateNotNullOrEmpty]
     public string Content { get; set; } = string.Empty;
 
     /// <summary>Path to a JavaScript file to parse.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile)]
     [Alias("File")]
+    [ValidateNotNullOrEmpty]
     public string Path { get; set; } = string.Empty;
 
     /// <summary>Parses the input as an ECMAScript module.</summary>
@@ -47,9 +50,7 @@ public sealed class CmdletConvertFromJavaScriptAst : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
-        string source = ParameterSetName == ParameterSetFile
-            ? File.ReadAllText(Path.ToFullPath())
-            : Content;
+        string source = ReadSource();
         ParserOptions options = new() {
             Tolerant = Tolerant.IsPresent,
             PreserveParens = PreserveParens.IsPresent,
@@ -62,5 +63,17 @@ public sealed class CmdletConvertFromJavaScriptAst : AsyncPSCmdlet {
 
         WriteObject(ast);
         return Task.CompletedTask;
+    }
+
+    private string ReadSource() {
+        if (ParameterSetName != ParameterSetFile) {
+            return Content;
+        }
+
+        try {
+            return File.ReadAllText(Path.ToFullPath());
+        } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) {
+            throw new PSInvalidOperationException($"Unable to read JavaScript file '{Path}': {ex.Message}");
+        }
     }
 }

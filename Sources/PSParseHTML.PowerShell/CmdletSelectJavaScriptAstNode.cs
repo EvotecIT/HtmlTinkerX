@@ -22,14 +22,17 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     /// <summary>JavaScript content to parse and inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSource, ValueFromPipeline = true, Position = 0)]
     [Alias("Content")]
+    [ValidateNotNullOrEmpty]
     public string Source { get; set; } = string.Empty;
 
     /// <summary>Acornima AST node to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetAst, ValueFromPipeline = true, Position = 0)]
+    [ValidateNotNull]
     public Node Ast { get; set; } = null!;
 
     /// <summary>Node type names to return, such as VariableDeclaration, ObjectExpression, or ClassBody.</summary>
     [Parameter]
+    [ValidateNotNullOrEmpty]
     public string[]? Type { get; set; }
 
     /// <summary>Includes the root node in the traversal output.</summary>
@@ -52,6 +55,7 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         Node root = ParameterSetName == ParameterSetAst ? Ast : ParseSource(Source);
         foreach (Node node in EnumerateNodes(root, IncludeRoot.IsPresent)) {
+            ThrowIfStopped();
             if (MatchesType(node)) {
                 WriteObject(node);
             }
@@ -80,14 +84,16 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
         string fullName = node.GetType().FullName ?? runtimeType;
         string typeText = node.TypeText;
         string enumName = node.Type.ToString();
-        return Type.Any(filter =>
-            string.Equals(filter, runtimeType, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filter, fullName, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filter, typeText, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(filter, enumName, StringComparison.OrdinalIgnoreCase));
+        return Type.Any(filter => {
+            ThrowIfStopped();
+            return string.Equals(filter, runtimeType, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(filter, fullName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(filter, typeText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(filter, enumName, StringComparison.OrdinalIgnoreCase);
+        });
     }
 
-    private static IEnumerable<Node> EnumerateNodes(Node root, bool includeRoot) {
+    private IEnumerable<Node> EnumerateNodes(Node root, bool includeRoot) {
         Stack<Node> stack = new();
         if (includeRoot) {
             stack.Push(root);
@@ -98,6 +104,7 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
         }
 
         while (stack.Count > 0) {
+            ThrowIfStopped();
             Node node = stack.Pop();
             yield return node;
 
