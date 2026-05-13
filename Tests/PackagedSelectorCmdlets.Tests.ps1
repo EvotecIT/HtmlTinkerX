@@ -35,6 +35,7 @@ Import-Module PSParseHTML -Force
     JavaScriptAstNodeType = `$objectExpression.TypeText
     HtmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
     AcornimaParserAccelerator = [Acornima.Parser].FullName
+    AcornimaAstVisitorAccelerator = [Acornima.AstVisitor].FullName
 } | ConvertTo-Json -Depth 4 -Compress
 "@
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -58,5 +59,6 @@ Import-Module PSParseHTML -Force
         $result.JavaScriptAstNodeType | Should -Be 'ObjectExpression'
         $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
         $result.AcornimaParserAccelerator | Should -Be 'Acornima.Parser'
+        $result.AcornimaAstVisitorAccelerator | Should -Be 'Acornima.AstVisitor'
     }
 }

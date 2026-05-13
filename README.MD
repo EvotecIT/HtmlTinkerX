@@ -723,11 +723,13 @@ $ast | Select-JavaScriptAstNode -Type ObjectExpression
 $ast | Select-JavaScriptVariable -Name api -Contains
 ```
 
-For lower-level exploration, the packaged PowerShell module exposes selected dependency type accelerators through its AssemblyLoadContext boundary, including `[Acornima.Parser]`, `[Acornima.ParserOptions]`, and common `[Acornima.Ast.*]` node types.
+For lower-level exploration, the packaged PowerShell module exposes selected dependency type accelerators through its AssemblyLoadContext boundary, including `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.AstVisitor]`, and common `[Acornima.Ast.*]` node types.
 
 ```powershell
 $parser = [Acornima.Parser]::new()
 $script = $parser.ParseScript('const answer = 42;')
+$visitor = [Acornima.AstVisitor]::new()
+$visitor.Visit($script)
 $script | Select-JavaScriptAstNode -Type VariableDeclaration
 ```
 

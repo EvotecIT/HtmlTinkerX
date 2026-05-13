@@ -23,6 +23,6 @@ Current PowerShell-friendly entry points:
 - `ConvertFrom-JavaScriptAst` parses JavaScript into an Acornima AST.
 - `Select-JavaScriptAstNode` traverses descendant AST nodes by type, replacing the common `DescendantNodes` workflow.
 - `Select-JavaScriptVariable` finds variable declarations by exact, contains, or starts-with name matches.
-- Packaged builds expose selected type accelerators such as `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.Ast.Node]`, `[Acornima.Ast.VariableDeclaration]`, `[Acornima.Ast.ObjectExpression]`, and `[Acornima.Ast.ClassBody]`.
+- Packaged builds expose selected type accelerators such as `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.AstVisitor]`, `[Acornima.Ast.Node]`, `[Acornima.Ast.VariableDeclaration]`, `[Acornima.Ast.ObjectExpression]`, and `[Acornima.Ast.ClassBody]`.
 
 Do not add Esprima back only for compatibility unless the project intentionally decides to carry both parser APIs. Prefer Acornima cmdlets and type accelerators for new work because they match the current Jint dependency graph.

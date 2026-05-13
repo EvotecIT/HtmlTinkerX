@@ -435,8 +435,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Ignore me", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Hello", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -462,8 +461,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Share", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -490,8 +488,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Polish", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -520,8 +517,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Tools", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Tools", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -547,8 +543,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("related-posts", page.Html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("language-switcher", page.Html, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -574,8 +569,7 @@ public class HtmlCrawlerTests {
             Assert.Equal(HtmlCrawlContentSelectionReasonCode.RawSelectorMiss, page.ContentSelectionReasonCode);
             Assert.Null(page.ContentElementSelectorHint);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -602,8 +596,7 @@ public class HtmlCrawlerTests {
             Assert.Equal("article", page.ContentElementTag);
             Assert.Equal("article", page.ContentElementSelectorHint);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -633,8 +626,7 @@ public class HtmlCrawlerTests {
             Assert.True(page.ReaderCandidateCount >= 3);
             Assert.Equal("body", page.ReaderRootElementSelectorHint);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -661,8 +653,7 @@ public class HtmlCrawlerTests {
             Assert.Equal("main", page.ReaderRootElementSelectorHint);
             Assert.True(page.ReaderCandidateCount >= 2);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -737,8 +728,7 @@ public class HtmlCrawlerTests {
             string report = result.Summary.ToReportText(result.SitemapUrls);
             Assert.Contains("Best comparison sample Reader:", report, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -773,8 +763,7 @@ public class HtmlCrawlerTests {
             Assert.Empty(page.ContentComparisons);
             Assert.Null(page.BestContentComparisonMode);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -801,8 +790,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("Polish", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileWordPressMarkers, page.AppliedProfileReasonCode);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -829,8 +817,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileDocumentationMarkers, page.AppliedProfileReasonCode);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -856,8 +843,7 @@ public class HtmlCrawlerTests {
             Assert.DoesNotContain("On this page", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Documentation body", page.Text, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -884,8 +870,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("Users API", page.Text, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileApiDocumentationMarkers, page.AppliedProfileReasonCode);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -937,8 +922,7 @@ public class HtmlCrawlerTests {
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.ExplicitProfileName, namedPage.AppliedProfileReasonCode);
             Assert.Equal(HtmlCrawlProfileSelectionReasonCode.AutoProfileHostMatch, automaticPage.AppliedProfileReasonCode);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             File.Delete(profilePath);
         }
     }
@@ -1115,8 +1099,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("Guidance", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("external CSS", indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -1152,8 +1135,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.SitemapUrls, url => url == rootUrl + "sitemap.xml");
             Assert.Contains(result.SkippedPages, page => page.Url == rootUrl + "blocked" && page.SkipReason == HtmlCrawlSkipReason.DisallowedByRobots);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1182,8 +1164,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.Pages, page => page.Url == rootUrl + "blocked");
             Assert.DoesNotContain(result.SkippedPages, page => page.Url == rootUrl + "blocked");
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1238,8 +1219,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("Sitemap sources:", summaryText, StringComparison.OrdinalIgnoreCase);
             Assert.Contains(rootUrl + "sitemap.xml", summaryText, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -1268,8 +1248,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.Pages, page => page.Url == rootUrl + "docs/page-1");
             Assert.Contains(result.SkippedPages, page => page.Url == rootUrl + "blog/post-1" && page.SkipReason == HtmlCrawlSkipReason.OutsidePathScope);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1293,8 +1272,7 @@ public class HtmlCrawlerTests {
             Assert.Equal(rootUrl + "landing", page.RequestedUrl);
             Assert.Equal(rootUrl + "docs/home", page.CanonicalUrl);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1323,8 +1301,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.SkippedPages, page => page.Url == rootUrl + "copy-b" && page.SkipReason == HtmlCrawlSkipReason.DuplicateContent);
             Assert.Equal(1, result.Summary.DuplicatePageCount);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1347,8 +1324,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(result.Pages, page => page.Url == rootUrl);
             Assert.Contains(result.Pages, page => page.Url == rootUrl + "page");
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1534,8 +1510,7 @@ public class HtmlCrawlerTests {
             Assert.Contains(Path.GetFileName(home.HtmlPath!), indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains(Path.GetFileName(about.HtmlPath!), indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -2559,8 +2534,7 @@ public class HtmlCrawlerTests {
             Assert.Contains("not-assessed", indexHtml, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Offline state <code>Pending:not-assessed</code>: 1", indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }

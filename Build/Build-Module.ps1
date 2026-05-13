@@ -128,6 +128,7 @@ Build-Module -ModuleName 'PSParseHTML' {
             $newConfigurationBuildSplat.NETAssemblyTypeAccelerators = @(
                 'Acornima.Parser'
                 'Acornima.ParserOptions'
+                'Acornima.AstVisitor'
                 'Acornima.Ast.ClassBody'
                 'Acornima.Ast.Expression'
                 'Acornima.Ast.FunctionDeclaration'
