@@ -82,77 +82,52 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
-    $refreshPSD1Only = $true
-    if (-not [string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) {
-        switch -Regex ($Env:RefreshPSD1Only.Trim()) {
-            '^(1|true|yes|on)$' {
-                $refreshPSD1Only = $true
-                break
-            }
-            '^(0|false|no|off)$' {
-                $refreshPSD1Only = $false
-                break
-            }
-            default {
-                throw "RefreshPSD1Only must be a boolean value or numeric flag, but received '$Env:RefreshPSD1Only'."
-            }
-        }
-    }
-
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
-        SignModule                        = if ($Env:COMPUTERNAME -eq 'EVOMONSTER') { $true } else { $false }
+        SignModule                        = if ($Env:COMPUTERNAME -eq 'EVOMAGIC') { $true } else { $false }
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
+        NETProjectPath                    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
+        NETAssemblyLoadContext            = $true
+        NETAssemblyTypeAcceleratorMode    = 'AllowList'
+        NETAssemblyTypeAccelerators       = @(
+            'Acornima.Parser'
+            'Acornima.ParserOptions'
+            'Acornima.AstVisitor'
+            'Acornima.Ast.ClassBody'
+            'Acornima.Ast.Expression'
+            'Acornima.Ast.FunctionDeclaration'
+            'Acornima.Ast.Identifier'
+            'Acornima.Ast.Literal'
+            'Acornima.Ast.Module'
+            'Acornima.Ast.Node'
+            'Acornima.Ast.ObjectExpression'
+            'Acornima.Ast.Program'
+            'Acornima.Ast.Property'
+            'Acornima.Ast.Script'
+            'Acornima.Ast.Statement'
+            'Acornima.Ast.VariableDeclaration'
+            'Acornima.Ast.VariableDeclarator'
+            'HtmlAgilityPack.HtmlDocument'
+            'HtmlAgilityPack.HtmlEntity'
+            'HtmlAgilityPack.HtmlNode'
+            'HtmlAgilityPack.HtmlNodeType'
+            'HtmlAgilityPack.HtmlAttribute'
+        )
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = $refreshPSD1Only
+        RefreshPSD1Only                   = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
         NETBinaryModuleDocumentation      = $true
     }
-
-    #if (-not $refreshPSD1Only) {
-        $newConfigurationBuildSplat.NETProjectPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
-        $newConfigurationBuildSplat.NETAssemblyLoadContext = $true
-        $configurationBuildCommand = Get-Command -Name New-ConfigurationBuild -ErrorAction SilentlyContinue
-        if ($configurationBuildCommand -and $configurationBuildCommand.Parameters.ContainsKey('NETAssemblyTypeAccelerators')) {
-            $newConfigurationBuildSplat.NETAssemblyTypeAcceleratorMode = 'AllowList'
-            $newConfigurationBuildSplat.NETAssemblyTypeAccelerators = @(
-                'Acornima.Parser'
-                'Acornima.ParserOptions'
-                'Acornima.AstVisitor'
-                'Acornima.Ast.ClassBody'
-                'Acornima.Ast.Expression'
-                'Acornima.Ast.FunctionDeclaration'
-                'Acornima.Ast.Identifier'
-                'Acornima.Ast.Literal'
-                'Acornima.Ast.Module'
-                'Acornima.Ast.Node'
-                'Acornima.Ast.ObjectExpression'
-                'Acornima.Ast.Program'
-                'Acornima.Ast.Property'
-                'Acornima.Ast.Script'
-                'Acornima.Ast.Statement'
-                'Acornima.Ast.VariableDeclaration'
-                'Acornima.Ast.VariableDeclarator'
-                'HtmlAgilityPack.HtmlDocument'
-                'HtmlAgilityPack.HtmlEntity'
-                'HtmlAgilityPack.HtmlNode'
-                'HtmlAgilityPack.HtmlNodeType'
-                'HtmlAgilityPack.HtmlAttribute'
-            )
-        } else {
-            Write-Warning 'Installed PSPublishModule does not support NETAssemblyTypeAccelerators yet; skipping HtmlAgilityPack and Acornima type accelerator exposure for this build.'
-        }
-    #}
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
