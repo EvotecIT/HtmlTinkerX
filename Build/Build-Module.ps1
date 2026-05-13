@@ -126,6 +126,23 @@ Build-Module -ModuleName 'PSParseHTML' {
         if ($configurationBuildCommand -and $configurationBuildCommand.Parameters.ContainsKey('NETAssemblyTypeAccelerators')) {
             $newConfigurationBuildSplat.NETAssemblyTypeAcceleratorMode = 'AllowList'
             $newConfigurationBuildSplat.NETAssemblyTypeAccelerators = @(
+                'Acornima.Parser'
+                'Acornima.ParserOptions'
+                'Acornima.AstVisitor'
+                'Acornima.Ast.ClassBody'
+                'Acornima.Ast.Expression'
+                'Acornima.Ast.FunctionDeclaration'
+                'Acornima.Ast.Identifier'
+                'Acornima.Ast.Literal'
+                'Acornima.Ast.Module'
+                'Acornima.Ast.Node'
+                'Acornima.Ast.ObjectExpression'
+                'Acornima.Ast.Program'
+                'Acornima.Ast.Property'
+                'Acornima.Ast.Script'
+                'Acornima.Ast.Statement'
+                'Acornima.Ast.VariableDeclaration'
+                'Acornima.Ast.VariableDeclarator'
                 'HtmlAgilityPack.HtmlDocument'
                 'HtmlAgilityPack.HtmlEntity'
                 'HtmlAgilityPack.HtmlNode'
@@ -133,7 +150,7 @@ Build-Module -ModuleName 'PSParseHTML' {
                 'HtmlAgilityPack.HtmlAttribute'
             )
         } else {
-            Write-Warning 'Installed PSPublishModule does not support NETAssemblyTypeAccelerators yet; skipping HtmlAgilityPack type accelerator exposure for this build.'
+            Write-Warning 'Installed PSPublishModule does not support NETAssemblyTypeAccelerators yet; skipping HtmlAgilityPack and Acornima type accelerator exposure for this build.'
         }
     #}
 
