@@ -352,6 +352,16 @@ public static class HtmlParser {
     }
 
     /// <summary>
+    /// Converts HTML markup to Markdown.
+    /// </summary>
+    /// <param name="html">HTML content to convert.</param>
+    /// <param name="pageUrl">Optional absolute page URL used to resolve relative links and images.</param>
+    /// <returns>Markdown converted from the provided HTML.</returns>
+    public static string ConvertToMarkdown(string html, string? pageUrl = null) {
+        return HtmlParserToMarkdown.ConvertToMarkdown(html, pageUrl);
+    }
+
+    /// <summary>
     /// Extracts microdata items from HTML markup.
     /// </summary>
     /// <param name="html">HTML content containing microdata.</param>

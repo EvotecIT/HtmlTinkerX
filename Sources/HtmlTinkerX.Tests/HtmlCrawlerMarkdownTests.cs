@@ -105,6 +105,37 @@ public class HtmlCrawlerMarkdownTests {
         }
     }
 
+    [Fact]
+    public void HtmlParser_ConvertToMarkdown_UsesSharedMarkdownConverter() {
+        const string html = """
+<main>
+  <h1>Hello</h1>
+  <p>Read the <a href="/docs/start">docs</a>.</p>
+</main>
+""";
+
+        string markdown = HtmlParser.ConvertToMarkdown(html, "https://example.com/app/page.html");
+
+        Assert.Contains("# Hello", markdown, StringComparison.Ordinal);
+        Assert.Contains("[docs](https://example.com/docs/start)", markdown, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HtmlParserToMarkdown_ConvertToMarkdownDocument_ExposesPublicDocumentModel() {
+        const string html = """
+<main>
+  <h2>Details</h2>
+  <p>Converted from HTML.</p>
+</main>
+""";
+
+        MarkdownDoc document = HtmlParserToMarkdown.ConvertToMarkdownDocument(html, "https://example.com/app/page.html");
+        string markdown = document.ToMarkdown();
+
+        Assert.Contains("## Details", markdown, StringComparison.Ordinal);
+        Assert.Contains("Converted from HTML.", markdown, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(MarkdownImageRenderingMode.PortableMarkdown)]
     [InlineData(MarkdownImageRenderingMode.RichMarkdown)]
