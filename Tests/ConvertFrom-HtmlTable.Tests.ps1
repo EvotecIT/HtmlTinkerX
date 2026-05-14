@@ -258,6 +258,17 @@ $($ignoredTables -join "`n")
         $Rows.Count | Should -Be 0
     }
 
+    It 'Returns an empty DataSet when table selection matches nothing with AsDataSet' {
+        $Html = @"
+<table id="summary"><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+"@
+
+        $DataSet = ConvertFrom-HtmlTable -Content $Html -TableId 'missing' -AsDataSet
+
+        $DataSet.GetType().FullName | Should -Be 'System.Data.DataSet'
+        $DataSet.Tables.Count | Should -Be 0
+    }
+
     It 'Returns parsed tables from file path as a DataTable' {
         $Path = Join-Path $TestDrive 'table.html'
         @"

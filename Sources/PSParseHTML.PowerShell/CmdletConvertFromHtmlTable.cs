@@ -153,7 +153,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         }
 
         var detailedTables = SelectTables(await GetTablesDetailedAsync().ConfigureAwait(false));
-        if (detailedTables.Count == 0 && HasTableSelection()) {
+        if (detailedTables.Count == 0 && HasTableSelection() && !AsDataSet.IsPresent) {
             return;
         }
 
