@@ -188,6 +188,57 @@ $($ignoredTables -join "`n")
         $Result[0].Age | Should -Be '30'
     }
 
+    It 'Returns parsed table as DataTable when requested' {
+        $Html = @"
+<table id="sales-report">
+    <tr><th>Name</th><th>Amount</th><th>Active</th></tr>
+    <tr><td>North</td><td>12.50</td><td>true</td></tr>
+    <tr><td>South</td><td>7.25</td><td>false</td></tr>
+</table>
+"@
+
+        $Table = ConvertFrom-HtmlTable -Content $Html -AsDataTable -InferTypes
+
+        $Table.GetType().FullName | Should -Be 'System.Data.DataTable'
+        $Table.TableName | Should -Be 'sales_report'
+        $Table.Columns['Amount'].DataType.FullName | Should -Be 'System.Decimal'
+        $Table.Rows.Count | Should -Be 2
+        $Table.Rows[0]['Name'] | Should -Be 'North'
+        $Table.Rows[0]['Amount'] | Should -Be ([decimal]'12.50')
+    }
+
+    It 'Returns all parsed tables as a DataSet when requested' {
+        $Html = @"
+<table id="dup"><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="dup"><tr><th>Name</th></tr><tr><td>Two</td></tr></table>
+"@
+
+        $DataSet = ConvertFrom-HtmlTable -Content $Html -AsDataSet
+
+        $DataSet.GetType().FullName | Should -Be 'System.Data.DataSet'
+        $DataSet.Tables.Count | Should -Be 2
+        $DataSet.Tables[0].TableName | Should -Be 'dup'
+        $DataSet.Tables[1].TableName | Should -Be 'dup2'
+        $DataSet.Tables[1].Rows[0]['Name'] | Should -Be 'Two'
+    }
+
+    It 'Returns parsed tables from file path as a DataTable' {
+        $Path = Join-Path $TestDrive 'table.html'
+        @"
+<table id="from-file">
+    <tr><th>Name</th><th>Amount</th></tr>
+    <tr><td>North</td><td>12.50</td></tr>
+</table>
+"@ | Set-Content -LiteralPath $Path
+
+        $Table = ConvertFrom-HtmlTable -Path $Path -AsDataTable -InferTypes
+
+        $Table.GetType().FullName | Should -Be 'System.Data.DataTable'
+        $Table.TableName | Should -Be 'from_file'
+        $Table.Columns['Amount'].DataType.FullName | Should -Be 'System.Decimal'
+        $Table.Rows[0]['Name'] | Should -Be 'North'
+    }
+
     It 'Parses Wikipedia escape sequence table with correct columns' {
         [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['User-Agent'] = 'HtmlTinkerX.Tests'
         try {

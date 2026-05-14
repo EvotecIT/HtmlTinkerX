@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
@@ -23,14 +24,19 @@ namespace PSParseHTML.PowerShell;
 ///   <code>ConvertFrom-HtmlTable -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
-[OutputType(typeof(PSObject[]))]
+[OutputType(typeof(PSObject[]), typeof(DataTable), typeof(DataSet))]
 public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
+    private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML content containing tables.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>Path to an HTML file containing tables.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetFile, ValueFromPipelineByPropertyName = true)]
+    public string Path { get; set; } = string.Empty;
 
     /// <summary>URL of a page with tables.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -56,6 +62,26 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     /// <summary>Include table metadata information.</summary>
     [Parameter]
     public SwitchParameter IncludeMetadata { get; set; }
+
+    /// <summary>Return each parsed HTML table as a DataTable.</summary>
+    [Parameter]
+    public SwitchParameter AsDataTable { get; set; }
+
+    /// <summary>Return all parsed HTML tables as a DataSet.</summary>
+    [Parameter]
+    public SwitchParameter AsDataSet { get; set; }
+
+    /// <summary>Name to use when returning a single DataTable.</summary>
+    [Parameter]
+    public string? TableName { get; set; }
+
+    /// <summary>Name to use when returning a DataSet.</summary>
+    [Parameter]
+    public string? DataSetName { get; set; }
+
+    /// <summary>Infer simple .NET column types when returning DataTable/DataSet output.</summary>
+    [Parameter]
+    public SwitchParameter InferTypes { get; set; }
 
     /// <summary>Pad rows with missing cells.</summary>
     [Parameter]
@@ -93,7 +119,32 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
+        if (AsDataTable.IsPresent && AsDataSet.IsPresent) {
+            throw new PSArgumentException("Specify either -AsDataTable or -AsDataSet, but not both.");
+        }
+
+        if (IncludeMetadata.IsPresent && (AsDataTable.IsPresent || AsDataSet.IsPresent)) {
+            throw new PSArgumentException("-IncludeMetadata cannot be combined with -AsDataTable or -AsDataSet.");
+        }
+
         var detailedTables = await GetTablesDetailedAsync();
+
+        if (AsDataSet.IsPresent) {
+            WriteObject(detailedTables.ToDataSet(DataSetName, InferTypes.IsPresent), false);
+            return;
+        }
+
+        if (AsDataTable.IsPresent) {
+            if (detailedTables.Count > 1) {
+                WriteWarning($"{detailedTables.Count} tables found. Returning one DataTable per parsed table.");
+            }
+
+            bool useRequestedName = detailedTables.Count == 1 && !string.IsNullOrWhiteSpace(TableName);
+            foreach (var tableResult in detailedTables) {
+                WriteObject(tableResult.ToDataTable(useRequestedName ? TableName : null, InferTypes.IsPresent), false);
+            }
+            return;
+        }
 
         if (IncludeMetadata.IsPresent) {
             foreach (var tableResult in detailedTables) {
@@ -128,6 +179,14 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
 
             var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
             return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+        }
+
+        if (ParameterSetName == ParameterSetFile) {
+            if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
+                return HtmlParser.ParseFileTablesWithAngleSharpDetailed(Path.ToFullPath(), Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+            }
+
+            return HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed(Path.ToFullPath(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
         }
 
         if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {

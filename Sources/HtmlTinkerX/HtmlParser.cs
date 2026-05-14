@@ -3,8 +3,10 @@ using AngleSharp.Html.Parser;
 using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -109,6 +111,58 @@ public static class HtmlParser {
     }
 
     /// <summary>
+    /// Extracts table data from an HTML file using AngleSharp with detailed metadata.
+    /// </summary>
+    /// <param name="filePath">Path to an HTML file.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseFileTablesWithAngleSharpDetailed(
+        string filePath,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        string html = HtmlUtilities.ReadFileChecked(filePath);
+        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+    }
+
+    /// <summary>
+    /// Extracts table data from an HTML stream using AngleSharp with detailed metadata.
+    /// </summary>
+    /// <param name="stream">Readable stream containing HTML.</param>
+    /// <param name="encoding">Optional text encoding. UTF-8 is used when omitted.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseStreamTablesWithAngleSharpDetailed(
+        Stream stream,
+        Encoding? encoding = null,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        string html = ReadHtmlStream(stream, encoding);
+        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+    }
+
+    /// <summary>
     /// Extracts table data from HTML markup using AngleSharp.
     /// </summary>
     /// <param name="html">HTML content containing tables.</param>
@@ -168,6 +222,62 @@ public static class HtmlParser {
         string? emptyValuePlaceholder = null,
         HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
         return HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+    }
+
+    /// <summary>
+    /// Extracts table data from an HTML file using HtmlAgilityPack with detailed metadata.
+    /// </summary>
+    /// <param name="filePath">Path to an HTML file.</param>
+    /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseFileTablesWithHtmlAgilityPackDetailed(
+        string filePath,
+        bool reverseTable = false,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        string html = HtmlUtilities.ReadFileChecked(filePath);
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+    }
+
+    /// <summary>
+    /// Extracts table data from an HTML stream using HtmlAgilityPack with detailed metadata.
+    /// </summary>
+    /// <param name="stream">Readable stream containing HTML.</param>
+    /// <param name="encoding">Optional text encoding. UTF-8 is used when omitted.</param>
+    /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells.</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells.</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseStreamTablesWithHtmlAgilityPackDetailed(
+        Stream stream,
+        Encoding? encoding = null,
+        bool reverseTable = false,
+        IDictionary<string, string>? replaceContent = null,
+        IDictionary<string, string>? replaceHeaders = null,
+        bool allProperties = false,
+        bool skipFooter = false,
+        bool cleanHeaders = false,
+        string? emptyValuePlaceholder = null,
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        string html = ReadHtmlStream(stream, encoding);
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
     }
 
     /// <summary>
@@ -478,5 +588,18 @@ public static class HtmlParser {
                 counters[name] = 0;
             }
         }
+    }
+
+    private static string ReadHtmlStream(Stream stream, Encoding? encoding) {
+        if (stream == null) {
+            throw new ArgumentNullException(nameof(stream));
+        }
+
+        if (!stream.CanRead) {
+            throw new ArgumentException("Stream must be readable.", nameof(stream));
+        }
+
+        using var reader = new StreamReader(stream, encoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+        return reader.ReadToEnd();
     }
 }
