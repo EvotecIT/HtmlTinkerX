@@ -114,6 +114,47 @@ public class HtmlTableDataExtensionsTests {
     }
 
     [Fact]
+    public void SelectTables_RespectsCaseSensitiveMatching() {
+        const string html = """
+<table id="Summary" class="Report"><caption>Summary Data</caption><tr><th>Owner</th></tr><tr><td>Team</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html);
+
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary" }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { ClassName = "report", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { CaptionContains = "summary", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { Header = "owner", IgnoreCase = false }));
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { Id = "Summary", ClassName = "Report", CaptionContains = "Summary", Header = "Owner", IgnoreCase = false }));
+    }
+
+    [Fact]
+    public void SelectTables_EmptySelectionOptionsReturnAllTables() {
+        const string html = """
+<table id="one"><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="two"><tr><th>Name</th></tr><tr><td>Two</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithAngleSharpDetailed(html);
+        var selected = tables.SelectTables(new HtmlTableSelectionOptions {
+            Id = " ",
+            ClassName = "\t",
+            CaptionContains = "\r\n",
+            Header = string.Empty,
+            TableIndexes = { -1 }
+        });
+
+        Assert.Equal(2, selected.Count);
+
+        selected = tables.SelectTables(new HtmlTableSelectionOptions {
+            TableIndexes = null!
+        });
+
+        Assert.Equal(2, selected.Count);
+    }
+
+    [Fact]
     public void ToDataTable_NullTableThrows() {
         Assert.Throws<ArgumentNullException>(() => HtmlTableDataExtensions.ToDataTable(null!));
     }

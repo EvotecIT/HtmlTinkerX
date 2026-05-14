@@ -11,6 +11,9 @@ namespace HtmlTinkerX;
 /// Converts parsed HTML table models into common .NET tabular shapes.
 /// </summary>
 public static class HtmlTableDataExtensions {
+    private const string DefaultColumnNamePrefix = "Column";
+    private const string DefaultDataSetName = "HtmlTables";
+
     /// <summary>
     /// Converts a parsed HTML table into a <see cref="DataTable"/>.
     /// </summary>
@@ -62,7 +65,7 @@ public static class HtmlTableDataExtensions {
             throw new ArgumentNullException(nameof(tables));
         }
 
-        var dataSet = new DataSet(string.IsNullOrWhiteSpace(dataSetName) ? "HtmlTables" : dataSetName);
+        var dataSet = new DataSet(string.IsNullOrWhiteSpace(dataSetName) ? DefaultDataSetName : dataSetName);
         var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int index = 1;
         foreach (HtmlTableResult table in tables) {
@@ -94,9 +97,13 @@ public static class HtmlTableDataExtensions {
         }
 
         var comparison = options.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var indexSet = options.TableIndexes.Count > 0
+        var indexSet = options.TableIndexes?.Count > 0
             ? new HashSet<int>(options.TableIndexes.Where(index => index >= 0))
             : null;
+
+        if (!HasSelectionCriteria(options, indexSet)) {
+            return tables.Where(table => table != null).ToList();
+        }
 
         return tables
             .Where(table => table != null)
@@ -120,12 +127,12 @@ public static class HtmlTableDataExtensions {
         }
 
         if (headers.Count == 0) {
-            headers.Add("Column1");
+            headers.Add(DefaultColumnNamePrefix + "1");
         }
 
         for (int i = 0; i < headers.Count; i++) {
             if (string.IsNullOrWhiteSpace(headers[i])) {
-                headers[i] = "Column" + (i + 1).ToString(CultureInfo.InvariantCulture);
+                headers[i] = DefaultColumnNamePrefix + (i + 1).ToString(CultureInfo.InvariantCulture);
             }
         }
 
@@ -251,6 +258,14 @@ public static class HtmlTableDataExtensions {
         }
 
         return sanitized;
+    }
+
+    private static bool HasSelectionCriteria(HtmlTableSelectionOptions options, ISet<int>? indexSet) {
+        return indexSet?.Count > 0 ||
+               !string.IsNullOrWhiteSpace(options.Id) ||
+               !string.IsNullOrWhiteSpace(options.ClassName) ||
+               !string.IsNullOrWhiteSpace(options.CaptionContains) ||
+               !string.IsNullOrWhiteSpace(options.Header);
     }
 
     private static bool MatchesSelection(
