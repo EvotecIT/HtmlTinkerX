@@ -1443,7 +1443,7 @@ public static class HtmlParserFromTable {
         var links = cell.QuerySelectorAll("a[href]")
             .Select(link => (link.GetAttribute("href") ?? string.Empty).Trim())
             .Where(href => href.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
         return links.Length == 0 ? null : string.Join("; ", links);
     }
@@ -1452,7 +1452,7 @@ public static class HtmlParserFromTable {
         var links = cell.SelectNodes(".//a[@href]")?
             .Select(link => link.GetAttributeValue("href", string.Empty).Trim())
             .Where(href => href.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
         return links == null || links.Length == 0 ? null : string.Join("; ", links);
     }

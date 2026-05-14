@@ -85,6 +85,7 @@ public class HtmlTableDataExtensionsTests {
   <tr><th>Name</th><th>Owner</th></tr>
   <tr><td><a href="https://example.com/a">Alpha</a></td><td>Team A</td></tr>
   <tr><td><a href="/beta">Beta</a><a href="/beta/details">Details</a></td><td>Team B</td></tr>
+  <tr><td><a href="/Docs">Docs</a><a href="/docs">docs</a><a href="/Docs">duplicate</a></td><td>Team C</td></tr>
 </table>
 """;
 
@@ -95,6 +96,10 @@ public class HtmlTableDataExtensionsTests {
         Assert.Equal("Alpha", dataTable.Rows[0]["Name"]);
         Assert.Equal("https://example.com/a", dataTable.Rows[0]["NameUrl"]);
         Assert.Equal("/beta; /beta/details", dataTable.Rows[1]["NameUrl"]);
+        Assert.Equal("/Docs; /docs", dataTable.Rows[2]["NameUrl"]);
+
+        HtmlTableResult agilityTable = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+        Assert.Equal("/Docs; /docs", agilityTable.Data[2]["NameUrl"]);
     }
 
     [Fact]
