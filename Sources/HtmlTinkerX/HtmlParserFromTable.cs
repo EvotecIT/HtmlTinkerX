@@ -597,6 +597,7 @@ public static class HtmlParserFromTable {
 
             if (reverseTable) {
                 Dictionary<string, string?> obj = new();
+                Dictionary<string, string?> linkValues = new(StringComparer.OrdinalIgnoreCase);
                 int index = 0;
                 foreach (var row in rows) {
                     if (row == null) {
@@ -622,9 +623,21 @@ public static class HtmlParserFromTable {
                         header = (++index).ToString();
                     }
                     obj[header] = value;
+                    if (includeLinkUrls && cells.Count > 1) {
+                        string? linkUrl = ExtractLinkUrls(cells[1]);
+                        if (!string.IsNullOrWhiteSpace(linkUrl)) {
+                            var used = new HashSet<string>(obj.Keys.Concat(linkValues.Keys), StringComparer.OrdinalIgnoreCase);
+                            string linkHeader = CreateUniqueLinkHeaderName(header, index, used);
+                            linkValues[linkHeader] = linkUrl;
+                        }
+                    }
                 }
 
                 if (obj.Count > 0) {
+                    foreach (var linkValue in linkValues) {
+                        obj[linkValue.Key] = linkValue.Value;
+                    }
+
                     result.Data = new List<Dictionary<string, string?>> { obj };
                     metadata.Headers = obj.Keys.ToList();
                     metadata.ColumnCount = obj.Count;
@@ -1319,20 +1332,24 @@ public static class HtmlParserFromTable {
         var result = new Dictionary<int, string>();
         for (int i = 0; i < headers.Count; i++) {
             string header = headers[i];
-            string baseName = string.IsNullOrWhiteSpace(header)
-                ? DefaultColumnNamePrefix + (i + 1).ToString(CultureInfo.InvariantCulture) + LinkUrlSuffix
-                : header + LinkUrlSuffix;
-            string candidate = baseName;
-            int suffix = 2;
-            while (!used.Add(candidate)) {
-                candidate = baseName + suffix.ToString(CultureInfo.InvariantCulture);
-                suffix++;
-            }
-
-            result[i] = candidate;
+            result[i] = CreateUniqueLinkHeaderName(header, i + 1, used);
         }
 
         return result;
+    }
+
+    private static string CreateUniqueLinkHeaderName(string header, int columnIndex, ISet<string> used) {
+        string baseName = string.IsNullOrWhiteSpace(header)
+            ? DefaultColumnNamePrefix + columnIndex.ToString(CultureInfo.InvariantCulture) + LinkUrlSuffix
+            : header + LinkUrlSuffix;
+        string candidate = baseName;
+        int suffix = 2;
+        while (!used.Add(candidate)) {
+            candidate = baseName + suffix.ToString(CultureInfo.InvariantCulture);
+            suffix++;
+        }
+
+        return candidate;
     }
 
     private static void AppendUsedLinkHeaders(

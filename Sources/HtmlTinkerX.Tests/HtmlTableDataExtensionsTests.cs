@@ -150,6 +150,22 @@ public class HtmlTableDataExtensionsTests {
     }
 
     [Fact]
+    public void ParseTablesDetailed_ReverseTableCanIncludeLinkUrlColumns() {
+        const string html = """
+<table>
+  <tr><th>Name</th><td>Example</td></tr>
+  <tr><th>Website</th><td><a href="https://example.com">Open</a></td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable: true, includeLinkUrls: true).Single();
+
+        Assert.Contains("WebsiteUrl", table.Metadata.Headers);
+        Assert.Equal("Open", table.Data[0]["Website"]);
+        Assert.Equal("https://example.com", table.Data[0]["WebsiteUrl"]);
+    }
+
+    [Fact]
     public void SelectTables_FiltersByIndexIdClassCaptionAndHeader() {
         const string html = """
 <table id="summary" class="report compact"><caption>Summary data</caption><tr><th>Name</th></tr><tr><td>One</td></tr></table>
