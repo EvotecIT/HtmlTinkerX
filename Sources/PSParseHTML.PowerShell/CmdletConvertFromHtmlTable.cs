@@ -83,6 +83,31 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter InferTypes { get; set; }
 
+    /// <summary>Add companion URL columns for linked table cells.</summary>
+    [Parameter]
+    public SwitchParameter IncludeLinkUrls { get; set; }
+
+    /// <summary>Zero-based table indexes to include.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int[]? TableIndex { get; set; }
+
+    /// <summary>Table id to include.</summary>
+    [Parameter]
+    public string? TableId { get; set; }
+
+    /// <summary>CSS class token to include.</summary>
+    [Parameter]
+    public string? TableClass { get; set; }
+
+    /// <summary>Caption text fragment to include.</summary>
+    [Parameter]
+    public string? Caption { get; set; }
+
+    /// <summary>Header name to include.</summary>
+    [Parameter]
+    public string? Header { get; set; }
+
     /// <summary>Pad rows with missing cells.</summary>
     [Parameter]
     public SwitchParameter AllProperties { get; set; }
@@ -127,7 +152,10 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             throw new PSArgumentException("-IncludeMetadata cannot be combined with -AsDataTable or -AsDataSet.");
         }
 
-        var detailedTables = await GetTablesDetailedAsync();
+        var detailedTables = SelectTables(await GetTablesDetailedAsync().ConfigureAwait(false));
+        if (detailedTables.Count == 0 && HasTableSelection() && !AsDataSet.IsPresent) {
+            return;
+        }
 
         if (AsDataSet.IsPresent) {
             WriteObject(detailedTables.ToDataSet(DataSetName, InferTypes.IsPresent), false);
@@ -174,27 +202,34 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
                 string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
-                return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+                return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
             }
 
             var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
-            return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+            return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
         }
 
         if (ParameterSetName == ParameterSetFile) {
             if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                return HtmlParser.ParseFileTablesWithAngleSharpDetailed(Path.ToFullPath(), Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+                return HtmlParser.ParseFileTablesWithAngleSharpDetailed(Path.ToFullPath(), Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
             }
 
-            return HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed(Path.ToFullPath(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+            return HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed(Path.ToFullPath(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
         }
 
         if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-            return HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+            return HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
         }
 
-        return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat());
+        return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
     }
+
+    private bool HasTableSelection() =>
+        TableIndex != null ||
+        !string.IsNullOrWhiteSpace(TableId) ||
+        !string.IsNullOrWhiteSpace(TableClass) ||
+        !string.IsNullOrWhiteSpace(Caption) ||
+        !string.IsNullOrWhiteSpace(Header);
 
     private HtmlCellTextFormat GetCellTextFormat() =>
         Enum.TryParse<HtmlCellTextFormat>(CellTextFormat, true, out var fmt) ? fmt : HtmlCellTextFormat.Compact;
@@ -218,6 +253,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         tableObject.Properties.Add(new PSNoteProperty("TableIndex", tableResult.Metadata.TableIndex));
         tableObject.Properties.Add(new PSNoteProperty("TableId", tableResult.Metadata.Id ?? string.Empty));
         tableObject.Properties.Add(new PSNoteProperty("TableClasses", tableResult.Metadata.Classes ?? string.Empty));
+        tableObject.Properties.Add(new PSNoteProperty("Caption", tableResult.Metadata.Caption ?? string.Empty));
         tableObject.Properties.Add(new PSNoteProperty("TableAttributes", tableResult.Metadata.Attributes));
         tableObject.Properties.Add(new PSNoteProperty("RowCount", tableResult.Metadata.RowCount));
         tableObject.Properties.Add(new PSNoteProperty("ColumnCount", tableResult.Metadata.ColumnCount));
@@ -225,6 +261,31 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         tableObject.Properties.Add(new PSNoteProperty("IsVisible", tableResult.Metadata.IsVisible));
 
         return tableObject;
+    }
+
+    private List<HtmlTableResult> SelectTables(List<HtmlTableResult> tables) {
+        if ((TableIndex == null || TableIndex.Length == 0) &&
+            string.IsNullOrWhiteSpace(TableId) &&
+            string.IsNullOrWhiteSpace(TableClass) &&
+            string.IsNullOrWhiteSpace(Caption) &&
+            string.IsNullOrWhiteSpace(Header)) {
+            return tables;
+        }
+
+        var options = new HtmlTableSelectionOptions {
+            Id = TableId,
+            ClassName = TableClass,
+            CaptionContains = Caption,
+            Header = Header
+        };
+
+        if (TableIndex != null) {
+            foreach (int index in TableIndex) {
+                options.TableIndexes.Add(index);
+            }
+        }
+
+        return tables.SelectTables(options);
     }
 
     /// <summary>

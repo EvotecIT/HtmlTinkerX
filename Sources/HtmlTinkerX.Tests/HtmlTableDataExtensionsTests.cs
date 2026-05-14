@@ -79,6 +79,193 @@ public class HtmlTableDataExtensionsTests {
     }
 
     [Fact]
+    public void ParseTablesDetailed_CanIncludeLinkUrlColumns() {
+        const string html = """
+<table id="links">
+  <tr><th>Name</th><th>Owner</th></tr>
+  <tr><td><a href="https://example.com/a">Alpha</a></td><td>Team A</td></tr>
+  <tr><td><a href="/beta">Beta</a><a href="/beta/details">Details</a></td><td>Team B</td></tr>
+  <tr><td><a href="/Docs">Docs</a><a href="/docs">docs</a><a href="/Docs">duplicate</a></td><td>Team C</td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+        DataTable dataTable = table.ToDataTable();
+
+        Assert.Contains("NameUrl", table.Metadata.Headers);
+        Assert.Equal("Alpha", dataTable.Rows[0]["Name"]);
+        Assert.Equal("https://example.com/a", dataTable.Rows[0]["NameUrl"]);
+        Assert.Equal("/beta; /beta/details", dataTable.Rows[1]["NameUrl"]);
+        Assert.Equal("/Docs; /docs", dataTable.Rows[2]["NameUrl"]);
+
+        HtmlTableResult agilityTable = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+        Assert.Equal("/Docs; /docs", agilityTable.Data[2]["NameUrl"]);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_NormalizesLinkUrlColumnsAcrossRows() {
+        const string html = """
+<table id="links">
+  <tr><th>Name</th><th>Owner</th></tr>
+  <tr><td>Alpha</td><td>Team A</td></tr>
+  <tr><td><a href="https://example.com/b">Beta</a></td><td>Team B</td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+        DataTable dataTable = table.ToDataTable();
+
+        Assert.Contains("NameUrl", table.Metadata.Headers);
+        Assert.True(table.Data[0].ContainsKey("NameUrl"));
+        Assert.Null(table.Data[0]["NameUrl"]);
+        Assert.Equal(DBNull.Value, dataTable.Rows[0]["NameUrl"]);
+        Assert.Equal("https://example.com/b", dataTable.Rows[1]["NameUrl"]);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_UsesDistinctLinkUrlColumnsForEmptyHeaders() {
+        const string html = """
+<table>
+  <tr><th></th><th></th></tr>
+  <tr><td><a href="/one">One</a></td><td><a href="/two">Two</a></td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+
+        Assert.Contains("Column1Url", table.Metadata.Headers);
+        Assert.Contains("Column2Url", table.Metadata.Headers);
+        Assert.Equal("/one", table.Data[0]["Column1Url"]);
+        Assert.Equal("/two", table.Data[0]["Column2Url"]);
+
+        DataTable dataTable = table.ToDataTable();
+        Assert.Contains("0", dataTable.Columns.Cast<DataColumn>().Select(column => column.ColumnName));
+        Assert.Contains("1", dataTable.Columns.Cast<DataColumn>().Select(column => column.ColumnName));
+        Assert.Equal("One", dataTable.Rows[0]["0"]);
+        Assert.Equal("Two", dataTable.Rows[0]["1"]);
+        Assert.Equal("/one", dataTable.Rows[0]["Column1Url"]);
+        Assert.Equal("/two", dataTable.Rows[0]["Column2Url"]);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_UsesOnlyDirectCaptionForNestedTables() {
+        const string html = """
+<table id="outer">
+  <tr><td>
+    <table id="inner"><caption>Nested caption</caption><tr><td>Inside</td></tr></table>
+  </td></tr>
+</table>
+""";
+
+        HtmlTableResult outer = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html).Single(table => table.Metadata.Id == "outer");
+
+        Assert.Equal(string.Empty, outer.Metadata.Caption);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_ReverseTableCanIncludeLinkUrlColumns() {
+        const string html = """
+<table>
+  <tr><th>Name</th><td>Example</td></tr>
+  <tr><th>Website</th><td><a href="https://example.com">Open</a></td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, true, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
+
+        Assert.Contains("WebsiteUrl", table.Metadata.Headers);
+        Assert.Equal("Open", table.Data[0]["Website"]);
+        Assert.Equal("https://example.com", table.Data[0]["WebsiteUrl"]);
+    }
+
+    [Fact]
+    public void SelectTables_FiltersByIndexIdClassCaptionAndHeader() {
+        const string html = """
+<table id="summary" class="report compact"><caption>Summary data</caption><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="details" class="report wide"><caption>Detailed data</caption><tr><th>Owner</th></tr><tr><td>Team</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html);
+
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { TableIndexes = { 1 } }));
+        Assert.Equal("summary", tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary" }).Single().Metadata.Id);
+        Assert.Equal("details", tables.SelectTables(new HtmlTableSelectionOptions { ClassName = "wide" }).Single().Metadata.Id);
+        Assert.Equal("summary", tables.SelectTables(new HtmlTableSelectionOptions { CaptionContains = "summary" }).Single().Metadata.Id);
+        Assert.Equal("details", tables.SelectTables(new HtmlTableSelectionOptions { Header = "Owner" }).Single().Metadata.Id);
+    }
+
+    [Fact]
+    public void SelectTables_RespectsCaseSensitiveMatching() {
+        const string html = """
+<table id="Summary" class="Report"><caption>Summary Data</caption><tr><th>Owner</th></tr><tr><td>Team</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html);
+
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary" }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { ClassName = "report", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { CaptionContains = "summary", IgnoreCase = false }));
+        Assert.Empty(tables.SelectTables(new HtmlTableSelectionOptions { Header = "owner", IgnoreCase = false }));
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { Id = "Summary", ClassName = "Report", CaptionContains = "Summary", Header = "Owner", IgnoreCase = false }));
+    }
+
+    [Fact]
+    public void SelectTables_EmptySelectionOptionsReturnAllTables() {
+        const string html = """
+<table id="one"><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="two"><tr><th>Name</th></tr><tr><td>Two</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithAngleSharpDetailed(html);
+        var selected = tables.SelectTables(new HtmlTableSelectionOptions {
+            Id = " ",
+            ClassName = "\t",
+            CaptionContains = "\r\n",
+            Header = string.Empty,
+            TableIndexes = { -1 }
+        });
+
+        Assert.Equal(2, selected.Count);
+
+        selected = tables.SelectTables(new HtmlTableSelectionOptions {
+            TableIndexes = null!
+        });
+
+        Assert.Equal(2, selected.Count);
+    }
+
+    [Fact]
+    public void PublicDetailedParseOverloads_PreservePreviousSignatures() {
+        Type dictionaryType = typeof(System.Collections.Generic.IDictionary<string, string>);
+
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseFileTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseStreamTablesWithAngleSharpDetailed),
+            new[] { typeof(Stream), typeof(Encoding), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseStreamTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(Stream), typeof(Encoding), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParserFromTable).GetMethod(
+            nameof(HtmlParserFromTable.ParseTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParserFromTable).GetMethod(
+            nameof(HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+    }
+
+    [Fact]
     public void ToDataTable_NullTableThrows() {
         Assert.Throws<ArgumentNullException>(() => HtmlTableDataExtensions.ToDataTable(null!));
     }
