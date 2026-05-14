@@ -79,6 +79,41 @@ public class HtmlTableDataExtensionsTests {
     }
 
     [Fact]
+    public void ParseTablesDetailed_CanIncludeLinkUrlColumns() {
+        const string html = """
+<table id="links">
+  <tr><th>Name</th><th>Owner</th></tr>
+  <tr><td><a href="https://example.com/a">Alpha</a></td><td>Team A</td></tr>
+  <tr><td><a href="/beta">Beta</a><a href="/beta/details">Details</a></td><td>Team B</td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, includeLinkUrls: true).Single();
+        DataTable dataTable = table.ToDataTable();
+
+        Assert.Contains("NameUrl", table.Metadata.Headers);
+        Assert.Equal("Alpha", dataTable.Rows[0]["Name"]);
+        Assert.Equal("https://example.com/a", dataTable.Rows[0]["NameUrl"]);
+        Assert.Equal("/beta; /beta/details", dataTable.Rows[1]["NameUrl"]);
+    }
+
+    [Fact]
+    public void SelectTables_FiltersByIndexIdClassCaptionAndHeader() {
+        const string html = """
+<table id="summary" class="report compact"><caption>Summary data</caption><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="details" class="report wide"><caption>Detailed data</caption><tr><th>Owner</th></tr><tr><td>Team</td></tr></table>
+""";
+
+        var tables = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html);
+
+        Assert.Single(tables.SelectTables(new HtmlTableSelectionOptions { TableIndexes = { 1 } }));
+        Assert.Equal("summary", tables.SelectTables(new HtmlTableSelectionOptions { Id = "summary" }).Single().Metadata.Id);
+        Assert.Equal("details", tables.SelectTables(new HtmlTableSelectionOptions { ClassName = "wide" }).Single().Metadata.Id);
+        Assert.Equal("summary", tables.SelectTables(new HtmlTableSelectionOptions { CaptionContains = "summary" }).Single().Metadata.Id);
+        Assert.Equal("details", tables.SelectTables(new HtmlTableSelectionOptions { Header = "Owner" }).Single().Metadata.Id);
+    }
+
+    [Fact]
     public void ToDataTable_NullTableThrows() {
         Assert.Throws<ArgumentNullException>(() => HtmlTableDataExtensions.ToDataTable(null!));
     }

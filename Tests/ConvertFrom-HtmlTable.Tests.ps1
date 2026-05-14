@@ -222,6 +222,32 @@ $($ignoredTables -join "`n")
         $DataSet.Tables[1].Rows[0]['Name'] | Should -Be 'Two'
     }
 
+    It 'Selects tables and includes link URL metadata when requested' {
+        $Html = @"
+<table id="summary" class="report compact"><caption>Summary data</caption><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+<table id="details" class="report wide">
+    <caption>Detailed data</caption>
+    <tr><th>Name</th><th>Owner</th></tr>
+    <tr><td><a href="https://example.com/report">Report</a></td><td>Team A</td></tr>
+</table>
+"@
+
+        $Rows = ConvertFrom-HtmlTable -Content $Html -TableId 'details' -IncludeLinkUrls
+
+        $Rows.Count | Should -Be 1
+        $Rows[0].Name | Should -Be 'Report'
+        $Rows[0].NameUrl | Should -Be 'https://example.com/report'
+
+        $Metadata = ConvertFrom-HtmlTable -Content $Html -TableClass 'compact' -Caption 'summary' -Header 'Name' -IncludeMetadata
+        $Metadata.TableId | Should -Be 'summary'
+        $Metadata.Caption | Should -Be 'Summary data'
+
+        $DataTable = ConvertFrom-HtmlTable -Content $Html -TableIndex 1 -AsDataTable -IncludeLinkUrls
+        $DataTable.GetType().FullName | Should -Be 'System.Data.DataTable'
+        $DataTable.Columns['NameUrl'].ColumnName | Should -Be 'NameUrl'
+        $DataTable.Rows[0]['NameUrl'] | Should -Be 'https://example.com/report'
+    }
+
     It 'Returns parsed tables from file path as a DataTable' {
         $Path = Join-Path $TestDrive 'table.html'
         @"

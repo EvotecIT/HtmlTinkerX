@@ -33,6 +33,11 @@ public class HtmlTableMetadata {
     public string? Classes { get; set; }
 
     /// <summary>
+    /// Text from the table caption element, when present.
+    /// </summary>
+    public string? Caption { get; set; }
+
+    /// <summary>
     /// Additional attributes found on the table element.
     /// </summary>
     public Dictionary<string, string> Attributes { get; set; } = new();

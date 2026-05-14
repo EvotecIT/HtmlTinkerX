@@ -97,6 +97,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithAngleSharpDetailed(
         string html,
@@ -106,8 +107,9 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
-        return HtmlParserFromTable.ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
+        return HtmlParserFromTable.ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
@@ -121,6 +123,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseFileTablesWithAngleSharpDetailed(
         string filePath,
@@ -130,9 +133,10 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
         string html = HtmlUtilities.ReadFileChecked(filePath);
-        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
@@ -147,6 +151,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseStreamTablesWithAngleSharpDetailed(
         Stream stream,
@@ -157,9 +162,10 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
         string html = ReadHtmlStream(stream, encoding);
-        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
@@ -210,6 +216,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
@@ -220,8 +227,9 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
-        return HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
+        return HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
@@ -236,6 +244,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseFileTablesWithHtmlAgilityPackDetailed(
         string filePath,
@@ -246,9 +255,10 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
         string html = HtmlUtilities.ReadFileChecked(filePath);
-        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
@@ -264,6 +274,7 @@ public static class HtmlParser {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseStreamTablesWithHtmlAgilityPackDetailed(
         Stream stream,
@@ -275,9 +286,10 @@ public static class HtmlParser {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
+        bool includeLinkUrls = false) {
         string html = ReadHtmlStream(stream, encoding);
-        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat);
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls);
     }
 
     /// <summary>
