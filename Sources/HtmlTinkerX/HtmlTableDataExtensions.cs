@@ -112,9 +112,19 @@ public static class HtmlTableDataExtensions {
     }
 
     private static List<string> GetSourceHeaders(HtmlTableResult table) {
-        var headers = table.Metadata.Headers
-            .Where(header => !string.IsNullOrWhiteSpace(header))
-            .ToList();
+        var headers = new List<string>();
+        for (int i = 0; i < table.Metadata.Headers.Count; i++) {
+            string header = table.Metadata.Headers[i];
+            if (!string.IsNullOrWhiteSpace(header)) {
+                headers.Add(header);
+                continue;
+            }
+
+            string positionalHeader = i.ToString(CultureInfo.InvariantCulture);
+            if (table.Data.Any(row => row.ContainsKey(positionalHeader))) {
+                headers.Add(positionalHeader);
+            }
+        }
 
         if (headers.Count == 0) {
             foreach (Dictionary<string, string?> row in table.Data) {

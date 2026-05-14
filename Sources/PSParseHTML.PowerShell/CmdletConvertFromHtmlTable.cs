@@ -153,6 +153,9 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         }
 
         var detailedTables = SelectTables(await GetTablesDetailedAsync().ConfigureAwait(false));
+        if (detailedTables.Count == 0 && HasTableSelection()) {
+            return;
+        }
 
         if (AsDataSet.IsPresent) {
             WriteObject(detailedTables.ToDataSet(DataSetName, InferTypes.IsPresent), false);
@@ -220,6 +223,13 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
 
         return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
     }
+
+    private bool HasTableSelection() =>
+        TableIndex != null ||
+        !string.IsNullOrWhiteSpace(TableId) ||
+        !string.IsNullOrWhiteSpace(TableClass) ||
+        !string.IsNullOrWhiteSpace(Caption) ||
+        !string.IsNullOrWhiteSpace(Header);
 
     private HtmlCellTextFormat GetCellTextFormat() =>
         Enum.TryParse<HtmlCellTextFormat>(CellTextFormat, true, out var fmt) ? fmt : HtmlCellTextFormat.Compact;

@@ -248,6 +248,16 @@ $($ignoredTables -join "`n")
         $DataTable.Rows[0]['NameUrl'] | Should -Be 'https://example.com/report'
     }
 
+    It 'Returns no output when table selection matches nothing' {
+        $Html = @"
+<table id="summary"><tr><th>Name</th></tr><tr><td>One</td></tr></table>
+"@
+
+        $Rows = @(ConvertFrom-HtmlTable -Content $Html -TableId 'missing')
+
+        $Rows.Count | Should -Be 0
+    }
+
     It 'Returns parsed tables from file path as a DataTable' {
         $Path = Join-Path $TestDrive 'table.html'
         @"

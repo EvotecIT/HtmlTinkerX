@@ -88,7 +88,7 @@ public class HtmlTableDataExtensionsTests {
 </table>
 """;
 
-        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, includeLinkUrls: true).Single();
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
         DataTable dataTable = table.ToDataTable();
 
         Assert.Contains("NameUrl", table.Metadata.Headers);
@@ -107,7 +107,7 @@ public class HtmlTableDataExtensionsTests {
 </table>
 """;
 
-        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, includeLinkUrls: true).Single();
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
         DataTable dataTable = table.ToDataTable();
 
         Assert.Contains("NameUrl", table.Metadata.Headers);
@@ -126,12 +126,20 @@ public class HtmlTableDataExtensionsTests {
 </table>
 """;
 
-        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, includeLinkUrls: true).Single();
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, false, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
 
         Assert.Contains("Column1Url", table.Metadata.Headers);
         Assert.Contains("Column2Url", table.Metadata.Headers);
         Assert.Equal("/one", table.Data[0]["Column1Url"]);
         Assert.Equal("/two", table.Data[0]["Column2Url"]);
+
+        DataTable dataTable = table.ToDataTable();
+        Assert.Contains("0", dataTable.Columns.Cast<DataColumn>().Select(column => column.ColumnName));
+        Assert.Contains("1", dataTable.Columns.Cast<DataColumn>().Select(column => column.ColumnName));
+        Assert.Equal("One", dataTable.Rows[0]["0"]);
+        Assert.Equal("Two", dataTable.Rows[0]["1"]);
+        Assert.Equal("/one", dataTable.Rows[0]["Column1Url"]);
+        Assert.Equal("/two", dataTable.Rows[0]["Column2Url"]);
     }
 
     [Fact]
@@ -158,7 +166,7 @@ public class HtmlTableDataExtensionsTests {
 </table>
 """;
 
-        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable: true, includeLinkUrls: true).Single();
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, true, null, null, false, false, false, null, HtmlCellTextFormat.Compact, true).Single();
 
         Assert.Contains("WebsiteUrl", table.Metadata.Headers);
         Assert.Equal("Open", table.Data[0]["Website"]);
@@ -220,6 +228,36 @@ public class HtmlTableDataExtensionsTests {
         });
 
         Assert.Equal(2, selected.Count);
+    }
+
+    [Fact]
+    public void PublicDetailedParseOverloads_PreservePreviousSignatures() {
+        Type dictionaryType = typeof(System.Collections.Generic.IDictionary<string, string>);
+
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseFileTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseStreamTablesWithAngleSharpDetailed),
+            new[] { typeof(Stream), typeof(Encoding), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParser).GetMethod(
+            nameof(HtmlParser.ParseStreamTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(Stream), typeof(Encoding), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParserFromTable).GetMethod(
+            nameof(HtmlParserFromTable.ParseTablesWithAngleSharpDetailed),
+            new[] { typeof(string), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
+        Assert.NotNull(typeof(HtmlParserFromTable).GetMethod(
+            nameof(HtmlParserFromTable.ParseTablesWithHtmlAgilityPackDetailed),
+            new[] { typeof(string), typeof(bool), dictionaryType, dictionaryType, typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(HtmlCellTextFormat) }));
     }
 
     [Fact]

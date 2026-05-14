@@ -29,7 +29,6 @@ public static class HtmlParserFromTable {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
-    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     /// <example>
     /// <code>
@@ -44,8 +43,33 @@ public static class HtmlParserFromTable {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
-        bool includeLinkUrls = false) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        return ParseTablesWithAngleSharpDetailed(html, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls: false);
+    }
+
+    /// <summary>
+    /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing tables.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseTablesWithAngleSharpDetailed(
+        string html,
+        IDictionary<string, string>? replaceContent,
+        IDictionary<string, string>? replaceHeaders,
+        bool allProperties,
+        bool skipFooter,
+        bool cleanHeaders,
+        string? emptyValuePlaceholder,
+        HtmlCellTextFormat cellTextFormat,
+        bool includeLinkUrls) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -536,7 +560,6 @@ public static class HtmlParserFromTable {
     /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
     /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
     /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
-    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
     /// <returns>List of table parse results with metadata.</returns>
     public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
         string html,
@@ -547,8 +570,35 @@ public static class HtmlParserFromTable {
         bool skipFooter = false,
         bool cleanHeaders = false,
         string? emptyValuePlaceholder = null,
-        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact,
-        bool includeLinkUrls = false) {
+        HtmlCellTextFormat cellTextFormat = HtmlCellTextFormat.Compact) {
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls: false);
+    }
+
+    /// <summary>
+    /// Extracts table data from HTML markup using HtmlAgilityPack with detailed metadata.
+    /// </summary>
+    /// <param name="html">HTML content containing tables.</param>
+    /// <param name="reverseTable">Whether to treat rows as key/value pairs.</param>
+    /// <param name="replaceContent">Dictionary of text replacements for table cells (case-insensitive).</param>
+    /// <param name="replaceHeaders">Dictionary of text replacements for header cells (case-insensitive).</param>
+    /// <param name="allProperties">Whether to pad rows with missing cells.</param>
+    /// <param name="skipFooter">Whether to skip HTML table footer elements.</param>
+    /// <param name="cleanHeaders">Whether to automatically clean special characters from header names.</param>
+    /// <param name="emptyValuePlaceholder">Value to use for empty cells.</param>
+    /// <param name="cellTextFormat">Controls how cell text is flattened (compact, lines, markdown).</param>
+    /// <param name="includeLinkUrls">Whether to add companion URL columns for linked cells.</param>
+    /// <returns>List of table parse results with metadata.</returns>
+    public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
+        string html,
+        bool reverseTable,
+        IDictionary<string, string>? replaceContent,
+        IDictionary<string, string>? replaceHeaders,
+        bool allProperties,
+        bool skipFooter,
+        bool cleanHeaders,
+        string? emptyValuePlaceholder,
+        HtmlCellTextFormat cellTextFormat,
+        bool includeLinkUrls) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
