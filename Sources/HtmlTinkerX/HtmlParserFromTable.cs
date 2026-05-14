@@ -15,6 +15,9 @@ namespace HtmlTinkerX;
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
 public static class HtmlParserFromTable {
+    private const string DefaultColumnNamePrefix = "Column";
+    private const string LinkUrlSuffix = "Url";
+
     /// <summary>
     /// Extracts table data from HTML markup using AngleSharp with detailed metadata.
     /// </summary>
@@ -87,7 +90,7 @@ public static class HtmlParserFromTable {
             TableIndex = tableIndex,
             Id = table.Id,
             Classes = table.ClassName,
-            Caption = HtmlEntity.DeEntitize(table.QuerySelector("caption")?.TextContent ?? string.Empty).Trim()
+            Caption = HtmlEntity.DeEntitize(GetDirectCaptionText(table)).Trim()
         };
 
         foreach (var attr in table.Attributes) {
@@ -190,7 +193,7 @@ public static class HtmlParserFromTable {
         string? emptyValuePlaceholder,
         HtmlCellTextFormat cellTextFormat,
         IDictionary<string, string>? dataValueLookup = null,
-        IReadOnlyDictionary<string, string>? linkHeaderNames = null) {
+        IReadOnlyDictionary<int, string>? linkHeaderNames = null) {
         List<Dictionary<string, string?>> tableRows = new();
         Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
         Dictionary<int, (string? Value, int Remaining)> rowSpanLinks = new();
@@ -215,7 +218,7 @@ public static class HtmlParserFromTable {
                     }
                     if (linkHeaderNames != null && rowSpanLinks.TryGetValue(col, out var linkSpan)) {
                         if (!string.IsNullOrWhiteSpace(linkSpan.Value)) {
-                            linkValues[linkHeaderNames[headers[col]]] = linkSpan.Value;
+                            linkValues[linkHeaderNames[col]] = linkSpan.Value;
                         }
                         if (--linkSpan.Remaining == 0) {
                             rowSpanLinks.Remove(col);
@@ -248,10 +251,9 @@ public static class HtmlParserFromTable {
                         rowspan = rs;
                     }
                     for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                        string header = headers[col];
                         rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                         if (linkHeaderNames != null && !string.IsNullOrWhiteSpace(linkUrl)) {
-                            linkValues[linkHeaderNames[header]] = linkUrl;
+                            linkValues[linkHeaderNames[col]] = linkUrl;
                         }
                         if (rowspan > 1) {
                             rowSpans[col] = (rowValues[col], rowspan - 1);
@@ -571,7 +573,7 @@ public static class HtmlParserFromTable {
             metadata.TableIndex = tableIndex;
             metadata.Id = table.GetAttributeValue("id", string.Empty);
             metadata.Classes = table.GetAttributeValue("class", string.Empty);
-            metadata.Caption = HtmlEntity.DeEntitize(table.SelectSingleNode(".//caption")?.InnerText ?? string.Empty).Trim();
+            metadata.Caption = HtmlEntity.DeEntitize(GetDirectCaptionText(table)).Trim();
 
             // Extract all attributes
             foreach (var attr in table.Attributes) {
@@ -730,7 +732,7 @@ public static class HtmlParserFromTable {
                         }
                         if (linkHeaderNames != null && rowSpanLinks.TryGetValue(col, out var linkSpan)) {
                             if (!string.IsNullOrWhiteSpace(linkSpan.Value)) {
-                                linkValues[linkHeaderNames[headers[col]]] = linkSpan.Value;
+                                linkValues[linkHeaderNames[col]] = linkSpan.Value;
                             }
                             if (--linkSpan.Remaining == 0) {
                                 rowSpanLinks.Remove(col);
@@ -763,10 +765,9 @@ public static class HtmlParserFromTable {
                             rowspan = rs2;
                         }
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
-                            string header = headers[col];
                             rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                             if (linkHeaderNames != null && !string.IsNullOrWhiteSpace(linkUrl)) {
-                                linkValues[linkHeaderNames[header]] = linkUrl;
+                                linkValues[linkHeaderNames[col]] = linkUrl;
                             }
                             if (rowspan > 1) {
                                 rowSpans[col] = (rowValues[col], rowspan - 1);
@@ -1313,11 +1314,14 @@ public static class HtmlParserFromTable {
         return HtmlEntity.DeEntitize(cleaned);
     }
 
-    private static Dictionary<string, string> BuildLinkHeaderNames(IReadOnlyList<string> headers) {
+    private static Dictionary<int, string> BuildLinkHeaderNames(IReadOnlyList<string> headers) {
         var used = new HashSet<string>(headers, StringComparer.OrdinalIgnoreCase);
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string header in headers) {
-            string baseName = string.IsNullOrWhiteSpace(header) ? "ColumnUrl" : header + "Url";
+        var result = new Dictionary<int, string>();
+        for (int i = 0; i < headers.Count; i++) {
+            string header = headers[i];
+            string baseName = string.IsNullOrWhiteSpace(header)
+                ? DefaultColumnNamePrefix + (i + 1).ToString(CultureInfo.InvariantCulture) + LinkUrlSuffix
+                : header + LinkUrlSuffix;
             string candidate = baseName;
             int suffix = 2;
             while (!used.Add(candidate)) {
@@ -1325,7 +1329,7 @@ public static class HtmlParserFromTable {
                 suffix++;
             }
 
-            result[header] = candidate;
+            result[i] = candidate;
         }
 
         return result;
@@ -1334,20 +1338,38 @@ public static class HtmlParserFromTable {
     private static void AppendUsedLinkHeaders(
         IList<string> headers,
         IEnumerable<Dictionary<string, string?>> rows,
-        IReadOnlyDictionary<string, string>? linkHeaderNames) {
+        IReadOnlyDictionary<int, string>? linkHeaderNames) {
         if (linkHeaderNames == null) {
             return;
         }
 
+        var rowList = rows as IList<Dictionary<string, string?>> ?? rows.ToList();
         foreach (string linkHeader in linkHeaderNames.Values) {
             if (headers.Contains(linkHeader, StringComparer.OrdinalIgnoreCase)) {
                 continue;
             }
 
-            if (rows.Any(row => row.TryGetValue(linkHeader, out string? value) && !string.IsNullOrWhiteSpace(value))) {
+            if (rowList.Any(row => row.TryGetValue(linkHeader, out string? value) && !string.IsNullOrWhiteSpace(value))) {
                 headers.Add(linkHeader);
+                foreach (Dictionary<string, string?> row in rowList) {
+                    if (!row.ContainsKey(linkHeader)) {
+                        row[linkHeader] = null;
+                    }
+                }
             }
         }
+    }
+
+    private static string GetDirectCaptionText(IElement table) {
+        return table.Children
+            .FirstOrDefault(child => child.TagName.Equals("caption", StringComparison.OrdinalIgnoreCase))
+            ?.TextContent ?? string.Empty;
+    }
+
+    private static string GetDirectCaptionText(HtmlNode table) {
+        return table.ChildNodes
+            .FirstOrDefault(child => child.Name.Equals("caption", StringComparison.OrdinalIgnoreCase))
+            ?.InnerText ?? string.Empty;
     }
 
     private static string? ExtractLinkUrls(IElement cell) {

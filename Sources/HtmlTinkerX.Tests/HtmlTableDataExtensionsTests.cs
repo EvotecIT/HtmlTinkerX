@@ -98,6 +98,58 @@ public class HtmlTableDataExtensionsTests {
     }
 
     [Fact]
+    public void ParseTablesDetailed_NormalizesLinkUrlColumnsAcrossRows() {
+        const string html = """
+<table id="links">
+  <tr><th>Name</th><th>Owner</th></tr>
+  <tr><td>Alpha</td><td>Team A</td></tr>
+  <tr><td><a href="https://example.com/b">Beta</a></td><td>Team B</td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithAngleSharpDetailed(html, includeLinkUrls: true).Single();
+        DataTable dataTable = table.ToDataTable();
+
+        Assert.Contains("NameUrl", table.Metadata.Headers);
+        Assert.True(table.Data[0].ContainsKey("NameUrl"));
+        Assert.Null(table.Data[0]["NameUrl"]);
+        Assert.Equal(DBNull.Value, dataTable.Rows[0]["NameUrl"]);
+        Assert.Equal("https://example.com/b", dataTable.Rows[1]["NameUrl"]);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_UsesDistinctLinkUrlColumnsForEmptyHeaders() {
+        const string html = """
+<table>
+  <tr><th></th><th></th></tr>
+  <tr><td><a href="/one">One</a></td><td><a href="/two">Two</a></td></tr>
+</table>
+""";
+
+        HtmlTableResult table = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html, includeLinkUrls: true).Single();
+
+        Assert.Contains("Column1Url", table.Metadata.Headers);
+        Assert.Contains("Column2Url", table.Metadata.Headers);
+        Assert.Equal("/one", table.Data[0]["Column1Url"]);
+        Assert.Equal("/two", table.Data[0]["Column2Url"]);
+    }
+
+    [Fact]
+    public void ParseTablesDetailed_UsesOnlyDirectCaptionForNestedTables() {
+        const string html = """
+<table id="outer">
+  <tr><td>
+    <table id="inner"><caption>Nested caption</caption><tr><td>Inside</td></tr></table>
+  </td></tr>
+</table>
+""";
+
+        HtmlTableResult outer = HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(html).Single(table => table.Metadata.Id == "outer");
+
+        Assert.Equal(string.Empty, outer.Metadata.Caption);
+    }
+
+    [Fact]
     public void SelectTables_FiltersByIndexIdClassCaptionAndHeader() {
         const string html = """
 <table id="summary" class="report compact"><caption>Summary data</caption><tr><th>Name</th></tr><tr><td>One</td></tr></table>
