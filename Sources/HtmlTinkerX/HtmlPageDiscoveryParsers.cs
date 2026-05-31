@@ -155,14 +155,15 @@ public static class HtmlScriptDataParser {
     }
 
     private static bool IsDataScriptType(string type) {
-        if (type.Length == 0) {
+        string mediaType = type.Split(';')[0].Trim();
+        if (mediaType.Length == 0) {
             return false;
         }
 
-        return type.Equals("application/json", StringComparison.OrdinalIgnoreCase)
-            || type.EndsWith("+json", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("importmap", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("speculationrules", StringComparison.OrdinalIgnoreCase);
+        return mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("importmap", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("speculationrules", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -357,7 +358,7 @@ public static class HtmlWebManifestParser {
 
         AddImages(root, "icons", "Icon", baseUri, manifest.Icons);
         AddImages(root, "screenshots", "Screenshot", baseUri, manifest.Screenshots);
-        AddRelatedApplications(root, manifest.RelatedApplications);
+        AddRelatedApplications(root, baseUri, manifest.RelatedApplications);
         return manifest;
     }
 
@@ -386,7 +387,7 @@ public static class HtmlWebManifestParser {
         }
     }
 
-    private static void AddRelatedApplications(JsonElement root, List<HtmlWebManifestRelatedApplication> applications) {
+    private static void AddRelatedApplications(JsonElement root, Uri? baseUri, List<HtmlWebManifestRelatedApplication> applications) {
         if (!root.TryGetProperty("related_applications", out JsonElement array) || array.ValueKind != JsonValueKind.Array) {
             return;
         }
@@ -395,7 +396,7 @@ public static class HtmlWebManifestParser {
             applications.Add(new HtmlWebManifestRelatedApplication {
                 Index = applications.Count,
                 Platform = GetString(item, "platform"),
-                Url = GetString(item, "url"),
+                Url = Resolve(GetString(item, "url"), baseUri),
                 Id = GetString(item, "id")
             });
         }

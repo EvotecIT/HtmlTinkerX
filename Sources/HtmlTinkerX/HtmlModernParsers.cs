@@ -309,7 +309,9 @@ public static class HtmlHeadLinkParser {
             string href = element.GetAttribute("href") ?? string.Empty;
             string content = element.GetAttribute("content") ?? string.Empty;
             string target = href.Length > 0 ? href : content;
-            string resolved = HtmlModernParserUtilities.ResolveUrl(target, baseUri);
+            string resolved = href.Length > 0 || IsUrlValuedMeta(element)
+                ? HtmlModernParserUtilities.ResolveUrl(target, baseUri)
+                : string.Empty;
             links.Add(new HtmlHeadLink {
                 Index = links.Count,
                 Element = element.TagName.ToLowerInvariant(),
@@ -334,6 +336,41 @@ public static class HtmlHeadLinkParser {
         string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
         return Parse(html, new Uri(url));
     }
+
+    private static bool IsUrlValuedMeta(IElement element) {
+        string name = element.GetAttribute("name") ?? string.Empty;
+        string property = element.GetAttribute("property") ?? string.Empty;
+        string itemprop = element.GetAttribute("itemprop") ?? string.Empty;
+
+        return IsKnownUrlMetaName(name)
+            || IsKnownUrlMetaName(property)
+            || IsKnownUrlMetaName(itemprop);
+    }
+
+    private static bool IsKnownUrlMetaName(string value) {
+        string normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0) {
+            return false;
+        }
+
+        return normalized.Equals("url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("image", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("thumbnail", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("contentUrl", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("embedUrl", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("msapplication-starturl", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("msapplication-TileImage", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("msapplication-config", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("og:url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("og:image", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("og:audio", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("og:video", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("twitter:url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("twitter:image", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("twitter:player", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(":secure_url", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(":url", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>Extracts likely CSRF, anti-forgery, nonce, and auth tokens from HTML.</summary>
@@ -352,8 +389,8 @@ public static class HtmlTokenParser {
         foreach (IElement element in document.QuerySelectorAll("input[name], meta[name], meta[property], [data-token], [nonce]")) {
             string name = element.GetAttribute("name")
                 ?? element.GetAttribute("property")
-                ?? (element.HasAttribute("data-token") ? "data-token" : string.Empty)
-                ?? string.Empty;
+                ?? (element.HasAttribute("data-token") ? "data-token" : null)
+                ?? (element.HasAttribute("nonce") ? "nonce" : string.Empty);
             string value = element.GetAttribute("value")
                 ?? element.GetAttribute("content")
                 ?? element.GetAttribute("data-token")
@@ -645,9 +682,13 @@ internal static class HtmlModernParserUtilities {
     }
 
     internal static bool IsExternal(string value, Uri? baseUri) {
-        return baseUri != null
-            && Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
-            && !string.Equals(uri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase);
+        if (baseUri == null || !Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)) {
+            return false;
+        }
+
+        return !string.Equals(uri.Scheme, baseUri.Scheme, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(uri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase)
+            || uri.Port != baseUri.Port;
     }
 
     internal static string? GetJsonString(JsonElement element, string propertyName) {

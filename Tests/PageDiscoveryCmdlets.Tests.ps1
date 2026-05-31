@@ -8,7 +8,7 @@ Describe 'Page discovery parsing cmdlets' {
 <!doctype html>
 <html>
 <head>
-    <script type="application/json" id="settings">{"enabled":true}</script>
+    <script type="application/json; charset=utf-8" id="settings">{"enabled":true}</script>
     <link rel="preload" as="image" href="/preload.png" />
 </head>
 <body>
@@ -24,6 +24,9 @@ Describe 'Page discovery parsing cmdlets' {
   "name": "Example App",
   "short_name": "Example",
   "start_url": "/app",
+  "related_applications": [
+    { "platform": "webapp", "url": "/other.webmanifest", "id": "org.example.app" }
+  ],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
   ]
@@ -57,6 +60,7 @@ Expires: 2026-12-31T23:59:59Z
 
         $manifest.Name | Should -Be 'Example App'
         $manifest.StartUrl | Should -Be 'https://example.org/app'
+        $manifest.RelatedApplications[0].Url | Should -Be 'https://example.org/other.webmanifest'
         $manifest.Icons | Should -HaveCount 1
     }
 

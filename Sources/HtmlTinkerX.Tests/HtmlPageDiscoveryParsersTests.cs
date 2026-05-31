@@ -8,16 +8,18 @@ public class HtmlPageDiscoveryParsersTests {
     public void ScriptDataParserFindsGenericJsonScripts() {
         string html = """
             <script type="application/json" id="settings">{"enabled":true}</script>
+            <script type="application/json; charset=utf-8" id="qualified">{"qualified":true}</script>
             <script type="application/activity+json">{"name":"activity"}</script>
             <script>const ignored = true;</script>
             """;
 
         var items = HtmlScriptDataParser.Parse(html);
 
-        Assert.Equal(2, items.Count);
+        Assert.Equal(3, items.Count);
         Assert.Equal("settings", items[0].Id);
         Assert.True(items[0].IsJson);
         Assert.Contains("\"enabled\":true", items[0].RawJson);
+        Assert.Equal("qualified", items[1].Id);
     }
 
     [Fact]
@@ -75,7 +77,7 @@ public class HtmlPageDiscoveryParsersTests {
               "display": "standalone",
               "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }],
               "screenshots": [{ "src": "/screen.png", "sizes": "1280x720", "label": "Home" }],
-              "related_applications": [{ "platform": "play", "id": "org.example.app" }]
+              "related_applications": [{ "platform": "play", "url": "/other.webmanifest", "id": "org.example.app" }]
             }
             """;
 
@@ -87,6 +89,7 @@ public class HtmlPageDiscoveryParsersTests {
         Assert.Equal("https://example.org/icon-192.png", manifest.Icons[0].Url);
         Assert.Single(manifest.Screenshots);
         Assert.Single(manifest.RelatedApplications);
+        Assert.Equal("https://example.org/other.webmanifest", manifest.RelatedApplications[0].Url);
     }
 
     [Fact]

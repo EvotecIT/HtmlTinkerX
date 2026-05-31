@@ -7,6 +7,7 @@ Describe 'Modern parsing cmdlets' {
 <head>
 <link rel="canonical" href="/article" />
 <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
+<meta name="description" content="A short summary" />
 <meta name="csrf-token" content="meta-token" />
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Article","@id":"https://example.org/article","headline":"Hello"}
@@ -44,6 +45,7 @@ const csrfToken = "script-token";
 
         $links.Url | Should -Contain 'https://example.org/article'
         $links.Url | Should -Contain 'https://example.org/feed.xml'
+        ($links | Where-Object Name -EQ 'description').Url | Should -Be ''
     }
 
     It 'selects tokens' {

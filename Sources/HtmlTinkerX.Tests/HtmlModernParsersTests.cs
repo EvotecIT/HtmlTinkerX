@@ -45,16 +45,20 @@ public class HtmlModernParsersTests {
             <html><head>
             <link rel="canonical" href="/article" />
             <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
+            <meta name="description" content="A short summary" />
+            <meta property="og:image" content="/social.png" />
             <link rel="manifest" href="https://cdn.example.net/app.webmanifest" />
             </head></html>
             """;
 
         var links = HtmlHeadLinkParser.Parse(html, new System.Uri("https://example.org/base/page"));
 
-        Assert.Equal(3, links.Count);
+        Assert.Equal(5, links.Count);
         Assert.Equal("https://example.org/article", links[0].Url);
         Assert.False(links[0].IsExternal);
-        Assert.True(links[2].IsExternal);
+        Assert.Equal(string.Empty, links[2].Url);
+        Assert.Equal("https://example.org/social.png", links[3].Url);
+        Assert.True(links[4].IsExternal);
     }
 
     [Fact]
@@ -71,7 +75,18 @@ public class HtmlModernParsersTests {
 
         Assert.Contains(tokens, token => token.Name == "csrf-token" && token.Value == "meta-token");
         Assert.Contains(tokens, token => token.Name == "__RequestVerificationToken" && token.Value == "form-token");
+        Assert.Contains(tokens, token => token.Name == "nonce" && token.Value == "abc123");
         Assert.Contains(tokens, token => token.Name == "csrfToken" && token.Value == "script-token");
+    }
+
+    [Fact]
+    public void ExternalDetectionComparesSchemeHostAndPort() {
+        var baseUri = new System.Uri("https://example.org/");
+
+        Assert.False(HtmlModernParserUtilities.IsExternal("https://example.org/app.js", baseUri));
+        Assert.True(HtmlModernParserUtilities.IsExternal("http://example.org/app.js", baseUri));
+        Assert.True(HtmlModernParserUtilities.IsExternal("https://example.org:8443/app.js", baseUri));
+        Assert.True(HtmlModernParserUtilities.IsExternal("https://cdn.example.org/app.js", baseUri));
     }
 
     [Fact]
