@@ -14,7 +14,7 @@ Describe 'Page discovery parsing cmdlets' {
 <body>
     <picture>
         <source type="image/webp" srcset="/hero.webp 1x, /hero@2x.webp 2x" />
-        <img src="/hero.jpg" srcset="/hero-small.jpg 480w, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
+        <img src="/hero.jpg" srcset="/hero-small.jpg 480w, data:image/png;base64,AAAA, /fallback.png 2x, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
     </picture>
 </body>
 </html>
@@ -53,6 +53,8 @@ Expires: 2026-12-31T23:59:59Z
 
         $images.Url | Should -Contain 'https://example.org/hero.jpg'
         $images.WidthDescriptor | Should -Contain '480w'
+        $images.Source | Should -Contain 'data:image/png;base64,AAAA'
+        $images.Url | Should -Contain 'https://example.org/fallback.png'
         $images.PixelDensityDescriptor | Should -Contain '2x'
         $images.Url | Should -Contain 'https://example.org/preload.png'
     }

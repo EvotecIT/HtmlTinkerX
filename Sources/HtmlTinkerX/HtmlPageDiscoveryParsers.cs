@@ -340,7 +340,8 @@ public static class HtmlImageCandidateParser {
 
             string candidate = srcset.Substring(start, index - start).TrimStart();
             if (candidate.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                && !candidate.Any(char.IsWhiteSpace)) {
+                && !candidate.Any(char.IsWhiteSpace)
+                && !IsSeparatorAfterDataUrl(srcset, index)) {
                 continue;
             }
 
@@ -349,6 +350,10 @@ public static class HtmlImageCandidateParser {
         }
 
         yield return srcset.Substring(start);
+    }
+
+    private static bool IsSeparatorAfterDataUrl(string srcset, int commaIndex) {
+        return commaIndex + 1 >= srcset.Length || char.IsWhiteSpace(srcset[commaIndex + 1]);
     }
 
     private static void AddCandidate(List<HtmlImageCandidate> candidates, IElement element, string attribute, string? value, Uri? resolveBaseUri, Uri? pageBaseUri) {

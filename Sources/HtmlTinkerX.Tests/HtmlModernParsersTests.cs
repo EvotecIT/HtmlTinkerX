@@ -27,7 +27,7 @@ public class HtmlModernParsersTests {
     public void AppStateParserExtractsNextAndAssignedState() {
         string html = """
             <script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"id":7}}}</script>
-            <script>window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true };</script>
+            <script>window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true, enabled: !0, disabled: !1 };</script>
             <script>const __APOLLO_STATE__ = { cache: { id: 42 } };</script>
             """;
 
@@ -38,6 +38,8 @@ public class HtmlModernParsersTests {
         Assert.Equal("ScriptJson", states[0].SourceKind);
         Assert.Equal("__INITIAL_STATE__", states[1].Name);
         Assert.Contains("\"Ada\"", states[1].RawJson);
+        Assert.Contains("\"enabled\":true", states[1].RawJson);
+        Assert.Contains("\"disabled\":false", states[1].RawJson);
         Assert.Equal("__APOLLO_STATE__", states[2].Name);
         Assert.Equal("VariableDeclaration", states[2].SourceKind);
     }
@@ -155,6 +157,7 @@ public class HtmlModernParsersTests {
     public void RobotsParserReturnsGroupsRulesAndSitemaps() {
         string robots = """
             User-agent: *
+            User-agent: ExampleBot
             Disallow: /private
             Crawl-delay: 2.5
             Sitemap: /sitemap.xml
@@ -166,5 +169,6 @@ public class HtmlModernParsersTests {
         Assert.Contains(rules, rule => rule.Directive == "Disallow" && rule.Path == "/private");
         Assert.Contains(rules, rule => rule.Directive == "Crawl-delay" && rule.CrawlDelay == 2.5m);
         Assert.Contains(rules, rule => rule.Directive == "Sitemap" && rule.Url == "https://example.org/sitemap.xml");
+        Assert.Single(rules, rule => rule.Directive == "Sitemap");
     }
 }

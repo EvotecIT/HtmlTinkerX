@@ -17,7 +17,7 @@ Describe 'Modern parsing cmdlets' {
 <body>
 <input type="hidden" name="__RequestVerificationToken" value="form-token" />
 <script>
-window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true };
+window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true, enabled: !0, disabled: !1 };
 const __APOLLO_STATE__ = { cache: { id: 42 } };
 fetch("/api/users", { method: "POST" });
 fetch("api/reports", { method: "DELETE" });
@@ -41,6 +41,8 @@ const csrfToken = "script-token";
         $state.Name | Should -Contain '__NEXT_DATA__'
         $state.Name | Should -Contain '__INITIAL_STATE__'
         $state.Name | Should -Contain '__APOLLO_STATE__'
+        ($state | Where-Object Name -EQ '__INITIAL_STATE__').RawJson | Should -Match '"enabled":true'
+        ($state | Where-Object Name -EQ '__INITIAL_STATE__').RawJson | Should -Match '"disabled":false'
     }
 
     It 'extracts head links' {
@@ -69,11 +71,12 @@ const csrfToken = "script-token";
     }
 
     It 'parses robots.txt' {
-        $rules = ConvertFrom-RobotsTxt -Content "User-agent: *`nDisallow: /private`nSitemap: /sitemap.xml" -BaseUrl 'https://example.org/robots.txt'
+        $rules = ConvertFrom-RobotsTxt -Content "User-agent: *`nUser-agent: ExampleBot`nDisallow: /private`nSitemap: /sitemap.xml" -BaseUrl 'https://example.org/robots.txt'
 
         $rules.Directive | Should -Contain 'User-agent'
         $rules.Path | Should -Contain '/private'
         $rules.Url | Should -Contain 'https://example.org/sitemap.xml'
+        @($rules | Where-Object Directive -EQ 'Sitemap') | Should -HaveCount 1
     }
 
     It 'exports aliases' {

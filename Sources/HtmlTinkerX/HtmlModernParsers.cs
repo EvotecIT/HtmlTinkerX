@@ -628,6 +628,11 @@ public static class HtmlRobotsParser {
                 continue;
             }
 
+            if (directive.Equals("Sitemap", StringComparison.OrdinalIgnoreCase)) {
+                rules.Add(CreateRobotsRule(rules.Count, Math.Max(groupIndex, 0), directive, value, string.Empty, index + 1, baseUri));
+                continue;
+            }
+
             IEnumerable<string> agents = currentAgents.Count == 0 ? new[] { string.Empty } : currentAgents;
             foreach (string agent in agents) {
                 rules.Add(CreateRobotsRule(rules.Count, Math.Max(groupIndex, 0), directive, value, agent, index + 1, baseUri));
@@ -782,10 +787,45 @@ internal static class HtmlModernParserUtilities {
             return values;
         }
 
-        if (node is UnaryExpression unary && unary.Operator.ToString() == "-" && EvaluateJavaScriptLiteral(unary.Argument) is IConvertible convertible) {
-            return -convertible.ToDouble(CultureInfo.InvariantCulture);
+        if (node is UnaryExpression unary) {
+            string? op = unary.Operator.ToString();
+            object? value = EvaluateJavaScriptLiteral(unary.Argument);
+            if ((op == "-" || op == "UnaryNegation") && value is IConvertible convertible) {
+                return -convertible.ToDouble(CultureInfo.InvariantCulture);
+            }
+
+            if (op == "!" || op == "LogicalNot") {
+                return !ToJavaScriptBoolean(value);
+            }
         }
 
         return null;
+    }
+
+    private static bool ToJavaScriptBoolean(object? value) {
+        if (value == null) {
+            return false;
+        }
+
+        if (value is bool boolean) {
+            return boolean;
+        }
+
+        if (value is string text) {
+            return text.Length > 0;
+        }
+
+        if (value is IConvertible convertible) {
+            try {
+                double number = convertible.ToDouble(CultureInfo.InvariantCulture);
+                return number != 0 && !double.IsNaN(number);
+            } catch (FormatException) {
+                return true;
+            } catch (InvalidCastException) {
+                return true;
+            }
+        }
+
+        return true;
     }
 }

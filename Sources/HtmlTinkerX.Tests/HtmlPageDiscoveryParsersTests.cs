@@ -56,7 +56,7 @@ public class HtmlPageDiscoveryParsersTests {
         string html = """
             <picture>
               <source type="image/webp" media="(min-width: 800px)" srcset="/hero.webp 1x, /hero@2x.webp 2x" />
-              <img src="hero.jpg" srcset="/hero-small.jpg 480w, data:image/svg+xml,<svg></svg> 1x, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
+              <img src="hero.jpg" srcset="/hero-small.jpg 480w, data:image/svg+xml,<svg></svg> 1x, data:image/png;base64,AAAA, /fallback.png 2x, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
             </picture>
             <link rel="preload" as="image" href="/preload.png" />
             <link rel="preload" as="image" imagesrcset="/preload-small.png 1x, /preload-large.png 2x" imagesizes="100vw" />
@@ -67,6 +67,8 @@ public class HtmlPageDiscoveryParsersTests {
         Assert.Contains(images, image => image.Source == "hero.jpg" && image.Url == "https://example.org/hero.jpg" && image.Element == "img");
         Assert.Contains(images, image => image.WidthDescriptor == "480w");
         Assert.Contains(images, image => image.Source == "data:image/svg+xml,<svg></svg>" && image.Url.StartsWith("data:image/svg+xml,", StringComparison.OrdinalIgnoreCase) && image.PixelDensityDescriptor == "1x");
+        Assert.Contains(images, image => image.Source == "data:image/png;base64,AAAA" && image.Url == "data:image/png;base64,AAAA");
+        Assert.Contains(images, image => image.Source == "/fallback.png" && image.Url == "https://example.org/fallback.png" && image.PixelDensityDescriptor == "2x");
         Assert.Contains(images, image => image.PixelDensityDescriptor == "2x" && image.Type == "image/webp");
         Assert.Contains(images, image => image.SourceAttribute == "href" && image.Url == "https://example.org/preload.png");
         Assert.Contains(images, image => image.SourceAttribute == "imagesrcset" && image.Source == "/preload-large.png" && image.PixelDensityDescriptor == "2x" && image.Sizes == "100vw");
