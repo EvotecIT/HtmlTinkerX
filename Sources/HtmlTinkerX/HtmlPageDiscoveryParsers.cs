@@ -235,7 +235,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
     }
 
     private static bool IsJavaScriptScriptType(string type) {
-        string normalized = (type ?? string.Empty).Trim();
+        string normalized = (type ?? string.Empty).Split(';')[0].Trim();
         return normalized.Length == 0
             || normalized.Equals("module", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)

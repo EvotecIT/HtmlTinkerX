@@ -26,7 +26,7 @@ public class HtmlPageDiscoveryParsersTests {
     public async Task LinkedJavaScriptEndpointParserDownloadsSameOriginScripts() {
         using var server = TestServerCompat.CreateTestServer(async context => {
             if (context.Request.Path == "/page") {
-                await context.Response.WriteAsync("""<script src="/app.js"></script><script src="https://cdn.example.org/external.js"></script>""");
+                await context.Response.WriteAsync("""<script type="text/javascript; charset=utf-8" src="/app.js"></script><script src="https://cdn.example.org/external.js"></script>""");
                 return;
             }
 

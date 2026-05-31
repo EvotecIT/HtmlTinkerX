@@ -232,25 +232,32 @@ public static class HtmlAppStateParser {
         }
 
         foreach (AssignmentExpression assignment in HtmlModernParserUtilities.Walk(root).OfType<AssignmentExpression>()) {
-            string? name = GetStateName(assignment.Left);
-            if (name == null || !KnownNames.Contains(name, StringComparer.OrdinalIgnoreCase)) {
-                continue;
-            }
-
-            object? value = HtmlModernParserUtilities.EvaluateJavaScriptLiteral(assignment.Right);
-            if (value == null) {
-                continue;
-            }
-
-            entries.Add(new HtmlAppStateEntry {
-                ScriptIndex = scriptIndex,
-                Index = entries.Count,
-                Name = name,
-                Framework = GetFramework(name),
-                SourceKind = "Assignment",
-                RawJson = JsonSerializer.Serialize(value)
-            });
+            AddStateValue(GetStateName(assignment.Left), assignment.Right, scriptIndex, "Assignment", entries);
         }
+
+        foreach (VariableDeclarator declarator in HtmlModernParserUtilities.Walk(root).OfType<VariableDeclarator>()) {
+            AddStateValue(GetStateName(declarator.Id), declarator.Init, scriptIndex, "VariableDeclaration", entries);
+        }
+    }
+
+    private static void AddStateValue(string? name, AcornimaNode? node, int scriptIndex, string sourceKind, List<HtmlAppStateEntry> entries) {
+        if (name == null || node == null || !KnownNames.Contains(name, StringComparer.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        object? value = HtmlModernParserUtilities.EvaluateJavaScriptLiteral(node);
+        if (value == null) {
+            return;
+        }
+
+        entries.Add(new HtmlAppStateEntry {
+            ScriptIndex = scriptIndex,
+            Index = entries.Count,
+            Name = name,
+            Framework = GetFramework(name),
+            SourceKind = sourceKind,
+            RawJson = JsonSerializer.Serialize(value)
+        });
     }
 
     private static string NormalizeJson(string json) {
@@ -456,7 +463,7 @@ public static class HtmlTokenParser {
 /// <summary>Discovers likely endpoints from static JavaScript source.</summary>
 public static class HtmlJavaScriptEndpointParser {
     private static readonly Regex EndpointStringRegex = new(
-        @"['""](?<url>(?:https?:)?//[^'""]+|/[^'""]+|[A-Za-z0-9_\-./]+/(?:api|graphql|rest|v[0-9])[^'""]*)['""]",
+        @"['""](?<url>(?:https?:)?//[^'""]+|/[^'""]+|(?:api|graphql|rest|v[0-9])(?:[/?#][^'""]*)?|[A-Za-z0-9_\-./]+/(?:api|graphql|rest|v[0-9])[^'""]*)['""]",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyList<HtmlJavaScriptEndpoint> ParseJavaScript(string script) {
@@ -514,7 +521,7 @@ public static class HtmlJavaScriptEndpointParser {
     }
 
     private static bool IsJavaScriptScript(IElement script) {
-        string type = (script.GetAttribute("type") ?? string.Empty).Trim();
+        string type = (script.GetAttribute("type") ?? string.Empty).Split(';')[0].Trim();
         if (type.Length == 0) {
             return true;
         }
@@ -532,6 +539,9 @@ public static class HtmlJavaScriptEndpointParser {
         }
 
         return value.Contains("/api", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("api", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("rest", StringComparison.OrdinalIgnoreCase)
+            || Regex.IsMatch(value, @"^v[0-9](?:/|$)", RegexOptions.IgnoreCase)
             || value.Contains("graphql", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("http", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("/", StringComparison.Ordinal);

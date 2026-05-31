@@ -28,15 +28,18 @@ public class HtmlModernParsersTests {
         string html = """
             <script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"id":7}}}</script>
             <script>window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true };</script>
+            <script>const __APOLLO_STATE__ = { cache: { id: 42 } };</script>
             """;
 
         var states = HtmlAppStateParser.Parse(html);
 
-        Assert.Equal(2, states.Count);
+        Assert.Equal(3, states.Count);
         Assert.Equal("__NEXT_DATA__", states[0].Name);
         Assert.Equal("ScriptJson", states[0].SourceKind);
         Assert.Equal("__INITIAL_STATE__", states[1].Name);
         Assert.Contains("\"Ada\"", states[1].RawJson);
+        Assert.Equal("__APOLLO_STATE__", states[2].Name);
+        Assert.Equal("VariableDeclaration", states[2].SourceKind);
     }
 
     [Fact]
@@ -93,14 +96,18 @@ public class HtmlModernParsersTests {
     public void JavaScriptEndpointParserFindsLikelyEndpoints() {
         string script = """
             fetch("/api/users", { method: "POST" });
+            fetch("api/reports", { method: "DELETE" });
             axios.get("https://api.example.org/v1/items");
+            axios.get("graphql");
             client.post("/graphql", { query: "query GetItems { items { id } }" });
             """;
 
         var endpoints = HtmlJavaScriptEndpointParser.ParseJavaScript(script);
 
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/users" && endpoint.Method == "POST");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "api/reports" && endpoint.Method == "DELETE");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "https://api.example.org/v1/items" && endpoint.Client == "axios");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "graphql" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/graphql" && endpoint.OperationName == "GetItems");
     }
 
@@ -110,7 +117,7 @@ public class HtmlModernParsersTests {
             <script type="application/ld+json">
             {"@context":"https://schema.org","@id":"https://example.org/products/widget"}
             </script>
-            <script type="module">
+            <script type="module; charset=utf-8">
             fetch("/api/products/42", { method: "POST" });
             </script>
             """;

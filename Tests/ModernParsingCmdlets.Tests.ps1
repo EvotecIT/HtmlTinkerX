@@ -18,7 +18,9 @@ Describe 'Modern parsing cmdlets' {
 <input type="hidden" name="__RequestVerificationToken" value="form-token" />
 <script>
 window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true };
+const __APOLLO_STATE__ = { cache: { id: 42 } };
 fetch("/api/users", { method: "POST" });
+fetch("api/reports", { method: "DELETE" });
 const csrfToken = "script-token";
 </script>
 </body>
@@ -38,6 +40,7 @@ const csrfToken = "script-token";
 
         $state.Name | Should -Contain '__NEXT_DATA__'
         $state.Name | Should -Contain '__INITIAL_STATE__'
+        $state.Name | Should -Contain '__APOLLO_STATE__'
     }
 
     It 'extracts head links' {
@@ -60,7 +63,9 @@ const csrfToken = "script-token";
         $endpoints = ConvertFrom-JavaScriptEndpoint -Content $script:Html -Html
 
         $endpoints.Url | Should -Contain '/api/users'
+        $endpoints.Url | Should -Contain 'api/reports'
         ($endpoints | Where-Object Url -EQ '/api/users').Method | Should -Be 'POST'
+        ($endpoints | Where-Object Url -EQ 'api/reports').Method | Should -Be 'DELETE'
     }
 
     It 'parses robots.txt' {
