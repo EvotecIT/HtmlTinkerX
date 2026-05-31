@@ -555,6 +555,11 @@ public static class HtmlJavaScriptEndpointParser {
             return methodCall.Groups["method"].Value.ToUpperInvariant();
         }
 
+        Match xhrOpen = Regex.Match(before, @"\.open\s*\(\s*['""](?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]\s*,\s*$", RegexOptions.IgnoreCase);
+        if (xhrOpen.Success) {
+            return xhrOpen.Groups["method"].Value.ToUpperInvariant();
+        }
+
         Match methodOption = Regex.Match(after, @"\bmethod\s*:\s*['""](?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]", RegexOptions.IgnoreCase);
         if (methodOption.Success) {
             return methodOption.Groups["method"].Value.ToUpperInvariant();
@@ -569,6 +574,7 @@ public static class HtmlJavaScriptEndpointParser {
         if (Regex.IsMatch(before, @"axios\.(?:get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase)) return "axios";
         if (Regex.IsMatch(before, @"(?:^|[^\w])fetch\s*\($", RegexOptions.IgnoreCase)) return "fetch";
         if (Regex.IsMatch(before, @"\$\.(?:ajax|get|post)\s*\($", RegexOptions.IgnoreCase)) return "jQuery.ajax";
+        if (Regex.IsMatch(before, @"\.open\s*\(\s*['""](?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]\s*,\s*$", RegexOptions.IgnoreCase)) return "XMLHttpRequest";
         if (Regex.IsMatch(before, @"(?:XMLHttpRequest|\.open\s*\()$", RegexOptions.IgnoreCase)) return "XMLHttpRequest";
         if (Regex.IsMatch(before, @"[A-Za-z0-9_$]+\.(?:get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase)) return "client";
         return string.Empty;

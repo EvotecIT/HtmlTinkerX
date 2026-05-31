@@ -100,6 +100,9 @@ public class HtmlModernParsersTests {
             axios.get("https://api.example.org/v1/items");
             axios.get("graphql");
             client.post("/graphql", { query: "query GetItems { items { id } }" });
+            const xhr = new XMLHttpRequest();
+            xhr.open("PATCH", "/api/profile");
+            xhr.send();
             """;
 
         var endpoints = HtmlJavaScriptEndpointParser.ParseJavaScript(script);
@@ -109,6 +112,7 @@ public class HtmlModernParsersTests {
         Assert.Contains(endpoints, endpoint => endpoint.Url == "https://api.example.org/v1/items" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "graphql" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/graphql" && endpoint.OperationName == "GetItems");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/profile" && endpoint.Method == "PATCH" && endpoint.Client == "XMLHttpRequest");
     }
 
     [Fact]

@@ -70,11 +70,19 @@ public sealed class CmdletConvertFromWellKnownText : AsyncPSCmdlet {
     }
 
     private static string NormalizeKind(string kind) {
-        return kind switch {
-            "SecurityTxt" => "security.txt",
-            "HumansTxt" => "humans.txt",
-            "AdsTxt" => "ads.txt",
-            _ => kind
-        };
+        string normalized = kind.Trim();
+        if (normalized.Equals("SecurityTxt", StringComparison.OrdinalIgnoreCase)) {
+            return "security.txt";
+        }
+
+        if (normalized.Equals("HumansTxt", StringComparison.OrdinalIgnoreCase)) {
+            return "humans.txt";
+        }
+
+        if (normalized.Equals("AdsTxt", StringComparison.OrdinalIgnoreCase)) {
+            return "ads.txt";
+        }
+
+        return normalized;
     }
 }
