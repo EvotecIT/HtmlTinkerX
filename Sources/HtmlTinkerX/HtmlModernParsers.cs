@@ -384,7 +384,7 @@ public static class HtmlHeadLinkParser {
 /// <summary>Extracts likely CSRF, anti-forgery, nonce, and auth tokens from HTML.</summary>
 public static class HtmlTokenParser {
     private static readonly Regex ScriptTokenRegex = new(
-        @"(?<name>[A-Za-z0-9_\-]*(?:csrf|xsrf|token|nonce|authenticity|verification)[A-Za-z0-9_\-]*)\s*[:=]\s*['""](?<value>[^'""]+)['""]",
+        @"(?:['""](?<name>[A-Za-z0-9_\-]*(?:csrf|xsrf|token|nonce|authenticity|verification)[A-Za-z0-9_\-]*)['""]|(?<name>[A-Za-z0-9_\-]*(?:csrf|xsrf|token|nonce|authenticity|verification)[A-Za-z0-9_\-]*))\s*[:=]\s*['""](?<value>[^'""]+)['""]",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyList<HtmlToken> Parse(string html, string[]? names = null) {
@@ -464,7 +464,7 @@ public static class HtmlTokenParser {
 /// <summary>Discovers likely endpoints from static JavaScript source.</summary>
 public static class HtmlJavaScriptEndpointParser {
     private static readonly Regex EndpointStringRegex = new(
-        @"['""](?<url>(?:https?:)?//[^'""]+|/[^'""]+|(?:api|graphql|rest|v[0-9])(?:[/?#][^'""]*)?|[A-Za-z0-9_\-./]+/(?:api|graphql|rest|v[0-9])[^'""]*)['""]",
+        @"(?:['""](?<url>(?:https?:)?//[^'""]+|/[^'""]+|(?:api|graphql|rest|v[0-9])(?:[/?#][^'""]*)?|[A-Za-z0-9_\-./]+/(?:api|graphql|rest|v[0-9])[^'""]*)['""]|`(?<url>(?:https?:)?//[^`$]+|/[^`$]+|(?:api|graphql|rest|v[0-9])(?:[/?#][^`$]*)?|[A-Za-z0-9_\-./]+/(?:api|graphql|rest|v[0-9])[^`$]*)[^`]*`)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyList<HtmlJavaScriptEndpoint> ParseJavaScript(string script) {
@@ -550,8 +550,8 @@ public static class HtmlJavaScriptEndpointParser {
 
     private static string InferMethod(string script, int index) {
         string before = script.Substring(Math.Max(0, index - 80), index - Math.Max(0, index - 80));
-        string after = script.Substring(index, Math.Min(script.Length - index, 140));
-        Match methodCall = Regex.Match(before, @"(?:axios|client|\$)\.(?<method>get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase);
+        string after = GetCurrentCallTail(script, index, 240);
+        Match methodCall = Regex.Match(before, @"[A-Za-z_$][A-Za-z0-9_$]*\.(?<method>get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase);
         if (methodCall.Success) {
             return methodCall.Groups["method"].Value.ToUpperInvariant();
         }
@@ -567,6 +567,27 @@ public static class HtmlJavaScriptEndpointParser {
         }
 
         return string.Empty;
+    }
+
+    private static string GetCurrentCallTail(string script, int index, int maxLength) {
+        int length = Math.Min(script.Length - index, maxLength);
+        string window = script.Substring(index, length);
+        int closeParen = window.IndexOf(')');
+        int semicolon = window.IndexOf(';');
+        int end = MinPositive(closeParen, semicolon);
+        return end >= 0 ? window.Substring(0, end + 1) : window;
+    }
+
+    private static int MinPositive(int first, int second) {
+        if (first < 0) {
+            return second;
+        }
+
+        if (second < 0) {
+            return first;
+        }
+
+        return Math.Min(first, second);
     }
 
     private static string InferClient(string script, int index) {

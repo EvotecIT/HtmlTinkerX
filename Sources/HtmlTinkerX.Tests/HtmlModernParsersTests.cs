@@ -89,7 +89,7 @@ public class HtmlModernParsersTests {
             <html><head><meta name="csrf-token" content="meta-token" /></head>
             <body>
             <input type="hidden" name="__RequestVerificationToken" value="form-token" />
-            <script nonce="abc123">const csrfToken = "script-token";</script>
+            <script nonce="abc123">const csrfToken = "script-token"; window.App = {"csrfToken":"quoted-token"};</script>
             </body></html>
             """;
 
@@ -99,6 +99,7 @@ public class HtmlModernParsersTests {
         Assert.Contains(tokens, token => token.Name == "__RequestVerificationToken" && token.Value == "form-token");
         Assert.Contains(tokens, token => token.Name == "nonce" && token.Value == "abc123");
         Assert.Contains(tokens, token => token.Name == "csrfToken" && token.Value == "script-token");
+        Assert.Contains(tokens, token => token.Name == "csrfToken" && token.Value == "quoted-token");
     }
 
     [Fact]
@@ -119,6 +120,11 @@ public class HtmlModernParsersTests {
             axios.get("https://api.example.org/v1/items");
             axios.get("graphql");
             client.post("/graphql", { query: "query GetItems { items { id } }" });
+            apiClient.post("/api/wrapped");
+            http.delete("/api/old-items");
+            fetch(`/api/template/${id}`);
+            fetch("/api/no-method");
+            fetch("/api/with-method", { method: "POST" });
             const xhr = new XMLHttpRequest();
             xhr.open("PATCH", "/api/profile");
             xhr.send();
@@ -132,6 +138,11 @@ public class HtmlModernParsersTests {
         Assert.Contains(endpoints, endpoint => endpoint.Url == "https://api.example.org/v1/items" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "graphql" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/graphql" && endpoint.OperationName == "GetItems");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/wrapped" && endpoint.Method == "POST" && endpoint.Client == "client");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/old-items" && endpoint.Method == "DELETE" && endpoint.Client == "client");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/template/" && endpoint.Client == "fetch");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/no-method" && endpoint.Method == string.Empty);
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/with-method" && endpoint.Method == "POST");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/profile" && endpoint.Method == "PATCH" && endpoint.Client == "XMLHttpRequest");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/jquery" && endpoint.Method == "PUT" && endpoint.Client == "jQuery.ajax");
     }

@@ -21,6 +21,11 @@ window.__INITIAL_STATE__ = { user: { name: "Ada" }, ok: true, enabled: !0, disab
 const __APOLLO_STATE__ = { cache: { id: 42 } };
 fetch("/api/users", { method: "POST" });
 fetch("api/reports", { method: "DELETE" });
+fetch(`/api/template/${id}`);
+fetch("/api/no-method");
+fetch("/api/with-method", { method: "POST" });
+apiClient.post("/api/wrapped");
+window.App = {"csrfToken":"quoted-token"};
 const csrfToken = "script-token";
 </script>
 </body>
@@ -59,6 +64,7 @@ const csrfToken = "script-token";
         $tokens.Value | Should -Contain 'meta-token'
         $tokens.Value | Should -Contain 'form-token'
         $tokens.Value | Should -Contain 'script-token'
+        $tokens.Value | Should -Contain 'quoted-token'
     }
 
     It 'discovers JavaScript endpoints from HTML scripts' {
@@ -66,8 +72,13 @@ const csrfToken = "script-token";
 
         $endpoints.Url | Should -Contain '/api/users'
         $endpoints.Url | Should -Contain 'api/reports'
+        $endpoints.Url | Should -Contain '/api/template/'
+        $endpoints.Url | Should -Contain '/api/wrapped'
         ($endpoints | Where-Object Url -EQ '/api/users').Method | Should -Be 'POST'
         ($endpoints | Where-Object Url -EQ 'api/reports').Method | Should -Be 'DELETE'
+        ($endpoints | Where-Object Url -EQ '/api/wrapped').Method | Should -Be 'POST'
+        ($endpoints | Where-Object Url -EQ '/api/no-method').Method | Should -Be ''
+        ($endpoints | Where-Object Url -EQ '/api/with-method').Method | Should -Be 'POST'
     }
 
     It 'parses robots.txt' {
