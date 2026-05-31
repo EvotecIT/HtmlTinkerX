@@ -32,8 +32,10 @@ Describe 'Page discovery parsing cmdlets' {
   ]
 }
 '@
-        $script:SecurityTxt = @'
+$script:SecurityTxt = @'
+# comment
 Contact: /security
+Policy: https://example.org/report#scope
 Expires: 2026-12-31T23:59:59Z
 '@
     }
@@ -67,8 +69,9 @@ Expires: 2026-12-31T23:59:59Z
     It 'parses well-known text files' {
         $records = ConvertFrom-WellKnownText -Content $script:SecurityTxt -Kind SecurityTxt -BaseUrl 'https://example.org/.well-known/security.txt'
 
-        $records | Should -HaveCount 2
+        $records | Should -HaveCount 3
         ($records | Where-Object Field -EQ 'Contact').Url | Should -Be 'https://example.org/security'
+        ($records | Where-Object Field -EQ 'Policy').Url | Should -Be 'https://example.org/report#scope'
     }
 
     It 'exports the new commands and aliases' {

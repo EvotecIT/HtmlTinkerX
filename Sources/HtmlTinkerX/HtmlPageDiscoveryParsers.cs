@@ -439,8 +439,8 @@ public static class HtmlWellKnownParser {
         List<HtmlWellKnownRecord> records = new();
         string[] lines = SplitLines(content);
         for (int index = 0; index < lines.Length; index++) {
-            string line = StripComment(lines[index]).Trim();
-            if (line.Length == 0) {
+            string line = lines[index].Trim();
+            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)) {
                 continue;
             }
 

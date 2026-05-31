@@ -95,7 +95,10 @@ public class HtmlPageDiscoveryParsersTests {
     [Fact]
     public void WellKnownParserParsesSecurityHumansAndAdsTxt() {
         string security = """
+            # security contact details
             Contact: /security
+            Policy: https://example.org/report#scope
+            Canonical: /.well-known/security.txt#v1
             Expires: 2026-12-31T23:59:59Z
             """;
         string humans = """
@@ -112,6 +115,8 @@ public class HtmlPageDiscoveryParsersTests {
         var adsRecords = HtmlWellKnownParser.Parse(ads, "ads.txt");
 
         Assert.Contains(securityRecords, record => record.Field == "Contact" && record.Url == "https://example.org/security");
+        Assert.Contains(securityRecords, record => record.Field == "Policy" && record.Value == "https://example.org/report#scope" && record.Url == "https://example.org/report#scope");
+        Assert.Contains(securityRecords, record => record.Field == "Canonical" && record.Url == "https://example.org/.well-known/security.txt#v1");
         Assert.Contains(humansRecords, record => record.Section == "TEAM" && record.Field == "Developer" && record.Value == "Ada");
         Assert.Contains(adsRecords, record => record.Domain == "example.com" && record.Relationship == "DIRECT");
         Assert.Contains(adsRecords, record => record.Field == "OWNERDOMAIN" && record.Value == "example.org");
