@@ -65,6 +65,26 @@ public class HtmlReactFlightParserTests {
     }
 
     [Fact]
+    public void ParsePreservesUnaryValuesInFormStatePayloads() {
+        string html = """
+            <html>
+            <body>
+            <script>
+            self.__next_f.push([2,{count:-1,enabled:!0,disabled:!1}]);
+            </script>
+            </body>
+            </html>
+            """;
+
+        HtmlReactFlightDocument document = HtmlReactFlightParser.Parse(html);
+
+        HtmlReactFlightPayload payload = Assert.Single(document.Payloads);
+        Assert.Equal(HtmlReactFlightPayloadKind.FormState, payload.Kind);
+        Assert.Equal("{\"count\":-1,\"enabled\":true,\"disabled\":false}", payload.FormStateJson);
+        Assert.Equal("[2,{\"count\":-1,\"enabled\":true,\"disabled\":false}]", payload.RawJson);
+    }
+
+    [Fact]
     public void ParseIgnoresScriptsThatDoNotContainNextFlightPayloads() {
         HtmlReactFlightDocument document = HtmlReactFlightParser.Parse("<script>const answer = 42;</script>");
 

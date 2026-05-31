@@ -382,11 +382,13 @@ public static class HtmlReactFlightParser {
         if (node is UnaryExpression unary) {
             string? op = unary.Operator.ToString();
             object? value = EvaluateLiteral(unary.Argument);
-            if (op == "-" && value is IConvertible convertible) {
+            if ((op == "-" || op == "UnaryNegation") && value is IConvertible convertible) {
                 return -convertible.ToDouble(CultureInfo.InvariantCulture);
             }
 
-            return value;
+            if (op == "!" || op == "LogicalNot") {
+                return !HtmlModernParserUtilities.ToJavaScriptBoolean(value);
+            }
         }
 
         return null;

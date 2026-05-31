@@ -39,6 +39,19 @@ self.__next_f.push([2,{"field":"value"}]);
         $payloads[2].FormStateJson | Should -Be '{"field":"value"}'
     }
 
+    It 'preserves unary literal values in form state payloads' {
+        $html = @'
+<script>
+self.__next_f.push([2,{count:-1,enabled:!0,disabled:!1}]);
+</script>
+'@
+
+        $payload = ConvertFrom-HtmlRscPayload -Content $html -RawPayload
+
+        $payload.FormStateJson | Should -Be '{"count":-1,"enabled":true,"disabled":false}'
+        $payload.RawJson | Should -Be '[2,{"count":-1,"enabled":true,"disabled":false}]'
+    }
+
     It 'returns the full document through the alias' {
         $document = ConvertFrom-HtmlReactFlight -Content $script:Html -AsDocument
 

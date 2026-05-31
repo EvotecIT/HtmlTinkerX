@@ -823,7 +823,7 @@ internal static class HtmlModernParserUtilities {
         return null;
     }
 
-    private static bool ToJavaScriptBoolean(object? value) {
+    internal static bool ToJavaScriptBoolean(object? value) {
         if (value == null) {
             return false;
         }
