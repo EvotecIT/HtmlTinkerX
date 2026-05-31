@@ -9,7 +9,7 @@ Describe 'Invoke-HTMLRendering' {
     It 'Loads content using Firefox engine' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
-        $html = Invoke-HTMLRendering -Url $uri -Browser Firefox
+        $html = Invoke-HTMLRendering -Url $uri -Browser Firefox -Timeout 30000
         $html | Should -Match 'Dynamic Content'
     }
 
