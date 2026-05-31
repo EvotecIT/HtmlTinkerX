@@ -421,6 +421,7 @@ public static class HtmlReactFlightParser {
             int tag = 0;
             int length = -1;
             int payloadStart;
+            int rawEnd;
             bool complete = true;
 
             if (i < stream.Length && IsLengthPrefixedTag(stream[i])) {
@@ -453,6 +454,10 @@ public static class HtmlReactFlightParser {
                 }
 
                 i += length;
+                rawEnd = i;
+                if (complete) {
+                    i = SkipOptionalRowTerminator(stream, i);
+                }
             } else {
                 if (i < stream.Length && IsNewlineDelimitedTag(stream[i])) {
                     tag = stream[i++];
@@ -466,11 +471,12 @@ public static class HtmlReactFlightParser {
                 }
 
                 length = newline - payloadStart;
+                rawEnd = TrimCarriageReturn(stream, rowStart, newline);
                 i = newline < stream.Length ? newline + 1 : newline;
             }
 
             string data = DecodeUtf8(stream, payloadStart, length);
-            string raw = DecodeUtf8(stream, rowStart, Math.Max(0, i - rowStart - (i > 0 && stream[i - 1] == (byte)'\n' ? 1 : 0)));
+            string raw = DecodeUtf8(stream, rowStart, Math.Max(0, rawEnd - rowStart));
             HtmlReactFlightRow row = new() {
                 Index = rows.Count,
                 Id = id,
@@ -490,6 +496,26 @@ public static class HtmlReactFlightParser {
             rows.Add(row);
             yield return row;
         }
+    }
+
+    private static int SkipOptionalRowTerminator(byte[] stream, int index) {
+        if (index >= stream.Length) {
+            return index;
+        }
+
+        if (stream[index] == (byte)'\r') {
+            return index + 1 < stream.Length && stream[index + 1] == (byte)'\n'
+                ? index + 2
+                : index + 1;
+        }
+
+        return stream[index] == (byte)'\n' ? index + 1 : index;
+    }
+
+    private static int TrimCarriageReturn(byte[] stream, int rowStart, int rowEnd) {
+        return rowEnd > rowStart && stream[rowEnd - 1] == (byte)'\r'
+            ? rowEnd - 1
+            : rowEnd;
     }
 
     private static int FindPayloadIndex(IEnumerable<HtmlReactFlightPayload> payloads, int offset) {

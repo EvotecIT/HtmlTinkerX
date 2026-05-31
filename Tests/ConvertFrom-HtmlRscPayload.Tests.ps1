@@ -8,7 +8,7 @@ Describe 'ConvertFrom-HtmlRscPayload' {
 <body>
 <script>
 (self.__next_f=self.__next_f||[]).push([0]);
-self.__next_f.push([1,"1:I[\"/app/page.js\",[\"static/chunk.js\"],\"default\"]\n2:HL[\"/style.css\",\"style\"]\n3:{\"name\":\"Ada\"}\n4:T5,hello5:{\"after\":true}\n"]);
+self.__next_f.push([1,"1:I[\"/app/page.js\",[\"static/chunk.js\"],\"default\"]\n2:HL[\"/style.css\",\"style\"]\n3:{\"name\":\"Ada\"}\n4:T5,hello\n5:{\"after\":true}\n"]);
 self.__next_f.push([2,{"field":"value"}]);
 </script>
 </body>
