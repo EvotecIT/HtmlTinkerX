@@ -26,7 +26,7 @@ public class HtmlPageDiscoveryParsersTests {
     public async Task LinkedJavaScriptEndpointParserDownloadsSameOriginScripts() {
         using var server = TestServerCompat.CreateTestServer(async context => {
             if (context.Request.Path == "/page") {
-                await context.Response.WriteAsync("""<base href="/assets/"><script type="text/javascript; charset=utf-8" src="app.js"></script><script src="https://cdn.example.org/external.js"></script>""");
+                await context.Response.WriteAsync("""<base href="/assets/"><script src="data:text/javascript,fetch('/api/inline')"></script><script type="text/javascript; charset=utf-8" src="app.js"></script>""");
                 return;
             }
 
@@ -40,13 +40,15 @@ public class HtmlPageDiscoveryParsersTests {
         using var client = server.CreateClient();
         string html = await client.GetStringAsync(server.BaseAddress + "page");
 
-        var endpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, server.BaseAddress, client: client);
+        var endpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, server.BaseAddress, includeExternal: true, client: client);
 
-        Assert.Single(endpoints);
-        Assert.Equal(server.BaseAddress + "assets/app.js", endpoints[0].ScriptUrl);
-        Assert.Equal("/api/items", endpoints[0].Url);
-        Assert.Equal("POST", endpoints[0].Method);
-        Assert.True(endpoints[0].IsDownloaded);
+        Assert.Equal(2, endpoints.Count);
+        Assert.Equal("data:text/javascript,fetch('/api/inline')", endpoints[0].ScriptUrl);
+        Assert.False(endpoints[0].IsDownloaded);
+        Assert.Equal(server.BaseAddress + "assets/app.js", endpoints[1].ScriptUrl);
+        Assert.Equal("/api/items", endpoints[1].Url);
+        Assert.Equal("POST", endpoints[1].Method);
+        Assert.True(endpoints[1].IsDownloaded);
     }
 
     [Fact]
@@ -54,7 +56,7 @@ public class HtmlPageDiscoveryParsersTests {
         string html = """
             <picture>
               <source type="image/webp" media="(min-width: 800px)" srcset="/hero.webp 1x, /hero@2x.webp 2x" />
-              <img src="/hero.jpg" srcset="/hero-small.jpg 480w, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
+              <img src="hero.jpg" srcset="/hero-small.jpg 480w, data:image/svg+xml,<svg></svg> 1x, /hero-large.jpg 960w" sizes="100vw" alt="Hero" />
             </picture>
             <link rel="preload" as="image" href="/preload.png" />
             <link rel="preload" as="image" imagesrcset="/preload-small.png 1x, /preload-large.png 2x" imagesizes="100vw" />
@@ -62,11 +64,25 @@ public class HtmlPageDiscoveryParsersTests {
 
         var images = HtmlImageCandidateParser.Parse(html, new Uri("https://example.org/page"));
 
-        Assert.Contains(images, image => image.Source == "/hero.jpg" && image.Element == "img");
+        Assert.Contains(images, image => image.Source == "hero.jpg" && image.Url == "https://example.org/hero.jpg" && image.Element == "img");
         Assert.Contains(images, image => image.WidthDescriptor == "480w");
+        Assert.Contains(images, image => image.Source == "data:image/svg+xml,<svg></svg>" && image.Url.StartsWith("data:image/svg+xml,", StringComparison.OrdinalIgnoreCase) && image.PixelDensityDescriptor == "1x");
         Assert.Contains(images, image => image.PixelDensityDescriptor == "2x" && image.Type == "image/webp");
         Assert.Contains(images, image => image.SourceAttribute == "href" && image.Url == "https://example.org/preload.png");
         Assert.Contains(images, image => image.SourceAttribute == "imagesrcset" && image.Source == "/preload-large.png" && image.PixelDensityDescriptor == "2x" && image.Sizes == "100vw");
+    }
+
+    [Fact]
+    public void ImageCandidateParserResolvesAgainstDocumentBase() {
+        string html = """
+            <base href="/assets/" />
+            <img src="hero.jpg" srcset="small.jpg 1x, large.jpg 2x" />
+            """;
+
+        var images = HtmlImageCandidateParser.Parse(html, new Uri("https://example.org/page"));
+
+        Assert.Contains(images, image => image.Source == "hero.jpg" && image.Url == "https://example.org/assets/hero.jpg");
+        Assert.Contains(images, image => image.Source == "large.jpg" && image.Url == "https://example.org/assets/large.jpg");
     }
 
     [Fact]

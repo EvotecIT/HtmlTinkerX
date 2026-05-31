@@ -178,7 +178,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
+        Uri effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri) ?? baseUri;
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         List<HtmlLinkedJavaScriptEndpoint> endpoints = new();
         int scriptIndex = 0;
@@ -193,6 +193,19 @@ public static class HtmlLinkedJavaScriptEndpointParser {
             string scriptUrl = HtmlModernParserUtilities.ResolveUrl(source, effectiveBaseUri);
             bool isExternal = HtmlModernParserUtilities.IsExternal(scriptUrl, baseUri);
             if (isExternal && !includeExternal) {
+                scriptIndex++;
+                continue;
+            }
+
+            if (!IsHttpUrl(scriptUrl)) {
+                endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
+                    Index = endpoints.Count,
+                    ScriptIndex = scriptIndex,
+                    ScriptUrl = scriptUrl,
+                    IsExternal = isExternal,
+                    IsDownloaded = false,
+                    Error = "Only HTTP and HTTPS script URLs can be downloaded."
+                });
                 scriptIndex++;
                 continue;
             }
@@ -245,10 +258,10 @@ public static class HtmlLinkedJavaScriptEndpointParser {
             || normalized.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Uri GetEffectiveBaseUri(IDocument document, Uri baseUri) {
-        string href = document.QuerySelector("base[href]")?.GetAttribute("href") ?? string.Empty;
-        string resolved = HtmlModernParserUtilities.ResolveUrl(href, baseUri);
-        return Uri.TryCreate(resolved, UriKind.Absolute, out Uri? effectiveBaseUri) ? effectiveBaseUri : baseUri;
+    private static bool IsHttpUrl(string value) {
+        return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
     }
 }
 
@@ -259,14 +272,15 @@ public static class HtmlImageCandidateParser {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        Uri? effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
         List<HtmlImageCandidate> candidates = new();
         foreach (IElement image in document.QuerySelectorAll("img")) {
-            AddCandidate(candidates, image, "src", image.GetAttribute("src"), baseUri);
-            AddSrcSetCandidates(candidates, image, "srcset", image.GetAttribute("srcset"), baseUri);
+            AddCandidate(candidates, image, "src", image.GetAttribute("src"), effectiveBaseUri, baseUri);
+            AddSrcSetCandidates(candidates, image, "srcset", image.GetAttribute("srcset"), effectiveBaseUri, baseUri);
         }
 
         foreach (IElement source in document.QuerySelectorAll("source[srcset]")) {
-            AddSrcSetCandidates(candidates, source, "srcset", source.GetAttribute("srcset"), baseUri);
+            AddSrcSetCandidates(candidates, source, "srcset", source.GetAttribute("srcset"), effectiveBaseUri, baseUri);
         }
 
         foreach (IElement link in document.QuerySelectorAll("link[href], link[imagesrcset]")) {
@@ -274,8 +288,8 @@ public static class HtmlImageCandidateParser {
             string asValue = link.GetAttribute("as") ?? string.Empty;
             if (rel.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Any(token => token.Equals("preload", StringComparison.OrdinalIgnoreCase))
                 && asValue.Equals("image", StringComparison.OrdinalIgnoreCase)) {
-                AddCandidate(candidates, link, "href", link.GetAttribute("href"), baseUri);
-                AddSrcSetCandidates(candidates, link, "imagesrcset", link.GetAttribute("imagesrcset"), baseUri);
+                AddCandidate(candidates, link, "href", link.GetAttribute("href"), effectiveBaseUri, baseUri);
+                AddSrcSetCandidates(candidates, link, "imagesrcset", link.GetAttribute("imagesrcset"), effectiveBaseUri, baseUri);
             }
         }
 
@@ -287,12 +301,12 @@ public static class HtmlImageCandidateParser {
         return Parse(html, new Uri(url, UriKind.Absolute));
     }
 
-    private static void AddSrcSetCandidates(List<HtmlImageCandidate> candidates, IElement element, string attribute, string? srcset, Uri? baseUri) {
+    private static void AddSrcSetCandidates(List<HtmlImageCandidate> candidates, IElement element, string attribute, string? srcset, Uri? resolveBaseUri, Uri? pageBaseUri) {
         if (string.IsNullOrWhiteSpace(srcset)) {
             return;
         }
 
-        foreach (string part in srcset!.Split(',')) {
+        foreach (string part in SplitSrcSet(srcset!)) {
             string candidate = part.Trim();
             if (candidate.Length == 0) {
                 continue;
@@ -303,7 +317,7 @@ public static class HtmlImageCandidateParser {
                 continue;
             }
 
-            HtmlImageCandidate item = CreateCandidate(candidates.Count, element, attribute, pieces[0], baseUri);
+            HtmlImageCandidate item = CreateCandidate(candidates.Count, element, attribute, pieces[0], resolveBaseUri, pageBaseUri);
             foreach (string descriptor in pieces.Skip(1)) {
                 if (descriptor.EndsWith("w", StringComparison.OrdinalIgnoreCase)) {
                     item.WidthDescriptor = descriptor;
@@ -316,16 +330,37 @@ public static class HtmlImageCandidateParser {
         }
     }
 
-    private static void AddCandidate(List<HtmlImageCandidate> candidates, IElement element, string attribute, string? value, Uri? baseUri) {
+    private static IEnumerable<string> SplitSrcSet(string srcset) {
+        int start = 0;
+        for (int index = 0; index < srcset.Length; index++) {
+            char current = srcset[index];
+            if (current != ',') {
+                continue;
+            }
+
+            string candidate = srcset.Substring(start, index - start).TrimStart();
+            if (candidate.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                && !candidate.Any(char.IsWhiteSpace)) {
+                continue;
+            }
+
+            yield return srcset.Substring(start, index - start);
+            start = index + 1;
+        }
+
+        yield return srcset.Substring(start);
+    }
+
+    private static void AddCandidate(List<HtmlImageCandidate> candidates, IElement element, string attribute, string? value, Uri? resolveBaseUri, Uri? pageBaseUri) {
         if (string.IsNullOrWhiteSpace(value)) {
             return;
         }
 
-        candidates.Add(CreateCandidate(candidates.Count, element, attribute, value!, baseUri));
+        candidates.Add(CreateCandidate(candidates.Count, element, attribute, value!, resolveBaseUri, pageBaseUri));
     }
 
-    private static HtmlImageCandidate CreateCandidate(int index, IElement element, string attribute, string source, Uri? baseUri) {
-        string url = HtmlModernParserUtilities.ResolveUrl(source, baseUri);
+    private static HtmlImageCandidate CreateCandidate(int index, IElement element, string attribute, string source, Uri? resolveBaseUri, Uri? pageBaseUri) {
+        string url = HtmlModernParserUtilities.ResolveUrl(source, resolveBaseUri);
         return new HtmlImageCandidate {
             Index = index,
             Element = element.LocalName,
@@ -338,7 +373,7 @@ public static class HtmlImageCandidateParser {
             Type = element.GetAttribute("type") ?? string.Empty,
             Media = element.GetAttribute("media") ?? string.Empty,
             Alt = element.GetAttribute("alt") ?? string.Empty,
-            IsExternal = HtmlModernParserUtilities.IsExternal(url, baseUri)
+            IsExternal = HtmlModernParserUtilities.IsExternal(url, pageBaseUri)
         };
     }
 }

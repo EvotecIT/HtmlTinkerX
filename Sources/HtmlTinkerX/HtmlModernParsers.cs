@@ -310,6 +310,7 @@ public static class HtmlHeadLinkParser {
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         IElement scope = document.Head ?? document.DocumentElement;
+        Uri? effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
         List<HtmlHeadLink> links = new();
 
         foreach (IElement element in scope.QuerySelectorAll("link[href], meta[content]")) {
@@ -317,7 +318,7 @@ public static class HtmlHeadLinkParser {
             string content = element.GetAttribute("content") ?? string.Empty;
             string target = href.Length > 0 ? href : content;
             string resolved = href.Length > 0 || IsUrlValuedMeta(element)
-                ? HtmlModernParserUtilities.ResolveUrl(target, baseUri)
+                ? HtmlModernParserUtilities.ResolveUrl(target, effectiveBaseUri)
                 : string.Empty;
             links.Add(new HtmlHeadLink {
                 Index = links.Count,
@@ -560,7 +561,7 @@ public static class HtmlJavaScriptEndpointParser {
             return xhrOpen.Groups["method"].Value.ToUpperInvariant();
         }
 
-        Match methodOption = Regex.Match(after, @"\bmethod\s*:\s*['""](?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]", RegexOptions.IgnoreCase);
+        Match methodOption = Regex.Match(after, @"\b(?:method|type)\s*:\s*['""](?<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]", RegexOptions.IgnoreCase);
         if (methodOption.Success) {
             return methodOption.Groups["method"].Value.ToUpperInvariant();
         }
@@ -574,6 +575,7 @@ public static class HtmlJavaScriptEndpointParser {
         if (Regex.IsMatch(before, @"axios\.(?:get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase)) return "axios";
         if (Regex.IsMatch(before, @"(?:^|[^\w])fetch\s*\($", RegexOptions.IgnoreCase)) return "fetch";
         if (Regex.IsMatch(before, @"\$\.(?:ajax|get|post)\s*\($", RegexOptions.IgnoreCase)) return "jQuery.ajax";
+        if (Regex.IsMatch(before, @"\$\.\s*ajax\s*\(\s*\{[^;]*$", RegexOptions.IgnoreCase)) return "jQuery.ajax";
         if (Regex.IsMatch(before, @"\.open\s*\(\s*['""](?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)['""]\s*,\s*$", RegexOptions.IgnoreCase)) return "XMLHttpRequest";
         if (Regex.IsMatch(before, @"(?:XMLHttpRequest|\.open\s*\()$", RegexOptions.IgnoreCase)) return "XMLHttpRequest";
         if (Regex.IsMatch(before, @"[A-Za-z0-9_$]+\.(?:get|post|put|patch|delete|head|options)\s*\($", RegexOptions.IgnoreCase)) return "client";
@@ -695,6 +697,16 @@ internal static class HtmlModernParserUtilities {
         }
 
         return Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute) ? absolute.AbsoluteUri : trimmed;
+    }
+
+    internal static Uri? GetEffectiveBaseUri(IDocument document, Uri? baseUri) {
+        if (baseUri == null) {
+            return null;
+        }
+
+        string href = document.QuerySelector("base[href]")?.GetAttribute("href") ?? string.Empty;
+        string resolved = ResolveUrl(href, baseUri);
+        return Uri.TryCreate(resolved, UriKind.Absolute, out Uri? effectiveBaseUri) ? effectiveBaseUri : baseUri;
     }
 
     internal static bool IsExternal(string value, Uri? baseUri) {

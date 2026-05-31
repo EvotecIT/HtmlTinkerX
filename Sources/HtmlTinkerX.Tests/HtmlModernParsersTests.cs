@@ -65,6 +65,23 @@ public class HtmlModernParsersTests {
     }
 
     [Fact]
+    public void HeadLinkParserResolvesAgainstDocumentBase() {
+        string html = """
+            <html><head>
+            <base href="/assets/" />
+            <link rel="manifest" href="app.webmanifest" />
+            <meta property="og:image" content="social.png" />
+            </head></html>
+            """;
+
+        var links = HtmlHeadLinkParser.Parse(html, new System.Uri("https://example.org/page"));
+
+        Assert.Equal("https://example.org/assets/app.webmanifest", links[0].Url);
+        Assert.Equal("https://example.org/assets/social.png", links[1].Url);
+        Assert.False(links[0].IsExternal);
+    }
+
+    [Fact]
     public void TokenParserFindsInputsMetaNonceAndScriptValues() {
         string html = """
             <html><head><meta name="csrf-token" content="meta-token" /></head>
@@ -103,6 +120,7 @@ public class HtmlModernParsersTests {
             const xhr = new XMLHttpRequest();
             xhr.open("PATCH", "/api/profile");
             xhr.send();
+            $.ajax({ url: "/api/jquery", type: "PUT" });
             """;
 
         var endpoints = HtmlJavaScriptEndpointParser.ParseJavaScript(script);
@@ -113,6 +131,7 @@ public class HtmlModernParsersTests {
         Assert.Contains(endpoints, endpoint => endpoint.Url == "graphql" && endpoint.Client == "axios");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/graphql" && endpoint.OperationName == "GetItems");
         Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/profile" && endpoint.Method == "PATCH" && endpoint.Client == "XMLHttpRequest");
+        Assert.Contains(endpoints, endpoint => endpoint.Url == "/api/jquery" && endpoint.Method == "PUT" && endpoint.Client == "jQuery.ajax");
     }
 
     [Fact]
