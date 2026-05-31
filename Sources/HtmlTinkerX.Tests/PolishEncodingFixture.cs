@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.TestHost;
 using System;
 using System.Net.Http;
 using System.Text;
@@ -32,7 +31,7 @@ internal static class PolishEncodingFixture {
 </body>
 </html>";
 
-    public static TestServer CreateServer() {
+    public static TestServerFixture CreateServer() {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var bytes = Encoding.GetEncoding("iso-8859-2").GetBytes(Html);
         return TestServerCompat.CreateTestServer(async context => {
@@ -41,7 +40,7 @@ internal static class PolishEncodingFixture {
         }, "/polish", "GET");
     }
 
-    public static HttpClient CreateClient(TestServer server) {
+    public static HttpClient CreateClient(TestServerFixture server) {
         var client = server.CreateClient();
         client.BaseAddress = new Uri("http://localhost");
         return client;

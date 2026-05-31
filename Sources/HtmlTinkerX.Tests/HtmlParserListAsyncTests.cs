@@ -1,5 +1,4 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.TestHost;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
@@ -7,7 +6,7 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlParserListAsyncTests {
-    private static TestServer CreateServer() {
+    private static TestServerFixture CreateServer() {
         return TestServerCompat.CreateListParsingTestServer();
     }
 

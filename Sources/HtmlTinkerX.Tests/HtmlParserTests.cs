@@ -1,8 +1,5 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.TestHost;
 using System;
 using System.Threading.Tasks;
 using Xunit;
@@ -10,13 +7,11 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTests {
-    private static TestServer CreateServer() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                const string html = "<!DOCTYPE html><html><head><title>Example Domain</title></head><body></body></html>";
-                await ctx.Response.WriteAsync(html);
-            }));
-        return new TestServer(builder);
+    private static TestServerFixture CreateServer() {
+        return TestServerCompat.CreateTestServer(async ctx => {
+            const string html = "<!DOCTYPE html><html><head><title>Example Domain</title></head><body></body></html>";
+            await ctx.Response.WriteAsync(html);
+        }, "/", "GET");
     }
     [Fact]
     public void ParseWithAngleSharp_FromString() {

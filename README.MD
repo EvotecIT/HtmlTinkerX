@@ -652,12 +652,24 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **ConvertFrom-HtmlMeta** - Extract name/content pairs from meta tags
 - **ConvertFrom-HtmlMicrodata** - Extract structured data items (schema.org types)
 - **ConvertFrom-HtmlOpenGraph** - Extract Open Graph metadata
+- **ConvertFrom-HtmlJsonLd** - Extract JSON-LD structured data scripts
+- **ConvertFrom-HtmlScriptData** - Extract generic JSON-bearing script data such as import maps and app settings
+- **ConvertFrom-HtmlAppState** - Extract common framework state payloads such as `__NEXT_DATA__`
+- **ConvertFrom-HtmlHeadLink** - Extract canonical, alternate, feed, icon, manifest, and preload head links
+- **ConvertFrom-HtmlImageCandidate** - Extract image URLs and responsive `srcset` candidates
 - **Select-HtmlNode** - Select HtmlAgilityPack nodes with XPath or common tag/attribute predicates
 - **Select-HtmlAttributeValue** - Read HTML attribute values with fallback defaults
 - **Select-HtmlInnerText** - Read node text with optional HTML entity decoding
+- **Select-HtmlToken** - Find CSRF, XSRF, nonce, anti-forgery, and auth token values
 - **ConvertFrom-JavaScriptAst** - Parse JavaScript into an Acornima AST
 - **Select-JavaScriptAstNode** - Traverse Acornima AST descendants by node type
 - **Select-JavaScriptVariable** - Find JavaScript variable declarations by name or prefix
+- **ConvertFrom-HtmlRscPayload** - Extract Next.js inline React Server Component / React Flight payload rows
+- **ConvertFrom-JavaScriptEndpoint** - Discover likely endpoints from static JavaScript strings
+- **ConvertFrom-HtmlLinkedJavaScriptEndpoint** - Download linked scripts and discover likely endpoints from JavaScript bundles
+- **ConvertFrom-RobotsTxt** - Parse robots.txt groups, rules, crawl delays, and sitemap directives
+- **ConvertFrom-WebManifest** - Parse web app manifest JSON
+- **ConvertFrom-WellKnownText** - Parse `security.txt`, `humans.txt`, and `ads.txt`
 - **Format-CSS** - Pretty-print style sheets
 - **Format-HTML** - Tidy up HTML markup
 - **Format-JavaScript** - Beautify JavaScript with customizable options
@@ -722,6 +734,63 @@ $ast = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };'
 $ast | Select-JavaScriptAstNode -Type ObjectExpression
 $ast | Select-JavaScriptVariable -Name api -Contains
 ```
+
+### React Server Component payload extraction
+
+Next.js can inline React Flight payload instructions in scripts that push data into `self.__next_f`. Use `ConvertFrom-HtmlRscPayload` to inspect that server-rendered app state through stable HtmlTinkerX objects without exposing framework dependency types:
+
+```powershell
+$rows = ConvertFrom-HtmlRscPayload -Content $html
+$rows | Where-Object IsJson | Select-Object Id, Tag, Kind, Data
+
+$payloads = ConvertFrom-HtmlRscPayload -Content $html -RawPayload
+$document = ConvertFrom-HtmlRscPayload -Content $html -AsDocument
+```
+
+This is a static extractor. It does not hydrate React, execute application JavaScript, or resolve client module references.
+
+### Modern page parsing helpers
+
+Several cmdlets expose stable HtmlTinkerX models for common data embedded in modern pages:
+
+```powershell
+$jsonLd = ConvertFrom-HtmlJsonLd -Content $html
+$scriptData = ConvertFrom-HtmlScriptData -Content $html
+$appState = ConvertFrom-HtmlAppState -Content $html
+$headLinks = ConvertFrom-HtmlHeadLink -Content $html -BaseUrl https://example.org/
+$images = ConvertFrom-HtmlImageCandidate -Content $html -BaseUrl https://example.org/
+$tokens = Select-HtmlToken -Content $html
+$rows = ConvertFrom-HtmlRscPayload -Content $html
+$endpoints = ConvertFrom-JavaScriptEndpoint -Content $html -Html
+$linkedEndpoints = ConvertFrom-HtmlLinkedJavaScriptEndpoint -Url https://example.org/
+$robotsRules = ConvertFrom-RobotsTxt -Content $robots -BaseUrl https://example.org/robots.txt
+$manifest = ConvertFrom-WebManifest -Content $manifestJson -BaseUrl https://example.org/manifest.webmanifest
+$security = ConvertFrom-WellKnownText -Content $securityTxt -Kind SecurityTxt -BaseUrl https://example.org/.well-known/security.txt
+
+$tokens | Where-Object Source -in 'Input', 'Meta'
+$endpoints | Where-Object Method -eq POST
+```
+
+The same parsing layer is available from C# through HtmlTinkerX:
+
+```csharp
+var jsonLd = HtmlJsonLdParser.Parse(html);
+var scriptData = HtmlScriptDataParser.Parse(html);
+var appState = HtmlAppStateParser.Parse(html);
+var headLinks = HtmlHeadLinkParser.Parse(html, new Uri("https://example.org/"));
+var images = HtmlImageCandidateParser.Parse(html, new Uri("https://example.org/"));
+var tokens = HtmlTokenParser.Parse(html);
+var reactFlight = HtmlReactFlightParser.Parse(html);
+var endpoints = HtmlJavaScriptEndpointParser.ParseHtml(html);
+var linkedEndpoints = await HtmlLinkedJavaScriptEndpointParser.ParseUrlAsync("https://example.org/");
+var robotsRules = HtmlRobotsParser.Parse(robots, new Uri("https://example.org/robots.txt"));
+var manifest = HtmlWebManifestParser.Parse(manifestJson, new Uri("https://example.org/manifest.webmanifest"));
+var security = HtmlWellKnownParser.Parse(securityTxt, "security.txt", new Uri("https://example.org/.well-known/security.txt"));
+```
+
+Runnable examples are available in `Examples\Example-ModernParsing.ps1` and `Sources\HtmlTinkerX.Examples\ModernParsingExample.cs`.
+
+These helpers are static parsers. They do not execute application JavaScript and they return PSParseHTML/HtmlTinkerX objects rather than exposed dependency implementation types.
 
 For lower-level exploration, the packaged PowerShell module exposes selected dependency type accelerators through its AssemblyLoadContext boundary, including `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.AstVisitor]`, and common `[Acornima.Ast.*]` node types.
 

@@ -1,7 +1,4 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using NUglify.Html;
 using System;
 using System.Net.Http;
@@ -128,13 +125,11 @@ public class HtmlOptimizerTests {
 
     [Fact]
     public async Task EmbedImagesAsDataUriAsync_ReplacesImageSources() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                byte[] img = System.Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=");
-                ctx.Response.ContentType = "image/png";
-                await ctx.Response.Body.WriteAsync(img, 0, img.Length);
-            }));
-        using var server = new TestServer(builder);
+        using var server = TestServerCompat.CreateTestServer(async ctx => {
+            byte[] img = System.Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=");
+            ctx.Response.ContentType = "image/png";
+            await ctx.Response.Body.WriteAsync(img, 0, img.Length);
+        }, null, null);
         using HttpClient client = server.CreateClient();
         string html = $"<html><body><img src=\"{server.BaseAddress}image.png\" /></body></html>";
 

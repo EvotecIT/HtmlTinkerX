@@ -1,7 +1,4 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using System;
 using System.Diagnostics;
 using System.Net.Http;
@@ -14,14 +11,12 @@ public class HtmlUtilitiesTests {
     private readonly ITestOutputHelper _output;
 
     public HtmlUtilitiesTests(ITestOutputHelper output) => _output = output;
-    private static TestServer CreateServer(string content, string charset) {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                ctx.Response.ContentType = $"text/plain; charset={charset}";
-                var bytes = System.Text.Encoding.GetEncoding(charset).GetBytes(content);
-                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            }));
-        return new TestServer(builder);
+    private static TestServerFixture CreateServer(string content, string charset) {
+        return TestServerCompat.CreateTestServer(async ctx => {
+            ctx.Response.ContentType = $"text/plain; charset={charset}";
+            var bytes = System.Text.Encoding.GetEncoding(charset).GetBytes(content);
+            await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }, "/", "GET");
     }
 
     [Fact]
@@ -98,13 +93,11 @@ public class HtmlUtilitiesTests {
 
     [Fact]
     public async Task GetStringWithProperEncodingAsync_TrimsQuotedCharset() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                ctx.Response.ContentType = "text/plain; charset=\"utf-8\"";
-                var bytes = System.Text.Encoding.UTF8.GetBytes("Hello");
-                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            }));
-        using var server = new TestServer(builder);
+        using var server = TestServerCompat.CreateTestServer(async ctx => {
+            ctx.Response.ContentType = "text/plain; charset=\"utf-8\"";
+            var bytes = System.Text.Encoding.UTF8.GetBytes("Hello");
+            await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }, "/", "GET");
         using HttpClient client = server.CreateClient();
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
         Assert.Equal("Hello", result);
@@ -112,18 +105,16 @@ public class HtmlUtilitiesTests {
 
     [Fact]
     public async Task GetStringWithProperEncodingAsync_DetectsMetaCharset() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                ctx.Response.ContentType = "text/html";
-                const string html = "<meta charset=\"UTF-16\">Hello";
-                byte[] preamble = System.Text.Encoding.Unicode.GetPreamble();
-                byte[] data = System.Text.Encoding.Unicode.GetBytes(html);
-                byte[] bytes = new byte[preamble.Length + data.Length];
-                preamble.CopyTo(bytes, 0);
-                data.CopyTo(bytes, preamble.Length);
-                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            }));
-        using var server = new TestServer(builder);
+        using var server = TestServerCompat.CreateTestServer(async ctx => {
+            ctx.Response.ContentType = "text/html";
+            const string html = "<meta charset=\"UTF-16\">Hello";
+            byte[] preamble = System.Text.Encoding.Unicode.GetPreamble();
+            byte[] data = System.Text.Encoding.Unicode.GetBytes(html);
+            byte[] bytes = new byte[preamble.Length + data.Length];
+            preamble.CopyTo(bytes, 0);
+            data.CopyTo(bytes, preamble.Length);
+            await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }, "/", "GET");
         using HttpClient client = server.CreateClient();
         string result = await HtmlUtilities.GetStringWithProperEncodingAsync(client, server.BaseAddress.ToString());
         Assert.Equal("<meta charset=\"UTF-16\">Hello", result);

@@ -1,24 +1,19 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using System.Net.Http;
 
 namespace HtmlTinkerX.Tests;
 
 public class HtmlResourceDownloadTests {
-    private static TestServer CreateServer() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                string content = ctx.Request.Path.Value switch {
-                    "/file1.txt" => "file1",
-                    "/file2.js" => "file2",
-                    _ => string.Empty
-                };
-                var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-                await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            }));
-        return new TestServer(builder);
+    private static TestServerFixture CreateServer() {
+        return TestServerCompat.CreateTestServer(async ctx => {
+            string content = ctx.Request.Path.Value switch {
+                "/file1.txt" => "file1",
+                "/file2.js" => "file2",
+                _ => string.Empty
+            };
+            var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+            await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+        }, null, null);
     }
 
     [Fact]
