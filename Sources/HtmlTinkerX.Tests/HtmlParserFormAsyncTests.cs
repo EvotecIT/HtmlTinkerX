@@ -1,5 +1,4 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.TestHost;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
@@ -10,7 +9,7 @@ namespace HtmlTinkerX.Tests;
 /// Tests asynchronous form parsing using <see cref="HtmlParser"/>.
 /// </summary>
 public class HtmlParserFormAsyncTests {
-    private static TestServer CreateServer() {
+    private static TestServerFixture CreateServer() {
         return TestServerCompat.CreateFormParsingTestServer();
     }
 

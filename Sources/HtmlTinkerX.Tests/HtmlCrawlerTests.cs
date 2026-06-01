@@ -156,9 +156,7 @@ public class HtmlCrawlerTests {
     public async Task MarkRenderedHiddenElementsAsync_MarksComputedHiddenContentFromStylesheets() {
         await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
         using IPlaywright playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions {
-            Headless = true
-        });
+        await using IBrowser browser = await LaunchChromiumWithRetryAsync(playwright);
         IPage page = await browser.NewPageAsync();
         await page.SetContentAsync("""
 <html>
@@ -180,6 +178,27 @@ public class HtmlCrawlerTests {
 
         Assert.Equal("true", await page.Locator(".theme-hidden").GetAttributeAsync("data-htmltinkerx-hidden"));
         Assert.Null(await page.Locator("main > p:first-of-type").GetAttributeAsync("data-htmltinkerx-hidden"));
+    }
+
+    private static async Task<IBrowser> LaunchChromiumWithRetryAsync(IPlaywright playwright) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                return await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions {
+                    Headless = true
+                });
+            } catch (PlaywrightException ex) when (attempt < 3 && IsTransientSpawnLock(ex)) {
+                await Task.Delay(TimeSpan.FromMilliseconds(750 * attempt));
+            }
+        }
+
+        return await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions {
+            Headless = true
+        });
+    }
+
+    private static bool IsTransientSpawnLock(PlaywrightException exception) {
+        return exception.Message.Contains("spawn EBUSY", System.StringComparison.OrdinalIgnoreCase)
+            || exception.Message.Contains("spawn ETXTBSY", System.StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

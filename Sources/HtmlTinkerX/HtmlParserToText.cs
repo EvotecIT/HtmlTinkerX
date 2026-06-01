@@ -49,7 +49,7 @@ public static class HtmlParserToText {
         RemoveNoise(document);
 
         if (!string.IsNullOrWhiteSpace(preferredSelector)) {
-            IElement? preferred = document.QuerySelector(preferredSelector);
+            IElement? preferred = document.QuerySelector(preferredSelector!);
             if (preferred != null && CountWords(preferred.TextContent) > 0) {
                 return BuildReadableTextResult(preferred, document, candidateCount: 1);
             }

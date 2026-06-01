@@ -316,7 +316,7 @@ public static class HtmlTableDataExtensions {
             return false;
         }
 
-        return classes.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+        return classes!.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Any(token => string.Equals(token, className, comparison));
     }
 }

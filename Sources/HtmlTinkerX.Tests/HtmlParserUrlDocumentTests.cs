@@ -1,8 +1,5 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.TestHost;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -12,13 +9,11 @@ namespace HtmlTinkerX.Tests;
 /// Tests for parsing HTML documents retrieved from a URL.
 /// </summary>
 public class HtmlParserUrlDocumentTests {
-    private static TestServer CreateServer() {
-        var builder = new WebHostBuilder()
-            .Configure(app => app.Run(async ctx => {
-                const string html = "<!DOCTYPE html><html><head><title>Server Page</title></head><body><p>Hello world</p></body></html>";
-                await ctx.Response.WriteAsync(html);
-            }));
-        return new TestServer(builder);
+    private static TestServerFixture CreateServer() {
+        return TestServerCompat.CreateTestServer(async ctx => {
+            const string html = "<!DOCTYPE html><html><head><title>Server Page</title></head><body><p>Hello world</p></body></html>";
+            await ctx.Response.WriteAsync(html);
+        }, "/", "GET");
     }
 
     [Fact]

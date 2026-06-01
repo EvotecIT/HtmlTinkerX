@@ -23,6 +23,16 @@ Current PowerShell-friendly entry points:
 - `ConvertFrom-JavaScriptAst` parses JavaScript into an Acornima AST.
 - `Select-JavaScriptAstNode` traverses descendant AST nodes by type, replacing the common `DescendantNodes` workflow.
 - `Select-JavaScriptVariable` finds variable declarations by exact, contains, or starts-with name matches.
+
+## React Server Component / React Flight payloads
+
+Modern Next.js pages can inline React Flight payload instructions in `<script>` tags that push data into `self.__next_f`. Use `ConvertFrom-HtmlRscPayload` to extract those instructions through stable HtmlTinkerX model objects instead of relying on Acornima or framework implementation types directly.
+
+The cmdlet returns decoded Flight rows by default, `-RawPayload` returns the raw inline payload instructions, and `-AsDocument` returns both collections together. This is a static extractor for server-rendered app state; it does not hydrate React, execute application JavaScript, or resolve client module references.
+
+## Stable parsing surfaces instead of dependency exposure
+
+Prefer workflow cmdlets and HtmlTinkerX model objects over new type accelerators. The module now exposes static parsers for JSON-LD (`ConvertFrom-HtmlJsonLd`), generic script data (`ConvertFrom-HtmlScriptData`), embedded app state (`ConvertFrom-HtmlAppState`), head discovery links (`ConvertFrom-HtmlHeadLink`), image candidates (`ConvertFrom-HtmlImageCandidate`), token extraction (`Select-HtmlToken`), JavaScript endpoint discovery (`ConvertFrom-JavaScriptEndpoint` and `ConvertFrom-HtmlLinkedJavaScriptEndpoint`), web manifests (`ConvertFrom-WebManifest`), well-known text files (`ConvertFrom-WellKnownText`), and robots.txt (`ConvertFrom-RobotsTxt`). These keep common parsing workflows available without requiring users to script directly against bundled dependency types.
 - Packaged builds expose selected type accelerators such as `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.Ast.Node]`, `[Acornima.Ast.VariableDeclaration]`, `[Acornima.Ast.ObjectExpression]`, and `[Acornima.Ast.ClassBody]`.
 
 Do not add Esprima back only for compatibility unless the project intentionally decides to carry both parser APIs. Prefer Acornima cmdlets and type accelerators for new work because they match the current Jint dependency graph.

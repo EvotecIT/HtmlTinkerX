@@ -1,9 +1,5 @@
 using HtmlTinkerX;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
@@ -13,7 +9,7 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlFormSubmitterTests {
-    private static TestServer CreateServer() {
+    private static TestServerFixture CreateServer() {
         return TestServerCompat.CreateFormTestServer();
     }
 

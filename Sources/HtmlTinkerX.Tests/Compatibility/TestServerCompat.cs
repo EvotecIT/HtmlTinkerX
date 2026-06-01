@@ -2,51 +2,93 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
+#if !FRAMEWORK
+using Microsoft.Extensions.Hosting;
+#endif
 
 namespace HtmlTinkerX.Tests
 {
+    internal sealed class TestServerFixture : IDisposable
+    {
+        private readonly TestServer _server;
+#if !FRAMEWORK
+        private readonly IHost? _host;
+
+        public TestServerFixture(IHost host)
+        {
+            _host = host;
+            _server = host.GetTestServer();
+        }
+#else
+        public TestServerFixture(TestServer server)
+        {
+            _server = server;
+        }
+#endif
+
+        public Uri BaseAddress => _server.BaseAddress;
+
+        public HttpClient CreateClient()
+        {
+            return _server.CreateClient();
+        }
+
+        public void Dispose()
+        {
+            _server.Dispose();
+#if !FRAMEWORK
+            _host?.Dispose();
+#endif
+        }
+    }
+
     internal static class TestServerCompat
     {
-        public static TestServer CreateTestServer(Func<HttpContext, Task> handler, string path = "/", string method = "POST")
+        public static TestServerFixture CreateTestServer(Func<HttpContext, Task> handler, string? path = "/", string? method = "POST")
         {
 #if FRAMEWORK
             var builder = new WebHostBuilder()
-                .Configure(app =>
-                {
-                    app.Run(async context =>
-                    {
-                        if (context.Request.Path.Value == path && context.Request.Method == method)
-                        {
-                            await handler(context);
-                        }
-                        else
-                        {
-                            context.Response.StatusCode = 404;
-                        }
-                    });
-                });
+                .Configure(app => ConfigureApplication(app, handler, path, method));
+            return new TestServerFixture(new TestServer(builder));
 #else
-            var builder = new WebHostBuilder()
-                .ConfigureServices(s => s.AddRouting())
-                .Configure(app =>
+            IHost host = new HostBuilder()
+                .ConfigureWebHost(webHost =>
                 {
-                    app.UseRouting();
-                    app.UseEndpoints(endpoints =>
-                    {
-                        if (method == "GET")
-                            endpoints.MapGet(path, handler);
-                        else
-                            endpoints.MapPost(path, handler);
-                    });
-                });
+                    webHost.UseTestServer();
+                    webHost.Configure(app => ConfigureApplication(app, handler, path, method));
+                })
+                .Build();
+            host.Start();
+            return new TestServerFixture(host);
 #endif
-            return new TestServer(builder);
         }
 
-        public static TestServer CreateFormTestServer()
+        private static void ConfigureApplication(IApplicationBuilder app, Func<HttpContext, Task> handler, string? path, string? method)
+        {
+            app.Run(async context =>
+            {
+                if (ShouldHandle(context, path, method))
+                {
+                    await handler(context);
+                }
+                else
+                {
+                    context.Response.StatusCode = 404;
+                }
+            });
+        }
+
+        private static bool ShouldHandle(HttpContext context, string? path, string? method)
+        {
+            bool pathMatches = path == null || string.Equals(context.Request.Path.Value, path, StringComparison.Ordinal);
+            bool methodMatches = method == null || string.Equals(context.Request.Method, method, StringComparison.OrdinalIgnoreCase);
+            return pathMatches && methodMatches;
+        }
+
+        public static TestServerFixture CreateFormTestServer()
         {
             return CreateTestServer(async context =>
             {
@@ -57,7 +99,7 @@ namespace HtmlTinkerX.Tests
             }, "/login");
         }
 
-        public static TestServer CreateListTestServer()
+        public static TestServerFixture CreateListTestServer()
         {
             return CreateTestServer(async context =>
             {
@@ -69,7 +111,7 @@ namespace HtmlTinkerX.Tests
             }, "/list");
         }
 
-        public static TestServer CreateFormParsingTestServer()
+        public static TestServerFixture CreateFormParsingTestServer()
         {
             return CreateTestServer(async context =>
             {
@@ -78,7 +120,7 @@ namespace HtmlTinkerX.Tests
             }, "/form", "GET");
         }
 
-        public static TestServer CreateListParsingTestServer()
+        public static TestServerFixture CreateListParsingTestServer()
         {
             return CreateTestServer(async context =>
             {
