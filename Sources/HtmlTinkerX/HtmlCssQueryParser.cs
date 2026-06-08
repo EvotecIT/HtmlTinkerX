@@ -123,22 +123,10 @@ public static class HtmlCssQueryParser {
                 continue;
             }
 
-            if (item.Rule is ICssStyleRule styleRule) {
-                foreach (ICssProperty declaration in styleRule.Style) {
-                    foreach (string url in ExtractCssUrls(declaration.Value)) {
-                        references.Add(CreateUrlReference(index++, styleRule.SelectorText, declaration.Name, url, baseUri, item.Context));
-                    }
-                }
-
-                continue;
-            }
-
-            if (item.Rule is IEnumerable<ICssProperty> declarationRule) {
-                string? selector = GetDeclarationRuleSelector(item.Rule);
-                foreach (ICssProperty declaration in declarationRule) {
-                    foreach (string url in ExtractCssUrls(declaration.Value)) {
-                        references.Add(CreateUrlReference(index++, selector, declaration.Name, url, baseUri, item.Context));
-                    }
+            string? selector = GetDeclarationRuleSelector(item.Rule);
+            foreach (ICssProperty declaration in GetRuleDeclarations(item.Rule)) {
+                foreach (string url in ExtractCssUrls(declaration.Value)) {
+                    references.Add(CreateUrlReference(index++, selector, declaration.Name, url, baseUri, item.Context));
                 }
             }
         }

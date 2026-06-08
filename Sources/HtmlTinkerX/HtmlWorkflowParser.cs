@@ -311,7 +311,29 @@ public static class HtmlWorkflowParser {
             return descriptorIndex >= 0 ? trimmed.Substring(0, descriptorIndex) : trimmed;
         }
 
-        return trimmed.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+        string[] parts = trimmed.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) {
+            return string.Empty;
+        }
+
+        if (parts.Length == 1) {
+            return parts[0];
+        }
+
+        return parts.Length == 2 && IsSrcSetDescriptor(parts[1]) ? parts[0] : trimmed;
+    }
+
+    private static bool IsSrcSetDescriptor(string value) {
+        if (value.Length < 2) {
+            return false;
+        }
+
+        char suffix = value[value.Length - 1];
+        if (suffix != 'w' && suffix != 'x') {
+            return false;
+        }
+
+        return double.TryParse(value.Substring(0, value.Length - 1), System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out double number) && number > 0;
     }
 
     private static bool IsSeparatorAfterDataUrl(string srcset, int commaIndex) {

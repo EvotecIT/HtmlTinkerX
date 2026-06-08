@@ -161,6 +161,20 @@ Describe 'CSS query cmdlets' {
         $urls[0].Url | Should -Be '/img/badge.png'
     }
 
+    It 'extracts urls from keyframe declarations' {
+        $urls = @(ConvertFrom-CssUrl -Content @'
+@keyframes fade {
+    50% {
+        background-image: url("/img/mid.png");
+    }
+}
+'@ -BaseUrl 'https://example.org/')
+
+        $urls.Count | Should -Be 1
+        $urls[0].Selector | Should -Be '50%'
+        $urls[0].ResolvedUrl | Should -Be 'https://example.org/img/mid.png'
+    }
+
     It 'selects declarations from non-style CSS declaration rules' {
         $declarations = @(Select-CssDeclaration -Content @'
 @font-face {
@@ -278,6 +292,16 @@ Describe 'HTML workflow cmdlets' {
         $assets.Count | Should -Be 0
     }
 
+    It 'extracts legacy JavaScript MIME script assets' {
+        $scripts = @(Select-HtmlScript -Content '<script type="text/jscript" src="/legacy.js"></script>' -BaseUrl 'https://example.org/' -JavaScript)
+        $assets = @(Select-HtmlAsset -Content '<script type="text/jscript" src="/legacy.js"></script>' -BaseUrl 'https://example.org/')
+
+        $scripts.Count | Should -Be 1
+        $scripts[0].ResolvedUrl | Should -Be 'https://example.org/legacy.js'
+        $assets.Count | Should -Be 1
+        $assets[0].ResolvedUrl | Should -Be 'https://example.org/legacy.js'
+    }
+
     It 'extracts video poster image assets' {
         $assets = @(Select-HtmlAsset -Content '<video poster="/img/poster.jpg" src="/media/movie.mp4"></video>' -BaseUrl 'https://example.org/')
 
@@ -293,6 +317,16 @@ Describe 'HTML workflow cmdlets' {
         $assets[0].Kind | Should -Be 'Image'
         $assets[0].Element | Should -Be 'input'
         $assets[0].ResolvedUrl | Should -Be 'https://example.org/submit.png'
+    }
+
+    It 'reports malformed srcset candidates with spaces as invalid assets' {
+        $assets = @(Select-HtmlAsset -Content '<img srcset="bad image.png 1x">' -BaseUrl 'https://example.org/')
+        $findings = @(Measure-HtmlCompatibility -Content '<img srcset="bad image.png 1x">' -BaseUrl 'https://example.org/')
+
+        $assets.Count | Should -Be 1
+        $assets[0].Url | Should -Be 'bad image.png 1x'
+        $assets[0].IsValidUrl | Should -BeFalse
+        $findings.RuleId | Should -Contain 'invalid-resource-url'
     }
 
     It 'extracts prefetch links as preload-style assets' {
