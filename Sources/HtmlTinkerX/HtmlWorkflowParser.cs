@@ -18,6 +18,7 @@ public static class HtmlWorkflowParser {
         List<HtmlScriptReference> scripts = new();
         int index = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {
+            int sourceIndex = index++;
             string type = script.GetAttribute("type") ?? string.Empty;
             bool isJavaScript = HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(type);
             bool isModule = NormalizeScriptType(type).Equals("module", StringComparison.OrdinalIgnoreCase);
@@ -33,7 +34,7 @@ public static class HtmlWorkflowParser {
             }
 
             scripts.Add(new HtmlScriptReference {
-                Index = index++,
+                Index = sourceIndex,
                 Type = type,
                 Source = src,
                 ResolvedUrl = ResolveUrl(src, effectiveBaseUri, out _),
@@ -58,7 +59,7 @@ public static class HtmlWorkflowParser {
         List<HtmlAssetReference> assets = new();
         int index = 0;
 
-        foreach (IElement element in document.QuerySelectorAll("script, link[href], link[imagesrcset], img[src], img[srcset], picture source[srcset], audio[src], video[src], video[poster], audio source[src], video source[src], track[src], style")) {
+        foreach (IElement element in document.QuerySelectorAll("script, link[href], link[imagesrcset], img[src], img[srcset], input[type=image][src], picture source[srcset], audio[src], video[src], video[poster], audio source[src], video source[src], track[src], style")) {
             foreach (HtmlAssetReference asset in CreateAssetsForElement(element, effectiveBaseUri, includeInline)) {
                 asset.Index = index++;
                 assets.Add(asset);
@@ -94,8 +95,7 @@ public static class HtmlWorkflowParser {
         }
 
         foreach (IElement label in document.QuerySelectorAll("label")) {
-            string text = (label.TextContent ?? string.Empty).Trim();
-            if (text.Length == 0 && string.IsNullOrWhiteSpace(label.GetAttribute("aria-label")) && string.IsNullOrWhiteSpace(label.GetAttribute("title"))) {
+            if (!HasReadableLabel(label)) {
                 AddFinding(findings, "empty-label", "Warning", "Label has no readable text.", label, null, null);
             }
 
@@ -208,6 +208,13 @@ public static class HtmlWorkflowParser {
                 }
             }
 
+            yield break;
+        }
+
+        if (element.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase)
+            && (element.GetAttribute("type") ?? string.Empty).Trim().Equals("image", StringComparison.OrdinalIgnoreCase)
+            && element.HasAttribute("src")) {
+            yield return CreateAsset(0, "Image", element, "src", element.GetAttribute("src") ?? string.Empty, baseUri);
             yield break;
         }
 
@@ -357,7 +364,7 @@ public static class HtmlWorkflowParser {
         string type = (field.GetAttribute("type") ?? string.Empty).Trim();
         return field.LocalName switch {
             "button" => true,
-            "input" => !new[] { "hidden", "submit", "button", "reset" }.Contains(type, StringComparer.OrdinalIgnoreCase),
+            "input" => !new[] { "hidden", "submit", "reset" }.Contains(type, StringComparer.OrdinalIgnoreCase),
             "select" or "textarea" => true,
             _ => false
         };
@@ -367,6 +374,7 @@ public static class HtmlWorkflowParser {
         if (!string.IsNullOrWhiteSpace(field.GetAttribute("aria-label")) ||
             !string.IsNullOrWhiteSpace(field.GetAttribute("title")) ||
             HasAltAccessibleName(field) ||
+            HasValueAccessibleName(field) ||
             HasOwnReadableText(field) ||
             HasReadableLabelledByTarget(document, field.GetAttribute("aria-labelledby"))) {
             return true;
@@ -399,7 +407,8 @@ public static class HtmlWorkflowParser {
     private static bool HasReadableLabel(IElement label) {
         return !string.IsNullOrWhiteSpace(label.TextContent) ||
             !string.IsNullOrWhiteSpace(label.GetAttribute("aria-label")) ||
-            !string.IsNullOrWhiteSpace(label.GetAttribute("title"));
+            !string.IsNullOrWhiteSpace(label.GetAttribute("title")) ||
+            label.QuerySelectorAll("img[alt]").Any(static image => !string.IsNullOrWhiteSpace(image.GetAttribute("alt")));
     }
 
     private static bool HasAltAccessibleName(IElement field) {
@@ -407,6 +416,13 @@ public static class HtmlWorkflowParser {
         return field.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
             type.Equals("image", StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(field.GetAttribute("alt"));
+    }
+
+    private static bool HasValueAccessibleName(IElement field) {
+        string type = (field.GetAttribute("type") ?? string.Empty).Trim();
+        return field.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
+            type.Equals("button", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(field.GetAttribute("value"));
     }
 
     private static bool HasOwnReadableText(IElement field) {

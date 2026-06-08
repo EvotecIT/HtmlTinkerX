@@ -18,12 +18,13 @@ public static class HtmlCssQueryParser {
                 continue;
             }
 
+            int sourceIndex = index++;
             if (!MatchesCssSelector(styleRule.SelectorText, selector, contains)) {
                 continue;
             }
 
             matches.Add(new HtmlCssRuleMatch {
-                Index = index++,
+                Index = sourceIndex,
                 Selector = styleRule.SelectorText,
                 RuleType = item.Rule.Type.ToString(),
                 Context = item.Context,

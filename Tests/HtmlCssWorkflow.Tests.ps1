@@ -57,6 +57,24 @@ Describe 'CSS query cmdlets' {
         $declaration.Selector | Should -Be '.btn'
     }
 
+    It 'preserves CSS rule source indexes after filtering' {
+        $css = @'
+.first {
+    color: red;
+}
+
+.second {
+    color: blue;
+}
+'@
+
+        $rule = Select-CssRule -Content $css -Selector '.second'
+
+        $rule.Count | Should -Be 1
+        $rule.Index | Should -Be 1
+        $rule.Selector | Should -Be '.second'
+    }
+
     It 'matches CSS custom property names case-sensitively' {
         $css = @'
 :root {
@@ -143,6 +161,19 @@ Describe 'HTML workflow cmdlets' {
         $scripts[1].IsJavaScript | Should -BeTrue
     }
 
+    It 'preserves script source indexes when filtering JavaScript scripts' {
+        $html = @'
+<script type="application/ld+json">{"name":"schema"}</script>
+<script src="/app/site.js"></script>
+'@
+
+        $scripts = @(Select-HtmlScript -Content $html -BaseUrl 'https://example.org/' -JavaScript)
+
+        $scripts.Count | Should -Be 1
+        $scripts[0].Index | Should -Be 1
+        $scripts[0].ResolvedUrl | Should -Be 'https://example.org/app/site.js'
+    }
+
     It 'resolves script and asset urls through document base elements' {
         $html = @'
 <base href="/assets/">
@@ -197,6 +228,15 @@ Describe 'HTML workflow cmdlets' {
         ($assets | Where-Object Attribute -eq 'poster').Kind | Should -Be 'Image'
         ($assets | Where-Object Attribute -eq 'poster').ResolvedUrl | Should -Be 'https://example.org/img/poster.jpg'
         ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
+    }
+
+    It 'extracts image submit button sources as image assets' {
+        $assets = @(Select-HtmlAsset -Content '<input type="image" src="/submit.png" alt="Submit">' -BaseUrl 'https://example.org/')
+
+        $assets.Count | Should -Be 1
+        $assets[0].Kind | Should -Be 'Image'
+        $assets[0].Element | Should -Be 'input'
+        $assets[0].ResolvedUrl | Should -Be 'https://example.org/submit.png'
     }
 
     It 'indexes assets in document source order' {
@@ -272,6 +312,14 @@ Describe 'HTML workflow cmdlets' {
         $findings.RuleId | Should -Contain 'form-field-missing-label'
     }
 
+    It 'checks input buttons for accessible names' {
+        $findings = @(Measure-HtmlCompatibility -Content '<input type="button" id="save">')
+        $named = @(Measure-HtmlCompatibility -Content '<input type="button" value="Save">')
+
+        $findings.RuleId | Should -Contain 'form-field-missing-label'
+        $named.RuleId | Should -Not -Contain 'form-field-missing-label'
+    }
+
     It 'checks unlabeled buttons and ignores alt on non-image fields' {
         $html = @'
 <button id="save"></button>
@@ -282,6 +330,18 @@ Describe 'HTML workflow cmdlets' {
         $findings = @(Measure-HtmlCompatibility -Content $html)
 
         @($findings | Where-Object RuleId -eq 'form-field-missing-label').Count | Should -Be 2
+    }
+
+    It 'counts image alt text inside labels as readable text' {
+        $html = @'
+<label for="search"><img src="/search.png" alt="Search"></label>
+<input id="search">
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        $findings.RuleId | Should -Not -Contain 'empty-label'
+        $findings.RuleId | Should -Not -Contain 'form-field-missing-label'
     }
 
     It 'rejects labels targeting non-labelable elements' {
