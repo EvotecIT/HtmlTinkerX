@@ -173,9 +173,15 @@ public static class HtmlJavaScriptVariableSelector {
 
         return IsJavaScriptModuleType(normalized)
             || normalized.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("text/jscript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("text/livescript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("text/x-javascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("application/x-javascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
-            || normalized.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
+            || normalized.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("application/x-ecmascript", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("text/x-ecmascript", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsJavaScriptModuleType(string? type) {

@@ -217,6 +217,17 @@ window.$Config = {
         $values[1].Value | Should -Be 'https://example.com/logout'
     }
 
+    It 'selects JavaScript variables from legacy JavaScript MIME scripts' {
+        $variable = Select-HtmlJavaScriptVariable -Content @'
+<script type="application/x-javascript">
+const legacy = "ok";
+</script>
+'@ -Name legacy
+
+        $variable.Name | Should -Be 'legacy'
+        $variable.Value | Should -Be 'ok'
+    }
+
     It 'parses HTML module scripts with the module grammar' {
         $value = Select-HtmlJavaScriptVariable -Content @'
 <script type="module">

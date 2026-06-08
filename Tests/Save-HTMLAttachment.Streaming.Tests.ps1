@@ -1,17 +1,24 @@
 Describe 'Save-HTMLAttachment streaming' {
     It 'Outputs file paths as downloads complete' -Skip:(-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+        $listener.Start()
+        $port = $listener.LocalEndpoint.Port
+        $listener.Stop()
+
         # Bind explicitly to IPv4 to avoid macOS IPv6-only listener issues
-        $server = Start-Process -FilePath python3 -ArgumentList '-u', '-m', 'http.server', '8010', '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
+        $server = Start-Process -FilePath python3 -ArgumentList '-u', '-m', 'http.server', $port, '--bind', '127.0.0.1' -WorkingDirectory (Join-Path $PSScriptRoot 'Documents') -PassThru
         Start-Sleep -Seconds 1
         $timeout = [System.Diagnostics.Stopwatch]::StartNew()
         while ($true) {
             try {
                 $socket = New-Object Net.Sockets.TcpClient
-                # Use localhost to allow IPv4/IPv6 resolution as needed
-                $socket.Connect('localhost', 8010)
+                $socket.Connect('127.0.0.1', $port)
                 $socket.Dispose()
                 break
             } catch {
+                if ($server.HasExited) {
+                    throw "HTTP server exited before accepting connections. Exit code: $($server.ExitCode)"
+                }
                 if ($timeout.Elapsed -gt [TimeSpan]::FromSeconds(10)) {
                     throw 'HTTP server failed to start.'
                 }
@@ -20,7 +27,7 @@ Describe 'Save-HTMLAttachment streaming' {
         }
         try {
             # Match the server bind address to avoid IPv6/IPv4 mismatch
-            $uri = 'http://127.0.0.1:8010/multi_download.html'
+            $uri = "http://127.0.0.1:$port/multi_download.html"
             $dest = Join-Path $TestDrive 'stream'
             $results = @()
             foreach ($file in Save-HTMLAttachment -Url $uri -Path $dest) {
@@ -31,7 +38,9 @@ Describe 'Save-HTMLAttachment streaming' {
             Test-Path (Join-Path $dest 'download2.txt') | Should -BeTrue
         }
         finally {
-            $server | Stop-Process
+            if ($server -and -not $server.HasExited) {
+                $server | Stop-Process
+            }
         }
     }
 }
