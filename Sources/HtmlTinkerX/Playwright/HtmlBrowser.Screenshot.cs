@@ -139,7 +139,7 @@ public static partial class HtmlBrowser {
                         var elements = await page.QuerySelectorAllAsync(sel);
                         foreach (var element in elements) {
                             var box = await element.BoundingBoxAsync();
-                            if (box != null) {
+                            if (box != null && box.Width > 0 && box.Height > 0) {
                                 composition.StrokeRectangle(box.X, box.Y, box.Width, box.Height, ChartColors.Red, 3);
                             }
                         }

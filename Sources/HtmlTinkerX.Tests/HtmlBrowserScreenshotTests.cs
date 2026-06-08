@@ -93,6 +93,38 @@ public class HtmlBrowserScreenshotTests {
     }
 
     [Fact]
+    public async Task CaptureScreenshotAsync_SkipsZeroSizeHighlightsAndContinuesSelectorMatches() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string file = Path.Combine(dir, "highlight-zero.png");
+        var page = new Mock<IPage>();
+        var zeroElement = new Mock<IElementHandle>();
+        var validElement = new Mock<IElementHandle>();
+        zeroElement.Setup(e => e.BoundingBoxAsync())
+            .ReturnsAsync(new ElementHandleBoundingBoxResult { X = 1, Y = 1, Width = 0, Height = 2 });
+        validElement.Setup(e => e.BoundingBoxAsync())
+            .ReturnsAsync(new ElementHandleBoundingBoxResult { X = 4, Y = 4, Width = 3, Height = 3 });
+        page.Setup(p => p.ScreenshotAsync(It.IsAny<PageScreenshotOptions>()))
+            .ReturnsAsync(CreatePngImage());
+        page.Setup(p => p.QuerySelectorAllAsync("div"))
+            .ReturnsAsync(new[] { zeroElement.Object, validElement.Object });
+
+        await HtmlBrowser.CaptureScreenshotAsync(
+            page.Object,
+            file,
+            new ScreenshotOptions { HighlightSelectors = new[] { "div" } });
+
+        Assert.True(File.Exists(file));
+        var decoded = RasterImageDecoder.Decode(File.ReadAllBytes(file));
+        var highlightPixel = PixelAt(decoded, 4, 4);
+        Assert.True(highlightPixel.R > 180 && highlightPixel.G < 80 && highlightPixel.B < 80);
+        zeroElement.Verify(e => e.BoundingBoxAsync(), Times.Once);
+        validElement.Verify(e => e.BoundingBoxAsync(), Times.Once);
+
+        File.Delete(file);
+        Directory.Delete(dir);
+    }
+
+    [Fact]
     public async Task CaptureScreenshotAsync_SavesRequestedFormat() {
         string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string file = Path.Combine(dir, "test.bmp");
@@ -137,7 +169,7 @@ public class HtmlBrowserScreenshotTests {
         Assert.Equal((byte)'G', saved[0]);
         Assert.Equal((byte)'I', saved[1]);
         Assert.Equal((byte)'F', saved[2]);
-        Assert.Equal(0x3B, saved[^1]);
+        Assert.Equal(0x3B, saved[saved.Length - 1]);
 
         File.Delete(file);
         Directory.Delete(dir);
