@@ -58,51 +58,10 @@ public static class HtmlWorkflowParser {
         List<HtmlAssetReference> assets = new();
         int index = 0;
 
-        foreach (IElement script in document.QuerySelectorAll("script")) {
-            string src = script.GetAttribute("src") ?? string.Empty;
-            if (script.HasAttribute("src")) {
-                assets.Add(CreateAsset(index++, "Script", script, "src", src, effectiveBaseUri));
-            } else if (includeInline && HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type")) && !string.IsNullOrWhiteSpace(script.TextContent)) {
-                assets.Add(CreateInlineAsset(index++, "InlineScript", script));
-            }
-        }
-
-        foreach (IElement link in document.QuerySelectorAll("link[href], link[imagesrcset]")) {
-            string rel = link.GetAttribute("rel") ?? string.Empty;
-            string href = link.GetAttribute("href") ?? string.Empty;
-            string? kind = GetLinkAssetKind(rel);
-            if (kind != null && link.HasAttribute("href")) {
-                assets.Add(CreateAsset(index++, kind, link, "href", href, effectiveBaseUri));
-            }
-
-            if (IsImagePreload(link)) {
-                foreach (string candidate in SplitSrcSet(link.GetAttribute("imagesrcset") ?? string.Empty)) {
-                    assets.Add(CreateAsset(index++, "ImageCandidate", link, "imagesrcset", candidate, effectiveBaseUri));
-                }
-            }
-        }
-
-        foreach (IElement image in document.QuerySelectorAll("img[src]")) {
-            assets.Add(CreateAsset(index++, "Image", image, "src", image.GetAttribute("src") ?? string.Empty, effectiveBaseUri));
-        }
-
-        foreach (IElement source in document.QuerySelectorAll("picture source[srcset], img[srcset]")) {
-            string attribute = !string.IsNullOrWhiteSpace(source.GetAttribute("srcset")) ? "srcset" : "src";
-            string value = source.GetAttribute(attribute) ?? string.Empty;
-            foreach (string candidate in SplitSrcSet(value)) {
-                assets.Add(CreateAsset(index++, "ImageCandidate", source, attribute, candidate, effectiveBaseUri));
-            }
-        }
-
-        foreach (IElement media in document.QuerySelectorAll("audio[src], video[src], audio source[src], video source[src], track[src]")) {
-            assets.Add(CreateAsset(index++, "Media", media, "src", media.GetAttribute("src") ?? string.Empty, effectiveBaseUri));
-        }
-
-        if (includeInline) {
-            foreach (IElement style in document.QuerySelectorAll("style")) {
-                if (!string.IsNullOrWhiteSpace(style.TextContent)) {
-                    assets.Add(CreateInlineAsset(index++, "InlineStyle", style));
-                }
+        foreach (IElement element in document.QuerySelectorAll("script, link[href], link[imagesrcset], img[src], img[srcset], picture source[srcset], audio[src], video[src], audio source[src], video source[src], track[src], style")) {
+            foreach (HtmlAssetReference asset in CreateAssetsForElement(element, effectiveBaseUri, includeInline)) {
+                asset.Index = index++;
+                assets.Add(asset);
             }
         }
 
@@ -203,6 +162,69 @@ public static class HtmlWorkflowParser {
             IsInline = true,
             Content = element.TextContent ?? string.Empty
         };
+    }
+
+    private static IEnumerable<HtmlAssetReference> CreateAssetsForElement(IElement element, Uri? baseUri, bool includeInline) {
+        if (element.LocalName.Equals("script", StringComparison.OrdinalIgnoreCase)) {
+            string src = element.GetAttribute("src") ?? string.Empty;
+            if (element.HasAttribute("src")) {
+                yield return CreateAsset(0, "Script", element, "src", src, baseUri);
+            } else if (includeInline && HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(element.GetAttribute("type")) && !string.IsNullOrWhiteSpace(element.TextContent)) {
+                yield return CreateInlineAsset(0, "InlineScript", element);
+            }
+
+            yield break;
+        }
+
+        if (element.LocalName.Equals("link", StringComparison.OrdinalIgnoreCase)) {
+            string rel = element.GetAttribute("rel") ?? string.Empty;
+            string? kind = GetLinkAssetKind(rel);
+            if (kind != null && element.HasAttribute("href")) {
+                yield return CreateAsset(0, kind, element, "href", element.GetAttribute("href") ?? string.Empty, baseUri);
+            }
+
+            if (IsImagePreload(element)) {
+                foreach (string candidate in SplitSrcSet(element.GetAttribute("imagesrcset") ?? string.Empty)) {
+                    yield return CreateAsset(0, "ImageCandidate", element, "imagesrcset", candidate, baseUri);
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.LocalName.Equals("img", StringComparison.OrdinalIgnoreCase)) {
+            if (element.HasAttribute("src")) {
+                yield return CreateAsset(0, "Image", element, "src", element.GetAttribute("src") ?? string.Empty, baseUri);
+            }
+
+            if (element.HasAttribute("srcset")) {
+                foreach (string candidate in SplitSrcSet(element.GetAttribute("srcset") ?? string.Empty)) {
+                    yield return CreateAsset(0, "ImageCandidate", element, "srcset", candidate, baseUri);
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.LocalName.Equals("source", StringComparison.OrdinalIgnoreCase) && element.ParentElement?.LocalName.Equals("picture", StringComparison.OrdinalIgnoreCase) == true) {
+            foreach (string candidate in SplitSrcSet(element.GetAttribute("srcset") ?? string.Empty)) {
+                yield return CreateAsset(0, "ImageCandidate", element, "srcset", candidate, baseUri);
+            }
+
+            yield break;
+        }
+
+        if (element.LocalName.Equals("audio", StringComparison.OrdinalIgnoreCase) ||
+            element.LocalName.Equals("video", StringComparison.OrdinalIgnoreCase) ||
+            element.LocalName.Equals("track", StringComparison.OrdinalIgnoreCase) ||
+            element.LocalName.Equals("source", StringComparison.OrdinalIgnoreCase)) {
+            yield return CreateAsset(0, "Media", element, "src", element.GetAttribute("src") ?? string.Empty, baseUri);
+            yield break;
+        }
+
+        if (includeInline && element.LocalName.Equals("style", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(element.TextContent)) {
+            yield return CreateInlineAsset(0, "InlineStyle", element);
+        }
     }
 
     private static string? GetLinkAssetKind(string rel) {
@@ -336,17 +358,23 @@ public static class HtmlWorkflowParser {
         }
 
         string? id = field.GetAttribute("id");
-        if (!string.IsNullOrWhiteSpace(id) && document.QuerySelectorAll("label[for]").Any(label => string.Equals(label.GetAttribute("for"), id, StringComparison.Ordinal))) {
+        if (!string.IsNullOrWhiteSpace(id) && document.QuerySelectorAll("label[for]").Any(label => string.Equals(label.GetAttribute("for"), id, StringComparison.Ordinal) && HasReadableLabel(label))) {
             return true;
         }
 
         for (INode? parent = field.Parent; parent != null; parent = parent.Parent) {
-            if (parent is IElement element && element.LocalName.Equals("label", StringComparison.OrdinalIgnoreCase)) {
+            if (parent is IElement element && element.LocalName.Equals("label", StringComparison.OrdinalIgnoreCase) && HasReadableLabel(element)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool HasReadableLabel(IElement label) {
+        return !string.IsNullOrWhiteSpace(label.TextContent) ||
+            !string.IsNullOrWhiteSpace(label.GetAttribute("aria-label")) ||
+            !string.IsNullOrWhiteSpace(label.GetAttribute("title"));
     }
 
     private static bool HasReadableLabelledByTarget(IDocument document, string? value) {

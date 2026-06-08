@@ -74,7 +74,7 @@ public static class HtmlCssQueryParser {
         List<HtmlCssVariableMatch> matches = new();
         int index = 0;
         foreach (HtmlCssDeclarationMatch declaration in SelectDeclarations(css, null, null, contains: false)) {
-            if (!declaration.Property.StartsWith("--", StringComparison.Ordinal) || !Matches(declaration.Property, name, contains)) {
+            if (!declaration.Property.StartsWith("--", StringComparison.Ordinal) || !MatchesCssCustomProperty(declaration.Property, name, contains)) {
                 continue;
             }
 
@@ -88,6 +88,14 @@ public static class HtmlCssQueryParser {
         }
 
         return matches;
+    }
+
+    private static bool MatchesCssCustomProperty(string value, string? pattern, bool contains) {
+        if (string.IsNullOrEmpty(pattern)) {
+            return true;
+        }
+
+        return contains ? value.IndexOf(pattern, StringComparison.Ordinal) >= 0 : string.Equals(value, pattern, StringComparison.Ordinal);
     }
 
     /// <summary>Extracts URL references from CSS declarations and imports.</summary>

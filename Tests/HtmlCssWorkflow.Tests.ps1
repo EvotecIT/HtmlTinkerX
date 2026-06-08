@@ -37,6 +37,21 @@ Describe 'CSS query cmdlets' {
         $specificity.Class | Should -Be 2
     }
 
+    It 'matches CSS custom property names case-sensitively' {
+        $css = @'
+:root {
+    --brand: #111111;
+    --Brand: #222222;
+}
+'@
+
+        $variable = Get-CssVariable -Content $css -Name '--brand'
+
+        $variable.Count | Should -Be 1
+        $variable.Name | Should -Be '--brand'
+        $variable.Value | Should -Be '#111111'
+    }
+
     It 'extracts urls from non-style CSS declaration rules' {
         $urls = @(ConvertFrom-CssUrl -Content @'
 @font-face {
@@ -129,6 +144,20 @@ Describe 'HTML workflow cmdlets' {
         ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
     }
 
+    It 'indexes assets in document source order' {
+        $html = @'
+<link rel="stylesheet" href="/first.css">
+<script src="/second.js"></script>
+<img src="/third.png">
+<style>.fourth { color: red; }</style>
+'@
+
+        $assets = @(Select-HtmlAsset -Content $html -BaseUrl 'https://example.org/' -IncludeInline)
+
+        $assets.Kind | Should -Be @('Stylesheet', 'Script', 'Image', 'InlineStyle')
+        $assets.Index | Should -Be @(0, 1, 2, 3)
+    }
+
     It 'reports common HTML compatibility findings' {
         $html = @'
 <form>
@@ -167,6 +196,18 @@ Describe 'HTML workflow cmdlets' {
         $findings = @(Measure-HtmlCompatibility -Content $html -BaseUrl 'https://example.org/')
 
         $findings.RuleId | Should -Contain 'invalid-resource-url'
+        $findings.RuleId | Should -Contain 'form-field-missing-label'
+    }
+
+    It 'requires associated labels to be readable' {
+        $html = @'
+<label for="email"></label>
+<input id="email">
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        $findings.RuleId | Should -Contain 'empty-label'
         $findings.RuleId | Should -Contain 'form-field-missing-label'
     }
 }
