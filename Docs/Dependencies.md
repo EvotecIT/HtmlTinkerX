@@ -21,6 +21,7 @@ Current PowerShell-friendly entry points:
 - `ConvertFrom-JavaScriptAst` parses JavaScript into an Acornima AST.
 - `Select-JavaScriptAstNode` traverses descendant AST nodes by type, replacing the common `DescendantNodes` workflow. Use `-IncludeRoot` for `DescendantNodesAndSelf`-style output.
 - `Select-JavaScriptVariable` finds variable declarations and loose assignments by exact, contains, or starts-with name matches. It can match member assignment paths such as `window.$Config` and read dotted object values with `-PropertyPath`.
+- `Select-HtmlJavaScriptVariable` applies the same JavaScript variable selection to inline JavaScript script tags in HTML, skipping non-JavaScript scripts such as JSON-LD.
 
 ## React Server Component / React Flight payloads
 

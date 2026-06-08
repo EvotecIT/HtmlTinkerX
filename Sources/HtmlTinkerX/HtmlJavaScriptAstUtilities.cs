@@ -67,7 +67,13 @@ public static class HtmlJavaScriptAstUtilities {
             string? op = unary.Operator.ToString();
             object? value = EvaluateJavaScriptLiteral(unary.Argument);
             if ((op == "-" || op == "UnaryNegation") && value is IConvertible convertible) {
-                return -convertible.ToDouble(CultureInfo.InvariantCulture);
+                try {
+                    return -convertible.ToDouble(CultureInfo.InvariantCulture);
+                } catch (FormatException) {
+                    return null;
+                } catch (InvalidCastException) {
+                    return null;
+                }
             }
 
             if (op == "!" || op == "LogicalNot") {
@@ -92,7 +98,9 @@ public static class HtmlJavaScriptAstUtilities {
 
         if (node is MemberExpression member) {
             string? target = GetMemberPath(member.Object);
-            string? property = GetPropertyName(member.Property);
+            string? property = member.Computed
+                ? GetComputedPropertyName(member.Property)
+                : GetPropertyName(member.Property);
             if (string.IsNullOrEmpty(target) || string.IsNullOrEmpty(property)) {
                 return null;
             }
@@ -181,6 +189,12 @@ public static class HtmlJavaScriptAstUtilities {
     private static string? GetPropertyName(Node node) {
         return node switch {
             Identifier identifier => identifier.Name,
+            _ => null
+        };
+    }
+
+    private static string? GetComputedPropertyName(Node node) {
+        return node switch {
             Literal literal => literal.Value?.ToString(),
             _ => null
         };

@@ -90,107 +90,45 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string[]? PropertyPath { get; set; }
 
+    /// <summary>Enables Acornima tolerant parsing for JavaScript source input.</summary>
+    [Parameter(ParameterSetName = ParameterSetSource)]
+    public SwitchParameter Tolerant { get; set; }
+
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
         if (Contains.IsPresent && StartsWith.IsPresent) {
             throw new PSArgumentException("Use either -Contains or -StartsWith, not both.");
         }
 
-        Node root = ParameterSetName == ParameterSetAst
-            ? Ast
-            : new Acornima.Parser().ParseScript(Source, sourceFile: null, strict: false);
+        IReadOnlyList<HtmlJavaScriptVariableMatch> matches = ParameterSetName == ParameterSetAst
+            ? HtmlJavaScriptVariableSelector.SelectFromAst(Ast, Name, Contains.IsPresent, StartsWith.IsPresent, DeclarationOnly.IsPresent, PropertyPath)
+            : HtmlJavaScriptVariableSelector.SelectJavaScript(Source, Name, Contains.IsPresent, StartsWith.IsPresent, DeclarationOnly.IsPresent, PropertyPath, Tolerant.IsPresent);
 
-        foreach (VariableDeclaration declaration in HtmlJavaScriptAstUtilities.DescendantNodesAndSelf(root).OfType<VariableDeclaration>()) {
+        foreach (HtmlJavaScriptVariableMatch match in matches) {
             ThrowIfStopped();
-            foreach (VariableDeclarator declarator in declaration.Declarations) {
-                ThrowIfStopped();
-                if (declarator.Id is not Identifier identifier ||
-                    string.IsNullOrEmpty(identifier.Name) ||
-                    !IsMatch(identifier.Name, identifier.Name)) {
-                    continue;
-                }
-
-                WriteVariable(identifier.Name, identifier.Name, declaration.Kind.ToString(), declarator.Init, declarator);
-            }
-        }
-
-        if (!DeclarationOnly.IsPresent) {
-            foreach (AssignmentExpression assignment in HtmlJavaScriptAstUtilities.DescendantNodesAndSelf(root).OfType<AssignmentExpression>()) {
-                ThrowIfStopped();
-                string? path = HtmlJavaScriptAstUtilities.GetMemberPath(assignment.Left);
-                string? name = GetLastPathSegment(path);
-                if (name is null || name.Length == 0 || !IsMatch(name, path)) {
-                    continue;
-                }
-
-                WriteVariable(name, path ?? name, "Assignment", assignment.Right, assignment);
-            }
+            WriteObject(ToPSObject(match));
         }
 
         return Task.CompletedTask;
     }
 
-    private bool IsMatch(string variableName, string? variablePath) {
-        if (Name == null || Name.Length == 0) {
-            return true;
-        }
-
-        foreach (string name in Name) {
-            ThrowIfStopped();
-            if (Contains.IsPresent && (variableName.Contains(name) || (variablePath?.Contains(name) ?? false))) {
-                return true;
-            }
-
-            if (StartsWith.IsPresent && (variableName.StartsWith(name) || (variablePath?.StartsWith(name) ?? false))) {
-                return true;
-            }
-
-            if (!Contains.IsPresent && !StartsWith.IsPresent && (variableName == name || variablePath == name)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void WriteVariable(string name, string path, string kind, Node? valueNode, Node node) {
-        object? value = HtmlJavaScriptAstUtilities.EvaluateJavaScriptLiteral(valueNode);
-        if (PropertyPath == null || PropertyPath.Length == 0) {
-            WriteVariableObject(name, path, kind, null, value, valueNode, node);
-            return;
-        }
-
-        foreach (string propertyPath in PropertyPath) {
-            ThrowIfStopped();
-            WriteVariableObject(name, path, kind, propertyPath, HtmlJavaScriptAstUtilities.GetPropertyPathValue(value, propertyPath), valueNode, node);
-        }
-    }
-
-    private void WriteVariableObject(string name, string path, string kind, string? propertyPath, object? value, Node? valueNode, Node node) {
+    internal static PSObject ToPSObject(HtmlJavaScriptVariableMatch match) {
         PSObject result = new();
-        result.Properties.Add(new PSNoteProperty("Name", name));
-        result.Properties.Add(new PSNoteProperty("Path", path));
-        result.Properties.Add(new PSNoteProperty("Kind", kind));
-        if (propertyPath != null) {
-            result.Properties.Add(new PSNoteProperty("PropertyPath", propertyPath));
+        result.Properties.Add(new PSNoteProperty("Name", match.Name));
+        result.Properties.Add(new PSNoteProperty("Path", match.Path));
+        result.Properties.Add(new PSNoteProperty("Kind", match.Kind));
+        if (match.PropertyPath != null) {
+            result.Properties.Add(new PSNoteProperty("PropertyPath", match.PropertyPath));
         }
 
-        result.Properties.Add(new PSNoteProperty("Value", value));
-        result.Properties.Add(new PSNoteProperty("RawValue", GetRawValue(valueNode)));
-        result.Properties.Add(new PSNoteProperty("Node", node));
-        WriteObject(result);
-    }
-
-    private static string? GetLastPathSegment(string? path) {
-        if (string.IsNullOrEmpty(path)) {
-            return null;
+        if (match.ScriptIndex != null) {
+            result.Properties.Add(new PSNoteProperty("ScriptIndex", match.ScriptIndex.Value));
+            result.Properties.Add(new PSNoteProperty("ScriptType", match.ScriptType ?? string.Empty));
         }
 
-        int separator = path!.LastIndexOf('.');
-        return separator >= 0 ? path.Substring(separator + 1) : path;
-    }
-
-    private static string? GetRawValue(Node? node) {
-        return node is Literal literal ? literal.Raw : null;
+        result.Properties.Add(new PSNoteProperty("Value", match.Value));
+        result.Properties.Add(new PSNoteProperty("RawValue", match.RawValue));
+        result.Properties.Add(new PSNoteProperty("Node", match.Node));
+        return result;
     }
 }

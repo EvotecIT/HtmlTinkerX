@@ -661,6 +661,7 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Select-HtmlAttributeValue** - Read HTML attribute values with fallback defaults
 - **Select-HtmlInnerText** - Read node text with optional HTML entity decoding
 - **Select-HtmlToken** - Find CSRF, XSRF, nonce, anti-forgery, and auth token values
+- **Select-HtmlJavaScriptVariable** - Find JavaScript variable declarations and assignments inside HTML script tags
 - **ConvertFrom-JavaScriptAst** - Parse JavaScript into an Acornima AST
 - **Select-JavaScriptAstNode** - Traverse Acornima AST descendants by node type
 - **Select-JavaScriptVariable** - Find JavaScript variable declarations and loose assignments by name or prefix
@@ -738,6 +739,8 @@ $config = Select-JavaScriptVariable -Source '$Config = { sCtx: "abc", enabled: !
 $config.Value['sCtx']
 
 Select-JavaScriptVariable -Source 'window.$Config = { auth: { sCtx: "abc" } }' -Name '$Config' -PropertyPath auth.sCtx
+
+Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath auth.sCtx
 ```
 
 ### React Server Component payload extraction

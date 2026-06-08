@@ -91,6 +91,93 @@ $Config = { sCtx: "second" };
         $values[1].Value | Should -Be 'second'
     }
 
+    It 'preserves source order across JavaScript declarations and assignments' {
+        $values = @(Select-JavaScriptVariable -Source @'
+$Config = { sCtx: "assigned-first" };
+var $Config = { sCtx: "declared-second" };
+'@ -Name '$Config' -PropertyPath 'sCtx')
+
+        $values.Count | Should -Be 2
+        $values[0].Kind | Should -Be 'Assignment'
+        $values[0].Value | Should -Be 'assigned-first'
+        $values[1].Kind | Should -Be 'Var'
+        $values[1].Value | Should -Be 'declared-second'
+    }
+
+    It 'skips compound assignments because their value depends on previous state' {
+        $values = @(Select-JavaScriptVariable -Source @'
+$Config += suffix;
+$Config = { sCtx: "final" };
+'@ -Name '$Config' -PropertyPath 'sCtx')
+
+        $values.Count | Should -Be 1
+        $values[0].Kind | Should -Be 'Assignment'
+        $values[0].Value | Should -Be 'final'
+    }
+
+    It 'does not convert dynamic computed member assignments to static paths' {
+        $dynamic = @(Select-JavaScriptVariable -Source @'
+window[key] = { sCtx: "dynamic" };
+window["$Config"] = { sCtx: "literal" };
+'@ -Name '$Config' -PropertyPath 'sCtx')
+
+        $dynamic.Count | Should -Be 1
+        $dynamic[0].Path | Should -Be 'window.$Config'
+        $dynamic[0].Value | Should -Be 'literal'
+
+        $key = @(Select-JavaScriptVariable -Source 'window[key] = { sCtx: "dynamic" };' -Name key)
+        $key.Count | Should -Be 0
+    }
+
+    It 'does not throw when unary minus cannot be statically converted to a number' {
+        { $script:unary = Select-JavaScriptVariable -Source 'const value = -"abc";' -Name value } | Should -Not -Throw
+        $script:unary.Name | Should -Be 'value'
+        $script:unary.Value | Should -BeNullOrEmpty
+    }
+
+    It 'selects JavaScript variables directly from HTML script tags' {
+        $values = @(Select-HtmlJavaScriptVariable -Content @'
+<html>
+<head>
+<script type="application/ld+json">{"name":"schema"}</script>
+<script type="text/javascript">
+window.$Config = {
+    auth: {
+        sCtx: "expected-context",
+        urls: {
+            logout: "https://example.com/logout"
+        }
+    }
+};
+</script>
+</head>
+</html>
+'@ -Name '$Config' -PropertyPath 'auth.sCtx','auth.urls.logout')
+
+        $values.Count | Should -Be 2
+        $values[0].Name | Should -Be '$Config'
+        $values[0].Path | Should -Be 'window.$Config'
+        $values[0].ScriptIndex | Should -Be 1
+        $values[0].ScriptType | Should -Be 'text/javascript'
+        $values[0].PropertyPath | Should -Be 'auth.sCtx'
+        $values[0].Value | Should -Be 'expected-context'
+        $values[1].PropertyPath | Should -Be 'auth.urls.logout'
+        $values[1].Value | Should -Be 'https://example.com/logout'
+    }
+
+    It 'returns each matching HTML JavaScript assignment occurrence in source order' {
+        $values = @(Select-HtmlJavaScriptVariable -Content @'
+<script>
+$Config = { sCtx: "first" };
+$Config = { sCtx: "second" };
+</script>
+'@ -Name '$Config' -PropertyPath 'sCtx')
+
+        $values.Count | Should -Be 2
+        $values[0].Value | Should -Be 'first'
+        $values[1].Value | Should -Be 'second'
+    }
+
     It 'selects descendant AST nodes by Acornima type' {
         $nodes = ConvertFrom-JavaScriptAst -Content 'class App { run() { const answer = 42; } }' |
             Select-JavaScriptAstNode -Type ClassBody, VariableDeclaration

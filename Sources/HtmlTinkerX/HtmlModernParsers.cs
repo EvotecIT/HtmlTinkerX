@@ -507,7 +507,7 @@ public static class HtmlJavaScriptEndpointParser {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         List<HtmlJavaScriptEndpoint> endpoints = new();
         foreach (IElement script in document.QuerySelectorAll("script")) {
-            if (!IsJavaScriptScript(script)) {
+            if (!HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type"))) {
                 continue;
             }
 
@@ -519,19 +519,6 @@ public static class HtmlJavaScriptEndpointParser {
         }
 
         return endpoints;
-    }
-
-    private static bool IsJavaScriptScript(IElement script) {
-        string type = (script.GetAttribute("type") ?? string.Empty).Split(';')[0].Trim();
-        if (type.Length == 0) {
-            return true;
-        }
-
-        return type.Equals("module", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool LooksLikeEndpoint(string value) {
