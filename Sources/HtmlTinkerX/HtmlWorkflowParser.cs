@@ -60,7 +60,7 @@ public static class HtmlWorkflowParser {
 
         foreach (IElement script in document.QuerySelectorAll("script")) {
             string src = script.GetAttribute("src") ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(src)) {
+            if (script.HasAttribute("src")) {
                 assets.Add(CreateAsset(index++, "Script", script, "src", src, effectiveBaseUri));
             } else if (includeInline && HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type")) && !string.IsNullOrWhiteSpace(script.TextContent)) {
                 assets.Add(CreateInlineAsset(index++, "InlineScript", script));
@@ -71,7 +71,7 @@ public static class HtmlWorkflowParser {
             string rel = link.GetAttribute("rel") ?? string.Empty;
             string href = link.GetAttribute("href") ?? string.Empty;
             string? kind = GetLinkAssetKind(rel);
-            if (kind != null && !string.IsNullOrWhiteSpace(href)) {
+            if (kind != null && link.HasAttribute("href")) {
                 assets.Add(CreateAsset(index++, kind, link, "href", href, effectiveBaseUri));
             }
 
@@ -302,11 +302,12 @@ public static class HtmlWorkflowParser {
 
     private static string? ResolveUrl(string url, Uri? baseUri, out bool isValid) {
         isValid = false;
-        if (string.IsNullOrWhiteSpace(url) || url.Any(char.IsWhiteSpace)) {
+        string normalized = (url ?? string.Empty).Trim();
+        if (normalized.Length == 0 || normalized.Any(char.IsWhiteSpace)) {
             return null;
         }
 
-        if (!Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out Uri? parsed)) {
+        if (!Uri.TryCreate(normalized, UriKind.RelativeOrAbsolute, out Uri? parsed)) {
             return null;
         }
 
@@ -329,8 +330,8 @@ public static class HtmlWorkflowParser {
 
     private static bool HasAccessibleLabel(IDocument document, IElement field) {
         if (!string.IsNullOrWhiteSpace(field.GetAttribute("aria-label")) ||
-            !string.IsNullOrWhiteSpace(field.GetAttribute("aria-labelledby")) ||
-            !string.IsNullOrWhiteSpace(field.GetAttribute("title"))) {
+            !string.IsNullOrWhiteSpace(field.GetAttribute("title")) ||
+            HasReadableLabelledByTarget(document, field.GetAttribute("aria-labelledby"))) {
             return true;
         }
 
@@ -341,6 +342,22 @@ public static class HtmlWorkflowParser {
 
         for (INode? parent = field.Parent; parent != null; parent = parent.Parent) {
             if (parent is IElement element && element.LocalName.Equals("label", StringComparison.OrdinalIgnoreCase)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasReadableLabelledByTarget(IDocument document, string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return false;
+        }
+
+        string labelledBy = value!;
+        foreach (string id in labelledBy.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
+            IElement? target = document.GetElementById(id);
+            if (!string.IsNullOrWhiteSpace(target?.TextContent)) {
                 return true;
             }
         }

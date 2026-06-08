@@ -103,7 +103,7 @@ Describe 'HTML workflow cmdlets' {
 <link rel="preload" as="image" imagesrcset="/img/small.png 400w, /img/large.png 800w">
 <link rel="manifest" href="/site.webmanifest">
 <link rel="icon" href="/favicon.ico">
-<script src="/app/site.js"></script>
+<script src=" /app/site.js "></script>
 <img src="/img/logo.png" srcset="data:image/svg+xml,%3Csvg%3E%3C/svg%3E 1x, /img/logo-2x.png 2x">
 <picture><source srcset="/img/wide.png 1200w"></picture>
 <video><source src="/media/movie.mp4" type="video/mp4"></video>
@@ -120,6 +120,7 @@ Describe 'HTML workflow cmdlets' {
         $assets.Kind | Should -Contain 'Image'
         $assets.Kind | Should -Contain 'ImageCandidate'
         ($assets | Where-Object Kind -eq 'Stylesheet').ResolvedUrl | Should -Be 'https://example.org/css/site.css'
+        ($assets | Where-Object Kind -eq 'Script').ResolvedUrl | Should -Be 'https://example.org/app/site.js'
         $imageCandidates.Url | Should -Contain 'data:image/svg+xml,%3Csvg%3E%3C/svg%3E'
         $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/small.png'
         $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/large.png'
@@ -154,5 +155,18 @@ Describe 'HTML workflow cmdlets' {
         $findings = @(Measure-HtmlCompatibility -Content '<img src="/img/divider.png" alt="">' -BaseUrl 'https://example.org/')
 
         $findings.RuleId | Should -Not -Contain 'missing-img-alt'
+    }
+
+    It 'reports blank resource urls and unresolved aria-labelledby labels' {
+        $html = @'
+<link rel="stylesheet" href="">
+<input id="search" aria-labelledby="missing empty">
+<span id="empty"></span>
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html -BaseUrl 'https://example.org/')
+
+        $findings.RuleId | Should -Contain 'invalid-resource-url'
+        $findings.RuleId | Should -Contain 'form-field-missing-label'
     }
 }
