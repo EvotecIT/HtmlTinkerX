@@ -69,6 +69,11 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | `Optimize-CSS`        | `HtmlOptimizer.OptimizeCss()`        | Minify CSS stylesheets             |
 | `Optimize-JavaScript` | `HtmlOptimizer.OptimizeJavaScript()` | Minify JavaScript code             |
 | `Optimize-Email`      | `PreMailerClient.MoveCssInline()`    | Inline CSS for email compatibility |
+| `Select-CssRule`      | `HtmlCssQueryParser.SelectRules()`   | Query CSS rules by selector        |
+| `Select-CssDeclaration` | `HtmlCssQueryParser.SelectDeclarations()` | Query CSS declarations       |
+| `Get-CssVariable`     | `HtmlCssQueryParser.SelectVariables()` | Extract CSS custom properties    |
+| `ConvertFrom-CssUrl`  | `HtmlCssQueryParser.SelectUrls()`    | Extract and resolve CSS URLs       |
+| `Measure-CssSpecificity` | `HtmlCssQueryParser.MeasureSpecificity()` | Measure selector specificity |
 
 ### Browser Automation & Sessions
 | PowerShell Cmdlet       | C# Method                          | Description                      |
@@ -137,6 +142,9 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | PowerShell Cmdlet          | C# Method                               | Description                   |
 | -------------------------- | --------------------------------------- | ----------------------------- |
 | `Get-HTMLResource`         | `HtmlResourceParser.ExtractResources()` | Extract scripts and CSS       |
+| `Select-HtmlScript`        | `HtmlWorkflowParser.SelectScripts()`    | Select script tags by real JS type rules |
+| `Select-HtmlAsset`         | `HtmlWorkflowParser.SelectAssets()`     | Extract scripts, stylesheets, images, preloads, manifests, and icons |
+| `Measure-HtmlCompatibility` | `HtmlWorkflowParser.MeasureCompatibility()` | Find common HTML compatibility issues |
 | `Invoke-HTMLCrawl`         | `HtmlCrawler.CrawlAsync()`              | Crawl a site offline          |
 | `Save-HTMLAttachment`      | `HtmlBrowser.SaveAttachmentsAsync()`    | Download files from pages     |
 | `Get-HTMLContent`          | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
@@ -741,6 +749,44 @@ $config.Value['sCtx']
 Select-JavaScriptVariable -Source 'window.$Config = { auth: { sCtx: "abc" } }' -Name '$Config' -PropertyPath auth.sCtx
 
 Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath auth.sCtx
+```
+
+### CSS and HTML workflow audits
+
+Use the CSS query cmdlets to inspect generated stylesheets for theme tokens, declarations, asset URLs, media-query overrides, and selector specificity:
+
+```powershell
+$css = @'
+:root { --brand-color: #0369a1; }
+.btn { color: var(--brand-color); background-image: url("/img/button.png"); }
+@media (min-width: 40rem) {
+    .btn.primary { color: white !important; }
+}
+'@
+
+Select-CssRule -Content $css -Selector '.btn'
+Select-CssDeclaration -Content $css -Property color
+Get-CssVariable -Content $css -Name '--brand-color'
+ConvertFrom-CssUrl -Content $css -BaseUrl 'https://example.org/app/'
+Measure-CssSpecificity -Selector '#app .btn:hover'
+```
+
+Use the HTML workflow bridges to inspect scripts, page assets, and common compatibility issues without launching a browser:
+
+```powershell
+$html = @'
+<link rel="stylesheet" href="/css/site.css">
+<link rel="manifest" href="/site.webmanifest">
+<script type="application/ld+json">{"name":"schema"}</script>
+<script type="module" src="/app/module.js"></script>
+<img id="logo" src="/img/logo.png">
+<label for="missing"></label>
+<input id="email" name="email">
+'@
+
+Select-HtmlScript -Content $html -BaseUrl 'https://example.org/' -JavaScript
+Select-HtmlAsset -Content $html -BaseUrl 'https://example.org/'
+Measure-HtmlCompatibility -Content $html -BaseUrl 'https://example.org/'
 ```
 
 ### React Server Component payload extraction
