@@ -663,7 +663,7 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Select-HtmlToken** - Find CSRF, XSRF, nonce, anti-forgery, and auth token values
 - **ConvertFrom-JavaScriptAst** - Parse JavaScript into an Acornima AST
 - **Select-JavaScriptAstNode** - Traverse Acornima AST descendants by node type
-- **Select-JavaScriptVariable** - Find JavaScript variable declarations by name or prefix
+- **Select-JavaScriptVariable** - Find JavaScript variable declarations and loose assignments by name or prefix
 - **ConvertFrom-HtmlRscPayload** - Extract Next.js inline React Server Component / React Flight payload rows
 - **ConvertFrom-JavaScriptEndpoint** - Discover likely endpoints from static JavaScript strings
 - **ConvertFrom-HtmlLinkedJavaScriptEndpoint** - Download linked scripts and discover likely endpoints from JavaScript bundles
@@ -733,6 +733,11 @@ HtmlTinkerX currently uses Jint 4.x, which uses Acornima for JavaScript parsing.
 $ast = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };'
 $ast | Select-JavaScriptAstNode -Type ObjectExpression
 $ast | Select-JavaScriptVariable -Name api -Contains
+
+$config = Select-JavaScriptVariable -Source '$Config = { sCtx: "abc", enabled: !0 }' -Name '$Config'
+$config.Value['sCtx']
+
+Select-JavaScriptVariable -Source 'window.$Config = { auth: { sCtx: "abc" } }' -Name '$Config' -PropertyPath auth.sCtx
 ```
 
 ### React Server Component payload extraction
@@ -800,6 +805,7 @@ $script = $parser.ParseScript('const answer = 42;')
 $visitor = [Acornima.AstVisitor]::new()
 $visitor.Visit($script)
 $script | Select-JavaScriptAstNode -Type VariableDeclaration
+$script | Select-JavaScriptAstNode -Type Script -IncludeRoot
 ```
 
 ## 🎯 C# API Reference

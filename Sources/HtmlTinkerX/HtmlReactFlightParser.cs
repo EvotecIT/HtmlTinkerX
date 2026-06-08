@@ -387,7 +387,7 @@ public static class HtmlReactFlightParser {
             }
 
             if (op == "!" || op == "LogicalNot") {
-                return !HtmlModernParserUtilities.ToJavaScriptBoolean(value);
+                return !HtmlJavaScriptAstUtilities.ToJavaScriptBoolean(value);
             }
         }
 
