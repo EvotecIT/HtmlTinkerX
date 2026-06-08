@@ -100,13 +100,22 @@ public static class HtmlCssQueryParser {
                 continue;
             }
 
-            if (item.Rule is not ICssStyleRule styleRule) {
+            if (item.Rule is ICssStyleRule styleRule) {
+                foreach (ICssProperty declaration in styleRule.Style) {
+                    foreach (string url in ExtractCssUrls(declaration.Value)) {
+                        references.Add(CreateUrlReference(index++, styleRule.SelectorText, declaration.Name, url, baseUri, item.Context));
+                    }
+                }
+
                 continue;
             }
 
-            foreach (ICssProperty declaration in styleRule.Style) {
-                foreach (string url in ExtractCssUrls(declaration.Value)) {
-                    references.Add(CreateUrlReference(index++, styleRule.SelectorText, declaration.Name, url, baseUri, item.Context));
+            if (item.Rule is IEnumerable<ICssProperty> declarationRule) {
+                string selector = GetDeclarationRuleSelector(item.Rule);
+                foreach (ICssProperty declaration in declarationRule) {
+                    foreach (string url in ExtractCssUrls(declaration.Value)) {
+                        references.Add(CreateUrlReference(index++, selector, declaration.Name, url, baseUri, item.Context));
+                    }
                 }
             }
         }
@@ -196,6 +205,10 @@ public static class HtmlCssQueryParser {
                 yield return url;
             }
         }
+    }
+
+    private static string GetDeclarationRuleSelector(ICssRule rule) {
+        return rule.Type == CssRuleType.FontFace ? "@font-face" : $"@{rule.Type}";
     }
 
     private static HtmlCssUrlReference CreateUrlReference(int index, string? selector, string property, string url, Uri? baseUri, string? context) {

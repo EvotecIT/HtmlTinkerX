@@ -67,12 +67,18 @@ public static class HtmlWorkflowParser {
             }
         }
 
-        foreach (IElement link in document.QuerySelectorAll("link[href]")) {
+        foreach (IElement link in document.QuerySelectorAll("link[href], link[imagesrcset]")) {
             string rel = link.GetAttribute("rel") ?? string.Empty;
             string href = link.GetAttribute("href") ?? string.Empty;
             string? kind = GetLinkAssetKind(rel);
-            if (kind != null) {
+            if (kind != null && !string.IsNullOrWhiteSpace(href)) {
                 assets.Add(CreateAsset(index++, kind, link, "href", href, effectiveBaseUri));
+            }
+
+            if (IsImagePreload(link)) {
+                foreach (string candidate in SplitSrcSet(link.GetAttribute("imagesrcset") ?? string.Empty)) {
+                    assets.Add(CreateAsset(index++, "ImageCandidate", link, "imagesrcset", candidate, effectiveBaseUri));
+                }
             }
         }
 
@@ -221,26 +227,73 @@ public static class HtmlWorkflowParser {
     }
 
     private static IEnumerable<string> SplitSrcSet(string value) {
-        foreach (string candidate in (value ?? string.Empty).Split(',')) {
-            string trimmed = candidate.Trim();
-            if (trimmed.Length == 0) {
+        string srcset = value ?? string.Empty;
+        int start = 0;
+        for (int index = 0; index < srcset.Length; index++) {
+            if (srcset[index] != ',') {
                 continue;
             }
 
-            string url = trimmed.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+            string candidate = srcset.Substring(start, index - start).TrimStart();
+            if (candidate.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                && !candidate.Any(char.IsWhiteSpace)
+                && !IsSeparatorAfterDataUrl(srcset, index)) {
+                continue;
+            }
+
+            string url = GetSrcSetUrl(candidate);
             if (url.Length > 0) {
                 yield return url;
             }
+
+            start = index + 1;
+        }
+
+        string finalUrl = GetSrcSetUrl(srcset.Substring(start).TrimStart());
+        if (finalUrl.Length > 0) {
+            yield return finalUrl;
         }
     }
 
-    private static Uri? GetEffectiveBaseUri(IDocument document, Uri? baseUri) {
-        if (baseUri != null) {
-            return baseUri;
+    private static string GetSrcSetUrl(string candidate) {
+        string trimmed = candidate.Trim();
+        if (trimmed.Length == 0) {
+            return string.Empty;
         }
 
+        if (trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
+            int descriptorIndex = trimmed.IndexOfAny(new[] { ' ', '\t', '\r', '\n' });
+            return descriptorIndex >= 0 ? trimmed.Substring(0, descriptorIndex) : trimmed;
+        }
+
+        return trimmed.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+    }
+
+    private static bool IsSeparatorAfterDataUrl(string srcset, int commaIndex) {
+        return commaIndex + 1 >= srcset.Length || char.IsWhiteSpace(srcset[commaIndex + 1]);
+    }
+
+    private static bool IsImagePreload(IElement link) {
+        string rel = link.GetAttribute("rel") ?? string.Empty;
+        string asValue = link.GetAttribute("as") ?? string.Empty;
+        return asValue.Equals("image", StringComparison.OrdinalIgnoreCase)
+            && rel.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(static token => token.Equals("preload", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Uri? GetEffectiveBaseUri(IDocument document, Uri? baseUri) {
         string? baseHref = document.QuerySelector("base[href]")?.GetAttribute("href");
-        return Uri.TryCreate(baseHref, UriKind.Absolute, out Uri? parsed) ? parsed : null;
+        if (!string.IsNullOrWhiteSpace(baseHref) && Uri.TryCreate(baseHref, UriKind.RelativeOrAbsolute, out Uri? parsedBase)) {
+            if (parsedBase!.IsAbsoluteUri) {
+                return parsedBase;
+            }
+
+            if (baseUri != null) {
+                return new Uri(baseUri, parsedBase);
+            }
+        }
+
+        return baseUri;
     }
 
     private static string? ResolveUrl(string url, Uri? baseUri, out bool isValid) {

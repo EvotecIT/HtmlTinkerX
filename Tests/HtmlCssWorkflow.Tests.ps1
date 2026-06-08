@@ -36,6 +36,20 @@ Describe 'CSS query cmdlets' {
         $specificity.Id | Should -Be 1
         $specificity.Class | Should -Be 2
     }
+
+    It 'extracts urls from non-style CSS declaration rules' {
+        $urls = @(ConvertFrom-CssUrl -Content @'
+@font-face {
+    font-family: "Site";
+    src: url("/fonts/site.woff2") format("woff2");
+}
+'@ -BaseUrl 'https://example.org/app/')
+
+        $urls.Count | Should -Be 1
+        $urls[0].Selector | Should -Be '@font-face'
+        $urls[0].Property | Should -Be 'src'
+        $urls[0].ResolvedUrl | Should -Be 'https://example.org/fonts/site.woff2'
+    }
 }
 
 Describe 'HTML workflow cmdlets' {
@@ -54,17 +68,34 @@ Describe 'HTML workflow cmdlets' {
         $scripts[1].IsJavaScript | Should -BeTrue
     }
 
+    It 'resolves script and asset urls through document base elements' {
+        $html = @'
+<base href="/assets/">
+<script src="app.js"></script>
+<link rel="stylesheet" href="site.css">
+'@
+
+        $script = Select-HtmlScript -Content $html -BaseUrl 'https://example.org/page/index.html' -JavaScript
+        $asset = Select-HtmlAsset -Content $html -BaseUrl 'https://example.org/page/index.html' |
+            Where-Object Kind -eq 'Stylesheet'
+
+        $script.ResolvedUrl | Should -Be 'https://example.org/assets/app.js'
+        $asset.ResolvedUrl | Should -Be 'https://example.org/assets/site.css'
+    }
+
     It 'extracts assets with resolved urls' {
         $html = @'
 <link rel="stylesheet" href="/css/site.css">
 <link rel="preload" href="/fonts/site.woff2" as="font">
+<link rel="preload" as="image" imagesrcset="/img/small.png 400w, /img/large.png 800w">
 <link rel="manifest" href="/site.webmanifest">
 <link rel="icon" href="/favicon.ico">
 <script src="/app/site.js"></script>
-<img src="/img/logo.png" srcset="/img/logo-2x.png 2x">
+<img src="/img/logo.png" srcset="data:image/svg+xml,%3Csvg%3E%3C/svg%3E 1x, /img/logo-2x.png 2x">
 '@
 
         $assets = @(Select-HtmlAsset -Content $html -BaseUrl 'https://example.org/app/page.html')
+        $imageCandidates = @($assets | Where-Object Kind -eq 'ImageCandidate')
 
         $assets.Kind | Should -Contain 'Stylesheet'
         $assets.Kind | Should -Contain 'Preload'
@@ -74,6 +105,9 @@ Describe 'HTML workflow cmdlets' {
         $assets.Kind | Should -Contain 'Image'
         $assets.Kind | Should -Contain 'ImageCandidate'
         ($assets | Where-Object Kind -eq 'Stylesheet').ResolvedUrl | Should -Be 'https://example.org/css/site.css'
+        $imageCandidates.Url | Should -Contain 'data:image/svg+xml,%3Csvg%3E%3C/svg%3E'
+        $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/small.png'
+        $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/large.png'
     }
 
     It 'reports common HTML compatibility findings' {
