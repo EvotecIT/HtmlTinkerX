@@ -173,6 +173,26 @@ Describe 'CSS query cmdlets' {
         $declarations[0].Selector | Should -Be '@font-face'
         $declarations[0].Property | Should -Be 'src'
     }
+
+    It 'selects declarations from keyframe step selectors' {
+        $declarations = @(Select-CssDeclaration -Content @'
+@keyframes fade {
+    from {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    to {
+        opacity: 1;
+    }
+}
+'@ -Selector '50%' -Property opacity)
+
+        $declarations.Count | Should -Be 1
+        $declarations[0].Selector | Should -Be '50%'
+        $declarations[0].Property | Should -Be 'opacity'
+    }
 }
 
 Describe 'HTML workflow cmdlets' {
@@ -250,6 +270,12 @@ Describe 'HTML workflow cmdlets' {
         $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/wide.png'
         $imageCandidates.ResolvedUrl | Should -Not -Contain 'https://example.org/media/movie.mp4'
         ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
+    }
+
+    It 'does not extract src assets from script data blocks' {
+        $assets = @(Select-HtmlAsset -Content '<script type="application/ld+json" src="bad url"></script>' -BaseUrl 'https://example.org/')
+
+        $assets.Count | Should -Be 0
     }
 
     It 'extracts video poster image assets' {
@@ -389,6 +415,12 @@ Describe 'HTML workflow cmdlets' {
 '@
 
         $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        $findings.RuleId | Should -Not -Contain 'form-field-missing-label'
+    }
+
+    It 'counts image alt text inside buttons as readable text' {
+        $findings = @(Measure-HtmlCompatibility -Content '<button><img src="/search.png" alt="Search"></button>')
 
         $findings.RuleId | Should -Not -Contain 'form-field-missing-label'
     }

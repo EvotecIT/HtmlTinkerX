@@ -172,7 +172,7 @@ public static class HtmlWorkflowParser {
     private static IEnumerable<HtmlAssetReference> CreateAssetsForElement(IElement element, Uri? baseUri, bool includeInline) {
         if (element.LocalName.Equals("script", StringComparison.OrdinalIgnoreCase)) {
             string src = element.GetAttribute("src") ?? string.Empty;
-            if (element.HasAttribute("src")) {
+            if (element.HasAttribute("src") && HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(element.GetAttribute("type"))) {
                 yield return CreateAsset(0, "Script", element, "src", src, baseUri);
             } else if (includeInline && HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(element.GetAttribute("type")) && !string.IsNullOrWhiteSpace(element.TextContent)) {
                 yield return CreateInlineAsset(0, "InlineScript", element);
@@ -427,7 +427,8 @@ public static class HtmlWorkflowParser {
 
     private static bool HasOwnReadableText(IElement field) {
         return field.LocalName.Equals("button", StringComparison.OrdinalIgnoreCase) &&
-            !string.IsNullOrWhiteSpace(field.TextContent);
+            (!string.IsNullOrWhiteSpace(field.TextContent) ||
+                field.QuerySelectorAll("img[alt]").Any(static image => !string.IsNullOrWhiteSpace(image.GetAttribute("alt"))));
     }
 
     private static bool HasReadableLabelledByTarget(IDocument document, string? value) {

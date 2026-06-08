@@ -308,6 +308,10 @@ public static class HtmlCssQueryParser {
             return styleRule.SelectorText;
         }
 
+        if (rule is ICssKeyframeRule keyframeRule) {
+            return keyframeRule.KeyText;
+        }
+
         if (rule is not IEnumerable<ICssProperty>) {
             return null;
         }
@@ -318,6 +322,10 @@ public static class HtmlCssQueryParser {
     private static IEnumerable<ICssProperty> GetRuleDeclarations(ICssRule rule) {
         if (rule is ICssStyleRule styleRule) {
             return styleRule.Style;
+        }
+
+        if (rule is ICssKeyframeRule keyframeRule) {
+            return keyframeRule.Style;
         }
 
         return rule is IEnumerable<ICssProperty> declarationRule ? declarationRule : Enumerable.Empty<ICssProperty>();
