@@ -1,13 +1,8 @@
 ﻿using Microsoft.Playwright;
-using SixLabors.Fonts;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Bmp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Processing;
+using ChartForgeX.Composition;
+using ChartForgeX.Core;
+using ChartForgeX.Primitives;
+using ChartForgeX.Raster;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -137,17 +132,15 @@ public static partial class HtmlBrowser {
 
         bool needsProcessing = (options.HighlightSelectors != null && System.Linq.Enumerable.Any(options.HighlightSelectors)) || !string.IsNullOrEmpty(options.OverlayText) || (options.Format != ImageFormat.Png && options.Format != ImageFormat.Jpeg);
         if (needsProcessing) {
-            using var image = SixLabors.ImageSharp.Image.Load(data);
-            var pen = SixLabors.ImageSharp.Drawing.Processing.Pens.Solid(SixLabors.ImageSharp.Color.Red, 3);
+            var composition = ImageComposition.FromBytes(data);
             if (options.HighlightSelectors != null) {
                 foreach (string sel in options.HighlightSelectors) {
                     try {
                         var elements = await page.QuerySelectorAllAsync(sel);
                         foreach (var element in elements) {
                             var box = await element.BoundingBoxAsync();
-                            if (box != null) {
-                                var rect = new SixLabors.ImageSharp.RectangleF((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height);
-                                image.Mutate(c => c.Draw(pen, rect));
+                            if (box != null && box.Width > 0 && box.Height > 0) {
+                                composition.StrokeRectangle(box.X, box.Y, box.Width, box.Height, ChartColors.Red, 3);
                             }
                         }
                     } catch {
@@ -156,27 +149,38 @@ public static partial class HtmlBrowser {
                 }
             }
 
-            if (!string.IsNullOrEmpty(options.OverlayText)) {
-                SixLabors.Fonts.FontFamily fontFamily;
-                if (!SixLabors.Fonts.SystemFonts.TryGet("DejaVu Sans", out fontFamily) &&
-                    !SixLabors.Fonts.SystemFonts.TryGet("Arial", out fontFamily)) {
-                    fontFamily = SixLabors.Fonts.SystemFonts.Collection.Families.First();
-                }
-                var font = fontFamily.CreateFont(20);
-                image.Mutate(c => c.DrawText(options.OverlayText, font, SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.PointF(10, 10)));
+            string? overlayText = options.OverlayText;
+            if (overlayText != null && overlayText.Length > 0) {
+                composition.DrawText(10, 10, Math.Max(1, composition.Width - 20), overlayText, 20, ChartColors.Red);
             }
-            await image.SaveAsync(fullPath, GetEncoder(options.Format, options.Quality));
+            File.WriteAllBytes(fullPath, composition.ToRasterImage(ToRasterImageFormat(options.Format), GetRasterImageOptions(options.Quality)));
         } else {
             File.WriteAllBytes(fullPath, data);
         }
     }
 
-    private static IImageEncoder GetEncoder(ImageFormat format, int quality) => format switch {
-        ImageFormat.Jpeg => new JpegEncoder { Quality = quality },
-        ImageFormat.Bmp => new BmpEncoder(),
-        ImageFormat.Gif => new GifEncoder(),
-        _ => new PngEncoder { CompressionLevel = (PngCompressionLevel)QualityToCompression(quality) }
+    private static RasterImageFormat ToRasterImageFormat(ImageFormat format) => format switch {
+        ImageFormat.Jpeg => RasterImageFormat.Jpeg,
+        ImageFormat.Bmp => RasterImageFormat.Bmp,
+        ImageFormat.Gif => RasterImageFormat.Gif,
+        _ => RasterImageFormat.Png
     };
+
+    private static RasterImageOptions GetRasterImageOptions(int quality) => new() {
+        Background = ChartColors.White,
+        JpegQuality = ClampJpegQuality(quality),
+        PngCompressionLevel = QualityToCompression(quality)
+    };
+
+    private static int ClampJpegQuality(int quality) {
+        if (quality < 1) {
+            return 1;
+        }
+        if (quality > 100) {
+            return 100;
+        }
+        return quality;
+    }
 
     private static int QualityToCompression(int quality) {
         if (quality < 0) {

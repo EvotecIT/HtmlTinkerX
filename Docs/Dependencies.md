@@ -1,18 +1,16 @@
 # Dependency Policy
 
-## SixLabors packages
+## Screenshot image processing
 
-Keep the SixLabors image stack on the 2.x-compatible package line:
+HtmlTinkerX uses ChartForgeX for dependency-free screenshot post-processing:
 
-- `SixLabors.ImageSharp` `2.1.13`
-- `SixLabors.ImageSharp.Drawing` `1.0.0`
-- `SixLabors.Fonts` `1.0.1`
+- decoding Playwright PNG/JPEG screenshot bytes for overlays and format conversion
+- drawing selector highlight rectangles and overlay text
+- encoding PNG, JPEG, BMP, and GIF screenshot output
 
-Do not upgrade `SixLabors.ImageSharp` to 3.x or `SixLabors.ImageSharp.Drawing` to 2.x as part of routine dependency cleanup. Those versions move the dependency graph onto the newer SixLabors license model. A future upgrade should be a deliberate project decision with an explicit license review, not an automatic package bump.
+The package reference lives in `Sources/HtmlTinkerX/HtmlTinkerX.csproj` and applies to every target framework, including `net472`, `net8.0`, and `net10.0`. Local development can pass `-p:ChartForgeXProjectPath=...` to validate against a sibling ChartForgeX checkout before a package is published.
 
-This means `dotnet list package --outdated` is expected to report these packages as outdated. Treat that as an intentional pin unless the license decision changes.
-
-The package references live in `Sources/HtmlTinkerX/HtmlTinkerX.csproj` and apply to every target framework, including `net472`, `net8.0`, and `net10.0`.
+Keep screenshot overlays thin and route reusable raster behavior through ChartForgeX instead of adding a second image-processing stack.
 
 ## JavaScript parser packages
 

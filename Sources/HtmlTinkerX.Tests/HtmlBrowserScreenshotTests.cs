@@ -1,11 +1,8 @@
+using ChartForgeX;
+using ChartForgeX.Raster;
 using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats;
 using System.Reflection;
 using System;
 using System.IO;
@@ -16,15 +13,17 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserScreenshotTests {
     private static byte[] CreatePngImage() {
-        using var image = new Image<Rgba32>(20, 20);
+        var pixels = new byte[20 * 20 * 4];
         for (int y = 0; y < 20; y++) {
             for (int x = 0; x < 20; x++) {
-                image[x, y] = Color.Blue;
+                int offset = (y * 20 + x) * 4;
+                pixels[offset] = 0;
+                pixels[offset + 1] = 0;
+                pixels[offset + 2] = 255;
+                pixels[offset + 3] = 255;
             }
         }
-        using var ms = new MemoryStream();
-        image.SaveAsPng(ms);
-        return ms.ToArray();
+        return new RgbaImage(20, 20, pixels).ToPng();
     }
 
     [Fact]
@@ -84,7 +83,42 @@ public class HtmlBrowserScreenshotTests {
         byte[] original = CreatePngImage();
         byte[] saved = File.ReadAllBytes(file);
         Assert.NotEqual(original, saved);
+        var decoded = RasterImageDecoder.Decode(saved);
+        var highlightPixel = PixelAt(decoded, 1, 1);
+        Assert.True(highlightPixel.R > 180 && highlightPixel.G < 80 && highlightPixel.B < 80);
         element.Verify(e => e.BoundingBoxAsync(), Times.AtLeastOnce());
+
+        File.Delete(file);
+        Directory.Delete(dir);
+    }
+
+    [Fact]
+    public async Task CaptureScreenshotAsync_SkipsZeroSizeHighlightsAndContinuesSelectorMatches() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string file = Path.Combine(dir, "highlight-zero.png");
+        var page = new Mock<IPage>();
+        var zeroElement = new Mock<IElementHandle>();
+        var validElement = new Mock<IElementHandle>();
+        zeroElement.Setup(e => e.BoundingBoxAsync())
+            .ReturnsAsync(new ElementHandleBoundingBoxResult { X = 1, Y = 1, Width = 0, Height = 2 });
+        validElement.Setup(e => e.BoundingBoxAsync())
+            .ReturnsAsync(new ElementHandleBoundingBoxResult { X = 4, Y = 4, Width = 3, Height = 3 });
+        page.Setup(p => p.ScreenshotAsync(It.IsAny<PageScreenshotOptions>()))
+            .ReturnsAsync(CreatePngImage());
+        page.Setup(p => p.QuerySelectorAllAsync("div"))
+            .ReturnsAsync(new[] { zeroElement.Object, validElement.Object });
+
+        await HtmlBrowser.CaptureScreenshotAsync(
+            page.Object,
+            file,
+            new ScreenshotOptions { HighlightSelectors = new[] { "div" } });
+
+        Assert.True(File.Exists(file));
+        var decoded = RasterImageDecoder.Decode(File.ReadAllBytes(file));
+        var highlightPixel = PixelAt(decoded, 4, 4);
+        Assert.True(highlightPixel.R > 180 && highlightPixel.G < 80 && highlightPixel.B < 80);
+        zeroElement.Verify(e => e.BoundingBoxAsync(), Times.Once);
+        validElement.Verify(e => e.BoundingBoxAsync(), Times.Once);
 
         File.Delete(file);
         Directory.Delete(dir);
@@ -116,14 +150,43 @@ public class HtmlBrowserScreenshotTests {
         Directory.Delete(dir);
     }
 
+    [Fact]
+    public async Task CaptureScreenshotAsync_SavesRequestedGifFormat() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string file = Path.Combine(dir, "test.gif");
+        var page = new Mock<IPage>();
+        page.Setup(p => p.ScreenshotAsync(It.IsAny<PageScreenshotOptions>()))
+            .ReturnsAsync(CreatePngImage());
+
+        await HtmlBrowser.CaptureScreenshotAsync(
+            page.Object,
+            file,
+            new ScreenshotOptions { Format = ImageFormat.Gif });
+
+        Assert.True(File.Exists(file));
+        byte[] saved = File.ReadAllBytes(file);
+        Assert.True(saved.Length > 16);
+        Assert.Equal((byte)'G', saved[0]);
+        Assert.Equal((byte)'I', saved[1]);
+        Assert.Equal((byte)'F', saved[2]);
+        Assert.Equal(0x3B, saved[saved.Length - 1]);
+
+        File.Delete(file);
+        Directory.Delete(dir);
+    }
+
     [Theory]
     [InlineData(100, 0)]
     [InlineData(50, 5)]
     [InlineData(0, 9)]
-    public void GetEncoder_MapsQualityToCompression(int quality, int expected) {
-        MethodInfo method = typeof(HtmlBrowser).GetMethod("GetEncoder", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var encoder = (IImageEncoder)method.Invoke(null, new object[] { ImageFormat.Png, quality })!;
-        var png = Assert.IsType<PngEncoder>(encoder);
-        Assert.Equal(expected, (int)png.CompressionLevel);
+    public void QualityToCompression_MapsScreenshotQuality(int quality, int expected) {
+        MethodInfo method = typeof(HtmlBrowser).GetMethod("QualityToCompression", BindingFlags.NonPublic | BindingFlags.Static)!;
+        int compression = (int)method.Invoke(null, new object[] { quality })!;
+        Assert.Equal(expected, compression);
+    }
+
+    private static (byte R, byte G, byte B, byte A) PixelAt(RgbaImage image, int x, int y) {
+        int offset = (y * image.Width + x) * 4;
+        return (image.Pixels[offset], image.Pixels[offset + 1], image.Pixels[offset + 2], image.Pixels[offset + 3]);
     }
 }

@@ -18,7 +18,7 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 [![top language](https://img.shields.io/github/languages/top/evotecit/HtmlTinkerX.svg)](https://github.com/EvotecIT/HtmlTinkerX)
 [![codecov](https://codecov.io/gh/EvotecIT/HtmlTinkerX/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/HtmlTinkerX)
 
-Dependency guardrails, including the intentional SixLabors 2.x-compatible pin, are documented in [Docs/Dependencies.md](Docs/Dependencies.md).
+Dependency guardrails, including the ChartForgeX-backed screenshot image-processing path, are documented in [Docs/Dependencies.md](Docs/Dependencies.md).
 
 ## 👨‍💻 Author & Social
 [![Twitter Follow](https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social)](https://twitter.com/PrzemyslawKlys)
@@ -1811,11 +1811,9 @@ HtmlTinkerX utilizes several high-quality open-source libraries:
 
 ### 🌐 Browser Automation
 - **[Microsoft.Playwright](https://github.com/microsoft/playwright-dotnet)** - Apache 2.0 License - Browser automation
-- **[SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp)** - Apache 2.0 License - Image processing
-- **[SixLabors.ImageSharp.Drawing](https://github.com/SixLabors/ImageSharp.Drawing)** - Apache 2.0 License - Image drawing
-- **[SixLabors.Fonts](https://github.com/SixLabors/Fonts)** - Apache 2.0 License - Font handling
+- **[ChartForgeX](https://github.com/EvotecIT/ChartForgeX)** - MIT License - Dependency-free screenshot image composition
 
-SixLabors packages are intentionally pinned to the 2.x-compatible line. See [Docs/Dependencies.md](Docs/Dependencies.md) before changing those versions.
+Screenshot image post-processing is routed through ChartForgeX. See [Docs/Dependencies.md](Docs/Dependencies.md) before changing that dependency path.
 
 ### 🔧 System Libraries
 - **[System.Net.Http](https://learn.microsoft.com/dotnet/api/system.net.http)** - MIT License - HTTP client

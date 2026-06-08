@@ -12,6 +12,7 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <OfficeImoMarkdownHtmlVersion>0.1.13</OfficeImoMarkdownHtmlVersion>
+        <ChartForgeXVersion>0.1.6</ChartForgeXVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -26,16 +27,14 @@
         <PackageReference Include="System.IO.Compression" Version="4.3.0" Condition=" '$(TargetFramework)' == 'net472' " />
         <PackageReference Include="System.Net.Http" Version="4.3.4" Condition=" '$(TargetFramework)' == 'net472' " />
         <PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
+    </ItemGroup>
 
-        <!--
-            Keep the SixLabors stack on the 2.x-compatible line.
-            ImageSharp 3.x changed licensing; do not upgrade these packages to 3.x/2.x Drawing
-            unless the project intentionally accepts the new license terms.
-            See Docs/Dependencies.md for the dependency policy.
-        -->
-        <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
-        <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
-        <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
+    <ItemGroup Condition=" '$(ChartForgeXProjectPath)' != '' ">
+        <ProjectReference Include="$(ChartForgeXProjectPath)" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(ChartForgeXProjectPath)' == '' ">
+        <PackageReference Include="ChartForgeX" Version="$(ChartForgeXVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
