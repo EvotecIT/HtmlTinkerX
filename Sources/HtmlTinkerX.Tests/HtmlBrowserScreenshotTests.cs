@@ -1,11 +1,8 @@
+using ChartForgeX;
+using ChartForgeX.Raster;
 using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats;
 using System.Reflection;
 using System;
 using System.IO;
@@ -16,15 +13,17 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserScreenshotTests {
     private static byte[] CreatePngImage() {
-        using var image = new Image<Rgba32>(20, 20);
+        var pixels = new byte[20 * 20 * 4];
         for (int y = 0; y < 20; y++) {
             for (int x = 0; x < 20; x++) {
-                image[x, y] = Color.Blue;
+                int offset = (y * 20 + x) * 4;
+                pixels[offset] = 0;
+                pixels[offset + 1] = 0;
+                pixels[offset + 2] = 255;
+                pixels[offset + 3] = 255;
             }
         }
-        using var ms = new MemoryStream();
-        image.SaveAsPng(ms);
-        return ms.ToArray();
+        return new RgbaImage(20, 20, pixels).ToPng();
     }
 
     [Fact]
@@ -84,6 +83,9 @@ public class HtmlBrowserScreenshotTests {
         byte[] original = CreatePngImage();
         byte[] saved = File.ReadAllBytes(file);
         Assert.NotEqual(original, saved);
+        var decoded = RasterImageDecoder.Decode(saved);
+        var highlightPixel = PixelAt(decoded, 1, 1);
+        Assert.True(highlightPixel.R > 180 && highlightPixel.G < 80 && highlightPixel.B < 80);
         element.Verify(e => e.BoundingBoxAsync(), Times.AtLeastOnce());
 
         File.Delete(file);
@@ -120,10 +122,14 @@ public class HtmlBrowserScreenshotTests {
     [InlineData(100, 0)]
     [InlineData(50, 5)]
     [InlineData(0, 9)]
-    public void GetEncoder_MapsQualityToCompression(int quality, int expected) {
-        MethodInfo method = typeof(HtmlBrowser).GetMethod("GetEncoder", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var encoder = (IImageEncoder)method.Invoke(null, new object[] { ImageFormat.Png, quality })!;
-        var png = Assert.IsType<PngEncoder>(encoder);
-        Assert.Equal(expected, (int)png.CompressionLevel);
+    public void QualityToCompression_MapsScreenshotQuality(int quality, int expected) {
+        MethodInfo method = typeof(HtmlBrowser).GetMethod("QualityToCompression", BindingFlags.NonPublic | BindingFlags.Static)!;
+        int compression = (int)method.Invoke(null, new object[] { quality })!;
+        Assert.Equal(expected, compression);
+    }
+
+    private static (byte R, byte G, byte B, byte A) PixelAt(RgbaImage image, int x, int y) {
+        int offset = (y * image.Width + x) * 4;
+        return (image.Pixels[offset], image.Pixels[offset + 1], image.Pixels[offset + 2], image.Pixels[offset + 3]);
     }
 }

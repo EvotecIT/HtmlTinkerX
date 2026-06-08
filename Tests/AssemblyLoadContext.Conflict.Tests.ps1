@@ -40,7 +40,7 @@ Import-Module PSParseHTML -Force
     ForEach-Object {
         `$alc = `$_
         foreach (`$assembly in `$alc.Assemblies) {
-            if (`$assembly.GetName().Name -in @('PSParseHTML.PowerShell', 'HtmlTinkerX', 'SixLabors.ImageSharp', 'Spectre.Console')) {
+            if (`$assembly.GetName().Name -in @('PSParseHTML.PowerShell', 'HtmlTinkerX', 'ChartForgeX', 'Spectre.Console')) {
                 [pscustomobject]@{
                     Assembly = `$assembly.GetName().Name
                     Version = `$assembly.GetName().Version.ToString()
