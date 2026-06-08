@@ -42,11 +42,17 @@ public static class HtmlCssQueryParser {
         int index = 0;
         foreach ((ICssRule Rule, string? Context) item in EnumerateRules(sheet.Rules, null)) {
             string? selectorText = GetDeclarationRuleSelector(item.Rule);
-            if (selectorText == null || !MatchesCssSelector(selectorText, selector, contains)) {
+            if (selectorText == null) {
                 continue;
             }
 
+            bool matchesSelector = MatchesCssSelector(selectorText, selector, contains);
             foreach (ICssProperty declaration in GetRuleDeclarations(item.Rule)) {
+                int sourceIndex = index++;
+                if (!matchesSelector) {
+                    continue;
+                }
+
                 bool matchesProperty = declaration.Name.StartsWith("--", StringComparison.Ordinal)
                     ? MatchesCssCustomProperty(declaration.Name, property, contains)
                     : Matches(declaration.Name, property, contains);
@@ -55,7 +61,7 @@ public static class HtmlCssQueryParser {
                 }
 
                 matches.Add(new HtmlCssDeclarationMatch {
-                    Index = index++,
+                    Index = sourceIndex,
                     Selector = selectorText,
                     Property = declaration.Name,
                     Value = declaration.Value,
@@ -71,14 +77,13 @@ public static class HtmlCssQueryParser {
     /// <summary>Selects CSS custom properties from source text.</summary>
     public static IReadOnlyList<HtmlCssVariableMatch> SelectVariables(string css, string? name = null, bool contains = false) {
         List<HtmlCssVariableMatch> matches = new();
-        int index = 0;
         foreach (HtmlCssDeclarationMatch declaration in SelectDeclarations(css, null, null, contains: false)) {
             if (!declaration.Property.StartsWith("--", StringComparison.Ordinal) || !MatchesCssCustomProperty(declaration.Property, name, contains)) {
                 continue;
             }
 
             matches.Add(new HtmlCssVariableMatch {
-                Index = index++,
+                Index = declaration.Index,
                 Selector = declaration.Selector,
                 Name = declaration.Property,
                 Value = declaration.Value,

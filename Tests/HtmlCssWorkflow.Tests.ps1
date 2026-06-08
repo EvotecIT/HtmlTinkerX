@@ -105,6 +105,36 @@ Describe 'CSS query cmdlets' {
         $declarations[0].Value | Should -Be '#111111'
     }
 
+    It 'preserves CSS declaration source indexes after filtering' {
+        $css = @'
+.card {
+    color: red;
+    background-color: blue;
+}
+'@
+
+        $declaration = Select-CssDeclaration -Content $css -Property background-color
+
+        $declaration.Count | Should -Be 1
+        $declaration.Index | Should -Be 1
+        $declaration.Property | Should -Be 'background-color'
+    }
+
+    It 'preserves CSS variable source indexes after filtering' {
+        $css = @'
+:root {
+    --first: 1;
+    --second: 2;
+}
+'@
+
+        $variable = Get-CssVariable -Content $css -Name '--second'
+
+        $variable.Count | Should -Be 1
+        $variable.Index | Should -Be 1
+        $variable.Name | Should -Be '--second'
+    }
+
     It 'extracts urls from non-style CSS declaration rules' {
         $urls = @(ConvertFrom-CssUrl -Content @'
 @font-face {
@@ -239,6 +269,14 @@ Describe 'HTML workflow cmdlets' {
         $assets[0].ResolvedUrl | Should -Be 'https://example.org/submit.png'
     }
 
+    It 'extracts prefetch links as preload-style assets' {
+        $assets = @(Select-HtmlAsset -Content '<link rel="prefetch" href="/next.html">' -BaseUrl 'https://example.org/')
+
+        $assets.Count | Should -Be 1
+        $assets[0].Kind | Should -Be 'Preload'
+        $assets[0].ResolvedUrl | Should -Be 'https://example.org/next.html'
+    }
+
     It 'indexes assets in document source order' {
         $html = @'
 <link rel="stylesheet" href="/first.css">
@@ -342,6 +380,28 @@ Describe 'HTML workflow cmdlets' {
 
         $findings.RuleId | Should -Not -Contain 'empty-label'
         $findings.RuleId | Should -Not -Contain 'form-field-missing-label'
+    }
+
+    It 'counts labelledby image alt text as an accessible name' {
+        $html = @'
+<span id="search"><img src="/search.png" alt="Search"></span>
+<input aria-labelledby="search">
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        $findings.RuleId | Should -Not -Contain 'form-field-missing-label'
+    }
+
+    It 'checks all labelable controls for labels' {
+        $html = @'
+<progress id="load"></progress>
+<output id="total"></output>
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        @($findings | Where-Object RuleId -eq 'form-field-missing-label').Count | Should -Be 2
     }
 
     It 'rejects labels targeting non-labelable elements' {

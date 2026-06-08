@@ -110,7 +110,7 @@ public static class HtmlWorkflowParser {
             }
         }
 
-        foreach (IElement field in document.QuerySelectorAll("button, input, select, textarea")) {
+        foreach (IElement field in document.QuerySelectorAll("button, input, select, textarea, meter, output, progress")) {
             if (IsLabelableFieldNeedingLabel(field) && !HasAccessibleLabel(document, field)) {
                 AddFinding(findings, "form-field-missing-label", "Warning", "Form field has no associated label or accessible name.", field, null, field.GetAttribute("name"));
             }
@@ -256,7 +256,7 @@ public static class HtmlWorkflowParser {
             return "ModulePreload";
         }
 
-        if (tokens.Any(static token => token.Equals("preload", StringComparison.OrdinalIgnoreCase) || token.Equals("preconnect", StringComparison.OrdinalIgnoreCase) || token.Equals("dns-prefetch", StringComparison.OrdinalIgnoreCase))) {
+        if (tokens.Any(static token => token.Equals("preload", StringComparison.OrdinalIgnoreCase) || token.Equals("prefetch", StringComparison.OrdinalIgnoreCase) || token.Equals("preconnect", StringComparison.OrdinalIgnoreCase) || token.Equals("dns-prefetch", StringComparison.OrdinalIgnoreCase))) {
             return "Preload";
         }
 
@@ -365,7 +365,7 @@ public static class HtmlWorkflowParser {
         return field.LocalName switch {
             "button" => true,
             "input" => !new[] { "hidden", "submit", "reset" }.Contains(type, StringComparer.OrdinalIgnoreCase),
-            "select" or "textarea" => true,
+            "select" or "textarea" or "meter" or "output" or "progress" => true,
             _ => false
         };
     }
@@ -438,7 +438,7 @@ public static class HtmlWorkflowParser {
         string labelledBy = value!;
         foreach (string id in labelledBy.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
             IElement? target = document.GetElementById(id);
-            if (!string.IsNullOrWhiteSpace(target?.TextContent)) {
+            if (target != null && HasReadableLabel(target)) {
                 return true;
             }
         }
