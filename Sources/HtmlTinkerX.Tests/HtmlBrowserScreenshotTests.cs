@@ -118,6 +118,31 @@ public class HtmlBrowserScreenshotTests {
         Directory.Delete(dir);
     }
 
+    [Fact]
+    public async Task CaptureScreenshotAsync_SavesRequestedGifFormat() {
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string file = Path.Combine(dir, "test.gif");
+        var page = new Mock<IPage>();
+        page.Setup(p => p.ScreenshotAsync(It.IsAny<PageScreenshotOptions>()))
+            .ReturnsAsync(CreatePngImage());
+
+        await HtmlBrowser.CaptureScreenshotAsync(
+            page.Object,
+            file,
+            new ScreenshotOptions { Format = ImageFormat.Gif });
+
+        Assert.True(File.Exists(file));
+        byte[] saved = File.ReadAllBytes(file);
+        Assert.True(saved.Length > 16);
+        Assert.Equal((byte)'G', saved[0]);
+        Assert.Equal((byte)'I', saved[1]);
+        Assert.Equal((byte)'F', saved[2]);
+        Assert.Equal(0x3B, saved[^1]);
+
+        File.Delete(file);
+        Directory.Delete(dir);
+    }
+
     [Theory]
     [InlineData(100, 0)]
     [InlineData(50, 5)]
