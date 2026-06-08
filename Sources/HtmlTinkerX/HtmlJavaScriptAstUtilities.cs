@@ -35,53 +35,84 @@ public static class HtmlJavaScriptAstUtilities {
     /// <param name="node">The Acornima node to evaluate.</param>
     /// <returns>A .NET literal, array, dictionary, or <see langword="null" /> when the node cannot be statically evaluated.</returns>
     public static object? EvaluateJavaScriptLiteral(Node? node) {
+        return TryEvaluateJavaScriptLiteral(node, out object? value) ? value : null;
+    }
+
+    private static bool TryEvaluateJavaScriptLiteral(Node? node, out object? value) {
         if (node == null) {
-            return null;
+            value = null;
+            return false;
         }
 
         if (node is Literal literal) {
-            return literal.Value;
+            value = literal.Value;
+            return true;
         }
 
         if (node is ArrayExpression array) {
-            return array.Elements.Select(EvaluateJavaScriptLiteral).ToArray();
+            List<object?> values = new();
+            foreach (Node? element in array.Elements) {
+                if (element is SpreadElement) {
+                    break;
+                }
+
+                values.Add(TryEvaluateJavaScriptLiteral(element, out object? item) ? item : null);
+            }
+
+            value = values.ToArray();
+            return true;
         }
 
         if (node is ObjectExpression objectExpression) {
             Dictionary<string, object?> values = new(StringComparer.Ordinal);
-            foreach (Property property in objectExpression.Properties.OfType<Property>()) {
-                string? key = property.Key switch {
-                    Identifier identifier => identifier.Name,
-                    Literal keyLiteral => keyLiteral.Value?.ToString(),
-                    _ => null
-                };
+            foreach (Node propertyNode in objectExpression.Properties) {
+                if (propertyNode is SpreadElement) {
+                    values.Clear();
+                    continue;
+                }
+
+                if (propertyNode is not Property property) {
+                    continue;
+                }
+
+                string? key = GetObjectPropertyName(property);
                 if (!string.IsNullOrEmpty(key)) {
-                    values[key!] = EvaluateJavaScriptLiteral(property.Value);
+                    values[key!] = TryEvaluateJavaScriptLiteral(property.Value, out object? propertyValue) ? propertyValue : null;
                 }
             }
 
-            return values;
+            value = values;
+            return true;
         }
 
         if (node is UnaryExpression unary) {
             string? op = unary.Operator.ToString();
-            object? value = EvaluateJavaScriptLiteral(unary.Argument);
-            if ((op == "-" || op == "UnaryNegation") && value is IConvertible convertible) {
+            if (!TryEvaluateJavaScriptLiteral(unary.Argument, out object? operandValue)) {
+                value = null;
+                return false;
+            }
+
+            if ((op == "-" || op == "UnaryNegation") && operandValue is IConvertible convertible) {
                 try {
-                    return -convertible.ToDouble(CultureInfo.InvariantCulture);
+                    value = -convertible.ToDouble(CultureInfo.InvariantCulture);
+                    return true;
                 } catch (FormatException) {
-                    return null;
+                    value = null;
+                    return true;
                 } catch (InvalidCastException) {
-                    return null;
+                    value = null;
+                    return true;
                 }
             }
 
             if (op == "!" || op == "LogicalNot") {
-                return !ToJavaScriptBoolean(value);
+                value = !ToJavaScriptBoolean(operandValue);
+                return true;
             }
         }
 
-        return null;
+        value = null;
+        return false;
     }
 
     /// <summary>Builds a dotted path for an identifier or member-expression target without executing script.</summary>
@@ -189,6 +220,18 @@ public static class HtmlJavaScriptAstUtilities {
     private static string? GetPropertyName(Node node) {
         return node switch {
             Identifier identifier => identifier.Name,
+            _ => null
+        };
+    }
+
+    private static string? GetObjectPropertyName(Property property) {
+        if (property.Computed) {
+            return GetComputedPropertyName(property.Key);
+        }
+
+        return property.Key switch {
+            Identifier identifier => identifier.Name,
+            Literal literal => literal.Value?.ToString(),
             _ => null
         };
     }

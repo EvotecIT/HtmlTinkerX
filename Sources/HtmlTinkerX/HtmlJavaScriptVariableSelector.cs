@@ -41,6 +41,17 @@ public sealed class HtmlJavaScriptVariableMatch {
 /// <summary>Selects JavaScript declarations and assignments from source text or inline HTML scripts.</summary>
 public static class HtmlJavaScriptVariableSelector {
     /// <summary>Selects variable declarations and assignment expressions from JavaScript source.</summary>
+    /// <param name="script">JavaScript source text to inspect.</param>
+    /// <param name="names">Optional variable names or assignment paths to match.</param>
+    /// <param name="contains">Matches names or paths that contain the requested names.</param>
+    /// <param name="startsWith">Matches names or paths that start with the requested names.</param>
+    /// <param name="declarationOnly">Returns declarations and skips loose assignments.</param>
+    /// <param name="propertyPaths">Optional dotted property paths to read from matched literal values.</param>
+    /// <param name="tolerant">Enables Acornima tolerant parsing.</param>
+    /// <param name="scriptIndex">Optional HTML script index metadata.</param>
+    /// <param name="scriptType">Optional HTML script type metadata.</param>
+    /// <param name="module">Parses the source with the ECMAScript module grammar.</param>
+    /// <returns>Matched declarations or assignments in source order.</returns>
     public static IReadOnlyList<HtmlJavaScriptVariableMatch> SelectJavaScript(
         string script,
         IReadOnlyList<string>? names = null,
@@ -50,7 +61,8 @@ public static class HtmlJavaScriptVariableSelector {
         IReadOnlyList<string>? propertyPaths = null,
         bool tolerant = false,
         int? scriptIndex = null,
-        string? scriptType = null) {
+        string? scriptType = null,
+        bool module = false) {
         if (script == null) {
             throw new ArgumentNullException(nameof(script));
         }
@@ -60,7 +72,9 @@ public static class HtmlJavaScriptVariableSelector {
         }
 
         Parser parser = new(new ParserOptions { Tolerant = tolerant });
-        AcornimaNode root = parser.ParseScript(script, sourceFile: null, strict: false);
+        AcornimaNode root = module
+            ? parser.ParseModule(script, sourceFile: null)
+            : parser.ParseScript(script, sourceFile: null, strict: false);
         return SelectFromAst(root, names, contains, startsWith, declarationOnly, propertyPaths, scriptIndex, scriptType);
     }
 
@@ -143,7 +157,7 @@ public static class HtmlJavaScriptVariableSelector {
                 continue;
             }
 
-            matches.AddRange(SelectJavaScript(content, names, contains, startsWith, declarationOnly, propertyPaths, tolerant, scriptIndex, type));
+            matches.AddRange(SelectJavaScript(content, names, contains, startsWith, declarationOnly, propertyPaths, tolerant, scriptIndex, type, IsJavaScriptModuleType(type)));
             scriptIndex++;
         }
 
@@ -152,16 +166,24 @@ public static class HtmlJavaScriptVariableSelector {
 
     /// <summary>Returns whether a script type should be treated as JavaScript.</summary>
     public static bool IsJavaScriptScriptType(string? type) {
-        string normalized = (type ?? string.Empty).Split(';')[0].Trim();
+        string normalized = NormalizeScriptType(type);
         if (normalized.Length == 0) {
             return true;
         }
 
-        return normalized.Equals("module", StringComparison.OrdinalIgnoreCase)
+        return IsJavaScriptModuleType(normalized)
             || normalized.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsJavaScriptModuleType(string? type) {
+        return NormalizeScriptType(type).Equals("module", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeScriptType(string? type) {
+        return (type ?? string.Empty).Split(';')[0].Trim();
     }
 
     private static void AddMatches(

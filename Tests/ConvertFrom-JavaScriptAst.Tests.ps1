@@ -135,6 +135,58 @@ window["$Config"] = { sCtx: "literal" };
         $script:unary.Value | Should -BeNullOrEmpty
     }
 
+    It 'does not report a concrete value for unary not over runtime expressions' {
+        $variable = Select-JavaScriptVariable -Source 'const enabled = !window.disabled;' -Name enabled
+
+        $variable.Name | Should -Be 'enabled'
+        $variable.Value | Should -BeNullOrEmpty
+    }
+
+    It 'does not treat dynamic computed object keys as static property paths' {
+        $values = @(Select-JavaScriptVariable -Source @'
+const cfg = {
+    [key]: "dynamic",
+    staticKey: "literal"
+};
+'@ -Name cfg -PropertyPath key, staticKey)
+
+        $values.Count | Should -Be 2
+        $values[0].PropertyPath | Should -Be 'key'
+        $values[0].Value | Should -BeNullOrEmpty
+        $values[1].PropertyPath | Should -Be 'staticKey'
+        $values[1].Value | Should -Be 'literal'
+    }
+
+    It 'treats object spreads as unknown overrides for earlier properties' {
+        $values = @(Select-JavaScriptVariable -Source @'
+const cfg = {
+    token: "old",
+    ...override,
+    safe: "after"
+};
+'@ -Name cfg -PropertyPath token, safe)
+
+        $values.Count | Should -Be 2
+        $values[0].PropertyPath | Should -Be 'token'
+        $values[0].Value | Should -BeNullOrEmpty
+        $values[1].PropertyPath | Should -Be 'safe'
+        $values[1].Value | Should -Be 'after'
+    }
+
+    It 'does not index arrays past a spread element as fixed positions' {
+        $values = @(Select-JavaScriptVariable -Source @'
+const cfg = {
+    items: ["first", ...extra, "last"]
+};
+'@ -Name cfg -PropertyPath items.0, items.2)
+
+        $values.Count | Should -Be 2
+        $values[0].PropertyPath | Should -Be 'items.0'
+        $values[0].Value | Should -Be 'first'
+        $values[1].PropertyPath | Should -Be 'items.2'
+        $values[1].Value | Should -BeNullOrEmpty
+    }
+
     It 'selects JavaScript variables directly from HTML script tags' {
         $values = @(Select-HtmlJavaScriptVariable -Content @'
 <html>
@@ -163,6 +215,24 @@ window.$Config = {
         $values[0].Value | Should -Be 'expected-context'
         $values[1].PropertyPath | Should -Be 'auth.urls.logout'
         $values[1].Value | Should -Be 'https://example.com/logout'
+    }
+
+    It 'parses HTML module scripts with the module grammar' {
+        $value = Select-HtmlJavaScriptVariable -Content @'
+<script type="module">
+import value from "./settings.js";
+window.$Config = { sCtx: "from-module" };
+</script>
+<script>
+window.$Config = { sCtx: "from-script" };
+</script>
+'@ -Name '$Config' -PropertyPath sCtx |
+            Select-Object -First 1
+
+        $value.Path | Should -Be 'window.$Config'
+        $value.ScriptIndex | Should -Be 0
+        $value.ScriptType | Should -Be 'module'
+        $value.Value | Should -Be 'from-module'
     }
 
     It 'returns each matching HTML JavaScript assignment occurrence in source order' {
