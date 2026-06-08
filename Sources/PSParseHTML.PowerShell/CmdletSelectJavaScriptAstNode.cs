@@ -1,7 +1,7 @@
 using Acornima;
 using Acornima.Ast;
+using HtmlTinkerX;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Threading.Tasks;
@@ -12,6 +12,32 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Select variable declaration nodes</summary>
 ///   <code>ConvertFrom-JavaScriptAst -Content 'const value = 42;' | Select-JavaScriptAstNode -Type VariableDeclaration</code>
+/// </example>
+/// <example>
+///   <summary>Enumerate descendants and include the root AST node</summary>
+///   <code>
+/// $script = @'
+/// const settings = {
+///     apiKey: "abc",
+///     enabled: true
+/// };
+/// '@
+///
+/// Select-JavaScriptAstNode -Source $script -Type Script,ObjectExpression -IncludeRoot
+///   </code>
+/// </example>
+/// <example>
+///   <summary>Select nodes from ECMAScript module source</summary>
+///   <code>
+/// $module = @'
+/// import value from "./settings.js";
+/// export const settings = {
+///     enabled: true
+/// };
+/// '@
+///
+/// Select-JavaScriptAstNode -Source $module -Module -Type ImportDeclaration,ExportNamedDeclaration
+///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptAstNode", DefaultParameterSetName = ParameterSetSource)]
 [OutputType(typeof(Node))]
@@ -54,7 +80,10 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
         Node root = ParameterSetName == ParameterSetAst ? Ast : ParseSource(Source);
-        foreach (Node node in EnumerateNodes(root, IncludeRoot.IsPresent)) {
+        IEnumerable<Node> nodes = IncludeRoot.IsPresent
+            ? HtmlJavaScriptAstUtilities.DescendantNodesAndSelf(root)
+            : HtmlJavaScriptAstUtilities.DescendantNodes(root);
+        foreach (Node node in nodes) {
             ThrowIfStopped();
             if (MatchesType(node)) {
                 WriteObject(node);
@@ -93,24 +122,4 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
         });
     }
 
-    private IEnumerable<Node> EnumerateNodes(Node root, bool includeRoot) {
-        Stack<Node> stack = new();
-        if (includeRoot) {
-            stack.Push(root);
-        } else {
-            foreach (Node child in root.ChildNodes.Reverse()) {
-                stack.Push(child);
-            }
-        }
-
-        while (stack.Count > 0) {
-            ThrowIfStopped();
-            Node node = stack.Pop();
-            yield return node;
-
-            foreach (Node child in node.ChildNodes.Reverse()) {
-                stack.Push(child);
-            }
-        }
-    }
 }

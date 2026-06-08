@@ -19,8 +19,9 @@ HtmlTinkerX currently references Jint 4.x for JavaScript execution support. Jint
 Current PowerShell-friendly entry points:
 
 - `ConvertFrom-JavaScriptAst` parses JavaScript into an Acornima AST.
-- `Select-JavaScriptAstNode` traverses descendant AST nodes by type, replacing the common `DescendantNodes` workflow.
-- `Select-JavaScriptVariable` finds variable declarations by exact, contains, or starts-with name matches.
+- `Select-JavaScriptAstNode` traverses descendant AST nodes by type, replacing the common `DescendantNodes` workflow. Use `-IncludeRoot` for `DescendantNodesAndSelf`-style output.
+- `Select-JavaScriptVariable` finds variable declarations and loose assignments by exact, contains, or starts-with name matches. It can match member assignment paths such as `window.$Config` and read dotted object values with `-PropertyPath`.
+- `Select-HtmlJavaScriptVariable` applies the same JavaScript variable selection to inline JavaScript script tags in HTML, skipping non-JavaScript scripts such as JSON-LD.
 
 ## React Server Component / React Flight payloads
 
@@ -31,6 +32,6 @@ The cmdlet returns decoded Flight rows by default, `-RawPayload` returns the raw
 ## Stable parsing surfaces instead of dependency exposure
 
 Prefer workflow cmdlets and HtmlTinkerX model objects over new type accelerators. The module now exposes static parsers for JSON-LD (`ConvertFrom-HtmlJsonLd`), generic script data (`ConvertFrom-HtmlScriptData`), embedded app state (`ConvertFrom-HtmlAppState`), head discovery links (`ConvertFrom-HtmlHeadLink`), image candidates (`ConvertFrom-HtmlImageCandidate`), token extraction (`Select-HtmlToken`), JavaScript endpoint discovery (`ConvertFrom-JavaScriptEndpoint` and `ConvertFrom-HtmlLinkedJavaScriptEndpoint`), web manifests (`ConvertFrom-WebManifest`), well-known text files (`ConvertFrom-WellKnownText`), and robots.txt (`ConvertFrom-RobotsTxt`). These keep common parsing workflows available without requiring users to script directly against bundled dependency types.
-- Packaged builds expose selected type accelerators such as `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.Ast.Node]`, `[Acornima.Ast.VariableDeclaration]`, `[Acornima.Ast.ObjectExpression]`, and `[Acornima.Ast.ClassBody]`.
+- Packaged builds still expose selected legacy type accelerators such as `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.Ast.Node]`, `[Acornima.Ast.VariableDeclaration]`, `[Acornima.Ast.ObjectExpression]`, and `[Acornima.Ast.ClassBody]`, but new JavaScript AST workflows should prefer cmdlets and HtmlTinkerX helper APIs over adding accelerator entries.
 
 Do not add Esprima back only for compatibility unless the project intentionally decides to carry both parser APIs. Prefer Acornima cmdlets and type accelerators for new work because they match the current Jint dependency graph.

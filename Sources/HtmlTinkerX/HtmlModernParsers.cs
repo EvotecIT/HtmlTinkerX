@@ -231,11 +231,11 @@ public static class HtmlAppStateParser {
             return;
         }
 
-        foreach (AssignmentExpression assignment in HtmlModernParserUtilities.Walk(root).OfType<AssignmentExpression>()) {
+        foreach (AssignmentExpression assignment in HtmlJavaScriptAstUtilities.DescendantNodesAndSelf(root).OfType<AssignmentExpression>()) {
             AddStateValue(GetStateName(assignment.Left), assignment.Right, scriptIndex, "Assignment", entries);
         }
 
-        foreach (VariableDeclarator declarator in HtmlModernParserUtilities.Walk(root).OfType<VariableDeclarator>()) {
+        foreach (VariableDeclarator declarator in HtmlJavaScriptAstUtilities.DescendantNodesAndSelf(root).OfType<VariableDeclarator>()) {
             AddStateValue(GetStateName(declarator.Id), declarator.Init, scriptIndex, "VariableDeclaration", entries);
         }
     }
@@ -245,7 +245,7 @@ public static class HtmlAppStateParser {
             return;
         }
 
-        object? value = HtmlModernParserUtilities.EvaluateJavaScriptLiteral(node);
+        object? value = HtmlJavaScriptAstUtilities.EvaluateJavaScriptLiteral(node);
         if (value == null) {
             return;
         }
@@ -507,7 +507,7 @@ public static class HtmlJavaScriptEndpointParser {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         List<HtmlJavaScriptEndpoint> endpoints = new();
         foreach (IElement script in document.QuerySelectorAll("script")) {
-            if (!IsJavaScriptScript(script)) {
+            if (!HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type"))) {
                 continue;
             }
 
@@ -519,19 +519,6 @@ public static class HtmlJavaScriptEndpointParser {
         }
 
         return endpoints;
-    }
-
-    private static bool IsJavaScriptScript(IElement script) {
-        string type = (script.GetAttribute("type") ?? string.Empty).Split(';')[0].Trim();
-        if (type.Length == 0) {
-            return true;
-        }
-
-        return type.Equals("module", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool LooksLikeEndpoint(string value) {
@@ -767,86 +754,4 @@ internal static class HtmlModernParserUtilities {
         return value.GetRawText();
     }
 
-    internal static IEnumerable<AcornimaNode> Walk(AcornimaNode root) {
-        Stack<AcornimaNode> stack = new();
-        stack.Push(root);
-        while (stack.Count > 0) {
-            AcornimaNode node = stack.Pop();
-            yield return node;
-            List<AcornimaNode> children = node.ChildNodes.ToList();
-            for (int index = children.Count - 1; index >= 0; index--) {
-                stack.Push(children[index]);
-            }
-        }
-    }
-
-    internal static object? EvaluateJavaScriptLiteral(AcornimaNode? node) {
-        if (node == null) {
-            return null;
-        }
-
-        if (node is Literal literal) {
-            return literal.Value;
-        }
-
-        if (node is ArrayExpression array) {
-            return array.Elements.Select(EvaluateJavaScriptLiteral).ToArray();
-        }
-
-        if (node is ObjectExpression objectExpression) {
-            Dictionary<string, object?> values = new(StringComparer.Ordinal);
-            foreach (Acornima.Ast.Property property in objectExpression.Properties.OfType<Acornima.Ast.Property>()) {
-                string? key = property.Key switch {
-                    Identifier identifier => identifier.Name,
-                    Literal keyLiteral => keyLiteral.Value?.ToString(),
-                    _ => null
-                };
-                if (!string.IsNullOrEmpty(key)) {
-                    values[key!] = EvaluateJavaScriptLiteral(property.Value);
-                }
-            }
-            return values;
-        }
-
-        if (node is UnaryExpression unary) {
-            string? op = unary.Operator.ToString();
-            object? value = EvaluateJavaScriptLiteral(unary.Argument);
-            if ((op == "-" || op == "UnaryNegation") && value is IConvertible convertible) {
-                return -convertible.ToDouble(CultureInfo.InvariantCulture);
-            }
-
-            if (op == "!" || op == "LogicalNot") {
-                return !ToJavaScriptBoolean(value);
-            }
-        }
-
-        return null;
-    }
-
-    internal static bool ToJavaScriptBoolean(object? value) {
-        if (value == null) {
-            return false;
-        }
-
-        if (value is bool boolean) {
-            return boolean;
-        }
-
-        if (value is string text) {
-            return text.Length > 0;
-        }
-
-        if (value is IConvertible convertible) {
-            try {
-                double number = convertible.ToDouble(CultureInfo.InvariantCulture);
-                return number != 0 && !double.IsNaN(number);
-            } catch (FormatException) {
-                return true;
-            } catch (InvalidCastException) {
-                return true;
-            }
-        }
-
-        return true;
-    }
 }
