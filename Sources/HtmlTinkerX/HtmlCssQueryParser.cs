@@ -45,18 +45,19 @@ public static class HtmlCssQueryParser {
         List<HtmlCssDeclarationMatch> matches = new();
         int index = 0;
         foreach ((ICssRule Rule, string? Context) item in EnumerateRules(sheet.Rules, null)) {
-            if (item.Rule is not ICssStyleRule styleRule || !Matches(styleRule.SelectorText, selector, contains)) {
+            string? selectorText = GetDeclarationRuleSelector(item.Rule);
+            if (selectorText == null || !Matches(selectorText, selector, contains)) {
                 continue;
             }
 
-            foreach (ICssProperty declaration in styleRule.Style) {
+            foreach (ICssProperty declaration in GetRuleDeclarations(item.Rule)) {
                 if (!Matches(declaration.Name, property, contains)) {
                     continue;
                 }
 
                 matches.Add(new HtmlCssDeclarationMatch {
                     Index = index++,
-                    Selector = styleRule.SelectorText,
+                    Selector = selectorText,
                     Property = declaration.Name,
                     Value = declaration.Value,
                     Important = declaration.IsImportant,
@@ -111,7 +112,7 @@ public static class HtmlCssQueryParser {
             }
 
             if (item.Rule is IEnumerable<ICssProperty> declarationRule) {
-                string selector = GetDeclarationRuleSelector(item.Rule);
+                string? selector = GetDeclarationRuleSelector(item.Rule);
                 foreach (ICssProperty declaration in declarationRule) {
                     foreach (string url in ExtractCssUrls(declaration.Value)) {
                         references.Add(CreateUrlReference(index++, selector, declaration.Name, url, baseUri, item.Context));
@@ -207,8 +208,24 @@ public static class HtmlCssQueryParser {
         }
     }
 
-    private static string GetDeclarationRuleSelector(ICssRule rule) {
+    private static string? GetDeclarationRuleSelector(ICssRule rule) {
+        if (rule is ICssStyleRule styleRule) {
+            return styleRule.SelectorText;
+        }
+
+        if (rule is not IEnumerable<ICssProperty>) {
+            return null;
+        }
+
         return rule.Type == CssRuleType.FontFace ? "@font-face" : $"@{rule.Type}";
+    }
+
+    private static IEnumerable<ICssProperty> GetRuleDeclarations(ICssRule rule) {
+        if (rule is ICssStyleRule styleRule) {
+            return styleRule.Style;
+        }
+
+        return rule is IEnumerable<ICssProperty> declarationRule ? declarationRule : Enumerable.Empty<ICssProperty>();
     }
 
     private static HtmlCssUrlReference CreateUrlReference(int index, string? selector, string property, string url, Uri? baseUri, string? context) {

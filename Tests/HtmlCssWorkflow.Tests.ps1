@@ -50,6 +50,19 @@ Describe 'CSS query cmdlets' {
         $urls[0].Property | Should -Be 'src'
         $urls[0].ResolvedUrl | Should -Be 'https://example.org/fonts/site.woff2'
     }
+
+    It 'selects declarations from non-style CSS declaration rules' {
+        $declarations = @(Select-CssDeclaration -Content @'
+@font-face {
+    font-family: "Site";
+    src: url("/fonts/site.woff2") format("woff2");
+}
+'@ -Property src)
+
+        $declarations.Count | Should -Be 1
+        $declarations[0].Selector | Should -Be '@font-face'
+        $declarations[0].Property | Should -Be 'src'
+    }
 }
 
 Describe 'HTML workflow cmdlets' {
@@ -92,6 +105,8 @@ Describe 'HTML workflow cmdlets' {
 <link rel="icon" href="/favicon.ico">
 <script src="/app/site.js"></script>
 <img src="/img/logo.png" srcset="data:image/svg+xml,%3Csvg%3E%3C/svg%3E 1x, /img/logo-2x.png 2x">
+<picture><source srcset="/img/wide.png 1200w"></picture>
+<video><source src="/media/movie.mp4" type="video/mp4"></video>
 '@
 
         $assets = @(Select-HtmlAsset -Content $html -BaseUrl 'https://example.org/app/page.html')
@@ -108,6 +123,9 @@ Describe 'HTML workflow cmdlets' {
         $imageCandidates.Url | Should -Contain 'data:image/svg+xml,%3Csvg%3E%3C/svg%3E'
         $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/small.png'
         $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/large.png'
+        $imageCandidates.ResolvedUrl | Should -Contain 'https://example.org/img/wide.png'
+        $imageCandidates.ResolvedUrl | Should -Not -Contain 'https://example.org/media/movie.mp4'
+        ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
     }
 
     It 'reports common HTML compatibility findings' {
@@ -130,5 +148,11 @@ Describe 'HTML workflow cmdlets' {
         $findings.RuleId | Should -Contain 'form-field-missing-label'
         $findings.RuleId | Should -Contain 'empty-inline-style'
         $findings.RuleId | Should -Contain 'invalid-resource-url'
+    }
+
+    It 'allows decorative images with empty alt text' {
+        $findings = @(Measure-HtmlCompatibility -Content '<img src="/img/divider.png" alt="">' -BaseUrl 'https://example.org/')
+
+        $findings.RuleId | Should -Not -Contain 'missing-img-alt'
     }
 }

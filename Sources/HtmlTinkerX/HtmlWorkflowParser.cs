@@ -86,12 +86,16 @@ public static class HtmlWorkflowParser {
             assets.Add(CreateAsset(index++, "Image", image, "src", image.GetAttribute("src") ?? string.Empty, effectiveBaseUri));
         }
 
-        foreach (IElement source in document.QuerySelectorAll("source[src], source[srcset], img[srcset]")) {
+        foreach (IElement source in document.QuerySelectorAll("picture source[srcset], img[srcset]")) {
             string attribute = !string.IsNullOrWhiteSpace(source.GetAttribute("srcset")) ? "srcset" : "src";
             string value = source.GetAttribute(attribute) ?? string.Empty;
             foreach (string candidate in SplitSrcSet(value)) {
                 assets.Add(CreateAsset(index++, "ImageCandidate", source, attribute, candidate, effectiveBaseUri));
             }
+        }
+
+        foreach (IElement media in document.QuerySelectorAll("audio[src], video[src], audio source[src], video source[src], track[src]")) {
+            assets.Add(CreateAsset(index++, "Media", media, "src", media.GetAttribute("src") ?? string.Empty, effectiveBaseUri));
         }
 
         if (includeInline) {
@@ -125,8 +129,8 @@ public static class HtmlWorkflowParser {
         }
 
         foreach (IElement image in document.QuerySelectorAll("img")) {
-            if (string.IsNullOrWhiteSpace(image.GetAttribute("alt"))) {
-                AddFinding(findings, "missing-img-alt", "Warning", "Image is missing non-empty alt text.", image, "alt", image.GetAttribute("src"));
+            if (!image.HasAttribute("alt")) {
+                AddFinding(findings, "missing-img-alt", "Warning", "Image is missing an alt attribute.", image, "alt", image.GetAttribute("src"));
             }
         }
 
