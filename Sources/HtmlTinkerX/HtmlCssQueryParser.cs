@@ -3,16 +3,11 @@ using AngleSharp.Css.Parser;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace HtmlTinkerX;
 
 /// <summary>Parses CSS for rule, declaration, custom property, URL, and selector-specificity workflows.</summary>
 public static class HtmlCssQueryParser {
-    private static readonly Regex CssUrlRegex = new(
-        "url\\(\\s*(?:\"(?<url>[^\"]*)\"|'(?<url>[^']*)'|(?<url>[^)]*?))\\s*\\)",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     /// <summary>Selects CSS style rules from source text.</summary>
     public static IReadOnlyList<HtmlCssRuleMatch> SelectRules(string css, string? selector = null, bool contains = false) {
         ICssStyleSheet sheet = ParseStyleSheet(css);
@@ -51,7 +46,10 @@ public static class HtmlCssQueryParser {
             }
 
             foreach (ICssProperty declaration in GetRuleDeclarations(item.Rule)) {
-                if (!Matches(declaration.Name, property, contains)) {
+                bool matchesProperty = declaration.Name.StartsWith("--", StringComparison.Ordinal)
+                    ? MatchesCssCustomProperty(declaration.Name, property, contains)
+                    : Matches(declaration.Name, property, contains);
+                if (!matchesProperty) {
                     continue;
                 }
 
@@ -208,12 +206,85 @@ public static class HtmlCssQueryParser {
     }
 
     private static IEnumerable<string> ExtractCssUrls(string value) {
-        foreach (Match match in CssUrlRegex.Matches(value ?? string.Empty)) {
-            string url = match.Groups["url"].Value.Trim();
+        string cssValue = value ?? string.Empty;
+        bool inString = false;
+        char quote = '\0';
+        for (int index = 0; index < cssValue.Length; index++) {
+            char current = cssValue[index];
+            if (inString) {
+                if (current == '\\') {
+                    index++;
+                } else if (current == quote) {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (current == '"' || current == '\'') {
+                inString = true;
+                quote = current;
+                continue;
+            }
+
+            if (!StartsWithCssUrlFunction(cssValue, index)) {
+                continue;
+            }
+
+            int openIndex = index + 3;
+            int closeIndex = FindCssUrlFunctionEnd(cssValue, openIndex + 1);
+            if (closeIndex < 0) {
+                yield break;
+            }
+
+            string url = cssValue.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim().Trim('"', '\'');
             if (url.Length > 0) {
                 yield return url;
             }
+
+            index = closeIndex;
         }
+    }
+
+    private static bool StartsWithCssUrlFunction(string value, int index) {
+        if (index > 0 && (char.IsLetterOrDigit(value[index - 1]) || value[index - 1] == '-' || value[index - 1] == '_')) {
+            return false;
+        }
+
+        if (index + 3 >= value.Length || !value.Substring(index, 3).Equals("url", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        return value[index + 3] == '(';
+    }
+
+    private static int FindCssUrlFunctionEnd(string value, int start) {
+        bool inString = false;
+        char quote = '\0';
+        for (int index = start; index < value.Length; index++) {
+            char current = value[index];
+            if (inString) {
+                if (current == '\\') {
+                    index++;
+                } else if (current == quote) {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (current == '"' || current == '\'') {
+                inString = true;
+                quote = current;
+                continue;
+            }
+
+            if (current == ')') {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static string? GetDeclarationRuleSelector(ICssRule rule) {

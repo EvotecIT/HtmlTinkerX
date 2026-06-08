@@ -100,8 +100,13 @@ public static class HtmlWorkflowParser {
             }
 
             string? target = label.GetAttribute("for");
-            if (!string.IsNullOrWhiteSpace(target) && document.GetElementById(target!) == null) {
-                AddFinding(findings, "label-target-missing", "Error", $"Label references missing id '{target}'.", label, "for", target);
+            if (!string.IsNullOrWhiteSpace(target)) {
+                IElement? targetElement = document.GetElementById(target!);
+                if (targetElement == null) {
+                    AddFinding(findings, "label-target-missing", "Error", $"Label references missing id '{target}'.", label, "for", target);
+                } else if (!IsLabelableElement(targetElement)) {
+                    AddFinding(findings, "label-target-invalid", "Error", $"Label references non-labelable id '{target}'.", label, "for", target);
+                }
             }
         }
 
@@ -344,7 +349,7 @@ public static class HtmlWorkflowParser {
     private static bool IsLabelableFieldNeedingLabel(IElement field) {
         string type = (field.GetAttribute("type") ?? string.Empty).Trim();
         return field.LocalName switch {
-            "input" => !new[] { "hidden", "submit", "button", "reset", "image" }.Contains(type, StringComparer.OrdinalIgnoreCase),
+            "input" => !new[] { "hidden", "submit", "button", "reset" }.Contains(type, StringComparer.OrdinalIgnoreCase),
             "select" or "textarea" => true,
             _ => false
         };
@@ -353,6 +358,7 @@ public static class HtmlWorkflowParser {
     private static bool HasAccessibleLabel(IDocument document, IElement field) {
         if (!string.IsNullOrWhiteSpace(field.GetAttribute("aria-label")) ||
             !string.IsNullOrWhiteSpace(field.GetAttribute("title")) ||
+            !string.IsNullOrWhiteSpace(field.GetAttribute("alt")) ||
             HasReadableLabelledByTarget(document, field.GetAttribute("aria-labelledby"))) {
             return true;
         }
@@ -363,12 +369,22 @@ public static class HtmlWorkflowParser {
         }
 
         for (INode? parent = field.Parent; parent != null; parent = parent.Parent) {
-            if (parent is IElement element && element.LocalName.Equals("label", StringComparison.OrdinalIgnoreCase) && HasReadableLabel(element)) {
+            if (parent is IElement element && element.LocalName.Equals("label", StringComparison.OrdinalIgnoreCase) && !element.HasAttribute("for") && HasReadableLabel(element)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsLabelableElement(IElement element) {
+        if (element.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase)) {
+            string type = (element.GetAttribute("type") ?? string.Empty).Trim();
+            return !type.Equals("hidden", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return new[] { "button", "meter", "output", "progress", "select", "textarea" }
+            .Contains(element.LocalName, StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool HasReadableLabel(IElement label) {

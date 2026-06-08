@@ -52,6 +52,21 @@ Describe 'CSS query cmdlets' {
         $variable.Value | Should -Be '#111111'
     }
 
+    It 'selects custom property declarations case-sensitively' {
+        $css = @'
+:root {
+    --brand: #111111;
+    --Brand: #222222;
+}
+'@
+
+        $declarations = @(Select-CssDeclaration -Content $css -Property '--brand')
+
+        $declarations.Count | Should -Be 1
+        $declarations[0].Property | Should -Be '--brand'
+        $declarations[0].Value | Should -Be '#111111'
+    }
+
     It 'extracts urls from non-style CSS declaration rules' {
         $urls = @(ConvertFrom-CssUrl -Content @'
 @font-face {
@@ -64,6 +79,18 @@ Describe 'CSS query cmdlets' {
         $urls[0].Selector | Should -Be '@font-face'
         $urls[0].Property | Should -Be 'src'
         $urls[0].ResolvedUrl | Should -Be 'https://example.org/fonts/site.woff2'
+    }
+
+    It 'ignores url-like text inside CSS strings' {
+        $urls = @(ConvertFrom-CssUrl -Content @'
+.badge {
+    content: "url(/not-an-asset)";
+    background-image: url("/img/badge.png");
+}
+'@)
+
+        $urls.Count | Should -Be 1
+        $urls[0].Url | Should -Be '/img/badge.png'
     }
 
     It 'selects declarations from non-style CSS declaration rules' {
@@ -209,5 +236,33 @@ Describe 'HTML workflow cmdlets' {
 
         $findings.RuleId | Should -Contain 'empty-label'
         $findings.RuleId | Should -Contain 'form-field-missing-label'
+    }
+
+    It 'checks image submit buttons for accessible text' {
+        $findings = @(Measure-HtmlCompatibility -Content '<input type="image" src="/submit.png">')
+
+        $findings.RuleId | Should -Contain 'form-field-missing-label'
+    }
+
+    It 'rejects labels targeting non-labelable elements' {
+        $html = @'
+<label for="email">Email</label>
+<div id="email"></div>
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        $findings.RuleId | Should -Contain 'label-target-invalid'
+    }
+
+    It 'does not let for-bound ancestor labels name nested controls' {
+        $html = @'
+<label for="other">Email <input id="email"></label>
+<input id="other">
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        ($findings | Where-Object RuleId -eq 'form-field-missing-label').Value | Should -Contain $null
     }
 }
