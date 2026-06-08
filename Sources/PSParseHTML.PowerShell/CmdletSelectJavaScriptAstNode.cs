@@ -26,6 +26,19 @@ namespace PSParseHTML.PowerShell;
 /// Select-JavaScriptAstNode -Source $script -Type Script,ObjectExpression -IncludeRoot
 ///   </code>
 /// </example>
+/// <example>
+///   <summary>Select nodes from ECMAScript module source</summary>
+///   <code>
+/// $module = @'
+/// import value from "./settings.js";
+/// export const settings = {
+///     enabled: true
+/// };
+/// '@
+///
+/// Select-JavaScriptAstNode -Source $module -Module -Type ImportDeclaration,ExportNamedDeclaration
+///   </code>
+/// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptAstNode", DefaultParameterSetName = ParameterSetSource)]
 [OutputType(typeof(Node))]
 public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {

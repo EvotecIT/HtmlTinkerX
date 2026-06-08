@@ -25,6 +25,18 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 /// <example>
+///   <summary>Return only the final assignment when a value is overwritten</summary>
+///   <code>
+/// $script = @'
+/// $Config = { sCtx: "first" };
+/// $Config = { sCtx: "second" };
+/// '@
+///
+/// Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx |
+///     Select-Object -Last 1
+///   </code>
+/// </example>
+/// <example>
 ///   <summary>Match a member assignment and read a nested property path</summary>
 ///   <code>
 /// $script = @'
@@ -41,14 +53,33 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 /// <example>
-///   <summary>Return each matching assignment occurrence</summary>
+///   <summary>Skip compound assignments whose value depends on previous state</summary>
 ///   <code>
 /// $script = @'
-/// $Config = { sCtx: "first" };
-/// $Config = { sCtx: "second" };
+/// $Config += suffix;
+/// $Config = { sCtx: "final" };
 /// '@
 ///
 /// Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx
+///   </code>
+/// </example>
+/// <example>
+///   <summary>Return unknown values when runtime expressions make a property path dynamic</summary>
+///   <code>
+/// $script = @'
+/// const cfg = {
+///     [key]: "dynamic",
+///     token: "old",
+///     ...override,
+///     items: ["first", ...extra, "last"],
+///     safe: "after"
+/// };
+///
+/// const enabled = !window.disabled;
+/// '@
+///
+/// Select-JavaScriptVariable -Source $script -Name cfg -PropertyPath key,token,items.0,items.2,safe
+/// Select-JavaScriptVariable -Source $script -Name enabled
 ///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptVariable", DefaultParameterSetName = ParameterSetSource)]

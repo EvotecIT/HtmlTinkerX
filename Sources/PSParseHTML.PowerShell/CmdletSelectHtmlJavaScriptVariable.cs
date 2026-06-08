@@ -29,6 +29,23 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 /// <example>
+///   <summary>Read module scripts with ECMAScript module grammar</summary>
+///   <code>
+/// $html = @'
+/// <script type="module">
+/// import value from "./settings.js";
+/// window.$Config = { sCtx: "from-module" };
+/// </script>
+/// <script>
+/// window.$Config = { sCtx: "from-script" };
+/// </script>
+/// '@
+///
+/// Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx |
+///     Select-Object -First 1
+///   </code>
+/// </example>
+/// <example>
 ///   <summary>Ignore non-JavaScript script tags and return each matching assignment</summary>
 ///   <code>
 /// $html = @'
@@ -40,6 +57,23 @@ namespace PSParseHTML.PowerShell;
 /// '@
 ///
 /// Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx
+///   </code>
+/// </example>
+/// <example>
+///   <summary>Return every matching HTML assignment so callers can choose first or last</summary>
+///   <code>
+/// $html = @'
+/// <script>
+/// $Config = { sCtx: "first" };
+/// </script>
+/// <script type="text/javascript">
+/// $Config = { sCtx: "second" };
+/// </script>
+/// '@
+///
+/// $values = Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx
+/// $values | Select-Object -First 1
+/// $values | Select-Object -Last 1
 ///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlJavaScriptVariable", DefaultParameterSetName = ParameterSetContent)]
