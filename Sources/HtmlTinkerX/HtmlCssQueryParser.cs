@@ -18,7 +18,7 @@ public static class HtmlCssQueryParser {
                 continue;
             }
 
-            if (!Matches(styleRule.SelectorText, selector, contains)) {
+            if (!MatchesCssSelector(styleRule.SelectorText, selector, contains)) {
                 continue;
             }
 
@@ -41,7 +41,7 @@ public static class HtmlCssQueryParser {
         int index = 0;
         foreach ((ICssRule Rule, string? Context) item in EnumerateRules(sheet.Rules, null)) {
             string? selectorText = GetDeclarationRuleSelector(item.Rule);
-            if (selectorText == null || !Matches(selectorText, selector, contains)) {
+            if (selectorText == null || !MatchesCssSelector(selectorText, selector, contains)) {
                 continue;
             }
 
@@ -94,6 +94,16 @@ public static class HtmlCssQueryParser {
         }
 
         return contains ? value.IndexOf(pattern, StringComparison.Ordinal) >= 0 : string.Equals(value, pattern, StringComparison.Ordinal);
+    }
+
+    private static bool MatchesCssSelector(string value, string? filter, bool contains) {
+        if (string.IsNullOrEmpty(filter)) {
+            return true;
+        }
+
+        return contains
+            ? value.IndexOf(filter, StringComparison.Ordinal) >= 0
+            : string.Equals(value, filter, StringComparison.Ordinal);
     }
 
     /// <summary>Extracts URL references from CSS declarations and imports.</summary>

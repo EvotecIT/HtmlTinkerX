@@ -58,7 +58,7 @@ public static class HtmlWorkflowParser {
         List<HtmlAssetReference> assets = new();
         int index = 0;
 
-        foreach (IElement element in document.QuerySelectorAll("script, link[href], link[imagesrcset], img[src], img[srcset], picture source[srcset], audio[src], video[src], audio source[src], video source[src], track[src], style")) {
+        foreach (IElement element in document.QuerySelectorAll("script, link[href], link[imagesrcset], img[src], img[srcset], picture source[srcset], audio[src], video[src], video[poster], audio source[src], video source[src], track[src], style")) {
             foreach (HtmlAssetReference asset in CreateAssetsForElement(element, effectiveBaseUri, includeInline)) {
                 asset.Index = index++;
                 assets.Add(asset);
@@ -110,7 +110,7 @@ public static class HtmlWorkflowParser {
             }
         }
 
-        foreach (IElement field in document.QuerySelectorAll("input, select, textarea")) {
+        foreach (IElement field in document.QuerySelectorAll("button, input, select, textarea")) {
             if (IsLabelableFieldNeedingLabel(field) && !HasAccessibleLabel(document, field)) {
                 AddFinding(findings, "form-field-missing-label", "Warning", "Form field has no associated label or accessible name.", field, null, field.GetAttribute("name"));
             }
@@ -223,7 +223,14 @@ public static class HtmlWorkflowParser {
             element.LocalName.Equals("video", StringComparison.OrdinalIgnoreCase) ||
             element.LocalName.Equals("track", StringComparison.OrdinalIgnoreCase) ||
             element.LocalName.Equals("source", StringComparison.OrdinalIgnoreCase)) {
-            yield return CreateAsset(0, "Media", element, "src", element.GetAttribute("src") ?? string.Empty, baseUri);
+            if (element.LocalName.Equals("video", StringComparison.OrdinalIgnoreCase) && element.HasAttribute("poster")) {
+                yield return CreateAsset(0, "Image", element, "poster", element.GetAttribute("poster") ?? string.Empty, baseUri);
+            }
+
+            if (element.HasAttribute("src")) {
+                yield return CreateAsset(0, "Media", element, "src", element.GetAttribute("src") ?? string.Empty, baseUri);
+            }
+
             yield break;
         }
 
@@ -349,6 +356,7 @@ public static class HtmlWorkflowParser {
     private static bool IsLabelableFieldNeedingLabel(IElement field) {
         string type = (field.GetAttribute("type") ?? string.Empty).Trim();
         return field.LocalName switch {
+            "button" => true,
             "input" => !new[] { "hidden", "submit", "button", "reset" }.Contains(type, StringComparer.OrdinalIgnoreCase),
             "select" or "textarea" => true,
             _ => false
@@ -358,7 +366,8 @@ public static class HtmlWorkflowParser {
     private static bool HasAccessibleLabel(IDocument document, IElement field) {
         if (!string.IsNullOrWhiteSpace(field.GetAttribute("aria-label")) ||
             !string.IsNullOrWhiteSpace(field.GetAttribute("title")) ||
-            !string.IsNullOrWhiteSpace(field.GetAttribute("alt")) ||
+            HasAltAccessibleName(field) ||
+            HasOwnReadableText(field) ||
             HasReadableLabelledByTarget(document, field.GetAttribute("aria-labelledby"))) {
             return true;
         }
@@ -391,6 +400,18 @@ public static class HtmlWorkflowParser {
         return !string.IsNullOrWhiteSpace(label.TextContent) ||
             !string.IsNullOrWhiteSpace(label.GetAttribute("aria-label")) ||
             !string.IsNullOrWhiteSpace(label.GetAttribute("title"));
+    }
+
+    private static bool HasAltAccessibleName(IElement field) {
+        string type = (field.GetAttribute("type") ?? string.Empty).Trim();
+        return field.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
+            type.Equals("image", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(field.GetAttribute("alt"));
+    }
+
+    private static bool HasOwnReadableText(IElement field) {
+        return field.LocalName.Equals("button", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(field.TextContent);
     }
 
     private static bool HasReadableLabelledByTarget(IDocument document, string? value) {

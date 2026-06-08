@@ -37,6 +37,26 @@ Describe 'CSS query cmdlets' {
         $specificity.Class | Should -Be 2
     }
 
+    It 'matches CSS selectors case-sensitively' {
+        $css = @'
+.btn {
+    color: red;
+}
+
+.Btn {
+    color: blue;
+}
+'@
+
+        $rule = Select-CssRule -Content $css -Selector '.btn'
+        $declaration = Select-CssDeclaration -Content $css -Selector '.btn' -Property color
+
+        $rule.Count | Should -Be 1
+        $rule.Selector | Should -Be '.btn'
+        $declaration.Count | Should -Be 1
+        $declaration.Selector | Should -Be '.btn'
+    }
+
     It 'matches CSS custom property names case-sensitively' {
         $css = @'
 :root {
@@ -171,6 +191,14 @@ Describe 'HTML workflow cmdlets' {
         ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
     }
 
+    It 'extracts video poster image assets' {
+        $assets = @(Select-HtmlAsset -Content '<video poster="/img/poster.jpg" src="/media/movie.mp4"></video>' -BaseUrl 'https://example.org/')
+
+        ($assets | Where-Object Attribute -eq 'poster').Kind | Should -Be 'Image'
+        ($assets | Where-Object Attribute -eq 'poster').ResolvedUrl | Should -Be 'https://example.org/img/poster.jpg'
+        ($assets | Where-Object Kind -eq 'Media').ResolvedUrl | Should -Be 'https://example.org/media/movie.mp4'
+    }
+
     It 'indexes assets in document source order' {
         $html = @'
 <link rel="stylesheet" href="/first.css">
@@ -242,6 +270,18 @@ Describe 'HTML workflow cmdlets' {
         $findings = @(Measure-HtmlCompatibility -Content '<input type="image" src="/submit.png">')
 
         $findings.RuleId | Should -Contain 'form-field-missing-label'
+    }
+
+    It 'checks unlabeled buttons and ignores alt on non-image fields' {
+        $html = @'
+<button id="save"></button>
+<input type="text" alt="Email">
+<input type="image" src="/submit.png" alt="Submit">
+'@
+
+        $findings = @(Measure-HtmlCompatibility -Content $html)
+
+        @($findings | Where-Object RuleId -eq 'form-field-missing-label').Count | Should -Be 2
     }
 
     It 'rejects labels targeting non-labelable elements' {
