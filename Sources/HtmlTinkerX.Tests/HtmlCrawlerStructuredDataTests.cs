@@ -18,12 +18,30 @@ public class HtmlCrawlerStructuredJsonTests {
     }
 
     private static HttpListener StartServer(Dictionary<string, string> responses, out string rootUrl) {
-        int port = GetFreePort();
-        rootUrl = $"http://localhost:{port}/";
-        HttpListener listener = new();
-        listener.Prefixes.Add(rootUrl);
-        listener.Start();
+        const int maxAttempts = 20;
+        Exception? lastException = null;
 
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+            int port = GetFreePort();
+            string candidateRootUrl = $"http://127.0.0.1:{port}/";
+            HttpListener listener = new();
+            listener.Prefixes.Add(candidateRootUrl);
+
+            try {
+                listener.Start();
+                rootUrl = candidateRootUrl;
+                StartResponseLoop(listener, responses);
+                return listener;
+            } catch (HttpListenerException ex) {
+                lastException = ex;
+                DisposeListenerSafely(listener);
+            }
+        }
+
+        throw new InvalidOperationException("Unable to start test HTTP listener.", lastException);
+    }
+
+    private static void StartResponseLoop(HttpListener listener, Dictionary<string, string> responses) {
         _ = Task.Run(async () => {
             try {
                 while (listener.IsListening) {
@@ -44,8 +62,6 @@ public class HtmlCrawlerStructuredJsonTests {
             } catch (ObjectDisposedException) {
             }
         });
-
-        return listener;
     }
 
     private static void DisposeListenerSafely(HttpListener listener) {

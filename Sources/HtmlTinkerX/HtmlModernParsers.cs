@@ -87,6 +87,38 @@ public sealed class HtmlRobotsRule {
 
 /// <summary>Extracts JSON-LD structured data from HTML.</summary>
 public static class HtmlJsonLdParser {
+    /// <summary>Extracts JSON-LD items from script element contents.</summary>
+    /// <param name="scriptContents">The raw contents of script elements that contain JSON-LD payloads.</param>
+    /// <returns>Flattened JSON-LD items parsed from each non-empty script payload.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="scriptContents"/> is null.</exception>
+    public static IReadOnlyList<HtmlJsonLdItem> ParseScriptContents(IEnumerable<string> scriptContents) {
+        if (scriptContents == null) {
+            throw new ArgumentNullException(nameof(scriptContents));
+        }
+
+        return ParseScriptContents(scriptContents.Select((scriptContent, scriptIndex) => new KeyValuePair<int, string>(scriptIndex, scriptContent)));
+    }
+
+    /// <summary>Extracts JSON-LD items from indexed script element contents.</summary>
+    /// <param name="scriptContents">Pairs containing the original script index and the raw JSON-LD payload.</param>
+    /// <returns>Flattened JSON-LD items parsed from each non-empty script payload.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="scriptContents"/> is null.</exception>
+    public static IReadOnlyList<HtmlJsonLdItem> ParseScriptContents(IEnumerable<KeyValuePair<int, string>> scriptContents) {
+        if (scriptContents == null) {
+            throw new ArgumentNullException(nameof(scriptContents));
+        }
+
+        List<HtmlJsonLdItem> items = new();
+        foreach (KeyValuePair<int, string> scriptContent in scriptContents) {
+            string json = (scriptContent.Value ?? string.Empty).Trim();
+            if (json.Length > 0) {
+                AddJsonLdItems(json, scriptContent.Key, items);
+            }
+        }
+
+        return items;
+    }
+
     public static IReadOnlyList<HtmlJsonLdItem> Parse(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
