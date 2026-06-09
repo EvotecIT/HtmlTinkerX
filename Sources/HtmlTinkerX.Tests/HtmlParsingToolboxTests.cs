@@ -61,4 +61,16 @@ public class HtmlParsingToolboxTests {
         HtmlInteractionSurfaceItem endpoint = Assert.Single(surfaces, item => item.Kind == "LinkedEndpoint");
         Assert.Equal("/api/from-base", endpoint.Url);
     }
+
+    [Fact]
+    public void CompareStaticRendered_ResolvesFormActionsInSignatures() {
+        HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
+            """<form id="login" method="post" action="/login"><input name="user"></form>""",
+            """<form id="login" method="post" action="https://example.org/login"><input name="user"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
+        Assert.Empty(formDelta.Added);
+        Assert.Empty(formDelta.Removed);
+    }
 }

@@ -511,7 +511,7 @@ public static class HtmlParsingToolbox {
             RenderedFormCount = renderedItems.Count(static item => item.Kind == "Form"),
             StaticJsonLdCount = staticItems.Count(static item => item.Kind == "JsonLd"),
             RenderedJsonLdCount = renderedItems.Count(static item => item.Kind == "JsonLd"),
-            Deltas = CreateDeltas(staticItems, renderedItems)
+            Deltas = CreateDeltas(staticItems, renderedItems, baseUri)
         };
     }
 
@@ -685,12 +685,12 @@ public static class HtmlParsingToolbox {
         });
     }
 
-    private static IReadOnlyList<HtmlStaticRenderedDelta> CreateDeltas(IReadOnlyList<HtmlDataItem> staticItems, IReadOnlyList<HtmlDataItem> renderedItems) {
+    private static IReadOnlyList<HtmlStaticRenderedDelta> CreateDeltas(IReadOnlyList<HtmlDataItem> staticItems, IReadOnlyList<HtmlDataItem> renderedItems, Uri? baseUri) {
         string[] kinds = { "Link", "Form", "JsonLd", "AppState", "ScriptData", "Token" };
         List<HtmlStaticRenderedDelta> deltas = new();
         foreach (string kind in kinds) {
-            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(CreateSignature).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
-            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(CreateSignature).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
             deltas.Add(new HtmlStaticRenderedDelta {
                 Kind = kind,
                 StaticCount = staticSignatures.Length,
@@ -703,17 +703,17 @@ public static class HtmlParsingToolbox {
         return deltas;
     }
 
-    private static string CreateSignature(HtmlDataItem item) =>
+    private static string CreateSignature(HtmlDataItem item, Uri? baseUri) =>
         item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)
-            ? CreateFormSignature(item)
+            ? CreateFormSignature(item, baseUri)
             : item.Kind.Equals("Link", StringComparison.OrdinalIgnoreCase)
                 ? CreateLinkSignature(item)
             : IsScriptBackedDataKind(item.Kind)
                 ? CreateScriptBackedDataSignature(item)
             : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
-    private static string CreateFormSignature(HtmlDataItem item) =>
-        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{item.RawValue}|{SerializeValue(item.Value)}";
+    private static string CreateFormSignature(HtmlDataItem item, Uri? baseUri) =>
+        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{ResolveUrlValue(item.RawValue, baseUri)}|{SerializeValue(item.Value)}";
 
     private static string CreateLinkSignature(HtmlDataItem item) =>
         $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{SerializeValue(item.Value)}";
