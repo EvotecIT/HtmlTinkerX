@@ -1,3 +1,4 @@
+using HtmlAgilityPack;
 using HtmlTinkerX;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -12,15 +13,21 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>ConvertFrom-HtmlMeta -Url https://example.com</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
+    private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML content with meta tags.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>HtmlAgilityPack node to inspect.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetNode, ValueFromPipeline = true, Position = 0)]
+    [Alias("Node", "InputObject")]
+    public HtmlNode HtmlNode { get; set; } = null!;
 
     /// <summary>URL of a page with meta tags.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -42,6 +49,8 @@ public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             tags = await HtmlParser.ParseUrlMetaTagsAsync(Url.ToString(), client).ConfigureAwait(false);
+        } else if (ParameterSetName == ParameterSetNode) {
+            tags = HtmlParser.ParseMetaTags(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {
             tags = HtmlParser.ParseMetaTags(Content);
         }

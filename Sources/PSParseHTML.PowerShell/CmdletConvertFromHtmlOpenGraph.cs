@@ -1,3 +1,4 @@
+using HtmlAgilityPack;
 using HtmlTinkerX;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -12,15 +13,21 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>ConvertFrom-HtmlOpenGraph -Content $html</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlOpenGraph", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlOpenGraph", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
+    private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML markup containing Open Graph meta tags.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>HtmlAgilityPack node to inspect.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetNode, ValueFromPipeline = true, Position = 0)]
+    [Alias("Node", "InputObject")]
+    public HtmlNode HtmlNode { get; set; } = null!;
 
     /// <summary>URL of a page with Open Graph metadata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -42,6 +49,8 @@ public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             graph = await HtmlParser.ParseUrlOpenGraphAsync(Url.ToString(), client).ConfigureAwait(false);
+        } else if (ParameterSetName == ParameterSetNode) {
+            graph = HtmlParser.ParseOpenGraph(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {
             graph = HtmlParser.ParseOpenGraph(Content);
         }

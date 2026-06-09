@@ -16,6 +16,11 @@ internal static class HtmlPipelineInput {
         };
     }
 
+    internal static string ToHtmlMarkup(object input) {
+        HtmlNode node = ToHtmlNode(input);
+        return node.OuterHtml;
+    }
+
     internal static object Unwrap(object input) {
         if (input == null) {
             throw new PSArgumentNullException(nameof(input));

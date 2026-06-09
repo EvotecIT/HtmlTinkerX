@@ -48,6 +48,24 @@ Expires: 2026-12-31T23:59:59Z
         $items[0].IsJson | Should -BeTrue
     }
 
+    It 'extracts generic script JSON data from selected HtmlNode pipeline input' {
+        $items = ConvertFrom-HTML -Content $script:Html |
+            Select-HtmlNode -XPath '//script[@id="settings"]' |
+            ConvertFrom-HtmlScriptData
+
+        $items | Should -HaveCount 1
+        $items[0].Id | Should -Be 'settings'
+        $items[0].IsJson | Should -BeTrue
+    }
+
+    It 'extracts head links from selected HtmlNode pipeline input' {
+        $links = ConvertFrom-HTML -Content $script:Html |
+            Select-HtmlNode -XPath '//head' |
+            ConvertFrom-HtmlHeadLink -BaseUrl 'https://example.org/page'
+
+        $links.Url | Should -Contain 'https://example.org/preload.png'
+    }
+
     It 'extracts image candidates' {
         $images = ConvertFrom-HtmlImageCandidate -Content $script:Html -BaseUrl 'https://example.org/page'
 

@@ -1,3 +1,4 @@
+using HtmlAgilityPack;
 using HtmlTinkerX;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -12,15 +13,21 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>ConvertFrom-HtmlMicrodata -Content $html</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlMicrodata", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlMicrodata", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
+    private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML markup containing microdata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>HtmlAgilityPack node to inspect.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetNode, ValueFromPipeline = true, Position = 0)]
+    [Alias("Node", "InputObject")]
+    public HtmlNode HtmlNode { get; set; } = null!;
 
     /// <summary>URL of a page with microdata.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -42,6 +49,8 @@ public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             items = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client).ConfigureAwait(false);
+        } else if (ParameterSetName == ParameterSetNode) {
+            items = HtmlParser.ParseMicrodataItems(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {
             items = HtmlParser.ParseMicrodataItems(Content);
         }
