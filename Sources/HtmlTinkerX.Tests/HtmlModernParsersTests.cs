@@ -84,6 +84,23 @@ public class HtmlModernParsersTests {
     }
 
     [Fact]
+    public void HeadLinkParserReportsSelectorsByElementPosition() {
+        string html = """
+            <html><head>
+            <meta name="description" content="Summary" />
+            <meta property="og:title" content="Title" />
+            <link rel="canonical" href="/article" />
+            </head></html>
+            """;
+
+        var links = HtmlHeadLinkParser.Parse(html, new System.Uri("https://example.org/page"));
+
+        Assert.Equal("meta:nth-of-type(1)", links[0].Selector);
+        Assert.Equal("meta:nth-of-type(2)", links[1].Selector);
+        Assert.Equal("link:nth-of-type(1)", links[2].Selector);
+    }
+
+    [Fact]
     public void TokenParserFindsInputsMetaNonceAndScriptValues() {
         string html = """
             <html><head><meta name="csrf-token" content="meta-token" /></head>

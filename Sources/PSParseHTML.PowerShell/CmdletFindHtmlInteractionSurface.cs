@@ -50,11 +50,11 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
 
-    /// <summary>Base URL used to resolve linked script URLs. Defaults to Url when downloading.</summary>
+    /// <summary>Base URL used to resolve linked script URLs. Defaults to Url when downloading, and can be supplied by an absolute document base element.</summary>
     [Parameter]
     public Uri? BaseUrl { get; set; }
 
-    /// <summary>Downloads and inspects same-origin linked JavaScript files when BaseUrl or Url is available.</summary>
+    /// <summary>Downloads and inspects same-origin linked JavaScript files when BaseUrl, Url, or an absolute document base element is available.</summary>
     [Parameter]
     public SwitchParameter IncludeLinkedScripts { get; set; }
 
@@ -76,10 +76,6 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
         string html = await ReadHtmlAsync(client).ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);
-        if (IncludeLinkedScripts.IsPresent && baseUri == null) {
-            throw new PSArgumentException("-BaseUrl is required when -IncludeLinkedScripts is used with -Content, -Path, or HtmlNode input.");
-        }
-
         WriteObject((await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, IncludeLinkedScripts.IsPresent, IncludeExternalLinkedScripts.IsPresent, client).ConfigureAwait(false)).ToArray(), true);
     }
 

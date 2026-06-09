@@ -40,6 +40,7 @@ public sealed class HtmlAppStateEntry {
 public sealed class HtmlHeadLink {
     public int Index { get; set; }
     public string Element { get; set; } = string.Empty;
+    public string Selector { get; set; } = string.Empty;
     public string Rel { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Property { get; set; } = string.Empty;
@@ -355,6 +356,7 @@ public static class HtmlHeadLinkParser {
             links.Add(new HtmlHeadLink {
                 Index = links.Count,
                 Element = element.TagName.ToLowerInvariant(),
+                Selector = CreateElementSelector(element),
                 Rel = element.GetAttribute("rel") ?? string.Empty,
                 Name = element.GetAttribute("name") ?? string.Empty,
                 Property = element.GetAttribute("property") ?? string.Empty,
@@ -410,6 +412,30 @@ public static class HtmlHeadLinkParser {
             || normalized.Equals("twitter:player", StringComparison.OrdinalIgnoreCase)
             || normalized.EndsWith(":secure_url", StringComparison.OrdinalIgnoreCase)
             || normalized.EndsWith(":url", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateElementSelector(IElement element) {
+        string tag = element.TagName.ToLowerInvariant();
+        string id = element.GetAttribute("id") ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(id)) {
+            return $"{tag}#{id}";
+        }
+
+        int position = 1;
+        IElement? parent = element.ParentElement;
+        if (parent != null) {
+            foreach (IElement sibling in parent.Children) {
+                if (ReferenceEquals(sibling, element)) {
+                    break;
+                }
+
+                if (sibling.TagName.Equals(element.TagName, StringComparison.OrdinalIgnoreCase)) {
+                    position++;
+                }
+            }
+        }
+
+        return $"{tag}:nth-of-type({position})";
     }
 }
 

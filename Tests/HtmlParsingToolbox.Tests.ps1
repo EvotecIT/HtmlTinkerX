@@ -57,6 +57,7 @@ Describe 'HTML parsing toolbox cmdlets' {
         ($items | Where-Object Kind -EQ 'JsonLd').Type | Should -Contain 'Article'
         ($items | Where-Object Kind -EQ 'OpenGraph').Name | Should -Contain 'title'
         ($items | Where-Object Kind -EQ 'HeadLink').Value | Should -Contain 'https://example.org/toolbox'
+        ($items | Where-Object { $_.Kind -eq 'HeadLink' -and $_.Name -eq 'canonical' }).Selector | Should -Be 'link:nth-of-type(1)'
         ($items | Where-Object Kind -EQ 'ScriptData').Name | Should -Contain 'settings'
         ($items | Where-Object Kind -EQ 'AppState').Name | Should -Contain '__INITIAL_STATE__'
         ($items | Where-Object Kind -EQ 'Token').Value | Should -Contain 'form-token'
@@ -216,6 +217,17 @@ window.AppSettings = { feature: true };
 
         $linkDelta.Added | Should -BeNullOrEmpty
         $linkDelta.Removed | Should -BeNullOrEmpty
+    }
+
+    It 'does not report unchanged forms when rendered markup normalizes action values' {
+        $static = '<form id="login" method="post" action="/login"><input name="user" /></form>'
+        $rendered = '<form id="login" method="post" action="https://example.org/login"><input name="user" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        $formDelta.Added | Should -BeNullOrEmpty
+        $formDelta.Removed | Should -BeNullOrEmpty
     }
 
     It 'returns submitted selected option values when parsing forms' {

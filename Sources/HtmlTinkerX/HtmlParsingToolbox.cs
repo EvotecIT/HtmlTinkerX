@@ -279,6 +279,7 @@ public static class HtmlParsingToolbox {
 
         HashSet<string>? filter = CreateKindFilter(kinds);
         List<HtmlDataItem> items = new();
+        Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
 
         if (Includes(filter, "JsonLd")) {
             foreach (HtmlJsonLdItem item in HtmlJsonLdParser.Parse(html)) {
@@ -300,7 +301,7 @@ public static class HtmlParsingToolbox {
 
         if (Includes(filter, "HeadLink")) {
             foreach (HtmlHeadLink item in HtmlHeadLinkParser.Parse(html, baseUri)) {
-                Add(items, "HeadLink", FirstNonEmpty(item.Rel, item.Name, item.Property, item.Element), item.Type, null, FirstNonEmpty(item.Url, item.Href, item.Content), FirstNonEmpty(item.Href, item.Content, item.Url), $"{item.Element}:nth-of-type({item.Index + 1})", item.Element, item.Index);
+                Add(items, "HeadLink", FirstNonEmpty(item.Rel, item.Name, item.Property, item.Element), item.Type, null, FirstNonEmpty(item.Url, item.Href, item.Content), FirstNonEmpty(item.Href, item.Content, item.Url), item.Selector, item.Element, item.Index);
             }
         }
 
@@ -333,12 +334,12 @@ public static class HtmlParsingToolbox {
         if (Includes(filter, "Form")) {
             foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
                 string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, form.Fields.Select(field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name)).ToArray(), form.Metadata.Action, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
+                string actionTarget = ResolveUrlValue(form.Metadata.Action, effectiveBaseUri);
+                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, form.Fields.Select(field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name)).ToArray(), actionTarget, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
             }
         }
 
         if (Includes(filter, "Link")) {
-            Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
             foreach (HtmlDiscoveredLink link in HtmlDiscoveryParser.ParseLinks(html, effectiveBaseUri)) {
                 Add(items, "Link", FirstNonEmpty(link.Text, link.Title, link.Url), null, null, link.Url, link.Href, "a[href]", "Anchor", null);
             }
@@ -470,8 +471,8 @@ public static class HtmlParsingToolbox {
             AddSurface(items, "Endpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url), endpoint.Method, endpoint.Url, string.Empty, "script", "InlineScript", endpoint.Index, false, endpoint.Client);
         }
 
-        if (includeLinkedScripts && baseUri != null) {
-            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, client).ConfigureAwait(false)) {
+        if (includeLinkedScripts && effectiveBaseUri != null) {
+            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, effectiveBaseUri, includeExternalLinkedScripts, client).ConfigureAwait(false)) {
                 string metadata = FirstNonEmpty(endpoint.Error, endpoint.OperationName, endpoint.Client, endpoint.ScriptUrl);
                 AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, endpoint.Selector, "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
             }

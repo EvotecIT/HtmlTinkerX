@@ -38,4 +38,27 @@ public class HtmlParsingToolboxTests {
         Assert.Equal(1, endpoint.SourceIndex);
         Assert.Equal("/api/items", endpoint.Url);
     }
+
+    [Fact]
+    public async Task FindInteractionSurfaceAsync_UsesAbsoluteDocumentBaseForLinkedScripts() {
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            if (context.Request.Path == "/assets/app.js") {
+                await context.Response.WriteAsync("""fetch("/api/from-base");""");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        using var client = server.CreateClient();
+        string html = $"""<base href="{server.BaseAddress}assets/"><script src="app.js"></script>""";
+
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            html,
+            includeLinkedScripts: true,
+            includeExternalLinkedScripts: false,
+            client: client);
+
+        HtmlInteractionSurfaceItem endpoint = Assert.Single(surfaces, item => item.Kind == "LinkedEndpoint");
+        Assert.Equal("/api/from-base", endpoint.Url);
+    }
 }
