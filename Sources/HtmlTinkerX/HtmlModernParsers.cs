@@ -87,6 +87,29 @@ public sealed class HtmlRobotsRule {
 
 /// <summary>Extracts JSON-LD structured data from HTML.</summary>
 public static class HtmlJsonLdParser {
+    /// <summary>Extracts JSON-LD items from script element contents.</summary>
+    /// <param name="scriptContents">The raw contents of script elements that contain JSON-LD payloads.</param>
+    /// <returns>Flattened JSON-LD items parsed from each non-empty script payload.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="scriptContents"/> is null.</exception>
+    public static IReadOnlyList<HtmlJsonLdItem> ParseScriptContents(IEnumerable<string> scriptContents) {
+        if (scriptContents == null) {
+            throw new ArgumentNullException(nameof(scriptContents));
+        }
+
+        List<HtmlJsonLdItem> items = new();
+        int scriptIndex = 0;
+        foreach (string scriptContent in scriptContents) {
+            string json = (scriptContent ?? string.Empty).Trim();
+            if (json.Length > 0) {
+                AddJsonLdItems(json, scriptIndex, items);
+            }
+
+            scriptIndex++;
+        }
+
+        return items;
+    }
+
     public static IReadOnlyList<HtmlJsonLdItem> Parse(string html) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));

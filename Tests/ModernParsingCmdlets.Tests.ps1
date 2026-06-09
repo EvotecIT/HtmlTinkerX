@@ -40,6 +40,16 @@ const csrfToken = "script-token";
         $items[0].Type | Should -Be 'Article'
     }
 
+    It 'extracts JSON-LD from selected HtmlNode pipeline input' {
+        $items = ConvertFrom-HTML -Content $script:Html |
+            Select-HtmlNode -XPath '//script[@type="application/ld+json"]' |
+            ConvertFrom-HtmlJsonLd
+
+        $items | Should -HaveCount 1
+        $items[0].Type | Should -Be 'Article'
+        $items[0].Id | Should -Be 'https://example.org/article'
+    }
+
     It 'extracts app state' {
         $state = ConvertFrom-HtmlAppState -Content $script:Html
 

@@ -1,5 +1,7 @@
+using HtmlAgilityPack;
 using HtmlTinkerX;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
@@ -8,11 +10,12 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts JSON-LD structured data from HTML.</summary>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlJsonLd", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlJsonLd", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlJsonLdItem))]
 public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
+    private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML content to inspect.</summary>
@@ -25,6 +28,11 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     [Alias("File")]
     [ValidateNotNullOrEmpty]
     public string Path { get; set; } = string.Empty;
+
+    /// <summary>HtmlAgilityPack node to inspect.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetNode, ValueFromPipeline = true, Position = 0)]
+    [Alias("Node", "InputObject")]
+    public HtmlNode HtmlNode { get; set; } = null!;
 
     /// <summary>URL of an HTML page to download and inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -42,8 +50,35 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
+        if (ParameterSetName == ParameterSetNode) {
+            WriteObject(HtmlJsonLdParser.ParseScriptContents(GetJsonLdScriptContents()).ToArray(), true);
+            return;
+        }
+
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         WriteObject(HtmlJsonLdParser.Parse(html).ToArray(), true);
+    }
+
+    private IEnumerable<string> GetJsonLdScriptContents() {
+        if (IsJsonLdScript(HtmlNode)) {
+            yield return HtmlNode.InnerHtml;
+            yield break;
+        }
+
+        foreach (HtmlNode script in HtmlNode.Descendants("script")) {
+            if (IsJsonLdScript(script)) {
+                yield return script.InnerHtml;
+            }
+        }
+    }
+
+    private static bool IsJsonLdScript(HtmlNode node) {
+        if (!string.Equals(node.Name, "script", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        string type = node.GetAttributeValue("type", string.Empty);
+        return type.Contains("ld+json", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<string> ReadHtmlAsync() {
