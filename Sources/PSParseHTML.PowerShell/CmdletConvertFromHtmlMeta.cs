@@ -11,7 +11,12 @@ namespace PSParseHTML.PowerShell;
 /// Parses &lt;meta&gt; tags from HTML content or a URL.
 /// </summary>
 /// <example>
-/// <code>ConvertFrom-HtmlMeta -Url https://example.com</code>
+///   <summary>Extract meta tags from a page</summary>
+///   <code>ConvertFrom-HtmlMeta -Url https://example.com</code>
+/// </example>
+/// <example>
+///   <summary>Inspect only the selected head node</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlMeta</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]

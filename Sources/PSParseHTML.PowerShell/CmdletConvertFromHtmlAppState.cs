@@ -9,6 +9,14 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts common embedded application state objects from HTML.</summary>
+/// <example>
+///   <summary>Extract framework app-state payloads from HTML content</summary>
+///   <code>ConvertFrom-HtmlAppState -Content $html</code>
+/// </example>
+/// <example>
+///   <summary>Inspect only a selected script node for app-state payloads</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@id="__NEXT_DATA__"]' | ConvertFrom-HtmlAppState</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlAppState", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlAppStateEntry))]
 public sealed class CmdletConvertFromHtmlAppState : AsyncPSCmdlet {

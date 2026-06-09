@@ -23,6 +23,14 @@ namespace PSParseHTML.PowerShell;
 ///   <summary>Inspect only selected JSON-LD script nodes from an HtmlAgilityPack pipeline</summary>
 ///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/ld+json"]' | ConvertFrom-HtmlJsonLd</code>
 /// </example>
+/// <example>
+///   <summary>Return only Product JSON-LD items</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Content $html -Type Product</code>
+/// </example>
+/// <example>
+///   <summary>Emit parsed JSON payload objects instead of metadata records</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Content $html -Type Product -AsObject</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlJsonLd", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlJsonLdItem))]
 public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {

@@ -9,6 +9,14 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts generic JSON data embedded in script tags.</summary>
+/// <example>
+///   <summary>Extract generic JSON script data from HTML content</summary>
+///   <code>ConvertFrom-HtmlScriptData -Content $html</code>
+/// </example>
+/// <example>
+///   <summary>Inspect a selected application/json script node</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/json"]' | ConvertFrom-HtmlScriptData</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlScriptData", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlScriptDataItem))]
 public sealed class CmdletConvertFromHtmlScriptData : AsyncPSCmdlet {

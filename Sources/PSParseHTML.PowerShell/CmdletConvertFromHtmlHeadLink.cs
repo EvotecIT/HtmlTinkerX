@@ -9,6 +9,14 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts canonical, alternate, feed, icon, manifest, preload, and related head links.</summary>
+/// <example>
+///   <summary>Extract and resolve head links from a page</summary>
+///   <code>ConvertFrom-HtmlHeadLink -Url https://example.org/page</code>
+/// </example>
+/// <example>
+///   <summary>Inspect only the selected head node</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlHeadLink -BaseUrl https://example.org/page</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlHeadLink", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlHeadLink))]
 public sealed class CmdletConvertFromHtmlHeadLink : AsyncPSCmdlet {

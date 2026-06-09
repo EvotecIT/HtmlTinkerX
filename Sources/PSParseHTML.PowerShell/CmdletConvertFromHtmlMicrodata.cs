@@ -11,7 +11,12 @@ namespace PSParseHTML.PowerShell;
 /// Extracts microdata items from HTML content or a URL.
 /// </summary>
 /// <example>
-/// <code>ConvertFrom-HtmlMicrodata -Content $html</code>
+///   <summary>Extract microdata items from HTML content</summary>
+///   <code>ConvertFrom-HtmlMicrodata -Content $html</code>
+/// </example>
+/// <example>
+///   <summary>Inspect only selected microdata markup</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//*[@itemscope]' | ConvertFrom-HtmlMicrodata</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMicrodata", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]
