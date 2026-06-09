@@ -50,6 +50,24 @@ const csrfToken = "script-token";
         $items | Should -HaveCount 1
         $items[0].Type | Should -Be 'Article'
         $items[0].Id | Should -Be 'https://example.org/article'
+        $items[0].ScriptIndex | Should -Be 1
+    }
+
+    It 'preserves JSON-LD source script indexes from multiple selected HtmlNode inputs' {
+        $html = @'
+<html><head>
+<script>console.log("one")</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"One"}</script>
+<script>console.log("two")</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Two"}</script>
+</head></html>
+'@
+        $items = ConvertFrom-HTML -Content $html |
+            Select-HtmlNode -XPath '//script[@type="application/ld+json"]' |
+            ConvertFrom-HtmlJsonLd
+
+        $items | Should -HaveCount 2
+        $items.ScriptIndex | Should -Be @(1, 3)
     }
 
     It 'preserves JSON-LD script indexes from HtmlNode document input' {

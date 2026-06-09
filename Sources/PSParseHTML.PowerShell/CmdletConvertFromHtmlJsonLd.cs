@@ -73,18 +73,34 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
 
     private IEnumerable<KeyValuePair<int, string>> GetJsonLdScriptContents() {
         if (IsJsonLdScript(HtmlNode)) {
-            yield return new KeyValuePair<int, string>(0, HtmlNode.InnerHtml);
+            yield return new KeyValuePair<int, string>(GetSourceScriptIndex(HtmlNode, 0), HtmlNode.InnerHtml);
             yield break;
         }
 
         int scriptIndex = 0;
         foreach (HtmlNode script in HtmlNode.Descendants("script")) {
             if (IsJsonLdScript(script)) {
-                yield return new KeyValuePair<int, string>(scriptIndex, script.InnerHtml);
+                yield return new KeyValuePair<int, string>(GetSourceScriptIndex(script, scriptIndex), script.InnerHtml);
             }
 
             scriptIndex++;
         }
+    }
+
+    private static int GetSourceScriptIndex(HtmlNode script, int fallbackIndex) {
+        HtmlNode? documentNode = script.OwnerDocument?.DocumentNode;
+        if (documentNode != null) {
+            int index = 0;
+            foreach (HtmlNode candidate in documentNode.Descendants("script")) {
+                if (ReferenceEquals(candidate, script)) {
+                    return index;
+                }
+
+                index++;
+            }
+        }
+
+        return fallbackIndex;
     }
 
     private static bool IsJsonLdScript(HtmlNode node) {
