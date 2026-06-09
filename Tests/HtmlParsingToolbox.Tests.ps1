@@ -113,6 +113,22 @@ Describe 'HTML parsing toolbox cmdlets' {
         $config[0].Value | Should -Be '/api'
     }
 
+    It 'discovers default JavaScript config names case-insensitively' {
+        $html = @'
+<html><body>
+<script>
+window.appConfig = { api: { baseUrl: "/api" } };
+window.AppSettings = { feature: true };
+</script>
+</body></html>
+'@
+        $config = Select-HtmlJavaScriptConfig -Content $html -PropertyPath api.baseUrl
+        $settings = Select-HtmlJavaScriptConfig -Content $html | Where-Object Path -EQ 'window.AppSettings'
+
+        ($config | Where-Object Path -EQ 'window.appConfig').Value | Should -Be '/api'
+        $settings.Name | Should -Be 'AppSettings'
+    }
+
     It 'reports CSS selector usage against HTML' {
         $usage = Select-HtmlStyleUsage -Content $script:Html
 
@@ -162,6 +178,25 @@ Describe 'HTML parsing toolbox cmdlets' {
 
         ($formDelta.Removed -join '|') | Should -Not -Match 'user'
         ($formDelta.Added -join '|') | Should -Match 'q'
+    }
+
+    It 'does not report unchanged script data as removed when rendering inserts an earlier script' {
+        $static = '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Hello"}</script>'
+        $rendered = '<script>console.log("inserted")</script>' + $static
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered
+        $jsonDelta = $comparison.Deltas | Where-Object Kind -EQ 'JsonLd'
+
+        $jsonDelta.Added | Should -BeNullOrEmpty
+        $jsonDelta.Removed | Should -BeNullOrEmpty
+    }
+
+    It 'resolves selected links against document base elements' {
+        $html = '<html><head><base href="/app/"></head><body><a href="docs">Docs</a></body></html>'
+
+        $items = Select-HtmlData -Content $html -Kind Link -BaseUrl 'https://example.org/root/page'
+
+        ($items | Where-Object Kind -EQ 'Link').Value | Should -Contain 'https://example.org/app/docs'
     }
 
     It 'returns submitted selected option values when parsing forms' {

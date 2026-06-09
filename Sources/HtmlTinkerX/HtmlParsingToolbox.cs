@@ -338,7 +338,8 @@ public static class HtmlParsingToolbox {
         }
 
         if (Includes(filter, "Link")) {
-            foreach (HtmlDiscoveredLink link in HtmlDiscoveryParser.ParseLinks(html, baseUri)) {
+            Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
+            foreach (HtmlDiscoveredLink link in HtmlDiscoveryParser.ParseLinks(html, effectiveBaseUri)) {
                 Add(items, "Link", FirstNonEmpty(link.Text, link.Title, link.Url), null, null, link.Url, link.Href, "a[href]", "Anchor", null);
             }
         }
@@ -375,11 +376,12 @@ public static class HtmlParsingToolbox {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IReadOnlyList<string> effectiveNames = names == null || names.Count == 0 ? DefaultConfigNames : names;
-        bool effectiveContains = names == null || names.Count == 0 || contains;
+        bool defaultNameSearch = names == null || names.Count == 0;
+        IReadOnlyList<string> effectiveNames = defaultNameSearch ? DefaultConfigNames : names!;
+        bool effectiveContains = defaultNameSearch || contains;
         List<HtmlJavaScriptConfigItem> items = new();
 
-        AddJavaScriptConfigMatches(html, effectiveNames, effectiveContains, startsWith, propertyPaths, tolerant, items);
+        AddJavaScriptConfigMatches(html, effectiveNames, effectiveContains, startsWith, propertyPaths, tolerant, defaultNameSearch, items);
 
         if (includeAppState) {
             foreach (HtmlAppStateEntry state in HtmlAppStateParser.Parse(html)) {
@@ -549,6 +551,7 @@ public static class HtmlParsingToolbox {
         bool startsWith,
         IReadOnlyList<string>? propertyPaths,
         bool tolerant,
+        bool defaultNameSearch,
         List<HtmlJavaScriptConfigItem> items) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         int scriptIndex = 0;
@@ -573,24 +576,75 @@ public static class HtmlParsingToolbox {
                 continue;
             }
 
+            HashSet<string>? seen = defaultNameSearch ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : null;
             foreach (HtmlJavaScriptVariableMatch match in matches) {
-                items.Add(new HtmlJavaScriptConfigItem {
-                    Index = items.Count,
-                    Name = match.Name,
-                    Path = match.Path,
-                    Kind = match.Kind,
-                    PropertyPath = match.PropertyPath,
-                    Value = match.Value,
-                    RawValue = match.RawValue ?? SerializeValue(match.Value),
-                    ScriptIndex = match.ScriptIndex,
-                    ScriptType = match.ScriptType,
-                    Selector = match.ScriptIndex.HasValue ? $"script:nth-of-type({match.ScriptIndex.Value + 1})" : "script",
-                    Source = "JavaScript"
-                });
+                seen?.Add(CreateConfigMatchKey(match));
+                AddJavaScriptConfigMatch(match, items);
+            }
+
+            if (defaultNameSearch) {
+                AddCaseInsensitiveDefaultConfigMatches(content, names, propertyPaths, tolerant, scriptIndex, type, seen!, items);
             }
 
             scriptIndex++;
         }
+    }
+
+    private static void AddCaseInsensitiveDefaultConfigMatches(
+        string content,
+        IReadOnlyList<string> names,
+        IReadOnlyList<string>? propertyPaths,
+        bool tolerant,
+        int scriptIndex,
+        string scriptType,
+        HashSet<string> seen,
+        List<HtmlJavaScriptConfigItem> items) {
+        IReadOnlyList<HtmlJavaScriptVariableMatch> matches = HtmlJavaScriptVariableSelector.SelectJavaScript(
+            content,
+            null,
+            false,
+            false,
+            false,
+            propertyPaths,
+            tolerant,
+            scriptIndex,
+            scriptType,
+            IsJavaScriptModuleType(scriptType));
+
+        foreach (HtmlJavaScriptVariableMatch match in matches) {
+            string key = CreateConfigMatchKey(match);
+            if (seen.Contains(key)) {
+                continue;
+            }
+
+            bool nameMatches = IsConfigNameMatch(match.Name, names, true, false);
+            bool pathMatches = IsConfigNameMatch(match.Path, names, true, false);
+            if (!nameMatches && !pathMatches) {
+                continue;
+            }
+
+            seen.Add(key);
+            AddJavaScriptConfigMatch(match, items);
+        }
+    }
+
+    private static string CreateConfigMatchKey(HtmlJavaScriptVariableMatch match) =>
+        $"{match.ScriptIndex}|{match.Name}|{match.Path}|{match.PropertyPath}";
+
+    private static void AddJavaScriptConfigMatch(HtmlJavaScriptVariableMatch match, List<HtmlJavaScriptConfigItem> items) {
+        items.Add(new HtmlJavaScriptConfigItem {
+            Index = items.Count,
+            Name = match.Name,
+            Path = match.Path,
+            Kind = match.Kind,
+            PropertyPath = match.PropertyPath,
+            Value = match.Value,
+            RawValue = match.RawValue ?? SerializeValue(match.Value),
+            ScriptIndex = match.ScriptIndex,
+            ScriptType = match.ScriptType,
+            Selector = match.ScriptIndex.HasValue ? $"script:nth-of-type({match.ScriptIndex.Value + 1})" : "script",
+            Source = "JavaScript"
+        });
     }
 
     private static bool IsRecoverableJavaScriptParseException(Exception exception) =>
@@ -649,13 +703,28 @@ public static class HtmlParsingToolbox {
     private static string CreateSignature(HtmlDataItem item) =>
         item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)
             ? CreateFormSignature(item)
+            : IsScriptBackedDataKind(item.Kind)
+                ? CreateScriptBackedDataSignature(item)
             : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
     private static string CreateFormSignature(HtmlDataItem item) =>
         $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{item.RawValue}|{SerializeValue(item.Value)}";
 
+    private static string CreateScriptBackedDataSignature(HtmlDataItem item) =>
+        $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}";
+
+    private static bool IsScriptBackedDataKind(string kind) =>
+        kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("AppState", StringComparison.OrdinalIgnoreCase)
+        || kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsPositionalFormName(string value) =>
         value.StartsWith("form[", StringComparison.OrdinalIgnoreCase) && value.EndsWith("]", StringComparison.Ordinal);
+
+    private static Uri? GetEffectiveBaseUri(string html, Uri? baseUri) {
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
+    }
 
     private static int GetTextLength(string html) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
