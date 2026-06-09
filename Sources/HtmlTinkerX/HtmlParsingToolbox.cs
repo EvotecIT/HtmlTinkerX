@@ -315,7 +315,10 @@ public static class HtmlParsingToolbox {
         if (Includes(filter, "OpenGraph")) {
             foreach (OpenGraphProperty property in HtmlParser.ParseOpenGraph(html).Properties) {
                 foreach (string value in property.Values) {
-                    Add(items, "OpenGraph", property.Name, null, null, value, value, CreateAttributeSelector("meta", "property", "og:" + property.Name), "Meta", null);
+                    string resolved = IsUrlValuedOpenGraphName(property.Name)
+                        ? ResolveUrlValue(value, effectiveBaseUri)
+                        : value;
+                    Add(items, "OpenGraph", property.Name, null, null, resolved, value, CreateAttributeSelector("meta", "property", "og:" + property.Name), "Meta", null);
                 }
             }
         }
@@ -335,8 +338,8 @@ public static class HtmlParsingToolbox {
         if (Includes(filter, "Form")) {
             foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
                 string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-                string actionTarget = ResolveUrlValue(form.Metadata.Action, effectiveBaseUri);
-                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, form.Fields.Select(field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name)).ToArray(), actionTarget, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
+                string actionTarget = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri);
+                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, CreateFormFieldSignatures(form.Fields), actionTarget, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
             }
         }
 
@@ -457,7 +460,7 @@ public static class HtmlParsingToolbox {
         Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
         foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
             string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-            string formUrl = ResolveUrlValue(form.Metadata.Action, effectiveBaseUri);
+            string formUrl = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri);
             AddSurface(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), formUrl, string.Empty, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex, false, string.Join(",", form.Fields.Select(static field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name))));
             foreach (HtmlFormField field in form.Fields.Where(static field => field.Type.ToString().Equals("Hidden", StringComparison.OrdinalIgnoreCase))) {
                 AddSurface(items, "Field", field.Name, string.Empty, string.Empty, field.Value, $"{CreateFormSelector(form.Metadata)} input[name='{EscapeAttributeValue(field.Name)}']", "Field", form.Metadata.FormIndex, false, "hidden");
@@ -715,7 +718,7 @@ public static class HtmlParsingToolbox {
             : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
     private static string CreateFormSignature(HtmlDataItem item, Uri? baseUri) =>
-        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{ResolveUrlValue(item.RawValue, baseUri)}|{SerializeValue(item.Value)}";
+        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{ResolveFormActionValue(item.RawValue, baseUri)}|{SerializeValue(item.Value)}";
 
     private static string CreateLinkSignature(HtmlDataItem item) =>
         $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{SerializeValue(item.Value)}";
@@ -748,6 +751,38 @@ public static class HtmlParsingToolbox {
         }
 
         return HtmlModernParserUtilities.ResolveUrl(value, baseUri);
+    }
+
+    private static string ResolveFormActionValue(string value, Uri? baseUri) {
+        if (!string.IsNullOrWhiteSpace(value)) {
+            return ResolveUrlValue(value, baseUri);
+        }
+
+        return baseUri?.AbsoluteUri ?? string.Empty;
+    }
+
+    private static string[] CreateFormFieldSignatures(IEnumerable<HtmlFormField> fields) =>
+        fields
+            .Where(static field => !string.IsNullOrWhiteSpace(field.Name))
+            .Select(static field => $"{field.Name}={field.Value}")
+            .ToArray();
+
+    private static bool IsUrlValuedOpenGraphName(string name) {
+        string normalized = (name ?? string.Empty).Trim();
+        if (normalized.Length == 0) {
+            return false;
+        }
+
+        return normalized.Equals("url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("image", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("audio", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("video", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("image:url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("image:secure_url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("audio:url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("audio:secure_url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("video:url", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("video:secure_url", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int GetTextLength(string html) {

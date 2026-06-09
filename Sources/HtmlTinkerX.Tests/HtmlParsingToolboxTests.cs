@@ -14,6 +14,16 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public async Task FindInteractionSurfaceAsync_DefaultsActionlessFormsToPageUrl() {
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            """<form id="login" method="post"><input name="user"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlInteractionSurfaceItem form = Assert.Single(surfaces, item => item.Kind == "Form");
+        Assert.Equal("https://example.org/app/page", form.Url);
+    }
+
+    [Fact]
     public async Task FindInteractionSurfaceAsync_UsesActualLinkedScriptSelector() {
         using var server = TestServerCompat.CreateTestServer(async context => {
             if (context.Request.Path == "/app.js") {
@@ -137,6 +147,19 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public void SelectData_ResolvesOpenGraphUrlValuesAgainstBaseUri() {
+        string html = """<html><head><meta property="og:image" content="/img.png"><meta property="og:title" content="Docs"></head></html>""";
+
+        IReadOnlyList<HtmlDataItem> items = HtmlParsingToolbox.SelectData(html, new[] { "OpenGraph" }, new Uri("https://example.org/page"));
+
+        HtmlDataItem image = Assert.Single(items, item => item.Name == "image");
+        HtmlDataItem title = Assert.Single(items, item => item.Name == "title");
+        Assert.Equal("https://example.org/img.png", image.Value);
+        Assert.Equal("/img.png", image.RawValue);
+        Assert.Equal("Docs", title.Value);
+    }
+
+    [Fact]
     public void CompareStaticRendered_ResolvesFormActionsInSignatures() {
         HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
             """<form id="login" method="post" action="/login"><input name="user"></form>""",
@@ -146,5 +169,17 @@ public class HtmlParsingToolboxTests {
         HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
         Assert.Empty(formDelta.Added);
         Assert.Empty(formDelta.Removed);
+    }
+
+    [Fact]
+    public void CompareStaticRendered_DetectsHiddenFieldValueChanges() {
+        HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
+            """<form id="wizard" method="post"><input type="hidden" name="returnUrl" value="/a"><input name="user"></form>""",
+            """<form id="wizard" method="post"><input type="hidden" name="returnUrl" value="/b"><input name="user"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
+        Assert.Contains(formDelta.Added, item => item.Contains("returnUrl=/b", StringComparison.Ordinal));
+        Assert.Contains(formDelta.Removed, item => item.Contains("returnUrl=/a", StringComparison.Ordinal));
     }
 }

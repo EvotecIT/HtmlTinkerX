@@ -10,6 +10,7 @@ Describe 'HTML parsing toolbox cmdlets' {
     <title>Toolbox</title>
     <meta name="description" content="Toolbox page" />
     <meta property="og:title" content="Toolbox OG" />
+    <meta property="og:url" content="/toolbox" />
     <meta name="csrf-token" content="meta-token" />
     <link rel="canonical" href="/toolbox" />
     <style>
@@ -56,6 +57,7 @@ Describe 'HTML parsing toolbox cmdlets' {
 
         ($items | Where-Object Kind -EQ 'JsonLd').Type | Should -Contain 'Article'
         ($items | Where-Object Kind -EQ 'OpenGraph').Name | Should -Contain 'title'
+        ($items | Where-Object { $_.Kind -eq 'OpenGraph' -and $_.Name -eq 'url' }).Value | Should -Contain 'https://example.org/toolbox'
         ($items | Where-Object Kind -EQ 'HeadLink').Value | Should -Contain 'https://example.org/toolbox'
         ($items | Where-Object { $_.Kind -eq 'HeadLink' -and $_.Name -eq 'canonical' }).Selector | Should -Be 'link:nth-of-type(1)'
         ($items | Where-Object { $_.Kind -eq 'Meta' -and $_.Name -eq 'og:title' }).Selector | Should -Be "meta[property='og:title']"
@@ -152,6 +154,14 @@ window.AppSettings = { feature: true };
         ($surface | Where-Object Kind -EQ 'Endpoint').SourceIndex | Should -Contain 2
     }
 
+    It 'defaults actionless forms to the page URL when a base URL is known' {
+        $html = '<form id="login" method="post"><input name="user" /></form>'
+
+        $surface = Find-HtmlInteractionSurface -Content $html -BaseUrl 'https://example.org/app/page'
+
+        ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain 'https://example.org/app/page'
+    }
+
     It 'compares static and rendered HTML signatures' {
         $comparison = Compare-HtmlStaticRendered -StaticContent $script:Html -RenderedContent $script:RenderedHtml -BaseUrl 'https://example.org/app/page'
         $linkDelta = $comparison.Deltas | Where-Object Kind -EQ 'Link'
@@ -171,6 +181,17 @@ window.AppSettings = { feature: true };
         $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
 
         ($formDelta.Added -join '|') | Should -Match 'csrf'
+    }
+
+    It 'detects hidden field value changes in an existing rendered form' {
+        $static = '<form id="wizard" method="post"><input type="hidden" name="returnUrl" value="/a" /><input name="user" /></form>'
+        $rendered = '<form id="wizard" method="post"><input type="hidden" name="returnUrl" value="/b" /><input name="user" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        ($formDelta.Added -join '|') | Should -Match 'returnUrl=/b'
+        ($formDelta.Removed -join '|') | Should -Match 'returnUrl=/a'
     }
 
     It 'does not report unchanged anonymous forms as removed when rendering inserts an earlier form' {
