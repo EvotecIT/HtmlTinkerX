@@ -10,6 +10,18 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts JSON-LD structured data from HTML.</summary>
+/// <example>
+///   <summary>Extract JSON-LD from static HTML content</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Content $html</code>
+/// </example>
+/// <example>
+///   <summary>Download a page and extract JSON-LD structured data</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Url https://example.org/article</code>
+/// </example>
+/// <example>
+///   <summary>Inspect only selected JSON-LD script nodes from an HtmlAgilityPack pipeline</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/ld+json"]' | ConvertFrom-HtmlJsonLd</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlJsonLd", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlJsonLdItem))]
 public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
