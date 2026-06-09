@@ -40,6 +40,7 @@ public sealed class HtmlAppStateEntry {
 public sealed class HtmlHeadLink {
     public int Index { get; set; }
     public string Element { get; set; } = string.Empty;
+    public string Selector { get; set; } = string.Empty;
     public string Rel { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Property { get; set; } = string.Empty;
@@ -65,6 +66,8 @@ public sealed class HtmlToken {
 /// <summary>Potential endpoint discovered in static JavaScript.</summary>
 public sealed class HtmlJavaScriptEndpoint {
     public int Index { get; set; }
+    public int? ScriptIndex { get; set; }
+    public string Selector { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
     public string Method { get; set; } = string.Empty;
     public string Client { get; set; } = string.Empty;
@@ -336,13 +339,17 @@ public static class HtmlAppStateParser {
 /// <summary>Extracts structured head link and metadata relations.</summary>
 public static class HtmlHeadLinkParser {
     public static IReadOnlyList<HtmlHeadLink> Parse(string html, Uri? baseUri = null) {
+        return Parse(html, baseUri, null);
+    }
+
+    internal static IReadOnlyList<HtmlHeadLink> Parse(string html, Uri? baseUri, Uri? effectiveBaseUriOverride) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         IElement scope = document.Head ?? document.DocumentElement;
-        Uri? effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
+        Uri? effectiveBaseUri = effectiveBaseUriOverride ?? HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
         List<HtmlHeadLink> links = new();
 
         foreach (IElement element in scope.QuerySelectorAll("link[href], meta[content]")) {
@@ -355,6 +362,7 @@ public static class HtmlHeadLinkParser {
             links.Add(new HtmlHeadLink {
                 Index = links.Count,
                 Element = element.TagName.ToLowerInvariant(),
+                Selector = CreateElementSelector(element),
                 Rel = element.GetAttribute("rel") ?? string.Empty,
                 Name = element.GetAttribute("name") ?? string.Empty,
                 Property = element.GetAttribute("property") ?? string.Empty,
@@ -410,6 +418,30 @@ public static class HtmlHeadLinkParser {
             || normalized.Equals("twitter:player", StringComparison.OrdinalIgnoreCase)
             || normalized.EndsWith(":secure_url", StringComparison.OrdinalIgnoreCase)
             || normalized.EndsWith(":url", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateElementSelector(IElement element) {
+        string tag = element.TagName.ToLowerInvariant();
+        string id = element.GetAttribute("id") ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(id)) {
+            return $"{tag}#{id}";
+        }
+
+        int position = 1;
+        IElement? parent = element.ParentElement;
+        if (parent != null) {
+            foreach (IElement sibling in parent.Children) {
+                if (ReferenceEquals(sibling, element)) {
+                    break;
+                }
+
+                if (sibling.TagName.Equals(element.TagName, StringComparison.OrdinalIgnoreCase)) {
+                    position++;
+                }
+            }
+        }
+
+        return $"{tag}:nth-of-type({position})";
     }
 }
 
@@ -500,6 +532,10 @@ public static class HtmlJavaScriptEndpointParser {
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyList<HtmlJavaScriptEndpoint> ParseJavaScript(string script) {
+        return ParseJavaScript(script, null, string.Empty, "StringLiteral");
+    }
+
+    private static IReadOnlyList<HtmlJavaScriptEndpoint> ParseJavaScript(string script, int? scriptIndex, string selector, string source) {
         if (script == null) {
             throw new ArgumentNullException(nameof(script));
         }
@@ -513,11 +549,13 @@ public static class HtmlJavaScriptEndpointParser {
 
             endpoints.Add(new HtmlJavaScriptEndpoint {
                 Index = endpoints.Count,
+                ScriptIndex = scriptIndex,
+                Selector = selector,
                 Url = url,
                 Method = InferMethod(script, match.Index),
                 Client = InferClient(script, match.Index),
                 OperationName = InferGraphQlOperation(script, match.Index, url),
-                Source = "StringLiteral"
+                Source = source
             });
         }
 
@@ -538,19 +576,30 @@ public static class HtmlJavaScriptEndpointParser {
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         List<HtmlJavaScriptEndpoint> endpoints = new();
+        int scriptIndex = -1;
         foreach (IElement script in document.QuerySelectorAll("script")) {
+            scriptIndex++;
             if (!HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type"))) {
                 continue;
             }
 
-            foreach (HtmlJavaScriptEndpoint endpoint in ParseJavaScript(script.TextContent ?? string.Empty)) {
+            string selector = CreateScriptSelector(script, scriptIndex);
+            foreach (HtmlJavaScriptEndpoint endpoint in ParseJavaScript(script.TextContent ?? string.Empty, scriptIndex, selector, "InlineScript")) {
                 endpoint.Index = endpoints.Count;
-                endpoint.Source = "InlineScript";
                 endpoints.Add(endpoint);
             }
         }
 
         return endpoints;
+    }
+
+    private static string CreateScriptSelector(IElement element, int scriptIndex) {
+        string id = element.GetAttribute("id") ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(id)) {
+            return $"script#{id}";
+        }
+
+        return $"script:nth-of-type({scriptIndex + 1})";
     }
 
     private static bool LooksLikeEndpoint(string value) {
@@ -745,11 +794,15 @@ internal static class HtmlModernParserUtilities {
     }
 
     internal static Uri? GetEffectiveBaseUri(IDocument document, Uri? baseUri) {
-        if (baseUri == null) {
-            return null;
+        string href = document.QuerySelector("base[href]")?.GetAttribute("href") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(href)) {
+            return baseUri;
         }
 
-        string href = document.QuerySelector("base[href]")?.GetAttribute("href") ?? string.Empty;
+        if (baseUri == null && Uri.TryCreate(href.Trim(), UriKind.Absolute, out Uri? absoluteBaseUri)) {
+            return absoluteBaseUri;
+        }
+
         string resolved = ResolveUrl(href, baseUri);
         return Uri.TryCreate(resolved, UriKind.Absolute, out Uri? effectiveBaseUri) ? effectiveBaseUri : baseUri;
     }

@@ -9,4 +9,7 @@ public class HtmlFormField {
 
     /// <summary>Type of the field.</summary>
     public HtmlFormFieldType Type { get; set; }
+
+    /// <summary>Current value attribute or element value captured from the field, when present.</summary>
+    public string Value { get; set; } = string.Empty;
 }

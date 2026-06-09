@@ -84,6 +84,38 @@ public class HtmlModernParsersTests {
     }
 
     [Fact]
+    public void HeadLinkParserResolvesAgainstAbsoluteDocumentBaseWithoutBaseUri() {
+        string html = """
+            <html><head>
+            <base href="https://example.org/assets/" />
+            <link rel="canonical" href="docs" />
+            </head></html>
+            """;
+
+        var links = HtmlHeadLinkParser.Parse(html);
+
+        Assert.Single(links);
+        Assert.Equal("https://example.org/assets/docs", links[0].Url);
+    }
+
+    [Fact]
+    public void HeadLinkParserReportsSelectorsByElementPosition() {
+        string html = """
+            <html><head>
+            <meta name="description" content="Summary" />
+            <meta property="og:title" content="Title" />
+            <link rel="canonical" href="/article" />
+            </head></html>
+            """;
+
+        var links = HtmlHeadLinkParser.Parse(html, new System.Uri("https://example.org/page"));
+
+        Assert.Equal("meta:nth-of-type(1)", links[0].Selector);
+        Assert.Equal("meta:nth-of-type(2)", links[1].Selector);
+        Assert.Equal("link:nth-of-type(1)", links[2].Selector);
+    }
+
+    [Fact]
     public void TokenParserFindsInputsMetaNonceAndScriptValues() {
         string html = """
             <html><head><meta name="csrf-token" content="meta-token" /></head>
@@ -162,6 +194,23 @@ public class HtmlModernParsersTests {
 
         Assert.Single(endpoints);
         Assert.Equal("/api/products/42", endpoints[0].Url);
+        Assert.Equal(1, endpoints[0].ScriptIndex);
+        Assert.Equal("script:nth-of-type(2)", endpoints[0].Selector);
+    }
+
+    [Fact]
+    public void JavaScriptEndpointParserReportsInlineScriptProvenance() {
+        string html = """
+            <script>console.log("first")</script>
+            <script id="client-api">fetch("/api/products/42", { method: "POST" });</script>
+            """;
+
+        var endpoints = HtmlJavaScriptEndpointParser.ParseHtml(html);
+
+        Assert.Single(endpoints);
+        Assert.Equal("/api/products/42", endpoints[0].Url);
+        Assert.Equal(1, endpoints[0].ScriptIndex);
+        Assert.Equal("script#client-api", endpoints[0].Selector);
     }
 
     [Fact]

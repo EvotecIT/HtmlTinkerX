@@ -32,25 +32,11 @@ public static class HtmlFormFieldExtractor {
             string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
             results.Add(new HtmlFormField {
                 Name = nameValue,
-                Type = MapType(type)
+                Type = HtmlFormFieldUtilities.MapType(type),
+                Value = HtmlFormFieldUtilities.GetSubmittedValue(field)
             });
         }
         return results;
-    }
-
-    private static HtmlFormFieldType MapType(string? type) {
-        return type?.ToLowerInvariant() switch {
-            "text" => HtmlFormFieldType.Text,
-            "password" => HtmlFormFieldType.Password,
-            "hidden" => HtmlFormFieldType.Hidden,
-            "checkbox" => HtmlFormFieldType.Checkbox,
-            "radio" => HtmlFormFieldType.Radio,
-            "submit" => HtmlFormFieldType.Submit,
-            "select" => HtmlFormFieldType.Select,
-            "textarea" => HtmlFormFieldType.Textarea,
-            "button" => HtmlFormFieldType.Button,
-            _ => HtmlFormFieldType.Other,
-        };
     }
 
     /// <summary>
