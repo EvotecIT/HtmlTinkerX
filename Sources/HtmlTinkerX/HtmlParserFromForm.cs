@@ -100,6 +100,10 @@ public static class HtmlParserFromForm {
             IElement[] selectedOptions = field.QuerySelectorAll("option[selected]").ToArray();
 
             if (selectedOptions.Length == 0) {
+                if (field.HasAttribute("multiple")) {
+                    return string.Empty;
+                }
+
                 IElement? firstOption = field.QuerySelector("option");
                 if (firstOption != null) {
                     return GetOptionSubmittedValue(firstOption);

@@ -153,6 +153,17 @@ Describe 'HTML parsing toolbox cmdlets' {
         ($formDelta.Added -join '|') | Should -Match 'csrf'
     }
 
+    It 'does not report unchanged anonymous forms as removed when rendering inserts an earlier form' {
+        $static = '<form method="post" action="/login"><input name="user" /></form>'
+        $rendered = '<form method="get" action="/search"><input name="q" /></form><form method="post" action="/login"><input name="user" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        ($formDelta.Removed -join '|') | Should -Not -Match 'user'
+        ($formDelta.Added -join '|') | Should -Match 'q'
+    }
+
     It 'returns submitted selected option values when parsing forms' {
         $html = @'
 <form id="plan">
@@ -173,6 +184,20 @@ Describe 'HTML parsing toolbox cmdlets' {
   <select name="tier">
     <option value="basic">Basic</option>
     <option value="" selected>None</option>
+  </select>
+</form>
+'@
+        $form = ConvertFrom-HtmlForm -Content $html
+
+        ($form.Fields | Where-Object Name -EQ 'tier').Value | Should -Be ''
+    }
+
+    It 'does not default empty multi-selects to the first option' {
+        $html = @'
+<form id="plan">
+  <select name="tier" multiple>
+    <option value="basic">Basic</option>
+    <option value="pro">Pro</option>
   </select>
 </form>
 '@

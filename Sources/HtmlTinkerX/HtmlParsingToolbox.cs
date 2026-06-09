@@ -333,7 +333,7 @@ public static class HtmlParsingToolbox {
         if (Includes(filter, "Form")) {
             foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
                 string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), null, form.Fields.Select(field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name)).ToArray(), form.Metadata.Action, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
+                Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, form.Fields.Select(field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name)).ToArray(), form.Metadata.Action, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
             }
         }
 
@@ -647,7 +647,15 @@ public static class HtmlParsingToolbox {
     }
 
     private static string CreateSignature(HtmlDataItem item) =>
-        $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
+        item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)
+            ? CreateFormSignature(item)
+            : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
+
+    private static string CreateFormSignature(HtmlDataItem item) =>
+        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{item.RawValue}|{SerializeValue(item.Value)}";
+
+    private static bool IsPositionalFormName(string value) =>
+        value.StartsWith("form[", StringComparison.OrdinalIgnoreCase) && value.EndsWith("]", StringComparison.Ordinal);
 
     private static int GetTextLength(string html) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
