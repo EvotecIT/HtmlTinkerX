@@ -162,6 +162,14 @@ window.AppSettings = { feature: true };
         ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain 'https://example.org/app/page'
     }
 
+    It 'defaults actionless forms to the page URL when a document base is present' {
+        $html = '<base href="/assets/" /><form id="login" method="post"><input name="user" /></form>'
+
+        $surface = Find-HtmlInteractionSurface -Content $html -BaseUrl 'https://example.org/app/page'
+
+        ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain 'https://example.org/app/page'
+    }
+
     It 'compares static and rendered HTML signatures' {
         $comparison = Compare-HtmlStaticRendered -StaticContent $script:Html -RenderedContent $script:RenderedHtml -BaseUrl 'https://example.org/app/page'
         $linkDelta = $comparison.Deltas | Where-Object Kind -EQ 'Link'
@@ -192,6 +200,28 @@ window.AppSettings = { feature: true };
 
         ($formDelta.Added -join '|') | Should -Match 'returnUrl=/b'
         ($formDelta.Removed -join '|') | Should -Match 'returnUrl=/a'
+    }
+
+    It 'detects field type changes in an existing rendered form' {
+        $static = '<form id="wizard" method="post"><input type="hidden" name="csrf" value="abc" /></form>'
+        $rendered = '<form id="wizard" method="post"><input type="text" name="csrf" value="abc" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        ($formDelta.Added -join '|') | Should -Match 'Text:csrf=abc'
+        ($formDelta.Removed -join '|') | Should -Match 'Hidden:csrf=abc'
+    }
+
+    It 'detects case-only hidden field value changes in an existing rendered form' {
+        $static = '<form id="wizard" method="post"><input type="hidden" name="csrf" value="AbC123" /></form>'
+        $rendered = '<form id="wizard" method="post"><input type="hidden" name="csrf" value="abc123" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        ($formDelta.Added -join '|') | Should -Match 'csrf=abc123'
+        ($formDelta.Removed -join '|') | Should -Match 'csrf=AbC123'
     }
 
     It 'does not report unchanged anonymous forms as removed when rendering inserts an earlier form' {

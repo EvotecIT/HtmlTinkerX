@@ -24,6 +24,16 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public async Task FindInteractionSurfaceAsync_DefaultsActionlessFormsToPageUrlWhenDocumentBaseIsPresent() {
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            """<base href="/assets/"><form id="login" method="post"><input name="user"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlInteractionSurfaceItem form = Assert.Single(surfaces, item => item.Kind == "Form");
+        Assert.Equal("https://example.org/app/page", form.Url);
+    }
+
+    [Fact]
     public async Task FindInteractionSurfaceAsync_UsesActualLinkedScriptSelector() {
         using var server = TestServerCompat.CreateTestServer(async context => {
             if (context.Request.Path == "/app.js") {
@@ -181,5 +191,29 @@ public class HtmlParsingToolboxTests {
         HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
         Assert.Contains(formDelta.Added, item => item.Contains("returnUrl=/b", StringComparison.Ordinal));
         Assert.Contains(formDelta.Removed, item => item.Contains("returnUrl=/a", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CompareStaticRendered_DetectsFieldTypeChanges() {
+        HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
+            """<form id="wizard" method="post"><input type="hidden" name="csrf" value="abc"></form>""",
+            """<form id="wizard" method="post"><input type="text" name="csrf" value="abc"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
+        Assert.Contains(formDelta.Added, item => item.Contains("Text:csrf=abc", StringComparison.Ordinal));
+        Assert.Contains(formDelta.Removed, item => item.Contains("Hidden:csrf=abc", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CompareStaticRendered_DetectsCaseOnlyValueChanges() {
+        HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
+            """<form id="wizard" method="post"><input type="hidden" name="csrf" value="AbC123"></form>""",
+            """<form id="wizard" method="post"><input type="hidden" name="csrf" value="abc123"></form>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
+        Assert.Contains(formDelta.Added, item => item.Contains("csrf=abc123", StringComparison.Ordinal));
+        Assert.Contains(formDelta.Removed, item => item.Contains("csrf=AbC123", StringComparison.Ordinal));
     }
 }

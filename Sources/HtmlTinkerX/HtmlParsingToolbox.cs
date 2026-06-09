@@ -338,7 +338,7 @@ public static class HtmlParsingToolbox {
         if (Includes(filter, "Form")) {
             foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
                 string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-                string actionTarget = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri);
+                string actionTarget = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri, baseUri);
                 Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, CreateFormFieldSignatures(form.Fields), actionTarget, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
             }
         }
@@ -460,7 +460,7 @@ public static class HtmlParsingToolbox {
         Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
         foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
             string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-            string formUrl = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri);
+            string formUrl = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri, baseUri);
             AddSurface(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), formUrl, string.Empty, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex, false, string.Join(",", form.Fields.Select(static field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name))));
             foreach (HtmlFormField field in form.Fields.Where(static field => field.Type.ToString().Equals("Hidden", StringComparison.OrdinalIgnoreCase))) {
                 AddSurface(items, "Field", field.Name, string.Empty, string.Empty, field.Value, $"{CreateFormSelector(form.Metadata)} input[name='{EscapeAttributeValue(field.Name)}']", "Field", form.Metadata.FormIndex, false, "hidden");
@@ -694,14 +694,14 @@ public static class HtmlParsingToolbox {
         string[] kinds = { "Link", "Form", "JsonLd", "AppState", "ScriptData", "Token" };
         List<HtmlStaticRenderedDelta> deltas = new();
         foreach (string kind in kinds) {
-            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
-            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.Ordinal).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
+            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.Ordinal).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
             deltas.Add(new HtmlStaticRenderedDelta {
                 Kind = kind,
                 StaticCount = staticSignatures.Length,
                 RenderedCount = renderedSignatures.Length,
-                Added = renderedSignatures.Except(staticSignatures, StringComparer.OrdinalIgnoreCase).ToArray(),
-                Removed = staticSignatures.Except(renderedSignatures, StringComparer.OrdinalIgnoreCase).ToArray()
+                Added = renderedSignatures.Except(staticSignatures, StringComparer.Ordinal).ToArray(),
+                Removed = staticSignatures.Except(renderedSignatures, StringComparer.Ordinal).ToArray()
             });
         }
 
@@ -718,7 +718,7 @@ public static class HtmlParsingToolbox {
             : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
     private static string CreateFormSignature(HtmlDataItem item, Uri? baseUri) =>
-        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{ResolveFormActionValue(item.RawValue, baseUri)}|{SerializeValue(item.Value)}";
+        $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{ResolveFormActionValue(item.RawValue, baseUri, baseUri)}|{SerializeValue(item.Value)}";
 
     private static string CreateLinkSignature(HtmlDataItem item) =>
         $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{SerializeValue(item.Value)}";
@@ -753,18 +753,18 @@ public static class HtmlParsingToolbox {
         return HtmlModernParserUtilities.ResolveUrl(value, baseUri);
     }
 
-    private static string ResolveFormActionValue(string value, Uri? baseUri) {
+    private static string ResolveFormActionValue(string value, Uri? actionBaseUri, Uri? documentUri) {
         if (!string.IsNullOrWhiteSpace(value)) {
-            return ResolveUrlValue(value, baseUri);
+            return ResolveUrlValue(value, actionBaseUri);
         }
 
-        return baseUri?.AbsoluteUri ?? string.Empty;
+        return documentUri?.AbsoluteUri ?? string.Empty;
     }
 
     private static string[] CreateFormFieldSignatures(IEnumerable<HtmlFormField> fields) =>
         fields
             .Where(static field => !string.IsNullOrWhiteSpace(field.Name))
-            .Select(static field => $"{field.Name}={field.Value}")
+            .Select(static field => $"{field.Type}:{field.Name}={field.Value}")
             .ToArray();
 
     private static bool IsUrlValuedOpenGraphName(string name) {
