@@ -104,6 +104,30 @@ Describe 'HTML parsing toolbox cmdlets' {
         $state[0].Value | Should -Be 42
     }
 
+    It 'preserves case-distinct framework app-state keys' {
+        $html = @'
+<html><head>
+<script id="__NEXT_DATA__" type="application/json">
+{"props":{"pageProps":{"id":1,"ID":2}}}
+</script>
+</head></html>
+'@
+        $state = Select-HtmlJavaScriptConfig -Content $html -Name __NEXT_DATA__ -PropertyPath props.pageProps.id, props.pageProps.ID
+
+        ($state | Where-Object { $_.PropertyPath -ceq 'props.pageProps.id' }).Value | Should -Be 1
+        ($state | Where-Object { $_.PropertyPath -ceq 'props.pageProps.ID' }).Value | Should -Be 2
+    }
+
+    It 'does not duplicate assignment app-state matches when app-state parsing is enabled' {
+        $html = '<script>window.__INITIAL_STATE__ = { user: { name: "Ada" } };</script>'
+
+        $state = Select-HtmlJavaScriptConfig -Content $html -Name __INITIAL_STATE__ -PropertyPath user.name
+
+        $state | Should -HaveCount 1
+        $state[0].Source | Should -Be 'JavaScript'
+        $state[0].Value | Should -Be 'Ada'
+    }
+
     It 'keeps named JavaScript config searches tolerant' {
         $html = @'
 <html><body>
@@ -222,6 +246,19 @@ window.AppSettings = { feature: true };
 
         ($formDelta.Added -join '|') | Should -Match 'csrf=abc123'
         ($formDelta.Removed -join '|') | Should -Match 'csrf=AbC123'
+    }
+
+    It 'reports duplicate rendered links as added surface entries' {
+        $static = '<a href="/docs">Docs</a>'
+        $rendered = '<a href="/docs">Docs</a><a href="/docs">Docs</a>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $linkDelta = $comparison.Deltas | Where-Object Kind -EQ 'Link'
+
+        $linkDelta.StaticCount | Should -Be 1
+        $linkDelta.RenderedCount | Should -Be 2
+        $linkDelta.Added | Should -HaveCount 1
+        $linkDelta.Added[0] | Should -Match 'https://example.org/docs'
     }
 
     It 'does not report unchanged anonymous forms as removed when rendering inserts an earlier form' {

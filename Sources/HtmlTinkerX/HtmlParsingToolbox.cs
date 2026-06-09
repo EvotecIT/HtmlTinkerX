@@ -664,16 +664,45 @@ public static class HtmlParsingToolbox {
 
     private static void AddAppStateConfigMatches(HtmlAppStateEntry state, IReadOnlyList<string>? propertyPaths, List<HtmlJavaScriptConfigItem> items) {
         if (propertyPaths == null || propertyPaths.Count == 0) {
+            if (IsDuplicateJavaScriptAppStateMatch(state, null, items)) {
+                return;
+            }
+
             AddAppStateConfigMatch(state, null, state.RawJson, state.RawJson, items);
             return;
         }
 
         object? parsedValue = ParseJsonValue(state.RawJson);
         foreach (string propertyPath in propertyPaths) {
+            if (IsDuplicateJavaScriptAppStateMatch(state, propertyPath, items)) {
+                continue;
+            }
+
             object? value = HtmlJavaScriptAstUtilities.GetPropertyPathValue(parsedValue, propertyPath);
             AddAppStateConfigMatch(state, propertyPath, value, SerializeValue(value), items);
         }
     }
+
+    private static bool IsDuplicateJavaScriptAppStateMatch(HtmlAppStateEntry state, string? propertyPath, List<HtmlJavaScriptConfigItem> items) {
+        if (!IsAssignmentBackedAppState(state)) {
+            return false;
+        }
+
+        return items.Any(item =>
+            item.Source.Equals("JavaScript", StringComparison.OrdinalIgnoreCase)
+            && item.ScriptIndex == state.ScriptIndex
+            && string.Equals(item.PropertyPath, propertyPath, StringComparison.Ordinal)
+            && IsSameStatePath(item, state.Name));
+    }
+
+    private static bool IsAssignmentBackedAppState(HtmlAppStateEntry state) =>
+        state.SourceKind.Equals("Assignment", StringComparison.OrdinalIgnoreCase)
+        || state.SourceKind.Equals("VariableDeclaration", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSameStatePath(HtmlJavaScriptConfigItem item, string stateName) =>
+        item.Name.Equals(stateName, StringComparison.Ordinal)
+        || item.Path.Equals(stateName, StringComparison.Ordinal)
+        || item.Path.EndsWith("." + stateName, StringComparison.Ordinal);
 
     private static void AddAppStateConfigMatch(HtmlAppStateEntry state, string? propertyPath, object? value, string rawValue, List<HtmlJavaScriptConfigItem> items) {
         items.Add(new HtmlJavaScriptConfigItem {
@@ -694,18 +723,38 @@ public static class HtmlParsingToolbox {
         string[] kinds = { "Link", "Form", "JsonLd", "AppState", "ScriptData", "Token" };
         List<HtmlStaticRenderedDelta> deltas = new();
         foreach (string kind in kinds) {
-            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.Ordinal).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
-            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).Distinct(StringComparer.Ordinal).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
+            string[] staticSignatures = staticItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
+            string[] renderedSignatures = renderedItems.Where(item => item.Kind == kind).Select(item => CreateSignature(item, baseUri)).OrderBy(static item => item, StringComparer.Ordinal).ToArray();
             deltas.Add(new HtmlStaticRenderedDelta {
                 Kind = kind,
                 StaticCount = staticSignatures.Length,
                 RenderedCount = renderedSignatures.Length,
-                Added = renderedSignatures.Except(staticSignatures, StringComparer.Ordinal).ToArray(),
-                Removed = staticSignatures.Except(renderedSignatures, StringComparer.Ordinal).ToArray()
+                Added = ExceptByMultiplicity(renderedSignatures, staticSignatures),
+                Removed = ExceptByMultiplicity(staticSignatures, renderedSignatures)
             });
         }
 
         return deltas;
+    }
+
+    private static string[] ExceptByMultiplicity(IEnumerable<string> source, IEnumerable<string> subtract) {
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
+        foreach (string item in subtract) {
+            counts.TryGetValue(item, out int count);
+            counts[item] = count + 1;
+        }
+
+        List<string> result = new();
+        foreach (string item in source) {
+            if (counts.TryGetValue(item, out int count) && count > 0) {
+                counts[item] = count - 1;
+                continue;
+            }
+
+            result.Add(item);
+        }
+
+        return result.ToArray();
     }
 
     private static string CreateSignature(HtmlDataItem item, Uri? baseUri) =>
@@ -887,7 +936,7 @@ public static class HtmlParsingToolbox {
     private static object? ConvertJsonElement(JsonElement element) {
         switch (element.ValueKind) {
             case JsonValueKind.Object:
-                Dictionary<string, object?> properties = new(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, object?> properties = new();
                 foreach (JsonProperty property in element.EnumerateObject()) {
                     properties[property.Name] = ConvertJsonElement(property.Value);
                 }

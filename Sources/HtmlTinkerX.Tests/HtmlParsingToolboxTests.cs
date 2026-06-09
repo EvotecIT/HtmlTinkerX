@@ -170,6 +170,35 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public void SelectJavaScriptConfig_PreservesCaseDistinctAppStateKeys() {
+        string html = """<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"id":1,"ID":2}}}</script>""";
+
+        IReadOnlyList<HtmlJavaScriptConfigItem> items = HtmlParsingToolbox.SelectJavaScriptConfig(
+            html,
+            new[] { "__NEXT_DATA__" },
+            propertyPaths: new[] { "props.pageProps.id", "props.pageProps.ID" });
+
+        HtmlJavaScriptConfigItem lower = Assert.Single(items, item => item.PropertyPath == "props.pageProps.id");
+        HtmlJavaScriptConfigItem upper = Assert.Single(items, item => item.PropertyPath == "props.pageProps.ID");
+        Assert.Equal(1L, lower.Value);
+        Assert.Equal(2L, upper.Value);
+    }
+
+    [Fact]
+    public void SelectJavaScriptConfig_DoesNotDuplicateAssignmentAppStateMatches() {
+        string html = """<script>window.__INITIAL_STATE__ = { user: { name: "Ada" } };</script>""";
+
+        IReadOnlyList<HtmlJavaScriptConfigItem> items = HtmlParsingToolbox.SelectJavaScriptConfig(
+            html,
+            new[] { "__INITIAL_STATE__" },
+            propertyPaths: new[] { "user.name" });
+
+        HtmlJavaScriptConfigItem item = Assert.Single(items);
+        Assert.Equal("JavaScript", item.Source);
+        Assert.Equal("Ada", item.Value);
+    }
+
+    [Fact]
     public void CompareStaticRendered_ResolvesFormActionsInSignatures() {
         HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
             """<form id="login" method="post" action="/login"><input name="user"></form>""",
@@ -215,5 +244,20 @@ public class HtmlParsingToolboxTests {
         HtmlStaticRenderedDelta formDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Form");
         Assert.Contains(formDelta.Added, item => item.Contains("csrf=abc123", StringComparison.Ordinal));
         Assert.Contains(formDelta.Removed, item => item.Contains("csrf=AbC123", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CompareStaticRendered_DetectsDuplicatedRenderedLinks() {
+        HtmlStaticRenderedComparison comparison = HtmlParsingToolbox.CompareStaticRendered(
+            """<a href="/docs">Docs</a>""",
+            """<a href="/docs">Docs</a><a href="/docs">Docs</a>""",
+            new Uri("https://example.org/app/page"));
+
+        HtmlStaticRenderedDelta linkDelta = Assert.Single(comparison.Deltas, delta => delta.Kind == "Link");
+        Assert.Equal(1, linkDelta.StaticCount);
+        Assert.Equal(2, linkDelta.RenderedCount);
+        Assert.Single(linkDelta.Added);
+        Assert.Empty(linkDelta.Removed);
+        Assert.Contains("https://example.org/docs", linkDelta.Added[0], StringComparison.Ordinal);
     }
 }
