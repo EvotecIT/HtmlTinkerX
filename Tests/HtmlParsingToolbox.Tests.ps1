@@ -167,6 +167,33 @@ Describe 'HTML parsing toolbox cmdlets' {
         ($form.Fields | Where-Object Name -EQ 'tier').Value | Should -Be 'basic'
     }
 
+    It 'preserves empty selected option values when parsing forms' {
+        $html = @'
+<form id="plan">
+  <select name="tier">
+    <option value="basic">Basic</option>
+    <option value="" selected>None</option>
+  </select>
+</form>
+'@
+        $form = ConvertFrom-HtmlForm -Content $html
+
+        ($form.Fields | Where-Object Name -EQ 'tier').Value | Should -Be ''
+    }
+
+    It 'returns default checkbox and radio values when no value attribute is present' {
+        $html = @'
+<form id="prefs">
+  <input type="checkbox" name="remember" checked>
+  <input type="radio" name="mode" checked>
+</form>
+'@
+        $form = ConvertFrom-HtmlForm -Content $html
+
+        ($form.Fields | Where-Object Name -EQ 'remember').Value | Should -Be 'on'
+        ($form.Fields | Where-Object Name -EQ 'mode').Value | Should -Be 'on'
+    }
+
     It 'keeps configured HTTP defaults when page credentials are used' {
         try {
             [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = [TimeSpan]::FromSeconds(7)
