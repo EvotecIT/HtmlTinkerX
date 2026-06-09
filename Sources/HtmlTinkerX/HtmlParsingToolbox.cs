@@ -1,7 +1,9 @@
+using Acornima;
 using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -377,21 +379,7 @@ public static class HtmlParsingToolbox {
         bool effectiveContains = names == null || names.Count == 0 || contains;
         List<HtmlJavaScriptConfigItem> items = new();
 
-        foreach (HtmlJavaScriptVariableMatch match in HtmlJavaScriptVariableSelector.SelectHtml(html, effectiveNames, effectiveContains, startsWith, false, propertyPaths, tolerant)) {
-            items.Add(new HtmlJavaScriptConfigItem {
-                Index = items.Count,
-                Name = match.Name,
-                Path = match.Path,
-                Kind = match.Kind,
-                PropertyPath = match.PropertyPath,
-                Value = match.Value,
-                RawValue = match.RawValue ?? SerializeValue(match.Value),
-                ScriptIndex = match.ScriptIndex,
-                ScriptType = match.ScriptType,
-                Selector = match.ScriptIndex.HasValue ? $"script:nth-of-type({match.ScriptIndex.Value + 1})" : "script",
-                Source = "JavaScript"
-            });
-        }
+        AddJavaScriptConfigMatches(html, effectiveNames, effectiveContains, startsWith, propertyPaths, tolerant, items);
 
         if (includeAppState) {
             foreach (HtmlAppStateEntry state in HtmlAppStateParser.Parse(html)) {
@@ -464,8 +452,9 @@ public static class HtmlParsingToolbox {
     /// <param name="baseUri">Optional page URL used for linked script downloads and relative URL context.</param>
     /// <param name="includeLinkedScripts">Downloads and inspects linked JavaScript files when a base URI is available.</param>
     /// <param name="includeExternalLinkedScripts">Allows cross-origin linked JavaScript downloads.</param>
+    /// <param name="client">Optional HTTP client reused for linked JavaScript downloads, including caller-specified proxy settings.</param>
     /// <returns>Interaction surface records in source-family order.</returns>
-    public static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri = null, bool includeLinkedScripts = false, bool includeExternalLinkedScripts = false) {
+    public static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri = null, bool includeLinkedScripts = false, bool includeExternalLinkedScripts = false, HttpClient? client = null) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -475,7 +464,7 @@ public static class HtmlParsingToolbox {
             string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
             AddSurface(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Action, string.Empty, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex, false, string.Join(",", form.Fields.Select(static field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name))));
             foreach (HtmlFormField field in form.Fields.Where(static field => field.Type.ToString().Equals("Hidden", StringComparison.OrdinalIgnoreCase))) {
-                AddSurface(items, "Field", field.Name, string.Empty, string.Empty, string.Empty, $"{CreateFormSelector(form.Metadata)} input[name='{EscapeAttributeValue(field.Name)}']", "Field", form.Metadata.FormIndex, false, "hidden");
+                AddSurface(items, "Field", field.Name, string.Empty, string.Empty, field.Value, $"{CreateFormSelector(form.Metadata)} input[name='{EscapeAttributeValue(field.Name)}']", "Field", form.Metadata.FormIndex, false, "hidden");
             }
         }
 
@@ -488,7 +477,7 @@ public static class HtmlParsingToolbox {
         }
 
         if (includeLinkedScripts && baseUri != null) {
-            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts).ConfigureAwait(false)) {
+            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, client).ConfigureAwait(false)) {
                 string metadata = FirstNonEmpty(endpoint.Error, endpoint.OperationName, endpoint.Client, endpoint.ScriptUrl);
                 AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, $"script:nth-of-type({endpoint.ScriptIndex + 1})", "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
             }
@@ -562,6 +551,64 @@ public static class HtmlParsingToolbox {
             Error = error
         };
     }
+
+    private static void AddJavaScriptConfigMatches(
+        string html,
+        IReadOnlyList<string> names,
+        bool contains,
+        bool startsWith,
+        IReadOnlyList<string>? propertyPaths,
+        bool tolerant,
+        List<HtmlJavaScriptConfigItem> items) {
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        int scriptIndex = 0;
+        foreach (IElement script in document.QuerySelectorAll("script")) {
+            string type = script.GetAttribute("type") ?? string.Empty;
+            if (!HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(type)) {
+                scriptIndex++;
+                continue;
+            }
+
+            string content = script.TextContent ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(content)) {
+                scriptIndex++;
+                continue;
+            }
+
+            IReadOnlyList<HtmlJavaScriptVariableMatch> matches;
+            try {
+                matches = HtmlJavaScriptVariableSelector.SelectJavaScript(content, names, contains, startsWith, false, propertyPaths, tolerant, scriptIndex, type, IsJavaScriptModuleType(type));
+            } catch (Exception ex) when (IsRecoverableJavaScriptParseException(ex)) {
+                scriptIndex++;
+                continue;
+            }
+
+            foreach (HtmlJavaScriptVariableMatch match in matches) {
+                items.Add(new HtmlJavaScriptConfigItem {
+                    Index = items.Count,
+                    Name = match.Name,
+                    Path = match.Path,
+                    Kind = match.Kind,
+                    PropertyPath = match.PropertyPath,
+                    Value = match.Value,
+                    RawValue = match.RawValue ?? SerializeValue(match.Value),
+                    ScriptIndex = match.ScriptIndex,
+                    ScriptType = match.ScriptType,
+                    Selector = match.ScriptIndex.HasValue ? $"script:nth-of-type({match.ScriptIndex.Value + 1})" : "script",
+                    Source = "JavaScript"
+                });
+            }
+
+            scriptIndex++;
+        }
+    }
+
+    private static bool IsRecoverableJavaScriptParseException(Exception exception) =>
+        exception is ParseErrorException ||
+        exception.GetType().Name.Equals("SyntaxErrorException", StringComparison.Ordinal);
+
+    private static bool IsJavaScriptModuleType(string? type) =>
+        (type ?? string.Empty).Split(';')[0].Trim().Equals("module", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<HtmlStaticRenderedDelta> CreateDeltas(IReadOnlyList<HtmlDataItem> staticItems, IReadOnlyList<HtmlDataItem> renderedItems) {
         string[] kinds = { "Link", "Form", "JsonLd", "AppState", "ScriptData", "Token" };

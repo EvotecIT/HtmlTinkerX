@@ -112,10 +112,10 @@ public sealed class CmdletCompareHtmlStaticRendered : AsyncPSCmdlet {
                     await HtmlUtilities.ReadFileCheckedAsync(StaticPath.ToFullPath()).ConfigureAwait(false),
                     await HtmlUtilities.ReadFileCheckedAsync(RenderedPath.ToFullPath()).ConfigureAwait(false));
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                string? user = Credential?.UserName ?? Username;
+                string? pass = Credential?.GetNetworkCredential().Password ?? Password;
+                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password)) {
                     string staticHtml = await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
-                    string? user = Credential?.UserName ?? Username;
-                    string? pass = Credential?.GetNetworkCredential().Password ?? Password;
                     string? proxyUser = ProxyCredential?.UserName;
                     string? proxyPass = ProxyCredential?.GetNetworkCredential().Password;
                     using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);

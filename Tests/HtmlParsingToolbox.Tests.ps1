@@ -27,6 +27,7 @@ Describe 'HTML parsing toolbox cmdlets' {
         <a href="/docs">Docs</a>
         <form id="login" data-mode="login" method="post" action="/api/login">
             <input type="hidden" name="csrfToken" value="form-token" />
+            <input type="hidden" name="returnUrl" value="/dashboard" />
             <input type="text" name="user" />
         </form>
     </main>
@@ -83,6 +84,19 @@ Describe 'HTML parsing toolbox cmdlets' {
         $state.Name | Should -Contain '__INITIAL_STATE__'
     }
 
+    It 'keeps named JavaScript config searches tolerant' {
+        $html = @'
+<html><body>
+<script>if (</script>
+<script>window.__CONFIG__ = { api: { baseUrl: "/api" } };</script>
+</body></html>
+'@
+        $config = Select-HtmlJavaScriptConfig -Content $html -Name window.__CONFIG__ -PropertyPath api.baseUrl
+
+        $config | Should -HaveCount 1
+        $config[0].Value | Should -Be '/api'
+    }
+
     It 'reports CSS selector usage against HTML' {
         $usage = Select-HtmlStyleUsage -Content $script:Html
 
@@ -96,6 +110,7 @@ Describe 'HTML parsing toolbox cmdlets' {
 
         ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain '/api/login'
         ($surface | Where-Object Kind -EQ 'Field').Name | Should -Contain 'csrfToken'
+        ($surface | Where-Object { $_.Kind -eq 'Field' -and $_.Name -eq 'returnUrl' }).Value | Should -Be '/dashboard'
         ($surface | Where-Object Kind -EQ 'Token').Value | Should -Contain 'form-token'
         ($surface | Where-Object Kind -EQ 'Endpoint').Url | Should -Contain '/api/profile'
         ($surface | Where-Object Kind -EQ 'Endpoint').Method | Should -Contain 'POST'

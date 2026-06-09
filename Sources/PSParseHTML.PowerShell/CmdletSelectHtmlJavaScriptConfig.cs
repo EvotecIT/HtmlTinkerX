@@ -100,7 +100,7 @@ public sealed class CmdletSelectHtmlJavaScriptConfig : AsyncPSCmdlet {
             StartsWith.IsPresent,
             PropertyPath,
             includeAppState: !NoAppState.IsPresent,
-            tolerant: Tolerant.IsPresent || Name == null || Name.Length == 0).ToArray(), true);
+            tolerant: true).ToArray(), true);
     }
 
     private async Task<string> ReadHtmlAsync() {

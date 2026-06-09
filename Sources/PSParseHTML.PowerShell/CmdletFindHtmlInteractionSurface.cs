@@ -73,23 +73,22 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        string html = await ReadHtmlAsync().ConfigureAwait(false);
+        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        string html = await ReadHtmlAsync(client).ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);
         if (IncludeLinkedScripts.IsPresent && baseUri == null) {
             throw new PSArgumentException("-BaseUrl is required when -IncludeLinkedScripts is used with -Content, -Path, or HtmlNode input.");
         }
 
-        WriteObject((await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, IncludeLinkedScripts.IsPresent, IncludeExternalLinkedScripts.IsPresent).ConfigureAwait(false)).ToArray(), true);
+        WriteObject((await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, IncludeLinkedScripts.IsPresent, IncludeExternalLinkedScripts.IsPresent, client).ConfigureAwait(false)).ToArray(), true);
     }
 
-    private async Task<string> ReadHtmlAsync() {
+    private async Task<string> ReadHtmlAsync(HttpClient client) {
         switch (ParameterSetName) {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
-                    return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
-                }
+                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
             case ParameterSetNode:
                 return HtmlPipelineInput.ToHtmlMarkup(HtmlNode);
             default:

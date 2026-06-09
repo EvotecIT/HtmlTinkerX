@@ -51,7 +51,8 @@ public static class HtmlParserFromForm {
                 string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
                 result.Fields.Add(new HtmlFormField {
                     Name = nameValue,
-                    Type = MapType(type)
+                    Type = MapType(type),
+                    Value = field.GetAttribute("value") ?? field.TextContent ?? string.Empty
                 });
             }
             results.Add(result);
