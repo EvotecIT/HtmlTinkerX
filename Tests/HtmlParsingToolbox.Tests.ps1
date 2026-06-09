@@ -199,6 +199,25 @@ window.AppSettings = { feature: true };
         ($items | Where-Object Kind -EQ 'Link').Value | Should -Contain 'https://example.org/app/docs'
     }
 
+    It 'resolves selected links against absolute document base elements without BaseUrl' {
+        $html = '<html><head><base href="https://example.org/app/"></head><body><a href="docs">Docs</a></body></html>'
+
+        $items = Select-HtmlData -Content $html -Kind Link
+
+        ($items | Where-Object Kind -EQ 'Link').Value | Should -Contain 'https://example.org/app/docs'
+    }
+
+    It 'does not report unchanged links when rendered markup normalizes href values' {
+        $static = '<a href="/docs">Docs</a>'
+        $rendered = '<a href="https://example.org/docs">Docs</a>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered -BaseUrl 'https://example.org/app/page'
+        $linkDelta = $comparison.Deltas | Where-Object Kind -EQ 'Link'
+
+        $linkDelta.Added | Should -BeNullOrEmpty
+        $linkDelta.Removed | Should -BeNullOrEmpty
+    }
+
     It 'returns submitted selected option values when parsing forms' {
         $html = @'
 <form id="plan">

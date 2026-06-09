@@ -703,12 +703,17 @@ public static class HtmlParsingToolbox {
     private static string CreateSignature(HtmlDataItem item) =>
         item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)
             ? CreateFormSignature(item)
+            : item.Kind.Equals("Link", StringComparison.OrdinalIgnoreCase)
+                ? CreateLinkSignature(item)
             : IsScriptBackedDataKind(item.Kind)
                 ? CreateScriptBackedDataSignature(item)
             : $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
     private static string CreateFormSignature(HtmlDataItem item) =>
         $"{item.Kind}|{FirstNonEmpty(item.Id, IsPositionalFormName(item.Name) ? null : item.Name)}|{item.Type}|{item.RawValue}|{SerializeValue(item.Value)}";
+
+    private static string CreateLinkSignature(HtmlDataItem item) =>
+        $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{SerializeValue(item.Value)}";
 
     private static string CreateScriptBackedDataSignature(HtmlDataItem item) =>
         $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}";
@@ -723,7 +728,13 @@ public static class HtmlParsingToolbox {
 
     private static Uri? GetEffectiveBaseUri(string html, Uri? baseUri) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        return HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
+        Uri? effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
+        if (effectiveBaseUri != null) {
+            return effectiveBaseUri;
+        }
+
+        string? documentBase = document.QuerySelector("base[href]")?.GetAttribute("href");
+        return Uri.TryCreate(documentBase, UriKind.Absolute, out Uri? absoluteBaseUri) ? absoluteBaseUri : null;
     }
 
     private static int GetTextLength(string html) {
