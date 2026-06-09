@@ -99,6 +99,25 @@ const csrfToken = "script-token";
         $objects[0].name | Should -Be 'Widget'
     }
 
+    It 'emits parsed JSON-LD objects when tolerant JSON syntax is accepted' {
+        $html = @'
+<html><head>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"Product",
+  "name":"Widget",
+  // accepted by the JSON-LD parser options
+}
+</script>
+</head></html>
+'@
+        $objects = ConvertFrom-HtmlJsonLd -Content $html -AsObject
+
+        $objects | Should -HaveCount 1
+        $objects[0].name | Should -Be 'Widget'
+    }
+
     It 'extracts app state' {
         $state = ConvertFrom-HtmlAppState -Content $script:Html
 

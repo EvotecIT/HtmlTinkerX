@@ -30,6 +30,10 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
+    private static readonly JsonDocumentOptions JsonOptions = new() {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip
+    };
 
     /// <summary>HTML content to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
@@ -143,7 +147,7 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
 
     private static object? ConvertRawJsonToObject(HtmlJsonLdItem item) {
         try {
-            using JsonDocument document = JsonDocument.Parse(item.RawJson);
+            using JsonDocument document = JsonDocument.Parse(item.RawJson, JsonOptions);
             return ConvertJsonElement(document.RootElement);
         } catch (JsonException) {
             return item.RawJson;
