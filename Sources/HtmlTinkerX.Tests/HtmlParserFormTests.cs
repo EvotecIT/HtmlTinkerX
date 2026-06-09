@@ -35,4 +35,21 @@ public class HtmlParserFormTests {
     public void ParseFormsWithAngleSharp_NullHtml_Throws() {
         Assert.Throws<ArgumentNullException>(() => HtmlParser.ParseFormsWithAngleSharp(null!));
     }
+
+    [Fact]
+    public void ParseFormsWithAngleSharp_DoesNotSubmitUncheckedCheckboxOrRadioValues() {
+        string html = """
+            <form id="prefs">
+              <input type="checkbox" name="remember">
+              <input type="radio" name="mode" value="advanced">
+              <input type="checkbox" name="enabled" checked>
+            </form>
+            """;
+
+        var form = Assert.Single(HtmlParser.ParseFormsWithAngleSharp(html));
+
+        Assert.Equal(string.Empty, form.Fields.Single(field => field.Name == "remember").Value);
+        Assert.Equal(string.Empty, form.Fields.Single(field => field.Name == "mode").Value);
+        Assert.Equal("on", form.Fields.Single(field => field.Name == "enabled").Value);
+    }
 }

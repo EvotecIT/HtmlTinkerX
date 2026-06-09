@@ -288,12 +288,16 @@ window.AppSettings = { feature: true };
 <form id="prefs">
   <input type="checkbox" name="remember" checked>
   <input type="radio" name="mode" checked>
+  <input type="checkbox" name="notify">
+  <input type="radio" name="level" value="advanced">
 </form>
 '@
         $form = ConvertFrom-HtmlForm -Content $html
 
         ($form.Fields | Where-Object Name -EQ 'remember').Value | Should -Be 'on'
         ($form.Fields | Where-Object Name -EQ 'mode').Value | Should -Be 'on'
+        ($form.Fields | Where-Object Name -EQ 'notify').Value | Should -Be ''
+        ($form.Fields | Where-Object Name -EQ 'level').Value | Should -Be ''
     }
 
     It 'keeps configured HTTP defaults when page credentials are used' {

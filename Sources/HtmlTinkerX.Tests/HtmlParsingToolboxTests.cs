@@ -75,6 +75,47 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public async Task FindInteractionSurfaceAsync_UsesPageBaseOnceForRelativeDocumentBase() {
+        List<string> requestedPaths = new();
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            requestedPaths.Add(context.Request.Path.Value ?? string.Empty);
+            if (context.Request.Path == "/app/assets/app.js") {
+                await context.Response.WriteAsync("""fetch("/api/from-relative-base");""");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        using var client = server.CreateClient();
+        string html = """<base href="assets/"><script src="app.js"></script>""";
+
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            html,
+            new Uri(server.BaseAddress, "app/page"),
+            includeLinkedScripts: true,
+            includeExternalLinkedScripts: false,
+            client);
+
+        HtmlInteractionSurfaceItem endpoint = Assert.Single(surfaces, item => item.Kind == "LinkedEndpoint");
+        Assert.Equal("/api/from-relative-base", endpoint.Url);
+        Assert.Contains("/app/assets/app.js", requestedPaths);
+        Assert.DoesNotContain("/app/assets/assets/app.js", requestedPaths);
+    }
+
+    [Fact]
+    public async Task FindInteractionSurfaceAsync_KeepsExternalChecksAnchoredToPageBase() {
+        string html = """<base href="https://cdn.example.net/assets/"><script src="app.js"></script>""";
+
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            html,
+            new Uri("https://example.org/app/page"),
+            includeLinkedScripts: true,
+            includeExternalLinkedScripts: false);
+
+        Assert.DoesNotContain(surfaces, item => item.Kind == "LinkedEndpoint");
+    }
+
+    [Fact]
     public void SelectData_ResolvesHeadLinksAgainstAbsoluteDocumentBase() {
         string html = """<html><head><base href="https://example.org/app/"><link rel="canonical" href="docs"></head></html>""";
 

@@ -42,15 +42,19 @@ internal static class HtmlFormFieldUtilities {
             return field.TextContent ?? string.Empty;
         }
 
-        string? value = field.GetAttribute("value");
-        if (value != null) {
-            return value;
-        }
-
         string type = field.GetAttribute("type") ?? string.Empty;
         if (field.NodeName.Equals("input", StringComparison.OrdinalIgnoreCase)
             && (type.Equals("checkbox", StringComparison.OrdinalIgnoreCase) || type.Equals("radio", StringComparison.OrdinalIgnoreCase))) {
-            return "on";
+            if (!field.HasAttribute("checked")) {
+                return string.Empty;
+            }
+
+            return field.GetAttribute("value") ?? "on";
+        }
+
+        string? value = field.GetAttribute("value");
+        if (value != null) {
+            return value;
         }
 
         return field.TextContent ?? string.Empty;

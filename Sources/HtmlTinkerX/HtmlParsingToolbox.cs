@@ -473,7 +473,8 @@ public static class HtmlParsingToolbox {
         }
 
         if (includeLinkedScripts && effectiveBaseUri != null) {
-            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, effectiveBaseUri, includeExternalLinkedScripts, client).ConfigureAwait(false)) {
+            Uri linkedScriptPageBaseUri = baseUri ?? effectiveBaseUri;
+            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, linkedScriptPageBaseUri, includeExternalLinkedScripts, client, effectiveBaseUri).ConfigureAwait(false)) {
                 string metadata = FirstNonEmpty(endpoint.Error, endpoint.OperationName, endpoint.Client, endpoint.ScriptUrl);
                 AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, endpoint.Selector, "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
             }
