@@ -300,14 +300,15 @@ public static class HtmlParsingToolbox {
         }
 
         if (Includes(filter, "HeadLink")) {
-            foreach (HtmlHeadLink item in HtmlHeadLinkParser.Parse(html, baseUri)) {
+            foreach (HtmlHeadLink item in HtmlHeadLinkParser.Parse(html, baseUri, effectiveBaseUri)) {
                 Add(items, "HeadLink", FirstNonEmpty(item.Rel, item.Name, item.Property, item.Element), item.Type, null, FirstNonEmpty(item.Url, item.Href, item.Content), FirstNonEmpty(item.Href, item.Content, item.Url), item.Selector, item.Element, item.Index);
             }
         }
 
         if (Includes(filter, "Meta")) {
             foreach (HtmlMetaTag item in HtmlParser.ParseMetaTags(html)) {
-                Add(items, "Meta", item.Name, null, null, item.Content, item.Content, CreateAttributeSelector("meta", "name", item.Name), "Meta", null);
+                string attribute = FirstNonEmpty(item.SourceAttribute, "name");
+                Add(items, "Meta", item.Name, null, null, item.Content, item.Content, CreateAttributeSelector("meta", attribute, item.Name), "Meta", null);
             }
         }
 
@@ -468,7 +469,7 @@ public static class HtmlParsingToolbox {
         }
 
         foreach (HtmlJavaScriptEndpoint endpoint in HtmlJavaScriptEndpointParser.ParseHtml(html)) {
-            AddSurface(items, "Endpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url), endpoint.Method, endpoint.Url, string.Empty, "script", "InlineScript", endpoint.Index, false, endpoint.Client);
+            AddSurface(items, "Endpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url), endpoint.Method, endpoint.Url, string.Empty, FirstNonEmpty(endpoint.Selector, "script"), "InlineScript", endpoint.ScriptIndex ?? endpoint.Index, false, endpoint.Client);
         }
 
         if (includeLinkedScripts && effectiveBaseUri != null) {
@@ -741,7 +742,7 @@ public static class HtmlParsingToolbox {
     }
 
     private static string ResolveUrlValue(string value, Uri? baseUri) {
-        if (string.IsNullOrWhiteSpace(value) || baseUri == null || Uri.TryCreate(value, UriKind.Absolute, out _)) {
+        if (string.IsNullOrWhiteSpace(value) || baseUri == null) {
             return value;
         }
 

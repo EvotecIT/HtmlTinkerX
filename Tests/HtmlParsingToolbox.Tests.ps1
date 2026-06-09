@@ -58,6 +58,7 @@ Describe 'HTML parsing toolbox cmdlets' {
         ($items | Where-Object Kind -EQ 'OpenGraph').Name | Should -Contain 'title'
         ($items | Where-Object Kind -EQ 'HeadLink').Value | Should -Contain 'https://example.org/toolbox'
         ($items | Where-Object { $_.Kind -eq 'HeadLink' -and $_.Name -eq 'canonical' }).Selector | Should -Be 'link:nth-of-type(1)'
+        ($items | Where-Object { $_.Kind -eq 'Meta' -and $_.Name -eq 'og:title' }).Selector | Should -Be "meta[property='og:title']"
         ($items | Where-Object Kind -EQ 'ScriptData').Name | Should -Contain 'settings'
         ($items | Where-Object Kind -EQ 'AppState').Name | Should -Contain '__INITIAL_STATE__'
         ($items | Where-Object Kind -EQ 'Token').Value | Should -Contain 'form-token'
@@ -147,6 +148,8 @@ window.AppSettings = { feature: true };
         ($surface | Where-Object Kind -EQ 'Token').Value | Should -Contain 'form-token'
         ($surface | Where-Object Kind -EQ 'Endpoint').Url | Should -Contain '/api/profile'
         ($surface | Where-Object Kind -EQ 'Endpoint').Method | Should -Contain 'POST'
+        ($surface | Where-Object Kind -EQ 'Endpoint').Selector | Should -Contain 'script:nth-of-type(3)'
+        ($surface | Where-Object Kind -EQ 'Endpoint').SourceIndex | Should -Contain 2
     }
 
     It 'compares static and rendered HTML signatures' {
@@ -206,6 +209,14 @@ window.AppSettings = { feature: true };
         $items = Select-HtmlData -Content $html -Kind Link
 
         ($items | Where-Object Kind -EQ 'Link').Value | Should -Contain 'https://example.org/app/docs'
+    }
+
+    It 'resolves selected head links against absolute document base elements without BaseUrl' {
+        $html = '<html><head><base href="https://example.org/app/"><link rel="canonical" href="docs"></head></html>'
+
+        $items = Select-HtmlData -Content $html -Kind HeadLink
+
+        ($items | Where-Object Kind -EQ 'HeadLink').Value | Should -Contain 'https://example.org/app/docs'
     }
 
     It 'does not report unchanged links when rendered markup normalizes href values' {

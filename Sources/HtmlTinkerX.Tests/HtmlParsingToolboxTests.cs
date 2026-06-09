@@ -40,6 +40,18 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public async Task FindInteractionSurfaceAsync_UsesActualInlineScriptSelector() {
+        string html = """<script>console.log("inline")</script><script>fetch("/api/items", { method: "POST" });</script>""";
+
+        IReadOnlyList<HtmlInteractionSurfaceItem> surfaces = await HtmlParsingToolbox.FindInteractionSurfaceAsync(html);
+
+        HtmlInteractionSurfaceItem endpoint = Assert.Single(surfaces, item => item.Kind == "Endpoint");
+        Assert.Equal("script:nth-of-type(2)", endpoint.Selector);
+        Assert.Equal(1, endpoint.SourceIndex);
+        Assert.Equal("/api/items", endpoint.Url);
+    }
+
+    [Fact]
     public async Task FindInteractionSurfaceAsync_UsesAbsoluteDocumentBaseForLinkedScripts() {
         using var server = TestServerCompat.CreateTestServer(async context => {
             if (context.Request.Path == "/assets/app.js") {
@@ -60,6 +72,27 @@ public class HtmlParsingToolboxTests {
 
         HtmlInteractionSurfaceItem endpoint = Assert.Single(surfaces, item => item.Kind == "LinkedEndpoint");
         Assert.Equal("/api/from-base", endpoint.Url);
+    }
+
+    [Fact]
+    public void SelectData_ResolvesHeadLinksAgainstAbsoluteDocumentBase() {
+        string html = """<html><head><base href="https://example.org/app/"><link rel="canonical" href="docs"></head></html>""";
+
+        IReadOnlyList<HtmlDataItem> items = HtmlParsingToolbox.SelectData(html, new[] { "HeadLink" });
+
+        HtmlDataItem item = Assert.Single(items);
+        Assert.Equal("https://example.org/app/docs", item.Value);
+    }
+
+    [Fact]
+    public void SelectData_UsesMetaSourceAttributeInSelectors() {
+        string html = """<html><head><meta property="twitter:title" content="Docs"></head></html>""";
+
+        IReadOnlyList<HtmlDataItem> items = HtmlParsingToolbox.SelectData(html, new[] { "Meta" });
+
+        HtmlDataItem item = Assert.Single(items);
+        Assert.Equal("twitter:title", item.Name);
+        Assert.Equal("meta[property='twitter:title']", item.Selector);
     }
 
     [Fact]

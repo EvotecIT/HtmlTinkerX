@@ -29,16 +29,26 @@ public static class HtmlParserFromMeta {
         var nodes = document.QuerySelectorAll("meta");
         List<HtmlMetaTag> result = new();
         foreach (var node in nodes) {
-            string name = node.GetAttribute("name") ?? node.GetAttribute("property") ?? string.Empty;
+            string sourceAttribute = GetSourceAttribute(node);
+            string name = sourceAttribute.Length > 0 ? node.GetAttribute(sourceAttribute) ?? string.Empty : string.Empty;
             string content = node.GetAttribute("content") ?? string.Empty;
             if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(content)) {
                 result.Add(new HtmlMetaTag {
                     Name = name,
+                    SourceAttribute = sourceAttribute,
                     Content = content
                 });
             }
         }
         return result;
+    }
+
+    private static string GetSourceAttribute(IElement node) {
+        if (node.HasAttribute("name")) return "name";
+        if (node.HasAttribute("property")) return "property";
+        if (node.HasAttribute("itemprop")) return "itemprop";
+        if (node.HasAttribute("http-equiv")) return "http-equiv";
+        return string.Empty;
     }
 
     /// <summary>
