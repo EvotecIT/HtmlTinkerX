@@ -140,7 +140,7 @@ window.AppSettings = { feature: true };
     It 'finds forms, tokens, and inline JavaScript endpoints as interaction surfaces' {
         $surface = Find-HtmlInteractionSurface -Content $script:Html
 
-        ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain '/api/login'
+        ($surface | Where-Object Kind -EQ 'Form').Url | Should -Contain 'https://example.org/api/login'
         ($surface | Where-Object Kind -EQ 'Field').Name | Should -Contain 'csrfToken'
         ($surface | Where-Object { $_.Kind -eq 'Field' -and $_.Name -eq 'returnUrl' }).Value | Should -Be '/dashboard'
         ($surface | Where-Object Kind -EQ 'Token').Value | Should -Contain 'form-token'

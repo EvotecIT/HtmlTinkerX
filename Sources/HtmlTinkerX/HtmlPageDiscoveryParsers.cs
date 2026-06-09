@@ -25,6 +25,7 @@ public sealed class HtmlScriptDataItem {
 public sealed class HtmlLinkedJavaScriptEndpoint {
     public int Index { get; set; }
     public int ScriptIndex { get; set; }
+    public string Selector { get; set; } = string.Empty;
     public string ScriptUrl { get; set; } = string.Empty;
     public bool IsExternal { get; set; }
     public bool IsDownloaded { get; set; }
@@ -182,7 +183,12 @@ public static class HtmlLinkedJavaScriptEndpointParser {
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         List<HtmlLinkedJavaScriptEndpoint> endpoints = new();
         int scriptIndex = 0;
-        foreach (IElement script in document.QuerySelectorAll("script[src]")) {
+        foreach (IElement script in document.QuerySelectorAll("script")) {
+            if (!script.HasAttribute("src")) {
+                scriptIndex++;
+                continue;
+            }
+
             string type = script.GetAttribute("type") ?? string.Empty;
             if (!IsJavaScriptScriptType(type)) {
                 scriptIndex++;
@@ -190,6 +196,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
             }
 
             string source = script.GetAttribute("src") ?? string.Empty;
+            string selector = CreateScriptSelector(script, scriptIndex);
             string scriptUrl = HtmlModernParserUtilities.ResolveUrl(source, effectiveBaseUri);
             bool isExternal = HtmlModernParserUtilities.IsExternal(scriptUrl, baseUri);
             if (isExternal && !includeExternal) {
@@ -201,6 +208,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                 endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                     Index = endpoints.Count,
                     ScriptIndex = scriptIndex,
+                    Selector = selector,
                     ScriptUrl = scriptUrl,
                     IsExternal = isExternal,
                     IsDownloaded = false,
@@ -216,6 +224,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                     endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                         Index = endpoints.Count,
                         ScriptIndex = scriptIndex,
+                        Selector = selector,
                         ScriptUrl = scriptUrl,
                         IsExternal = isExternal,
                         IsDownloaded = true,
@@ -230,6 +239,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                 endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                     Index = endpoints.Count,
                     ScriptIndex = scriptIndex,
+                    Selector = selector,
                     ScriptUrl = scriptUrl,
                     IsExternal = isExternal,
                     IsDownloaded = false,
@@ -256,6 +266,11 @@ public static class HtmlLinkedJavaScriptEndpointParser {
             || normalized.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
             || normalized.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateScriptSelector(IElement script, int scriptIndex) {
+        string id = script.GetAttribute("id") ?? string.Empty;
+        return string.IsNullOrEmpty(id) ? $"script:nth-of-type({scriptIndex + 1})" : $"script#{id}";
     }
 
     private static bool IsHttpUrl(string value) {

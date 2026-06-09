@@ -452,9 +452,11 @@ public static class HtmlParsingToolbox {
         }
 
         List<HtmlInteractionSurfaceItem> items = new();
+        Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
         foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
             string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
-            AddSurface(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Action, string.Empty, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex, false, string.Join(",", form.Fields.Select(static field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name))));
+            string formUrl = ResolveUrlValue(form.Metadata.Action, effectiveBaseUri);
+            AddSurface(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), formUrl, string.Empty, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex, false, string.Join(",", form.Fields.Select(static field => field.Name).Where(static name => !string.IsNullOrWhiteSpace(name))));
             foreach (HtmlFormField field in form.Fields.Where(static field => field.Type.ToString().Equals("Hidden", StringComparison.OrdinalIgnoreCase))) {
                 AddSurface(items, "Field", field.Name, string.Empty, string.Empty, field.Value, $"{CreateFormSelector(form.Metadata)} input[name='{EscapeAttributeValue(field.Name)}']", "Field", form.Metadata.FormIndex, false, "hidden");
             }
@@ -471,7 +473,7 @@ public static class HtmlParsingToolbox {
         if (includeLinkedScripts && baseUri != null) {
             foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, client).ConfigureAwait(false)) {
                 string metadata = FirstNonEmpty(endpoint.Error, endpoint.OperationName, endpoint.Client, endpoint.ScriptUrl);
-                AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, $"script:nth-of-type({endpoint.ScriptIndex + 1})", "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
+                AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, endpoint.Selector, "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
             }
         }
 
@@ -735,6 +737,14 @@ public static class HtmlParsingToolbox {
 
         string? documentBase = document.QuerySelector("base[href]")?.GetAttribute("href");
         return Uri.TryCreate(documentBase, UriKind.Absolute, out Uri? absoluteBaseUri) ? absoluteBaseUri : null;
+    }
+
+    private static string ResolveUrlValue(string value, Uri? baseUri) {
+        if (string.IsNullOrWhiteSpace(value) || baseUri == null || Uri.TryCreate(value, UriKind.Absolute, out _)) {
+            return value;
+        }
+
+        return HtmlModernParserUtilities.ResolveUrl(value, baseUri);
     }
 
     private static int GetTextLength(string html) {
