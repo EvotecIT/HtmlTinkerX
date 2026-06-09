@@ -387,17 +387,7 @@ public static class HtmlParsingToolbox {
                     continue;
                 }
 
-                items.Add(new HtmlJavaScriptConfigItem {
-                    Index = items.Count,
-                    Name = state.Name,
-                    Path = state.Name,
-                    Kind = state.SourceKind,
-                    Value = state.RawJson,
-                    RawValue = state.RawJson,
-                    ScriptIndex = state.ScriptIndex,
-                    Selector = $"script:nth-of-type({state.ScriptIndex + 1})",
-                    Source = "AppState"
-                });
+                AddAppStateConfigMatches(state, propertyPaths, items);
             }
         }
 
@@ -610,6 +600,34 @@ public static class HtmlParsingToolbox {
     private static bool IsJavaScriptModuleType(string? type) =>
         (type ?? string.Empty).Split(';')[0].Trim().Equals("module", StringComparison.OrdinalIgnoreCase);
 
+    private static void AddAppStateConfigMatches(HtmlAppStateEntry state, IReadOnlyList<string>? propertyPaths, List<HtmlJavaScriptConfigItem> items) {
+        if (propertyPaths == null || propertyPaths.Count == 0) {
+            AddAppStateConfigMatch(state, null, state.RawJson, state.RawJson, items);
+            return;
+        }
+
+        object? parsedValue = ParseJsonValue(state.RawJson);
+        foreach (string propertyPath in propertyPaths) {
+            object? value = HtmlJavaScriptAstUtilities.GetPropertyPathValue(parsedValue, propertyPath);
+            AddAppStateConfigMatch(state, propertyPath, value, SerializeValue(value), items);
+        }
+    }
+
+    private static void AddAppStateConfigMatch(HtmlAppStateEntry state, string? propertyPath, object? value, string rawValue, List<HtmlJavaScriptConfigItem> items) {
+        items.Add(new HtmlJavaScriptConfigItem {
+            Index = items.Count,
+            Name = state.Name,
+            Path = state.Name,
+            Kind = state.SourceKind,
+            PropertyPath = propertyPath,
+            Value = value,
+            RawValue = rawValue,
+            ScriptIndex = state.ScriptIndex,
+            Selector = $"script:nth-of-type({state.ScriptIndex + 1})",
+            Source = "AppState"
+        });
+    }
+
     private static IReadOnlyList<HtmlStaticRenderedDelta> CreateDeltas(IReadOnlyList<HtmlDataItem> staticItems, IReadOnlyList<HtmlDataItem> renderedItems) {
         string[] kinds = { "Link", "Form", "JsonLd", "AppState", "ScriptData", "Token" };
         List<HtmlStaticRenderedDelta> deltas = new();
@@ -629,7 +647,7 @@ public static class HtmlParsingToolbox {
     }
 
     private static string CreateSignature(HtmlDataItem item) =>
-        $"{item.Kind}|{item.Name}|{item.Type}|{FirstNonEmpty(item.Id, item.RawValue, item.Value?.ToString(), item.Selector)}";
+        $"{item.Kind}|{item.Name}|{item.Type}|{item.Id}|{item.RawValue}|{SerializeValue(item.Value)}|{item.Selector}";
 
     private static int GetTextLength(string html) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
@@ -718,6 +736,43 @@ public static class HtmlParsingToolbox {
             return JsonSerializer.Serialize(value);
         } catch (NotSupportedException) {
             return value.ToString() ?? string.Empty;
+        }
+    }
+
+    private static object? ParseJsonValue(string json) {
+        try {
+            using JsonDocument document = JsonDocument.Parse(json, HtmlModernParserUtilities.JsonOptions);
+            return ConvertJsonElement(document.RootElement);
+        } catch (JsonException) {
+            return json;
+        }
+    }
+
+    private static object? ConvertJsonElement(JsonElement element) {
+        switch (element.ValueKind) {
+            case JsonValueKind.Object:
+                Dictionary<string, object?> properties = new(StringComparer.OrdinalIgnoreCase);
+                foreach (JsonProperty property in element.EnumerateObject()) {
+                    properties[property.Name] = ConvertJsonElement(property.Value);
+                }
+                return properties;
+            case JsonValueKind.Array:
+                return element.EnumerateArray().Select(ConvertJsonElement).ToList();
+            case JsonValueKind.String:
+                return element.GetString();
+            case JsonValueKind.Number:
+                if (element.TryGetInt64(out long integer)) {
+                    return integer;
+                }
+                return element.TryGetDecimal(out decimal number) ? number : element.GetDouble();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+            default:
+                return null;
         }
     }
 

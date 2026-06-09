@@ -84,6 +84,22 @@ Describe 'HTML parsing toolbox cmdlets' {
         $state.Name | Should -Contain '__INITIAL_STATE__'
     }
 
+    It 'applies property paths to framework app-state payloads' {
+        $html = @'
+<html><head>
+<script id="__NEXT_DATA__" type="application/json">
+{"props":{"pageProps":{"id":42,"slug":"docs"}}}
+</script>
+</head></html>
+'@
+        $state = Select-HtmlJavaScriptConfig -Content $html -Name __NEXT_DATA__ -PropertyPath props.pageProps.id
+
+        $state | Should -HaveCount 1
+        $state[0].Source | Should -Be 'AppState'
+        $state[0].PropertyPath | Should -Be 'props.pageProps.id'
+        $state[0].Value | Should -Be 42
+    }
+
     It 'keeps named JavaScript config searches tolerant' {
         $html = @'
 <html><body>
@@ -125,5 +141,49 @@ Describe 'HTML parsing toolbox cmdlets' {
         $comparison.RenderedFormCount | Should -BeGreaterThan $comparison.StaticFormCount
         ($linkDelta.Added -join '|') | Should -Match 'Rendered'
         ($formDelta.Added -join '|') | Should -Match 'dynamic'
+    }
+
+    It 'detects fields added to an existing rendered form' {
+        $static = '<form id="login" method="post" action="/login"><input name="user" /></form>'
+        $rendered = '<form id="login" method="post" action="/login"><input name="user" /><input type="hidden" name="csrf" value="abc" /></form>'
+
+        $comparison = Compare-HtmlStaticRendered -StaticContent $static -RenderedContent $rendered
+        $formDelta = $comparison.Deltas | Where-Object Kind -EQ 'Form'
+
+        ($formDelta.Added -join '|') | Should -Match 'csrf'
+    }
+
+    It 'returns submitted selected option values when parsing forms' {
+        $html = @'
+<form id="plan">
+  <select name="tier">
+    <option value="basic" selected>Basic</option>
+    <option value="pro">Pro</option>
+  </select>
+</form>
+'@
+        $form = ConvertFrom-HtmlForm -Content $html
+
+        ($form.Fields | Where-Object Name -EQ 'tier').Value | Should -Be 'basic'
+    }
+
+    It 'keeps configured HTTP defaults when page credentials are used' {
+        try {
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = [TimeSpan]::FromSeconds(7)
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['X-Toolbox-Test'] = 'Yes'
+            $credential = [System.Net.NetworkCredential]::new('user', 'pass')
+
+            $client = [HtmlTinkerX.HtmlHttpClientFactory]::Create([string] $null, [System.Net.ICredentials] $null, [System.Net.ICredentials] $credential)
+
+            $client.Timeout.TotalSeconds | Should -Be 7
+            $client.DefaultRequestHeaders.GetValues('X-Toolbox-Test') | Should -Contain 'Yes'
+        } finally {
+            if ($client) {
+                $client.Dispose()
+            }
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.Remove('X-Toolbox-Test') | Out-Null
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = [TimeSpan]::FromSeconds(100)
+            [HtmlTinkerX.HtmlHttpClientFactory]::ResetShared()
+        }
     }
 }

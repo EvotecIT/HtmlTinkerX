@@ -30,15 +30,27 @@ public static class HtmlHttpClientFactory {
     /// </summary>
     public static HttpClient Create(string? proxy = null, ICredentials? credential = null) {
         HttpClientHandler handler = new();
-        string? proxyToUse = proxy ?? DefaultProxy;
-        if (!string.IsNullOrEmpty(proxyToUse)) {
-            handler.Proxy = new WebProxy(proxyToUse);
-            handler.UseProxy = true;
-            ICredentials? credToUse = credential ?? DefaultProxyCredential;
-            if (credToUse != null) {
-                handler.Proxy!.Credentials = credToUse;
-            }
-        }
+        ConfigureProxy(handler, proxy, credential);
+        HttpClient client = new HttpClient(handler, disposeHandler: true);
+        ApplyDefaults(client);
+        return client;
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="HttpClient"/> using configured defaults plus optional target-page credentials.
+    /// </summary>
+    /// <param name="proxy">Optional proxy address. When omitted, <see cref="DefaultProxy"/> is used.</param>
+    /// <param name="proxyCredential">Optional proxy credentials. When omitted, <see cref="DefaultProxyCredential"/> is used.</param>
+    /// <param name="credentials">Optional credentials for the target page.</param>
+    /// <param name="preAuthenticate">Enables HTTP pre-authentication when page credentials are provided.</param>
+    /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
+    public static HttpClient Create(string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true) {
+        HttpClientHandler handler = new() {
+            Credentials = credentials,
+            PreAuthenticate = credentials != null && preAuthenticate
+        };
+
+        ConfigureProxy(handler, proxy, proxyCredential);
         HttpClient client = new HttpClient(handler, disposeHandler: true);
         ApplyDefaults(client);
         return client;
@@ -56,15 +68,7 @@ public static class HtmlHttpClientFactory {
             CookieContainer = cookieContainer,
             UseCookies = true
         };
-        string? proxyToUse = proxy ?? DefaultProxy;
-        if (!string.IsNullOrEmpty(proxyToUse)) {
-            handler.Proxy = new WebProxy(proxyToUse);
-            handler.UseProxy = true;
-            ICredentials? credToUse = credential ?? DefaultProxyCredential;
-            if (credToUse != null) {
-                handler.Proxy!.Credentials = credToUse;
-            }
-        }
+        ConfigureProxy(handler, proxy, credential);
         HttpClient client = new HttpClient(handler, disposeHandler: true);
         ApplyDefaults(client);
         return client;
@@ -99,6 +103,18 @@ public static class HtmlHttpClientFactory {
         client.DefaultRequestHeaders.Clear();
         foreach (var header in DefaultHeaders) {
             client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+        }
+    }
+
+    private static void ConfigureProxy(HttpClientHandler handler, string? proxy, ICredentials? credential) {
+        string? proxyToUse = proxy ?? DefaultProxy;
+        if (!string.IsNullOrEmpty(proxyToUse)) {
+            handler.Proxy = new WebProxy(proxyToUse);
+            handler.UseProxy = true;
+            ICredentials? credToUse = credential ?? DefaultProxyCredential;
+            if (credToUse != null) {
+                handler.Proxy!.Credentials = credToUse;
+            }
         }
     }
 }

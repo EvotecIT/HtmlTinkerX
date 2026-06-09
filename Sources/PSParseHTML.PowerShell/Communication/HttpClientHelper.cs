@@ -39,19 +39,6 @@ internal static class HttpClientHelper {
             return Create(proxy, proxyCredential);
         }
 
-        HttpClientHandler handler = new() {
-            Credentials = pageCredential,
-            PreAuthenticate = true
-        };
-
-        if (!string.IsNullOrWhiteSpace(proxy)) {
-            handler.Proxy = new WebProxy(proxy!);
-            NetworkCredential? proxyNetworkCredential = proxyCredential?.GetNetworkCredential();
-            if (proxyNetworkCredential != null) {
-                handler.Proxy.Credentials = proxyNetworkCredential;
-            }
-        }
-
-        return new HttpClient(handler);
+        return HtmlHttpClientFactory.Create(proxy, proxyCredential?.GetNetworkCredential(), pageCredential);
     }
 }

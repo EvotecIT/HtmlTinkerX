@@ -73,6 +73,7 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
             PSObject f = new();
             f.Properties.Add(new PSNoteProperty("Name", field.Name));
             f.Properties.Add(new PSNoteProperty("Type", field.Type));
+            f.Properties.Add(new PSNoteProperty("Value", field.Value));
             fieldObjects.Add(f);
         }
         obj.Properties.Add(new PSNoteProperty("Fields", fieldObjects.ToArray()));

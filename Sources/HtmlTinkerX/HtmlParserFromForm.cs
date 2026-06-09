@@ -52,7 +52,7 @@ public static class HtmlParserFromForm {
                 result.Fields.Add(new HtmlFormField {
                     Name = nameValue,
                     Type = MapType(type),
-                    Value = field.GetAttribute("value") ?? field.TextContent ?? string.Empty
+                    Value = GetSubmittedValue(field)
                 });
             }
             results.Add(result);
@@ -94,4 +94,31 @@ public static class HtmlParserFromForm {
             _ => HtmlFormFieldType.Other,
         };
     }
+
+    private static string GetSubmittedValue(IElement field) {
+        if (field.NodeName.Equals("select", StringComparison.OrdinalIgnoreCase)) {
+            string[] values = field.QuerySelectorAll("option[selected]")
+                .Select(GetOptionSubmittedValue)
+                .Where(static value => value.Length > 0)
+                .ToArray();
+
+            if (values.Length == 0) {
+                IElement? firstOption = field.QuerySelector("option");
+                if (firstOption != null) {
+                    return GetOptionSubmittedValue(firstOption);
+                }
+            }
+
+            return string.Join(",", values);
+        }
+
+        if (field.NodeName.Equals("textarea", StringComparison.OrdinalIgnoreCase)) {
+            return field.TextContent ?? string.Empty;
+        }
+
+        return field.GetAttribute("value") ?? field.TextContent ?? string.Empty;
+    }
+
+    private static string GetOptionSubmittedValue(IElement option) =>
+        option.GetAttribute("value") ?? option.TextContent ?? string.Empty;
 }
