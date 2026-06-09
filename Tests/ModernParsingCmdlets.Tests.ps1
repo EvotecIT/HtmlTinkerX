@@ -9,6 +9,7 @@ Describe 'Modern parsing cmdlets' {
 <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
 <meta name="description" content="A short summary" />
 <meta name="csrf-token" content="meta-token" />
+<script>console.log("first script");</script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Article","@id":"https://example.org/article","headline":"Hello"}
 </script>
@@ -38,6 +39,7 @@ const csrfToken = "script-token";
 
         $items | Should -HaveCount 1
         $items[0].Type | Should -Be 'Article'
+        $items[0].ScriptIndex | Should -Be 1
     }
 
     It 'extracts JSON-LD from selected HtmlNode pipeline input' {
@@ -47,6 +49,15 @@ const csrfToken = "script-token";
 
         $items | Should -HaveCount 1
         $items[0].Type | Should -Be 'Article'
+        $items[0].Id | Should -Be 'https://example.org/article'
+    }
+
+    It 'preserves JSON-LD script indexes from HtmlNode document input' {
+        $items = ConvertFrom-HTML -Content $script:Html |
+            ConvertFrom-HtmlJsonLd
+
+        $items | Should -HaveCount 1
+        $items[0].ScriptIndex | Should -Be 1
         $items[0].Id | Should -Be 'https://example.org/article'
     }
 
