@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -22,6 +23,14 @@ namespace PSParseHTML.PowerShell;
 ///   <summary>Inspect only selected JSON-LD script nodes from an HtmlAgilityPack pipeline</summary>
 ///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/ld+json"]' | ConvertFrom-HtmlJsonLd</code>
 /// </example>
+/// <example>
+///   <summary>Return only Product JSON-LD items</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Content $html -Type Product</code>
+/// </example>
+/// <example>
+///   <summary>Emit parsed JSON payload objects instead of metadata records</summary>
+///   <code>ConvertFrom-HtmlJsonLd -Content $html -Type Product -AsObject</code>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlJsonLd", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlJsonLdItem))]
 public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
@@ -29,6 +38,10 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
+    private static readonly JsonDocumentOptions JsonOptions = new() {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip
+    };
 
     /// <summary>HTML content to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
@@ -59,16 +72,31 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public PSCredential? ProxyCredential { get; set; }
 
+    /// <summary>Filters results to one or more JSON-LD @type values.</summary>
+    [Parameter]
+    public string[]? Type { get; set; }
+
+    /// <summary>Emits parsed JSON payloads instead of HtmlJsonLdItem metadata objects.</summary>
+    [Parameter]
+    public SwitchParameter AsObject { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
+        IReadOnlyList<HtmlJsonLdItem> items;
         if (ParameterSetName == ParameterSetNode) {
-            WriteObject(HtmlJsonLdParser.ParseScriptContents(GetJsonLdScriptContents()).ToArray(), true);
-            return;
+            items = HtmlJsonLdParser.ParseScriptContents(GetJsonLdScriptContents());
+        } else {
+            string html = await ReadHtmlAsync().ConfigureAwait(false);
+            items = HtmlJsonLdParser.Parse(html);
         }
 
-        string html = await ReadHtmlAsync().ConfigureAwait(false);
-        WriteObject(HtmlJsonLdParser.Parse(html).ToArray(), true);
+        HtmlJsonLdItem[] filteredItems = FilterByType(items).ToArray();
+        if (AsObject.IsPresent) {
+            WriteObject(filteredItems.Select(ConvertRawJsonToObject).ToArray(), true);
+        } else {
+            WriteObject(filteredItems, true);
+        }
     }
 
     private IEnumerable<KeyValuePair<int, string>> GetJsonLdScriptContents() {
@@ -110,6 +138,60 @@ public sealed class CmdletConvertFromHtmlJsonLd : AsyncPSCmdlet {
 
         string type = node.GetAttributeValue("type", string.Empty);
         return type.Contains("ld+json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IEnumerable<HtmlJsonLdItem> FilterByType(IEnumerable<HtmlJsonLdItem> items) {
+        if (Type == null || Type.Length == 0) {
+            return items;
+        }
+
+        HashSet<string> types = new(Type.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()), StringComparer.OrdinalIgnoreCase);
+        if (types.Count == 0) {
+            return items;
+        }
+
+        return items.Where(item => item.Type != null && item.Type.Split(',').Any(value => types.Contains(value.Trim())));
+    }
+
+    private static object? ConvertRawJsonToObject(HtmlJsonLdItem item) {
+        try {
+            using JsonDocument document = JsonDocument.Parse(item.RawJson, JsonOptions);
+            return ConvertJsonElement(document.RootElement);
+        } catch (JsonException) {
+            return item.RawJson;
+        }
+    }
+
+    private static object? ConvertJsonElement(JsonElement element) {
+        switch (element.ValueKind) {
+            case JsonValueKind.Object:
+                PSObject obj = new();
+                foreach (JsonProperty property in element.EnumerateObject()) {
+                    obj.Properties.Add(new PSNoteProperty(property.Name, ConvertJsonElement(property.Value)));
+                }
+
+                return obj;
+            case JsonValueKind.Array:
+                return element.EnumerateArray().Select(ConvertJsonElement).ToArray();
+            case JsonValueKind.String:
+                return element.GetString();
+            case JsonValueKind.Number:
+                if (element.TryGetInt64(out long longValue)) {
+                    return longValue;
+                }
+
+                if (element.TryGetDecimal(out decimal decimalValue)) {
+                    return decimalValue;
+                }
+
+                return element.GetDouble();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            default:
+                return null;
+        }
     }
 
     private async Task<string> ReadHtmlAsync() {

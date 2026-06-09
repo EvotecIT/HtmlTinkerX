@@ -79,6 +79,45 @@ const csrfToken = "script-token";
         $items[0].Id | Should -Be 'https://example.org/article'
     }
 
+    It 'filters JSON-LD by type and emits parsed objects' {
+        $html = @'
+<html><head>
+<script type="application/ld+json">
+[
+  {"@context":"https://schema.org","@type":"Article","headline":"Hello"},
+  {"@context":"https://schema.org","@type":"Product","name":"Widget"}
+]
+</script>
+</head></html>
+'@
+        $items = ConvertFrom-HtmlJsonLd -Content $html -Type Product
+        $objects = ConvertFrom-HtmlJsonLd -Content $html -Type Product -AsObject
+
+        $items | Should -HaveCount 1
+        $items[0].Type | Should -Be 'Product'
+        $objects | Should -HaveCount 1
+        $objects[0].name | Should -Be 'Widget'
+    }
+
+    It 'emits parsed JSON-LD objects when tolerant JSON syntax is accepted' {
+        $html = @'
+<html><head>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"Product",
+  "name":"Widget",
+  // accepted by the JSON-LD parser options
+}
+</script>
+</head></html>
+'@
+        $objects = ConvertFrom-HtmlJsonLd -Content $html -AsObject
+
+        $objects | Should -HaveCount 1
+        $objects[0].name | Should -Be 'Widget'
+    }
+
     It 'extracts app state' {
         $state = ConvertFrom-HtmlAppState -Content $script:Html
 
@@ -87,6 +126,15 @@ const csrfToken = "script-token";
         $state.Name | Should -Contain '__APOLLO_STATE__'
         ($state | Where-Object Name -EQ '__INITIAL_STATE__').RawJson | Should -Match '"enabled":true'
         ($state | Where-Object Name -EQ '__INITIAL_STATE__').RawJson | Should -Match '"disabled":false'
+    }
+
+    It 'extracts app state from selected HtmlNode pipeline input' {
+        $state = ConvertFrom-HTML -Content $script:Html |
+            Select-HtmlNode -XPath '//script[@id="__NEXT_DATA__"]' |
+            ConvertFrom-HtmlAppState
+
+        $state | Should -HaveCount 1
+        $state[0].Name | Should -Be '__NEXT_DATA__'
     }
 
     It 'extracts head links' {

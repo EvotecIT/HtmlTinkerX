@@ -1,3 +1,4 @@
+using HtmlAgilityPack;
 using HtmlTinkerX;
 using System;
 using System.Linq;
@@ -8,11 +9,20 @@ using System.Threading.Tasks;
 namespace PSParseHTML.PowerShell;
 
 /// <summary>Extracts generic JSON data embedded in script tags.</summary>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlScriptData", DefaultParameterSetName = ParameterSetContent)]
+/// <example>
+///   <summary>Extract generic JSON script data from HTML content</summary>
+///   <code>ConvertFrom-HtmlScriptData -Content $html</code>
+/// </example>
+/// <example>
+///   <summary>Inspect a selected application/json script node</summary>
+///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/json"]' | ConvertFrom-HtmlScriptData</code>
+/// </example>
+[Cmdlet(VerbsData.ConvertFrom, "HtmlScriptData", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlScriptDataItem))]
 public sealed class CmdletConvertFromHtmlScriptData : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
+    private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
 
     /// <summary>HTML content to inspect.</summary>
@@ -25,6 +35,11 @@ public sealed class CmdletConvertFromHtmlScriptData : AsyncPSCmdlet {
     [Alias("File")]
     [ValidateNotNullOrEmpty]
     public string Path { get; set; } = string.Empty;
+
+    /// <summary>HtmlAgilityPack node to inspect.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetNode, ValueFromPipeline = true, Position = 0)]
+    [Alias("Node", "InputObject")]
+    public HtmlNode HtmlNode { get; set; } = null!;
 
     /// <summary>URL of an HTML page to download and inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
@@ -54,6 +69,8 @@ public sealed class CmdletConvertFromHtmlScriptData : AsyncPSCmdlet {
                 using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
                 }
+            case ParameterSetNode:
+                return HtmlPipelineInput.ToHtmlMarkup(HtmlNode);
             default:
                 return Content;
         }
