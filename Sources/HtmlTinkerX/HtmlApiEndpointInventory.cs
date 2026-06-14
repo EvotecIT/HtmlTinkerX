@@ -154,6 +154,12 @@ public static class HtmlApiEndpointInventory {
             return null;
         }
 
+        if (pageUri != null && !HasExplicitScheme(url)) {
+            return Uri.TryCreate(pageUri, url, out Uri? pageRelativeUri)
+                ? pageRelativeUri
+                : null;
+        }
+
         if (Uri.TryCreate(url, UriKind.Absolute, out Uri? absoluteUri)) {
             return absoluteUri;
         }
@@ -161,6 +167,23 @@ public static class HtmlApiEndpointInventory {
         return pageUri != null && Uri.TryCreate(pageUri, url, out Uri? resolvedUri)
             ? resolvedUri
             : null;
+    }
+
+    private static bool HasExplicitScheme(string url) {
+        int colonIndex = url.IndexOf(':');
+        if (colonIndex <= 0) {
+            return false;
+        }
+
+        for (int index = 0; index < colonIndex; index++) {
+            char c = url[index];
+            bool valid = char.IsLetterOrDigit(c) || c == '+' || c == '-' || c == '.';
+            if (!valid) {
+                return false;
+            }
+        }
+
+        return char.IsLetter(url[0]);
     }
 
     private static Uri? TryCreateUri(string url) =>
