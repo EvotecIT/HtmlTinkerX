@@ -60,7 +60,7 @@ public static partial class HtmlBrowser {
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
         IReadOnlyList<HtmlLinkedJavaScriptEndpoint> linkedJavaScriptEndpoints = includeLinkedScripts && baseUri != null
-            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient, externalHttpClient, null).ConfigureAwait(false)
+            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient, externalHttpClient, null, cancellationToken).ConfigureAwait(false)
             : Array.Empty<HtmlLinkedJavaScriptEndpoint>();
         IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = HtmlParsingToolbox.FindInteractionSurface(html, baseUri, linkedJavaScriptEndpoints);
         HtmlStaticRenderedComparison? comparison = includeStaticRenderedComparison && staticHtml != null

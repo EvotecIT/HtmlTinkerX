@@ -1,5 +1,8 @@
 using HtmlTinkerX;
 using Microsoft.AspNetCore.Http;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 
 namespace HtmlTinkerX.Tests;
 
@@ -49,6 +52,26 @@ public class HtmlPageDiscoveryParsersTests {
         Assert.Equal("/api/items", endpoints[1].Url);
         Assert.Equal("POST", endpoints[1].Method);
         Assert.True(endpoints[1].IsDownloaded);
+    }
+
+    [Fact]
+    public async Task LinkedJavaScriptEndpointParserHonorsCancellation() {
+        using HttpClient client = new(new BlockingHandler(), false);
+        using CancellationTokenSource cts = new();
+        cts.CancelAfter(50);
+        string html = """<script src="/app.js"></script>""";
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, new Uri("https://example.org/"), includeExternal: false, client: client, cancellationToken: cts.Token));
+    }
+
+    private sealed class BlockingHandler : HttpMessageHandler {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            return new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StringContent(string.Empty)
+            };
+        }
     }
 
     [Fact]

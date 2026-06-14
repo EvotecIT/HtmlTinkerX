@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 #pragma warning disable CS1591
@@ -170,14 +171,18 @@ public static class HtmlScriptDataParser {
 
 public static class HtmlLinkedJavaScriptEndpointParser {
     public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal = false, HttpClient? client = null) {
-        return await ParseAsync(html, baseUri, includeExternal, client, null).ConfigureAwait(false);
+        return await ParseAsync(html, baseUri, includeExternal, client, CancellationToken.None).ConfigureAwait(false);
     }
 
-    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? client, Uri? effectiveBaseUriOverride) {
-        return await ParseAsync(html, pageBaseUri, includeExternal, client, client, effectiveBaseUriOverride).ConfigureAwait(false);
+    public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal, HttpClient? client, CancellationToken cancellationToken) {
+        return await ParseAsync(html, baseUri, includeExternal, client, null, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? sameOriginClient, HttpClient? externalClient, Uri? effectiveBaseUriOverride) {
+    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? client, Uri? effectiveBaseUriOverride, CancellationToken cancellationToken = default) {
+        return await ParseAsync(html, pageBaseUri, includeExternal, client, client, effectiveBaseUriOverride, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? sameOriginClient, HttpClient? externalClient, Uri? effectiveBaseUriOverride, CancellationToken cancellationToken = default) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -191,6 +196,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
         List<HtmlLinkedJavaScriptEndpoint> endpoints = new();
         int scriptIndex = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!script.HasAttribute("src")) {
                 scriptIndex++;
                 continue;
@@ -227,7 +233,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
 
             try {
                 HttpClient http = (isExternal ? externalClient : sameOriginClient) ?? HtmlHttpClientFactory.Shared;
-                string scriptContent = await HtmlUtilities.GetStringWithProperEncodingAsync(http, scriptUrl).ConfigureAwait(false);
+                string scriptContent = await HtmlUtilities.GetStringWithProperEncodingAsync(http, scriptUrl, cancellationToken).ConfigureAwait(false);
                 foreach (HtmlJavaScriptEndpoint endpoint in HtmlJavaScriptEndpointParser.ParseJavaScript(scriptContent)) {
                     endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                         Index = endpoints.Count,
@@ -243,7 +249,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                         Source = endpoint.Source
                     });
                 }
-            } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException) {
+            } catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException)) {
                 endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                     Index = endpoints.Count,
                     ScriptIndex = scriptIndex,

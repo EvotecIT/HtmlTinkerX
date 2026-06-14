@@ -270,6 +270,63 @@ window.addEventListener('scroll', () => {
         $text | Should -Be 'Loaded by scroll'
     }
 
+    It 'Can wait for function content revealed by auto-scroll' {
+        $htmlPath = Join-Path $TestDrive 'function-scroll.html'
+        @'
+<!doctype html>
+<html>
+<body style="min-height:4000px">
+<main>loading</main>
+<script>
+window.itemsLoaded = false;
+window.addEventListener('scroll', () => {
+  if (!window.itemsLoaded) {
+    window.itemsLoaded = true;
+    const item = document.createElement('div');
+    item.id = 'item';
+    item.textContent = 'Function loaded by scroll';
+    document.querySelector('main').appendChild(item);
+  }
+});
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -LoadState DomContentLoaded -AutoScroll -AutoScrollSteps 1 -AutoScrollDelayMs 20 -WaitForFunction '() => window.itemsLoaded === true' -Selector '#item' -AsText -Timeout 2000
+
+        $text | Should -Be 'Function loaded by scroll'
+    }
+
+    It 'Applies load delay before click interactions' {
+        $htmlPath = Join-Path $TestDrive 'delayed-click-handler.html'
+        @'
+<!doctype html>
+<html>
+<body>
+<button id="load">Load</button>
+<main>loading</main>
+<script>
+setTimeout(() => {
+  document.getElementById('load').addEventListener('click', () => {
+    const item = document.createElement('div');
+    item.id = 'clicked';
+    item.textContent = 'Clicked after hydration';
+    document.querySelector('main').appendChild(item);
+  });
+}, 75);
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitAfterLoadMs 150 -ClickSelector '#load' -WaitForSelector '#clicked' -Selector '#clicked' -AsText -Timeout 2000
+
+        $text | Should -Be 'Clicked after hydration'
+    }
+
     It 'Can apply rendered click interactions before extraction' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -554,8 +611,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         { Invoke-HTMLRendering -Url $uri -IncludeLinkedScripts } | Should -Throw '*only valid with -Snapshot*'
         { Invoke-HTMLRendering -Url $uri -IncludeExternalLinkedScripts } | Should -Throw '*requires -IncludeLinkedScripts*'
         { Invoke-HTMLRendering -Url $uri -IncludeResponseBody } | Should -Throw '*only valid with -Snapshot*'
-        { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires WaitForSelector, WaitForFunction, or WaitAfterLoadMs*'
+        { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires Selector, WaitForSelector, WaitForFunction, or WaitAfterLoadMs*'
         { Invoke-HTMLRendering -Url $uri -BlockResourceType Document } | Should -Throw '*would abort page navigation*'
+    }
+
+    It 'Can use extraction selector as commit readiness' {
+        $htmlPath = Join-Path $TestDrive 'commit-selector.html'
+        @'
+<!doctype html>
+<html>
+<body>
+<main>loading</main>
+<script>
+setTimeout(() => {
+  const item = document.createElement('div');
+  item.id = 'ready';
+  item.textContent = 'Selector ready';
+  document.querySelector('main').appendChild(item);
+}, 75);
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -LoadState Commit -Selector '#ready' -AsText -Timeout 2000
+
+        $text | Should -Be 'Selector ready'
     }
 
     It 'Honors timeout while waiting for extraction selectors' {

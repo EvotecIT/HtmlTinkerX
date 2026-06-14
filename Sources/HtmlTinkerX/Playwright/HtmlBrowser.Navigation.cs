@@ -105,6 +105,10 @@ public static partial class HtmlBrowser {
             await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
         }
 
+        if (hasExplicitInteractions) {
+            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
+        }
+
         IReadOnlyList<string> appliedInteractions = await ApplyPageInteractionsAsync(
             page,
             clickSelectors,
@@ -116,11 +120,7 @@ public static partial class HtmlBrowser {
             timeout,
             cancellationToken).ConfigureAwait(false);
 
-        if (hasExplicitInteractions) {
-            await WaitForFunctionReadinessAsync(page, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
-            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
-        } else if (autoScroll) {
-            await WaitForFunctionReadinessAsync(page, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+        if (autoScroll && !hasExplicitInteractions) {
             await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
         }
 

@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Linq;
+using System.Threading;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -342,11 +343,8 @@ public class HtmlCrawlerTests {
     }
 
     private static HttpListener StartServer(Dictionary<string, string> responses, out string rootUrl, string host = "localhost") {
-        int port = GetFreePort();
-        rootUrl = $"http://{host}:{port}/";
         HttpListener listener = new();
-        listener.Prefixes.Add(rootUrl);
-        listener.Start();
+        StartListenerWithFreePort(listener, out rootUrl, host);
 
         _ = Task.Run(async () => {
             try {
@@ -370,6 +368,25 @@ public class HtmlCrawlerTests {
         });
 
         return listener;
+    }
+
+    private static void StartListenerWithFreePort(HttpListener listener, out string rootUrl, string host = "localhost") {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            int port = GetFreePort();
+            rootUrl = $"http://{host}:{port}/";
+            listener.Prefixes.Clear();
+            listener.Prefixes.Add(rootUrl);
+
+            try {
+                listener.Start();
+                return;
+            } catch (HttpListenerException) when (attempt < 9) {
+                Thread.Sleep(25);
+            }
+        }
+
+        rootUrl = string.Empty;
+        throw new HttpListenerException();
     }
 
     private static void DisposeListenerSafely(HttpListener listener) {
@@ -1735,13 +1752,7 @@ public class HtmlCrawlerTests {
     public async Task CrawlAsync_Downloads_And_Rewrites_Script_Assets_To_LocalPaths() {
         string outputPath = Path.Combine(Path.GetTempPath(), "HtmlCrawlerScriptAssetTests", Guid.NewGuid().ToString("N"));
         HttpListener listener = new();
-        string rootUrl;
-        {
-            int port = GetFreePort();
-            rootUrl = $"http://localhost:{port}/";
-            listener.Prefixes.Add(rootUrl);
-        }
-        listener.Start();
+        StartListenerWithFreePort(listener, out string rootUrl);
 
         _ = Task.Run(async () => {
             try {

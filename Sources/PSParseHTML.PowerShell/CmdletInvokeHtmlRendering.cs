@@ -291,11 +291,12 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
         if (string.IsNullOrWhiteSpace(WaitForSelector)
             && string.IsNullOrWhiteSpace(WaitForFunction)
+            && string.IsNullOrWhiteSpace(Selector)
             && LoadState == HtmlBrowserLoadState.Commit
             && WaitAfterLoadMs == 0
             && !Session.IsPresent
             && RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
-            throw new PSArgumentException("LoadState Commit requires WaitForSelector, WaitForFunction, or WaitAfterLoadMs so content extraction has a readiness signal.");
+            throw new PSArgumentException("LoadState Commit requires Selector, WaitForSelector, WaitForFunction, or WaitAfterLoadMs so content extraction has a readiness signal.");
         }
         if (System.Array.IndexOf(BlockResourceType, HtmlNetworkResourceType.Document) >= 0) {
             throw new PSArgumentException("BlockResourceType Document would abort page navigation. Block subresources such as Image, Media, Font, Stylesheet, Script, XHR, or Fetch instead.");
