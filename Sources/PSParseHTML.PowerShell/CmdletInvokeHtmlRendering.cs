@@ -292,11 +292,12 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         if (string.IsNullOrWhiteSpace(WaitForSelector)
             && string.IsNullOrWhiteSpace(WaitForFunction)
             && string.IsNullOrWhiteSpace(Selector)
+            && !HasRenderingInteractions()
             && LoadState == HtmlBrowserLoadState.Commit
             && WaitAfterLoadMs == 0
             && !Session.IsPresent
             && RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
-            throw new PSArgumentException("LoadState Commit requires Selector, WaitForSelector, WaitForFunction, or WaitAfterLoadMs so content extraction has a readiness signal.");
+            throw new PSArgumentException("LoadState Commit requires Selector, WaitForSelector, WaitForFunction, WaitAfterLoadMs, or an interaction so content extraction has a readiness signal.");
         }
         if (System.Array.IndexOf(BlockResourceType, HtmlNetworkResourceType.Document) >= 0) {
             throw new PSArgumentException("BlockResourceType Document would abort page navigation. Block subresources such as Image, Media, Font, Stylesheet, Script, XHR, or Fetch instead.");
@@ -421,11 +422,15 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 HtmlNetworkResourceType[]? responseBodyResourceTypes = MyInvocation.BoundParameters.ContainsKey(nameof(ResponseBodyResourceType))
                     ? ResponseBodyResourceType
                     : null;
+                if (!string.IsNullOrWhiteSpace(Selector)) {
+                    _ = await HtmlBrowser.GetContentAsync(sess.Page, Selector, innerHtml: false, asText: false, timeout: Timeout, cancellationToken: token).ConfigureAwait(false);
+                }
+
                 await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token).ConfigureAwait(false);
             }
             if (Snapshot.IsPresent) {
                 HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent || IncludeStaticRenderedComparison.IsPresent
-                    ? await CreateSessionHttpClientAsync(sess, target, UserAgent, token).ConfigureAwait(false)
+                    ? await CreateSessionHttpClientAsync(sess, target, UserAgent, includePageCredentials: form == null, token).ConfigureAwait(false)
                     : null;
                 HttpClient? externalSnapshotHttpClient = IncludeLinkedScripts.IsPresent && IncludeExternalLinkedScripts.IsPresent
                     ? CreateExternalSnapshotHttpClient(UserAgent)
@@ -504,8 +509,31 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
     }
 
-    private async Task<HttpClient> CreateSessionHttpClientAsync(HtmlBrowserSession session, string target, string? userAgent, CancellationToken cancellationToken) {
-        HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, Credential, Username, Password, out CookieContainer cookieContainer);
+    private bool HasRenderingInteractions()
+        => HasAny(ClickSelector)
+            || HasAny(ClickText)
+            || HasAny(DismissSelector)
+            || HasAny(DismissText);
+
+    private static bool HasAny(string[]? values) {
+        if (values == null) {
+            return false;
+        }
+
+        foreach (string? value in values) {
+            if (!string.IsNullOrWhiteSpace(value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<HttpClient> CreateSessionHttpClientAsync(HtmlBrowserSession session, string target, string? userAgent, bool includePageCredentials, CancellationToken cancellationToken) {
+        PSCredential? pageCredential = includePageCredentials ? Credential : null;
+        string? pageUsername = includePageCredentials ? Username : null;
+        string? pagePassword = includePageCredentials ? Password : null;
+        HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, pageCredential, pageUsername, pagePassword, out CookieContainer cookieContainer);
         if (!string.IsNullOrWhiteSpace(userAgent)) {
             client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
         }

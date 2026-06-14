@@ -99,6 +99,38 @@ public sealed class SnapshotTestServer : IDisposable {
                     return;
                 }
 
+                if (string.Equals(path, "/auth-page", StringComparison.OrdinalIgnoreCase)) {
+                    await WriteResponseAsync(
+                        stream,
+                        "text/html",
+                        "<!doctype html><html><head><script src=\"/assets/challenge.js\"></script></head><body><main>form snapshot</main></body></html>",
+                        null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (string.Equals(path, "/login", StringComparison.OrdinalIgnoreCase)) {
+                    await WriteResponseAsync(
+                        stream,
+                        "text/html",
+                        "<!doctype html><html><body><form method=\"post\" action=\"/login\"><input id=\"user\" name=\"user\"><input id=\"pass\" name=\"pass\" type=\"password\"><button id=\"submit\" type=\"submit\">Sign in</button></form></body></html>",
+                        null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (string.Equals(path, "/response-ready", StringComparison.OrdinalIgnoreCase)) {
+                    await WriteResponseAsync(
+                        stream,
+                        "text/html",
+                        "<!doctype html><html><body><main>loading</main><script>setTimeout(async () => { const response = await fetch('/api/ready'); const data = await response.json(); const item = document.createElement('div'); item.id = 'ready'; item.textContent = data.message; document.querySelector('main').appendChild(item); }, 100);</script></body></html>",
+                        null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (string.Equals(path, "/api/ready", StringComparison.OrdinalIgnoreCase)) {
+                    await WriteResponseAsync(stream, "application/json", "{\"message\":\"response body ready\"}", null).ConfigureAwait(false);
+                    return;
+                }
+
                 if (string.Equals(path, "/assets/app.js", StringComparison.OrdinalIgnoreCase)) {
                     Interlocked.Increment(ref assetRequestCount);
                     headers.TryGetValue("User-Agent", out string userAgent);
@@ -108,6 +140,16 @@ public sealed class SnapshotTestServer : IDisposable {
                         ? "fetch(\"/api/protected\", { method: \"POST\" });"
                         : "console.log(\"denied\");";
                     await WriteResponseAsync(stream, "application/javascript", body, null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (string.Equals(path, "/assets/challenge.js", StringComparison.OrdinalIgnoreCase)) {
+                    if (headers.ContainsKey("Authorization")) {
+                        await WriteResponseAsync(stream, "application/javascript", "fetch(\"/api/leaked\", { method: \"POST\" });", null).ConfigureAwait(false);
+                    } else {
+                        await WriteResponseAsync(stream, "text/plain", "same-origin credentials required", "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"same-origin\"\r\n").ConfigureAwait(false);
+                    }
+
                     return;
                 }
 
@@ -348,6 +390,14 @@ setTimeout(() => {
         $text | Should -Be 'Delayed Click'
     }
 
+    It 'Can use rendered interactions as commit readiness' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $html = Invoke-HTMLRendering -Url $uri -LoadState Commit -ClickSelector '#show-details' -Timeout 2000
+
+        $html | Should -Match 'Clicked Details'
+    }
+
     It 'Can return inner HTML from a focused rendered selector' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -476,6 +526,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    It 'Waits for extraction selectors before snapshot response body capture' {
+        $port = Get-AvailableTcpPort
+        $server = Start-SnapshotTestServer -Port $port
+
+        try {
+            $snapshot = Invoke-HTMLRendering -Url "http://127.0.0.1:$port/response-ready" -LoadState Commit -Selector '#ready' -AsText -Snapshot -IncludeResponseBody -Timeout 3000
+
+            $snapshot.Content | Should -Be 'response body ready'
+            $readyResponse = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/api/ready' } | Select-Object -First 1
+            $readyResponse.ResponseBody | Should -Be '{"message":"response body ready"}'
+        } finally {
+            $server.Dispose()
+        }
+    }
+
     It 'Truncates captured UTF-8 response bodies on character boundaries' {
         $session = Invoke-HTMLRendering -Url 'about:blank' -Session
         try {
@@ -581,6 +646,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    It 'Does not send form-login credentials to snapshot HTTP-auth fetches' {
+        $port = Get-AvailableTcpPort
+        $server = Start-SnapshotTestServer -Port $port
+
+        try {
+            $snapshot = Invoke-HTMLRendering `
+                -Url "http://127.0.0.1:$port/auth-page" `
+                -LoginUrl "http://127.0.0.1:$port/login" `
+                -UsernameSelector '#user' `
+                -PasswordSelector '#pass' `
+                -SubmitSelector '#submit' `
+                -Username 'form-user' `
+                -Password 'form-pass' `
+                -LoadState DomContentLoaded `
+                -WaitForSelector 'main' `
+                -Selector 'main' `
+                -AsText `
+                -Snapshot `
+                -IncludeLinkedScripts
+
+            $snapshot.Content | Should -Be 'form snapshot'
+            $snapshot.LinkedJavaScriptEndpoints.Url | Should -Not -Contain '/api/leaked'
+        } finally {
+            $server.Dispose()
+        }
+    }
+
     It 'Can return applied interactions in a rendered page snapshot' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -611,7 +703,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { Invoke-HTMLRendering -Url $uri -IncludeLinkedScripts } | Should -Throw '*only valid with -Snapshot*'
         { Invoke-HTMLRendering -Url $uri -IncludeExternalLinkedScripts } | Should -Throw '*requires -IncludeLinkedScripts*'
         { Invoke-HTMLRendering -Url $uri -IncludeResponseBody } | Should -Throw '*only valid with -Snapshot*'
-        { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires Selector, WaitForSelector, WaitForFunction, or WaitAfterLoadMs*'
+        { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires Selector, WaitForSelector, WaitForFunction, WaitAfterLoadMs, or an interaction*'
         { Invoke-HTMLRendering -Url $uri -BlockResourceType Document } | Should -Throw '*would abort page navigation*'
     }
 

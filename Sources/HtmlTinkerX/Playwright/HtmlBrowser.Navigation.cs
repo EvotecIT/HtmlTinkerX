@@ -150,14 +150,14 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrWhiteSpace(waitForSelector)) {
             await page.WaitForSelectorAsync(waitForSelector!, new PageWaitForSelectorOptions {
                 Timeout = timeout
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         if (!string.IsNullOrWhiteSpace(waitForFunction)) {
             await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
                 Timeout = timeout
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -166,14 +166,14 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrWhiteSpace(waitForFunction)) {
             await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
                 Timeout = timeout
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
     private static async Task WaitAfterLoadAsync(IPage page, int waitAfterLoadMs, CancellationToken cancellationToken) {
         if (waitAfterLoadMs > 0) {
             cancellationToken.ThrowIfCancellationRequested();
-            await page.WaitForTimeoutAsync(waitAfterLoadMs).ConfigureAwait(false);
+            await page.WaitForTimeoutAsync(waitAfterLoadMs).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
