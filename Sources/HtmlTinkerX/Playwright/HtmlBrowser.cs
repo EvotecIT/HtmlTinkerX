@@ -131,32 +131,6 @@ public static partial class HtmlBrowser {
         return (context, page);
     }
 
-    private static async Task NavigateAsync(
-        IPage page,
-        string url,
-        HtmlFormLogin? formLogin,
-        string? username,
-        string? password,
-        int timeout,
-        CancellationToken cancellationToken) {
-        if (formLogin != null) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-            if (username != null) {
-                await page.FillAsync(formLogin.UsernameSelector, username, new PageFillOptions { Timeout = timeout });
-            }
-            if (password != null) {
-                await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout });
-            }
-            await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout });
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await page.GotoAsync(url, new PageGotoOptions { Timeout = timeout });
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout });
-    }
     /// <summary>
     /// Creates a new Playwright browser session and navigates to the specified URL.
     /// </summary>
@@ -183,6 +157,9 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
+        IEnumerable<HtmlNetworkResourceType>? blockResourceTypes = null,
+        IEnumerable<string>? blockResourcePatterns = null,
+        HtmlBrowserLoadState loadState = HtmlBrowserLoadState.NetworkIdle,
         int timeout = 10000,
         CancellationToken cancellationToken = default) {
         var (playwright, browserInstance) = await LaunchBrowserAsync(
@@ -223,7 +200,8 @@ public static partial class HtmlBrowser {
             videoPath,
             network);
 
-        await NavigateAsync(page, url, formLogin, username, password, timeout, cancellationToken);
+        await ApplyResourceBlockingAsync(page, blockResourceTypes, blockResourcePatterns, cancellationToken).ConfigureAwait(false);
+        await NavigateAsync(page, url, formLogin, username, password, loadState, timeout, cancellationToken);
 
         return session;
     }
@@ -254,9 +232,12 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
+        IEnumerable<HtmlNetworkResourceType>? blockResourceTypes = null,
+        IEnumerable<string>? blockResourcePatterns = null,
+        HtmlBrowserLoadState loadState = HtmlBrowserLoadState.NetworkIdle,
         int timeout = 10000,
         CancellationToken cancellationToken = default)
-        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, timeout, cancellationToken);
+        => CreatePageAsync(url, browser, clean, username, password, formLogin, headless, slowMo, videoPath, videoWidth, videoHeight, storageStatePath, userAgent, viewportWidth, viewportHeight, deviceScaleFactor, proxy, proxyUsername, proxyPassword, geoLatitude, geoLongitude, timezone, blockResourceTypes, blockResourcePatterns, loadState, timeout, cancellationToken);
 
     /// <summary>
     /// Disposes the specified browser session.
@@ -315,6 +296,9 @@ public static partial class HtmlBrowser {
             geoLatitude: geoLatitude,
             geoLongitude: geoLongitude,
             timezone: timezone,
+            blockResourceTypes: null,
+            blockResourcePatterns: null,
+            loadState: HtmlBrowserLoadState.NetworkIdle,
             timeout: timeout,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -449,15 +433,6 @@ public static partial class HtmlBrowser {
     }
 
     /// <summary>
-    /// Navigates the specified session to a new URL and waits for the network to be idle.
-    /// </summary>
-    public static async Task NavigateAsync(HtmlBrowserSession session, string url, int timeout = 10000, CancellationToken cancellationToken = default) {
-        cancellationToken.ThrowIfCancellationRequested();
-        await session.Page.GotoAsync(url, new PageGotoOptions { Timeout = timeout }).ConfigureAwait(false);
-        await session.Page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = timeout }).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
     public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) {
@@ -540,4 +515,5 @@ public static partial class HtmlBrowser {
         cancellationToken.ThrowIfCancellationRequested();
         await session.Page.SetViewportSizeAsync(info.ViewportWidth, info.ViewportHeight).ConfigureAwait(false);
     }
+
 }
