@@ -36,6 +36,10 @@ public static class HtmlPageDatasetBuilder {
             chunkTexts.Add(string.Empty);
         }
 
+        List<string> markdownChunks = effectiveOptions.IncludeMarkdown
+            ? BuildTextChunks(FirstNonEmpty(workbench.Markdown, sourceText), effectiveOptions.MaxChunkWords)
+            : new List<string>();
+
         IReadOnlyList<string> headings = ExtractHeadings(workbench);
         IReadOnlyList<string> dataKinds = workbench.Data
             .Select(static item => item.Kind)
@@ -61,7 +65,7 @@ public static class HtmlPageDatasetBuilder {
                 Title = workbench.Title,
                 AnalysisMode = workbench.AnalysisMode,
                 Text = text,
-                Markdown = effectiveOptions.IncludeMarkdown ? SelectMarkdownSlice(workbench.Markdown, text) : string.Empty,
+                Markdown = effectiveOptions.IncludeMarkdown ? SelectMarkdownSlice(markdownChunks, text, index) : string.Empty,
                 Summary = BuildSummary(text),
                 WordCount = CountWords(text),
                 CharacterCount = text.Length,
@@ -166,7 +170,7 @@ public static class HtmlPageDatasetBuilder {
                 Kind = item.Kind,
                 Name = item.Name,
                 Selector = item.Selector,
-                Url = item.RawValue,
+                Url = SanitizeProvenanceValue(item.Kind, item.RawValue),
                 Source = item.Source
             });
         }
@@ -176,7 +180,7 @@ public static class HtmlPageDatasetBuilder {
                 Kind = item.Kind,
                 Name = item.Name,
                 Selector = item.Selector,
-                Url = item.Url,
+                Url = SanitizeProvenanceValue(item.Kind, item.Url),
                 Source = item.Source
             });
         }
@@ -184,8 +188,64 @@ public static class HtmlPageDatasetBuilder {
         return provenance;
     }
 
-    private static string SelectMarkdownSlice(string markdown, string text) =>
-        string.IsNullOrWhiteSpace(markdown) ? string.Empty : markdown;
+    private static string SelectMarkdownSlice(IReadOnlyList<string> markdownChunks, string text, int index) {
+        if (markdownChunks.Count == 0) {
+            return text;
+        }
+
+        return index < markdownChunks.Count ? markdownChunks[index] : text;
+    }
+
+    private static string SanitizeProvenanceValue(string kind, string value) {
+        if (kind.Equals("Token", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("Field", StringComparison.OrdinalIgnoreCase)) {
+            return string.Empty;
+        }
+
+        return RedactSensitiveQueryValues(value);
+    }
+
+    private static string RedactSensitiveQueryValues(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        int queryIndex = value.IndexOf('?');
+        if (queryIndex < 0) {
+            return value;
+        }
+
+        int fragmentIndex = value.IndexOf('#', queryIndex);
+        string prefix = value.Substring(0, queryIndex + 1);
+        string query = fragmentIndex >= 0
+            ? value.Substring(queryIndex + 1, fragmentIndex - queryIndex - 1)
+            : value.Substring(queryIndex + 1);
+        string fragment = fragmentIndex >= 0 ? value.Substring(fragmentIndex) : string.Empty;
+        string[] sensitiveNames = {
+            "access_token",
+            "api_key",
+            "apikey",
+            "auth",
+            "code",
+            "credential",
+            "key",
+            "password",
+            "refresh_token",
+            "secret",
+            "session",
+            "token"
+        };
+        string[] pairs = query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] redactedPairs = pairs.Select(pair => {
+            string[] keyValue = pair.Split(new[] { '=' }, 2);
+            string name = Uri.UnescapeDataString(keyValue[0]);
+            return sensitiveNames.Any(sensitive => string.Equals(name, sensitive, StringComparison.OrdinalIgnoreCase))
+                ? keyValue[0] + "=<redacted>"
+                : pair;
+        }).ToArray();
+
+        return prefix + string.Join("&", redactedPairs) + fragment;
+    }
 
     private static string BuildSummary(string text) {
         string normalized = NormalizeWhitespace(text);

@@ -43,6 +43,10 @@ fetch("/api/session?token=abc123");
         $sensitiveEndpoint.RiskLevel | Should -Be 'High'
         $sensitiveEndpoint.HasSensitiveQuery | Should -BeTrue
         $sensitiveEndpoint.ReasonCodes | Should -Contain 'sensitive-query-name'
+        $sensitiveEndpoint.Url | Should -Match 'token=<redacted>'
+        $sensitiveEndpoint.ResolvedUrl | Should -Match 'token=<redacted>'
+        $sensitiveEndpoint.Url | Should -Not -Match 'abc123'
+        $sensitiveEndpoint.ResolvedUrl | Should -Not -Match 'abc123'
         $sensitiveEndpoint.Name | Should -Not -Match 'abc123'
         $sensitiveEndpoint.Metadata | Should -Not -Match 'abc123'
     }

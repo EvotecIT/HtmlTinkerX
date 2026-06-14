@@ -39,6 +39,24 @@ public class HtmlExtractionPlannerTests {
         Assert.True(plan.LooksLikeJavaScriptShell);
         Assert.Contains("Invoke-HtmlRendering", plan.SuggestedCommand);
         Assert.Contains("https://example.org/app", plan.SuggestedCommand);
+        Assert.DoesNotContain("| Invoke-HtmlPageWorkbench", plan.SuggestedProfileCommand);
+        Assert.Contains("-RenderedSnapshot $snapshot", plan.SuggestedProfileCommand);
+    }
+
+    [Fact]
+    public void Analyze_RecommendsValidSessionCommandForLoginForms() {
+        string html = """
+<html><body><form action="/login"><input name="user"><input type="password" name="password"></form></body></html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, new Uri("https://example.org/login"));
+
+        Assert.Equal(HtmlExtractionPlanMode.AuthRequired, plan.RecommendedMode);
+        Assert.Contains("Invoke-HtmlRendering", plan.SuggestedCommand);
+        Assert.Contains("-Session", plan.SuggestedCommand);
+        Assert.DoesNotContain("-Snapshot", plan.SuggestedCommand);
+        Assert.Contains("-Session", plan.SuggestedProfileCommand);
+        Assert.DoesNotContain("-Snapshot", plan.SuggestedProfileCommand);
     }
 
     [Fact]

@@ -219,8 +219,8 @@ public static class HtmlExtractionPlanner {
                 ? "Invoke-HtmlFormRelay -Content $html -BaseUrl '<current-response-url>'"
                 : $"Invoke-HtmlFormRelay -Url {target}",
             HtmlExtractionPlanMode.AuthRequired => url == null
-                ? "Invoke-HtmlRendering -Url '<login-protected-url>' -Snapshot -Session"
-                : $"Invoke-HtmlRendering -Url {target} -Snapshot -Session",
+                ? "Invoke-HtmlRendering -Url '<login-protected-url>' -Session"
+                : $"Invoke-HtmlRendering -Url {target} -Session",
             HtmlExtractionPlanMode.RenderedSnapshot => url == null
                 ? "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile HeavyDynamicPage"
                 : $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile HeavyDynamicPage",
@@ -241,8 +241,8 @@ public static class HtmlExtractionPlanner {
 
         return profile.Name switch {
             "auth-relay-page" => $"Invoke-HtmlFormRelay -Url {target}",
-            "login-protected-page" => $"Invoke-HtmlRendering -Url {target} -Snapshot -Session",
-            "app-shell" => $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile HeavyDynamicPage | Invoke-HtmlPageWorkbench",
+            "login-protected-page" => $"Invoke-HtmlRendering -Url {target} -Session",
+            "app-shell" => $"$snapshot = Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile HeavyDynamicPage; Invoke-HtmlPageWorkbench -Url {target} -RenderedSnapshot $snapshot",
             "api-docs-content" => $"Invoke-HtmlCrawl -Url {target} -Scenario Dataset -Profile api-docs-content",
             "docs-content" => $"Invoke-HtmlCrawl -Url {target} -Scenario Dataset -Profile docs-content",
             "dataset-page" => $"ConvertTo-HtmlDatasetJsonL -Url {target}",

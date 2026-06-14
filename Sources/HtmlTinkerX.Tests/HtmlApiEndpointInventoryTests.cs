@@ -48,6 +48,10 @@ fetch("/api/session?token=abc123");
         Assert.Equal(HtmlApiEndpointRiskLevel.High, sensitiveEndpoint.RiskLevel);
         Assert.True(sensitiveEndpoint.HasSensitiveQuery);
         Assert.Contains("sensitive-query-name", sensitiveEndpoint.ReasonCodes);
+        Assert.Contains("token=<redacted>", sensitiveEndpoint.Url);
+        Assert.Contains("token=<redacted>", sensitiveEndpoint.ResolvedUrl);
+        Assert.DoesNotContain("abc123", sensitiveEndpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", sensitiveEndpoint.ResolvedUrl, StringComparison.Ordinal);
         Assert.DoesNotContain("abc123", sensitiveEndpoint.Name, StringComparison.Ordinal);
         Assert.DoesNotContain("abc123", sensitiveEndpoint.Metadata, StringComparison.Ordinal);
     }

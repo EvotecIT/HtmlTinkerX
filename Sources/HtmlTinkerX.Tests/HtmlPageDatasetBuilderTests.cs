@@ -45,6 +45,27 @@ public class HtmlPageDatasetBuilderTests {
         Assert.Contains("hidden-form-fields", chunk.RedactionHints);
         Assert.Contains(chunk.Provenance, entry => entry.Kind == "ReadableText");
         Assert.Contains(chunk.Provenance, entry => entry.Kind == "Endpoint");
+        Assert.DoesNotContain(chunk.Provenance, entry => (entry.Url ?? string.Empty).Contains("secret", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Build_ChunksMarkdownInsteadOfRepeatingFullDocument() {
+        string paragraph = string.Join(" ", Enumerable.Range(1, 130).Select(index => $"word{index}"));
+        HtmlPageWorkbenchResult workbench = await HtmlPageWorkbench.AnalyzeAsync(
+            $"<html><body><main><h1>Long</h1><p>{paragraph}</p></main></body></html>",
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/long")
+            });
+
+        IReadOnlyList<HtmlPageDatasetChunk> chunks = HtmlPageDatasetBuilder.Build(
+            workbench,
+            new HtmlPageDatasetOptions {
+                MaxChunkWords = 50
+            });
+
+        Assert.True(chunks.Count > 1);
+        Assert.All(chunks, chunk => Assert.True(chunk.Markdown.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length <= 55));
+        Assert.NotEqual(chunks[0].Markdown, chunks[1].Markdown);
     }
 
     [Fact]

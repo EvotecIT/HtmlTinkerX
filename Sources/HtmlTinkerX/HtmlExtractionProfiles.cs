@@ -45,7 +45,7 @@ public static class HtmlExtractionProfiles {
             RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
             RenderProfile = HtmlRenderProfile.HeavyDynamicPage,
             DatasetReady = true,
-            SuggestedCommand = "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile HeavyDynamicPage | Invoke-HtmlPageWorkbench",
+            SuggestedCommand = "$snapshot = Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile HeavyDynamicPage; Invoke-HtmlPageWorkbench -Url '<page-url>' -RenderedSnapshot $snapshot",
             ReasonCodes = new[] { "javascript-shell", "app-state", "low-static-text" }
         },
         new HtmlExtractionProfile {
@@ -62,7 +62,7 @@ public static class HtmlExtractionProfiles {
             Description = "Pages that require interactive browser/session handling before extraction.",
             RecommendedMode = HtmlExtractionPlanMode.AuthRequired,
             RenderProfile = HtmlRenderProfile.HeavyDynamicPage,
-            SuggestedCommand = "Invoke-HtmlRendering -Url '<login-protected-url>' -Snapshot -Session",
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<login-protected-url>' -Session",
             ReasonCodes = new[] { "login-form", "password-field", "session-required" }
         },
         new HtmlExtractionProfile {

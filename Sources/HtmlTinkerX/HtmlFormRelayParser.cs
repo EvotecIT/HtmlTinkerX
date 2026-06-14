@@ -55,8 +55,9 @@ public static class HtmlFormRelayParser {
             return false;
         }
 
+        Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
         request = new HtmlFormRelayRequest {
-            ActionUri = ResolveAction(form.Metadata.Action, baseUri),
+            ActionUri = ResolveAction(form.Metadata.Action, effectiveBaseUri),
             Method = form.Metadata.Method,
             Fields = fields,
             FieldNames = fields.Keys.OrderBy(static name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -74,6 +75,13 @@ public static class HtmlFormRelayParser {
         return Uri.TryCreate(baseUri, action, out Uri? resolved)
             ? resolved
             : new Uri(action, UriKind.Absolute);
+    }
+
+    private static Uri GetEffectiveBaseUri(IDocument document, Uri responseUri) {
+        string? href = document.QuerySelector("base[href]")?.GetAttribute("href");
+        return !string.IsNullOrWhiteSpace(href) && Uri.TryCreate(responseUri, href, out Uri? resolved)
+            ? resolved
+            : responseUri;
     }
 
     private static HtmlFormRelayProtocolHint DetectProtocol(IEnumerable<string> fieldNames) {

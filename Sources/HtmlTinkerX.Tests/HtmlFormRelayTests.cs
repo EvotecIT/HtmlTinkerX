@@ -32,6 +32,28 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_ResolvesRelativeActionAgainstDocumentBase() {
+        string html = """
+<html>
+<head><base href="https://idp.example.org/sso/"></head>
+<body>
+<form method="POST" name="hiddenform" action="continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script>document.forms[0].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://rp.example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal("https://idp.example.org/sso/continue", request!.ActionUri.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task FollowAsync_SubmitsRelayHopsAndPreservesCookies() {
         string serverBase = string.Empty;
         using var server = TestServerCompat.CreateTestServer(async context => {

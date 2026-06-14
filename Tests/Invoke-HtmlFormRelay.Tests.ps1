@@ -56,6 +56,19 @@ public sealed class HtmlRelayTestServer : IDisposable {
             return;
         }
 
+        if (context.Request.Url.AbsolutePath == "/redirect-start") {
+            context.Response.StatusCode = 302;
+            context.Response.RedirectLocation = Url + "idp/page";
+            context.Response.Close();
+            return;
+        }
+
+        if (context.Request.Url.AbsolutePath == "/idp/page") {
+            context.Response.Headers.Add("Set-Cookie", "relay=ok; Path=/");
+            await WriteAsync(context.Response, "<form method=\"POST\" name=\"hiddenform\" action=\"complete\"><input type=\"hidden\" name=\"SAMLResponse\" value=\"redacted\" /><input type=\"hidden\" name=\"RelayState\" value=\"state\" /></form><script>document.forms[0].submit()</script>").ConfigureAwait(false);
+            return;
+        }
+
         if (context.Request.Url.AbsolutePath == "/complete") {
             Cookie cookie = context.Request.Cookies["relay"];
             if (cookie == null || cookie.Value != "ok") {
@@ -65,6 +78,18 @@ public sealed class HtmlRelayTestServer : IDisposable {
             }
 
             await WriteAsync(context.Response, "<main>done</main>").ConfigureAwait(false);
+            return;
+        }
+
+        if (context.Request.Url.AbsolutePath == "/idp/complete") {
+            Cookie cookie = context.Request.Cookies["relay"];
+            if (cookie == null || cookie.Value != "ok") {
+                context.Response.StatusCode = 401;
+                await WriteAsync(context.Response, "<main>missing cookie</main>").ConfigureAwait(false);
+                return;
+            }
+
+            await WriteAsync(context.Response, "<main>redirect done</main>").ConfigureAwait(false);
             return;
         }
 
@@ -125,6 +150,21 @@ Describe 'Invoke-HtmlFormRelay' {
             $result.FinalContent | Should -Match 'done'
             $result.Steps[0].ProtocolHint | Should -Be 'Saml'
             ($result.Steps[0].FieldNames -join ',') | Should -Not -Match 'redacted'
+        } finally {
+            $server.Dispose()
+        }
+    }
+
+    It 'uses the post-redirect Url as the base for relative relay actions' {
+        $server = [HtmlRelayTestServer]::new()
+        try {
+            $result = Invoke-HtmlFormRelay -Url ($server.Url + 'redirect-start')
+
+            $result.StopReason | Should -Be 'NoRelayForm'
+            $result.SubmittedRelay | Should -BeTrue
+            $result.FinalUrl | Should -Be ($server.Url + 'idp/complete')
+            $result.FinalContent | Should -Match 'redirect done'
+            $result.Steps[0].ActionUrl | Should -Be ($server.Url + 'idp/complete')
         } finally {
             $server.Dispose()
         }

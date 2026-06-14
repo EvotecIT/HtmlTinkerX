@@ -84,12 +84,15 @@ public static class HtmlApiEndpointInventory {
         List<string> reasonCodes = BuildReasonCodes(item, isExternal, isStateChanging, hasSensitiveQuery, hasAuthHint, resolvedUri);
         HtmlApiEndpointRiskLevel riskLevel = ChooseRiskLevel(isExternal, isStateChanging, hasSensitiveQuery, hasAuthHint);
 
+        string originalUrl = hasSensitiveQuery ? RedactSensitiveQueryValues(item.Url) : item.Url;
+        string resolvedUrl = hasSensitiveQuery ? RedactSensitiveQueryValues(resolvedUri?.AbsoluteUri ?? item.Url) : resolvedUri?.AbsoluteUri ?? item.Url;
+
         return new HtmlApiEndpointRecord {
             Kind = item.Kind,
             Name = FirstNonEmpty(item.Name, resolvedUri?.AbsolutePath, item.Url),
             Method = method,
-            Url = item.Url,
-            ResolvedUrl = resolvedUri?.AbsoluteUri ?? item.Url,
+            Url = originalUrl,
+            ResolvedUrl = resolvedUrl,
             Origin = GetOrigin(resolvedUri),
             IsExternal = isExternal,
             IsStateChanging = isStateChanging,
@@ -193,6 +196,34 @@ public static class HtmlApiEndpointInventory {
         }
 
         return false;
+    }
+
+    private static string RedactSensitiveQueryValues(string url) {
+        if (string.IsNullOrWhiteSpace(url)) {
+            return string.Empty;
+        }
+
+        int queryIndex = url.IndexOf('?');
+        if (queryIndex < 0) {
+            return url;
+        }
+
+        int fragmentIndex = url.IndexOf('#', queryIndex);
+        string prefix = url.Substring(0, queryIndex + 1);
+        string query = fragmentIndex >= 0
+            ? url.Substring(queryIndex + 1, fragmentIndex - queryIndex - 1)
+            : url.Substring(queryIndex + 1);
+        string fragment = fragmentIndex >= 0 ? url.Substring(fragmentIndex) : string.Empty;
+        string[] pairs = query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] redactedPairs = pairs.Select(pair => {
+            string[] keyValue = pair.Split(new[] { '=' }, 2);
+            string name = Uri.UnescapeDataString(keyValue[0]);
+            return SensitiveQueryNames.Any(sensitive => string.Equals(name, sensitive, StringComparison.OrdinalIgnoreCase))
+                ? keyValue[0] + "=<redacted>"
+                : pair;
+        }).ToArray();
+
+        return prefix + string.Join("&", redactedPairs) + fragment;
     }
 
     private static bool HasAuthHint(HtmlInteractionSurfaceItem item, Uri? uri, HtmlPageWorkbenchResult workbench) {

@@ -21,6 +21,7 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";
+    private Uri? initialResponseUri;
 
     /// <summary>URL returning the first possible relay form.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl, Position = 0)]
@@ -67,7 +68,7 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
         ValidateProxy(Proxy, ProxyCredential);
         using HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, credential: null, username: null, password: null, out CookieContainer _);
         string html = await GetInitialHtmlAsync(client).ConfigureAwait(false);
-        Uri baseUri = ParameterSetName == ParameterSetUrl ? Url : BaseUrl;
+        Uri baseUri = ParameterSetName == ParameterSetUrl ? initialResponseUri ?? Url : BaseUrl;
         HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
             html,
             baseUri,
@@ -84,7 +85,10 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
 
     private async Task<string> GetInitialHtmlAsync(HttpClient client) {
         if (ParameterSetName == ParameterSetUrl) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(Url, CancelToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            initialResponseUri = response.RequestMessage?.RequestUri ?? Url;
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, CancelToken).ConfigureAwait(false);
         }
 
         if (ParameterSetName == ParameterSetPath) {
