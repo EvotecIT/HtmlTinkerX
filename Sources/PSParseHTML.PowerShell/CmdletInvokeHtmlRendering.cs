@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -319,9 +320,6 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         string target = ParameterSetName == ParameterSetFile
             ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
             : Url;
-        string? staticHtml = IncludeStaticRenderedComparison.IsPresent
-            ? await ReadStaticHtmlAsync(target, token).ConfigureAwait(false)
-            : null;
 
         if (Session.IsPresent) {
             HtmlBrowserSession sess = await HtmlBrowser.OpenSessionWithOptionsAsync(
@@ -424,10 +422,13 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token).ConfigureAwait(false);
             }
             if (Snapshot.IsPresent) {
-                HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent
-                    ? HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password)
+                HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent || IncludeStaticRenderedComparison.IsPresent
+                    ? await CreateSessionHttpClientAsync(sess, target, token).ConfigureAwait(false)
                     : null;
                 try {
+                    string? staticHtml = IncludeStaticRenderedComparison.IsPresent
+                        ? await ReadStaticHtmlAsync(target, token, snapshotHttpClient).ConfigureAwait(false)
+                        : null;
                     HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
                         sess,
                         target,
@@ -496,7 +497,34 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
     }
 
-    private async Task<string> ReadStaticHtmlAsync(string target, CancellationToken cancellationToken) {
+    private async Task<HttpClient> CreateSessionHttpClientAsync(HtmlBrowserSession session, string target, CancellationToken cancellationToken) {
+        HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, Credential, Username, Password, out CookieContainer cookieContainer);
+        if (!Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri)
+            || (targetUri.Scheme != Uri.UriSchemeHttp && targetUri.Scheme != Uri.UriSchemeHttps)) {
+            return client;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var cookies = await session.Context.CookiesAsync(new[] { target }).ConfigureAwait(false);
+        foreach (var cookie in cookies) {
+            try {
+                System.Net.Cookie httpCookie = new(cookie.Name, cookie.Value, string.IsNullOrEmpty(cookie.Path) ? "/" : cookie.Path) {
+                    HttpOnly = cookie.HttpOnly,
+                    Secure = cookie.Secure
+                };
+                if (cookie.Expires > 0) {
+                    httpCookie.Expires = DateTimeOffset.FromUnixTimeSeconds((long)cookie.Expires).UtcDateTime;
+                }
+                cookieContainer.Add(targetUri, httpCookie);
+            } catch (CookieException) {
+                // Ignore browser cookies that cannot be represented by System.Net.Cookie.
+            }
+        }
+
+        return client;
+    }
+
+    private async Task<string> ReadStaticHtmlAsync(string target, CancellationToken cancellationToken, HttpClient? client = null) {
         if (ParameterSetName == ParameterSetFile) {
             return await HtmlUtilities.ReadFileCheckedAsync(Path!.ToFullPath()).ConfigureAwait(false);
         }
@@ -505,7 +533,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             return await HtmlUtilities.ReadFileCheckedAsync(uri.LocalPath).ConfigureAwait(false);
         }
 
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
+        if (client != null) {
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
+        }
+
+        using HttpClient localClient = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password);
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(localClient, target, cancellationToken).ConfigureAwait(false);
     }
 }

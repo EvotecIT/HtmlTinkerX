@@ -90,13 +90,13 @@ public static partial class HtmlBrowser {
     private static async Task<bool> TryClickSelectorAsync(IPage page, string selector, int interactionDelayMs, int timeout, CancellationToken cancellationToken) {
         try {
             ILocator locator = page.Locator(selector).First;
-            if (await locator.CountAsync().ConfigureAwait(false) == 0) {
-                return false;
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
+            await locator.WaitForAsync(new LocatorWaitForOptions {
+                State = WaitForSelectorState.Visible,
+                Timeout = timeout
+            }).ConfigureAwait(false);
             await locator.ClickAsync(new LocatorClickOptions {
-                Timeout = Math.Min(timeout, 3000)
+                Timeout = timeout
             }).ConfigureAwait(false);
             await WaitAfterInteractionAsync(page, interactionDelayMs).ConfigureAwait(false);
             return true;
@@ -108,13 +108,13 @@ public static partial class HtmlBrowser {
     private static async Task<bool> TryClickTextAsync(IPage page, string text, int interactionDelayMs, int timeout, CancellationToken cancellationToken) {
         try {
             ILocator locator = page.GetByText(text).First;
-            if (await locator.CountAsync().ConfigureAwait(false) == 0) {
-                return false;
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
+            await locator.WaitForAsync(new LocatorWaitForOptions {
+                State = WaitForSelectorState.Visible,
+                Timeout = timeout
+            }).ConfigureAwait(false);
             await locator.ClickAsync(new LocatorClickOptions {
-                Timeout = Math.Min(timeout, 3000)
+                Timeout = timeout
             }).ConfigureAwait(false);
             await WaitAfterInteractionAsync(page, interactionDelayMs).ConfigureAwait(false);
             return true;

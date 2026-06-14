@@ -75,6 +75,29 @@ public static class HtmlHttpClientFactory {
     }
 
     /// <summary>
+    /// Creates a new <see cref="HttpClient"/> with cookie support plus optional proxy and target-page credentials.
+    /// </summary>
+    /// <param name="cookieContainer">Container that will store cookies for the created handler.</param>
+    /// <param name="proxy">Optional proxy address.</param>
+    /// <param name="proxyCredential">Optional proxy credentials.</param>
+    /// <param name="credentials">Optional credentials for the target page.</param>
+    /// <param name="preAuthenticate">Enables HTTP pre-authentication when page credentials are provided.</param>
+    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true) {
+        cookieContainer = new CookieContainer();
+        HttpClientHandler handler = new() {
+            CookieContainer = cookieContainer,
+            Credentials = credentials,
+            PreAuthenticate = credentials != null && preAuthenticate,
+            UseCookies = true
+        };
+
+        ConfigureProxy(handler, proxy, proxyCredential);
+        HttpClient client = new HttpClient(handler, disposeHandler: true);
+        ApplyDefaults(client);
+        return client;
+    }
+
+    /// <summary>
     /// Gets a shared instance using the configured defaults.
     /// </summary>
     public static HttpClient Shared {

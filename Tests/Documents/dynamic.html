@@ -44,6 +44,15 @@
       div.appendChild(loaded);
       window.renderReady = true;
     }, 50);
+    setTimeout(function() {
+      const delayed = document.createElement('button');
+      delayed.id = 'delayed-click';
+      delayed.textContent = 'Delayed click';
+      delayed.onclick = function() {
+        document.getElementById('details').textContent = 'Delayed Click';
+      };
+      div.appendChild(delayed);
+    }, 75);
     fetch("/api/details", { method: "POST" });
   });
 </script>

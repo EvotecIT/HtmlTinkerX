@@ -50,6 +50,13 @@ Describe 'Invoke-HTMLRendering' {
         $text | Should -Be 'Clicked Details'
     }
 
+    It 'Can click targets that appear after initial load' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $text = Invoke-HTMLRendering -Url $uri -LoadState DomContentLoaded -ClickSelector '#delayed-click' -WaitForFunction '() => document.getElementById("details").textContent === "Delayed Click"' -Selector '#details' -AsText
+        $text | Should -Be 'Delayed Click'
+    }
+
     It 'Can return inner HTML from a focused rendered selector' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
