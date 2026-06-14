@@ -280,4 +280,33 @@ $Config = { sCtx: "second" };
 
         $node.GetType().FullName | Should -Be 'Acornima.Ast.Script'
     }
+
+    It 'exposes descendant-node aliases for reusable AST node input' {
+        $classBody = ConvertFrom-JavaScriptAst -Content 'class TicketCipher { constructor() { this.key = "abc"; } }' |
+            Select-JavaScriptDescendantNode -Type ClassBody |
+            Select-Object -First 1
+
+        $constructor = Select-JavaScriptDescendantNode -InputObject $classBody -Type MethodDefinition |
+            Select-Object -First 1
+
+        $constructor | Should -Not -BeNullOrEmpty
+        $constructor.TypeText | Should -Be 'MethodDefinition'
+    }
+
+    It 'filters selected AST nodes with a PowerShell scriptblock' {
+        $node = Select-JavaScriptAstNode -Source @'
+class TicketCipher {
+    constructor() {
+        this.iv = "iv-value";
+    }
+    decrypt() {
+        return this.iv;
+    }
+}
+'@ -Type MethodDefinition -FilterScript { param($node) $node.Key.Name -eq 'constructor' } |
+            Select-Object -First 1
+
+        $node | Should -Not -BeNullOrEmpty
+        $node.Key.Name | Should -Be 'constructor'
+    }
 }

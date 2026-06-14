@@ -41,4 +41,23 @@ internal static class HttpClientHelper {
 
         return HtmlHttpClientFactory.Create(proxy, proxyCredential?.GetNetworkCredential(), pageCredential);
     }
+
+    /// <summary>
+    /// Creates a new <see cref="HttpClient"/> using optional proxy settings, page credentials, and a returned cookie container.
+    /// </summary>
+    /// <param name="proxy">Proxy server address.</param>
+    /// <param name="proxyCredential">Credentials for the proxy.</param>
+    /// <param name="credential">Credentials for the target page.</param>
+    /// <param name="username">Username for the target page when <paramref name="credential"/> is not provided.</param>
+    /// <param name="password">Password for the target page when <paramref name="credential"/> is not provided.</param>
+    /// <param name="cookieContainer">Container used by the returned client.</param>
+    /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
+    internal static HttpClient CreateWithCookies(string? proxy, PSCredential? proxyCredential, PSCredential? credential, string? username, string? password, out CookieContainer cookieContainer) {
+        NetworkCredential? pageCredential = credential?.GetNetworkCredential();
+        if (pageCredential == null && !string.IsNullOrEmpty(username)) {
+            pageCredential = new NetworkCredential(username, password ?? string.Empty);
+        }
+
+        return HtmlHttpClientFactory.Create(out cookieContainer, proxy, proxyCredential?.GetNetworkCredential(), pageCredential);
+    }
 }
