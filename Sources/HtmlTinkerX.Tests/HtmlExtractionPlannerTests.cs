@@ -82,4 +82,24 @@ public class HtmlExtractionPlannerTests {
         Assert.NotEmpty(plan.Warnings);
         Assert.Contains("Invoke-HtmlFormRelay", plan.SuggestedCommand);
     }
+
+    [Fact]
+    public void Analyze_DoesNotRecommendRelayWhenGenericSubmitDoesNotTargetForm() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="a" action="/continue">
+<input type="hidden" name="csrf" value="redacted">
+</form>
+<script>const data = { submit: function() {} }; data.submit(); const marker = "hiddenform";</script>
+</body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html);
+
+        Assert.NotEqual(HtmlExtractionPlanMode.BrowserlessRelayCandidate, plan.RecommendedMode);
+        Assert.False(plan.HasAutoSubmitForm);
+        Assert.DoesNotContain("Invoke-HtmlFormRelay", plan.SuggestedCommand);
+    }
 }

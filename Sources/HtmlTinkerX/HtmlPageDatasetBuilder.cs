@@ -60,8 +60,8 @@ public static class HtmlPageDatasetBuilder {
             chunks.Add(new HtmlPageDatasetChunk {
                 ChunkId = $"page-chunk-{index + 1:D4}",
                 ChunkIndex = index,
-                SourceUrl = workbench.SourceUrl,
-                FinalUrl = workbench.FinalUrl,
+                SourceUrl = SanitizeUrl(workbench.SourceUrl),
+                FinalUrl = SanitizeUrl(workbench.FinalUrl),
                 Title = workbench.Title,
                 AnalysisMode = workbench.AnalysisMode,
                 Text = text,
@@ -158,9 +158,9 @@ public static class HtmlPageDatasetBuilder {
         List<HtmlPageDatasetProvenanceEntry> provenance = new() {
             new HtmlPageDatasetProvenanceEntry {
                 Kind = "ReadableText",
-                Name = FirstNonEmpty(workbench.ReadableText?.Title, workbench.Title),
+                Name = SanitizeProvenanceText(FirstNonEmpty(workbench.ReadableText?.Title, workbench.Title)),
                 Selector = workbench.ReadableText?.SelectorHint ?? string.Empty,
-                Url = FirstNonEmpty(workbench.FinalUrl, workbench.SourceUrl),
+                Url = SanitizeUrl(FirstNonEmpty(workbench.FinalUrl, workbench.SourceUrl)),
                 Source = workbench.AnalysisMode
             }
         };
@@ -168,7 +168,7 @@ public static class HtmlPageDatasetBuilder {
         foreach (HtmlDataItem item in workbench.Data.Take(40)) {
             provenance.Add(new HtmlPageDatasetProvenanceEntry {
                 Kind = item.Kind,
-                Name = item.Name,
+                Name = SanitizeProvenanceText(item.Name),
                 Selector = item.Selector,
                 Url = SanitizeProvenanceValue(item.Kind, item.RawValue),
                 Source = item.Source
@@ -178,7 +178,7 @@ public static class HtmlPageDatasetBuilder {
         foreach (HtmlInteractionSurfaceItem item in workbench.InteractionSurface.Take(40)) {
             provenance.Add(new HtmlPageDatasetProvenanceEntry {
                 Kind = item.Kind,
-                Name = item.Name,
+                Name = SanitizeProvenanceText(item.Name),
                 Selector = item.Selector,
                 Url = SanitizeProvenanceValue(item.Kind, item.Url),
                 Source = item.Source
@@ -212,6 +212,12 @@ public static class HtmlPageDatasetBuilder {
 
         return HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
     }
+
+    private static string SanitizeProvenanceText(string value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
+
+    private static string SanitizeUrl(string value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
 
     private static string BuildSummary(string text) {
         string normalized = NormalizeWhitespace(text);

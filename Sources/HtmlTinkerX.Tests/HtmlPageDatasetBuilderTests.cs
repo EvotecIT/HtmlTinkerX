@@ -92,6 +92,38 @@ public class HtmlPageDatasetBuilderTests {
     }
 
     [Fact]
+    public void Build_RedactsSensitiveChunkUrlsAndProvenanceNames() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page?access_token=abc123",
+            FinalUrl = "https://example.org/final?token=def456",
+            Title = "Sensitive URLs",
+            AnalysisMode = "Static",
+            ReadableText = new HtmlReadableTextResult {
+                Text = "Sensitive URL page.",
+                Title = "Sensitive URLs"
+            },
+            Data = new[] {
+                new HtmlDataItem {
+                    Kind = "Link",
+                    Name = "https://example.org/reset?token=abc123",
+                    RawValue = "https://example.org/reset?token=abc123",
+                    Source = "Anchor"
+                }
+            }
+        };
+
+        HtmlPageDatasetChunk chunk = Assert.Single(HtmlPageDatasetBuilder.Build(workbench));
+        string provenanceText = string.Join(" ", chunk.Provenance.Select(entry => string.Join(" ", entry.Name, entry.Url)));
+
+        Assert.Contains("access_token=<redacted>", chunk.SourceUrl);
+        Assert.Contains("token=<redacted>", chunk.FinalUrl);
+        Assert.Contains("token=<redacted>", provenanceText);
+        Assert.DoesNotContain("abc123", chunk.SourceUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("def456", chunk.FinalUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", provenanceText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ToJsonLines_SerializesOneChunkPerLine() {
         HtmlPageWorkbenchResult workbench = await HtmlPageWorkbench.AnalyzeAsync(
             "<html><body><main><h1>JSONL</h1><p>This page is small but still becomes one dataset record.</p></main></body></html>",

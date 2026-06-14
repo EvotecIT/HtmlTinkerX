@@ -27,8 +27,9 @@ fetch("/api/session?token=abc123");
         $endpoints.Count | Should -BeGreaterOrEqual 4
 
         $readEndpoint = $endpoints | Where-Object ResolvedUrl -EQ 'https://example.org/api/items'
-        $readEndpoint.RiskLevel | Should -Be 'Low'
-        $readEndpoint.ReasonCodes | Should -Contain 'same-origin-read'
+        $readEndpoint.RiskLevel | Should -Be 'Medium'
+        $readEndpoint.ReasonCodes | Should -Contain 'unknown-method'
+        $readEndpoint.ReasonCodes | Should -Not -Contain 'same-origin-read'
 
         $externalEndpoint = $endpoints | Where-Object ResolvedUrl -EQ 'https://api.example.net/public'
         $externalEndpoint.RiskLevel | Should -Be 'Medium'

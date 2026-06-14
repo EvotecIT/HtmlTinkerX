@@ -29,8 +29,9 @@ fetch("/api/session?token=abc123");
             });
 
         HtmlApiEndpointRecord readEndpoint = Assert.Single(workbench.ApiEndpoints, record => record.ResolvedUrl == "https://example.org/api/items");
-        Assert.Equal(HtmlApiEndpointRiskLevel.Low, readEndpoint.RiskLevel);
-        Assert.Contains("same-origin-read", readEndpoint.ReasonCodes);
+        Assert.Equal(HtmlApiEndpointRiskLevel.Medium, readEndpoint.RiskLevel);
+        Assert.Contains("unknown-method", readEndpoint.ReasonCodes);
+        Assert.DoesNotContain("same-origin-read", readEndpoint.ReasonCodes);
 
         HtmlApiEndpointRecord externalEndpoint = Assert.Single(workbench.ApiEndpoints, record => record.ResolvedUrl == "https://api.example.net/public");
         Assert.Equal(HtmlApiEndpointRiskLevel.Medium, externalEndpoint.RiskLevel);
@@ -75,6 +76,70 @@ fetch("/api/session?token=abc123");
 
         Assert.Contains("token=<redacted>", endpoint.Name);
         Assert.DoesNotContain("abc123", endpoint.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_RedactsSensitiveMetadata() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "LinkedEndpoint",
+                    Name = "/api/items",
+                    Url = "/api/items",
+                    Source = "LinkedScript",
+                    Metadata = "/app.js?token=abc123"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.Contains("token=<redacted>", endpoint.Metadata);
+        Assert.DoesNotContain("abc123", endpoint.Metadata, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_TreatsUnknownSameOriginMethodsAsReviewRisk() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/api/ambiguous",
+                    Url = "/api/ambiguous",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.Equal("UNKNOWN", endpoint.Method);
+        Assert.Equal(HtmlApiEndpointRiskLevel.Medium, endpoint.RiskLevel);
+        Assert.Contains("unknown-method", endpoint.ReasonCodes);
+        Assert.DoesNotContain("same-origin-read", endpoint.ReasonCodes);
+    }
+
+    [Fact]
+    public void Build_SkipsLinkedScriptDownloadDiagnosticsWithoutEndpointUrl() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "LinkedEndpoint",
+                    Name = "https://example.org/broken.js",
+                    Url = string.Empty,
+                    Source = "LinkedScript",
+                    Metadata = "404 Not Found"
+                }
+            }
+        };
+
+        Assert.Empty(HtmlApiEndpointInventory.Build(workbench));
     }
 
     [Fact]

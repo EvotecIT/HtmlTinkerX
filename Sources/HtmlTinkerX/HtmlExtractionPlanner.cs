@@ -37,7 +37,7 @@ public static class HtmlExtractionPlanner {
         int jsonLdCount = dataItems.Count(static item => item.Kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase));
         int openGraphCount = dataItems.Count(static item => item.Kind.Equals("OpenGraph", StringComparison.OrdinalIgnoreCase));
         int assetCount = dataItems.Count(static item => item.Kind.Equals("Asset", StringComparison.OrdinalIgnoreCase));
-        bool hasAutoSubmitForm = HasAutoSubmitForm(document, forms);
+        bool hasAutoSubmitForm = HasAutoSubmitForm(html, url);
         bool hasLoginForm = HasLoginForm(forms);
         bool hasStructuredData = dataItems.Any(static item =>
             item.Kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase)
@@ -178,28 +178,8 @@ public static class HtmlExtractionPlanner {
     private static bool HasLoginForm(IEnumerable<HtmlFormResult> forms) =>
         forms.Any(static form => form.Fields.Any(static field => field.Type == HtmlFormFieldType.Password));
 
-    private static bool HasAutoSubmitForm(IDocument document, IReadOnlyList<HtmlFormResult> forms) {
-        if (forms.Count != 1) {
-            return false;
-        }
-
-        HtmlFormResult form = forms[0];
-        int namedFieldCount = form.Fields.Count(static field => !string.IsNullOrWhiteSpace(field.Name));
-        int hiddenCount = form.Fields.Count(static field => field.Type == HtmlFormFieldType.Hidden);
-        bool mostlyHidden = namedFieldCount > 0 && hiddenCount >= Math.Max(1, namedFieldCount - 1);
-        bool knownRelayFields = ContainsAnyField(form, "wa", "wresult", "wctx", "SAMLRequest", "SAMLResponse", "RelayState");
-        bool autoSubmitScript = document.QuerySelectorAll("script")
-            .Select(static script => script.TextContent ?? string.Empty)
-            .Any(static script =>
-                script.IndexOf(".submit()", StringComparison.OrdinalIgnoreCase) >= 0
-                || script.IndexOf("document.forms[0]", StringComparison.OrdinalIgnoreCase) >= 0
-                || script.IndexOf("hiddenform", StringComparison.OrdinalIgnoreCase) >= 0);
-
-        return mostlyHidden && (knownRelayFields || autoSubmitScript);
-    }
-
-    private static bool ContainsAnyField(HtmlFormResult form, params string[] names) =>
-        form.Fields.Any(field => names.Any(name => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)));
+    private static bool HasAutoSubmitForm(string html, Uri? url) =>
+        HtmlFormRelayParser.TryParse(html, url ?? new Uri("https://example.invalid/"), out _);
 
     private static bool LooksLikeJavaScriptShell(IDocument document, int wordCount, int scriptCount, int appStateCount, int externalScriptCount) {
         string bodyText = Normalize(document.Body?.TextContent ?? string.Empty);

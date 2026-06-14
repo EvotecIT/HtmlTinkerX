@@ -47,6 +47,10 @@ public static class HtmlApiEndpointInventory {
                 continue;
             }
 
+            if (item.Kind.Equals("LinkedEndpoint", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(item.Url)) {
+                continue;
+            }
+
             records.Add(CreateRecord(item, pageUri, workbench));
         }
 
@@ -64,16 +68,19 @@ public static class HtmlApiEndpointInventory {
         string method = NormalizeMethod(item.Method, item.Kind);
         bool isExternal = resolvedUri != null && pageUri != null && !HasSameOrigin(pageUri, resolvedUri);
         bool isStateChanging = StateChangingMethods.Contains(method);
+        bool hasUnknownMethod = method.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase);
         bool hasSensitiveQuery = HtmlSensitiveValueRedactor.HasSensitiveQuery(resolvedUri)
             || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Url)
-            || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Name);
+            || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Name)
+            || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Metadata);
         bool hasAuthHint = HasAuthHint(item, resolvedUri, workbench);
-        List<string> reasonCodes = BuildReasonCodes(item, isExternal, isStateChanging, hasSensitiveQuery, hasAuthHint, resolvedUri);
-        HtmlApiEndpointRiskLevel riskLevel = ChooseRiskLevel(isExternal, isStateChanging, hasSensitiveQuery, hasAuthHint);
+        List<string> reasonCodes = BuildReasonCodes(item, isExternal, isStateChanging, hasUnknownMethod, hasSensitiveQuery, hasAuthHint, resolvedUri);
+        HtmlApiEndpointRiskLevel riskLevel = ChooseRiskLevel(isExternal, isStateChanging, hasUnknownMethod, hasSensitiveQuery, hasAuthHint);
 
         string originalUrl = hasSensitiveQuery ? HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(item.Url) : item.Url;
         string resolvedUrl = hasSensitiveQuery ? HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(resolvedUri?.AbsoluteUri ?? item.Url) : resolvedUri?.AbsoluteUri ?? item.Url;
         string name = FirstNonEmpty(item.Name, resolvedUri?.AbsolutePath, item.Url);
+        string metadata = hasSensitiveQuery ? HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(item.Metadata) : item.Metadata;
 
         return new HtmlApiEndpointRecord {
             Kind = item.Kind,
@@ -90,11 +97,11 @@ public static class HtmlApiEndpointInventory {
             ReasonCodes = reasonCodes,
             Selector = item.Selector,
             Source = item.Source,
-            Metadata = item.Metadata
+            Metadata = metadata
         };
     }
 
-    private static List<string> BuildReasonCodes(HtmlInteractionSurfaceItem item, bool isExternal, bool isStateChanging, bool hasSensitiveQuery, bool hasAuthHint, Uri? resolvedUri) {
+    private static List<string> BuildReasonCodes(HtmlInteractionSurfaceItem item, bool isExternal, bool isStateChanging, bool hasUnknownMethod, bool hasSensitiveQuery, bool hasAuthHint, Uri? resolvedUri) {
         List<string> reasonCodes = new();
         if (item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)) {
             reasonCodes.Add("form-action");
@@ -110,6 +117,10 @@ public static class HtmlApiEndpointInventory {
 
         if (isStateChanging) {
             reasonCodes.Add("state-changing-method");
+        }
+
+        if (hasUnknownMethod) {
+            reasonCodes.Add("unknown-method");
         }
 
         if (hasSensitiveQuery) {
@@ -131,12 +142,12 @@ public static class HtmlApiEndpointInventory {
         return reasonCodes;
     }
 
-    private static HtmlApiEndpointRiskLevel ChooseRiskLevel(bool isExternal, bool isStateChanging, bool hasSensitiveQuery, bool hasAuthHint) {
+    private static HtmlApiEndpointRiskLevel ChooseRiskLevel(bool isExternal, bool isStateChanging, bool hasUnknownMethod, bool hasSensitiveQuery, bool hasAuthHint) {
         if (isStateChanging || hasSensitiveQuery) {
             return HtmlApiEndpointRiskLevel.High;
         }
 
-        return isExternal || hasAuthHint
+        return isExternal || hasAuthHint || hasUnknownMethod
             ? HtmlApiEndpointRiskLevel.Medium
             : HtmlApiEndpointRiskLevel.Low;
     }
