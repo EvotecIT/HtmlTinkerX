@@ -1,8 +1,11 @@
 using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -41,6 +44,40 @@ public class HtmlBrowserNetworkLogTests {
         Assert.Equal("v1", entry.RequestHeaders["h1"]);
         Assert.Equal("v2", entry.ResponseHeaders!["h2"]);
         Assert.NotNull(entry.Duration);
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task CaptureResponseBodiesAsync_CanceledToken_Throws() {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+
+        var request = new Mock<IRequest>();
+        request.SetupGet(r => r.Url).Returns("https://example.com/api/data");
+        request.SetupGet(r => r.Method).Returns("GET");
+        request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        request.SetupGet(r => r.ResourceType).Returns("fetch");
+
+        var pendingBody = new TaskCompletionSource<string>();
+        var response = new Mock<IResponse>();
+        response.SetupGet(r => r.Request).Returns(request.Object);
+        response.SetupGet(r => r.Status).Returns(200);
+        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        response.Setup(r => r.TextAsync()).Returns(pendingBody.Task);
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+
+        page.Raise(p => p.Request += null!, page.Object, request.Object);
+        page.Raise(p => p.Response += null!, page.Object, response.Object);
+
+        using CancellationTokenSource cts = new();
+        cts.CancelAfter(50);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            session.CaptureResponseBodiesAsync(100, new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch }, cts.Token));
+        Assert.Null(HtmlBrowser.GetNetworkLog(session).Single().ResponseBodyError);
         await session.DisposeAsync();
     }
 

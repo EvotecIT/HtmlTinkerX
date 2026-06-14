@@ -117,7 +117,7 @@ public static partial class HtmlBrowser {
             cancellationToken).ConfigureAwait(false);
 
         if (hasExplicitInteractions) {
-            await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitForFunctionReadinessAsync(page, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
             await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
         } else if (autoScroll) {
             await WaitForFunctionReadinessAsync(page, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);

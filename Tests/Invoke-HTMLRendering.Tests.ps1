@@ -238,6 +238,38 @@ setTimeout(() => {
         $text | Should -Be 'Lazy after hydration'
     }
 
+    It 'Can wait for selector content revealed by click-enabled auto-scroll' {
+        $htmlPath = Join-Path $TestDrive 'click-scroll.html'
+        @'
+<!doctype html>
+<html>
+<body style="min-height:4000px">
+<button id="enable">Load</button>
+<main>loading</main>
+<script>
+let enabled = false;
+document.getElementById('enable').addEventListener('click', () => {
+  enabled = true;
+});
+window.addEventListener('scroll', () => {
+  if (enabled && !document.getElementById('item')) {
+    const item = document.createElement('div');
+    item.id = 'item';
+    item.textContent = 'Loaded by scroll';
+    document.querySelector('main').appendChild(item);
+  }
+});
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -LoadState DomContentLoaded -ClickSelector '#enable' -AutoScroll -AutoScrollSteps 1 -AutoScrollDelayMs 20 -WaitForSelector '#item' -Selector '#item' -AsText -Timeout 2000
+
+        $text | Should -Be 'Loaded by scroll'
+    }
+
     It 'Can apply rendered click interactions before extraction' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri

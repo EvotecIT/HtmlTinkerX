@@ -188,8 +188,14 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
 
             try {
                 Task<string> readTask = response.TextAsync();
-                Task completed = await Task.WhenAny(readTask, Task.Delay(TimeSpan.FromSeconds(3), cancellationToken)).ConfigureAwait(false);
-                if (!ReferenceEquals(completed, readTask)) {
+                Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
+                Task cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                Task completed = await Task.WhenAny(readTask, timeoutTask, cancellationTask).ConfigureAwait(false);
+                if (ReferenceEquals(completed, cancellationTask)) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                if (ReferenceEquals(completed, timeoutTask)) {
                     item.Entry.ResponseBodyError = "Response body capture timed out.";
                     continue;
                 }
