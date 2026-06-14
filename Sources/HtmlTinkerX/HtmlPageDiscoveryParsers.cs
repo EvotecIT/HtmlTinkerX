@@ -174,6 +174,10 @@ public static class HtmlLinkedJavaScriptEndpointParser {
     }
 
     internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? client, Uri? effectiveBaseUriOverride) {
+        return await ParseAsync(html, pageBaseUri, includeExternal, client, client, effectiveBaseUriOverride).ConfigureAwait(false);
+    }
+
+    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? sameOriginClient, HttpClient? externalClient, Uri? effectiveBaseUriOverride) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -184,7 +188,6 @@ public static class HtmlLinkedJavaScriptEndpointParser {
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         Uri effectiveBaseUri = effectiveBaseUriOverride ?? HtmlModernParserUtilities.GetEffectiveBaseUri(document, pageBaseUri) ?? pageBaseUri;
-        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         List<HtmlLinkedJavaScriptEndpoint> endpoints = new();
         int scriptIndex = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {
@@ -223,6 +226,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
             }
 
             try {
+                HttpClient http = (isExternal ? externalClient : sameOriginClient) ?? HtmlHttpClientFactory.Shared;
                 string scriptContent = await HtmlUtilities.GetStringWithProperEncodingAsync(http, scriptUrl).ConfigureAwait(false);
                 foreach (HtmlJavaScriptEndpoint endpoint in HtmlJavaScriptEndpointParser.ParseJavaScript(scriptContent)) {
                     endpoints.Add(new HtmlLinkedJavaScriptEndpoint {

@@ -13,7 +13,8 @@ function script:Get-AvailableTcpPort {
 
 function script:Start-SnapshotTestServer {
     param(
-        [int] $Port
+        [int] $Port,
+        [int] $ExternalScriptPort = 0
     )
 
     if (-not ('SnapshotTestServer' -as [type])) {
@@ -29,11 +30,25 @@ using System.Threading.Tasks;
 
 public sealed class SnapshotTestServer : IDisposable {
     private readonly TcpListener listener;
+    private readonly int externalScriptPort;
     private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
     private Task acceptLoop;
+    private int assetRequestCount;
 
     public SnapshotTestServer(int port) {
+        this.externalScriptPort = 0;
         listener = new TcpListener(IPAddress.Parse("127.0.0.1"), port);
+    }
+
+    public SnapshotTestServer(int port, int externalScriptPort) {
+        this.externalScriptPort = externalScriptPort;
+        listener = new TcpListener(IPAddress.Parse("127.0.0.1"), port);
+    }
+
+    public int AssetRequestCount {
+        get {
+            return Volatile.Read(ref assetRequestCount);
+        }
     }
 
     public void Start() {
@@ -56,7 +71,7 @@ public sealed class SnapshotTestServer : IDisposable {
         }
     }
 
-    private static async Task HandleClientAsync(TcpClient client) {
+    private async Task HandleClientAsync(TcpClient client) {
         using (client) {
             NetworkStream stream = client.GetStream();
             using (StreamReader reader = new StreamReader(stream, Encoding.ASCII, false, 1024, true)) {
@@ -73,15 +88,19 @@ public sealed class SnapshotTestServer : IDisposable {
                 string[] parts = requestLine.Split(' ');
                 string path = parts.Length > 1 ? parts[1] : "/";
                 if (string.Equals(path, "/page", StringComparison.OrdinalIgnoreCase)) {
+                    string scriptSrc = externalScriptPort > 0
+                        ? "http://127.0.0.1:" + externalScriptPort.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/challenge.js"
+                        : "/assets/app.js";
                     await WriteResponseAsync(
                         stream,
                         "text/html",
-                        "<!doctype html><html><head><script src=\"/assets/app.js\"></script></head><body><main>snapshot</main></body></html>",
+                        "<!doctype html><html><head><script src=\"" + scriptSrc + "\"></script></head><body><main>snapshot</main></body></html>",
                         "Set-Cookie: assetCookie=1; Path=/assets\r\n").ConfigureAwait(false);
                     return;
                 }
 
                 if (string.Equals(path, "/assets/app.js", StringComparison.OrdinalIgnoreCase)) {
+                    Interlocked.Increment(ref assetRequestCount);
                     headers.TryGetValue("User-Agent", out string userAgent);
                     headers.TryGetValue("Cookie", out string cookie);
                     string body = string.Equals(userAgent, "SnapshotAgent", StringComparison.Ordinal)
@@ -89,6 +108,16 @@ public sealed class SnapshotTestServer : IDisposable {
                         ? "fetch(\"/api/protected\", { method: \"POST\" });"
                         : "console.log(\"denied\");";
                     await WriteResponseAsync(stream, "application/javascript", body, null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (string.Equals(path, "/challenge.js", StringComparison.OrdinalIgnoreCase)) {
+                    if (headers.ContainsKey("Authorization")) {
+                        await WriteResponseAsync(stream, "application/javascript", "fetch(\"/api/leaked\", { method: \"POST\" });", null).ConfigureAwait(false);
+                    } else {
+                        await WriteResponseAsync(stream, "text/plain", "external credentials required", "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"external\"\r\n").ConfigureAwait(false);
+                    }
+
                     return;
                 }
 
@@ -126,7 +155,7 @@ public sealed class SnapshotTestServer : IDisposable {
 '@
     }
 
-    $server = [SnapshotTestServer]::new($Port)
+    $server = [SnapshotTestServer]::new($Port, $ExternalScriptPort)
     $server.Start()
     return $server
 }
@@ -152,6 +181,18 @@ Describe 'Invoke-HTMLRendering' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $text = Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitForFunction '() => window.renderReady === true' -Selector '#loaded' -AsText
         $text | Should -Be 'Dynamic Content'
+    }
+
+    It 'Can open a browser session with commit load state' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $session = Invoke-HTMLRendering -Url $uri -Session -LoadState Commit
+
+        try {
+            $session.GetType().Name | Should -Be 'HtmlBrowserSession'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
     }
 
     It 'Can use DOMContentLoaded navigation with selector readiness' {
@@ -425,8 +466,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             $snapshot.Content | Should -Be 'snapshot'
             $snapshot.LinkedJavaScriptEndpoints.Url | Should -Contain '/api/protected'
+            $server.AssetRequestCount | Should -Be 2
         } finally {
             $server.Dispose()
+        }
+    }
+
+    It 'Does not send page credentials to external linked-script fetches' {
+        $externalPort = Get-AvailableTcpPort
+        $pagePort = Get-AvailableTcpPort
+        $externalServer = Start-SnapshotTestServer -Port $externalPort
+        $pageServer = Start-SnapshotTestServer -Port $pagePort -ExternalScriptPort $externalPort
+        $securePassword = ConvertTo-SecureString 'page-pass' -AsPlainText -Force
+        $credential = [pscredential]::new('page-user', $securePassword)
+
+        try {
+            $snapshot = Invoke-HTMLRendering -Url "http://127.0.0.1:$pagePort/page" -LoadState DomContentLoaded -WaitForSelector 'main' -Selector 'main' -AsText -Snapshot -IncludeLinkedScripts -IncludeExternalLinkedScripts -Credential $credential -UserAgent 'SnapshotAgent'
+
+            $snapshot.Content | Should -Be 'snapshot'
+            $snapshot.LinkedJavaScriptEndpoints.Url | Should -Not -Contain '/api/leaked'
+            ($snapshot.LinkedJavaScriptEndpoints | Where-Object ScriptUrl -Like "http://127.0.0.1:$externalPort/challenge.js").Error | Should -Not -BeNullOrEmpty
+        } finally {
+            $pageServer.Dispose()
+            $externalServer.Dispose()
         }
     }
 

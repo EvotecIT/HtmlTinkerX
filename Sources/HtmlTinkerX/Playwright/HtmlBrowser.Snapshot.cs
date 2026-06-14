@@ -28,6 +28,7 @@ public static partial class HtmlBrowser {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="httpClient">Optional HTTP client reused for linked JavaScript downloads.</param>
     /// <param name="extractionTimeout">Optional selector wait timeout in milliseconds.</param>
+    /// <param name="externalHttpClient">Optional HTTP client used only for cross-origin linked JavaScript downloads.</param>
     /// <returns>A rendered page snapshot with common parsing outputs.</returns>
     public static async Task<HtmlRenderedPageSnapshot> CreateSnapshotAsync(
         HtmlBrowserSession session,
@@ -43,7 +44,8 @@ public static partial class HtmlBrowser {
         bool includeNetworkLog = false,
         CancellationToken cancellationToken = default,
         HttpClient? httpClient = null,
-        int? extractionTimeout = null) {
+        int? extractionTimeout = null,
+        HttpClient? externalHttpClient = null) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
@@ -57,10 +59,10 @@ public static partial class HtmlBrowser {
         Uri? baseUri = Uri.TryCreate(session.Page.Url, UriKind.Absolute, out Uri? parsedUri) ? parsedUri : null;
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
-        IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts, httpClient).ConfigureAwait(false);
         IReadOnlyList<HtmlLinkedJavaScriptEndpoint> linkedJavaScriptEndpoints = includeLinkedScripts && baseUri != null
-            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient).ConfigureAwait(false)
+            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient, externalHttpClient, null).ConfigureAwait(false)
             : Array.Empty<HtmlLinkedJavaScriptEndpoint>();
+        IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = HtmlParsingToolbox.FindInteractionSurface(html, baseUri, linkedJavaScriptEndpoints);
         HtmlStaticRenderedComparison? comparison = includeStaticRenderedComparison && staticHtml != null
             ? HtmlParsingToolbox.CompareStaticRendered(staticHtml, html, baseUri)
             : null;

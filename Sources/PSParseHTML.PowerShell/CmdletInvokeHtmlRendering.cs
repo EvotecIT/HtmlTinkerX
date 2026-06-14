@@ -293,6 +293,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             && string.IsNullOrWhiteSpace(WaitForFunction)
             && LoadState == HtmlBrowserLoadState.Commit
             && WaitAfterLoadMs == 0
+            && !Session.IsPresent
             && RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
             throw new PSArgumentException("LoadState Commit requires WaitForSelector, WaitForFunction, or WaitAfterLoadMs so content extraction has a readiness signal.");
         }
@@ -425,6 +426,9 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent || IncludeStaticRenderedComparison.IsPresent
                     ? await CreateSessionHttpClientAsync(sess, target, UserAgent, token).ConfigureAwait(false)
                     : null;
+                HttpClient? externalSnapshotHttpClient = IncludeLinkedScripts.IsPresent && IncludeExternalLinkedScripts.IsPresent
+                    ? CreateExternalSnapshotHttpClient(UserAgent)
+                    : null;
                 try {
                     string? staticHtml = IncludeStaticRenderedComparison.IsPresent
                         ? await ReadStaticHtmlAsync(target, token, snapshotHttpClient).ConfigureAwait(false)
@@ -443,9 +447,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                         IncludeNetworkLog.IsPresent,
                         token,
                         snapshotHttpClient,
-                        Timeout).ConfigureAwait(false);
+                        Timeout,
+                        externalSnapshotHttpClient).ConfigureAwait(false);
                     WriteObject(snapshot);
                 } finally {
+                    externalSnapshotHttpClient?.Dispose();
                     snapshotHttpClient?.Dispose();
                 }
                 return;
@@ -524,6 +530,15 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             } catch (CookieException) {
                 // Ignore browser cookies that cannot be represented by System.Net.Cookie.
             }
+        }
+
+        return client;
+    }
+
+    private HttpClient CreateExternalSnapshotHttpClient(string? userAgent) {
+        HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        if (!string.IsNullOrWhiteSpace(userAgent)) {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
         }
 
         return client;

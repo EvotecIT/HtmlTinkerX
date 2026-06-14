@@ -452,6 +452,19 @@ public static class HtmlParsingToolbox {
     /// <param name="client">Optional HTTP client reused for linked JavaScript downloads, including caller-specified proxy settings.</param>
     /// <returns>Interaction surface records in source-family order.</returns>
     public static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri = null, bool includeLinkedScripts = false, bool includeExternalLinkedScripts = false, HttpClient? client = null) {
+        IReadOnlyList<HtmlLinkedJavaScriptEndpoint>? linkedEndpoints = null;
+        if (includeLinkedScripts) {
+            Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
+            if (effectiveBaseUri != null) {
+                Uri linkedScriptPageBaseUri = baseUri ?? effectiveBaseUri;
+                linkedEndpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, linkedScriptPageBaseUri, includeExternalLinkedScripts, client, effectiveBaseUri).ConfigureAwait(false);
+            }
+        }
+
+        return FindInteractionSurface(html, baseUri, linkedEndpoints);
+    }
+
+    internal static IReadOnlyList<HtmlInteractionSurfaceItem> FindInteractionSurface(string html, Uri? baseUri, IReadOnlyList<HtmlLinkedJavaScriptEndpoint>? linkedEndpoints) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -475,9 +488,8 @@ public static class HtmlParsingToolbox {
             AddSurface(items, "Endpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url), endpoint.Method, endpoint.Url, string.Empty, FirstNonEmpty(endpoint.Selector, "script"), "InlineScript", endpoint.ScriptIndex ?? endpoint.Index, false, endpoint.Client);
         }
 
-        if (includeLinkedScripts && effectiveBaseUri != null) {
-            Uri linkedScriptPageBaseUri = baseUri ?? effectiveBaseUri;
-            foreach (HtmlLinkedJavaScriptEndpoint endpoint in await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, linkedScriptPageBaseUri, includeExternalLinkedScripts, client, effectiveBaseUri).ConfigureAwait(false)) {
+        if (linkedEndpoints != null) {
+            foreach (HtmlLinkedJavaScriptEndpoint endpoint in linkedEndpoints) {
                 string metadata = FirstNonEmpty(endpoint.Error, endpoint.OperationName, endpoint.Client, endpoint.ScriptUrl);
                 AddSurface(items, "LinkedEndpoint", FirstNonEmpty(endpoint.OperationName, endpoint.Client, endpoint.Url, endpoint.ScriptUrl), endpoint.Method, endpoint.Url, string.Empty, endpoint.Selector, "LinkedScript", endpoint.ScriptIndex, endpoint.IsExternal, metadata);
             }
