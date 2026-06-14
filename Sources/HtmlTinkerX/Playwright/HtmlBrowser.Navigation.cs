@@ -92,18 +92,15 @@ public static partial class HtmlBrowser {
             throw new ArgumentOutOfRangeException(nameof(autoScrollDelayMs), "AutoScrollDelayMs must be zero or greater.");
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!string.IsNullOrWhiteSpace(waitForSelector)) {
-            await page.WaitForSelectorAsync(waitForSelector!, new PageWaitForSelectorOptions {
-                Timeout = timeout
-            }).ConfigureAwait(false);
-        }
+        bool hasPageChangingActions =
+            HasAny(clickSelectors) ||
+            HasAny(clickTexts) ||
+            HasAny(dismissSelectors) ||
+            HasAny(dismissTexts) ||
+            autoScroll;
 
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!string.IsNullOrWhiteSpace(waitForFunction)) {
-            await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
-                Timeout = timeout
-            }).ConfigureAwait(false);
+        if (!hasPageChangingActions) {
+            await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
         }
 
         IReadOnlyList<string> appliedInteractions = await ApplyPageInteractionsAsync(
@@ -117,26 +114,59 @@ public static partial class HtmlBrowser {
             timeout,
             cancellationToken).ConfigureAwait(false);
 
+        if (autoScroll) {
+            for (int i = 0; i < autoScrollSteps; i++) {
+                cancellationToken.ThrowIfCancellationRequested();
+                await page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
+                if (autoScrollDelayMs > 0) {
+                    await page.WaitForTimeoutAsync(autoScrollDelayMs).ConfigureAwait(false);
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.EvaluateAsync("() => window.scrollTo(0, 0)").ConfigureAwait(false);
+        }
+
+        if (hasPageChangingActions) {
+            await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+        }
+
         if (waitAfterLoadMs > 0) {
             cancellationToken.ThrowIfCancellationRequested();
             await page.WaitForTimeoutAsync(waitAfterLoadMs).ConfigureAwait(false);
         }
 
-        if (!autoScroll) {
-            return appliedInteractions;
-        }
+        return appliedInteractions;
+    }
 
-        for (int i = 0; i < autoScrollSteps; i++) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
-            if (autoScrollDelayMs > 0) {
-                await page.WaitForTimeoutAsync(autoScrollDelayMs).ConfigureAwait(false);
-            }
+    private static async Task WaitForExtractionReadinessAsync(IPage page, string? waitForSelector, string? waitForFunction, int timeout, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.IsNullOrWhiteSpace(waitForSelector)) {
+            await page.WaitForSelectorAsync(waitForSelector!, new PageWaitForSelectorOptions {
+                Timeout = timeout
+            }).ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await page.EvaluateAsync("() => window.scrollTo(0, 0)").ConfigureAwait(false);
-        return appliedInteractions;
+        if (!string.IsNullOrWhiteSpace(waitForFunction)) {
+            await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
+                Timeout = timeout
+            }).ConfigureAwait(false);
+        }
+    }
+
+    private static bool HasAny(IEnumerable<string>? values) {
+        if (values == null) {
+            return false;
+        }
+
+        foreach (string? value in values) {
+            if (!string.IsNullOrWhiteSpace(value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

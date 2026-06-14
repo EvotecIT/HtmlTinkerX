@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,6 +26,8 @@ public static partial class HtmlBrowser {
     /// <param name="includeExternalLinkedScripts">Allows cross-origin linked JavaScript downloads when linked-script inspection is enabled.</param>
     /// <param name="includeNetworkLog">Include captured browser network entries. This is opt-in because headers may contain sensitive values.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="httpClient">Optional HTTP client reused for linked JavaScript downloads.</param>
+    /// <param name="extractionTimeout">Optional selector wait timeout in milliseconds.</param>
     /// <returns>A rendered page snapshot with common parsing outputs.</returns>
     public static async Task<HtmlRenderedPageSnapshot> CreateSnapshotAsync(
         HtmlBrowserSession session,
@@ -38,7 +41,9 @@ public static partial class HtmlBrowser {
         bool includeLinkedScripts = false,
         bool includeExternalLinkedScripts = false,
         bool includeNetworkLog = false,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        HttpClient? httpClient = null,
+        int? extractionTimeout = null) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
@@ -47,14 +52,14 @@ public static partial class HtmlBrowser {
         string text = await GetContentAsync(session.Page, asText: true, cancellationToken: cancellationToken).ConfigureAwait(false);
         string content = string.IsNullOrWhiteSpace(selector) && !asText && !innerHtml
             ? html
-            : await GetContentAsync(session.Page, selector, innerHtml, asText, cancellationToken).ConfigureAwait(false);
+            : await GetContentAsync(session.Page, selector, innerHtml, asText, extractionTimeout, cancellationToken).ConfigureAwait(false);
         string title = await session.Page.TitleAsync().ConfigureAwait(false);
         Uri? baseUri = Uri.TryCreate(session.Page.Url, UriKind.Absolute, out Uri? parsedUri) ? parsedUri : null;
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
-        IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts).ConfigureAwait(false);
+        IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts, httpClient).ConfigureAwait(false);
         IReadOnlyList<HtmlLinkedJavaScriptEndpoint> linkedJavaScriptEndpoints = includeLinkedScripts && baseUri != null
-            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts).ConfigureAwait(false)
+            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient).ConfigureAwait(false)
             : Array.Empty<HtmlLinkedJavaScriptEndpoint>();
         HtmlStaticRenderedComparison? comparison = includeStaticRenderedComparison && staticHtml != null
             ? HtmlParsingToolbox.CompareStaticRendered(staticHtml, html, baseUri)

@@ -43,6 +43,13 @@ Describe 'Invoke-HTMLRendering' {
         $text | Should -Be 'Clicked Details'
     }
 
+    It 'Can wait for content revealed by rendered click interactions' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+        $text = Invoke-HTMLRendering -Url $uri -LoadState DomContentLoaded -ClickSelector '#show-details' -WaitForSelector '#details' -Selector '#details' -AsText
+        $text | Should -Be 'Clicked Details'
+    }
+
     It 'Can return inner HTML from a focused rendered selector' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -246,6 +253,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         { Invoke-HTMLRendering -Url $uri -IncludeResponseBody } | Should -Throw '*only valid with -Snapshot*'
         { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires WaitForSelector, WaitForFunction, or WaitAfterLoadMs*'
         { Invoke-HTMLRendering -Url $uri -BlockResourceType Document } | Should -Throw '*would abort page navigation*'
+    }
+
+    It 'Honors timeout while waiting for extraction selectors' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $uri = [System.Uri]::new($path).AbsoluteUri
+
+        $elapsed = Measure-Command {
+            { Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitAfterLoadMs 50 -Selector '#missing' -AsText -Timeout 500 } | Should -Throw
+        }
+
+        $elapsed.TotalSeconds | Should -BeLessThan 10
     }
 
     It 'Loads content using Firefox engine' {

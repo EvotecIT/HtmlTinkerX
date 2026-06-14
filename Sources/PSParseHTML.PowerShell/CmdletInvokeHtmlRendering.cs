@@ -324,7 +324,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             : null;
 
         if (Session.IsPresent) {
-            HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
+            HtmlBrowserSession sess = await HtmlBrowser.OpenSessionWithOptionsAsync(
                 target,
                 Browser,
                 Clean.IsPresent,
@@ -376,7 +376,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             WriteObject(sess);
         } else {
-            await using HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
+            await using HtmlBrowserSession sess = await HtmlBrowser.OpenSessionWithOptionsAsync(
                 target,
                 Browser,
                 Clean.IsPresent,
@@ -424,24 +424,33 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token).ConfigureAwait(false);
             }
             if (Snapshot.IsPresent) {
-                HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
-                    sess,
-                    target,
-                    Selector,
-                    InnerHtml.IsPresent,
-                    AsText.IsPresent,
-                    appliedInteractions,
-                    staticHtml,
-                    IncludeStaticRenderedComparison.IsPresent,
-                    IncludeLinkedScripts.IsPresent,
-                    IncludeExternalLinkedScripts.IsPresent,
-                    IncludeNetworkLog.IsPresent || IncludeResponseBody.IsPresent,
-                    token).ConfigureAwait(false);
-                WriteObject(snapshot);
+                HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent
+                    ? HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password)
+                    : null;
+                try {
+                    HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
+                        sess,
+                        target,
+                        Selector,
+                        InnerHtml.IsPresent,
+                        AsText.IsPresent,
+                        appliedInteractions,
+                        staticHtml,
+                        IncludeStaticRenderedComparison.IsPresent,
+                        IncludeLinkedScripts.IsPresent,
+                        IncludeExternalLinkedScripts.IsPresent,
+                        IncludeNetworkLog.IsPresent || IncludeResponseBody.IsPresent,
+                        token,
+                        snapshotHttpClient,
+                        Timeout).ConfigureAwait(false);
+                    WriteObject(snapshot);
+                } finally {
+                    snapshotHttpClient?.Dispose();
+                }
                 return;
             }
 
-            string html = await HtmlBrowser.GetContentAsync(sess.Page, Selector, InnerHtml.IsPresent, AsText.IsPresent, token).ConfigureAwait(false);
+            string html = await HtmlBrowser.GetContentAsync(sess.Page, Selector, InnerHtml.IsPresent, AsText.IsPresent, Timeout, token).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(OutFile)) {
                 string outPath = OutFile!.ToFullPath();
 #if NETSTANDARD2_0 || NETFRAMEWORK

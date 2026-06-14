@@ -232,6 +232,63 @@ public static partial class HtmlBrowser {
         double? geoLatitude = null,
         double? geoLongitude = null,
         string? timezone = null,
+        int timeout = 10000,
+        CancellationToken cancellationToken = default)
+        => OpenSessionWithOptionsAsync(
+            url,
+            browser,
+            clean,
+            username,
+            password,
+            formLogin,
+            headless,
+            slowMo,
+            videoPath,
+            videoWidth,
+            videoHeight,
+            storageStatePath,
+            userAgent,
+            viewportWidth,
+            viewportHeight,
+            deviceScaleFactor,
+            proxy,
+            proxyUsername,
+            proxyPassword,
+            geoLatitude,
+            geoLongitude,
+            timezone,
+            blockResourceTypes: null,
+            blockResourcePatterns: null,
+            loadState: HtmlBrowserLoadState.NetworkIdle,
+            timeout,
+            cancellationToken);
+
+    /// <summary>
+    /// Creates a new <see cref="HtmlBrowserSession"/> and navigates to the specified URL.
+    /// </summary>
+    public static Task<HtmlBrowserSession> OpenSessionWithOptionsAsync(
+        string url,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        bool clean = false,
+        string? username = null,
+        string? password = null,
+        HtmlFormLogin? formLogin = null,
+        bool headless = true,
+        int slowMo = 0,
+        string? videoPath = null,
+        int videoWidth = 800,
+        int videoHeight = 600,
+        string? storageStatePath = null,
+        string? userAgent = null,
+        int? viewportWidth = null,
+        int? viewportHeight = null,
+        float? deviceScaleFactor = null,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null,
+        double? geoLatitude = null,
+        double? geoLongitude = null,
+        string? timezone = null,
         IEnumerable<HtmlNetworkResourceType>? blockResourceTypes = null,
         IEnumerable<string>? blockResourcePatterns = null,
         HtmlBrowserLoadState loadState = HtmlBrowserLoadState.NetworkIdle,
@@ -273,7 +330,7 @@ public static partial class HtmlBrowser {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The rendered HTML markup.</returns>
     public static async Task<string> GetPageContentAsync(string url, HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium, bool clean = false, string? username = null, string? password = null, HtmlFormLogin? formLogin = null, bool headless = true, int slowMo = 0, string? userAgent = null, int? viewportWidth = null, int? viewportHeight = null, float? deviceScaleFactor = null, string? proxy = null, string? proxyUsername = null, string? proxyPassword = null, double? geoLatitude = null, double? geoLongitude = null, string? timezone = null, int timeout = 10000, CancellationToken cancellationToken = default) {
-        await using HtmlBrowserSession session = await OpenSessionAsync(
+        await using HtmlBrowserSession session = await OpenSessionWithOptionsAsync(
             url,
             browser,
             clean,
@@ -348,7 +405,20 @@ public static partial class HtmlBrowser {
     /// <param name="asText">Return text content instead of markup.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Extracted markup or text.</returns>
-    public static async Task<string> GetContentAsync(IPage page, string? selector = null, bool innerHtml = false, bool asText = false, CancellationToken cancellationToken = default) {
+    public static Task<string> GetContentAsync(IPage page, string? selector = null, bool innerHtml = false, bool asText = false, CancellationToken cancellationToken = default)
+        => GetContentAsync(page, selector, innerHtml, asText, timeout: null, cancellationToken);
+
+    /// <summary>
+    /// Gets HTML content from an already loaded page or element.
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="selector">Optional CSS selector for the element.</param>
+    /// <param name="innerHtml">Return inner HTML instead of outer HTML.</param>
+    /// <param name="asText">Return text content instead of markup.</param>
+    /// <param name="timeout">Optional selector wait timeout in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Extracted markup or text.</returns>
+    public static async Task<string> GetContentAsync(IPage page, string? selector, bool innerHtml, bool asText, int? timeout, CancellationToken cancellationToken = default) {
         if (string.IsNullOrEmpty(selector)) {
             if (asText) {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -360,7 +430,9 @@ public static partial class HtmlBrowser {
 
         var locator = page.Locator(selector!);
         cancellationToken.ThrowIfCancellationRequested();
-        await locator.WaitForAsync();
+        await locator.WaitForAsync(new LocatorWaitForOptions {
+            Timeout = timeout
+        }).ConfigureAwait(false);
 
         if (asText) {
             return await locator.InnerTextAsync().ConfigureAwait(false);
