@@ -94,12 +94,14 @@ public static partial class HtmlBrowser {
             await locator.WaitForAsync(new LocatorWaitForOptions {
                 State = WaitForSelectorState.Visible,
                 Timeout = timeout
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             await locator.ClickAsync(new LocatorClickOptions {
                 Timeout = timeout
-            }).ConfigureAwait(false);
-            await WaitAfterInteractionAsync(page, interactionDelayMs).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await WaitAfterInteractionAsync(interactionDelayMs, cancellationToken).ConfigureAwait(false);
             return true;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch {
             return false;
         }
@@ -112,20 +114,39 @@ public static partial class HtmlBrowser {
             await locator.WaitForAsync(new LocatorWaitForOptions {
                 State = WaitForSelectorState.Visible,
                 Timeout = timeout
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             await locator.ClickAsync(new LocatorClickOptions {
                 Timeout = timeout
-            }).ConfigureAwait(false);
-            await WaitAfterInteractionAsync(page, interactionDelayMs).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await WaitAfterInteractionAsync(interactionDelayMs, cancellationToken).ConfigureAwait(false);
             return true;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch {
             return false;
         }
     }
 
-    private static async Task WaitAfterInteractionAsync(IPage page, int interactionDelayMs) {
+    private static async Task WaitAfterInteractionAsync(int interactionDelayMs, CancellationToken cancellationToken) {
         if (interactionDelayMs > 0) {
-            await page.WaitForTimeoutAsync(interactionDelayMs).ConfigureAwait(false);
+            await Task.Delay(interactionDelayMs, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private static async Task WaitWithCancellationAsync(this Task task, CancellationToken cancellationToken) {
+        if (!cancellationToken.CanBeCanceled || task.IsCompleted) {
+            await task.ConfigureAwait(false);
+            return;
+        }
+
+        TaskCompletionSource<bool> cancellation = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancellation);
+        Task completed = await Task.WhenAny(task, cancellation.Task).ConfigureAwait(false);
+        if (completed != task) {
+            _ = task.ContinueWith(static completedTask => _ = completedTask.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        await task.ConfigureAwait(false);
     }
 }

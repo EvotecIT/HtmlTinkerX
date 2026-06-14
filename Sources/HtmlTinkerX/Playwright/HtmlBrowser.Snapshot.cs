@@ -50,11 +50,15 @@ public static partial class HtmlBrowser {
             throw new ArgumentNullException(nameof(session));
         }
 
+        bool hasSelector = !string.IsNullOrWhiteSpace(selector);
+        string? content = null;
+        if (hasSelector) {
+            content = await GetContentAsync(session.Page, selector, innerHtml, asText, extractionTimeout, cancellationToken).ConfigureAwait(false);
+        }
+
         string html = await GetContentAsync(session.Page, cancellationToken: cancellationToken).ConfigureAwait(false);
         string text = await GetContentAsync(session.Page, asText: true, cancellationToken: cancellationToken).ConfigureAwait(false);
-        string content = string.IsNullOrWhiteSpace(selector) && !asText && !innerHtml
-            ? html
-            : await GetContentAsync(session.Page, selector, innerHtml, asText, extractionTimeout, cancellationToken).ConfigureAwait(false);
+        content ??= asText ? text : html;
         string title = await session.Page.TitleAsync().ConfigureAwait(false);
         Uri? baseUri = Uri.TryCreate(session.Page.Url, UriKind.Absolute, out Uri? parsedUri) ? parsedUri : null;
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
