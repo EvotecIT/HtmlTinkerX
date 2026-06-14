@@ -28,9 +28,10 @@ public static partial class HtmlBrowser {
         int maxBytes = 65536,
         IEnumerable<HtmlNetworkResourceType>? resourceTypes = null,
         CancellationToken cancellationToken = default) {
-        HashSet<HtmlNetworkResourceType> effectiveTypes = resourceTypes == null
+        HtmlNetworkResourceType[] requestedTypes = resourceTypes?.ToArray() ?? System.Array.Empty<HtmlNetworkResourceType>();
+        HashSet<HtmlNetworkResourceType> effectiveTypes = requestedTypes.Length == 0
             ? new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.XHR, HtmlNetworkResourceType.Fetch }
-            : new HashSet<HtmlNetworkResourceType>(resourceTypes.Where(static type => type != HtmlNetworkResourceType.Document));
+            : new HashSet<HtmlNetworkResourceType>(requestedTypes.Where(static type => type != HtmlNetworkResourceType.Document));
 
         return session.CaptureResponseBodiesAsync(maxBytes, effectiveTypes, cancellationToken);
     }

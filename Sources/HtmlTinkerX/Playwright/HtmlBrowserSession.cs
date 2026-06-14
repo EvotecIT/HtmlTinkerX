@@ -174,7 +174,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         IReadOnlyList<(IRequest Request, HtmlNetworkEntry Entry)> entries;
         lock (NetworkSync) {
             entries = _network
-                .Where(item => resourceTypes.Count == 0 || resourceTypes.Contains(item.Value.ResourceType))
+                .Where(item => resourceTypes.Contains(item.Value.ResourceType))
                 .Select(item => (item.Key, item.Value))
                 .ToArray();
         }
@@ -213,11 +213,16 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
 
         truncated = true;
         int length = Math.Min(maxBytes, bytes.Length);
-        while (length > 0 && (bytes[length - 1] & 0xC0) == 0x80) {
-            length--;
+        Encoding strictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+        while (length > 0) {
+            try {
+                return strictUtf8.GetString(bytes, 0, length);
+            } catch (DecoderFallbackException) {
+                length--;
+            }
         }
 
-        return Encoding.UTF8.GetString(bytes, 0, length);
+        return string.Empty;
     }
 
     private void TrimNetworkLog(int limit) {

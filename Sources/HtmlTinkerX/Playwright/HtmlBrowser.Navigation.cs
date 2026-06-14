@@ -32,7 +32,7 @@ public static partial class HtmlBrowser {
                 await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout }).ConfigureAwait(false);
             }
             await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
-            await WaitForLoadStateAsync(page, loadState, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitForLoadStateAsync(page, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken).ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();

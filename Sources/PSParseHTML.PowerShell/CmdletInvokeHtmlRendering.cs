@@ -349,22 +349,28 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 loadState: LoadState,
                 timeout: Timeout,
                 cancellationToken: token).ConfigureAwait(false);
-            await HtmlBrowser.PreparePageForContentAsync(
-                sess.Page,
-                waitForSelector: WaitForSelector,
-                waitForFunction: WaitForFunction,
-                clickSelectors: ClickSelector,
-                clickTexts: ClickText,
-                dismissSelectors: DismissSelector,
-                dismissTexts: DismissText,
-                interactionDelayMs: InteractionDelayMs,
-                interactionRepeatCount: InteractionRepeatCount,
-                waitAfterLoadMs: WaitAfterLoadMs,
-                autoScroll: AutoScroll.IsPresent,
-                autoScrollSteps: AutoScrollSteps,
-                autoScrollDelayMs: AutoScrollDelayMs,
-                timeout: Timeout,
-                cancellationToken: token).ConfigureAwait(false);
+            try {
+                await HtmlBrowser.PreparePageForContentAsync(
+                    sess.Page,
+                    waitForSelector: WaitForSelector,
+                    waitForFunction: WaitForFunction,
+                    clickSelectors: ClickSelector,
+                    clickTexts: ClickText,
+                    dismissSelectors: DismissSelector,
+                    dismissTexts: DismissText,
+                    interactionDelayMs: InteractionDelayMs,
+                    interactionRepeatCount: InteractionRepeatCount,
+                    waitAfterLoadMs: WaitAfterLoadMs,
+                    autoScroll: AutoScroll.IsPresent,
+                    autoScrollSteps: AutoScrollSteps,
+                    autoScrollDelayMs: AutoScrollDelayMs,
+                    timeout: Timeout,
+                    cancellationToken: token).ConfigureAwait(false);
+            } catch {
+                await sess.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
@@ -412,7 +418,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 timeout: Timeout,
                 cancellationToken: token).ConfigureAwait(false);
             if (IncludeResponseBody.IsPresent) {
-                await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, ResponseBodyResourceType, token).ConfigureAwait(false);
+                HtmlNetworkResourceType[]? responseBodyResourceTypes = MyInvocation.BoundParameters.ContainsKey(nameof(ResponseBodyResourceType))
+                    ? ResponseBodyResourceType
+                    : null;
+                await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token).ConfigureAwait(false);
             }
             if (Snapshot.IsPresent) {
                 HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
@@ -487,7 +496,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             return await HtmlUtilities.ReadFileCheckedAsync(uri.LocalPath).ConfigureAwait(false);
         }
 
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password);
         return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
     }
 }

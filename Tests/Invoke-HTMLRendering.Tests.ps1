@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             [HtmlTinkerX.HtmlBrowser]::CaptureResponseBodiesAsync(
                 $session,
                 20,
-                [HtmlTinkerX.HtmlNetworkResourceType[]]@([HtmlTinkerX.HtmlNetworkResourceType]::Fetch),
+                [HtmlTinkerX.HtmlNetworkResourceType[]]@(),
                 [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
 
             $snapshot = [HtmlTinkerX.HtmlBrowser]::CreateSnapshotAsync(
@@ -137,6 +137,59 @@ document.addEventListener('DOMContentLoaded', async () => {
             $dataRequest = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/api/data' } | Select-Object -First 1
             $dataRequest.ResponseBody | Should -Be '{"message":"ticket-d'
             $dataRequest.ResponseBodyTruncated | Should -BeTrue
+            $documentRequest = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/response-body.html' } | Select-Object -First 1
+            $documentRequest.ResponseBody | Should -BeNullOrEmpty
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
+    It 'Truncates captured UTF-8 response bodies on character boundaries' {
+        $session = Invoke-HTMLRendering -Url 'about:blank' -Session
+        try {
+            Register-HTMLRoute -Session $session -Pattern '**/utf8-body.html' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                    Status = 200
+                    ContentType = 'text/html'
+                    Body = @'
+<!doctype html>
+<html>
+<head>
+<script>
+window.renderReady = false;
+document.addEventListener('DOMContentLoaded', async () => {
+  const response = await fetch('/api/utf8');
+  document.querySelector('main').textContent = await response.text();
+  window.renderReady = true;
+});
+</script>
+</head>
+<body><main>loading</main></body>
+</html>
+'@
+                }) | Out-Null
+            }
+            Register-HTMLRoute -Session $session -Pattern '**/api/utf8' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                    Status = 200
+                    ContentType = 'text/plain; charset=utf-8'
+                    Body = 'éx'
+                }) | Out-Null
+            }
+
+            Invoke-HTMLNavigation -Session $session -Url 'https://example.com/utf8-body.html'
+            $session.Page.WaitForFunctionAsync('() => window.renderReady === true', $null).GetAwaiter().GetResult()
+            [HtmlTinkerX.HtmlBrowser]::CaptureResponseBodiesAsync(
+                $session,
+                2,
+                [HtmlTinkerX.HtmlNetworkResourceType[]]@([HtmlTinkerX.HtmlNetworkResourceType]::Fetch),
+                [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+
+            $entry = $session.NetworkLog | Where-Object { $_.Url -like '*/api/utf8' } | Select-Object -First 1
+            $entry.ResponseBody | Should -Be 'é'
+            $entry.ResponseBodyTruncated | Should -BeTrue
         } finally {
             Close-HtmlBrowserSession -Session $session
         }
