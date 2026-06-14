@@ -90,8 +90,15 @@ public static partial class HtmlBrowser {
             StaticRenderedComparison = comparison,
             AppliedInteractions = appliedInteractions?.ToArray() ?? Array.Empty<string>(),
             ConsoleLog = session.ConsoleLog.ToArray(),
-            NetworkLog = includeNetworkLog ? session.NetworkLog.ToArray() : Array.Empty<HtmlNetworkEntry>()
+            NetworkLog = SelectSnapshotNetworkLog(session, includeNetworkLog)
         };
+    }
+
+    private static IReadOnlyList<HtmlNetworkEntry> SelectSnapshotNetworkLog(HtmlBrowserSession session, bool includeNetworkLog) {
+        HtmlNetworkEntry[] entries = session.NetworkLog.ToArray();
+        return includeNetworkLog
+            ? entries
+            : entries.Where(static entry => entry.ResponseBody != null || entry.ResponseBodyError != null).ToArray();
     }
 
     private static string GetContentKind(string? selector, bool innerHtml, bool asText) {

@@ -423,7 +423,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
             }
             if (Snapshot.IsPresent) {
                 HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent || IncludeStaticRenderedComparison.IsPresent
-                    ? await CreateSessionHttpClientAsync(sess, target, token).ConfigureAwait(false)
+                    ? await CreateSessionHttpClientAsync(sess, target, UserAgent, token).ConfigureAwait(false)
                     : null;
                 try {
                     string? staticHtml = IncludeStaticRenderedComparison.IsPresent
@@ -440,7 +440,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                         IncludeStaticRenderedComparison.IsPresent,
                         IncludeLinkedScripts.IsPresent,
                         IncludeExternalLinkedScripts.IsPresent,
-                        IncludeNetworkLog.IsPresent || IncludeResponseBody.IsPresent,
+                        IncludeNetworkLog.IsPresent,
                         token,
                         snapshotHttpClient,
                         Timeout).ConfigureAwait(false);
@@ -497,25 +497,30 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
     }
 
-    private async Task<HttpClient> CreateSessionHttpClientAsync(HtmlBrowserSession session, string target, CancellationToken cancellationToken) {
+    private async Task<HttpClient> CreateSessionHttpClientAsync(HtmlBrowserSession session, string target, string? userAgent, CancellationToken cancellationToken) {
         HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, Credential, Username, Password, out CookieContainer cookieContainer);
+        if (!string.IsNullOrWhiteSpace(userAgent)) {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
+        }
+
         if (!Uri.TryCreate(target, UriKind.Absolute, out Uri? targetUri)
             || (targetUri.Scheme != Uri.UriSchemeHttp && targetUri.Scheme != Uri.UriSchemeHttps)) {
             return client;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var cookies = await session.Context.CookiesAsync(new[] { target }).ConfigureAwait(false);
+        var cookies = await session.Context.CookiesAsync().ConfigureAwait(false);
         foreach (var cookie in cookies) {
             try {
                 System.Net.Cookie httpCookie = new(cookie.Name, cookie.Value, string.IsNullOrEmpty(cookie.Path) ? "/" : cookie.Path) {
+                    Domain = string.IsNullOrWhiteSpace(cookie.Domain) ? targetUri.Host : cookie.Domain,
                     HttpOnly = cookie.HttpOnly,
                     Secure = cookie.Secure
                 };
                 if (cookie.Expires > 0) {
                     httpCookie.Expires = DateTimeOffset.FromUnixTimeSeconds((long)cookie.Expires).UtcDateTime;
                 }
-                cookieContainer.Add(targetUri, httpCookie);
+                cookieContainer.Add(httpCookie);
             } catch (CookieException) {
                 // Ignore browser cookies that cannot be represented by System.Net.Cookie.
             }

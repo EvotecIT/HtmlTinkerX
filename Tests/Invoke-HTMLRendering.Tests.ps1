@@ -1,5 +1,50 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
 
+$script:Python3Available = $false
+$pythonCommand = Get-Command python3 -ErrorAction SilentlyContinue
+if ($pythonCommand) {
+    try {
+        & python3 --version *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $script:Python3Available = $true
+        }
+    } catch {
+        $script:Python3Available = $false
+    }
+}
+
+function script:Get-AvailableTcpPort {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Parse('127.0.0.1'), 0)
+    $listener.Start()
+    try {
+        $endpoint = [Net.IPEndPoint]$listener.LocalEndpoint
+        return $endpoint.Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
+function script:Wait-TestTcpPort {
+    param(
+        [int] $Port
+    )
+
+    $timeout = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        try {
+            $socket = [Net.Sockets.TcpClient]::new()
+            $socket.Connect('127.0.0.1', $Port)
+            $socket.Dispose()
+            break
+        } catch {
+            if ($timeout.Elapsed -gt [TimeSpan]::FromSeconds(10)) {
+                throw 'HTTP server failed to start.'
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
 Describe 'Invoke-HTMLRendering' {
     It 'Loads dynamic content from a local file' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
@@ -34,6 +79,35 @@ Describe 'Invoke-HTMLRendering' {
         $uri = [System.Uri]::new($path).AbsoluteUri
         $text = Invoke-HTMLRendering -Url $uri -RenderProfile HeavyDynamicPage -Selector '#loaded' -AsText
         $text | Should -Be 'Dynamic Content'
+    }
+
+    It 'Applies load delay before auto-scrolling lazy pages' {
+        $htmlPath = Join-Path $TestDrive 'delayed-scroll.html'
+        @'
+<!doctype html>
+<html>
+<body style="min-height:4000px">
+<main>loading</main>
+<script>
+setTimeout(() => {
+  window.addEventListener('scroll', () => {
+    if (!document.getElementById('lazy')) {
+      const item = document.createElement('div');
+      item.id = 'lazy';
+      item.textContent = 'Lazy after hydration';
+      document.querySelector('main').appendChild(item);
+    }
+  });
+}, 75);
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitAfterLoadMs 150 -AutoScroll -AutoScrollSteps 1 -AutoScrollDelayMs 20 -WaitForSelector '#lazy' -Selector '#lazy' -AsText
+
+        $text | Should -Be 'Lazy after hydration'
     }
 
     It 'Can apply rendered click interactions before extraction' {
@@ -144,7 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 $false,
                 $false,
                 $false,
-                $true,
+                $false,
                 [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
 
             $snapshot.Content | Should -Match 'ticket-data'
@@ -152,7 +226,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             $dataRequest.ResponseBody | Should -Be '{"message":"ticket-d'
             $dataRequest.ResponseBodyTruncated | Should -BeTrue
             $documentRequest = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/response-body.html' } | Select-Object -First 1
-            $documentRequest.ResponseBody | Should -BeNullOrEmpty
+            $documentRequest | Should -BeNullOrEmpty
+            $snapshot.NetworkLog.Count | Should -Be 1
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
+    It 'Can capture document response bodies when explicitly requested' {
+        $session = Invoke-HTMLRendering -Url 'about:blank' -Session
+        try {
+            Register-HTMLRoute -Session $session -Pattern '**/document-body.html' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                    Status = 200
+                    ContentType = 'text/html'
+                    Body = '<!doctype html><html><body><main>document-body</main></body></html>'
+                }) | Out-Null
+            }
+
+            Invoke-HTMLNavigation -Session $session -Url 'https://example.com/document-body.html'
+            [HtmlTinkerX.HtmlBrowser]::CaptureResponseBodiesAsync(
+                $session,
+                200,
+                [HtmlTinkerX.HtmlNetworkResourceType[]]@([HtmlTinkerX.HtmlNetworkResourceType]::Document),
+                [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+
+            $entry = $session.NetworkLog | Where-Object { $_.Url -like '*/document-body.html' } | Select-Object -First 1
+            $entry.ResponseBody | Should -Match 'document-body'
         } finally {
             Close-HtmlBrowserSession -Session $session
         }
@@ -226,6 +327,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         $snapshot.Content | Should -Be 'linked'
         $snapshot.LinkedJavaScriptEndpoints.ScriptUrl | Should -Match 'linked-app.js'
         $snapshot.LinkedJavaScriptEndpoints.Error | Should -Contain 'Only HTTP and HTTPS script URLs can be downloaded.'
+    }
+
+    It 'Reuses browser cookies and User-Agent for snapshot linked-script fetches' -Skip:(-not $script:Python3Available) {
+        $port = Get-AvailableTcpPort
+        $serverPath = Join-Path $TestDrive 'snapshot_server.py'
+        @'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import sys
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        ua = self.headers.get("User-Agent", "")
+        cookie = self.headers.get("Cookie", "")
+        if self.path == "/page":
+            body = b'<!doctype html><html><head><script src="/assets/app.js"></script></head><body><main>snapshot</main></body></html>'
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Set-Cookie", "assetCookie=1; Path=/assets")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == "/assets/app.js":
+            if "assetCookie=1" in cookie and ua == "SnapshotAgent":
+                body = b'fetch("/api/protected", { method: "POST" });'
+            else:
+                body = b'console.log("denied");'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        return
+
+HTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
+'@ | Set-Content -LiteralPath $serverPath -Encoding UTF8
+        $server = Start-Process -FilePath 'python3' -ArgumentList '-u', $serverPath, $port -PassThru
+        Wait-TestTcpPort -Port $port
+
+        try {
+            $snapshot = Invoke-HTMLRendering -Url "http://127.0.0.1:$port/page" -LoadState DomContentLoaded -WaitForSelector 'main' -Selector 'main' -AsText -Snapshot -IncludeLinkedScripts -UserAgent 'SnapshotAgent'
+
+            $snapshot.Content | Should -Be 'snapshot'
+            $snapshot.LinkedJavaScriptEndpoints.Url | Should -Contain '/api/protected'
+        } finally {
+            $server | Stop-Process
+        }
     }
 
     It 'Can return applied interactions in a rendered page snapshot' {

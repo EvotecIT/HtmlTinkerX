@@ -106,6 +106,28 @@ public class HtmlBrowserRoutesTests {
         page.Verify();
     }
 
+    [Fact]
+    public async Task ApplyResourceBlockingAsync_FallsBackForAllowedRequests() {
+        var page = new Mock<IPage>();
+        Func<IRoute, Task>? handler = null;
+        page.Setup(p => p.RouteAsync("**/*", It.IsAny<Func<IRoute, Task>>(), null))
+            .Callback<string, Func<IRoute, Task>, PageRouteOptions?>((_, h, _) => handler = h)
+            .Returns(CompletedRouteRegistration());
+        var request = new Mock<IRequest>();
+        request.SetupGet(r => r.ResourceType).Returns("xhr");
+        var route = new Mock<IRoute>();
+        route.SetupGet(r => r.Request).Returns(request.Object);
+        route.Setup(r => r.FallbackAsync(null)).Returns(Task.CompletedTask).Verifiable();
+
+        await HtmlBrowser.ApplyResourceBlockingAsync(page.Object, new[] { HtmlNetworkResourceType.Image });
+        Assert.NotNull(handler);
+        await handler!(route.Object);
+
+        route.Verify();
+        route.Verify(r => r.ContinueAsync(It.IsAny<RouteContinueOptions>()), Times.Never);
+        route.Verify(r => r.AbortAsync(It.IsAny<string>()), Times.Never);
+    }
+
     private static Task<IAsyncDisposable> CompletedRouteRegistration() =>
         Task.FromResult(Mock.Of<IAsyncDisposable>());
 }

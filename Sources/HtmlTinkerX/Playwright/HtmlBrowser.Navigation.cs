@@ -92,15 +92,17 @@ public static partial class HtmlBrowser {
             throw new ArgumentOutOfRangeException(nameof(autoScrollDelayMs), "AutoScrollDelayMs must be zero or greater.");
         }
 
-        bool hasPageChangingActions =
+        bool hasExplicitInteractions =
             HasAny(clickSelectors) ||
             HasAny(clickTexts) ||
             HasAny(dismissSelectors) ||
-            HasAny(dismissTexts) ||
-            autoScroll;
+            HasAny(dismissTexts);
+
+        bool hasPageChangingActions = hasExplicitInteractions || autoScroll;
 
         if (!hasPageChangingActions) {
             await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
         }
 
         IReadOnlyList<string> appliedInteractions = await ApplyPageInteractionsAsync(
@@ -113,6 +115,14 @@ public static partial class HtmlBrowser {
             interactionRepeatCount,
             timeout,
             cancellationToken).ConfigureAwait(false);
+
+        if (hasExplicitInteractions) {
+            await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
+        } else if (autoScroll) {
+            await WaitForFunctionReadinessAsync(page, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
+        }
 
         if (autoScroll) {
             for (int i = 0; i < autoScrollSteps; i++) {
@@ -129,11 +139,7 @@ public static partial class HtmlBrowser {
 
         if (hasPageChangingActions) {
             await WaitForExtractionReadinessAsync(page, waitForSelector, waitForFunction, timeout, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (waitAfterLoadMs > 0) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await page.WaitForTimeoutAsync(waitAfterLoadMs).ConfigureAwait(false);
+            await WaitAfterLoadAsync(page, waitAfterLoadMs, cancellationToken).ConfigureAwait(false);
         }
 
         return appliedInteractions;
@@ -152,6 +158,22 @@ public static partial class HtmlBrowser {
             await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
                 Timeout = timeout
             }).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WaitForFunctionReadinessAsync(IPage page, string? waitForFunction, int timeout, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.IsNullOrWhiteSpace(waitForFunction)) {
+            await page.WaitForFunctionAsync(waitForFunction!, null, new PageWaitForFunctionOptions {
+                Timeout = timeout
+            }).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WaitAfterLoadAsync(IPage page, int waitAfterLoadMs, CancellationToken cancellationToken) {
+        if (waitAfterLoadMs > 0) {
+            cancellationToken.ThrowIfCancellationRequested();
+            await page.WaitForTimeoutAsync(waitAfterLoadMs).ConfigureAwait(false);
         }
     }
 

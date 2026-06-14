@@ -31,7 +31,7 @@ public static partial class HtmlBrowser {
         HtmlNetworkResourceType[] requestedTypes = resourceTypes?.ToArray() ?? System.Array.Empty<HtmlNetworkResourceType>();
         HashSet<HtmlNetworkResourceType> effectiveTypes = requestedTypes.Length == 0
             ? new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.XHR, HtmlNetworkResourceType.Fetch }
-            : new HashSet<HtmlNetworkResourceType>(requestedTypes.Where(static type => type != HtmlNetworkResourceType.Document));
+            : new HashSet<HtmlNetworkResourceType>(requestedTypes);
 
         return session.CaptureResponseBodiesAsync(maxBytes, effectiveTypes, cancellationToken);
     }

@@ -76,7 +76,7 @@ public static partial class HtmlBrowser {
                 HtmlNetworkResourceType resourceType = HtmlEnumParser.ParseNetworkResourceType(route.Request.ResourceType);
                 return blockedTypes.Contains(resourceType)
                     ? route.AbortAsync()
-                    : route.ContinueAsync();
+                    : route.FallbackAsync();
             }).ConfigureAwait(false);
             applied.AddRange(blockedTypes.Select(static type => $"Blocked resource type: {type}"));
         }
