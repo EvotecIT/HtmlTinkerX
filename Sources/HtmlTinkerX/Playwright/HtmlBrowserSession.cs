@@ -2,6 +2,8 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -41,6 +43,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// </summary>
     public string? VideoPath { get; internal set; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
+    private readonly ConcurrentDictionary<IRequest, IResponse> _responses = new();
     private ConcurrentQueue<IRequest>? _order;
     private object? _networkSync;
     private ConcurrentQueue<IRequest> RequestOrder => LazyInitializer.EnsureInitialized(ref _order, () => new ConcurrentQueue<IRequest>())!;
@@ -147,6 +150,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             entry.Status = (System.Net.HttpStatusCode)res.Status;
             entry.ResponseHeaders = new Dictionary<string, string>(res.Headers);
             entry.ResponseReceived = System.DateTimeOffset.UtcNow;
+            _responses[res.Request] = res;
         };
 
         Page.RequestFinished += (_, req) => {
@@ -162,10 +166,65 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         };
     }
 
+    internal async Task CaptureResponseBodiesAsync(int maxBytes, ISet<HtmlNetworkResourceType> resourceTypes, CancellationToken cancellationToken) {
+        if (maxBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), "Response body capture size must be greater than zero.");
+        }
+
+        IReadOnlyList<(IRequest Request, HtmlNetworkEntry Entry)> entries;
+        lock (NetworkSync) {
+            entries = _network
+                .Where(item => resourceTypes.Count == 0 || resourceTypes.Contains(item.Value.ResourceType))
+                .Select(item => (item.Key, item.Value))
+                .ToArray();
+        }
+
+        foreach ((IRequest Request, HtmlNetworkEntry Entry) item in entries) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_responses.TryGetValue(item.Request, out IResponse? response)) {
+                item.Entry.ResponseBodyError = "Response body is not available for this request.";
+                continue;
+            }
+
+            try {
+                Task<string> readTask = response.TextAsync();
+                Task completed = await Task.WhenAny(readTask, Task.Delay(TimeSpan.FromSeconds(3), cancellationToken)).ConfigureAwait(false);
+                if (!ReferenceEquals(completed, readTask)) {
+                    item.Entry.ResponseBodyError = "Response body capture timed out.";
+                    continue;
+                }
+
+                string body = await readTask.ConfigureAwait(false);
+                item.Entry.ResponseBody = TruncateUtf8(body, maxBytes, out bool truncated);
+                item.Entry.ResponseBodyTruncated = truncated;
+                item.Entry.ResponseBodyError = null;
+            } catch (Exception ex) when (ex is PlaywrightException || ex is InvalidOperationException) {
+                item.Entry.ResponseBodyError = ex.Message;
+            }
+        }
+    }
+
+    private static string TruncateUtf8(string value, int maxBytes, out bool truncated) {
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+        if (bytes.Length <= maxBytes) {
+            truncated = false;
+            return value;
+        }
+
+        truncated = true;
+        int length = Math.Min(maxBytes, bytes.Length);
+        while (length > 0 && (bytes[length - 1] & 0xC0) == 0x80) {
+            length--;
+        }
+
+        return Encoding.UTF8.GetString(bytes, 0, length);
+    }
+
     private void TrimNetworkLog(int limit) {
         ConcurrentQueue<IRequest> requestOrder = RequestOrder;
         while (requestOrder.Count > limit && requestOrder.TryDequeue(out IRequest? oldReq)) {
             _network?.TryRemove(oldReq, out _);
+            _responses.TryRemove(oldReq, out _);
         }
     }
 
