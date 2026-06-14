@@ -432,7 +432,7 @@ public static partial class HtmlBrowser {
         cancellationToken.ThrowIfCancellationRequested();
         await locator.WaitForAsync(new LocatorWaitForOptions {
             Timeout = timeout
-        }).ConfigureAwait(false);
+        }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         if (asText) {
             return await locator.InnerTextAsync().ConfigureAwait(false);

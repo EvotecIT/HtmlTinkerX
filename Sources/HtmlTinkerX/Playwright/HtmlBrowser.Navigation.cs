@@ -32,7 +32,7 @@ public static partial class HtmlBrowser {
                 await page.FillAsync(formLogin.PasswordSelector, password, new PageFillOptions { Timeout = timeout }).ConfigureAwait(false);
             }
             await page.ClickAsync(formLogin.SubmitSelector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
-            await WaitForLoadStateAsync(page, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken).ConfigureAwait(false);
+            await WaitForLoadStateAsync(page, loadState, timeout, cancellationToken).ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -129,7 +129,7 @@ public static partial class HtmlBrowser {
                 cancellationToken.ThrowIfCancellationRequested();
                 await page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)").ConfigureAwait(false);
                 if (autoScrollDelayMs > 0) {
-                    await page.WaitForTimeoutAsync(autoScrollDelayMs).ConfigureAwait(false);
+                    await page.WaitForTimeoutAsync(autoScrollDelayMs).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
                 }
             }
 

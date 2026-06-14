@@ -13,6 +13,7 @@ namespace HtmlTinkerX;
 /// Represents a headless browser session consisting of Playwright objects.
 /// </summary>
 public sealed class HtmlBrowserSession : IAsyncDisposable {
+    private const int DefaultBufferedResponseBodyReadLimitBytes = 1024 * 1024;
     /// <summary>
     /// Gets the <see cref="IPlaywright"/> instance used by the session.
     /// </summary>
@@ -187,6 +188,14 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             }
 
             try {
+                if (TryGetDeclaredContentLength(item.Entry, out long contentLength)
+                    && contentLength > Math.Max(maxBytes, DefaultBufferedResponseBodyReadLimitBytes)) {
+                    item.Entry.ResponseBody = null;
+                    item.Entry.ResponseBodyTruncated = true;
+                    item.Entry.ResponseBodyError = $"Response body length {contentLength} exceeds buffered capture limit {Math.Max(maxBytes, DefaultBufferedResponseBodyReadLimitBytes)}.";
+                    continue;
+                }
+
                 Task<string> readTask = response.TextAsync();
                 Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
                 Task cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
@@ -208,6 +217,20 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 item.Entry.ResponseBodyError = ex.Message;
             }
         }
+    }
+
+    private static bool TryGetDeclaredContentLength(HtmlNetworkEntry entry, out long contentLength) {
+        contentLength = 0;
+        if (entry.ResponseHeaders == null) {
+            return false;
+        }
+
+        if (!entry.ResponseHeaders.TryGetValue("content-length", out string? value)
+            || string.IsNullOrWhiteSpace(value)) {
+            return false;
+        }
+
+        return long.TryParse(value, out contentLength) && contentLength >= 0;
     }
 
     private static string TruncateUtf8(string value, int maxBytes, out bool truncated) {

@@ -81,6 +81,42 @@ public class HtmlBrowserNetworkLogTests {
         await session.DisposeAsync();
     }
 
+    [Fact]
+    public async Task CaptureResponseBodiesAsync_SkipsLargeDeclaredBodiesBeforeReading() {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+
+        var request = new Mock<IRequest>();
+        request.SetupGet(r => r.Url).Returns("https://example.com/api/large");
+        request.SetupGet(r => r.Method).Returns("GET");
+        request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        request.SetupGet(r => r.ResourceType).Returns("fetch");
+
+        var response = new Mock<IResponse>();
+        response.SetupGet(r => r.Request).Returns(request.Object);
+        response.SetupGet(r => r.Status).Returns(200);
+        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string> {
+            ["content-length"] = "2097152"
+        });
+        response.Setup(r => r.TextAsync()).ThrowsAsync(new InvalidOperationException("Body should not be read."));
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+
+        page.Raise(p => p.Request += null!, page.Object, request.Object);
+        page.Raise(p => p.Response += null!, page.Object, response.Object);
+
+        await session.CaptureResponseBodiesAsync(100, new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch }, CancellationToken.None);
+
+        HtmlNetworkEntry entry = HtmlBrowser.GetNetworkLog(session).Single();
+        Assert.Null(entry.ResponseBody);
+        Assert.True(entry.ResponseBodyTruncated);
+        Assert.Contains("exceeds buffered capture limit", entry.ResponseBodyError);
+        response.Verify(r => r.TextAsync(), Times.Never);
+        await session.DisposeAsync();
+    }
+
 #if NETFRAMEWORK
     [Fact]
     public Task NetworkLog_PreservesRequestOrder_NetFramework() => VerifyNetworkLogOrderAsync();
