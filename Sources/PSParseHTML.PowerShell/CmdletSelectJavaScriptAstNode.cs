@@ -40,7 +40,6 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptAstNode", DefaultParameterSetName = ParameterSetSource)]
-[Alias("Select-JavaScriptDescendantNode", "Select-JSAstNode", "Select-JSDescendantNode")]
 [OutputType(typeof(Node))]
 public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     private const string ParameterSetSource = "Source";
@@ -54,7 +53,6 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
 
     /// <summary>Acornima AST node to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetAst, ValueFromPipeline = true, Position = 0)]
-    [Alias("InputObject", "Node")]
     [ValidateNotNull]
     public Node Ast { get; set; } = null!;
 
@@ -66,10 +64,6 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     /// <summary>Includes the root node in the traversal output.</summary>
     [Parameter]
     public SwitchParameter IncludeRoot { get; set; }
-
-    /// <summary>Optional PowerShell predicate used to filter each matched AST node. The node is passed as the first scriptblock argument.</summary>
-    [Parameter]
-    public ScriptBlock? FilterScript { get; set; }
 
     /// <summary>Parses source input as an ECMAScript module.</summary>
     [Parameter(ParameterSetName = ParameterSetSource)]
@@ -91,7 +85,7 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
             : HtmlJavaScriptAstUtilities.DescendantNodes(root);
         foreach (Node node in nodes) {
             ThrowIfStopped();
-            if (MatchesType(node) && MatchesFilter(node)) {
+            if (MatchesType(node)) {
                 WriteObject(node);
             }
         }
@@ -126,15 +120,6 @@ public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
                 string.Equals(filter, typeText, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(filter, enumName, StringComparison.OrdinalIgnoreCase);
         });
-    }
-
-    private bool MatchesFilter(Node node) {
-        if (FilterScript == null) {
-            return true;
-        }
-
-        object? result = FilterScript.InvokeReturnAsIs(node);
-        return LanguagePrimitives.IsTrue(result);
     }
 
 }

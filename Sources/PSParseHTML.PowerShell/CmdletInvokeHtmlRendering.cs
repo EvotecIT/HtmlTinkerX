@@ -1,8 +1,6 @@
 using HtmlTinkerX;
-using System;
 using System.IO;
 using System.Management.Automation;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,7 +14,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HTMLRendering", DefaultParameterSetName = ParameterSetDefault)]
 [Alias("Start-HTMLSession", "Open-HTMLSession")]
-[OutputType(typeof(string), typeof(HtmlBrowserSession), typeof(HtmlRenderedPageSnapshot))]
+[OutputType(typeof(string), typeof(HtmlBrowserSession))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetFile = "File";
@@ -84,124 +82,6 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Session { get; set; }
 
-    /// <summary>Optional Playwright storage state file used to reuse cookies, local storage, and authenticated browser state.</summary>
-    [Parameter]
-    public string? StorageStatePath { get; set; }
-
-    /// <summary>Optional CSS selector used to return one rendered element instead of the full document.</summary>
-    [Parameter]
-    public string? Selector { get; set; }
-
-    /// <summary>Return inner HTML for the selected element instead of outer HTML.</summary>
-    [Parameter]
-    public SwitchParameter InnerHtml { get; set; }
-
-    /// <summary>Return rendered text instead of HTML markup.</summary>
-    [Parameter]
-    public SwitchParameter AsText { get; set; }
-
-    /// <summary>Return a structured rendered-page snapshot with common parsed app data instead of raw content.</summary>
-    [Parameter]
-    public SwitchParameter Snapshot { get; set; }
-
-    /// <summary>Include browser network entries in Snapshot output. Headers may contain sensitive values.</summary>
-    [Parameter]
-    public SwitchParameter IncludeNetworkLog { get; set; }
-
-    /// <summary>Preset rendering strategy for common dynamic-page scenarios.</summary>
-    [Parameter]
-    public HtmlRenderProfile RenderProfile { get; set; } = HtmlRenderProfile.Custom;
-
-    /// <summary>Include a static-vs-rendered comparison in Snapshot output.</summary>
-    [Parameter]
-    public SwitchParameter IncludeStaticRenderedComparison { get; set; }
-
-    /// <summary>Download and inspect same-origin linked JavaScript files for endpoint discovery in Snapshot output.</summary>
-    [Parameter]
-    public SwitchParameter IncludeLinkedScripts { get; set; }
-
-    /// <summary>Allow cross-origin linked JavaScript downloads when IncludeLinkedScripts is used.</summary>
-    [Parameter]
-    public SwitchParameter IncludeExternalLinkedScripts { get; set; }
-
-    /// <summary>Capture response bodies for selected network requests in Snapshot output. Bodies may contain sensitive values.</summary>
-    [Parameter]
-    public SwitchParameter IncludeResponseBody { get; set; }
-
-    /// <summary>Maximum UTF-8 bytes stored per captured response body.</summary>
-    [Parameter]
-    [ValidateRange(1, int.MaxValue)]
-    public int ResponseBodyMaxBytes { get; set; } = 65536;
-
-    /// <summary>Network resource types whose response bodies should be captured. Defaults to XHR and Fetch.</summary>
-    [Parameter]
-    public HtmlNetworkResourceType[] ResponseBodyResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
-
-    /// <summary>Optional CSS selector to wait for before extracting rendered content.</summary>
-    [Parameter]
-    public string? WaitForSelector { get; set; }
-
-    /// <summary>Optional JavaScript predicate to wait for before extracting rendered content.</summary>
-    [Parameter]
-    public string? WaitForFunction { get; set; }
-
-    /// <summary>Initial browser navigation readiness state.</summary>
-    [Parameter]
-    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
-
-    /// <summary>Browser resource types to abort before navigation, such as Image, Media, Font, or Stylesheet.</summary>
-    [Parameter]
-    public HtmlNetworkResourceType[] BlockResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
-
-    /// <summary>Playwright URL glob patterns to abort before navigation, such as **/analytics/**.</summary>
-    [Parameter]
-    public string[] BlockResourcePattern { get; set; } = System.Array.Empty<string>();
-
-    /// <summary>Optional selectors to click before extraction.</summary>
-    [Parameter]
-    public string[] ClickSelector { get; set; } = System.Array.Empty<string>();
-
-    /// <summary>Optional visible texts to click before extraction.</summary>
-    [Parameter]
-    public string[] ClickText { get; set; } = System.Array.Empty<string>();
-
-    /// <summary>Optional selectors to dismiss before normal click interactions.</summary>
-    [Parameter]
-    public string[] DismissSelector { get; set; } = System.Array.Empty<string>();
-
-    /// <summary>Optional visible texts to dismiss before normal click interactions.</summary>
-    [Parameter]
-    public string[] DismissText { get; set; } = System.Array.Empty<string>();
-
-    /// <summary>Delay after each rendered interaction in milliseconds.</summary>
-    [Parameter]
-    [ValidateRange(0, int.MaxValue)]
-    public int InteractionDelayMs { get; set; } = 300;
-
-    /// <summary>Number of times click interactions should be retried on rendered pages.</summary>
-    [Parameter]
-    [ValidateRange(1, int.MaxValue)]
-    public int InteractionRepeatCount { get; set; } = 1;
-
-    /// <summary>Optional delay after rendered page load in milliseconds.</summary>
-    [Parameter]
-    [ValidateRange(0, int.MaxValue)]
-    public int WaitAfterLoadMs { get; set; }
-
-    /// <summary>Scroll the rendered page before extraction to trigger lazy-loaded content.</summary>
-    [Parameter]
-    public SwitchParameter AutoScroll { get; set; }
-
-    /// <summary>Number of incremental scroll steps performed when AutoScroll is enabled.</summary>
-    [Parameter]
-    [ValidateRange(1, int.MaxValue)]
-    public int AutoScrollSteps { get; set; } = 3;
-
-    /// <summary>Delay after each auto-scroll step in milliseconds.</summary>
-    [Parameter]
-    [ValidateRange(0, int.MaxValue)]
-    public int AutoScrollDelayMs { get; set; } = 400;
-
     /// <summary>Do not set the opened session as the default session.</summary>
     [Parameter]
     public SwitchParameter NoDefault { get; set; }
@@ -256,49 +136,6 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ApplyRenderProfile();
-
-        if (AsText.IsPresent && InnerHtml.IsPresent) {
-            throw new PSArgumentException("Use either -AsText or -InnerHtml, not both.");
-        }
-        if (InnerHtml.IsPresent && string.IsNullOrWhiteSpace(Selector)) {
-            throw new PSArgumentException("InnerHtml requires Selector.");
-        }
-        if (Snapshot.IsPresent && Session.IsPresent) {
-            throw new PSArgumentException("Use either -Snapshot or -Session, not both.");
-        }
-        if (Session.IsPresent && (!string.IsNullOrWhiteSpace(Selector) || InnerHtml.IsPresent || AsText.IsPresent)) {
-            throw new PSArgumentException("Selector, InnerHtml, and AsText are content extraction options and cannot be used with -Session.");
-        }
-        if (Snapshot.IsPresent && !string.IsNullOrEmpty(OutFile)) {
-            throw new PSArgumentException("Snapshot output is an object and cannot be written with -OutFile. Omit -Snapshot when saving rendered content.");
-        }
-        if (IncludeNetworkLog.IsPresent && !Snapshot.IsPresent) {
-            throw new PSArgumentException("IncludeNetworkLog is only valid with -Snapshot.");
-        }
-        if (IncludeStaticRenderedComparison.IsPresent && !Snapshot.IsPresent) {
-            throw new PSArgumentException("IncludeStaticRenderedComparison is only valid with -Snapshot.");
-        }
-        if (IncludeLinkedScripts.IsPresent && !Snapshot.IsPresent) {
-            throw new PSArgumentException("IncludeLinkedScripts is only valid with -Snapshot.");
-        }
-        if (IncludeExternalLinkedScripts.IsPresent && !IncludeLinkedScripts.IsPresent) {
-            throw new PSArgumentException("IncludeExternalLinkedScripts requires -IncludeLinkedScripts.");
-        }
-        if (IncludeResponseBody.IsPresent && !Snapshot.IsPresent) {
-            throw new PSArgumentException("IncludeResponseBody is only valid with -Snapshot.");
-        }
-        if (string.IsNullOrWhiteSpace(WaitForSelector)
-            && string.IsNullOrWhiteSpace(WaitForFunction)
-            && LoadState == HtmlBrowserLoadState.Commit
-            && WaitAfterLoadMs == 0
-            && RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
-            throw new PSArgumentException("LoadState Commit requires WaitForSelector, WaitForFunction, or WaitAfterLoadMs so content extraction has a readiness signal.");
-        }
-        if (System.Array.IndexOf(BlockResourceType, HtmlNetworkResourceType.Document) >= 0) {
-            throw new PSArgumentException("BlockResourceType Document would abort page navigation. Block subresources such as Image, Media, Font, Stylesheet, Script, XHR, or Fetch instead.");
-        }
-
         ValidateProxy(Proxy, ProxyCredential);
         string? user = Credential?.UserName ?? Username;
         string? pass = Credential?.GetNetworkCredential().Password ?? Password;
@@ -319,9 +156,6 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         string target = ParameterSetName == ParameterSetFile
             ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
             : Url;
-        string? staticHtml = IncludeStaticRenderedComparison.IsPresent
-            ? await ReadStaticHtmlAsync(target, token).ConfigureAwait(false)
-            : null;
 
         if (Session.IsPresent) {
             HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
@@ -333,7 +167,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 form,
                 headless: !Visible.IsPresent,
                 slowMo: SlowMo,
-                storageStatePath: StorageStatePath?.ToFullPath(),
+                storageStatePath: null,
                 userAgent: UserAgent,
                 viewportWidth: ViewportWidth,
                 viewportHeight: ViewportHeight,
@@ -344,150 +178,18 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                 geoLatitude: GeoLatitude,
                 geoLongitude: GeoLongitude,
                 timezone: Timezone,
-                blockResourceTypes: BlockResourceType,
-                blockResourcePatterns: BlockResourcePattern,
-                loadState: LoadState,
-                timeout: Timeout,
-                cancellationToken: token).ConfigureAwait(false);
-            await HtmlBrowser.PreparePageForContentAsync(
-                sess.Page,
-                waitForSelector: WaitForSelector,
-                waitForFunction: WaitForFunction,
-                clickSelectors: ClickSelector,
-                clickTexts: ClickText,
-                dismissSelectors: DismissSelector,
-                dismissTexts: DismissText,
-                interactionDelayMs: InteractionDelayMs,
-                interactionRepeatCount: InteractionRepeatCount,
-                waitAfterLoadMs: WaitAfterLoadMs,
-                autoScroll: AutoScroll.IsPresent,
-                autoScrollSteps: AutoScrollSteps,
-                autoScrollDelayMs: AutoScrollDelayMs,
                 timeout: Timeout,
                 cancellationToken: token).ConfigureAwait(false);
             if (!NoDefault.IsPresent) {
                 SessionState.PSVariable.Set("PSParseHTML_DefaultSession", sess);
             }
             WriteObject(sess);
+        } else if (!string.IsNullOrEmpty(OutFile)) {
+            string outPath = OutFile!.ToFullPath();
+            await HtmlBrowser.SavePageContentAsync(target, outPath, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout, token).ConfigureAwait(false);
         } else {
-            await using HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
-                target,
-                Browser,
-                Clean.IsPresent,
-                user,
-                pass,
-                form,
-                headless: !Visible.IsPresent,
-                slowMo: SlowMo,
-                storageStatePath: StorageStatePath?.ToFullPath(),
-                userAgent: UserAgent,
-                viewportWidth: ViewportWidth,
-                viewportHeight: ViewportHeight,
-                deviceScaleFactor: (float?)DeviceScaleFactor,
-                proxy: Proxy,
-                proxyUsername: pUser,
-                proxyPassword: pPass,
-                geoLatitude: GeoLatitude,
-                geoLongitude: GeoLongitude,
-                timezone: Timezone,
-                blockResourceTypes: BlockResourceType,
-                blockResourcePatterns: BlockResourcePattern,
-                loadState: LoadState,
-                timeout: Timeout,
-                cancellationToken: token).ConfigureAwait(false);
-            var appliedInteractions = await HtmlBrowser.PreparePageForContentAsync(
-                sess.Page,
-                waitForSelector: WaitForSelector,
-                waitForFunction: WaitForFunction,
-                clickSelectors: ClickSelector,
-                clickTexts: ClickText,
-                dismissSelectors: DismissSelector,
-                dismissTexts: DismissText,
-                interactionDelayMs: InteractionDelayMs,
-                interactionRepeatCount: InteractionRepeatCount,
-                waitAfterLoadMs: WaitAfterLoadMs,
-                autoScroll: AutoScroll.IsPresent,
-                autoScrollSteps: AutoScrollSteps,
-                autoScrollDelayMs: AutoScrollDelayMs,
-                timeout: Timeout,
-                cancellationToken: token).ConfigureAwait(false);
-            if (IncludeResponseBody.IsPresent) {
-                await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, ResponseBodyResourceType, token).ConfigureAwait(false);
-            }
-            if (Snapshot.IsPresent) {
-                HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
-                    sess,
-                    target,
-                    Selector,
-                    InnerHtml.IsPresent,
-                    AsText.IsPresent,
-                    appliedInteractions,
-                    staticHtml,
-                    IncludeStaticRenderedComparison.IsPresent,
-                    IncludeLinkedScripts.IsPresent,
-                    IncludeExternalLinkedScripts.IsPresent,
-                    IncludeNetworkLog.IsPresent || IncludeResponseBody.IsPresent,
-                    token).ConfigureAwait(false);
-                WriteObject(snapshot);
-                return;
-            }
-
-            string html = await HtmlBrowser.GetContentAsync(sess.Page, Selector, InnerHtml.IsPresent, AsText.IsPresent, token).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(OutFile)) {
-                string outPath = OutFile!.ToFullPath();
-#if NETSTANDARD2_0 || NETFRAMEWORK
-                File.WriteAllText(outPath, html);
-#else
-                await File.WriteAllTextAsync(outPath, html, token).ConfigureAwait(false);
-#endif
-            } else {
-                WriteObject(html);
-            }
+            string html = await HtmlBrowser.GetPageContentAsync(target, Browser, Clean.IsPresent, user, pass, form, !Visible.IsPresent, SlowMo, UserAgent, ViewportWidth, ViewportHeight, (float?)DeviceScaleFactor, Proxy, pUser, pPass, GeoLatitude, GeoLongitude, Timezone, Timeout, token).ConfigureAwait(false);
+            WriteObject(html);
         }
-    }
-
-    private void ApplyRenderProfile() {
-        if (RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
-            return;
-        }
-
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
-            LoadState = HtmlBrowserLoadState.Commit;
-        }
-
-        if (string.IsNullOrWhiteSpace(WaitForSelector)
-            && string.IsNullOrWhiteSpace(WaitForFunction)
-            && WaitAfterLoadMs == 0) {
-            WaitAfterLoadMs = 1000;
-        }
-
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScroll))) {
-            AutoScroll = true;
-        }
-
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScrollSteps))) {
-            AutoScrollSteps = 5;
-        }
-
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(BlockResourceType))) {
-            BlockResourceType = new[] {
-                HtmlNetworkResourceType.Image,
-                HtmlNetworkResourceType.Font,
-                HtmlNetworkResourceType.Media
-            };
-        }
-    }
-
-    private async Task<string> ReadStaticHtmlAsync(string target, CancellationToken cancellationToken) {
-        if (ParameterSetName == ParameterSetFile) {
-            return await HtmlUtilities.ReadFileCheckedAsync(Path!.ToFullPath()).ConfigureAwait(false);
-        }
-
-        if (Uri.TryCreate(target, UriKind.Absolute, out Uri? uri) && uri.IsFile) {
-            return await HtmlUtilities.ReadFileCheckedAsync(uri.LocalPath).ConfigureAwait(false);
-        }
-
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -24,15 +24,6 @@ public sealed class HtmlNetworkEntry {
     /// <summary>Response headers.</summary>
     public IDictionary<string, string>? ResponseHeaders { get; set; }
 
-    /// <summary>Optional captured response body. This is populated only when explicitly requested.</summary>
-    public string? ResponseBody { get; set; }
-
-    /// <summary>Whether <see cref="ResponseBody"/> was truncated to the configured capture limit.</summary>
-    public bool ResponseBodyTruncated { get; set; }
-
-    /// <summary>Error reported while capturing the response body, when capture was requested but unavailable.</summary>
-    public string? ResponseBodyError { get; set; }
-
     /// <summary>Time when the request was issued.</summary>
     public System.DateTimeOffset Started { get; set; }
 
