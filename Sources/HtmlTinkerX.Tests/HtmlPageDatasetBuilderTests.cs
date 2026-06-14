@@ -69,6 +69,29 @@ public class HtmlPageDatasetBuilderTests {
     }
 
     [Fact]
+    public async Task Build_RedactsSensitiveScriptStateProvenance() {
+        string html = """
+<html>
+<head>
+<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"sessionToken":"abc123","safe":"ok"}}}</script>
+</head>
+<body><main><h1>State</h1><p>State payload page.</p></main></body>
+</html>
+""";
+        HtmlPageWorkbenchResult workbench = await HtmlPageWorkbench.AnalyzeAsync(
+            html,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/state")
+            });
+
+        HtmlPageDatasetChunk chunk = Assert.Single(HtmlPageDatasetBuilder.Build(workbench));
+        string provenanceText = string.Join(" ", chunk.Provenance.Select(entry => entry.Url));
+
+        Assert.Contains("<redacted>", provenanceText);
+        Assert.DoesNotContain("abc123", provenanceText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ToJsonLines_SerializesOneChunkPerLine() {
         HtmlPageWorkbenchResult workbench = await HtmlPageWorkbench.AnalyzeAsync(
             "<html><body><main><h1>JSONL</h1><p>This page is small but still becomes one dataset record.</p></main></body></html>",

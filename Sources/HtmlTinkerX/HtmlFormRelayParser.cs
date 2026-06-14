@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace HtmlTinkerX;
 
@@ -39,16 +40,19 @@ public static class HtmlFormRelayParser {
         }
 
         HtmlFormResult form = forms[0];
-        Dictionary<string, string> fields = form.Fields
+        List<KeyValuePair<string, string>> fieldValues = form.Fields
             .Where(static field => !string.IsNullOrWhiteSpace(field.Name))
-            .GroupBy(static field => field.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(static group => group.Key, static group => group.Last().Value ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+            .Select(static field => new KeyValuePair<string, string>(field.Name, field.Value ?? string.Empty))
+            .ToList();
+        Dictionary<string, string> fields = fieldValues
+            .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
         if (fields.Count == 0) {
             return false;
         }
 
         int hiddenCount = form.Fields.Count(static field => field.Type == HtmlFormFieldType.Hidden);
-        bool mostlyHidden = hiddenCount >= Math.Max(1, fields.Count - 1);
+        bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
         HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
         bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement);
         if (!mostlyHidden || (!hasAutoSubmitMarker && protocolHint == HtmlFormRelayProtocolHint.Generic)) {
@@ -60,7 +64,8 @@ public static class HtmlFormRelayParser {
             ActionUri = ResolveAction(form.Metadata.Action, effectiveBaseUri),
             Method = form.Metadata.Method,
             Fields = fields,
-            FieldNames = fields.Keys.OrderBy(static name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            FieldValues = fieldValues,
+            FieldNames = fieldValues.Select(static field => field.Key).ToArray(),
             ProtocolHint = protocolHint,
             HasAutoSubmitMarker = hasAutoSubmitMarker
         };
@@ -102,10 +107,35 @@ public static class HtmlFormRelayParser {
         string formId = formElement.Id ?? string.Empty;
         return document.QuerySelectorAll("script")
             .Select(static script => script.TextContent ?? string.Empty)
-            .Any(script =>
-                script.IndexOf(".submit()", StringComparison.OrdinalIgnoreCase) >= 0
-                || script.IndexOf("document.forms[0]", StringComparison.OrdinalIgnoreCase) >= 0
-                || (!string.IsNullOrWhiteSpace(formName) && script.IndexOf(formName, StringComparison.OrdinalIgnoreCase) >= 0)
-                || (!string.IsNullOrWhiteSpace(formId) && script.IndexOf(formId, StringComparison.OrdinalIgnoreCase) >= 0));
+            .Any(script => TargetsFormSubmit(script, formName, formId));
+    }
+
+    private static bool TargetsFormSubmit(string script, string formName, string formId) {
+        if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*0\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
+            return true;
+        }
+
+        return MatchesNamedFormSubmit(script, formName) || MatchesIdentifiedFormSubmit(script, formId);
+    }
+
+    private static bool MatchesNamedFormSubmit(string script, string formName) {
+        if (string.IsNullOrWhiteSpace(formName)) {
+            return false;
+        }
+
+        string escaped = Regex.Escape(formName);
+        return Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*['""]" + escaped + @"['""]\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            || Regex.IsMatch(script, @"document\s*\.\s*forms\s*\.\s*" + escaped + @"\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            || Regex.IsMatch(script, @"document\s*\.\s*" + escaped + @"\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool MatchesIdentifiedFormSubmit(string script, string formId) {
+        if (string.IsNullOrWhiteSpace(formId)) {
+            return false;
+        }
+
+        string escaped = Regex.Escape(formId);
+        return Regex.IsMatch(script, @"document\s*\.\s*getElementById\s*\(\s*['""]" + escaped + @"['""]\s*\)\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            || Regex.IsMatch(script, @"document\s*\.\s*querySelector\s*\(\s*['""]#" + escaped + @"['""]\s*\)\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 }

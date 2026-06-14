@@ -54,6 +54,82 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_RejectsGenericHiddenFormWhenSubmitDoesNotTargetForm() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="a" action="/continue">
+<input type="hidden" name="csrf" value="redacted">
+</form>
+<script>const data = { submit: function() {} }; data.submit(); const marker = "a";</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
+    public void TryParse_PreservesDuplicateFieldValuesInSourceOrder() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="scope" value="openid">
+<input type="hidden" name="scope" value="profile">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(new[] { "SAMLResponse", "scope", "scope" }, request!.FieldNames);
+        Assert.Equal(new[] { "openid", "profile" }, request.FieldValues.Where(field => field.Key == "scope").Select(field => field.Value).ToArray());
+        Assert.Equal("profile", request.Fields["scope"]);
+    }
+
+    [Fact]
+    public async Task FollowAsync_SubmitsDuplicateFieldValues() {
+        string serverBase = string.Empty;
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            if (context.Request.Path == "/continue") {
+                IFormCollection form = await context.Request.ReadFormAsync();
+                Assert.Equal(new[] { "openid", "profile" }, form["scope"].ToArray());
+                await context.Response.WriteAsync("<main>done</main>");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        serverBase = server.BaseAddress.ToString().TrimEnd('/');
+        string initialHtml = $"""
+<form method="POST" name="hiddenform" action="{serverBase}/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="scope" value="openid">
+<input type="hidden" name="scope" value="profile">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+""";
+        using HttpClient client = CreateCookieAwareClient(server);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            initialHtml,
+            new Uri(serverBase + "/start"),
+            client);
+
+        Assert.True(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.NoRelayForm, result.StopReason);
+    }
+
+    [Fact]
     public async Task FollowAsync_SubmitsRelayHopsAndPreservesCookies() {
         string serverBase = string.Empty;
         using var server = TestServerCompat.CreateTestServer(async context => {

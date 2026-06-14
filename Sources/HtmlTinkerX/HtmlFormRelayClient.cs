@@ -102,15 +102,18 @@ public static class HtmlFormRelayClient {
 
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HtmlFormRelayRequest request, CancellationToken cancellationToken) {
         if (request.Method == FormMethod.Get) {
-            Uri uri = await BuildGetUriAsync(request.ActionUri, request.Fields).ConfigureAwait(false);
+            Uri uri = await BuildGetUriAsync(request.ActionUri, GetSubmittedFields(request)).ConfigureAwait(false);
             return await client.GetAsync(uri, cancellationToken).ConfigureAwait(false);
         }
 
-        using FormUrlEncodedContent content = new(request.Fields);
+        using FormUrlEncodedContent content = new(GetSubmittedFields(request));
         return await client.PostAsync(request.ActionUri, content, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IReadOnlyDictionary<string, string> fields) {
+    private static IEnumerable<KeyValuePair<string, string>> GetSubmittedFields(HtmlFormRelayRequest request) =>
+        request.FieldValues.Count > 0 ? request.FieldValues : request.Fields;
+
+    private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IEnumerable<KeyValuePair<string, string>> fields) {
         UriBuilder builder = new(actionUri);
         List<KeyValuePair<string, string>> parameters = new();
         if (!string.IsNullOrEmpty(builder.Query)) {

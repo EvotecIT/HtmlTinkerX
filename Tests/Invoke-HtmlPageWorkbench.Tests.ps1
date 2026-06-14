@@ -1,4 +1,5 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+. "$PSScriptRoot/Support/HtmlRedirectTestServer.ps1"
 
 Describe 'Invoke-HtmlPageWorkbench' {
     It 'exports the unified page workbench command' {
@@ -85,5 +86,18 @@ Describe 'Invoke-HtmlPageWorkbench' {
         $result.HiddenFields.Count | Should -Be 1
         $result.StaticData.Where({ $_.Kind -eq 'Link' }).Count | Should -Be 0
         $result.Warnings -join "`n" | Should -Match 'Rendered content differs'
+    }
+
+    It 'uses the final response Url as the base when Url follows redirects' {
+        $server = [HtmlRedirectTestServer]::new()
+        try {
+            $result = Invoke-HtmlPageWorkbench -Url ($server.Url + 'redirect-workbench')
+
+            $result.SourceUrl | Should -Be ($server.Url + 'final/workbench')
+            $result.Links[0].Value | Should -Be ($server.Url + 'final/relative-link')
+            ($result.ApiEndpoints | Where-Object ResolvedUrl -EQ ($server.Url + 'final/relative-api')) | Should -Not -BeNullOrEmpty
+        } finally {
+            $server.Dispose()
+        }
     }
 }

@@ -57,6 +57,27 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_RedactsEndpointDerivedNames() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/api/session?token=abc123",
+                    Url = "/api/session?token=abc123",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.Contains("token=<redacted>", endpoint.Name);
+        Assert.DoesNotContain("abc123", endpoint.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Build_CanFilterFormsOrScriptEndpoints() {
         string html = """
 <html>

@@ -50,7 +50,7 @@ public static class HtmlPageWorkbench {
             ? NormalizeList(renderedSnapshot!.Data, () => HtmlParsingToolbox.SelectData(renderedSnapshot.Html, baseUri: renderedBaseUri))
             : Array.Empty<HtmlDataItem>();
         IReadOnlyList<HtmlInteractionSurfaceItem> renderedInteractionSurface = hasRenderedSnapshot
-            ? NormalizeList(renderedSnapshot!.InteractionSurface, () => HtmlParsingToolbox.FindInteractionSurface(renderedSnapshot.Html, renderedBaseUri, renderedSnapshot.LinkedJavaScriptEndpoints))
+            ? await GetRenderedInteractionSurfaceAsync(renderedSnapshot!, renderedBaseUri, effectiveOptions, client, cancellationToken).ConfigureAwait(false)
             : Array.Empty<HtmlInteractionSurfaceItem>();
         IReadOnlyList<HtmlJavaScriptConfigItem> renderedJavaScriptConfig = hasRenderedSnapshot
             ? NormalizeList(renderedSnapshot!.JavaScriptConfig, () => HtmlParsingToolbox.SelectJavaScriptConfig(renderedSnapshot.Html))
@@ -181,6 +181,27 @@ public static class HtmlPageWorkbench {
 
     private static IReadOnlyList<T> NormalizeList<T>(IReadOnlyList<T>? source, Func<IReadOnlyList<T>> fallback) =>
         source == null || source.Count == 0 ? fallback() : source;
+
+    private static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> GetRenderedInteractionSurfaceAsync(
+        HtmlRenderedPageSnapshot renderedSnapshot,
+        Uri? renderedBaseUri,
+        HtmlPageWorkbenchOptions options,
+        HttpClient? client,
+        CancellationToken cancellationToken) {
+        if (options.IncludeLinkedScripts) {
+            return await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+                renderedSnapshot.Html,
+                renderedBaseUri,
+                includeLinkedScripts: true,
+                includeExternalLinkedScripts: options.IncludeExternalLinkedScripts,
+                client,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return NormalizeList(
+            renderedSnapshot.InteractionSurface,
+            () => HtmlParsingToolbox.FindInteractionSurface(renderedSnapshot.Html, renderedBaseUri, renderedSnapshot.LinkedJavaScriptEndpoints));
+    }
 
     private static bool HasRenderedDelta(HtmlStaticRenderedComparison comparison) =>
         comparison.Deltas.Any(static delta => delta.Added.Length > 0 || delta.Removed.Length > 0)

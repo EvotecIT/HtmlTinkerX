@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+
 namespace HtmlTinkerX.Tests;
 
 public class HtmlPageWorkbenchTests {
@@ -108,5 +112,44 @@ public class HtmlPageWorkbenchTests {
         Assert.NotEmpty(result.RenderedData);
         Assert.NotEmpty(result.RenderedInteractionSurface);
         Assert.Contains(result.Warnings, warning => warning.Contains("Rendered content differs", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_HonorsLinkedScriptInspectionForRenderedSnapshot() {
+        string staticHtml = "<html><body><div id=\"root\">Loading...</div></body></html>";
+        HtmlRenderedPageSnapshot snapshot = new() {
+            Url = "https://example.org/app",
+            FinalUrl = "https://example.org/app",
+            Title = "Rendered App",
+            Html = """
+<html>
+<head><script src="/app.js"></script></head>
+<body><main><h1>Rendered App</h1></main></body>
+</html>
+"""
+        };
+        using HttpClient client = new(new LinkedScriptHandler());
+
+        HtmlPageWorkbenchResult result = await HtmlPageWorkbench.AnalyzeAsync(
+            staticHtml,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/app"),
+                RenderedSnapshot = snapshot,
+                IncludeLinkedScripts = true
+            },
+            client);
+
+        Assert.Contains(result.Endpoints, endpoint => endpoint.Kind == "LinkedEndpoint" && endpoint.Url == "/api/rendered-linked");
+    }
+
+    private sealed class LinkedScriptHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                RequestMessage = request,
+                Content = new StringContent("fetch('/api/rendered-linked');")
+            };
+
+            return Task.FromResult(response);
+        }
     }
 }

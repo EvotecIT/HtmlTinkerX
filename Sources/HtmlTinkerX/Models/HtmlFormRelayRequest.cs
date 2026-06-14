@@ -13,8 +13,11 @@ public sealed class HtmlFormRelayRequest {
     /// <summary>Form submission method.</summary>
     public FormMethod Method { get; set; } = FormMethod.Get;
 
-    /// <summary>Submitted fields keyed by name.</summary>
+    /// <summary>Submitted fields keyed by name. Repeated field names keep the last value for dictionary compatibility; use <see cref="FieldValues"/> for browser-faithful submissions.</summary>
     public IReadOnlyDictionary<string, string> Fields { get; set; } = new Dictionary<string, string>();
+
+    /// <summary>Submitted fields in source order, preserving repeated field names.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> FieldValues { get; set; } = new List<KeyValuePair<string, string>>();
 
     /// <summary>Names of fields that will be submitted.</summary>
     public IReadOnlyList<string> FieldNames { get; set; } = new List<string>();

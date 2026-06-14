@@ -21,6 +21,7 @@ public sealed class CmdletFindHtmlApiEndpoint : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";
     private const string ParameterSetUrl = "Url";
+    private Uri? downloadedResponseUri;
 
     /// <summary>Page workbench result to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetWorkbench, ValueFromPipeline = true, Position = 0)]
@@ -92,7 +93,7 @@ public sealed class CmdletFindHtmlApiEndpoint : AsyncPSCmdlet {
 
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
         string html = await ReadHtmlAsync(client).ConfigureAwait(false);
-        Uri? baseUri = ParameterSetName == ParameterSetUrl ? Url : BaseUrl;
+        Uri? baseUri = ParameterSetName == ParameterSetUrl ? downloadedResponseUri ?? Url : BaseUrl;
         return await HtmlPageWorkbench.AnalyzeAsync(
             html,
             new HtmlPageWorkbenchOptions {
@@ -106,7 +107,10 @@ public sealed class CmdletFindHtmlApiEndpoint : AsyncPSCmdlet {
 
     private async Task<string> ReadHtmlAsync(HttpClient client) {
         if (ParameterSetName == ParameterSetUrl) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(Url, CancelToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            downloadedResponseUri = response.RequestMessage?.RequestUri ?? Url;
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, CancelToken).ConfigureAwait(false);
         }
 
         if (ParameterSetName == ParameterSetPath) {

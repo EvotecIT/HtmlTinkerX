@@ -1,4 +1,5 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+. "$PSScriptRoot/Support/HtmlRedirectTestServer.ps1"
 
 Describe 'Find-HtmlApiEndpoint' {
     It 'exports the API endpoint inventory command' {
@@ -64,5 +65,19 @@ fetch("/api/session?token=abc123");
 
         $endpoints.Kind | Should -Contain 'Endpoint'
         $endpoints.Kind | Should -Not -Contain 'Form'
+    }
+
+    It 'uses the final response Url as the base when Url follows redirects' {
+        $server = [HtmlRedirectTestServer]::new()
+        try {
+            $endpoints = Find-HtmlApiEndpoint -Url ($server.Url + 'redirect-api')
+
+            $endpoint = $endpoints | Where-Object { $_.ResolvedUrl -like ($server.Url + 'final/relative-api*') }
+            $endpoint | Should -Not -BeNullOrEmpty
+            $endpoint.ResolvedUrl | Should -Match 'token=<redacted>'
+            $endpoint.Name | Should -Not -Match 'abc123'
+        } finally {
+            $server.Dispose()
+        }
     }
 }

@@ -202,49 +202,15 @@ public static class HtmlPageDatasetBuilder {
             return string.Empty;
         }
 
-        return RedactSensitiveQueryValues(value);
-    }
-
-    private static string RedactSensitiveQueryValues(string value) {
-        if (string.IsNullOrWhiteSpace(value)) {
-            return string.Empty;
+        if (kind.Equals("AppState", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("JavaScriptConfig", StringComparison.OrdinalIgnoreCase)) {
+            string redacted = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(value);
+            return HtmlSensitiveValueRedactor.IsSensitiveName(value) ? redacted : value;
         }
 
-        int queryIndex = value.IndexOf('?');
-        if (queryIndex < 0) {
-            return value;
-        }
-
-        int fragmentIndex = value.IndexOf('#', queryIndex);
-        string prefix = value.Substring(0, queryIndex + 1);
-        string query = fragmentIndex >= 0
-            ? value.Substring(queryIndex + 1, fragmentIndex - queryIndex - 1)
-            : value.Substring(queryIndex + 1);
-        string fragment = fragmentIndex >= 0 ? value.Substring(fragmentIndex) : string.Empty;
-        string[] sensitiveNames = {
-            "access_token",
-            "api_key",
-            "apikey",
-            "auth",
-            "code",
-            "credential",
-            "key",
-            "password",
-            "refresh_token",
-            "secret",
-            "session",
-            "token"
-        };
-        string[] pairs = query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
-        string[] redactedPairs = pairs.Select(pair => {
-            string[] keyValue = pair.Split(new[] { '=' }, 2);
-            string name = Uri.UnescapeDataString(keyValue[0]);
-            return sensitiveNames.Any(sensitive => string.Equals(name, sensitive, StringComparison.OrdinalIgnoreCase))
-                ? keyValue[0] + "=<redacted>"
-                : pair;
-        }).ToArray();
-
-        return prefix + string.Join("&", redactedPairs) + fragment;
+        return HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
     }
 
     private static string BuildSummary(string text) {

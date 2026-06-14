@@ -1,4 +1,5 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+. "$PSScriptRoot/Support/HtmlRedirectTestServer.ps1"
 
 Describe 'ConvertTo-HtmlDatasetJsonL' {
     It 'exports the single-page dataset JSONL command' {
@@ -47,5 +48,17 @@ Describe 'ConvertTo-HtmlDatasetJsonL' {
         $chunk.GetType().Name | Should -Be 'HtmlPageDatasetChunk'
         $chunk.SourceUrl | Should -Be 'https://example.org/object'
         $chunk.Markdown | Should -Match 'Object Output'
+    }
+
+    It 'uses the final response Url as the dataset source when Url follows redirects' {
+        $server = [HtmlRedirectTestServer]::new()
+        try {
+            $chunk = ConvertTo-HtmlDatasetJsonL -Url ($server.Url + 'redirect-dataset') -AsObject
+
+            $chunk.SourceUrl | Should -Be ($server.Url + 'final/dataset')
+            $chunk.FinalUrl | Should -Be ($server.Url + 'final/dataset')
+        } finally {
+            $server.Dispose()
+        }
     }
 }
