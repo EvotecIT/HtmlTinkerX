@@ -10,9 +10,9 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that minifies HTML content using NUglify.
 /// </summary>
 /// <example>
-/// <code>Optimize-HTML -Content $html</code>
+/// <code>Optimize-Html -Content $html</code>
 /// </example>
-[Cmdlet(VerbsCommon.Optimize, "HTML", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsCommon.Optimize, "Html", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
 public sealed class CmdletOptimizeHtml : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

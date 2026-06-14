@@ -14,7 +14,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Submit, "HtmlBrowserForm", DefaultParameterSetName = ParameterSetHttp)]
 [OutputType(typeof(string))]
-[Alias("Submit-HTMLForm")]
+[Alias("Submit-HtmlForm")]
 public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     private const string ParameterSetSession = "Session";
     private const string ParameterSetHttp = "Http";

@@ -13,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserConsoleLog")]
 [OutputType(typeof(HtmlConsoleEntry))]
-[Alias("Get-HTMLConsoleLog")]
+[Alias("Get-HtmlConsoleLog")]
 public sealed class CmdletGetHtmlBrowserConsoleLog : AsyncPSCmdlet {
     /// <summary>Browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

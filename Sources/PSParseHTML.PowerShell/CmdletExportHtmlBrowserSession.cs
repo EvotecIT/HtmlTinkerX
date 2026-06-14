@@ -12,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// <code>Export-HTMLSession -Session $session -Path session.json</code>
 /// </example>
 [Cmdlet(VerbsData.Export, "HtmlBrowserSession")]
-[Alias("Export-HTMLSession")]
+[Alias("Export-HtmlSession")]
 public sealed class CmdletExportHtmlBrowserSession : AsyncPSCmdlet {
     /// <summary>Browser session to export.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]

@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that configures default <see cref="HttpClient"/> options used by the module.
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HtmlBrowserClientOption")]
-[Alias("Set-HTMLHttpClientOption")]
+[Alias("Set-HtmlHttpClientOption")]
 public sealed class CmdletSetHtmlBrowserClientOption : AsyncPSCmdlet {
     /// <summary>Timeout in seconds for created clients.</summary>
     [Parameter]

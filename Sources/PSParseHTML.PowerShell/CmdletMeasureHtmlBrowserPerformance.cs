@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsDiagnostic.Measure, "HtmlBrowserPerformance", DefaultParameterSetName = ParameterSetUrl)]
 [OutputType(typeof(HtmlPerformanceMetrics))]
-[Alias("Measure-HTMLPerformance")]
+[Alias("Measure-HtmlPerformance")]
 public sealed class CmdletMeasureHtmlBrowserPerformance : AsyncPSCmdlet {
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetFile = "File";

@@ -40,7 +40,7 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptAstNode", DefaultParameterSetName = ParameterSetSource)]
-[Alias("Select-JavaScriptDescendantNode", "Select-JSAstNode", "Select-JSDescendantNode")]
+[Alias("Select-JavaScriptDescendantNode", "Select-JSAstNode", "Select-JSDescendantNode", "sjsn", "sjsdn")]
 [OutputType(typeof(Node))]
 public sealed class CmdletSelectJavaScriptAstNode : AsyncPSCmdlet {
     private const string ParameterSetSource = "Source";

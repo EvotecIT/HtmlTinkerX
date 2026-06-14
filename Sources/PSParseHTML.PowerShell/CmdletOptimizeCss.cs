@@ -9,9 +9,9 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that minifies CSS content.
 /// </summary>
 /// <example>
-/// <code>Optimize-CSS -Css $css</code>
+/// <code>Optimize-Css -Css $css</code>
 /// </example>
-[Cmdlet(VerbsCommon.Optimize, "CSS", DefaultParameterSetName = ParameterSetCss)]
+[Cmdlet(VerbsCommon.Optimize, "Css", DefaultParameterSetName = ParameterSetCss)]
 [OutputType(typeof(string))]
 public sealed class CmdletOptimizeCss : AsyncPSCmdlet {
     private const string ParameterSetCss = "Css";

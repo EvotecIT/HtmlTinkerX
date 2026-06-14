@@ -7,7 +7,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>Returns inner text from HtmlAgilityPack nodes or documents.</summary>
 /// <example>
 ///   <summary>Read decoded paragraph text</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//p' | Select-HtmlInnerText -DeEntitize</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//p' | Select-HtmlInnerText -DeEntitize</code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlInnerText")]
 [OutputType(typeof(string))]

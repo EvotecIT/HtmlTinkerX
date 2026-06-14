@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HtmlBrowserChecked")]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Set-HTMLChecked")]
+[Alias("Set-HtmlChecked")]
 public sealed class CmdletSetHtmlBrowserChecked : AsyncPSCmdlet {
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

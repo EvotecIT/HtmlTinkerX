@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserScript")]
 [OutputType(typeof(object))]
-[Alias("Invoke-HTMLScript")]
+[Alias("Invoke-HtmlScript")]
 public sealed class CmdletInvokeHtmlBrowserScript : AsyncPSCmdlet {
     /// <summary>Browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

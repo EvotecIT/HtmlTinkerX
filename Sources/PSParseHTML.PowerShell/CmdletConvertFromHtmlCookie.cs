@@ -8,9 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// Converts various cookie representations into <see cref="HtmlCookie"/> objects.
 /// </summary>
 /// <example>
-///   <code>ConvertFrom-HTMLCookie -Content "Set-Cookie: id=42; Path=/" -Format SetCookie</code>
+///   <code>ConvertFrom-HtmlCookie -Content "Set-Cookie: id=42; Path=/" -Format SetCookie</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HTMLCookie", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlCookie", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlCookie))]
 public sealed class CmdletConvertFromHtmlCookie : PSCmdlet {
     private const string ParameterSetContent = "Content";

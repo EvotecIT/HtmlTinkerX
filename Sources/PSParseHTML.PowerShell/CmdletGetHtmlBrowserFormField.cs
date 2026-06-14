@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserFormField", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlFormField))]
-[Alias("Get-HTMLFormField")]
+[Alias("Get-HtmlFormField")]
 public sealed class CmdletGetHtmlBrowserFormField : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";

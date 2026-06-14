@@ -21,7 +21,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Inspect only selected JSON-LD script nodes from an HtmlAgilityPack pipeline</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/ld+json"]' | ConvertFrom-HtmlJsonLd</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//script[@type="application/ld+json"]' | ConvertFrom-HtmlJsonLd</code>
 /// </example>
 /// <example>
 ///   <summary>Return only Product JSON-LD items</summary>

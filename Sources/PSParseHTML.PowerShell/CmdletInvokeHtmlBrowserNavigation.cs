@@ -12,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserNavigation", DefaultParameterSetName = ParameterSetUrl)]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Invoke-HTMLNavigation")]
+[Alias("Invoke-HtmlNavigation")]
 public sealed class CmdletInvokeHtmlBrowserNavigation : AsyncPSCmdlet {
     private const string ParameterSetUrl = "ByUrl";
     private const string ParameterSetText = "ByText";

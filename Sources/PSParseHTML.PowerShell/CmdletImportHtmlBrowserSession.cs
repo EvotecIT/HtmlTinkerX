@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.Import, "HtmlBrowserSession")]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Import-HTMLSession")]
+[Alias("Import-HtmlSession")]
 public sealed class CmdletImportHtmlBrowserSession : AsyncPSCmdlet {
     /// <summary>Path to the saved session state.</summary>
     [Parameter(Mandatory = true, Position = 0)]

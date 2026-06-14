@@ -10,10 +10,10 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that captures a screenshot of a web page using a headless browser. If <c>OutFile</c> has no extension, one is added based on <see cref="Format"/>.
 /// </summary>
 /// <example>
-/// <code>Save-HTMLScreenshot -Url https://example.com -OutFile page.png</code>
+/// <code>Save-HtmlScreenshot -Url https://example.com -OutFile page.png</code>
 /// </example>
 [Cmdlet(VerbsData.Save, "HtmlBrowserScreenshot", DefaultParameterSetName = ParameterSetSessionDefault)]
-[Alias("Save-HTMLScreenshot")]
+[Alias("Save-HtmlScreenshot")]
 public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";
     private const string ParameterSetClip = "Clip";

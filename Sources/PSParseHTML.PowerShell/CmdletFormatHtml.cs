@@ -8,9 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that formats HTML markup using NUglify.
 /// </summary>
 /// <example>
-/// <code>Format-HTML -Content '&lt;div&gt;test&lt;/div&gt;'</code>
+/// <code>Format-Html -Content '&lt;div&gt;test&lt;/div&gt;'</code>
 /// </example>
-[Cmdlet(VerbsCommon.Format, "HTML", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsCommon.Format, "Html", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
 public sealed class CmdletFormatHtml : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

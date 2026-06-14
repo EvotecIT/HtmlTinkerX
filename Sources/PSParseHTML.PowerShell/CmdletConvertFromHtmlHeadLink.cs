@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Inspect only the selected head node</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlHeadLink -BaseUrl https://example.org/page</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlHeadLink -BaseUrl https://example.org/page</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlHeadLink", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlHeadLink))]

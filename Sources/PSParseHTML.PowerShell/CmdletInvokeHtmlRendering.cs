@@ -13,10 +13,10 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that retrieves HTML content after executing JavaScript using a headless browser.
 /// </summary>
 /// <example>
-/// <code>Invoke-HTMLRendering -Url https://example.com -Browser Chromium -Clean</code>
+/// <code>Invoke-HtmlRendering -Url https://example.com -Browser Chromium -Clean</code>
 /// </example>
-[Cmdlet(VerbsLifecycle.Invoke, "HTMLRendering", DefaultParameterSetName = ParameterSetDefault)]
-[Alias("Start-HTMLSession", "Open-HTMLSession")]
+[Cmdlet(VerbsLifecycle.Invoke, "HtmlRendering", DefaultParameterSetName = ParameterSetDefault)]
+[Alias("Start-HtmlSession", "Open-HtmlSession")]
 [OutputType(typeof(string), typeof(HtmlBrowserSession), typeof(HtmlRenderedPageSnapshot))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";

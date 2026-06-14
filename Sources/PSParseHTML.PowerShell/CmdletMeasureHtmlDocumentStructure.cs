@@ -20,7 +20,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsDiagnostic.Measure, "HtmlDocumentStructure", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlDocumentStatistics))]
-[Alias("Measure-HTMLDocument")]
+[Alias("Measure-HtmlDocument")]
 public sealed class CmdletMeasureHtmlDocumentStructure : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";

@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserContent")]
 [OutputType(typeof(string))]
-[Alias("Get-HTMLContent")]
+[Alias("Get-HtmlContent")]
 public sealed class CmdletGetHtmlBrowserContent : AsyncPSCmdlet {
     /// <summary>Browser session in use.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

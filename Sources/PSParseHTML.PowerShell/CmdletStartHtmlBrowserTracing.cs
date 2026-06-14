@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// Starts capturing a Playwright trace for the given session.
 /// </summary>
 [Cmdlet(VerbsLifecycle.Start, "HtmlBrowserTracing")]
-[Alias("Start-HTMLTracing")]
+[Alias("Start-HtmlTracing")]
 public sealed class CmdletStartHtmlBrowserTracing : AsyncPSCmdlet {
     /// <summary>
     /// Browser session to trace.

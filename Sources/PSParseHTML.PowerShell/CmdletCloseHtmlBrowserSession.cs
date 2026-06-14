@@ -12,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// <code>Close-HTMLSession -Session $session</code>
 /// </example>
 [Cmdlet(VerbsCommon.Close, "HtmlBrowserSession")]
-[Alias("Close-HTMLSession", "Stop-HTMLSession")]
+[Alias("Close-HtmlSession", "Stop-HtmlSession")]
 public sealed class CmdletCloseHtmlBrowserSession : AsyncPSCmdlet {
     /// <summary>Browser session to dispose.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]

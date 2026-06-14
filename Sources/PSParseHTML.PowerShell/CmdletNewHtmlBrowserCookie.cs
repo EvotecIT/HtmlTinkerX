@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.New, "HtmlBrowserCookie")]
 [OutputType(typeof(HtmlCookie))]
-[Alias("New-HTMLCookie")]
+[Alias("New-HtmlCookie")]
 public sealed class CmdletNewHtmlBrowserCookie : PSCmdlet {
     /// <summary>Cookie name.</summary>
     [Parameter(Mandatory = true, Position = 0)]

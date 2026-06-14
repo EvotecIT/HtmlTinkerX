@@ -13,12 +13,12 @@ namespace PSParseHTML.PowerShell;
 /// Crawls a site offline and returns extracted pages with optional browser rendering.
 /// </summary>
 /// <example>
-/// <code>Invoke-HTMLCrawl -Url https://example.com/docs -MaxDepth 1</code>
+/// <code>Invoke-HtmlCrawl -Url https://example.com/docs -MaxDepth 1</code>
 /// </example>
 /// <example>
-/// <code>Invoke-HTMLCrawl -Url https://example.com/app -Render -WaitForSelector main -StorageStatePath .\state.json</code>
+/// <code>Invoke-HtmlCrawl -Url https://example.com/app -Render -WaitForSelector main -StorageStatePath .\state.json</code>
 /// </example>
-[Cmdlet(VerbsLifecycle.Invoke, "HTMLCrawl")]
+[Cmdlet(VerbsLifecycle.Invoke, "HtmlCrawl")]
 [OutputType(typeof(HtmlCrawlResult))]
 public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Starting URL for the crawl.</summary>

@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that removes a previously registered Playwright route handler.
 /// </summary>
-[Cmdlet(VerbsLifecycle.Unregister, "HTMLRoute")]
+[Cmdlet(VerbsLifecycle.Unregister, "HtmlRoute")]
 public sealed class CmdletUnregisterHtmlRoute : AsyncPSCmdlet {
     /// <summary>Browser session in use.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
@@ -20,7 +20,7 @@ public sealed class CmdletUnregisterHtmlRoute : AsyncPSCmdlet {
     [Parameter(Mandatory = true, Position = 1)]
     public string Pattern { get; set; } = string.Empty;
 
-    /// <summary>Handler returned by Register-HTMLRoute.</summary>
+    /// <summary>Handler returned by Register-HtmlRoute.</summary>
     [Parameter(Position = 2)]
     public Delegate? Handler { get; set; }
 
