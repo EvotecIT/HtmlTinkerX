@@ -40,10 +40,7 @@ public static class HtmlFormRelayParser {
         }
 
         HtmlFormResult form = forms[0];
-        List<KeyValuePair<string, string>> fieldValues = form.Fields
-            .Where(static field => !string.IsNullOrWhiteSpace(field.Name))
-            .Select(static field => new KeyValuePair<string, string>(field.Name, field.Value ?? string.Empty))
-            .ToList();
+        List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(formElement);
         Dictionary<string, string> fields = fieldValues
             .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
@@ -51,7 +48,8 @@ public static class HtmlFormRelayParser {
             return false;
         }
 
-        int hiddenCount = form.Fields.Count(static field => field.Type == HtmlFormFieldType.Hidden);
+        int hiddenCount = formElement.QuerySelectorAll("input[type=hidden]")
+            .Count(static field => IsSuccessfulControl(field));
         bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
         HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
         bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement);
@@ -100,6 +98,58 @@ public static class HtmlFormRelayParser {
         }
 
         return HtmlFormRelayProtocolHint.Generic;
+    }
+
+    private static List<KeyValuePair<string, string>> CreateSubmittedFieldValues(IElement formElement) {
+        List<KeyValuePair<string, string>> fieldValues = new();
+        foreach (IElement field in formElement.QuerySelectorAll("input,select,textarea,button")) {
+            if (!IsSuccessfulControl(field)) {
+                continue;
+            }
+
+            string name = field.GetAttribute("name")!;
+            if (field.NodeName.Equals("select", StringComparison.OrdinalIgnoreCase) && field.HasAttribute("multiple")) {
+                IElement[] selectedOptions = field.QuerySelectorAll("option[selected]").ToArray();
+                foreach (IElement option in selectedOptions) {
+                    fieldValues.Add(new KeyValuePair<string, string>(name, option.GetAttribute("value") ?? option.TextContent ?? string.Empty));
+                }
+
+                continue;
+            }
+
+            fieldValues.Add(new KeyValuePair<string, string>(name, HtmlFormFieldUtilities.GetSubmittedValue(field)));
+        }
+
+        return fieldValues;
+    }
+
+    private static bool IsSuccessfulControl(IElement field) {
+        if (field.HasAttribute("disabled") || string.IsNullOrWhiteSpace(field.GetAttribute("name"))) {
+            return false;
+        }
+
+        string nodeName = field.NodeName;
+        string type = field.GetAttribute("type") ?? string.Empty;
+        if (nodeName.Equals("button", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        if (nodeName.Equals("input", StringComparison.OrdinalIgnoreCase)) {
+            if (type.Equals("submit", StringComparison.OrdinalIgnoreCase)
+                || type.Equals("button", StringComparison.OrdinalIgnoreCase)
+                || type.Equals("reset", StringComparison.OrdinalIgnoreCase)
+                || type.Equals("image", StringComparison.OrdinalIgnoreCase)
+                || type.Equals("file", StringComparison.OrdinalIgnoreCase)) {
+                return false;
+            }
+
+            if ((type.Equals("checkbox", StringComparison.OrdinalIgnoreCase) || type.Equals("radio", StringComparison.OrdinalIgnoreCase))
+                && !field.HasAttribute("checked")) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool HasAutoSubmitMarker(IDocument document, IElement formElement) {

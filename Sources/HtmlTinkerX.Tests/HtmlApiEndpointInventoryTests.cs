@@ -101,6 +101,59 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_DoesNotTreatBenignNamesAsSensitiveQueryText() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "decodeKeyMetrics",
+                    Url = "/graphql",
+                    Method = "GET",
+                    Source = "InlineScript",
+                    Metadata = "decodeKeyMetrics"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.False(endpoint.HasSensitiveQuery);
+        Assert.Equal(HtmlApiEndpointRiskLevel.Low, endpoint.RiskLevel);
+        Assert.Contains("same-origin-read", endpoint.ReasonCodes);
+        Assert.DoesNotContain("sensitive-query-name", endpoint.ReasonCodes);
+    }
+
+    [Fact]
+    public void Build_RedactsSensitiveUrlFragments() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/callback#access_token=abc123",
+                    Url = "/callback?ok=1#access_token=abc123",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Equal(HtmlApiEndpointRiskLevel.High, endpoint.RiskLevel);
+        Assert.Contains("access_token=<redacted>", endpoint.Url);
+        Assert.Contains("access_token=<redacted>", endpoint.ResolvedUrl);
+        Assert.Contains("access_token=<redacted>", endpoint.Name);
+        Assert.DoesNotContain("abc123", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", endpoint.ResolvedUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", endpoint.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_TreatsUnknownSameOriginMethodsAsReviewRisk() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page",

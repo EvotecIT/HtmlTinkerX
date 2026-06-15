@@ -22,11 +22,11 @@ internal static class HtmlSensitiveValueRedactor {
     };
 
     internal static bool HasSensitiveQuery(Uri? uri) {
-        if (uri == null || string.IsNullOrWhiteSpace(uri.Query)) {
+        if (uri == null || (string.IsNullOrWhiteSpace(uri.Query) && string.IsNullOrWhiteSpace(uri.Fragment))) {
             return false;
         }
 
-        return HasSensitiveQueryText(uri.Query);
+        return HasSensitiveQueryText(uri.Query) || HasSensitiveQueryText(uri.Fragment);
     }
 
     internal static bool HasSensitiveQueryText(string value) {
@@ -34,17 +34,12 @@ internal static class HtmlSensitiveValueRedactor {
             return false;
         }
 
-        int queryIndex = value.IndexOf('?');
-        string query = queryIndex >= 0 ? value.Substring(queryIndex + 1) : value.TrimStart('?');
-        int fragmentIndex = query.IndexOf('#');
-        if (fragmentIndex >= 0) {
-            query = query.Substring(0, fragmentIndex);
-        }
-
-        foreach (string pair in query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
-            string name = pair.Split(new[] { '=' }, 2)[0];
-            if (IsSensitiveName(Uri.UnescapeDataString(name))) {
-                return true;
+        foreach (string parameters in GetParameterSegments(value)) {
+            foreach (string pair in parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
+                string name = pair.Split(new[] { '=' }, 2)[0];
+                if (IsSensitiveName(Uri.UnescapeDataString(name))) {
+                    return true;
+                }
             }
         }
 
@@ -57,24 +52,51 @@ internal static class HtmlSensitiveValueRedactor {
         }
 
         int queryIndex = value.IndexOf('?');
-        if (queryIndex < 0) {
+        int fragmentIndex = value.IndexOf('#');
+        if (queryIndex < 0 && fragmentIndex < 0) {
             return value;
         }
 
-        int fragmentIndex = value.IndexOf('#', queryIndex);
-        string prefix = value.Substring(0, queryIndex + 1);
-        string query = fragmentIndex >= 0
-            ? value.Substring(queryIndex + 1, fragmentIndex - queryIndex - 1)
-            : value.Substring(queryIndex + 1);
-        string fragment = fragmentIndex >= 0 ? value.Substring(fragmentIndex) : string.Empty;
-        string[] pairs = query.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+        if (queryIndex >= 0 && (fragmentIndex < 0 || queryIndex < fragmentIndex)) {
+            int queryEnd = fragmentIndex >= 0 ? fragmentIndex : value.Length;
+            string prefix = value.Substring(0, queryIndex + 1);
+            string query = value.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
+            string fragment = fragmentIndex >= 0 ? "#" + RedactParameterPairs(value.Substring(fragmentIndex + 1)) : string.Empty;
+            return prefix + RedactParameterPairs(query) + fragment;
+        }
+
+        return value.Substring(0, fragmentIndex + 1) + RedactParameterPairs(value.Substring(fragmentIndex + 1));
+    }
+
+    private static string[] GetParameterSegments(string value) {
+        int queryIndex = value.IndexOf('?');
+        int fragmentIndex = value.IndexOf('#');
+        if (queryIndex < 0 && fragmentIndex < 0) {
+            return Array.Empty<string>();
+        }
+
+        if (queryIndex >= 0 && (fragmentIndex < 0 || queryIndex < fragmentIndex)) {
+            int queryEnd = fragmentIndex >= 0 ? fragmentIndex : value.Length;
+            string query = value.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
+            if (fragmentIndex >= 0) {
+                return new[] { query, value.Substring(fragmentIndex + 1) };
+            }
+
+            return new[] { query };
+        }
+
+        return new[] { value.Substring(fragmentIndex + 1) };
+    }
+
+    private static string RedactParameterPairs(string parameters) {
+        string[] pairs = parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
         string[] redactedPairs = pairs.Select(pair => {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = Uri.UnescapeDataString(keyValue[0]);
             return IsSensitiveName(name) ? keyValue[0] + "=<redacted>" : pair;
         }).ToArray();
 
-        return prefix + string.Join("&", redactedPairs) + fragment;
+        return string.Join("&", redactedPairs);
     }
 
     internal static bool IsSensitiveName(string value) =>

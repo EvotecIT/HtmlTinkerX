@@ -97,6 +97,31 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_FiltersControlsThatBrowserSubmitOmits() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="disabledToken" value="leak" disabled>
+<input type="checkbox" name="remember" value="yes">
+<input type="submit" name="submit" value="Continue">
+<button name="fallback" value="noscript">Continue</button>
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(new[] { "SAMLResponse" }, request!.FieldNames);
+        Assert.DoesNotContain(request.FieldValues, field => field.Key == "submit" || field.Key == "fallback" || field.Key == "disabledToken" || field.Key == "remember");
+    }
+
+    [Fact]
     public async Task FollowAsync_SubmitsDuplicateFieldValues() {
         string serverBase = string.Empty;
         using var server = TestServerCompat.CreateTestServer(async context => {
@@ -127,6 +152,43 @@ public class HtmlFormRelayTests {
 
         Assert.True(result.SubmittedRelay);
         Assert.Equal(HtmlFormRelayStopReason.NoRelayForm, result.StopReason);
+    }
+
+    [Fact]
+    public async Task FollowAsync_RedactsSensitiveDiagnosticUrls() {
+        string serverBase = string.Empty;
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            if (context.Request.Path == "/continue") {
+                Assert.Equal("abc123", context.Request.Query["token"]);
+                await context.Response.WriteAsync("<main>done</main>");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        serverBase = server.BaseAddress.ToString().TrimEnd('/');
+        string initialHtml = $"""
+<form method="POST" name="hiddenform" action="{serverBase}/continue?token=abc123#access_token=frag456">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+""";
+        using HttpClient client = CreateCookieAwareClient(server);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            initialHtml,
+            new Uri(serverBase + "/start?session=start123#access_token=start456"),
+            client);
+
+        HtmlFormRelayStep step = Assert.Single(result.Steps);
+        Assert.Contains("token=<redacted>", step.ActionUrl);
+        Assert.Contains("access_token=<redacted>", step.ActionUrl);
+        Assert.Contains("token=<redacted>", step.ResponseUrl);
+        Assert.Contains("token=<redacted>", result.FinalUrl);
+        Assert.DoesNotContain("abc123", step.ActionUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("frag456", step.ActionUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", step.ResponseUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", result.FinalUrl, StringComparison.Ordinal);
     }
 
     [Fact]

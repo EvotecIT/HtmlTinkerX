@@ -61,7 +61,7 @@ public static class HtmlFormRelayClient {
 
             using HttpResponseMessage response = await SendAsync(http, request, cancellationToken).ConfigureAwait(false);
             step.StatusCode = (int)response.StatusCode;
-            step.ResponseUrl = response.RequestMessage?.RequestUri?.AbsoluteUri ?? request.ActionUri.AbsoluteUri;
+            step.ResponseUrl = RedactUrl(response.RequestMessage?.RequestUri?.AbsoluteUri ?? request.ActionUri.AbsoluteUri);
             steps.Add(step);
 
             currentUri = response.RequestMessage?.RequestUri ?? request.ActionUri;
@@ -74,7 +74,7 @@ public static class HtmlFormRelayClient {
     private static HtmlFormRelayResult CreateResult(string content, Uri uri, HtmlFormRelayStopReason reason, IReadOnlyList<HtmlFormRelayStep> steps) =>
         new() {
             FinalContent = content,
-            FinalUrl = uri.AbsoluteUri,
+            FinalUrl = RedactUrl(uri.AbsoluteUri),
             StopReason = reason,
             SubmittedRelay = steps.Any(static step => !step.Blocked),
             Steps = steps.ToArray()
@@ -84,7 +84,7 @@ public static class HtmlFormRelayClient {
         new() {
             Index = index,
             Method = request.Method,
-            ActionUrl = request.ActionUri.AbsoluteUri,
+            ActionUrl = RedactUrl(request.ActionUri.AbsoluteUri),
             FieldNames = request.FieldNames,
             ProtocolHint = request.ProtocolHint,
             IsCrossHost = isCrossHost,
@@ -112,6 +112,9 @@ public static class HtmlFormRelayClient {
 
     private static IEnumerable<KeyValuePair<string, string>> GetSubmittedFields(HtmlFormRelayRequest request) =>
         request.FieldValues.Count > 0 ? request.FieldValues : request.Fields;
+
+    private static string RedactUrl(string value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
 
     private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IEnumerable<KeyValuePair<string, string>> fields) {
         UriBuilder builder = new(actionUri);
