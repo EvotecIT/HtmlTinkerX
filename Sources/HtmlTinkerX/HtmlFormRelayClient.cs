@@ -128,22 +128,15 @@ public static class HtmlFormRelayClient {
 
     private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IEnumerable<KeyValuePair<string, string>> fields) {
         UriBuilder builder = new(actionUri);
-        List<KeyValuePair<string, string>> parameters = new();
-        if (!string.IsNullOrEmpty(builder.Query)) {
-            foreach (string pair in builder.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
-                string[] kv = pair.Split(new[] { '=' }, 2);
-                parameters.Add(new KeyValuePair<string, string>(
-                    Uri.UnescapeDataString(kv[0]),
-                    kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : string.Empty));
-            }
+        using FormUrlEncodedContent queryContent = new(fields);
+        string submittedQuery = await queryContent.ReadAsStringAsync().ConfigureAwait(false);
+        string existingQuery = builder.Query;
+        if (string.IsNullOrEmpty(existingQuery)) {
+            builder.Query = submittedQuery;
+        } else if (!string.IsNullOrEmpty(submittedQuery)) {
+            builder.Query = existingQuery.TrimStart('?') + "&" + submittedQuery;
         }
 
-        foreach (KeyValuePair<string, string> field in fields) {
-            parameters.Add(field);
-        }
-
-        using FormUrlEncodedContent queryContent = new(parameters);
-        builder.Query = await queryContent.ReadAsStringAsync().ConfigureAwait(false);
         return builder.Uri;
     }
 }

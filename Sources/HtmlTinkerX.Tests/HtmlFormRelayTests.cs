@@ -328,6 +328,28 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_IncludesFormOwnedControlsOutsideFormElement() {
+        string html = """
+<html>
+<body>
+<form id="relay" method="POST" action="/continue">
+</form>
+<input type="hidden" form="relay" name="SAMLResponse" value="redacted">
+<input type="hidden" form="relay" name="RelayState" value="state">
+<script>document.getElementById('relay').submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(new[] { "SAMLResponse", "RelayState" }, request!.FieldNames);
+        Assert.Equal("https://example.org/continue", request.ActionUri.AbsoluteUri);
+    }
+
+    [Fact]
     public void TryParse_ReturnsFalseForMalformedRelayAction() {
         string html = """
 <html>
@@ -595,6 +617,31 @@ public class HtmlFormRelayTests {
         Assert.Equal("https://idp.example.net/complete", step.ResponseUrl);
     }
 
+    [Fact]
+    public async Task FollowAsync_PreservesExistingGetActionQueryBytes() {
+        string html = """
+<form method="GET" name="hiddenform" action="https://rp.example.org/continue?RelayState=a%20b&sig=raw+plus">
+<input type="hidden" name="SAMLResponse" value="redacted value">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+""";
+        using QueryCaptureHandler handler = new();
+        using HttpClient client = new(handler);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            html,
+            new Uri("https://rp.example.org/start"),
+            client);
+
+        Assert.True(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.NoRelayForm, result.StopReason);
+        Assert.Contains("RelayState=a%20b", handler.ObservedQuery);
+        Assert.Contains("sig=raw+plus", handler.ObservedQuery);
+        Assert.Contains("SAMLResponse=redacted+value", handler.ObservedQuery);
+        Assert.DoesNotContain("RelayState=a+b", handler.ObservedQuery, StringComparison.Ordinal);
+        Assert.DoesNotContain("sig=raw%2Bplus", handler.ObservedQuery, StringComparison.Ordinal);
+    }
+
     private static HttpClient CreateCookieAwareClient(TestServerFixture server) {
         TestServerCookieHandler handler = new() {
             InnerHandler = server.CreateHandler()
@@ -633,6 +680,20 @@ public class HtmlFormRelayTests {
             HttpResponseMessage response = new(HttpStatusCode.OK) {
                 RequestMessage = new HttpRequestMessage(request.Method, "https://idp.example.net/complete"),
                 Content = new StringContent("<main>redirected</main>")
+            };
+
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class QueryCaptureHandler : HttpMessageHandler, IDisposable {
+        public string ObservedQuery { get; private set; } = string.Empty;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            ObservedQuery = request.RequestUri?.Query ?? string.Empty;
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                RequestMessage = request,
+                Content = new StringContent("<main>done</main>")
             };
 
             return Task.FromResult(response);

@@ -41,7 +41,8 @@ public static class HtmlFormRelayParser {
         for (int formIndex = 0; formIndex < formElements.Length; formIndex++) {
             IElement formElement = formElements[formIndex];
             HtmlFormResult form = forms[formIndex];
-            List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(formElement);
+            List<IElement> successfulControls = GetSuccessfulControls(document, formElement);
+            List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(successfulControls);
             Dictionary<string, string> fields = fieldValues
                 .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
@@ -49,8 +50,9 @@ public static class HtmlFormRelayParser {
                 continue;
             }
 
-            int hiddenCount = formElement.QuerySelectorAll("input[type=hidden]")
-                .Count(static field => IsSuccessfulControl(field));
+            int hiddenCount = successfulControls.Count(static field =>
+                field.NodeName.Equals("input", StringComparison.OrdinalIgnoreCase)
+                && (field.GetAttribute("type") ?? string.Empty).Equals("hidden", StringComparison.OrdinalIgnoreCase));
             bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
             HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
             bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement, formIndex);
@@ -151,13 +153,36 @@ public static class HtmlFormRelayParser {
         return HtmlFormRelayProtocolHint.Generic;
     }
 
-    private static List<KeyValuePair<string, string>> CreateSubmittedFieldValues(IElement formElement) {
-        List<KeyValuePair<string, string>> fieldValues = new();
-        foreach (IElement field in formElement.QuerySelectorAll("input,select,textarea,button")) {
-            if (!IsSuccessfulControl(field)) {
-                continue;
-            }
+    private static List<IElement> GetSuccessfulControls(IDocument document, IElement formElement) {
+        string formId = formElement.Id ?? string.Empty;
+        return document.QuerySelectorAll("input,select,textarea,button")
+            .Where(field => IsOwnedByForm(field, formElement, formId))
+            .Where(IsSuccessfulControl)
+            .ToList();
+    }
 
+    private static bool IsOwnedByForm(IElement field, IElement formElement, string formId) {
+        if (IsDescendantOf(field, formElement)) {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(formId)
+            && string.Equals(field.GetAttribute("form"), formId, StringComparison.Ordinal);
+    }
+
+    private static bool IsDescendantOf(IElement field, IElement formElement) {
+        for (IElement? parent = field.ParentElement; parent != null; parent = parent.ParentElement) {
+            if (ReferenceEquals(parent, formElement)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<KeyValuePair<string, string>> CreateSubmittedFieldValues(IEnumerable<IElement> controls) {
+        List<KeyValuePair<string, string>> fieldValues = new();
+        foreach (IElement field in controls) {
             string name = field.GetAttribute("name")!;
             if (field.NodeName.Equals("select", StringComparison.OrdinalIgnoreCase) && field.HasAttribute("multiple")) {
                 IElement[] selectedOptions = field.QuerySelectorAll("option[selected]").ToArray();

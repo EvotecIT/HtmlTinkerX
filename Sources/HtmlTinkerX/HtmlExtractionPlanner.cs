@@ -32,7 +32,8 @@ public static class HtmlExtractionPlanner {
         int scriptCount = document.QuerySelectorAll("script").Length;
         int executableScriptCount = document.QuerySelectorAll("script")
             .Count(static script => IsExecutableScript(script));
-        int externalScriptCount = document.QuerySelectorAll("script[src]").Length;
+        int externalScriptCount = document.QuerySelectorAll("script[src]")
+            .Count(static script => IsExecutableScript(script));
         int linkCount = document.QuerySelectorAll("a[href]").Length;
         int hiddenFieldCount = forms.Sum(static form => form.Fields.Count(static field => field.Type == HtmlFormFieldType.Hidden));
         int appStateCount = dataItems.Count(static item => item.Kind.Equals("AppState", StringComparison.OrdinalIgnoreCase));
@@ -184,17 +185,7 @@ public static class HtmlExtractionPlanner {
         HtmlFormRelayParser.TryParse(html, url ?? new Uri("https://example.invalid/"), out _);
 
     private static bool IsExecutableScript(IElement script) {
-        string type = script.GetAttribute("type") ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(type)) {
-            return true;
-        }
-
-        type = type.Split(';')[0].Trim();
-        return type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("module", StringComparison.OrdinalIgnoreCase);
+        return HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type"));
     }
 
     private static bool LooksLikeJavaScriptShell(IDocument document, int wordCount, int scriptCount, int appStateCount, int externalScriptCount) {

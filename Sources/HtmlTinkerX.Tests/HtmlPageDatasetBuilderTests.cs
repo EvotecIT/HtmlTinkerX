@@ -69,6 +69,28 @@ public class HtmlPageDatasetBuilderTests {
     }
 
     [Fact]
+    public void Build_RedactsSensitiveMarkdownLinkTargets() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            Title = "Markdown",
+            AnalysisMode = "Static",
+            Markdown = "[Reset](https://example.org/reset?token=abc123) ![Chart](https://example.org/chart.png?access_token=def456)",
+            ReadableText = new HtmlReadableTextResult {
+                Text = "Markdown link page.",
+                Title = "Markdown"
+            }
+        };
+
+        HtmlPageDatasetChunk chunk = Assert.Single(HtmlPageDatasetBuilder.Build(workbench));
+
+        Assert.Contains("token=<redacted>", chunk.Markdown);
+        Assert.Contains("access_token=<redacted>", chunk.Markdown);
+        Assert.DoesNotContain("abc123", chunk.Markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("def456", chunk.Markdown, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Build_RedactsSensitiveScriptStateProvenance() {
         string html = """
 <html>

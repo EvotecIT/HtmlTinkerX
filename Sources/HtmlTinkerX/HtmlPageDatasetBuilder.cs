@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 
 namespace HtmlTinkerX;
@@ -65,7 +66,7 @@ public static class HtmlPageDatasetBuilder {
                 Title = workbench.Title,
                 AnalysisMode = workbench.AnalysisMode,
                 Text = text,
-                Markdown = effectiveOptions.IncludeMarkdown ? SelectMarkdownSlice(markdownChunks, text, index) : string.Empty,
+                Markdown = effectiveOptions.IncludeMarkdown ? SanitizeMarkdown(SelectMarkdownSlice(markdownChunks, text, index)) : string.Empty,
                 Summary = BuildSummary(text),
                 WordCount = CountWords(text),
                 CharacterCount = text.Length,
@@ -218,6 +219,18 @@ public static class HtmlPageDatasetBuilder {
 
     private static string SanitizeUrl(string value) =>
         HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
+
+    private static string SanitizeMarkdown(string markdown) {
+        if (string.IsNullOrWhiteSpace(markdown)) {
+            return string.Empty;
+        }
+
+        return Regex.Replace(
+            markdown,
+            @"(?<prefix>!?\[[^\]]*\]\()(?<url>[^)\s]+)(?<suffix>\))",
+            match => match.Groups["prefix"].Value + SanitizeUrl(match.Groups["url"].Value) + match.Groups["suffix"].Value,
+            RegexOptions.CultureInvariant);
+    }
 
     private static string BuildSummary(string text) {
         string normalized = NormalizeWhitespace(text);
