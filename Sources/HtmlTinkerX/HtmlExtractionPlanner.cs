@@ -200,7 +200,7 @@ public static class HtmlExtractionPlanner {
     }
 
     private static string BuildSuggestedCommand(HtmlExtractionPlanMode mode, Uri? url) {
-        string target = url == null ? "$html" : "'" + url.AbsoluteUri.Replace("'", "''") + "'";
+        string target = BuildCommandTarget(url);
         return mode switch {
             HtmlExtractionPlanMode.BrowserlessRelayCandidate => url == null
                 ? "Invoke-HtmlFormRelay -Content $html -BaseUrl '<current-response-url>'"
@@ -221,7 +221,7 @@ public static class HtmlExtractionPlanner {
     }
 
     private static string BuildProfileCommand(HtmlExtractionProfile profile, Uri? url) {
-        string target = url == null ? null! : "'" + url.AbsoluteUri.Replace("'", "''") + "'";
+        string target = BuildCommandTarget(url);
         if (url == null) {
             return profile.SuggestedCommand;
         }
@@ -235,6 +235,15 @@ public static class HtmlExtractionPlanner {
             "dataset-page" => $"ConvertTo-HtmlDatasetJsonL -Url {target}",
             _ => $"Invoke-HtmlPageWorkbench -Url {target}"
         };
+    }
+
+    private static string BuildCommandTarget(Uri? url) {
+        if (url == null) {
+            return "$html";
+        }
+
+        string redactedUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(url.AbsoluteUri);
+        return "'" + redactedUrl.Replace("'", "''") + "'";
     }
 
     private static string BuildProfileReason(HtmlExtractionProfile profile) =>

@@ -78,6 +78,10 @@ public static class HtmlFormRelayClient {
             currentHtml = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
         }
 
+        if (!HtmlFormRelayParser.TryParse(currentHtml, currentUri, out _)) {
+            return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.NoRelayForm, steps);
+        }
+
         return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.MaxRelayCountReached, steps);
     }
 

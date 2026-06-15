@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace HtmlTinkerX;
 
@@ -150,5 +151,11 @@ public static class HtmlExtractionProfiles {
     }
 
     private static bool ContainsAny(string value, params string[] markers) =>
-        markers.Any(marker => value.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+        markers.Any(marker => ContainsToken(value, marker));
+
+    private static bool ContainsToken(string value, string marker) =>
+        Regex.IsMatch(
+            value ?? string.Empty,
+            @"(?<![A-Za-z0-9])" + Regex.Escape(marker) + @"(?![A-Za-z0-9])",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }

@@ -162,12 +162,13 @@ public static class HtmlFormRelayParser {
     }
 
     private static bool IsOwnedByForm(IElement field, IElement formElement, string formId) {
-        if (IsDescendantOf(field, formElement)) {
-            return true;
+        string ownerFormId = field.GetAttribute("form") ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(ownerFormId)) {
+            return !string.IsNullOrWhiteSpace(formId)
+                && string.Equals(ownerFormId, formId, StringComparison.Ordinal);
         }
 
-        return !string.IsNullOrWhiteSpace(formId)
-            && string.Equals(field.GetAttribute("form"), formId, StringComparison.Ordinal);
+        return IsDescendantOf(field, formElement);
     }
 
     private static bool IsDescendantOf(IElement field, IElement formElement) {
@@ -259,15 +260,16 @@ public static class HtmlFormRelayParser {
             return false;
         }
 
+        string scriptWithoutUserDrivenHandlers = RemoveUserDrivenSubmitContexts(script);
+        if (HasAutomaticSubmitWrapper(scriptWithoutUserDrivenHandlers, formName, formId, formIndex)) {
+            return true;
+        }
+
         if (HasUserDrivenSubmitContext(script)) {
             return false;
         }
 
-        if (HasAutomaticSubmitWrapper(script, formName, formId, formIndex)) {
-            return true;
-        }
-
-        return ContainsTargetedFormSubmit(RemoveFunctionDeclarationBodies(script), formName, formId, formIndex);
+        return ContainsTargetedFormSubmit(RemoveFunctionDeclarationBodies(scriptWithoutUserDrivenHandlers), formName, formId, formIndex);
     }
 
     private static bool ContainsTargetedFormSubmit(string script, string formName, string formId, int formIndex) {
@@ -295,6 +297,15 @@ public static class HtmlFormRelayParser {
         return Regex.IsMatch(
             script,
             @"addEventListener\s*\(\s*['""](?:" + userEvents + @")['""].*?submit\s*\(",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    }
+
+    private static string RemoveUserDrivenSubmitContexts(string script) {
+        const string userEvents = "click|dblclick|auxclick|submit|change|input|keydown|keyup|keypress|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend";
+        return Regex.Replace(
+            script,
+            @"addEventListener\s*\(\s*['""](?:" + userEvents + @")['""].*?submit\s*\(.*?\)\s*\)\s*;?",
+            string.Empty,
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
     }
 

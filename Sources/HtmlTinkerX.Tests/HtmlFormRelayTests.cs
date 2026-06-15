@@ -223,6 +223,32 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_AcceptsAutomaticSubmitWithManualFallbackListener() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<button id="continue">Continue</button>
+<script>
+setTimeout(() => document.forms['hiddenform'].submit(), 0);
+document.getElementById('continue').addEventListener('click', () => document.forms['hiddenform'].submit());
+</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal("https://example.org/continue", request!.ActionUri.AbsoluteUri);
+        Assert.True(request.HasAutoSubmitMarker);
+    }
+
+    [Fact]
     public void TryParse_RejectsHelperFunctionWithoutAutomaticInvocation() {
         string html = """
 <html>
@@ -347,6 +373,29 @@ public class HtmlFormRelayTests {
         Assert.NotNull(request);
         Assert.Equal(new[] { "SAMLResponse", "RelayState" }, request!.FieldNames);
         Assert.Equal("https://example.org/continue", request.ActionUri.AbsoluteUri);
+    }
+
+    [Fact]
+    public void TryParse_ExcludesDescendantControlsOwnedByAnotherForm() {
+        string html = """
+<html>
+<body>
+<form id="relay" method="POST" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" form="other" name="RelayState" value="wrong-form">
+</form>
+<form id="other" method="POST" action="/other"></form>
+<script>document.getElementById('relay').submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(new[] { "SAMLResponse" }, request!.FieldNames);
+        Assert.DoesNotContain(request.FieldValues, field => field.Key == "RelayState");
     }
 
     [Fact]
@@ -640,6 +689,39 @@ public class HtmlFormRelayTests {
         Assert.Contains("SAMLResponse=redacted+value", handler.ObservedQuery);
         Assert.DoesNotContain("RelayState=a+b", handler.ObservedQuery, StringComparison.Ordinal);
         Assert.DoesNotContain("sig=raw%2Bplus", handler.ObservedQuery, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FollowAsync_ReturnsNoRelayFormWhenFinalAllowedHopCompletesAtRelayLimit() {
+        string serverBase = string.Empty;
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            if (context.Request.Path == "/continue") {
+                await context.Response.WriteAsync("<main>done</main>");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        serverBase = server.BaseAddress.ToString().TrimEnd('/');
+        string html = $"""
+<form method="POST" name="hiddenform" action="{serverBase}/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms[0].submit()</script>
+""";
+        using HttpClient client = CreateCookieAwareClient(server);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            html,
+            new Uri(serverBase + "/start"),
+            client,
+            new HtmlFormRelayOptions {
+                MaxRelayCount = 1
+            });
+
+        Assert.True(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.NoRelayForm, result.StopReason);
+        Assert.Contains("done", result.FinalContent);
     }
 
     private static HttpClient CreateCookieAwareClient(TestServerFixture server) {

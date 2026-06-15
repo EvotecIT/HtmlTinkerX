@@ -182,4 +182,68 @@ public class HtmlExtractionPlannerTests {
         Assert.False(plan.HasAutoSubmitForm);
         Assert.DoesNotContain("Invoke-HtmlFormRelay", plan.SuggestedCommand);
     }
+
+    [Fact]
+    public void Analyze_DoesNotRecommendApiProfileForApiLettersInsideNormalWords() {
+        string html = """
+<html>
+<head><title>Capital scraping rapid examples</title></head>
+<body>
+<main>
+<p>This guide covers capital city examples and scraping workflows with rapid iteration for ordinary page extraction.</p>
+<p>It has enough readable content to be useful as a static dataset without endpoint catalog signals.</p>
+</main>
+</body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, new Uri("https://example.org/capital-scraping-rapid"));
+
+        Assert.NotEqual("api-docs-content", plan.SuggestedProfileName);
+        Assert.DoesNotContain("api-docs-content", plan.SuggestedProfileCommand);
+    }
+
+    [Fact]
+    public void Analyze_RecommendsApiProfileForApiTokenMarkers() {
+        string html = """
+<html>
+<head><title>API reference</title></head>
+<body>
+<main>
+<p>This API reference lists endpoint details, response schemas, and request formats for service integrations.</p>
+</main>
+</body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, new Uri("https://example.org/docs/api/reference"));
+
+        Assert.Equal("api-docs-content", plan.SuggestedProfileName);
+        Assert.Contains("api-docs-content", plan.SuggestedProfileCommand);
+    }
+
+    [Fact]
+    public void Analyze_RedactsSensitiveUrlValuesInSuggestedCommands() {
+        string html = """
+<html>
+<body>
+<main>
+<p>This page contains useful readable content that can be extracted statically while keeping URL secrets out of suggested commands.</p>
+</main>
+</body>
+</html>
+""";
+        Uri url = new("https://user:pass@example.org/page?access_token=abc123&safe=ok#id_token=frag456");
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, url);
+
+        Assert.DoesNotContain("user:pass", plan.SuggestedCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", plan.SuggestedCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("frag456", plan.SuggestedCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", plan.SuggestedProfileCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", plan.SuggestedProfileCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("frag456", plan.SuggestedProfileCommand, StringComparison.Ordinal);
+        Assert.Contains("access_token=<redacted>", plan.SuggestedCommand);
+        Assert.Contains("id_token=<redacted>", plan.SuggestedProfileCommand);
+    }
 }
