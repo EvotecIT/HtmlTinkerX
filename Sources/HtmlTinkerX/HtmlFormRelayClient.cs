@@ -61,10 +61,21 @@ public static class HtmlFormRelayClient {
 
             using HttpResponseMessage response = await SendAsync(http, request, cancellationToken).ConfigureAwait(false);
             step.StatusCode = (int)response.StatusCode;
-            step.ResponseUrl = RedactUrl(response.RequestMessage?.RequestUri?.AbsoluteUri ?? request.ActionUri.AbsoluteUri);
+            Uri nextUri = response.RequestMessage?.RequestUri ?? request.ActionUri;
+            step.ResponseUrl = RedactUrl(nextUri.AbsoluteUri);
+            bool responseCrossHost = !string.Equals(currentUri.Host, nextUri.Host, StringComparison.OrdinalIgnoreCase);
+            bool responseCrossOrigin = !HasSameOrigin(currentUri, nextUri);
+            if (responseCrossOrigin && !IsCrossOriginAllowed(nextUri, effectiveOptions)) {
+                step.IsCrossHost = responseCrossHost;
+                step.IsCrossOrigin = responseCrossOrigin;
+                step.Blocked = true;
+                steps.Add(step);
+                return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.CrossHostBlocked, steps);
+            }
+
             steps.Add(step);
 
-            currentUri = response.RequestMessage?.RequestUri ?? request.ActionUri;
+            currentUri = nextUri;
             currentHtml = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
 

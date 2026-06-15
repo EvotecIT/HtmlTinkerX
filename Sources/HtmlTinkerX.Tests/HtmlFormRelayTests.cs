@@ -97,6 +97,29 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_AcceptsTargetedRelayFormOnMultiFormPage() {
+        string html = """
+<html>
+<body>
+<form method="GET" action="/search"><input name="q"></form>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal("https://example.org/continue", request!.ActionUri.AbsoluteUri);
+        Assert.Equal(new[] { "SAMLResponse", "RelayState" }, request.FieldNames);
+    }
+
+    [Fact]
     public void TryParse_FiltersControlsThatBrowserSubmitOmits() {
         string html = """
 <html>
@@ -313,6 +336,30 @@ public class HtmlFormRelayTests {
         Assert.True(step.IsCrossOrigin);
     }
 
+    [Fact]
+    public async Task FollowAsync_BlocksUnallowedCrossOriginRedirectDiagnostics() {
+        string html = """
+<form method="POST" name="hiddenform" action="https://rp.example.org/relay">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+""";
+        using HttpClient client = new(new RedirectedRelayHandler());
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            html,
+            new Uri("https://rp.example.org/start"),
+            client);
+
+        Assert.False(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.CrossHostBlocked, result.StopReason);
+        HtmlFormRelayStep step = Assert.Single(result.Steps);
+        Assert.True(step.Blocked);
+        Assert.True(step.IsCrossHost);
+        Assert.True(step.IsCrossOrigin);
+        Assert.Equal("https://idp.example.net/complete", step.ResponseUrl);
+    }
+
     private static HttpClient CreateCookieAwareClient(TestServerFixture server) {
         TestServerCookieHandler handler = new() {
             InnerHandler = server.CreateHandler()
@@ -343,6 +390,17 @@ public class HtmlFormRelayTests {
             }
 
             return response;
+        }
+    }
+
+    private sealed class RedirectedRelayHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                RequestMessage = new HttpRequestMessage(request.Method, "https://idp.example.net/complete"),
+                Content = new StringContent("<main>redirected</main>")
+            };
+
+            return Task.FromResult(response);
         }
     }
 }

@@ -216,7 +216,7 @@ public static class HtmlApiEndpointInventory {
     }
 
     private static string GetOrigin(Uri? uri) =>
-        uri == null ? string.Empty : uri.GetLeftPart(UriPartial.Authority);
+        uri == null ? string.Empty : HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(uri.GetLeftPart(UriPartial.Authority));
 
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;

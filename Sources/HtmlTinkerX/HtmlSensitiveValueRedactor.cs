@@ -36,6 +36,10 @@ internal static class HtmlSensitiveValueRedactor {
             return false;
         }
 
+        if (!string.Equals(value, RedactUserInfo(value), StringComparison.Ordinal)) {
+            return true;
+        }
+
         foreach (string parameters in GetParameterSegments(value)) {
             foreach (string pair in parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
                 string name = pair.Split(new[] { '=' }, 2)[0];

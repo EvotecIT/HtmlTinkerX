@@ -29,49 +29,54 @@ public static class HtmlFormRelayParser {
         request = null;
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         IHtmlCollection<IElement> formElements = document.QuerySelectorAll("form");
-        if (formElements.Length != 1) {
+        if (formElements.Length == 0) {
             return false;
         }
 
-        IElement formElement = formElements[0];
         List<HtmlFormResult> forms = HtmlParser.ParseFormsWithAngleSharp(html);
-        if (forms.Count != 1) {
+        if (forms.Count != formElements.Length) {
             return false;
         }
 
-        HtmlFormResult form = forms[0];
-        List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(formElement);
-        Dictionary<string, string> fields = fieldValues
-            .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
-        if (fields.Count == 0) {
-            return false;
+        for (int formIndex = 0; formIndex < formElements.Length; formIndex++) {
+            IElement formElement = formElements[formIndex];
+            HtmlFormResult form = forms[formIndex];
+            List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(formElement);
+            Dictionary<string, string> fields = fieldValues
+                .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+            if (fields.Count == 0) {
+                continue;
+            }
+
+            int hiddenCount = formElement.QuerySelectorAll("input[type=hidden]")
+                .Count(static field => IsSuccessfulControl(field));
+            bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
+            HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
+            bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement, formIndex);
+            bool requiresAutoSubmitMarker = formElements.Length > 1 || protocolHint == HtmlFormRelayProtocolHint.Generic;
+            if (!mostlyHidden || (requiresAutoSubmitMarker && !hasAutoSubmitMarker)) {
+                continue;
+            }
+
+            Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
+            if (!TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
+                continue;
+            }
+
+            request = new HtmlFormRelayRequest {
+                ActionUri = actionUri,
+                Method = form.Metadata.Method,
+                Fields = fields,
+                FieldValues = fieldValues,
+                FieldNames = fieldValues.Select(static field => field.Key).ToArray(),
+                ProtocolHint = protocolHint,
+                HasAutoSubmitMarker = hasAutoSubmitMarker
+            };
+            return true;
         }
 
-        int hiddenCount = formElement.QuerySelectorAll("input[type=hidden]")
-            .Count(static field => IsSuccessfulControl(field));
-        bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
-        HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
-        bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement);
-        if (!mostlyHidden || (!hasAutoSubmitMarker && protocolHint == HtmlFormRelayProtocolHint.Generic)) {
-            return false;
-        }
-
-        Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
-        if (!TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
-            return false;
-        }
-
-        request = new HtmlFormRelayRequest {
-            ActionUri = actionUri,
-            Method = form.Metadata.Method,
-            Fields = fields,
-            FieldValues = fieldValues,
-            FieldNames = fieldValues.Select(static field => field.Key).ToArray(),
-            ProtocolHint = protocolHint,
-            HasAutoSubmitMarker = hasAutoSubmitMarker
-        };
-        return true;
+        return false;
     }
 
     private static bool TryResolveAction(string action, Uri baseUri, out Uri actionUri) {
@@ -188,16 +193,16 @@ public static class HtmlFormRelayParser {
         return true;
     }
 
-    private static bool HasAutoSubmitMarker(IDocument document, IElement formElement) {
+    private static bool HasAutoSubmitMarker(IDocument document, IElement formElement, int formIndex) {
         string formName = formElement.GetAttribute("name") ?? string.Empty;
         string formId = formElement.Id ?? string.Empty;
         return document.QuerySelectorAll("script")
             .Select(static script => script.TextContent ?? string.Empty)
-            .Any(script => TargetsFormSubmit(script, formName, formId));
+            .Any(script => TargetsFormSubmit(script, formName, formId, formIndex));
     }
 
-    private static bool TargetsFormSubmit(string script, string formName, string formId) {
-        if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*0\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
+    private static bool TargetsFormSubmit(string script, string formName, string formId, int formIndex) {
+        if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*" + formIndex + @"\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
             return true;
         }
 

@@ -30,6 +30,8 @@ public static class HtmlExtractionPlanner {
 
         int wordCount = CountWords(readable.Text);
         int scriptCount = document.QuerySelectorAll("script").Length;
+        int executableScriptCount = document.QuerySelectorAll("script")
+            .Count(static script => IsExecutableScript(script));
         int externalScriptCount = document.QuerySelectorAll("script[src]").Length;
         int linkCount = document.QuerySelectorAll("a[href]").Length;
         int hiddenFieldCount = forms.Sum(static form => form.Fields.Count(static field => field.Type == HtmlFormFieldType.Hidden));
@@ -45,7 +47,7 @@ public static class HtmlExtractionPlanner {
             || item.Kind.Equals("Microdata", StringComparison.OrdinalIgnoreCase)
             || item.Kind.Equals("AppState", StringComparison.OrdinalIgnoreCase)
             || item.Kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase));
-        bool looksLikeJavaScriptShell = LooksLikeJavaScriptShell(document, wordCount, scriptCount, appStateCount, externalScriptCount);
+        bool looksLikeJavaScriptShell = LooksLikeJavaScriptShell(document, wordCount, executableScriptCount, appStateCount, externalScriptCount);
 
         List<string> reasons = new();
         List<string> warnings = new();
@@ -180,6 +182,20 @@ public static class HtmlExtractionPlanner {
 
     private static bool HasAutoSubmitForm(string html, Uri? url) =>
         HtmlFormRelayParser.TryParse(html, url ?? new Uri("https://example.invalid/"), out _);
+
+    private static bool IsExecutableScript(IElement script) {
+        string type = script.GetAttribute("type") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(type)) {
+            return true;
+        }
+
+        type = type.Split(';')[0].Trim();
+        return type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("application/ecmascript", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("text/ecmascript", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("module", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool LooksLikeJavaScriptShell(IDocument document, int wordCount, int scriptCount, int appStateCount, int externalScriptCount) {
         string bodyText = Normalize(document.Body?.TextContent ?? string.Empty);

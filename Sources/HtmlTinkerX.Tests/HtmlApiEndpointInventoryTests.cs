@@ -175,9 +175,35 @@ fetch("/api/session?token=abc123");
         Assert.Contains("<redacted>@api.example.net", endpoint.Url);
         Assert.Contains("<redacted>@api.example.net", endpoint.ResolvedUrl);
         Assert.Contains("<redacted>@api.example.net", endpoint.Name);
+        Assert.Contains("<redacted>@api.example.net", endpoint.Origin);
         Assert.DoesNotContain("user:pass", endpoint.Url, StringComparison.Ordinal);
         Assert.DoesNotContain("user:pass", endpoint.ResolvedUrl, StringComparison.Ordinal);
         Assert.DoesNotContain("user:pass", endpoint.Name, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", endpoint.Origin, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_RedactsUserInfoInEndpointMetadata() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "LinkedEndpoint",
+                    Name = "/api/items",
+                    Url = "/api/items",
+                    Method = "GET",
+                    Source = "LinkedScript",
+                    Metadata = "https://user:pass@cdn.example.net/app.js"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Contains("<redacted>@cdn.example.net", endpoint.Metadata);
+        Assert.DoesNotContain("user:pass", endpoint.Metadata, StringComparison.Ordinal);
     }
 
     [Fact]

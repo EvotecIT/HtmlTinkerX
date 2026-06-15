@@ -44,6 +44,26 @@ public class HtmlExtractionPlannerTests {
     }
 
     [Fact]
+    public void Analyze_DoesNotTreatStructuredDataScriptsAsJavaScriptShell() {
+        string html = """
+<html>
+<head>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"A"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList"}</script>
+</head>
+<body></body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html);
+
+        Assert.Equal(HtmlExtractionPlanMode.Static, plan.RecommendedMode);
+        Assert.False(plan.LooksLikeJavaScriptShell);
+        Assert.True(plan.HasStructuredData);
+        Assert.DoesNotContain("Invoke-HtmlRendering", plan.SuggestedCommand);
+    }
+
+    [Fact]
     public void Analyze_RecommendsValidSessionCommandForLoginForms() {
         string html = """
 <html><body><form action="/login"><input name="user"><input type="password" name="password"></form></body></html>

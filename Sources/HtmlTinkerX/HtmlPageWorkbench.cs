@@ -33,7 +33,7 @@ public static class HtmlPageWorkbench {
         Uri? staticEffectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
         HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, baseUri);
         HtmlReadableTextResult staticReadableText = HtmlParserToText.ExtractReadableText(html);
-        string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, baseUri?.AbsoluteUri);
+        string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, staticEffectiveBaseUri?.AbsoluteUri);
         IReadOnlyList<HtmlDataItem> staticData = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> staticJavaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
         IReadOnlyList<HtmlInteractionSurfaceItem> staticInteractionSurface = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
@@ -61,7 +61,7 @@ public static class HtmlPageWorkbench {
             ? renderedSnapshot!.ReadableText ?? HtmlParserToText.ExtractReadableText(renderedSnapshot.Html)
             : staticReadableText;
         string markdown = hasRenderedSnapshot
-            ? FirstNonEmpty(renderedSnapshot!.Markdown, HtmlParserToMarkdown.ConvertToMarkdown(renderedSnapshot.Html, renderedBaseUri?.AbsoluteUri))
+            ? FirstNonEmpty(renderedSnapshot!.Markdown, HtmlParserToMarkdown.ConvertToMarkdown(renderedSnapshot.Html, renderedEffectiveBaseUri?.AbsoluteUri))
             : staticMarkdown;
         IReadOnlyList<HtmlDataItem> data = hasRenderedSnapshot ? renderedData : staticData;
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = hasRenderedSnapshot ? renderedJavaScriptConfig : staticJavaScriptConfig;

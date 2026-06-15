@@ -150,7 +150,7 @@ public class HtmlPageWorkbenchTests {
 <base href="https://cdn.example.net/app/">
 <script>fetch("api/items");</script>
 </head>
-<body><main><h1>Base URL</h1></main></body>
+<body><main><h1>Base URL</h1><a href="docs">Docs</a></main></body>
 </html>
 """;
 
@@ -166,6 +166,7 @@ public class HtmlPageWorkbenchTests {
         Assert.Equal("https://cdn.example.net/app/api/items", endpoint.ResolvedUrl);
         Assert.True(endpoint.IsExternal);
         Assert.Contains("external-origin", endpoint.ReasonCodes);
+        Assert.Contains("https://cdn.example.net/app/docs", result.Markdown);
     }
 
     private sealed class LinkedScriptHandler : HttpMessageHandler {
