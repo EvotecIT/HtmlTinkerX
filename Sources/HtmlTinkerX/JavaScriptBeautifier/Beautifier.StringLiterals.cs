@@ -35,6 +35,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
         private bool ShouldSplitStringLiteral(string tokenText)
             => Opts.SplitLongStringLiterals &&
+               IsStringLiteralSplitContext() &&
                TryGetQuotedStringContent(tokenText, out _, out string content) &&
                content.Length > GetStringLiteralChunkLength();
 
@@ -45,6 +46,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             }
 
             List<string> literalChunks = chunks!;
+            Append("(");
             Append(literalChunks[0]);
             for (int i = 1; i < literalChunks.Count; i++) {
                 Append(" ");
@@ -53,12 +55,15 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 AppendIndentString();
                 Append(literalChunks[i]);
             }
+
+            Append(")");
         }
 
         private bool TrySplitStringLiteral(string tokenText, out List<string>? chunks) {
             chunks = null;
 
             if (!Opts.SplitLongStringLiterals ||
+                !IsStringLiteralSplitContext() ||
                 !TryGetQuotedStringContent(tokenText, out char quote, out string content)) {
                 return false;
             }
@@ -97,6 +102,11 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
             return DefaultMaxStringLiteralLength;
         }
+
+        private bool IsStringLiteralSplitContext()
+            => LastType == "TK_EQUALS" ||
+               LastType == "TK_COMMA" ||
+               LastType == "TK_OPERATOR";
 
         private static bool TryGetQuotedStringContent(string tokenText, out char quote, out string content) {
             quote = '\0';
@@ -147,6 +157,18 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 if (HasHexDigits(content, escapedIndex + 1, 4)) {
                     return escapedIndex + 4;
                 }
+            }
+
+            if (escaped >= '0' && escaped <= '7') {
+                int end = escapedIndex;
+                while (end + 1 < content.Length &&
+                       end - escapedIndex < 2 &&
+                       content[end + 1] >= '0' &&
+                       content[end + 1] <= '7') {
+                    end++;
+                }
+
+                return end;
             }
 
             return escapedIndex;

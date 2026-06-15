@@ -43,9 +43,9 @@ function x()
         $Content = "var payload='abcdefghijkl';"
         $Output = Format-JavaScript -Content $Content -SplitLongLine -MaxStringLiteralLength 4
         $Output.Replace("`r`n", "`n") | Should -Be @"
-var payload = 'abcd' +
+var payload = ('abcd' +
     'efgh' +
-    'ijkl';
+    'ijkl');
 "@.Replace("`r`n", "`n").TrimEnd()
     }
 

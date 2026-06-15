@@ -64,7 +64,7 @@ public class HtmlFormatterTests {
             MaxStringLiteralLength = 4
         };
         const string expected =
-            "var payload = 'abcd' +\n    'efgh' +\n    'ijkl';";
+            "var payload = ('abcd' +\n    'efgh' +\n    'ijkl');";
 
         string result = HtmlFormatter.FormatJavaScript(js, opts);
         TestHelpers.EqualIgnoringLineEndings(expected, result);
@@ -94,7 +94,60 @@ public class HtmlFormatterTests {
             MaxStringLiteralLength = 4
         };
         const string expected =
-            "var payload = 'ab\\'' +\n    'cdef';";
+            "var payload = ('ab\\'' +\n    'cdef');";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitObjectPropertyKeys() {
+        const string js = "var payload={'abcdefghijkl':1};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected = "var payload = {\n    'abcdefghijkl': 1\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_ParenthesizesSplitStringBeforeMemberAccess() {
+        const string js = "var size='abcdefghijkl'.length;";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var size = ('abcd' +\n    'efgh' +\n    'ijkl').length;";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitDirectivePositionLiterals() {
+        const string js = "'abcdefghijkl';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(js, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_KeepsLegacyOctalEscapesInOneSplitUnit() {
+        const string js = "var payload=\"\\123456\";";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 2
+        };
+        const string expected =
+            "var payload = (\"\\123\" +\n    \"45\" +\n    \"6\");";
 
         string result = HtmlFormatter.FormatJavaScript(js, opts);
         TestHelpers.EqualIgnoringLineEndings(expected, result);
