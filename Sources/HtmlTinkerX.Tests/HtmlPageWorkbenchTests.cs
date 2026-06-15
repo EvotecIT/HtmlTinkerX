@@ -142,6 +142,32 @@ public class HtmlPageWorkbenchTests {
         Assert.Contains(result.Endpoints, endpoint => endpoint.Kind == "LinkedEndpoint" && endpoint.Url == "/api/rendered-linked");
     }
 
+    [Fact]
+    public async Task AnalyzeAsync_ResolvesApiInventoryAgainstDocumentBase() {
+        string html = """
+<html>
+<head>
+<base href="https://cdn.example.net/app/">
+<script>fetch("api/items");</script>
+</head>
+<body><main><h1>Base URL</h1></main></body>
+</html>
+""";
+
+        HtmlPageWorkbenchResult result = await HtmlPageWorkbench.AnalyzeAsync(
+            html,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/page")
+            });
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(result.ApiEndpoints, item => item.Url == "api/items");
+
+        Assert.Equal("https://cdn.example.net/app/", result.EffectiveBaseUrl);
+        Assert.Equal("https://cdn.example.net/app/api/items", endpoint.ResolvedUrl);
+        Assert.True(endpoint.IsExternal);
+        Assert.Contains("external-origin", endpoint.ReasonCodes);
+    }
+
     private sealed class LinkedScriptHandler : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             HttpResponseMessage response = new(HttpStatusCode.OK) {

@@ -13,6 +13,9 @@ public sealed class HtmlPageWorkbenchResult {
     /// <summary>Final URL after rendering or redirects, when known.</summary>
     public string FinalUrl { get; set; } = string.Empty;
 
+    /// <summary>Effective document base URL after applying any HTML base element, when known.</summary>
+    public string EffectiveBaseUrl { get; set; } = string.Empty;
+
     /// <summary>Content view used for the primary grouped extraction results.</summary>
     public string AnalysisMode { get; set; } = "Static";
 

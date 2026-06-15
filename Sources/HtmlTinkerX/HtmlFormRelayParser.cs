@@ -58,8 +58,12 @@ public static class HtmlFormRelayParser {
         }
 
         Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
+        if (!TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
+            return false;
+        }
+
         request = new HtmlFormRelayRequest {
-            ActionUri = ResolveAction(form.Metadata.Action, effectiveBaseUri),
+            ActionUri = actionUri,
             Method = form.Metadata.Method,
             Fields = fields,
             FieldValues = fieldValues,
@@ -70,14 +74,46 @@ public static class HtmlFormRelayParser {
         return true;
     }
 
-    private static Uri ResolveAction(string action, Uri baseUri) {
+    private static bool TryResolveAction(string action, Uri baseUri, out Uri actionUri) {
         if (string.IsNullOrWhiteSpace(action)) {
-            return baseUri;
+            actionUri = baseUri;
+            return true;
         }
 
-        return Uri.TryCreate(baseUri, action, out Uri? resolved)
-            ? resolved
-            : new Uri(action, UriKind.Absolute);
+        if (HasExplicitScheme(action)) {
+            if (Uri.TryCreate(action, UriKind.Absolute, out Uri? absoluteUri)) {
+                actionUri = absoluteUri;
+                return true;
+            }
+
+            actionUri = null!;
+            return false;
+        }
+
+        if (Uri.TryCreate(baseUri, action, out Uri? resolved)) {
+            actionUri = resolved;
+            return true;
+        }
+
+        actionUri = null!;
+        return false;
+    }
+
+    private static bool HasExplicitScheme(string value) {
+        int colonIndex = value.IndexOf(':');
+        if (colonIndex <= 0) {
+            return false;
+        }
+
+        for (int index = 0; index < colonIndex; index++) {
+            char c = value[index];
+            bool valid = char.IsLetterOrDigit(c) || c == '+' || c == '-' || c == '.';
+            if (!valid) {
+                return false;
+            }
+        }
+
+        return char.IsLetter(value[0]);
     }
 
     private static Uri GetEffectiveBaseUri(IDocument document, Uri responseUri) {

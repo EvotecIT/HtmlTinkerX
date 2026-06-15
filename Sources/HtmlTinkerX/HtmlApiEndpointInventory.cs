@@ -38,6 +38,7 @@ public static class HtmlApiEndpointInventory {
 
         HtmlApiEndpointInventoryOptions effectiveOptions = options ?? new HtmlApiEndpointInventoryOptions();
         Uri? pageUri = TryCreateUri(FirstNonEmpty(workbench.FinalUrl, workbench.SourceUrl));
+        Uri? resolutionBaseUri = TryCreateUri(workbench.EffectiveBaseUrl) ?? pageUri;
         List<HtmlApiEndpointRecord> records = new();
         foreach (HtmlInteractionSurfaceItem item in workbench.InteractionSurface) {
             bool isForm = item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase);
@@ -51,7 +52,7 @@ public static class HtmlApiEndpointInventory {
                 continue;
             }
 
-            records.Add(CreateRecord(item, pageUri, workbench));
+            records.Add(CreateRecord(item, resolutionBaseUri, pageUri, workbench));
         }
 
         return records
@@ -63,8 +64,8 @@ public static class HtmlApiEndpointInventory {
             .ToArray();
     }
 
-    private static HtmlApiEndpointRecord CreateRecord(HtmlInteractionSurfaceItem item, Uri? pageUri, HtmlPageWorkbenchResult workbench) {
-        Uri? resolvedUri = ResolveUri(item.Url, pageUri);
+    private static HtmlApiEndpointRecord CreateRecord(HtmlInteractionSurfaceItem item, Uri? resolutionBaseUri, Uri? pageUri, HtmlPageWorkbenchResult workbench) {
+        Uri? resolvedUri = ResolveUri(item.Url, resolutionBaseUri);
         string method = NormalizeMethod(item.Method, item.Kind);
         bool isExternal = resolvedUri != null && pageUri != null && !HasSameOrigin(pageUri, resolvedUri);
         bool isStateChanging = StateChangingMethods.Contains(method);

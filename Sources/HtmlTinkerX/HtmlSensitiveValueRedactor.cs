@@ -22,11 +22,13 @@ internal static class HtmlSensitiveValueRedactor {
     };
 
     internal static bool HasSensitiveQuery(Uri? uri) {
-        if (uri == null || (string.IsNullOrWhiteSpace(uri.Query) && string.IsNullOrWhiteSpace(uri.Fragment))) {
+        if (uri == null) {
             return false;
         }
 
-        return HasSensitiveQueryText(uri.Query) || HasSensitiveQueryText(uri.Fragment);
+        return !string.IsNullOrWhiteSpace(uri.UserInfo)
+            || HasSensitiveQueryText(uri.Query)
+            || HasSensitiveQueryText(uri.Fragment);
     }
 
     internal static bool HasSensitiveQueryText(string value) {
@@ -51,21 +53,22 @@ internal static class HtmlSensitiveValueRedactor {
             return string.Empty;
         }
 
-        int queryIndex = value.IndexOf('?');
-        int fragmentIndex = value.IndexOf('#');
+        string redactedValue = RedactUserInfo(value);
+        int queryIndex = redactedValue.IndexOf('?');
+        int fragmentIndex = redactedValue.IndexOf('#');
         if (queryIndex < 0 && fragmentIndex < 0) {
-            return value;
+            return redactedValue;
         }
 
         if (queryIndex >= 0 && (fragmentIndex < 0 || queryIndex < fragmentIndex)) {
-            int queryEnd = fragmentIndex >= 0 ? fragmentIndex : value.Length;
-            string prefix = value.Substring(0, queryIndex + 1);
-            string query = value.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
-            string fragment = fragmentIndex >= 0 ? "#" + RedactParameterPairs(value.Substring(fragmentIndex + 1)) : string.Empty;
+            int queryEnd = fragmentIndex >= 0 ? fragmentIndex : redactedValue.Length;
+            string prefix = redactedValue.Substring(0, queryIndex + 1);
+            string query = redactedValue.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
+            string fragment = fragmentIndex >= 0 ? "#" + RedactParameterPairs(redactedValue.Substring(fragmentIndex + 1)) : string.Empty;
             return prefix + RedactParameterPairs(query) + fragment;
         }
 
-        return value.Substring(0, fragmentIndex + 1) + RedactParameterPairs(value.Substring(fragmentIndex + 1));
+        return redactedValue.Substring(0, fragmentIndex + 1) + RedactParameterPairs(redactedValue.Substring(fragmentIndex + 1));
     }
 
     private static string[] GetParameterSegments(string value) {
@@ -99,6 +102,13 @@ internal static class HtmlSensitiveValueRedactor {
         return string.Join("&", redactedPairs);
     }
 
+    private static string RedactUserInfo(string value) =>
+        Regex.Replace(
+            value,
+            "^([A-Za-z][A-Za-z0-9+.-]*://)([^/?#@]+@)",
+            "$1<redacted>@",
+            RegexOptions.CultureInvariant);
+
     internal static bool IsSensitiveName(string value) =>
         !string.IsNullOrWhiteSpace(value)
         && SensitiveNames.Any(name => value.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
@@ -120,6 +130,28 @@ internal static class HtmlSensitiveValueRedactor {
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        redacted = Regex.Replace(
+            redacted,
+            "\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'",
+            RedactSensitiveUrlLiteral,
+            RegexOptions.CultureInvariant);
+
         return redacted;
+    }
+
+    private static string RedactSensitiveUrlLiteral(Match match) {
+        string literal = match.Value;
+        if (literal.Length < 2) {
+            return literal;
+        }
+
+        char quote = literal[0];
+        string value = literal.Substring(1, literal.Length - 2);
+        if (!HasSensitiveQueryText(value) && string.Equals(value, RedactUserInfo(value), StringComparison.Ordinal)) {
+            return literal;
+        }
+
+        string redacted = RedactSensitiveQueryValues(value);
+        return quote + redacted.Replace("\\", "\\\\").Replace(quote.ToString(), "\\" + quote) + quote;
     }
 }

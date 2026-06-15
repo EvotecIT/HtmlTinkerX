@@ -73,7 +73,7 @@ public class HtmlPageDatasetBuilderTests {
         string html = """
 <html>
 <head>
-<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"sessionToken":"abc123","safe":"ok"}}}</script>
+<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"sessionToken":"abc123","redirectUrl":"/callback?access_token=url456","safe":"ok"}}}</script>
 </head>
 <body><main><h1>State</h1><p>State payload page.</p></main></body>
 </html>
@@ -89,6 +89,7 @@ public class HtmlPageDatasetBuilderTests {
 
         Assert.Contains("<redacted>", provenanceText);
         Assert.DoesNotContain("abc123", provenanceText, StringComparison.Ordinal);
+        Assert.DoesNotContain("url456", provenanceText, StringComparison.Ordinal);
     }
 
     [Fact]

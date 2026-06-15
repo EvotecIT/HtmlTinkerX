@@ -206,8 +206,7 @@ public static class HtmlPageDatasetBuilder {
             || kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase)
             || kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase)
             || kind.Equals("JavaScriptConfig", StringComparison.OrdinalIgnoreCase)) {
-            string redacted = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(value);
-            return HtmlSensitiveValueRedactor.IsSensitiveName(value) ? redacted : value;
+            return HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(value);
         }
 
         return HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);

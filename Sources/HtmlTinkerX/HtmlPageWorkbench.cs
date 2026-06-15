@@ -30,6 +30,7 @@ public static class HtmlPageWorkbench {
 
         HtmlPageWorkbenchOptions effectiveOptions = options ?? new HtmlPageWorkbenchOptions();
         Uri? baseUri = effectiveOptions.BaseUri;
+        Uri? staticEffectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
         HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, baseUri);
         HtmlReadableTextResult staticReadableText = HtmlParserToText.ExtractReadableText(html);
         string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, baseUri?.AbsoluteUri);
@@ -46,6 +47,7 @@ public static class HtmlPageWorkbench {
         HtmlRenderedPageSnapshot? renderedSnapshot = effectiveOptions.RenderedSnapshot;
         bool hasRenderedSnapshot = renderedSnapshot != null && !string.IsNullOrWhiteSpace(renderedSnapshot.Html);
         Uri? renderedBaseUri = GetRenderedBaseUri(renderedSnapshot, baseUri);
+        Uri? renderedEffectiveBaseUri = hasRenderedSnapshot ? GetEffectiveBaseUri(renderedSnapshot!.Html, renderedBaseUri) : null;
         IReadOnlyList<HtmlDataItem> renderedData = hasRenderedSnapshot
             ? NormalizeList(renderedSnapshot!.Data, () => HtmlParsingToolbox.SelectData(renderedSnapshot.Html, baseUri: renderedBaseUri))
             : Array.Empty<HtmlDataItem>();
@@ -84,6 +86,7 @@ public static class HtmlPageWorkbench {
         HtmlPageWorkbenchResult result = new() {
             SourceUrl = baseUri?.AbsoluteUri ?? string.Empty,
             FinalUrl = FirstNonEmpty(renderedSnapshot?.FinalUrl, renderedSnapshot?.Url, baseUri?.AbsoluteUri),
+            EffectiveBaseUrl = (hasRenderedSnapshot ? renderedEffectiveBaseUri : staticEffectiveBaseUri)?.AbsoluteUri ?? string.Empty,
             AnalysisMode = hasRenderedSnapshot ? "RenderedSnapshot" : "Static",
             Title = FirstNonEmpty(renderedSnapshot?.Title, readableText.Title, plan.Title),
             Html = effectiveOptions.IncludeHtml ? html : string.Empty,
@@ -177,6 +180,15 @@ public static class HtmlPageWorkbench {
         }
 
         return fallback;
+    }
+
+    private static Uri? GetEffectiveBaseUri(string html, Uri? baseUri) {
+        if (string.IsNullOrWhiteSpace(html)) {
+            return baseUri;
+        }
+
+        var document = HtmlParser.ParseWithAngleSharp(html);
+        return HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
     }
 
     private static IReadOnlyList<T> NormalizeList<T>(IReadOnlyList<T>? source, Func<IReadOnlyList<T>> fallback) =>

@@ -154,6 +154,33 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_RedactsUrlUserInfo() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "https://user:pass@api.example.net/items",
+                    Url = "https://user:pass@api.example.net/items",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Contains("<redacted>@api.example.net", endpoint.Url);
+        Assert.Contains("<redacted>@api.example.net", endpoint.ResolvedUrl);
+        Assert.Contains("<redacted>@api.example.net", endpoint.Name);
+        Assert.DoesNotContain("user:pass", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", endpoint.ResolvedUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", endpoint.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_TreatsUnknownSameOriginMethodsAsReviewRisk() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page",

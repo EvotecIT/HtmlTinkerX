@@ -122,6 +122,27 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_ReturnsFalseForMalformedRelayAction() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="http://[::1">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+</body>
+</html>
+""";
+        bool parsed = false;
+
+        Exception? exception = Record.Exception(() =>
+            parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? _));
+
+        Assert.Null(exception);
+        Assert.False(parsed);
+    }
+
+    [Fact]
     public async Task FollowAsync_SubmitsDuplicateFieldValues() {
         string serverBase = string.Empty;
         using var server = TestServerCompat.CreateTestServer(async context => {
