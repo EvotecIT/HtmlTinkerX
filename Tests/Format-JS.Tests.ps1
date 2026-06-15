@@ -38,4 +38,26 @@ function x()
         $Output = Format-JavaScript -Content $Content -IndentSize 2 -BraceStyle Expand
         $Output.Replace("`r`n", "`n") | Should -Be $Expected.Replace("`r`n", "`n").TrimEnd()
     }
+
+    It 'Exposes wrapping and long string splitting options' {
+        $Content = "var payload='abcdefghijkl';"
+        $Output = Format-JavaScript -Content $Content -SplitLongLine -MaxStringLiteralLength 4
+        $Output.Replace("`r`n", "`n") | Should -Be @"
+var payload = 'abcd' +
+    'efgh' +
+    'ijkl';
+"@.Replace("`r`n", "`n").TrimEnd()
+    }
+
+    It 'Wraps before a long array string argument when requested' {
+        $Content = "! function(n, r, e) { (r = e(2)(!1)).push([n.i, 'my really long string', `"`"]), n.exports = r }"
+        $Output = Format-JavaScript -Content $Content -WrapLineLength 40
+        $Output.Replace("`r`n", "`n") | Should -Be @"
+! function(n, r, e) {
+    (r = e(2)(!1)).push([n.i,
+        'my really long string', ""]),
+        n.exports = r
+}
+"@.Replace("`r`n", "`n").TrimEnd()
+    }
 }

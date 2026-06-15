@@ -32,7 +32,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
     /// <summary>
     /// Provides functionality for beautifying JavaScript code.
     /// </summary>
-    public class Beautifier {
+    public partial class Beautifier {
         /// <summary>
         /// Initializes a new instance of the <see cref="Beautifier"/> class using default options.
         /// </summary>
@@ -1100,13 +1100,13 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                        LastType == "TK_EQUALS" ||
                        LastType == "TK_OPERATOR") {
                 if (Flags.Mode != BeautifierMode.Object) {
-                    AllowWrapOrPreservedNewline(tokenText);
+                    AllowWrapOrPreservedNewline(tokenText, LastType == "TK_COMMA" && ShouldSplitStringLiteral(tokenText));
                 }
             } else {
                 AppendNewline();
             }
 
-            Append(tokenText);
+            AppendStringToken(tokenText);
         }
 
         private void HandleEquals(string tokenText) {
@@ -1150,6 +1150,9 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 } else {
                     Append(" ");
                 }
+            } else if (ShouldBreakStatementComma()) {
+                Append(tokenText);
+                AppendNewline();
             } else {
                 if (Flags.Mode == BeautifierMode.Object) {
                     Append(tokenText);

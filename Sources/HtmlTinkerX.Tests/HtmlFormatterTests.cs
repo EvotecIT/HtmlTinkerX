@@ -36,6 +36,71 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    public void FormatJavaScript_BreaksStatementCommaSequences() {
+        const string js = "! function(n) { n.value = \"text\", n.value2 = \"hello world\", n.value3 = \"foo\" }";
+        const string expected =
+            "! function(n) {\n    n.value = \"text\",\n    n.value2 = \"hello world\",\n    n.value3 = \"foo\"\n}";
+
+        string result = HtmlFormatter.FormatJavaScript(js);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_WrapLineLengthBreaksBeforeArrayStringArgument() {
+        const string js = "! function(n, r, e) { (r = e(2)(!1)).push([n.i, 'my really long string', \"\"]), n.exports = r }";
+        BeautifierOptions opts = new BeautifierOptions { WrapLineLength = 40 };
+        const string expected =
+            "! function(n, r, e) {\n    (r = e(2)(!1)).push([n.i,\n        'my really long string', \"\"]),\n        n.exports = r\n}";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitsLongStringLiteralsWhenRequested() {
+        const string js = "var payload='abcdefghijkl';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = 'abcd' +\n    'efgh' +\n    'ijkl';";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitLongStringKeepsIssueScenarioBelowEditorLimit() {
+        string js = $"! function(n, r, e) {{ (r = e(2)(!1)).push([n.i, '{new string('x', 2600)}', \"\"]), n.exports = r }}";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        int maxLineLength = result
+            .Replace("\r\n", "\n")
+            .Split('\n')
+            .Max(line => line.Length);
+
+        Assert.True(maxLineLength < 2500, $"Expected all lines below 2500 columns, longest line was {maxLineLength}.");
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitInsideEscapeSequences() {
+        const string js = "var payload='ab\\'cdef';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = 'ab\\'' +\n    'cdef';";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
     /// <summary>
     /// Formats minified CSS text.
     /// </summary>
