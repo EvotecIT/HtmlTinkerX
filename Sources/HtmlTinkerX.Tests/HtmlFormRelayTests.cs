@@ -354,6 +354,30 @@ document.getElementById('continue').addEventListener('click', () => document.for
     }
 
     [Fact]
+    public void TryParse_FiltersControlsDisabledByFieldset() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<fieldset disabled>
+<input type="hidden" name="SAMLResponse" value="disabled-token">
+</fieldset>
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(new[] { "RelayState" }, request!.FieldNames);
+        Assert.DoesNotContain(request.FieldValues, field => field.Value == "disabled-token");
+    }
+
+    [Fact]
     public void TryParse_IncludesFormOwnedControlsOutsideFormElement() {
         string html = """
 <html>
@@ -667,6 +691,31 @@ document.getElementById('continue').addEventListener('click', () => document.for
     }
 
     [Fact]
+    public async Task FollowAsync_BlocksUnallowedRedirectLocationBeforeFollowing() {
+        string html = """
+<form method="POST" name="hiddenform" action="https://rp.example.org/relay">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms['hiddenform'].submit()</script>
+""";
+        using RedirectLocationHandler handler = new();
+        using HttpClient client = new(handler);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            html,
+            new Uri("https://rp.example.org/start"),
+            client);
+
+        Assert.True(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.CrossHostBlocked, result.StopReason);
+        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal("https://rp.example.org/relay", handler.LastRequestUri?.AbsoluteUri);
+        HtmlFormRelayStep step = Assert.Single(result.Steps);
+        Assert.Equal(307, step.StatusCode);
+        Assert.Equal("https://idp.example.net/complete", step.ResponseUrl);
+    }
+
+    [Fact]
     public async Task FollowAsync_PreservesExistingGetActionQueryBytes() {
         string html = """
 <form method="GET" name="hiddenform" action="https://rp.example.org/continue?RelayState=a%20b&sig=raw+plus">
@@ -764,6 +813,23 @@ document.getElementById('continue').addEventListener('click', () => document.for
                 Content = new StringContent("<main>redirected</main>")
             };
 
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class RedirectLocationHandler : HttpMessageHandler, IDisposable {
+        public int RequestCount { get; private set; }
+
+        public Uri? LastRequestUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            RequestCount++;
+            LastRequestUri = request.RequestUri;
+            HttpResponseMessage response = new(HttpStatusCode.TemporaryRedirect) {
+                RequestMessage = request,
+                Content = new StringContent(string.Empty)
+            };
+            response.Headers.Location = new Uri("https://idp.example.net/complete");
             return Task.FromResult(response);
         }
     }

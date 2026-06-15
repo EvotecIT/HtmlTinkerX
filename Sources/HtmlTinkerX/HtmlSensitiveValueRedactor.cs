@@ -179,9 +179,57 @@ internal static class HtmlSensitiveValueRedactor {
             "$1<redacted>@",
             RegexOptions.CultureInvariant);
 
-    internal static bool IsSensitiveName(string value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && SensitiveNames.Any(name => value.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+    internal static bool IsSensitiveName(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return false;
+        }
+
+        if (SensitiveNames.Any(name => IsSensitiveNameMatch(value, name))) {
+            return true;
+        }
+
+        return Regex.IsMatch(value, @"access%[A-Za-z0-9]*token", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool IsSensitiveNameMatch(string value, string sensitiveName) {
+        int startIndex = 0;
+        while (startIndex < value.Length) {
+            int index = value.IndexOf(sensitiveName, startIndex, StringComparison.OrdinalIgnoreCase);
+            if (index < 0) {
+                return false;
+            }
+
+            if (HasNameBoundaryBefore(value, index) && HasNameBoundaryAfter(value, index + sensitiveName.Length - 1)) {
+                return true;
+            }
+
+            startIndex = index + 1;
+        }
+
+        return false;
+    }
+
+    private static bool HasNameBoundaryBefore(string value, int index) {
+        if (index <= 0) {
+            return true;
+        }
+
+        char previous = value[index - 1];
+        char current = value[index];
+        return !char.IsLetterOrDigit(previous)
+            || (char.IsLower(previous) && char.IsUpper(current));
+    }
+
+    private static bool HasNameBoundaryAfter(string value, int index) {
+        if (index >= value.Length - 1) {
+            return true;
+        }
+
+        char current = value[index];
+        char next = value[index + 1];
+        return !char.IsLetterOrDigit(next)
+            || (char.IsLower(current) && char.IsUpper(next));
+    }
 
     internal static string RedactSensitiveStructuredText(string value) {
         if (string.IsNullOrWhiteSpace(value)) {
@@ -190,7 +238,7 @@ internal static class HtmlSensitiveValueRedactor {
 
         string redacted = Regex.Replace(
             value,
-            "(\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^\"]*\"\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "((?:\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^\"]*\"|'[^']*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 

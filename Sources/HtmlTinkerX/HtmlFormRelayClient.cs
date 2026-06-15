@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,7 +40,10 @@ public static class HtmlFormRelayClient {
             throw new ArgumentOutOfRangeException(nameof(options), "MaxRelayCount must be at least 1.");
         }
 
-        HttpClient http = client ?? HtmlHttpClientFactory.Shared;
+        using HttpClient? ownedClient = client == null
+            ? HtmlHttpClientFactory.Create(out _, allowAutoRedirect: false)
+            : null;
+        HttpClient http = client ?? ownedClient!;
         string currentHtml = html;
         Uri currentUri = responseUri;
         List<HtmlFormRelayStep> steps = new();
@@ -61,7 +65,7 @@ public static class HtmlFormRelayClient {
 
             using HttpResponseMessage response = await SendAsync(http, request, cancellationToken).ConfigureAwait(false);
             step.StatusCode = (int)response.StatusCode;
-            Uri nextUri = response.RequestMessage?.RequestUri ?? request.ActionUri;
+            Uri nextUri = GetNextUri(response, request.ActionUri);
             step.ResponseUrl = RedactUrl(nextUri.AbsoluteUri);
             bool responseCrossHost = !string.Equals(currentUri.Host, nextUri.Host, StringComparison.OrdinalIgnoreCase);
             bool responseCrossOrigin = !HasSameOrigin(currentUri, nextUri);
@@ -129,6 +133,21 @@ public static class HtmlFormRelayClient {
 
     private static string RedactUrl(string value) =>
         HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
+
+    private static Uri GetNextUri(HttpResponseMessage response, Uri requestUri) {
+        if (IsRedirectStatusCode(response.StatusCode) && response.Headers.Location != null) {
+            return response.Headers.Location.IsAbsoluteUri
+                ? response.Headers.Location
+                : new Uri(requestUri, response.Headers.Location);
+        }
+
+        return response.RequestMessage?.RequestUri ?? requestUri;
+    }
+
+    private static bool IsRedirectStatusCode(HttpStatusCode statusCode) {
+        int status = (int)statusCode;
+        return status >= 300 && status <= 399;
+    }
 
     private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IEnumerable<KeyValuePair<string, string>> fields) {
         UriBuilder builder = new(actionUri);

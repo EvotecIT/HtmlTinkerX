@@ -51,13 +51,26 @@ internal static class HttpClientHelper {
     /// <param name="username">Username for the target page when <paramref name="credential"/> is not provided.</param>
     /// <param name="password">Password for the target page when <paramref name="credential"/> is not provided.</param>
     /// <param name="cookieContainer">Container used by the returned client.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
     /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
-    internal static HttpClient CreateWithCookies(string? proxy, PSCredential? proxyCredential, PSCredential? credential, string? username, string? password, out CookieContainer cookieContainer) {
+    internal static HttpClient CreateWithCookies(string? proxy, PSCredential? proxyCredential, PSCredential? credential, string? username, string? password, out CookieContainer cookieContainer, bool allowAutoRedirect = true) {
         NetworkCredential? pageCredential = credential?.GetNetworkCredential();
         if (pageCredential == null && !string.IsNullOrEmpty(username)) {
             pageCredential = new NetworkCredential(username, password ?? string.Empty);
         }
 
-        return HtmlHttpClientFactory.Create(out cookieContainer, proxy, proxyCredential?.GetNetworkCredential(), pageCredential);
+        return HtmlHttpClientFactory.Create(out cookieContainer, proxy, proxyCredential?.GetNetworkCredential(), pageCredential, allowAutoRedirect: allowAutoRedirect);
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="HttpClient"/> over an existing cookie container.
+    /// </summary>
+    /// <param name="cookieContainer">Container used by the returned client.</param>
+    /// <param name="proxy">Proxy server address.</param>
+    /// <param name="proxyCredential">Credentials for the proxy.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
+    internal static HttpClient CreateWithCookies(CookieContainer cookieContainer, string? proxy, PSCredential? proxyCredential, bool allowAutoRedirect = true) {
+        return HtmlHttpClientFactory.Create(cookieContainer, proxy, proxyCredential?.GetNetworkCredential(), allowAutoRedirect);
     }
 }

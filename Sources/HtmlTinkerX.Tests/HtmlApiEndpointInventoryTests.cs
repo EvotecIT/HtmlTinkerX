@@ -150,6 +150,57 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_DoesNotTreatBenignQueryNameSubstringsAsSensitive() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/api/search?monkey=banana&keyboard=us&zipcode=12345",
+                    Url = "/api/search?monkey=banana&keyboard=us&zipcode=12345",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.False(endpoint.HasSensitiveQuery);
+        Assert.Equal(HtmlApiEndpointRiskLevel.Low, endpoint.RiskLevel);
+        Assert.Contains("monkey=banana", endpoint.Url);
+        Assert.Contains("keyboard=us", endpoint.Url);
+        Assert.Contains("zipcode=12345", endpoint.Url);
+        Assert.DoesNotContain("<redacted>", endpoint.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_TreatsDelimitedAndCamelCaseSensitiveQueryNamesAsSensitive() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/callback?apiKey=abc123&sessionToken=def456",
+                    Url = "/callback?apiKey=abc123&sessionToken=def456",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Contains("apiKey=<redacted>", endpoint.Url);
+        Assert.Contains("sessionToken=<redacted>", endpoint.Url);
+        Assert.DoesNotContain("abc123", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("def456", endpoint.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Build_ClassifiesGetFormSensitiveFieldNamesAsQueryParameters() {
         string html = """
 <html>

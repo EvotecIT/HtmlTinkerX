@@ -31,7 +31,6 @@ public static class HtmlPageWorkbench {
         HtmlPageWorkbenchOptions effectiveOptions = options ?? new HtmlPageWorkbenchOptions();
         Uri? baseUri = effectiveOptions.BaseUri;
         Uri? staticEffectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
-        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html, baseUri);
         HtmlReadableTextResult staticReadableText = HtmlParserToText.ExtractReadableText(html);
         string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, staticEffectiveBaseUri?.AbsoluteUri);
         IReadOnlyList<HtmlDataItem> staticData = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
@@ -67,6 +66,9 @@ public static class HtmlPageWorkbench {
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = hasRenderedSnapshot ? renderedJavaScriptConfig : staticJavaScriptConfig;
         IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = hasRenderedSnapshot ? renderedInteractionSurface : staticInteractionSurface;
         HtmlStaticRenderedComparison? staticRenderedComparison = CreateStaticRenderedComparison(html, renderedSnapshot, renderedBaseUri, effectiveOptions);
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(
+            hasRenderedSnapshot ? renderedSnapshot!.Html : html,
+            hasRenderedSnapshot ? renderedBaseUri : baseUri);
 
         IReadOnlyList<HtmlDataItem> forms = FilterData(data, "Form");
         IReadOnlyList<HtmlDataItem> links = FilterData(data, "Link");

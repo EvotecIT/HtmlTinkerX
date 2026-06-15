@@ -105,6 +105,8 @@ public class HtmlPageWorkbenchTests {
         Assert.Equal("Rendered App", result.Title);
         Assert.Same(snapshot, result.RenderedSnapshot);
         Assert.NotNull(result.StaticRenderedComparison);
+        Assert.Equal(HtmlExtractionPlanMode.Static, result.ExtractionPlan!.RecommendedMode);
+        Assert.DoesNotContain("Invoke-HtmlRendering", result.SuggestedNextCommand);
         Assert.DoesNotContain(result.StaticData, static item => item.Kind == "Link");
         Assert.Single(result.Links);
         Assert.Single(result.Forms);

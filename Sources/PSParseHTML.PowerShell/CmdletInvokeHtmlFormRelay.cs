@@ -66,13 +66,14 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        using HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, credential: null, username: null, password: null, out CookieContainer _);
+        using HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, credential: null, username: null, password: null, out CookieContainer cookieContainer);
         string html = await GetInitialHtmlAsync(client).ConfigureAwait(false);
         Uri baseUri = ParameterSetName == ParameterSetUrl ? initialResponseUri ?? Url : BaseUrl;
+        using HttpClient relayClient = HttpClientHelper.CreateWithCookies(cookieContainer, Proxy, ProxyCredential, allowAutoRedirect: false);
         HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
             html,
             baseUri,
-            client,
+            relayClient,
             new HtmlFormRelayOptions {
                 MaxRelayCount = MaxRelayCount,
                 AllowCrossHost = AllowCrossHost.IsPresent,

@@ -201,7 +201,7 @@ public static class HtmlFormRelayParser {
     }
 
     private static bool IsSuccessfulControl(IElement field) {
-        if (field.HasAttribute("disabled") || string.IsNullOrWhiteSpace(field.GetAttribute("name"))) {
+        if (field.HasAttribute("disabled") || IsDisabledByFieldset(field) || string.IsNullOrWhiteSpace(field.GetAttribute("name"))) {
             return false;
         }
 
@@ -227,6 +227,23 @@ public static class HtmlFormRelayParser {
         }
 
         return true;
+    }
+
+    private static bool IsDisabledByFieldset(IElement field) {
+        for (IElement? parent = field.ParentElement; parent != null; parent = parent.ParentElement) {
+            if (!parent.NodeName.Equals("fieldset", StringComparison.OrdinalIgnoreCase) || !parent.HasAttribute("disabled")) {
+                continue;
+            }
+
+            IElement? firstLegend = parent.Children.FirstOrDefault(child => child.NodeName.Equals("legend", StringComparison.OrdinalIgnoreCase));
+            if (firstLegend != null && (ReferenceEquals(field, firstLegend) || IsDescendantOf(field, firstLegend))) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private static bool HasAutoSubmitMarker(IDocument document, IElement formElement, int formIndex) {
