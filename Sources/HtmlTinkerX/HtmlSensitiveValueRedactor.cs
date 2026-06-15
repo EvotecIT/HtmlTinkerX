@@ -48,7 +48,7 @@ internal static class HtmlSensitiveValueRedactor {
             foreach (string pair in parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
                 string[] keyValue = pair.Split(new[] { '=' }, 2);
                 string name = keyValue[0];
-                if (IsSensitiveName(Uri.UnescapeDataString(name))) {
+                if (IsSensitiveName(SafeUnescapeDataString(name))) {
                     return true;
                 }
 
@@ -103,20 +103,22 @@ internal static class HtmlSensitiveValueRedactor {
             int queryEnd = fragmentIndex >= 0 ? fragmentIndex : value.Length;
             string query = value.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
             if (fragmentIndex >= 0) {
-                return new[] { query, value.Substring(fragmentIndex + 1) };
+                string fragment = value.Substring(fragmentIndex + 1);
+                return HasParameterPairs(fragment) ? new[] { query, fragment } : new[] { query };
             }
 
             return new[] { query };
         }
 
-        return new[] { value.Substring(fragmentIndex + 1) };
+        string fragmentOnly = value.Substring(fragmentIndex + 1);
+        return HasParameterPairs(fragmentOnly) ? new[] { fragmentOnly } : Array.Empty<string>();
     }
 
     private static string RedactParameterPairs(string parameters) {
         string[] pairs = parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
         string[] redactedPairs = pairs.Select(pair => {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
-            string name = Uri.UnescapeDataString(keyValue[0]);
+            string name = SafeUnescapeDataString(keyValue[0]);
             if (IsSensitiveName(name)) {
                 return keyValue[0] + "=<redacted>";
             }
@@ -129,6 +131,17 @@ internal static class HtmlSensitiveValueRedactor {
         }).ToArray();
 
         return string.Join("&", redactedPairs);
+    }
+
+    private static bool HasParameterPairs(string value) =>
+        !string.IsNullOrWhiteSpace(value) && value.IndexOf('=') >= 0;
+
+    private static string SafeUnescapeDataString(string value) {
+        try {
+            return Uri.UnescapeDataString(value);
+        } catch (UriFormatException) {
+            return value;
+        }
     }
 
     private static bool TryRedactNestedValue(string value, out string redacted) {
@@ -204,11 +217,15 @@ internal static class HtmlSensitiveValueRedactor {
 
         char quote = literal[0];
         string value = literal.Substring(1, literal.Length - 2);
-        if (!HasSensitiveQueryText(value) && string.Equals(value, RedactUserInfo(value), StringComparison.Ordinal)) {
+        string normalizedValue = NormalizeEscapedUrlLiteral(value);
+        if (!HasSensitiveQueryText(normalizedValue) && string.Equals(normalizedValue, RedactUserInfo(normalizedValue), StringComparison.Ordinal)) {
             return literal;
         }
 
-        string redacted = RedactSensitiveQueryValues(value);
+        string redacted = RedactSensitiveQueryValues(normalizedValue);
         return quote + redacted.Replace("\\", "\\\\").Replace(quote.ToString(), "\\" + quote) + quote;
     }
+
+    private static string NormalizeEscapedUrlLiteral(string value) =>
+        value.Replace("\\/", "/");
 }

@@ -205,6 +205,7 @@ public static class HtmlPageDatasetBuilder {
         if (kind.Equals("AppState", StringComparison.OrdinalIgnoreCase)
             || kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase)
             || kind.Equals("JsonLd", StringComparison.OrdinalIgnoreCase)
+            || kind.Equals("Microdata", StringComparison.OrdinalIgnoreCase)
             || kind.Equals("JavaScriptConfig", StringComparison.OrdinalIgnoreCase)) {
             return HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(value);
         }

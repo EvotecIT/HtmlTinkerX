@@ -73,7 +73,7 @@ public class HtmlPageDatasetBuilderTests {
         string html = """
 <html>
 <head>
-<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"sessionToken":"abc123","redirectUrl":"/callback?access_token=url456","safe":"ok"}}}</script>
+<script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"sessionToken":"abc123","redirectUrl":"https:\/\/user:pass@example.org\/callback","next":"/callback?access_token=url456","safe":"ok"}}}</script>
 </head>
 <body><main><h1>State</h1><p>State payload page.</p></main></body>
 </html>
@@ -89,7 +89,36 @@ public class HtmlPageDatasetBuilderTests {
 
         Assert.Contains("<redacted>", provenanceText);
         Assert.DoesNotContain("abc123", provenanceText, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", provenanceText, StringComparison.Ordinal);
         Assert.DoesNotContain("url456", provenanceText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_RedactsMicrodataStructuredProvenance() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            Title = "Microdata",
+            AnalysisMode = "Static",
+            ReadableText = new HtmlReadableTextResult {
+                Text = "Microdata page.",
+                Title = "Microdata"
+            },
+            Data = new[] {
+                new HtmlDataItem {
+                    Kind = "Microdata",
+                    Name = "Profile",
+                    RawValue = "{\"url\":[\"https://user:pass@example.org/profile\"]}",
+                    Source = "Microdata"
+                }
+            }
+        };
+
+        HtmlPageDatasetChunk chunk = Assert.Single(HtmlPageDatasetBuilder.Build(workbench));
+        string provenanceText = string.Join(" ", chunk.Provenance.Select(entry => entry.Url));
+
+        Assert.Contains("<redacted>@example.org", provenanceText);
+        Assert.DoesNotContain("user:pass", provenanceText, StringComparison.Ordinal);
     }
 
     [Fact]

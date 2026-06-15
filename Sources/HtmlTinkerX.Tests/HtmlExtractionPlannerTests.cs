@@ -122,4 +122,45 @@ public class HtmlExtractionPlannerTests {
         Assert.False(plan.HasAutoSubmitForm);
         Assert.DoesNotContain("Invoke-HtmlFormRelay", plan.SuggestedCommand);
     }
+
+    [Fact]
+    public void Analyze_DoesNotRecommendRelayFromNonExecutableScriptMarker() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script type="application/json">{"x":"document.forms[0].submit()"}</script>
+</body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html);
+
+        Assert.NotEqual(HtmlExtractionPlanMode.BrowserlessRelayCandidate, plan.RecommendedMode);
+        Assert.False(plan.HasAutoSubmitForm);
+        Assert.DoesNotContain("Invoke-HtmlFormRelay", plan.SuggestedCommand);
+    }
+
+    [Fact]
+    public void Analyze_DoesNotRecommendRelayForNonHttpAction() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="mailto:security@example.org">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms[0].submit()</script>
+</body>
+</html>
+""";
+
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(html);
+
+        Assert.NotEqual(HtmlExtractionPlanMode.BrowserlessRelayCandidate, plan.RecommendedMode);
+        Assert.False(plan.HasAutoSubmitForm);
+        Assert.DoesNotContain("Invoke-HtmlFormRelay", plan.SuggestedCommand);
+    }
 }

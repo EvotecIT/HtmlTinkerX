@@ -180,6 +180,45 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_IgnoresNonExecutableScriptMarkers() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script type="application/json">{"x":"document.forms[0].submit()"}</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
+    public void TryParse_RejectsNonHttpRelayActions() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="javascript:document.forms[0].submit()">
+<input type="hidden" name="SAMLResponse" value="redacted">
+</form>
+<script>document.forms[0].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
     public void TryParse_FiltersControlsThatBrowserSubmitOmits() {
         string html = """
 <html>

@@ -86,8 +86,13 @@ public static class HtmlFormRelayParser {
 
         if (HasExplicitScheme(action)) {
             if (Uri.TryCreate(action, UriKind.Absolute, out Uri? absoluteUri)) {
-                actionUri = absoluteUri;
-                return true;
+                if (IsHttpUri(absoluteUri)) {
+                    actionUri = absoluteUri;
+                    return true;
+                }
+
+                actionUri = null!;
+                return false;
             }
 
             actionUri = null!;
@@ -102,6 +107,10 @@ public static class HtmlFormRelayParser {
         actionUri = null!;
         return false;
     }
+
+    private static bool IsHttpUri(Uri uri) =>
+        uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+        || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 
     private static bool HasExplicitScheme(string value) {
         int colonIndex = value.IndexOf(':');
@@ -196,6 +205,7 @@ public static class HtmlFormRelayParser {
         string formName = formElement.GetAttribute("name") ?? string.Empty;
         string formId = formElement.Id ?? string.Empty;
         return document.QuerySelectorAll("script")
+            .Where(IsExecutableScriptElement)
             .Select(static script => script.TextContent ?? string.Empty)
             .Any(script => TargetsFormSubmit(script, formName, formId, formIndex))
             || document.All
@@ -208,6 +218,14 @@ public static class HtmlFormRelayParser {
         attributeName.Equals("onload", StringComparison.OrdinalIgnoreCase)
         || attributeName.Equals("onpageshow", StringComparison.OrdinalIgnoreCase)
         || attributeName.Equals("onreadystatechange", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsExecutableScriptElement(IElement script) {
+        string type = (script.GetAttribute("type") ?? string.Empty).Split(';')[0].Trim();
+        return type.Length == 0
+            || type.Equals("module", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool TargetsFormSubmit(string script, string formName, string formId, int formIndex) {
         if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*" + formIndex + @"\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {

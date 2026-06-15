@@ -126,6 +126,56 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_DoesNotTreatOrdinaryAnchorsAsSensitiveQueryText() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "Docs",
+                    Url = "https://docs.example/#code-samples",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.False(endpoint.HasSensitiveQuery);
+        Assert.Contains("#code-samples", endpoint.Url);
+        Assert.DoesNotContain("<redacted>", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive-query-name", endpoint.ReasonCodes);
+    }
+
+    [Fact]
+    public void Build_RedactsMalformedSensitiveQueryNamesBestEffort() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/api?access%ZZtoken=abc123",
+                    Url = "/api?access%ZZtoken=abc123",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        Exception? exception = Record.Exception(() => HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.Null(exception);
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Contains("access%ZZtoken=<redacted>", endpoint.Url);
+        Assert.DoesNotContain("abc123", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", endpoint.ResolvedUrl, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_RedactsSensitiveUrlFragments() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page",
