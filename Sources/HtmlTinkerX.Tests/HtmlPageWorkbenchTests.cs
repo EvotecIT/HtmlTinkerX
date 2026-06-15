@@ -143,6 +143,30 @@ public class HtmlPageWorkbenchTests {
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ExcludesLinkedScriptDiagnosticsFromEndpointCounts() {
+        string html = """
+<html>
+<head><script src="data:text/javascript,fetch('/api/inline')"></script></head>
+<body><main><h1>Diagnostics</h1></main></body>
+</html>
+""";
+
+        HtmlPageWorkbenchResult result = await HtmlPageWorkbench.AnalyzeAsync(
+            html,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/app"),
+                IncludeLinkedScripts = true,
+                IncludeExternalLinkedScripts = true
+            });
+
+        Assert.Contains(result.InteractionSurface, item => item.Kind == "LinkedEndpoint" && string.IsNullOrWhiteSpace(item.Url));
+        Assert.Empty(result.Endpoints);
+        Assert.Empty(result.ApiEndpoints);
+        Assert.Equal(0, result.EndpointCount);
+        Assert.Equal(0, result.ApiEndpointCount);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_ResolvesApiInventoryAgainstDocumentBase() {
         string html = """
 <html>

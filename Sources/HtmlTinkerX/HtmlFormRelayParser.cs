@@ -200,9 +200,14 @@ public static class HtmlFormRelayParser {
             .Any(script => TargetsFormSubmit(script, formName, formId, formIndex))
             || document.All
                 .SelectMany(static element => element.Attributes)
-                .Where(static attribute => attribute.Name.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+                .Where(static attribute => IsAutomaticSubmitEventAttribute(attribute.Name))
                 .Any(attribute => TargetsFormSubmit(attribute.Value ?? string.Empty, formName, formId, formIndex));
     }
+
+    private static bool IsAutomaticSubmitEventAttribute(string attributeName) =>
+        attributeName.Equals("onload", StringComparison.OrdinalIgnoreCase)
+        || attributeName.Equals("onpageshow", StringComparison.OrdinalIgnoreCase)
+        || attributeName.Equals("onreadystatechange", StringComparison.OrdinalIgnoreCase);
 
     private static bool TargetsFormSubmit(string script, string formName, string formId, int formIndex) {
         if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*" + formIndex + @"\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {

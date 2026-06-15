@@ -76,7 +76,7 @@ public static class HtmlFormRelayClient {
             steps.Add(step);
 
             currentUri = nextUri;
-            currentHtml = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            currentHtml = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
         }
 
         return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.MaxRelayCountReached, steps);

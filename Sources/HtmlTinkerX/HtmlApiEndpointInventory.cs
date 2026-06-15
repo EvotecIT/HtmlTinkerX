@@ -56,7 +56,7 @@ public static class HtmlApiEndpointInventory {
         }
 
         return records
-            .GroupBy(static record => string.Join("|", record.Kind, record.Method, record.ResolvedUrl, record.Url), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(static record => string.Join("|", record.Kind, record.Method, record.ResolvedUrl, record.Url, record.Name), StringComparer.OrdinalIgnoreCase)
             .Select(static group => group.First())
             .OrderByDescending(static record => record.RiskLevel)
             .ThenBy(static record => record.Kind, StringComparer.OrdinalIgnoreCase)

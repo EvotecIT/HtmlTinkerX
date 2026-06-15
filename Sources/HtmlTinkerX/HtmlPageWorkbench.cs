@@ -77,9 +77,7 @@ public static class HtmlPageWorkbench {
         IReadOnlyList<HtmlInteractionSurfaceItem> hiddenFields = FilterSurface(interactionSurface, "Field");
         IReadOnlyList<HtmlInteractionSurfaceItem> tokens = FilterSurface(interactionSurface, "Token");
         IReadOnlyList<HtmlInteractionSurfaceItem> endpoints = interactionSurface
-            .Where(static item =>
-                item.Kind.Equals("Endpoint", StringComparison.OrdinalIgnoreCase)
-                || item.Kind.Equals("LinkedEndpoint", StringComparison.OrdinalIgnoreCase))
+            .Where(IsEndpointSurface)
             .ToArray();
         IReadOnlyList<string> warnings = CreateWarnings(plan, hiddenFields, tokens, endpoints, renderedSnapshot, staticRenderedComparison);
 
@@ -133,6 +131,15 @@ public static class HtmlPageWorkbench {
 
     private static IReadOnlyList<HtmlInteractionSurfaceItem> FilterSurface(IEnumerable<HtmlInteractionSurfaceItem> items, string kind) =>
         items.Where(item => item.Kind.Equals(kind, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+    private static bool IsEndpointSurface(HtmlInteractionSurfaceItem item) {
+        if (item.Kind.Equals("Endpoint", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        return item.Kind.Equals("LinkedEndpoint", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(item.Url);
+    }
 
     private static IReadOnlyList<string> CreateWarnings(
         HtmlExtractionPlan plan,

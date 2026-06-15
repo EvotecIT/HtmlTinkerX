@@ -303,6 +303,36 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_PreservesDistinctOperationsForSameEndpoint() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "GetUser",
+                    Url = "/graphql",
+                    Method = "POST",
+                    Source = "InlineScript"
+                },
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "UpdateUser",
+                    Url = "/graphql",
+                    Method = "POST",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        IReadOnlyList<HtmlApiEndpointRecord> endpoints = HtmlApiEndpointInventory.Build(workbench);
+
+        Assert.Equal(2, endpoints.Count);
+        Assert.Contains(endpoints, endpoint => endpoint.Name == "GetUser");
+        Assert.Contains(endpoints, endpoint => endpoint.Name == "UpdateUser");
+    }
+
+    [Fact]
     public async Task Build_CanFilterFormsOrScriptEndpoints() {
         string html = """
 <html>

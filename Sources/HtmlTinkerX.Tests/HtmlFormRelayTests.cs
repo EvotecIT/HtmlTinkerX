@@ -160,6 +160,26 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_RejectsClickDrivenRelayFallback() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<button onclick="document.forms[0].submit()">Continue</button>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
     public void TryParse_FiltersControlsThatBrowserSubmitOmits() {
         string html = """
 <html>
@@ -226,6 +246,58 @@ public class HtmlFormRelayTests {
 <input type="hidden" name="scope" value="profile">
 </form>
 <script>document.forms['hiddenform'].submit()</script>
+""";
+        using HttpClient client = CreateCookieAwareClient(server);
+
+        HtmlFormRelayResult result = await HtmlFormRelayClient.FollowAsync(
+            initialHtml,
+            new Uri(serverBase + "/start"),
+            client);
+
+        Assert.True(result.SubmittedRelay);
+        Assert.Equal(HtmlFormRelayStopReason.NoRelayForm, result.StopReason);
+    }
+
+    [Fact]
+    public async Task FollowAsync_UsesMetaCharsetForRelayHopHtml() {
+        const string expectedValue = "zażółć";
+        string serverBase = string.Empty;
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            if (context.Request.Path == "/signin") {
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                string relayHtml = $"""
+<html>
+<head><meta charset="iso-8859-2"></head>
+<body>
+<form method="POST" name="hiddenform" action="{serverBase}/complete">
+<input type="hidden" name="SAMLResponse" value="{expectedValue}">
+</form>
+<script>document.forms[0].submit()</script>
+</body>
+</html>
+""";
+                byte[] bytes = System.Text.Encoding.GetEncoding("iso-8859-2").GetBytes(relayHtml);
+                context.Response.ContentType = "text/html";
+                await context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+                return;
+            }
+
+            if (context.Request.Path == "/complete") {
+                IFormCollection form = await context.Request.ReadFormAsync();
+                Assert.Equal(expectedValue, form["SAMLResponse"]);
+                await context.Response.WriteAsync("<main>done</main>");
+                return;
+            }
+
+            context.Response.StatusCode = 404;
+        }, null, null);
+        serverBase = server.BaseAddress.ToString().TrimEnd('/');
+        string initialHtml = $"""
+<form method="POST" name="hiddenform" action="{serverBase}/signin">
+<input type="hidden" name="wa" value="signin1.0">
+<input type="hidden" name="wresult" value="redacted">
+</form>
+<script>document.forms[0].submit()</script>
 """;
         using HttpClient client = CreateCookieAwareClient(server);
 
