@@ -114,6 +114,48 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    public void FormatJavaScript_DoesNotSplitCommaFollowingObjectPropertyKeys() {
+        const string js = "var payload={'a':1,'abcdefghijkl':2};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected = "var payload = {\n    'a': 1,\n    'abcdefghijkl': 2\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitsFirstFunctionCallArgument() {
+        const string js = "send('abcdefghijkl');";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "send(('abcd' +\n    'efgh' +\n    'ijkl'));";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitStringNewlinesSurviveKeepArrayIndentation() {
+        const string js = "var values=['abcdefghijkl'];";
+        BeautifierOptions opts = new BeautifierOptions {
+            KeepArrayIndentation = true,
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var values = [('abcd' +\n    'efgh' +\n    'ijkl')];";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
     public void FormatJavaScript_ParenthesizesSplitStringBeforeMemberAccess() {
         const string js = "var size='abcdefghijkl'.length;";
         BeautifierOptions opts = new BeautifierOptions {
@@ -137,6 +179,20 @@ public class HtmlFormatterTests {
 
         string result = HtmlFormatter.FormatJavaScript(js, opts);
         TestHelpers.EqualIgnoringLineEndings(js, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_KeepsCrLfContinuationsInOneSplitUnit() {
+        const string js = "var payload=\"ab\\\r\ncdef\";";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = (\"ab\" +\n    \"\\\r\nc\" +\n    \"def\");";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
     }
 
     [Fact]

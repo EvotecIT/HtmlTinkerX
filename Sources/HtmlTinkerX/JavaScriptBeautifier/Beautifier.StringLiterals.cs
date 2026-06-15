@@ -51,8 +51,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             for (int i = 1; i < literalChunks.Count; i++) {
                 Append(" ");
                 Append("+");
-                AppendNewline(resetStatementFlags: false);
-                AppendIndentString();
+                AppendSplitStringNewline();
                 Append(literalChunks[i]);
             }
 
@@ -103,10 +102,46 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             return DefaultMaxStringLiteralLength;
         }
 
-        private bool IsStringLiteralSplitContext()
-            => LastType == "TK_EQUALS" ||
-               LastType == "TK_COMMA" ||
-               LastType == "TK_OPERATOR";
+        private bool IsStringLiteralSplitContext() {
+            if (Flags.Mode == BeautifierMode.Object) {
+                return false;
+            }
+
+            if (LastType == "TK_EQUALS" ||
+                LastType == "TK_COMMA" ||
+                LastType == "TK_OPERATOR") {
+                return true;
+            }
+
+            if (LastType == "TK_START_EXPR" && IsExpression(Flags.Mode)) {
+                return true;
+            }
+
+            return LastType == "TK_WORD" && (LastText == "return" || LastText == "throw");
+        }
+
+        private void AppendSplitStringNewline() {
+            TrimOutput();
+
+            if (Output.Count == 0) {
+                return;
+            }
+
+            if (Output[Output.Count - 1] != "\n") {
+                JustAddedNewline = true;
+                Output.Add("\n");
+            }
+
+            if (!string.IsNullOrEmpty(PreindentString)) {
+                Output.Add(PreindentString);
+            }
+
+            for (int i = 0; i < Flags.IndentationLevel + Flags.ChainExtraIndentation; i++) {
+                AppendIndentString();
+            }
+
+            AppendIndentString();
+        }
 
         private static bool TryGetQuotedStringContent(string tokenText, out char quote, out string content) {
             quote = '\0';
@@ -157,6 +192,10 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
                 if (HasHexDigits(content, escapedIndex + 1, 4)) {
                     return escapedIndex + 4;
                 }
+            }
+
+            if (escaped == '\r' && escapedIndex + 1 < content.Length && content[escapedIndex + 1] == '\n') {
+                return escapedIndex + 1;
             }
 
             if (escaped >= '0' && escaped <= '7') {
