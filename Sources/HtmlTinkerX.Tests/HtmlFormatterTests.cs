@@ -36,6 +36,233 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    public void FormatJavaScript_BreaksStatementCommaSequences() {
+        const string js = "! function(n) { n.value = \"text\", n.value2 = \"hello world\", n.value3 = \"foo\" }";
+        const string expected =
+            "! function(n) {\n    n.value = \"text\",\n    n.value2 = \"hello world\",\n    n.value3 = \"foo\"\n}";
+
+        string result = HtmlFormatter.FormatJavaScript(js);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_WrapLineLengthBreaksBeforeArrayStringArgument() {
+        const string js = "! function(n, r, e) { (r = e(2)(!1)).push([n.i, 'my really long string', \"\"]), n.exports = r }";
+        BeautifierOptions opts = new BeautifierOptions { WrapLineLength = 40 };
+        const string expected =
+            "! function(n, r, e) {\n    (r = e(2)(!1)).push([n.i,\n        'my really long string', \"\"]),\n        n.exports = r\n}";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitsLongStringLiteralsWhenRequested() {
+        const string js = "var payload='abcdefghijkl';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = ('abcd' +\n    'efgh' +\n    'ijkl');";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitLongStringKeepsIssueScenarioBelowEditorLimit() {
+        string js = $"! function(n, r, e) {{ (r = e(2)(!1)).push([n.i, '{new string('x', 2600)}', \"\"]), n.exports = r }}";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        int maxLineLength = result
+            .Replace("\r\n", "\n")
+            .Split('\n')
+            .Max(line => line.Length);
+
+        Assert.True(maxLineLength < 2500, $"Expected all lines below 2500 columns, longest line was {maxLineLength}.");
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitInsideEscapeSequences() {
+        const string js = "var payload='ab\\'cdef';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = ('ab\\'' +\n    'cdef');";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitObjectPropertyKeys() {
+        const string js = "var payload={'abcdefghijkl':1};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected = "var payload = {\n    'abcdefghijkl': 1\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitCommaFollowingObjectPropertyKeys() {
+        const string js = "var payload={'a':1,'abcdefghijkl':2};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected = "var payload = {\n    'a': 1,\n    'abcdefghijkl': 2\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitsObjectPropertyValues() {
+        const string js = "var payload={a:'abcdefghijkl'};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = {\n    a: ('abcd' +\n        'efgh' +\n        'ijkl')\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitImportAttributeValues() {
+        const string js = "import data from './data.json' with { type: 'abcdefghijkl' };";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitStringNamedImportSpecifiers() {
+        const string js = "import { a, 'abcdefghijkl' as b } from './m.js';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitStringNamedExportSpecifiers() {
+        const string js = "export { a, 'abcdefghijkl' as b } from './m.js';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitsFirstFunctionCallArgument() {
+        const string js = "send('abcdefghijkl');";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "send(('abcd' +\n    'efgh' +\n    'ijkl'));";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_SplitStringNewlinesSurviveKeepArrayIndentation() {
+        const string js = "var values=['abcdefghijkl'];";
+        BeautifierOptions opts = new BeautifierOptions {
+            KeepArrayIndentation = true,
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var values = [('abcd' +\n    'efgh' +\n    'ijkl')];";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_ParenthesizesSplitStringBeforeMemberAccess() {
+        const string js = "var size='abcdefghijkl'.length;";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var size = ('abcd' +\n    'efgh' +\n    'ijkl').length;";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitDirectivePositionLiterals() {
+        const string js = "'abcdefghijkl';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(js, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_KeepsCrLfContinuationsInOneSplitUnit() {
+        const string js = "var payload=\"ab\\\r\ncdef\";";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = (\"ab\" +\n    \"\\\r\nc\" +\n    \"def\");";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_KeepsLegacyOctalEscapesInOneSplitUnit() {
+        const string js = "var payload=\"\\123456\";";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 2
+        };
+        const string expected =
+            "var payload = (\"\\123\" +\n    \"45\" +\n    \"6\");";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
     /// <summary>
     /// Formats minified CSS text.
     /// </summary>

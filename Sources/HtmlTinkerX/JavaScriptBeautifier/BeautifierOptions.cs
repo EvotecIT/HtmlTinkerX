@@ -45,6 +45,8 @@ public class BeautifierOptions {
         WrapLineLength = 0;
         BreakChainedMethods = false;
         UnescapeStrings = false;
+        SplitLongStringLiterals = false;
+        MaxStringLiteralLength = 0;
     }
 
     /// <summary>
@@ -111,4 +113,15 @@ public class BeautifierOptions {
     /// Gets or sets a value indicating whether hexadecimal escape sequences in strings should be converted to characters.
     /// </summary>
     public bool UnescapeStrings { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether long quoted string literals should be split into concatenated chunks.
+    /// </summary>
+    public bool SplitLongStringLiterals { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum raw content length for a quoted string chunk when splitting long literals.
+    /// A value of zero uses <see cref="WrapLineLength"/> when set, otherwise a conservative editor-friendly default.
+    /// </summary>
+    public int MaxStringLiteralLength { get; set; }
 }

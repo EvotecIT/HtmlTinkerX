@@ -78,6 +78,20 @@ public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
     [Parameter]
     public bool EvalCode { get; set; }
 
+    /// <summary>Line length at which formatter may wrap before the next token. Use 0 to disable token wrapping.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int WrapLineLength { get; set; }
+
+    /// <summary>Split long quoted string literals into concatenated chunks.</summary>
+    [Parameter]
+    [Alias("SplitLongLine", "SplitLongString")]
+    public SwitchParameter SplitLongStringLiterals { get; set; }
+
+    /// <summary>Maximum raw content length for each string literal chunk. Use 0 for the formatter default.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int MaxStringLiteralLength { get; set; }
 
     /// <summary>Break chained methods.</summary>
     [Parameter]
@@ -96,7 +110,10 @@ public sealed class CmdletFormatJavaScript : AsyncPSCmdlet {
             KeepArrayIndentation = KeepArrayIndentation,
             KeepFunctionIndentation = KeepFunctionIndentation,
             EvalCode = EvalCode,
-            BreakChainedMethods = BreakChainedMethods
+            WrapLineLength = WrapLineLength,
+            BreakChainedMethods = BreakChainedMethods,
+            SplitLongStringLiterals = SplitLongStringLiterals.IsPresent,
+            MaxStringLiteralLength = MaxStringLiteralLength
         };
 
         string formatted = ParameterSetName == ParameterSetFile
