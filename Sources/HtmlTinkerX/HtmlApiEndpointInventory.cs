@@ -70,10 +70,12 @@ public static class HtmlApiEndpointInventory {
         bool isExternal = resolvedUri != null && pageUri != null && !HasSameOrigin(pageUri, resolvedUri);
         bool isStateChanging = StateChangingMethods.Contains(method);
         bool hasUnknownMethod = method.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase);
+        bool hasSensitiveGetFormFields = IsGetForm(item, method) && HasSensitiveFormFieldMetadata(item.Metadata);
         bool hasSensitiveQuery = HtmlSensitiveValueRedactor.HasSensitiveQuery(resolvedUri)
             || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Url)
             || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Name)
-            || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Metadata);
+            || HtmlSensitiveValueRedactor.HasSensitiveQueryText(item.Metadata)
+            || hasSensitiveGetFormFields;
         bool hasAuthHint = HasAuthHint(item, resolvedUri, workbench);
         List<string> reasonCodes = BuildReasonCodes(item, isExternal, isStateChanging, hasUnknownMethod, hasSensitiveQuery, hasAuthHint, resolvedUri);
         HtmlApiEndpointRiskLevel riskLevel = ChooseRiskLevel(isExternal, isStateChanging, hasUnknownMethod, hasSensitiveQuery, hasAuthHint);
@@ -159,6 +161,21 @@ public static class HtmlApiEndpointInventory {
         }
 
         return kind.Equals("Form", StringComparison.OrdinalIgnoreCase) ? "GET" : "UNKNOWN";
+    }
+
+    private static bool IsGetForm(HtmlInteractionSurfaceItem item, string method) =>
+        item.Kind.Equals("Form", StringComparison.OrdinalIgnoreCase)
+        && method.Equals("GET", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasSensitiveFormFieldMetadata(string metadata) {
+        if (string.IsNullOrWhiteSpace(metadata)) {
+            return false;
+        }
+
+        return metadata
+            .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(static name => name.Trim())
+            .Any(HtmlSensitiveValueRedactor.IsSensitiveName);
     }
 
     private static Uri? ResolveUri(string url, Uri? pageUri) {

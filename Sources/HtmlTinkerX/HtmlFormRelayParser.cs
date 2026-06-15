@@ -58,7 +58,9 @@ public static class HtmlFormRelayParser {
                 continue;
             }
 
-            Uri effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
+            Uri effectiveBaseUri = string.IsNullOrWhiteSpace(form.Metadata.Action)
+                ? baseUri
+                : GetEffectiveBaseUri(document, baseUri);
             if (!TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
                 continue;
             }
@@ -220,19 +222,63 @@ public static class HtmlFormRelayParser {
         || attributeName.Equals("onreadystatechange", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsExecutableScriptElement(IElement script) {
-        string type = (script.GetAttribute("type") ?? string.Empty).Split(';')[0].Trim();
-        return type.Length == 0
-            || type.Equals("module", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase);
+        return HtmlJavaScriptVariableSelector.IsJavaScriptScriptType(script.GetAttribute("type"));
     }
 
     private static bool TargetsFormSubmit(string script, string formName, string formId, int formIndex) {
-        if (Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*" + formIndex + @"\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
+        if (string.IsNullOrWhiteSpace(script)) {
+            return false;
+        }
+
+        if (!ContainsTargetedFormSubmit(script, formName, formId, formIndex)) {
+            return false;
+        }
+
+        if (HasUserDrivenSubmitContext(script)) {
+            return false;
+        }
+
+        if (HasAutomaticSubmitWrapper(script, formName, formId, formIndex)) {
             return true;
         }
 
-        return MatchesNamedFormSubmit(script, formName) || MatchesIdentifiedFormSubmit(script, formId);
+        return ContainsTargetedFormSubmit(RemoveFunctionDeclarationBodies(script), formName, formId, formIndex);
+    }
+
+    private static bool ContainsTargetedFormSubmit(string script, string formName, string formId, int formIndex) {
+        return Regex.IsMatch(script, @"document\s*\.\s*forms\s*\[\s*" + formIndex + @"\s*\]\s*\.\s*submit\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            || MatchesNamedFormSubmit(script, formName)
+            || MatchesIdentifiedFormSubmit(script, formId);
+    }
+
+    private static bool HasAutomaticSubmitWrapper(string script, string formName, string formId, int formIndex) {
+        string[] automaticMarkers = {
+            @"setTimeout\s*\(",
+            @"setInterval\s*\(",
+            @"requestAnimationFrame\s*\(",
+            @"(?:window|document)\s*\.\s*(?:onload|onpageshow|onreadystatechange)\s*=",
+            @"addEventListener\s*\(\s*['""](?:load|pageshow|DOMContentLoaded|readystatechange)['""]"
+        };
+
+        return automaticMarkers.Any(marker =>
+            Regex.IsMatch(script, marker, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            && ContainsTargetedFormSubmit(script, formName, formId, formIndex));
+    }
+
+    private static bool HasUserDrivenSubmitContext(string script) {
+        const string userEvents = "click|dblclick|auxclick|submit|change|input|keydown|keyup|keypress|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend";
+        return Regex.IsMatch(
+            script,
+            @"addEventListener\s*\(\s*['""](?:" + userEvents + @")['""].*?submit\s*\(",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    }
+
+    private static string RemoveFunctionDeclarationBodies(string script) {
+        return Regex.Replace(
+            script,
+            @"function(?:\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s*\([^)]*\)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
     }
 
     private static bool MatchesNamedFormSubmit(string script, string formName) {

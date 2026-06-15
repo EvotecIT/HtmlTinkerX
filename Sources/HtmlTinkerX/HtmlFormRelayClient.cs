@@ -68,7 +68,6 @@ public static class HtmlFormRelayClient {
             if (responseCrossOrigin && !IsCrossOriginAllowed(nextUri, effectiveOptions)) {
                 step.IsCrossHost = responseCrossHost;
                 step.IsCrossOrigin = responseCrossOrigin;
-                step.Blocked = true;
                 steps.Add(step);
                 return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.CrossHostBlocked, steps);
             }

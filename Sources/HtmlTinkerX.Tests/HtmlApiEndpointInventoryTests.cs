@@ -150,6 +150,33 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public async Task Build_ClassifiesGetFormSensitiveFieldNamesAsQueryParameters() {
+        string html = """
+<html>
+<body>
+<form method="get" action="/callback">
+<input name="code">
+<input name="state">
+</form>
+</body>
+</html>
+""";
+        HtmlPageWorkbenchResult workbench = await HtmlPageWorkbench.AnalyzeAsync(
+            html,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/page")
+            });
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.Equal("Form", endpoint.Kind);
+        Assert.Equal("GET", endpoint.Method);
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Equal(HtmlApiEndpointRiskLevel.High, endpoint.RiskLevel);
+        Assert.Contains("sensitive-query-name", endpoint.ReasonCodes);
+    }
+
+    [Fact]
     public void Build_RedactsMalformedSensitiveQueryNamesBestEffort() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page",

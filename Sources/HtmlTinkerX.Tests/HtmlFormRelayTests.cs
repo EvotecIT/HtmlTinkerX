@@ -54,6 +54,28 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_KeepsEmptyActionOnResponseUrlWhenDocumentBaseIsPresent() {
+        string html = """
+<html>
+<head><base href="https://idp.example.org/sso/"></head>
+<body>
+<form method="POST" name="hiddenform">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script>document.forms[0].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://rp.example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal("https://rp.example.org/start", request!.ActionUri.AbsoluteUri);
+    }
+
+    [Fact]
     public void TryParse_RejectsGenericHiddenFormWhenSubmitDoesNotTargetForm() {
         string html = """
 <html>
@@ -180,6 +202,47 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_RejectsClickListenerDrivenRelayFallback() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<button id="continue">Continue</button>
+<script>document.getElementById('continue').addEventListener('click', () => document.forms[0].submit())</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
+    public void TryParse_RejectsHelperFunctionWithoutAutomaticInvocation() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script>function continueRelay() { document.forms[0].submit(); }</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
     public void TryParse_IgnoresNonExecutableScriptMarkers() {
         string html = """
 <html>
@@ -197,6 +260,27 @@ public class HtmlFormRelayTests {
 
         Assert.False(parsed);
         Assert.Null(request);
+    }
+
+    [Fact]
+    public void TryParse_AcceptsEcmaScriptMimeSubmitMarker() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+</form>
+<script type="application/ecmascript">document.forms[0].submit()</script>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal("https://example.org/continue", request!.ActionUri.AbsoluteUri);
     }
 
     [Fact]
@@ -502,10 +586,10 @@ public class HtmlFormRelayTests {
             new Uri("https://rp.example.org/start"),
             client);
 
-        Assert.False(result.SubmittedRelay);
+        Assert.True(result.SubmittedRelay);
         Assert.Equal(HtmlFormRelayStopReason.CrossHostBlocked, result.StopReason);
         HtmlFormRelayStep step = Assert.Single(result.Steps);
-        Assert.True(step.Blocked);
+        Assert.False(step.Blocked);
         Assert.True(step.IsCrossHost);
         Assert.True(step.IsCrossOrigin);
         Assert.Equal("https://idp.example.net/complete", step.ResponseUrl);

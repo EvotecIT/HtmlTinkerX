@@ -226,6 +226,18 @@ internal static class HtmlSensitiveValueRedactor {
         return quote + redacted.Replace("\\", "\\\\").Replace(quote.ToString(), "\\" + quote) + quote;
     }
 
-    private static string NormalizeEscapedUrlLiteral(string value) =>
-        value.Replace("\\/", "/");
+    private static string NormalizeEscapedUrlLiteral(string value) {
+        string normalized = value.Replace("\\/", "/").Replace("&amp;", "&");
+        return Regex.Replace(
+            normalized,
+            @"\\u00(23|26|3[dD]|3[fF])",
+            match => match.Groups[1].Value.ToUpperInvariant() switch {
+                "23" => "#",
+                "26" => "&",
+                "3D" => "=",
+                "3F" => "?",
+                _ => match.Value
+            },
+            RegexOptions.CultureInvariant);
+    }
 }

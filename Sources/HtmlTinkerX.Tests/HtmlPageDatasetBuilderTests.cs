@@ -122,6 +122,34 @@ public class HtmlPageDatasetBuilderTests {
     }
 
     [Fact]
+    public void Build_RedactsJsonEscapedStructuredUrlSeparators() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            Title = "App State",
+            AnalysisMode = "Static",
+            ReadableText = new HtmlReadableTextResult {
+                Text = "App state page.",
+                Title = "App State"
+            },
+            Data = new[] {
+                new HtmlDataItem {
+                    Kind = "AppState",
+                    Name = "__NEXT_DATA__",
+                    RawValue = "{\"redirectUrl\":\"/callback?state=ok\\u0026access_token=escaped789\"}",
+                    Source = "AppState"
+                }
+            }
+        };
+
+        HtmlPageDatasetChunk chunk = Assert.Single(HtmlPageDatasetBuilder.Build(workbench));
+        string provenanceText = string.Join(" ", chunk.Provenance.Select(entry => entry.Url));
+
+        Assert.Contains("access_token=<redacted>", provenanceText);
+        Assert.DoesNotContain("escaped789", provenanceText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_RedactsSensitiveChunkUrlsAndProvenanceNames() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page?access_token=abc123",
