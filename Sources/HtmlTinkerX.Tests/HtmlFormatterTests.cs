@@ -141,6 +141,45 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    public void FormatJavaScript_DoesNotSplitImportAttributeValues() {
+        const string js = "import data from './data.json' with { type: 'abcdefghijkl' };";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitStringNamedImportSpecifiers() {
+        const string js = "import { a, 'abcdefghijkl' as b } from './m.js';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
+    public void FormatJavaScript_DoesNotSplitStringNamedExportSpecifiers() {
+        const string js = "export { a, 'abcdefghijkl' as b } from './m.js';";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        Assert.Contains("'abcdefghijkl'", result);
+        Assert.DoesNotContain("'abcd' +", result);
+    }
+
+    [Fact]
     public void FormatJavaScript_SplitsFirstFunctionCallArgument() {
         const string js = "send('abcdefghijkl');";
         BeautifierOptions opts = new BeautifierOptions {

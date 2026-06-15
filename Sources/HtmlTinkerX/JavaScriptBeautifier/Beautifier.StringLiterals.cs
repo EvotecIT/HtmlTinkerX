@@ -29,6 +29,10 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
     public partial class Beautifier {
         private const int DefaultMaxStringLiteralLength = 2400;
 
+        private int ImportAttributeBlockDepth { get; set; }
+
+        private int ModuleSpecifierBlockDepth { get; set; }
+
         private bool ShouldBreakStatementComma()
             => (Flags.Mode == BeautifierMode.Block || Flags.Mode == BeautifierMode.DoBlock) &&
                (LastType == "TK_STRING" || LastType == "TK_WORD");
@@ -103,6 +107,10 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         }
 
         private bool IsStringLiteralSplitContext() {
+            if (ImportAttributeBlockDepth > 0 || ModuleSpecifierBlockDepth > 0) {
+                return false;
+            }
+
             if (Flags.Mode == BeautifierMode.Object) {
                 return LastText == ":";
             }
@@ -118,6 +126,30 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
             }
 
             return LastType == "TK_WORD" && (LastText == "return" || LastText == "throw");
+        }
+
+        private void TrackStringLiteralBlockStart() {
+            if (ImportAttributeBlockDepth > 0) {
+                ImportAttributeBlockDepth++;
+            } else if (LastWord == "with" || LastWord == "assert") {
+                ImportAttributeBlockDepth = 1;
+            }
+
+            if (ModuleSpecifierBlockDepth > 0) {
+                ModuleSpecifierBlockDepth++;
+            } else if (LastWord == "import" || LastWord == "export") {
+                ModuleSpecifierBlockDepth = 1;
+            }
+        }
+
+        private void TrackStringLiteralBlockEnd() {
+            if (ImportAttributeBlockDepth > 0) {
+                ImportAttributeBlockDepth--;
+            }
+
+            if (ModuleSpecifierBlockDepth > 0) {
+                ModuleSpecifierBlockDepth--;
+            }
         }
 
         private void AppendSplitStringNewline() {

@@ -840,6 +840,8 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         }
 
         private void HandleStartBlock(string tokenText) {
+            TrackStringLiteralBlockStart();
+
             if (LastWord == "do") {
                 SetMode(BeautifierMode.DoBlock);
             } else {
@@ -880,6 +882,8 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
         }
 
         private void HandleEndBlock(string tokenText) {
+            TrackStringLiteralBlockEnd();
+
             RestoreMode();
             if (Opts.BraceStyle == BraceStyle.Expand) {
                 if (LastText != "{") {
