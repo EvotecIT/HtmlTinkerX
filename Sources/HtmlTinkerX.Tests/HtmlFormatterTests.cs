@@ -127,6 +127,20 @@ public class HtmlFormatterTests {
     }
 
     [Fact]
+    public void FormatJavaScript_SplitsObjectPropertyValues() {
+        const string js = "var payload={a:'abcdefghijkl'};";
+        BeautifierOptions opts = new BeautifierOptions {
+            SplitLongStringLiterals = true,
+            MaxStringLiteralLength = 4
+        };
+        const string expected =
+            "var payload = {\n    a: ('abcd' +\n        'efgh' +\n        'ijkl')\n};";
+
+        string result = HtmlFormatter.FormatJavaScript(js, opts);
+        TestHelpers.EqualIgnoringLineEndings(expected, result);
+    }
+
+    [Fact]
     public void FormatJavaScript_SplitsFirstFunctionCallArgument() {
         const string js = "send('abcdefghijkl');";
         BeautifierOptions opts = new BeautifierOptions {

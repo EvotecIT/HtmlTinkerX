@@ -104,7 +104,7 @@ namespace HtmlTinkerX.JavaScriptBeautifier {
 
         private bool IsStringLiteralSplitContext() {
             if (Flags.Mode == BeautifierMode.Object) {
-                return false;
+                return LastText == ":";
             }
 
             if (LastType == "TK_EQUALS" ||
