@@ -62,10 +62,14 @@ public sealed class CmdletInvokeHtmlPageWorkbench : AsyncPSCmdlet {
 
     /// <summary>Proxy server address used when downloading by URL or inspecting linked scripts.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetContent)]
+    [Parameter(ParameterSetName = ParameterSetPath)]
     public string? Proxy { get; set; }
 
     /// <summary>Credentials used with the proxy server.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetContent)]
+    [Parameter(ParameterSetName = ParameterSetPath)]
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />

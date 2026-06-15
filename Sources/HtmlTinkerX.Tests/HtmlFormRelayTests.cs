@@ -120,6 +120,46 @@ public class HtmlFormRelayTests {
     }
 
     [Fact]
+    public void TryParse_AcceptsOnloadDrivenRelayForm() {
+        string html = """
+<html>
+<body onload="document.forms[0].submit()">
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="csrf" value="redacted">
+</form>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.True(parsed);
+        Assert.NotNull(request);
+        Assert.Equal(HtmlFormRelayProtocolHint.Generic, request!.ProtocolHint);
+        Assert.True(request.HasAutoSubmitMarker);
+    }
+
+    [Fact]
+    public void TryParse_RejectsProtocolRelayWithoutAutoSubmitProof() {
+        string html = """
+<html>
+<body>
+<form method="POST" name="hiddenform" action="/continue">
+<input type="hidden" name="SAMLResponse" value="redacted">
+<input type="hidden" name="RelayState" value="state">
+<noscript><button type="submit">Continue</button></noscript>
+</form>
+</body>
+</html>
+""";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.org/start"), out HtmlFormRelayRequest? request);
+
+        Assert.False(parsed);
+        Assert.Null(request);
+    }
+
+    [Fact]
     public void TryParse_FiltersControlsThatBrowserSubmitOmits() {
         string html = """
 <html>

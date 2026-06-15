@@ -32,6 +32,10 @@ internal static class HtmlSensitiveValueRedactor {
     }
 
     internal static bool HasSensitiveQueryText(string value) {
+        return HasSensitiveQueryText(value, 0);
+    }
+
+    private static bool HasSensitiveQueryText(string value, int depth) {
         if (string.IsNullOrWhiteSpace(value)) {
             return false;
         }
@@ -42,14 +46,27 @@ internal static class HtmlSensitiveValueRedactor {
 
         foreach (string parameters in GetParameterSegments(value)) {
             foreach (string pair in parameters.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
-                string name = pair.Split(new[] { '=' }, 2)[0];
+                string[] keyValue = pair.Split(new[] { '=' }, 2);
+                string name = keyValue[0];
                 if (IsSensitiveName(Uri.UnescapeDataString(name))) {
+                    return true;
+                }
+
+                if (keyValue.Length == 2 && depth < 4 && HasSensitiveNestedValue(keyValue[1], depth + 1)) {
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    private static bool HasSensitiveNestedValue(string value, int depth) {
+        try {
+            return HasSensitiveQueryText(Uri.UnescapeDataString(value), depth);
+        } catch (UriFormatException) {
+            return false;
+        }
     }
 
     internal static string RedactSensitiveQueryValues(string value) {
@@ -100,16 +117,52 @@ internal static class HtmlSensitiveValueRedactor {
         string[] redactedPairs = pairs.Select(pair => {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = Uri.UnescapeDataString(keyValue[0]);
-            return IsSensitiveName(name) ? keyValue[0] + "=<redacted>" : pair;
+            if (IsSensitiveName(name)) {
+                return keyValue[0] + "=<redacted>";
+            }
+
+            if (keyValue.Length == 2 && TryRedactNestedValue(keyValue[1], out string? nestedRedacted)) {
+                return keyValue[0] + "=" + nestedRedacted;
+            }
+
+            return pair;
         }).ToArray();
 
         return string.Join("&", redactedPairs);
     }
 
+    private static bool TryRedactNestedValue(string value, out string redacted) {
+        redacted = value;
+        string decoded;
+        try {
+            decoded = Uri.UnescapeDataString(value);
+        } catch (UriFormatException) {
+            return false;
+        }
+
+        if (string.Equals(decoded, value, StringComparison.Ordinal) && !HasSensitiveQueryText(decoded)) {
+            return false;
+        }
+
+        if (!HasSensitiveQueryText(decoded)) {
+            return false;
+        }
+
+        string nestedRedacted = RedactSensitiveQueryValues(decoded);
+        if (string.Equals(nestedRedacted, decoded, StringComparison.Ordinal)) {
+            return false;
+        }
+
+        redacted = string.Equals(decoded, value, StringComparison.Ordinal)
+            ? nestedRedacted
+            : Uri.EscapeDataString(nestedRedacted);
+        return true;
+    }
+
     private static string RedactUserInfo(string value) =>
         Regex.Replace(
             value,
-            "^([A-Za-z][A-Za-z0-9+.-]*://)([^/?#@]+@)",
+            "^(([A-Za-z][A-Za-z0-9+.-]*:)?//)([^/?#@]+@)",
             "$1<redacted>@",
             RegexOptions.CultureInvariant);
 

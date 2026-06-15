@@ -100,4 +100,17 @@ Describe 'Invoke-HtmlPageWorkbench' {
             $server.Dispose()
         }
     }
+
+    It 'binds proxy parameters with content when linked scripts are inspected' {
+        $command = Get-Command Invoke-HtmlPageWorkbench
+        $command.Parameters['Proxy'].ParameterSets.Keys | Should -Contain 'Content'
+        $command.Parameters['ProxyCredential'].ParameterSets.Keys | Should -Contain 'Content'
+
+        $html = '<html><body><main>Proxy binding check</main></body></html>'
+        $credential = [pscredential]::new('proxy-user', (ConvertTo-SecureString 'proxy-pass' -AsPlainText -Force))
+
+        {
+            Invoke-HtmlPageWorkbench -Content $html -BaseUrl 'https://example.org/page' -IncludeLinkedScripts -Proxy 'http://proxy.example:8080' -ProxyCredential $credential
+        } | Should -Not -Throw
+    }
 }

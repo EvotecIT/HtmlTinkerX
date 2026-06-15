@@ -54,8 +54,7 @@ public static class HtmlFormRelayParser {
             bool mostlyHidden = hiddenCount >= Math.Max(1, fieldValues.Count - 1);
             HtmlFormRelayProtocolHint protocolHint = DetectProtocol(fields.Keys);
             bool hasAutoSubmitMarker = HasAutoSubmitMarker(document, formElement, formIndex);
-            bool requiresAutoSubmitMarker = formElements.Length > 1 || protocolHint == HtmlFormRelayProtocolHint.Generic;
-            if (!mostlyHidden || (requiresAutoSubmitMarker && !hasAutoSubmitMarker)) {
+            if (!mostlyHidden || !hasAutoSubmitMarker) {
                 continue;
             }
 
@@ -198,7 +197,11 @@ public static class HtmlFormRelayParser {
         string formId = formElement.Id ?? string.Empty;
         return document.QuerySelectorAll("script")
             .Select(static script => script.TextContent ?? string.Empty)
-            .Any(script => TargetsFormSubmit(script, formName, formId, formIndex));
+            .Any(script => TargetsFormSubmit(script, formName, formId, formIndex))
+            || document.All
+                .SelectMany(static element => element.Attributes)
+                .Where(static attribute => attribute.Name.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+                .Any(attribute => TargetsFormSubmit(attribute.Value ?? string.Empty, formName, formId, formIndex));
     }
 
     private static bool TargetsFormSubmit(string script, string formName, string formId, int formIndex) {

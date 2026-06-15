@@ -207,6 +207,60 @@ fetch("/api/session?token=abc123");
     }
 
     [Fact]
+    public void Build_RedactsNestedSensitiveUrlParameters() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "/api/redirect?redirect=%2Fcallback%3Faccess_token%3Dabc123",
+                    Url = "/api/redirect?redirect=%2Fcallback%3Faccess_token%3Dabc123",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.DoesNotContain("abc123", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", endpoint.ResolvedUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("abc123", endpoint.Name, StringComparison.Ordinal);
+        Assert.Contains(Uri.EscapeDataString("access_token=<redacted>"), endpoint.Url);
+        Assert.Contains(Uri.EscapeDataString("access_token=<redacted>"), endpoint.ResolvedUrl);
+        Assert.Contains(Uri.EscapeDataString("access_token=<redacted>"), endpoint.Name);
+    }
+
+    [Fact]
+    public void Build_RedactsProtocolRelativeUserInfo() {
+        HtmlPageWorkbenchResult workbench = new() {
+            SourceUrl = "https://example.org/page",
+            FinalUrl = "https://example.org/page",
+            InteractionSurface = new[] {
+                new HtmlInteractionSurfaceItem {
+                    Kind = "Endpoint",
+                    Name = "//user:pass@api.example.net/items",
+                    Url = "//user:pass@api.example.net/items",
+                    Method = "GET",
+                    Source = "InlineScript"
+                }
+            }
+        };
+
+        HtmlApiEndpointRecord endpoint = Assert.Single(HtmlApiEndpointInventory.Build(workbench));
+
+        Assert.True(endpoint.HasSensitiveQuery);
+        Assert.Contains("//<redacted>@api.example.net", endpoint.Url);
+        Assert.Contains("<redacted>@api.example.net", endpoint.ResolvedUrl);
+        Assert.Contains("//<redacted>@api.example.net", endpoint.Name);
+        Assert.DoesNotContain("user:pass", endpoint.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", endpoint.ResolvedUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("user:pass", endpoint.Name, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_TreatsUnknownSameOriginMethodsAsReviewRisk() {
         HtmlPageWorkbenchResult workbench = new() {
             SourceUrl = "https://example.org/page",
