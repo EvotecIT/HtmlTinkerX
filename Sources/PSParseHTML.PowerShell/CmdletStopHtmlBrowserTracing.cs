@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that stops Playwright tracing for a browser session.
 /// </summary>
 [Cmdlet(VerbsLifecycle.Stop, "HtmlBrowserTracing")]
-[Alias("Stop-HTMLTracing")]
+[Alias("Stop-HtmlTracing")]
 public sealed class CmdletStopHtmlBrowserTracing : AsyncPSCmdlet {
     /// <summary>Browser session to stop tracing for.</summary>
     [Parameter(ValueFromPipeline = true, Position = 0)]

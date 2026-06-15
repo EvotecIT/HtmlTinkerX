@@ -13,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>Export-HTMLOutline -Url https://example.com -Path outline.json</code>
 /// </example>
-[Cmdlet(VerbsData.Export, "HTMLOutline", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.Export, "HtmlOutline", DefaultParameterSetName = ParameterSetContent)]
 public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";

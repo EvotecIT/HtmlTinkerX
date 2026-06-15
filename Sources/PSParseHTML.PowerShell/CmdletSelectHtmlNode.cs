@@ -10,11 +10,11 @@ namespace PSParseHTML.PowerShell;
 /// <summary>Selects HtmlAgilityPack nodes using XPath or common tag and attribute predicates.</summary>
 /// <example>
 ///   <summary>Select links by XPath</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//a'</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//a'</code>
 /// </example>
 /// <example>
 ///   <summary>Select the first heading with a specific class</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -Tag h3 -AttributeName class -AttributeValue 'title' -Single</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -Tag h3 -AttributeName class -AttributeValue 'title' -Single</code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlNode", DefaultParameterSetName = ParameterSetXPath)]
 [OutputType(typeof(HtmlNode))]

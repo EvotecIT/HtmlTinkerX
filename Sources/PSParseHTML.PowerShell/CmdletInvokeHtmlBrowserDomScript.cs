@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserDomScript", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(object))]
-[Alias("Invoke-HTMLDomScript")]
+[Alias("Invoke-HtmlDomScript")]
 public sealed class CmdletInvokeHtmlBrowserDomScript : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";

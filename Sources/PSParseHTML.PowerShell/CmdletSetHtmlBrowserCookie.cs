@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that adds cookies to an active browser session.
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HtmlBrowserCookie")]
-[Alias("Set-HTMLCookie")]
+[Alias("Set-HtmlCookie")]
 public sealed class CmdletSetHtmlBrowserCookie : AsyncPSCmdlet {
     /// <summary>Browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

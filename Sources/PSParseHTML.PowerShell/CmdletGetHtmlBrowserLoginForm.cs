@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserLoginForm", DefaultParameterSetName = ParameterSetSession)]
 [OutputType(typeof(HtmlFormLogin))]
-[Alias("Get-HTMLLoginForm")]
+[Alias("Get-HtmlLoginForm")]
 public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
     private const string ParameterSetSession = "Session";
     private const string ParameterSetUrl = "Url";

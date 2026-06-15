@@ -10,9 +10,9 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that formats CSS content using AngleSharp.
 /// </summary>
 /// <example>
-/// <code>Format-CSS -Content "body{margin:0}"</code>
+/// <code>Format-Css -Content "body{margin:0}"</code>
 /// </example>
-[Cmdlet(VerbsCommon.Format, "CSS", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsCommon.Format, "Css", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
 public sealed class CmdletFormatCss : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

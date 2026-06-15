@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HtmlBrowserSelectOption")]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Set-HTMLSelectOption")]
+[Alias("Set-HtmlSelectOption")]
 public sealed class CmdletSetHtmlBrowserSelectOption : AsyncPSCmdlet {
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

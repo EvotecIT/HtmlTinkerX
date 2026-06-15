@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// Generates a simple HTML viewer for a HAR file and returns the parsed data.
 /// </summary>
 [Cmdlet(VerbsCommon.Show, "HtmlBrowserHar")]
-[Alias("Show-HTMLHar")]
+[Alias("Show-HtmlHar")]
 public sealed class CmdletShowHtmlBrowserHar : AsyncPSCmdlet {
     /// <summary>Path to the HAR file.</summary>
     [Parameter(Mandatory = true, Position = 0)]

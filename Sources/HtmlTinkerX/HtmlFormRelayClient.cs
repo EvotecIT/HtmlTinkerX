@@ -1,0 +1,165 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace HtmlTinkerX;
+
+/// <summary>
+/// Follows deterministic browserless hidden-form relay responses with an HTTP client.
+/// </summary>
+public static class HtmlFormRelayClient {
+    /// <summary>
+    /// Follows hidden auto-submit relay forms until no relay form remains or a safety limit is reached.
+    /// </summary>
+    /// <param name="html">Initial response content.</param>
+    /// <param name="responseUri">Initial response URI.</param>
+    /// <param name="client">HTTP client used to submit relay forms. Use a cookie-enabled client to preserve sessions.</param>
+    /// <param name="options">Relay options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Final content and relay diagnostics.</returns>
+    public static async Task<HtmlFormRelayResult> FollowAsync(
+        string html,
+        Uri responseUri,
+        HttpClient? client = null,
+        HtmlFormRelayOptions? options = null,
+        CancellationToken cancellationToken = default) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        if (responseUri == null) {
+            throw new ArgumentNullException(nameof(responseUri));
+        }
+
+        HtmlFormRelayOptions effectiveOptions = options ?? new HtmlFormRelayOptions();
+        if (effectiveOptions.MaxRelayCount < 1) {
+            throw new ArgumentOutOfRangeException(nameof(options), "MaxRelayCount must be at least 1.");
+        }
+
+        using HttpClient? ownedClient = client == null
+            ? HtmlHttpClientFactory.Create(out _, allowAutoRedirect: false)
+            : null;
+        HttpClient http = client ?? ownedClient!;
+        string currentHtml = html;
+        Uri currentUri = responseUri;
+        List<HtmlFormRelayStep> steps = new();
+
+        for (int index = 0; index < effectiveOptions.MaxRelayCount; index++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!HtmlFormRelayParser.TryParse(currentHtml, currentUri, out HtmlFormRelayRequest? request) || request == null) {
+                return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.NoRelayForm, steps);
+            }
+
+            bool isCrossHost = !string.Equals(currentUri.Host, request.ActionUri.Host, StringComparison.OrdinalIgnoreCase);
+            bool isCrossOrigin = !HasSameOrigin(currentUri, request.ActionUri);
+            HtmlFormRelayStep step = CreateStep(index, request, isCrossHost, isCrossOrigin);
+            if (isCrossOrigin && !IsCrossOriginAllowed(request.ActionUri, effectiveOptions)) {
+                step.Blocked = true;
+                steps.Add(step);
+                return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.CrossHostBlocked, steps);
+            }
+
+            using HttpResponseMessage response = await SendAsync(http, request, cancellationToken).ConfigureAwait(false);
+            step.StatusCode = (int)response.StatusCode;
+            Uri nextUri = GetNextUri(response, request.ActionUri);
+            step.ResponseUrl = RedactUrl(nextUri.AbsoluteUri);
+            bool responseCrossHost = !string.Equals(currentUri.Host, nextUri.Host, StringComparison.OrdinalIgnoreCase);
+            bool responseCrossOrigin = !HasSameOrigin(currentUri, nextUri);
+            if (responseCrossOrigin && !IsCrossOriginAllowed(nextUri, effectiveOptions)) {
+                step.IsCrossHost = responseCrossHost;
+                step.IsCrossOrigin = responseCrossOrigin;
+                steps.Add(step);
+                return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.CrossHostBlocked, steps);
+            }
+
+            steps.Add(step);
+
+            currentUri = nextUri;
+            currentHtml = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!HtmlFormRelayParser.TryParse(currentHtml, currentUri, out _)) {
+            return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.NoRelayForm, steps);
+        }
+
+        return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.MaxRelayCountReached, steps);
+    }
+
+    private static HtmlFormRelayResult CreateResult(string content, Uri uri, HtmlFormRelayStopReason reason, IReadOnlyList<HtmlFormRelayStep> steps) =>
+        new() {
+            FinalContent = content,
+            FinalUrl = RedactUrl(uri.AbsoluteUri),
+            StopReason = reason,
+            SubmittedRelay = steps.Any(static step => !step.Blocked),
+            Steps = steps.ToArray()
+        };
+
+    private static HtmlFormRelayStep CreateStep(int index, HtmlFormRelayRequest request, bool isCrossHost, bool isCrossOrigin) =>
+        new() {
+            Index = index,
+            Method = request.Method,
+            ActionUrl = RedactUrl(request.ActionUri.AbsoluteUri),
+            FieldNames = request.FieldNames,
+            ProtocolHint = request.ProtocolHint,
+            IsCrossHost = isCrossHost,
+            IsCrossOrigin = isCrossOrigin
+        };
+
+    private static bool HasSameOrigin(Uri currentUri, Uri actionUri) =>
+        string.Equals(currentUri.Scheme, actionUri.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentUri.Host, actionUri.Host, StringComparison.OrdinalIgnoreCase)
+        && currentUri.Port == actionUri.Port;
+
+    private static bool IsCrossOriginAllowed(Uri actionUri, HtmlFormRelayOptions options) =>
+        options.AllowCrossHost
+        || options.AllowedHosts.Any(host => string.Equals(host, actionUri.Host, StringComparison.OrdinalIgnoreCase));
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HtmlFormRelayRequest request, CancellationToken cancellationToken) {
+        if (request.Method == FormMethod.Get) {
+            Uri uri = await BuildGetUriAsync(request.ActionUri, GetSubmittedFields(request)).ConfigureAwait(false);
+            return await client.GetAsync(uri, cancellationToken).ConfigureAwait(false);
+        }
+
+        using FormUrlEncodedContent content = new(GetSubmittedFields(request));
+        return await client.PostAsync(request.ActionUri, content, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static IEnumerable<KeyValuePair<string, string>> GetSubmittedFields(HtmlFormRelayRequest request) =>
+        request.FieldValues.Count > 0 ? request.FieldValues : request.Fields;
+
+    private static string RedactUrl(string value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);
+
+    private static Uri GetNextUri(HttpResponseMessage response, Uri requestUri) {
+        if (IsRedirectStatusCode(response.StatusCode) && response.Headers.Location != null) {
+            return response.Headers.Location.IsAbsoluteUri
+                ? response.Headers.Location
+                : new Uri(requestUri, response.Headers.Location);
+        }
+
+        return response.RequestMessage?.RequestUri ?? requestUri;
+    }
+
+    private static bool IsRedirectStatusCode(HttpStatusCode statusCode) {
+        int status = (int)statusCode;
+        return status >= 300 && status <= 399;
+    }
+
+    private static async Task<Uri> BuildGetUriAsync(Uri actionUri, IEnumerable<KeyValuePair<string, string>> fields) {
+        UriBuilder builder = new(actionUri);
+        using FormUrlEncodedContent queryContent = new(fields);
+        string submittedQuery = await queryContent.ReadAsStringAsync().ConfigureAwait(false);
+        string existingQuery = builder.Query;
+        if (string.IsNullOrEmpty(existingQuery)) {
+            builder.Query = submittedQuery;
+        } else if (!string.IsNullOrEmpty(submittedQuery)) {
+            builder.Query = existingQuery.TrimStart('?') + "&" + submittedQuery;
+        }
+
+        return builder.Uri;
+    }
+}

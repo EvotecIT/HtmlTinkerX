@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// Saves network traffic from a browser session to a HAR file.
 /// </summary>
 [Cmdlet(VerbsData.Save, "HtmlBrowserHar")]
-[Alias("Save-HTMLHar")]
+[Alias("Save-HtmlHar")]
 public sealed class CmdletSaveHtmlBrowserHar : AsyncPSCmdlet {
     private const string ParameterSetSession = "Session";
     private const string ParameterSetHar = "Har";

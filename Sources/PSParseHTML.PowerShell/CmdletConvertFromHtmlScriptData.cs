@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Inspect a selected application/json script node</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//script[@type="application/json"]' | ConvertFrom-HtmlScriptData</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//script[@type="application/json"]' | ConvertFrom-HtmlScriptData</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlScriptData", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlScriptDataItem))]

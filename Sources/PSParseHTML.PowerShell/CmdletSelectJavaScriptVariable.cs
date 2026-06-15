@@ -83,6 +83,7 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "JavaScriptVariable", DefaultParameterSetName = ParameterSetSource)]
+[Alias("sjsv")]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
     private const string ParameterSetSource = "Source";
@@ -96,6 +97,7 @@ public sealed class CmdletSelectJavaScriptVariable : AsyncPSCmdlet {
 
     /// <summary>Acornima AST node to inspect.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetAst, ValueFromPipeline = true, Position = 0)]
+    [Alias("InputObject", "Node")]
     [ValidateNotNull]
     public Node Ast { get; set; } = null!;
 

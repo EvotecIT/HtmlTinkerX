@@ -16,7 +16,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Inspect only the selected head node</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlMeta</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//head' | ConvertFrom-HtmlMeta</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]

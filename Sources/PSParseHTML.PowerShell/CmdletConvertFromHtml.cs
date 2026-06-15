@@ -16,13 +16,14 @@ namespace PSParseHTML.PowerShell;
 /// </para>
 /// <example>
 ///   <summary>Download a web page and parse it</summary>
-///   <code>ConvertFrom-HTML -Url https://example.com</code>
+///   <code>ConvertFrom-Html -Url https://example.com</code>
 /// </example>
 /// <example>
 ///   <summary>Use a proxy server when downloading</summary>
-///   <code>ConvertFrom-HTML -Url https://example.com -Proxy http://proxy:8080</code>
+///   <code>ConvertFrom-Html -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HTML", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.ConvertFrom, "Html", DefaultParameterSetName = ParameterSetContent)]
+[Alias("cfhtml")]
 [OutputType(typeof(object))]
 public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

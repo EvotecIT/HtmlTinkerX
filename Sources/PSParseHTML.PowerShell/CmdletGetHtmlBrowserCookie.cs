@@ -12,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserCookie")]
 [OutputType(typeof(HtmlCookie))]
-[Alias("Get-HTMLCookie")]
+[Alias("Get-HtmlCookie")]
 public sealed class CmdletGetHtmlBrowserCookie : AsyncPSCmdlet {
     /// <summary>Browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

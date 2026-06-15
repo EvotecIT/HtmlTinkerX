@@ -14,7 +14,7 @@ namespace PSParseHTML.PowerShell;
 ///   <code>Save-HTMLAttachment -Url https://example.com/download.html -Path C:\temp</code>
 /// </example>
 [Cmdlet(VerbsData.Save, "HtmlBrowserAttachment", DefaultParameterSetName = ParameterSetDefault)]
-[Alias("Save-HTMLAttachment", "Save-HTMLDownload")]
+[Alias("Save-HtmlAttachment", "Save-HtmlDownload")]
 [OutputType(typeof(string))]
 public sealed class CmdletSaveHtmlBrowserAttachment : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";

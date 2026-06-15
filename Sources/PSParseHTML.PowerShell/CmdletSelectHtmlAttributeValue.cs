@@ -8,7 +8,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>Returns an HTML attribute value from HtmlAgilityPack nodes, attributes, or matching object properties.</summary>
 /// <example>
 ///   <summary>Read href values from links</summary>
-///   <code>ConvertFrom-HTML -Content $html | Select-HtmlNode -XPath '//a' | Select-HtmlAttributeValue -AttributeName href</code>
+///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//a' | Select-HtmlAttributeValue -AttributeName href</code>
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlAttributeValue")]
 [OutputType(typeof(string))]

@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "HtmlBrowserInput")]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Set-HTMLInput")]
+[Alias("Set-HtmlInput")]
 public sealed class CmdletSetHtmlBrowserInput : AsyncPSCmdlet {
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

@@ -15,13 +15,13 @@ namespace PSParseHTML.PowerShell;
 /// </para>
 /// <example>
 ///   <summary>Convert a simple HTML string</summary>
-///   <code>Convert-HTMLToMarkdown -Content "&lt;h1&gt;Hello&lt;/h1&gt;"</code>
+///   <code>Convert-HtmlToMarkdown -Content "&lt;h1&gt;Hello&lt;/h1&gt;"</code>
 /// </example>
 /// <example>
 ///   <summary>Download through a proxy</summary>
-///   <code>Convert-HTMLToMarkdown -Url https://example.com -Proxy http://proxy:8080</code>
+///   <code>Convert-HtmlToMarkdown -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
-[Cmdlet(VerbsData.Convert, "HTMLToMarkdown", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsData.Convert, "HtmlToMarkdown", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
 public sealed class CmdletConvertHtmlToMarkdown : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

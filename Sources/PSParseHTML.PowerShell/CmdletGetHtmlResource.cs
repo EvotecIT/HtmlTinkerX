@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Parses external and inline resources and returns their links or downloads them.
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "HTMLResource", DefaultParameterSetName = ParameterSetContent)]
+[Cmdlet(VerbsCommon.Get, "HtmlResource", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlResourceLink))]
 public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

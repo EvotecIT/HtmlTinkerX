@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -100,6 +101,19 @@ public static class HtmlUtilities {
     public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
         using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
+        return await ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads an HTTP response body with header, BOM, and HTML meta charset detection.
+    /// </summary>
+    /// <param name="response">HTTP response to read.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Content as a string with proper encoding.</returns>
+    public static async Task<string> ReadResponseContentWithProperEncodingAsync(HttpResponseMessage response, CancellationToken cancellationToken = default) {
+        if (response == null) {
+            throw new ArgumentNullException(nameof(response));
+        }
 
         var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();

@@ -36,6 +36,11 @@ namespace HtmlTinkerX.Tests
             return _server.CreateClient();
         }
 
+        public HttpMessageHandler CreateHandler()
+        {
+            return _server.CreateHandler();
+        }
+
         public void Dispose()
         {
             _server.Dispose();

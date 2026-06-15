@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// Cmdlet that stops video recording for a browser session.
 /// </summary>
 [Cmdlet(VerbsLifecycle.Stop, "HtmlBrowserVideoCapture")]
-[Alias("Stop-HTMLVideoRecording")]
+[Alias("Stop-HtmlVideoRecording")]
 public sealed class CmdletStopHtmlBrowserVideoCapture : AsyncPSCmdlet {
     /// <summary>Browser session with an active recording.</summary>
     [Parameter(ValueFromPipeline = true, Position = 0)]

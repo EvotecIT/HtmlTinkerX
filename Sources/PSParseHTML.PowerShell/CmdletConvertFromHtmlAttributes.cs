@@ -20,7 +20,7 @@ namespace PSParseHTML.PowerShell;
 ///   <code>ConvertFrom-HtmlAttributes -Url https://example.com -Proxy http://proxy:8080 -Tag a</code>
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlAttributes", DefaultParameterSetName = ParameterSetContent)]
-[Alias("ConvertFrom-HTMLTag", "ConvertFrom-HTMLClass")]
+[Alias("ConvertFrom-HtmlTag", "ConvertFrom-HtmlClass")]
 [OutputType(typeof(string), typeof(IElement))]
 public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";

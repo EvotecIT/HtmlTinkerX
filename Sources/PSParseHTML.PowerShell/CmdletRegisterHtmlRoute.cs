@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that registers a Playwright route handler for an active session.
 /// </summary>
-[Cmdlet(VerbsLifecycle.Register, "HTMLRoute")]
+[Cmdlet(VerbsLifecycle.Register, "HtmlRoute")]
 public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
     /// <summary>Browser session in use.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

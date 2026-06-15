@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserClick")]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Invoke-HTMLClick")]
+[Alias("Invoke-HtmlClick")]
 public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

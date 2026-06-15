@@ -28,8 +28,13 @@ public static class HtmlHttpClientFactory {
     /// <summary>
     /// Creates a new <see cref="HttpClient"/> using defaults or the provided overrides.
     /// </summary>
-    public static HttpClient Create(string? proxy = null, ICredentials? credential = null) {
-        HttpClientHandler handler = new();
+    /// <param name="proxy">Optional proxy address. When omitted, <see cref="DefaultProxy"/> is used.</param>
+    /// <param name="credential">Optional proxy credentials. When omitted, <see cref="DefaultProxyCredential"/> is used.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    public static HttpClient Create(string? proxy = null, ICredentials? credential = null, bool allowAutoRedirect = true) {
+        HttpClientHandler handler = new() {
+            AllowAutoRedirect = allowAutoRedirect
+        };
         ConfigureProxy(handler, proxy, credential);
         HttpClient client = new HttpClient(handler, disposeHandler: true);
         ApplyDefaults(client);
@@ -43,9 +48,11 @@ public static class HtmlHttpClientFactory {
     /// <param name="proxyCredential">Optional proxy credentials. When omitted, <see cref="DefaultProxyCredential"/> is used.</param>
     /// <param name="credentials">Optional credentials for the target page.</param>
     /// <param name="preAuthenticate">Enables HTTP pre-authentication when page credentials are provided.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
     /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
-    public static HttpClient Create(string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true) {
+    public static HttpClient Create(string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true, bool allowAutoRedirect = true) {
         HttpClientHandler handler = new() {
+            AllowAutoRedirect = allowAutoRedirect,
             Credentials = credentials,
             PreAuthenticate = credentials != null && preAuthenticate
         };
@@ -62,9 +69,22 @@ public static class HtmlHttpClientFactory {
     /// <param name="cookieContainer">Container that will store cookies for the created handler.</param>
     /// <param name="proxy">Optional proxy address.</param>
     /// <param name="credential">Optional proxy credentials.</param>
-    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy = null, ICredentials? credential = null) {
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy = null, ICredentials? credential = null, bool allowAutoRedirect = true) {
         cookieContainer = new CookieContainer();
+        return Create(cookieContainer, proxy, credential, allowAutoRedirect);
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="HttpClient"/> with an existing cookie container.
+    /// </summary>
+    /// <param name="cookieContainer">Container used by the returned handler.</param>
+    /// <param name="proxy">Optional proxy address.</param>
+    /// <param name="credential">Optional proxy credentials.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    public static HttpClient Create(CookieContainer cookieContainer, string? proxy = null, ICredentials? credential = null, bool allowAutoRedirect = true) {
         HttpClientHandler handler = new() {
+            AllowAutoRedirect = allowAutoRedirect,
             CookieContainer = cookieContainer,
             UseCookies = true
         };
@@ -82,9 +102,24 @@ public static class HtmlHttpClientFactory {
     /// <param name="proxyCredential">Optional proxy credentials.</param>
     /// <param name="credentials">Optional credentials for the target page.</param>
     /// <param name="preAuthenticate">Enables HTTP pre-authentication when page credentials are provided.</param>
-    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true) {
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    public static HttpClient Create(out CookieContainer cookieContainer, string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true, bool allowAutoRedirect = true) {
         cookieContainer = new CookieContainer();
+        return Create(cookieContainer, proxy, proxyCredential, credentials, preAuthenticate, allowAutoRedirect);
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="HttpClient"/> with an existing cookie container plus optional proxy and target-page credentials.
+    /// </summary>
+    /// <param name="cookieContainer">Container used by the returned handler.</param>
+    /// <param name="proxy">Optional proxy address.</param>
+    /// <param name="proxyCredential">Optional proxy credentials.</param>
+    /// <param name="credentials">Optional credentials for the target page.</param>
+    /// <param name="preAuthenticate">Enables HTTP pre-authentication when page credentials are provided.</param>
+    /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
+    public static HttpClient Create(CookieContainer cookieContainer, string? proxy, ICredentials? proxyCredential, ICredentials? credentials, bool preAuthenticate = true, bool allowAutoRedirect = true) {
         HttpClientHandler handler = new() {
+            AllowAutoRedirect = allowAutoRedirect,
             CookieContainer = cookieContainer,
             Credentials = credentials,
             PreAuthenticate = credentials != null && preAuthenticate,

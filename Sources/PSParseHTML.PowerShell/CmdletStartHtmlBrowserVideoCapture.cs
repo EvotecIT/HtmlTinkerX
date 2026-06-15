@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsLifecycle.Start, "HtmlBrowserVideoCapture", DefaultParameterSetName = ParameterSetSession)]
 [OutputType(typeof(HtmlBrowserSession))]
-[Alias("Start-HTMLVideoRecording")]
+[Alias("Start-HtmlVideoRecording")]
 public sealed class CmdletStartHtmlBrowserVideoCapture : AsyncPSCmdlet {
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetFile = "File";

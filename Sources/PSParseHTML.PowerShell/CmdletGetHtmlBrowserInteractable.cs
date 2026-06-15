@@ -14,7 +14,7 @@ namespace PSParseHTML.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "HtmlBrowserInteractable", DefaultParameterSetName = ParameterSetSession)]
 [OutputType(typeof(HtmlInteractableInfo))]
-[Alias("Get-HTMLInteractable")]
+[Alias("Get-HtmlInteractable")]
 public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
     private const string ParameterSetSession = "Session";
     private const string ParameterSetUrl = "Url";
