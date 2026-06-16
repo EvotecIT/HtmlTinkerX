@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,5 +46,25 @@ public class HtmlBrowserApiCompatibilityTests {
 
         Assert.NotNull(method);
         Assert.Equal(typeof(Task<HtmlBrowserSession>), method!.ReturnType);
+    }
+
+    [Fact]
+    public void CaptureResponseBodiesAsync_PreservesPreRedactionSignature() {
+        Type[] parameterTypes = {
+            typeof(HtmlBrowserSession),
+            typeof(int),
+            typeof(IEnumerable<HtmlNetworkResourceType>),
+            typeof(CancellationToken)
+        };
+
+        MethodInfo? method = typeof(HtmlBrowser).GetMethod(
+            nameof(HtmlBrowser.CaptureResponseBodiesAsync),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task), method!.ReturnType);
     }
 }

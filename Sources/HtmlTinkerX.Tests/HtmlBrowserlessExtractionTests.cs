@@ -76,6 +76,7 @@ public class HtmlBrowserlessExtractionTests {
             Kind = "ApiEndpoint",
             Name = "Products",
             Method = "GET",
+            PageUrl = "https://example.org/products",
             ResolvedUrl = "https://example.org/api/products",
             RequiresHttpFetch = true,
             CanExtractDirectly = true
@@ -104,6 +105,90 @@ public class HtmlBrowserlessExtractionTests {
         Assert.Equal(2, result.Items.Count);
         Assert.Contains(result.Items, item => item.Name == "Alpha");
         Assert.Contains("items", result.RawContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_DoesNotFetchEndpointWhenOriginCannotBeProven() {
+        HtmlBrowserlessDataSource source = new() {
+            Kind = "ApiEndpoint",
+            Name = "Products",
+            Method = "GET",
+            ResolvedUrl = "https://example.org/api/products",
+            RequiresHttpFetch = true,
+            CanExtractDirectly = true
+        };
+
+        using CountingHandler handler = new("""
+{
+  "items": [
+    { "id": "p1", "name": "Alpha" }
+  ]
+}
+""");
+        using HttpClient client = new(handler);
+
+        HtmlBrowserlessExtractionResult result = await HtmlBrowserlessExtraction.ExtractAsync(
+            source,
+            new HtmlBrowserlessExtractionOptions {
+                AllowHttpFetch = true
+            },
+            client);
+
+        Assert.False(result.Success);
+        Assert.Equal(0, handler.RequestCount);
+        Assert.Contains(result.Warnings, warning => warning.Contains("cannot be proven same-origin", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExtractAsync_PropagatesCallerCancellation() {
+        HtmlBrowserlessDataSource source = new() {
+            Kind = "ApiEndpoint",
+            Name = "Products",
+            Method = "GET",
+            PageUrl = "https://example.org/products",
+            ResolvedUrl = "https://example.org/api/products",
+            RequiresHttpFetch = true,
+            CanExtractDirectly = true
+        };
+
+        using CancellationTokenSource cts = new();
+        using HttpClient client = new(new CancelingHandler(cts));
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            HtmlBrowserlessExtraction.ExtractAsync(
+                source,
+                new HtmlBrowserlessExtractionOptions {
+                    AllowHttpFetch = true
+                },
+                client,
+                cts.Token));
+    }
+
+    [Fact]
+    public async Task ExtractAsync_TruncatesFetchedResponsesByBytes() {
+        HtmlBrowserlessDataSource source = new() {
+            Kind = "ApiEndpoint",
+            Name = "Products",
+            Method = "GET",
+            PageUrl = "https://example.org/products",
+            ResolvedUrl = "https://example.org/api/products",
+            RequiresHttpFetch = true,
+            CanExtractDirectly = true
+        };
+
+        using HttpClient client = new(new TextHandler("abcdef"));
+
+        HtmlBrowserlessExtractionResult result = await HtmlBrowserlessExtraction.ExtractAsync(
+            source,
+            new HtmlBrowserlessExtractionOptions {
+                AllowHttpFetch = true,
+                IncludeRawContent = true,
+                MaxResponseBytes = 3
+            },
+            client);
+
+        Assert.Equal("abc", result.RawContent);
+        Assert.Contains(result.Warnings, warning => warning.Contains("3 bytes", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -156,7 +241,8 @@ public class HtmlBrowserlessExtractionTests {
         HtmlBrowserlessExtractionResult result = await HtmlBrowserlessExtraction.ExtractRecipeAsync(
             imported,
             new HtmlBrowserlessExtractionOptions {
-                AllowHttpFetch = true
+                AllowHttpFetch = true,
+                AllowMediumRiskEndpoints = true
             });
 
         Assert.False(result.Success);
@@ -176,6 +262,54 @@ public class HtmlBrowserlessExtractionTests {
                 Content = new StringContent(content)
             };
             response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class CountingHandler : HttpMessageHandler {
+        private readonly string content;
+
+        public CountingHandler(string content) {
+            this.content = content;
+        }
+
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            RequestCount++;
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                Content = new StringContent(content)
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class CancelingHandler : HttpMessageHandler {
+        private readonly CancellationTokenSource cts;
+
+        public CancelingHandler(CancellationTokenSource cts) {
+            this.cts = cts;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            cts.Cancel();
+            return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
+        }
+    }
+
+    private sealed class TextHandler : HttpMessageHandler {
+        private readonly string content;
+
+        public TextHandler(string content) {
+            this.content = content;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                Content = new StringContent(content)
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
             return Task.FromResult(response);
         }
     }

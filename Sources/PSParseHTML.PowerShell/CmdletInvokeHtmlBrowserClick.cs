@@ -95,11 +95,20 @@ public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
 
         if (ParameterSetName == ParameterSetText) {
             if (IfVisible.IsPresent) {
-                _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout).ConfigureAwait(false);
+                _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout, nth: Nth).ConfigureAwait(false);
             } else {
                 await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, waitForNavigation: false, Timeout, nth: Nth).ConfigureAwait(false);
             }
         } else if (IfVisible.IsPresent) {
+            if (Nth.HasValue) {
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSInvalidOperationException("-Nth with -IfVisible selector clicks is not supported. Use text clicks or omit -IfVisible."),
+                    "NthIfVisibleSelectorClickOptionConflict",
+                    ErrorCategory.InvalidArgument,
+                    Selector));
+                return;
+            }
+
             _ = await HtmlBrowser.TryMouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
         } else {
             if (Nth.HasValue && (ClickCount != 1 || Modifier is { Length: > 0 } || Button != MouseButton.Left)) {

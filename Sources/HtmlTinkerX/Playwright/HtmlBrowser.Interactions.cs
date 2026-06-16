@@ -89,17 +89,19 @@ public static partial class HtmlBrowser {
         bool exact = false,
         string? regex = null,
         int timeout = 10000,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        int? nth = null) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
 
         try {
-            ILocator locator = !string.IsNullOrEmpty(regex)
-                ? session.Page.GetByText(new System.Text.RegularExpressions.Regex(regex)).First
+            ILocator matches = !string.IsNullOrEmpty(regex)
+                ? session.Page.GetByText(new System.Text.RegularExpressions.Regex(regex))
                 : exact
-                    ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true }).First
-                    : session.Page.GetByText(text).First;
+                    ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true })
+                    : session.Page.GetByText(text);
+            ILocator locator = nth.HasValue ? matches.Nth(nth.Value) : matches.First;
 
             cancellationToken.ThrowIfCancellationRequested();
             await locator.WaitForAsync(new LocatorWaitForOptions {

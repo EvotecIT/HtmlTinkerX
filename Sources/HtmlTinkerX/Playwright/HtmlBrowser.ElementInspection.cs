@@ -20,7 +20,7 @@ public static partial class HtmlBrowser {
         const rect = el.getBoundingClientRect();
         const tag = el.tagName ? el.tagName.toLowerCase() : '';
         const style = window.getComputedStyle(el);
-        const disabled = el.disabled === true || el.getAttribute('aria-disabled') === 'true';
+        const disabled = (el.matches && el.matches(':disabled')) || el.disabled === true || el.getAttribute('aria-disabled') === 'true';
         const visible = !!(rect.width || rect.height) &&
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&

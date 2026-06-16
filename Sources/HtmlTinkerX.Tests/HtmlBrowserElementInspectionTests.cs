@@ -65,4 +65,45 @@ sessionStorage.setItem('existingSession', '2');
             }
         }
     }
+
+    [Fact]
+    public async Task GetElementsAsync_ReportsControlsDisabledByFieldsetAsDisabled() {
+        string file = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
+        File.WriteAllText(file, """
+<!doctype html>
+<html>
+<body>
+<fieldset disabled>
+<input id="field" name="field" value="value">
+</fieldset>
+</body>
+</html>
+""");
+
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(new Uri(file).AbsoluteUri);
+        try {
+            HtmlBrowserElementInfo element = Assert.Single(await HtmlBrowser.GetElementsAsync(session, "#field"));
+
+            Assert.False(element.Enabled);
+            Assert.False(element.Editable);
+        } finally {
+            await HtmlBrowser.CloseSessionAsync(session);
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task GetDiagnosticsAsync_ReturnsStorageWarningsForOpaqueOrigins() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("data:text/html,<html><body>opaque</body></html>");
+        try {
+            HtmlBrowserDiagnostics diagnostics = await HtmlBrowser.GetDiagnosticsAsync(session);
+
+            Assert.Empty(diagnostics.LocalStorageKeys);
+            Assert.Empty(diagnostics.SessionStorageKeys);
+            Assert.Contains(diagnostics.ConsistencyWarnings, warning => warning.Contains("localStorage access was denied", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(diagnostics.ConsistencyWarnings, warning => warning.Contains("sessionStorage access was denied", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            await HtmlBrowser.CloseSessionAsync(session);
+        }
+    }
 }

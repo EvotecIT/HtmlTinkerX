@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -314,11 +315,7 @@ public static class HtmlBrowserlessExtraction {
             }
 
             using HttpResponseMessage response = await effectiveClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            string content = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
-            if (options.MaxResponseBytes > 0 && content.Length > options.MaxResponseBytes) {
-                content = content.Substring(0, options.MaxResponseBytes);
-                warnings.Add($"Response body was truncated to {options.MaxResponseBytes} characters.");
-            }
+            string content = await ReadResponseContentBoundedAsync(response, options.MaxResponseBytes, warnings, cancellationToken).ConfigureAwait(false);
 
             string contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
             requests.Add(new HtmlBrowserlessExtractionRequest {
@@ -340,6 +337,8 @@ public static class HtmlBrowserlessExtraction {
                 Evidence = Combine(source.Evidence, $"Fetched endpoint directly and extracted {items.Count} item(s)."),
                 Warnings = warnings
             };
+        } catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException) {
             requests.Add(new HtmlBrowserlessExtractionRequest {
                 Method = "GET",
@@ -368,8 +367,8 @@ public static class HtmlBrowserlessExtraction {
             return false;
         }
 
-        if (source.IsExternal && !options.AllowExternalEndpoints) {
-            warnings.Add("External endpoint fetch was not allowed.");
+        if (string.IsNullOrWhiteSpace(source.ResolvedUrl) || !Uri.TryCreate(source.ResolvedUrl, UriKind.Absolute, out Uri? endpointUri)) {
+            warnings.Add("Endpoint does not have a resolved absolute URL.");
             return false;
         }
 
@@ -383,12 +382,87 @@ public static class HtmlBrowserlessExtraction {
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(source.ResolvedUrl)) {
-            warnings.Add("Endpoint does not have a resolved URL.");
+        EndpointOriginState originState = GetEndpointOriginState(source, endpointUri);
+        if (originState == EndpointOriginState.Unknown && !options.AllowExternalEndpoints) {
+            warnings.Add("Endpoint origin cannot be proven same-origin; allow external endpoints explicitly before fetching.");
+            return false;
+        }
+
+        if (originState == EndpointOriginState.External && !options.AllowExternalEndpoints) {
+            warnings.Add("External endpoint fetch was not allowed.");
             return false;
         }
 
         return true;
+    }
+
+    private static EndpointOriginState GetEndpointOriginState(HtmlBrowserlessDataSource source, Uri endpointUri) {
+        if (source.IsExternal) {
+            return EndpointOriginState.External;
+        }
+
+        if (string.IsNullOrWhiteSpace(source.PageUrl) || !Uri.TryCreate(source.PageUrl, UriKind.Absolute, out Uri? pageUri)) {
+            return EndpointOriginState.Unknown;
+        }
+
+        return HasSameOrigin(pageUri, endpointUri)
+            ? EndpointOriginState.SameOrigin
+            : EndpointOriginState.External;
+    }
+
+    private static bool HasSameOrigin(Uri left, Uri right) =>
+        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
+        && left.Port == right.Port;
+
+    private static async Task<string> ReadResponseContentBoundedAsync(HttpResponseMessage response, int maxBytes, List<string> warnings, CancellationToken cancellationToken) {
+        if (maxBytes <= 0) {
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+
+        using Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        byte[] buffer = new byte[Math.Min(8192, maxBytes + 1)];
+        using MemoryStream memory = new(capacity: Math.Min(maxBytes, 8192));
+        bool truncated = false;
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            int allowed = maxBytes - (int)memory.Length;
+            int readSize = allowed > 0 ? Math.Min(buffer.Length, allowed + 1) : 1;
+            int read = await stream.ReadAsync(buffer, 0, readSize, cancellationToken).ConfigureAwait(false);
+            if (read == 0) {
+                break;
+            }
+
+            int toWrite = Math.Min(read, Math.Max(0, allowed));
+            if (toWrite > 0) {
+                memory.Write(buffer, 0, toWrite);
+            }
+
+            if (read > allowed) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            warnings.Add($"Response body was truncated to {maxBytes} bytes.");
+        }
+
+        Encoding encoding = GetResponseEncoding(response) ?? Encoding.UTF8;
+        return encoding.GetString(memory.ToArray());
+    }
+
+    private static Encoding? GetResponseEncoding(HttpResponseMessage response) {
+        string? charset = response.Content.Headers.ContentType?.CharSet;
+        if (string.IsNullOrWhiteSpace(charset)) {
+            return null;
+        }
+
+        try {
+            return Encoding.GetEncoding(charset!.Trim('"'));
+        } catch (ArgumentException) {
+            return null;
+        }
     }
 
     private static IReadOnlyList<HtmlBrowserlessExtractionItem> ExtractItemsFromResponse(HtmlBrowserlessDataSource source, string content, string contentType) {
@@ -612,4 +686,10 @@ public static class HtmlBrowserlessExtraction {
 
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private enum EndpointOriginState {
+        SameOrigin,
+        External,
+        Unknown
+    }
 }

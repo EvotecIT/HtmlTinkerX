@@ -170,6 +170,9 @@ public static partial class HtmlBrowser {
         int viewportHeight = await session.Page.EvaluateAsync<int>("() => window.innerHeight").ConfigureAwait(false);
         double devicePixelRatio = await session.Page.EvaluateAsync<double>("() => window.devicePixelRatio || 1").ConfigureAwait(false);
         string timezone = await session.Page.EvaluateAsync<string>("() => Intl.DateTimeFormat().resolvedOptions().timeZone || ''").ConfigureAwait(false);
+        List<string> storageWarnings = new();
+        string[] localStorageKeys = await GetStorageKeysOrEmptyAsync(session, "localStorage", storageWarnings).ConfigureAwait(false);
+        string[] sessionStorageKeys = await GetStorageKeysOrEmptyAsync(session, "sessionStorage", storageWarnings).ConfigureAwait(false);
         IReadOnlyList<string> consistencyWarnings = BuildConsistencyWarnings(
             userAgent,
             language,
@@ -180,7 +183,9 @@ public static partial class HtmlBrowser {
             devicePixelRatio,
             timezone,
             failedRequests,
-            consoleErrors);
+            consoleErrors)
+            .Concat(storageWarnings)
+            .ToArray();
 
         return new HtmlBrowserDiagnostics {
             Url = session.Page.Url,
@@ -195,8 +200,8 @@ public static partial class HtmlBrowser {
             ViewportHeight = viewportHeight,
             DevicePixelRatio = devicePixelRatio,
             Timezone = timezone,
-            LocalStorageKeys = await session.Page.EvaluateAsync<string[]>("() => Object.keys(window.localStorage || {})").ConfigureAwait(false),
-            SessionStorageKeys = await session.Page.EvaluateAsync<string[]>("() => Object.keys(window.sessionStorage || {})").ConfigureAwait(false),
+            LocalStorageKeys = localStorageKeys,
+            SessionStorageKeys = sessionStorageKeys,
             CookieCount = cookies.Count,
             NetworkEntryCount = networkEntries.Length,
             ObservedApiCalls = networkEntries
@@ -211,6 +216,20 @@ public static partial class HtmlBrowser {
             FingerprintRiskScore = Math.Min(100, consistencyWarnings.Count * 20)
         };
     }
+
+    private static async Task<string[]> GetStorageKeysOrEmptyAsync(HtmlBrowserSession session, string storageName, List<string> warnings) {
+        try {
+            return await session.Page.EvaluateAsync<string[]>($"() => Object.keys(window.{storageName} || {{}})").ConfigureAwait(false);
+        } catch (PlaywrightException ex) when (IsStorageAccessDenied(ex)) {
+            warnings.Add($"{storageName} access was denied for this page origin.");
+            return Array.Empty<string>();
+        }
+    }
+
+    private static bool IsStorageAccessDenied(PlaywrightException exception) =>
+        exception.Message.IndexOf("SecurityError", StringComparison.OrdinalIgnoreCase) >= 0
+        || exception.Message.IndexOf("Access is denied", StringComparison.OrdinalIgnoreCase) >= 0
+        || exception.Message.IndexOf("denied", StringComparison.OrdinalIgnoreCase) >= 0;
 
     private static IReadOnlyList<string> BuildConsistencyWarnings(
         string userAgent,

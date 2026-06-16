@@ -23,6 +23,20 @@ public static partial class HtmlBrowser {
     /// <param name="maxBytes">Maximum UTF-8 bytes stored per response body.</param>
     /// <param name="resourceTypes">Resource types to capture. When omitted, XHR and Fetch responses are captured.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    public static Task CaptureResponseBodiesAsync(
+        HtmlBrowserSession session,
+        int maxBytes,
+        IEnumerable<HtmlNetworkResourceType>? resourceTypes,
+        CancellationToken cancellationToken) =>
+        CaptureResponseBodiesAsync(session, maxBytes, resourceTypes, cancellationToken, redactSensitiveValues: false);
+
+    /// <summary>
+    /// Captures response bodies for selected network resource types after the page has finished issuing requests.
+    /// </summary>
+    /// <param name="session">Browser session containing network responses.</param>
+    /// <param name="maxBytes">Maximum UTF-8 bytes stored per response body.</param>
+    /// <param name="resourceTypes">Resource types to capture. When omitted, XHR and Fetch responses are captured.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="redactSensitiveValues">Redact common tokens, passwords, and sensitive URL query values before storing body text.</param>
     public static Task CaptureResponseBodiesAsync(
         HtmlBrowserSession session,

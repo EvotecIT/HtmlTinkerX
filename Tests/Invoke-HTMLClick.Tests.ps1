@@ -38,4 +38,39 @@ describe 'Invoke-HTMLClick' {
             Close-HtmlBrowserSession -Session $session
         }
     }
+
+    it 'Honors Nth for best-effort visible text clicks' {
+        $htmlPath = Join-Path $TestDrive 'text-click-nth.html'
+        @'
+<!doctype html>
+<html>
+<body>
+<button onclick="document.getElementById('result').textContent = 'first';">Choose</button>
+<button onclick="document.getElementById('result').textContent = 'second';">Choose</button>
+<main id="result"></main>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+        $session = Invoke-HtmlRendering -Url $uri -Session
+
+        try {
+            Invoke-HtmlClick -Session $session -Text 'Choose' -Exact -Nth 1 -IfVisible
+            $text = Get-HtmlContent -Session $session -Selector '#result' -AsText
+
+            $text | Should -Be 'second'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
+    it 'Rejects selector Nth for best-effort visible clicks' {
+        $session = Invoke-HtmlRendering -Url 'about:blank' -Session
+
+        try {
+            { Invoke-HtmlClick -Session $session -Selector 'button' -Nth 1 -IfVisible } | Should -Throw '*Nth*IfVisible*selector*'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
 }
