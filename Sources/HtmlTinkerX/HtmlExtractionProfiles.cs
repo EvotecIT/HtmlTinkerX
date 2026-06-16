@@ -44,10 +44,48 @@ public static class HtmlExtractionProfiles {
             DisplayName = "Rendered app shell",
             Description = "Thin JavaScript shells or SPA pages where rendered snapshots should drive extraction.",
             RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
-            RenderProfile = HtmlRenderProfile.HeavyDynamicPage,
+            RenderProfile = HtmlRenderProfile.AppShell,
             DatasetReady = true,
-            SuggestedCommand = "$snapshot = Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile HeavyDynamicPage; Invoke-HtmlPageWorkbench -Url '<page-url>' -RenderedSnapshot $snapshot",
+            SuggestedCommand = "$snapshot = Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile AppShell; Invoke-HtmlPageWorkbench -Url '<page-url>' -RenderedSnapshot $snapshot",
             ReasonCodes = new[] { "javascript-shell", "app-state", "low-static-text" }
+        },
+        new HtmlExtractionProfile {
+            Name = "lazy-loaded-content",
+            DisplayName = "Lazy-loaded content",
+            Description = "Catalogs, timelines, and result pages that reveal content after scrolling or short hydration.",
+            RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
+            RenderProfile = HtmlRenderProfile.LazyLoadedContent,
+            DatasetReady = true,
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile LazyLoadedContent -AutoScroll",
+            ReasonCodes = new[] { "lazy-content", "infinite-scroll", "catalog-or-results" }
+        },
+        new HtmlExtractionProfile {
+            Name = "interactive-page",
+            DisplayName = "Interactive page",
+            Description = "Pages that need visible clicks, typed input, overlay dismissal, or targeted waits before extraction.",
+            RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
+            RenderProfile = HtmlRenderProfile.InteractivePage,
+            DatasetReady = true,
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile InteractivePage -DismissText 'Accept'",
+            ReasonCodes = new[] { "interactive-controls", "overlay-dismissal", "operator-guided-extraction" }
+        },
+        new HtmlExtractionProfile {
+            Name = "network-capture",
+            DisplayName = "Network capture",
+            Description = "Rendered pass focused on observed XHR/fetch calls, console errors, and optional response body capture.",
+            RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
+            RenderProfile = HtmlRenderProfile.NetworkCapture,
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile NetworkCapture -IncludeNetworkLog",
+            ReasonCodes = new[] { "observed-api-calls", "console-errors", "dynamic-data" }
+        },
+        new HtmlExtractionProfile {
+            Name = "low-bandwidth",
+            DisplayName = "Low-bandwidth render",
+            Description = "Rendering profile that blocks heavy visual resources while preserving scripts and data calls.",
+            RecommendedMode = HtmlExtractionPlanMode.RenderedSnapshot,
+            RenderProfile = HtmlRenderProfile.LowBandwidth,
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile LowBandwidth",
+            ReasonCodes = new[] { "bandwidth-saving", "resource-blocking", "script-preserving" }
         },
         new HtmlExtractionProfile {
             Name = "auth-relay-page",
@@ -62,8 +100,8 @@ public static class HtmlExtractionProfiles {
             DisplayName = "Login-protected page",
             Description = "Pages that require interactive browser/session handling before extraction.",
             RecommendedMode = HtmlExtractionPlanMode.AuthRequired,
-            RenderProfile = HtmlRenderProfile.HeavyDynamicPage,
-            SuggestedCommand = "Invoke-HtmlRendering -Url '<login-protected-url>' -Session",
+            RenderProfile = HtmlRenderProfile.LoginProtected,
+            SuggestedCommand = "Invoke-HtmlRendering -Url '<login-protected-url>' -Session -RenderProfile LoginProtected",
             ReasonCodes = new[] { "login-form", "password-field", "session-required" }
         },
         new HtmlExtractionProfile {
@@ -131,6 +169,10 @@ public static class HtmlExtractionProfiles {
             return "app-shell";
         }
 
+        if (LooksLikeInteractivePage(plan)) {
+            return "interactive-page";
+        }
+
         if (LooksLikeApiDocs(plan, url)) {
             return "api-docs-content";
         }
@@ -149,6 +191,9 @@ public static class HtmlExtractionProfiles {
         return ContainsAny(combined, "api", "openapi", "swagger", "redoc", "reference")
             || plan.Reasons.Any(reason => ContainsAny(reason, "api", "endpoint", "openapi", "swagger", "redoc"));
     }
+
+    private static bool LooksLikeInteractivePage(HtmlExtractionPlan plan) =>
+        plan.FormCount > 0 || plan.HiddenFieldCount > 0;
 
     private static bool ContainsAny(string value, params string[] markers) =>
         markers.Any(marker => ContainsToken(value, marker));

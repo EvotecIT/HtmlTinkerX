@@ -33,4 +33,25 @@ public sealed class HtmlInteractableInfo {
 
     /// <summary>Element class attribute if present.</summary>
     public string? Class { get; set; }
+
+    /// <summary>Whether the element is enabled.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Whether the element is editable.</summary>
+    public bool Editable { get; set; }
+
+    /// <summary>Whether the element intersects the viewport.</summary>
+    public bool InViewport { get; set; }
+
+    /// <summary>Element left coordinate relative to the viewport.</summary>
+    public double X { get; set; }
+
+    /// <summary>Element top coordinate relative to the viewport.</summary>
+    public double Y { get; set; }
+
+    /// <summary>Element width in CSS pixels.</summary>
+    public double Width { get; set; }
+
+    /// <summary>Element height in CSS pixels.</summary>
+    public double Height { get; set; }
 }

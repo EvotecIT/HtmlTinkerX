@@ -8,7 +8,12 @@ public class HtmlExtractionProfilesTests {
     public void Defaults_ExposeProductLevelWorkflowProfiles() {
         Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "docs-content" && profile.CrawlProfileName == "docs-content");
         Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "api-docs-content" && profile.CrawlProfileName == "api-docs-content");
-        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "app-shell" && profile.RenderProfile == HtmlRenderProfile.HeavyDynamicPage);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "app-shell" && profile.RenderProfile == HtmlRenderProfile.AppShell);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "interactive-page" && profile.RenderProfile == HtmlRenderProfile.InteractivePage);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "lazy-loaded-content" && profile.RenderProfile == HtmlRenderProfile.LazyLoadedContent);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "network-capture" && profile.RenderProfile == HtmlRenderProfile.NetworkCapture);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "low-bandwidth" && profile.RenderProfile == HtmlRenderProfile.LowBandwidth);
+        Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "login-protected-page" && profile.RenderProfile == HtmlRenderProfile.LoginProtected);
         Assert.Contains(HtmlExtractionProfiles.Defaults, profile => profile.Name == "auth-relay-page" && profile.RecommendedMode == HtmlExtractionPlanMode.BrowserlessRelayCandidate);
         Assert.Contains(HtmlExtractionProfiles.Names, name => name == "dataset-page");
     }
@@ -42,7 +47,7 @@ public class HtmlExtractionProfilesTests {
 
         Assert.Equal(HtmlExtractionPlanMode.RenderedSnapshot, plan.RecommendedMode);
         Assert.Equal("app-shell", plan.SuggestedProfileName);
-        Assert.Contains("HeavyDynamicPage", plan.SuggestedProfileCommand, StringComparison.Ordinal);
+        Assert.Contains("AppShell", plan.SuggestedProfileCommand, StringComparison.Ordinal);
         Assert.Contains("Thin JavaScript shells", plan.SuggestedProfileReason, StringComparison.Ordinal);
     }
 }

@@ -129,6 +129,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeResponseBody { get; set; }
 
+    /// <summary>Redact common sensitive values from captured response body text.</summary>
+    [Parameter]
+    public SwitchParameter RedactResponseBody { get; set; }
+
     /// <summary>Maximum UTF-8 bytes stored per captured response body.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
@@ -289,6 +293,9 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         if (IncludeResponseBody.IsPresent && !Snapshot.IsPresent) {
             throw new PSArgumentException("IncludeResponseBody is only valid with -Snapshot.");
         }
+        if (RedactResponseBody.IsPresent && !IncludeResponseBody.IsPresent) {
+            throw new PSArgumentException("RedactResponseBody requires -IncludeResponseBody.");
+        }
         if (string.IsNullOrWhiteSpace(WaitForSelector)
             && string.IsNullOrWhiteSpace(WaitForFunction)
             && string.IsNullOrWhiteSpace(Selector)
@@ -426,7 +433,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                     _ = await HtmlBrowser.GetContentAsync(sess.Page, Selector, innerHtml: false, asText: false, timeout: Timeout, cancellationToken: token).ConfigureAwait(false);
                 }
 
-                await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token).ConfigureAwait(false);
+                await HtmlBrowser.CaptureResponseBodiesAsync(sess, ResponseBodyMaxBytes, responseBodyResourceTypes, token, RedactResponseBody.IsPresent).ConfigureAwait(false);
             }
             if (Snapshot.IsPresent) {
                 HttpClient? snapshotHttpClient = IncludeLinkedScripts.IsPresent || IncludeStaticRenderedComparison.IsPresent
@@ -478,34 +485,118 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     }
 
     private void ApplyRenderProfile() {
-        if (RenderProfile != HtmlRenderProfile.HeavyDynamicPage) {
-            return;
-        }
+        switch (RenderProfile) {
+            case HtmlRenderProfile.FastStaticFallback:
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
+                    LoadState = HtmlBrowserLoadState.DomContentLoaded;
+                }
 
+                ApplyDefaultBlockedResources(HtmlNetworkResourceType.Image, HtmlNetworkResourceType.Font, HtmlNetworkResourceType.Media);
+                return;
+            case HtmlRenderProfile.InteractivePage:
+                ApplyInteractiveProfile();
+                return;
+            case HtmlRenderProfile.LazyLoadedPage:
+                ApplyInteractiveProfile();
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScroll))) {
+                    AutoScroll = true;
+                }
+
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScrollSteps))) {
+                    AutoScrollSteps = 5;
+                }
+
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScrollDelayMs))) {
+                    AutoScrollDelayMs = 350;
+                }
+                return;
+            case HtmlRenderProfile.AppShell:
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
+                    LoadState = HtmlBrowserLoadState.Commit;
+                }
+
+                if (string.IsNullOrWhiteSpace(WaitForSelector)
+                    && string.IsNullOrWhiteSpace(WaitForFunction)
+                    && WaitAfterLoadMs == 0) {
+                    WaitAfterLoadMs = 1000;
+                }
+
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScroll))) {
+                    AutoScroll = true;
+                }
+
+                ApplyDefaultBlockedResources(HtmlNetworkResourceType.Image, HtmlNetworkResourceType.Font, HtmlNetworkResourceType.Media);
+                return;
+            case HtmlRenderProfile.LoginProtected:
+                ApplyInteractiveProfile();
+                return;
+            case HtmlRenderProfile.NetworkCapture:
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
+                    LoadState = HtmlBrowserLoadState.DomContentLoaded;
+                }
+
+                if (WaitAfterLoadMs == 0) {
+                    WaitAfterLoadMs = 500;
+                }
+                return;
+            case HtmlRenderProfile.LowBandwidth:
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
+                    LoadState = HtmlBrowserLoadState.Commit;
+                }
+
+                if (string.IsNullOrWhiteSpace(WaitForSelector)
+                    && string.IsNullOrWhiteSpace(WaitForFunction)
+                    && WaitAfterLoadMs == 0) {
+                    WaitAfterLoadMs = 500;
+                }
+
+                ApplyDefaultBlockedResources(HtmlNetworkResourceType.Image, HtmlNetworkResourceType.Font, HtmlNetworkResourceType.Media, HtmlNetworkResourceType.Stylesheet);
+                return;
+            case HtmlRenderProfile.HeavyDynamicPage:
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
+                    LoadState = HtmlBrowserLoadState.Commit;
+                }
+
+                if (string.IsNullOrWhiteSpace(WaitForSelector)
+                    && string.IsNullOrWhiteSpace(WaitForFunction)
+                    && WaitAfterLoadMs == 0) {
+                    WaitAfterLoadMs = 1000;
+                }
+
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScroll))) {
+                    AutoScroll = true;
+                }
+
+                if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScrollSteps))) {
+                    AutoScrollSteps = 5;
+                }
+
+                ApplyDefaultBlockedResources(HtmlNetworkResourceType.Image, HtmlNetworkResourceType.Font, HtmlNetworkResourceType.Media);
+                return;
+        }
+    }
+
+    private void ApplyInteractiveProfile() {
         if (!MyInvocation.BoundParameters.ContainsKey(nameof(LoadState))) {
-            LoadState = HtmlBrowserLoadState.Commit;
+            LoadState = HtmlBrowserLoadState.DomContentLoaded;
         }
 
-        if (string.IsNullOrWhiteSpace(WaitForSelector)
-            && string.IsNullOrWhiteSpace(WaitForFunction)
-            && WaitAfterLoadMs == 0) {
-            WaitAfterLoadMs = 1000;
+        if (WaitAfterLoadMs == 0) {
+            WaitAfterLoadMs = 500;
         }
 
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScroll))) {
-            AutoScroll = true;
+        if (!MyInvocation.BoundParameters.ContainsKey(nameof(InteractionDelayMs))) {
+            InteractionDelayMs = 350;
         }
 
-        if (!MyInvocation.BoundParameters.ContainsKey(nameof(AutoScrollSteps))) {
-            AutoScrollSteps = 5;
+        if (!MyInvocation.BoundParameters.ContainsKey(nameof(SlowMo))) {
+            SlowMo = 50;
         }
+    }
 
+    private void ApplyDefaultBlockedResources(params HtmlNetworkResourceType[] resourceTypes) {
         if (!MyInvocation.BoundParameters.ContainsKey(nameof(BlockResourceType))) {
-            BlockResourceType = new[] {
-                HtmlNetworkResourceType.Image,
-                HtmlNetworkResourceType.Font,
-                HtmlNetworkResourceType.Media
-            };
+            BlockResourceType = resourceTypes;
         }
     }
 

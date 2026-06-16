@@ -117,6 +117,54 @@ public class HtmlPageWorkbenchTests {
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ConnectsPlannerProfileToRenderedWorkbenchStory() {
+        string staticHtml = """
+<html>
+<head><title>Loading</title><script src="/runtime.js"></script><script src="/app.js"></script></head>
+<body><div id="root">Loading...</div></body>
+</html>
+""";
+        HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(staticHtml, new Uri("https://example.org/app"));
+        HtmlExtractionProfile profile = HtmlExtractionProfiles.Recommend(plan, new Uri("https://example.org/app"));
+        HtmlRenderedPageSnapshot snapshot = new() {
+            Url = "https://example.org/app",
+            FinalUrl = "https://example.org/app#results",
+            Title = "Browser extraction local story",
+            Html = """
+<html>
+<head><title>Browser extraction local story</title></head>
+<body>
+<main>
+<h1>Search demo</h1>
+<section id="results">
+<article class="product"><h2>Found HtmlTinkerX guide</h2><p>Rendered from a local API call.</p></article>
+<article class="product"><h2>Workbench profile sample</h2><p>Added after a click.</p></article>
+</section>
+</main>
+</body>
+</html>
+""",
+            Text = "Search demo Found HtmlTinkerX guide Rendered from a local API call. Workbench profile sample Added after a click."
+        };
+
+        HtmlPageWorkbenchResult result = await HtmlPageWorkbench.AnalyzeAsync(
+            staticHtml,
+            new HtmlPageWorkbenchOptions {
+                BaseUri = new Uri("https://example.org/app"),
+                RenderedSnapshot = snapshot
+            });
+
+        Assert.Equal(HtmlExtractionPlanMode.RenderedSnapshot, plan.RecommendedMode);
+        Assert.Equal("app-shell", profile.Name);
+        Assert.Equal(HtmlRenderProfile.AppShell, profile.RenderProfile);
+        Assert.Equal("RenderedSnapshot", result.AnalysisMode);
+        Assert.Equal("Browser extraction local story", result.Title);
+        Assert.Contains("Found HtmlTinkerX guide", result.ReadableText!.Text);
+        Assert.NotNull(result.StaticRenderedComparison);
+        Assert.Contains(result.Warnings, warning => warning.Contains("Rendered content differs", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_HonorsLinkedScriptInspectionForRenderedSnapshot() {
         string staticHtml = "<html><body><div id=\"root\">Loading...</div></body></html>";
         HtmlRenderedPageSnapshot snapshot = new() {
