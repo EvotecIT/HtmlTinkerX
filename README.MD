@@ -696,9 +696,175 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Invoke-HTMLClick** - Click elements in the browser
 - **Get-HTMLInteractable** - List clickable elements
 - **Set-HTMLInput** - Set input field values
+- **Invoke-HtmlKey** - Send keyboard input such as `Enter`, `Control+A`, or `ArrowDown`
+- **Invoke-HtmlHover** - Hover over an element
+- **Invoke-HtmlScroll** - Scroll an element into view
+- **Wait-HtmlContent** - Wait for text or a stable DOM
+- **Invoke-HtmlOverlayDismissal** - Try common cookie/modal dismissals
+- **Get-HtmlDiagnostics** - Inspect navigator, viewport, storage, console errors, observed API calls, and WebSockets
+- **Get-HtmlElement** / **Test-HtmlElement** - Inspect selector matches, geometry, attributes, and state
+- **Get-HtmlActiveElement** - Inspect the focused element after clicks or keyboard navigation
+- **Get-HtmlStorage** / **Set-HtmlStorage** - Read or update local/session storage entries
+- **Save-HtmlContent** - Save rendered session HTML or text to disk
+- **Find-HtmlDataSource** - Discover static, app-state, JSON, and endpoint sources before opening a browser
+- **Invoke-HtmlDataExtraction** - Extract a discovered browserless source
+- **Export-HtmlExtractionRecipe** / **Import-HtmlExtractionRecipe** / **Invoke-HtmlExtractionRecipe** - Save and rerun browserless extraction recipes
 - **Set-HTMLSelectOption** - Select dropdown options
 - **Set-HTMLChecked** - Check/uncheck checkboxes and radio buttons
 - **Submit-HTMLForm** - Submit forms
+
+#### Browser Extraction Mode
+
+Browser extraction mode is the rendering-backed path for pages where static HTML is not enough. The intended workflow is: plan the page, choose the lightest render profile that matches the problem, interact only as needed, snapshot the rendered state, inspect diagnostics, and feed the same rendered snapshot into the workbench.
+
+| Profile | Use when | PowerShell story | C# story |
+| --- | --- | --- | --- |
+| `FastStaticFallback` | static extraction is likely enough but a cheap browser fallback is useful | `Invoke-HtmlRendering -RenderProfile FastStaticFallback` | `HtmlBrowser.GetPageContentAsync(...)` with blocked heavy resources |
+| `InteractivePage` | forms, buttons, search boxes, or reactive inputs reveal content | `Start-HtmlSession`, `Set-HtmlInput`, `Invoke-HtmlKey`, `Wait-HtmlContent` | `HtmlBrowser.TypeInputAsync`, `PressKeysAsync`, `WaitForTextAsync` |
+| `LazyLoadedContent` | content appears after scrolling or delayed viewport work | `Invoke-HtmlRendering -RenderProfile LazyLoadedContent -AutoScroll` | `HtmlBrowser.CreateSnapshotAsync(...)` after scroll/wait helpers |
+| `AppShell` | the original HTML is a thin JavaScript shell | `Invoke-HtmlRendering -RenderProfile AppShell -Snapshot` | planner recommends `HtmlRenderProfile.AppShell` before workbench analysis |
+| `LoginProtected` | storage state or a visible login session is needed | `Start-HtmlSession`, `Export-BrowserState`, `-StorageStatePath` | `HtmlBrowser.ExportBrowserStateAsync` and `ImportBrowserStateAsync` |
+| `NetworkCapture` | API calls, response bodies, console errors, or WebSockets explain the page | `-IncludeNetworkLog -IncludeResponseBody -RedactResponseBody` | `HtmlBrowser.GetNetworkLog`, `GetDiagnosticsAsync` |
+| `LowBandwidth` | bandwidth is constrained or media/fonts/styles are not needed | `Invoke-HtmlRendering -RenderProfile LowBandwidth` | browser content with aggressive resource blocking |
+| `HeavyDynamicPage` | legacy broad dynamic-page profile is still needed | `Invoke-HtmlRendering -RenderProfile HeavyDynamicPage` | existing high-wait dynamic rendering behavior |
+
+```powershell
+# Hydrated app page with visible-only interactions before extraction
+$snapshot = Invoke-HtmlRendering -Url 'https://example.com/app' `
+    -RenderProfile InteractivePage `
+    -DismissText 'Accept' `
+    -ClickText 'Load more' `
+    -WaitForSelector 'main' `
+    -Selector 'main' `
+    -Snapshot
+
+# Lazy-loaded content that appears while scrolling
+$content = Invoke-HtmlRendering -Url 'https://example.com/catalog' `
+    -RenderProfile LazyLoadedContent `
+    -WaitForSelector '.product-card' `
+    -Selector '.product-grid'
+
+# JavaScript app shell with parsed snapshot data
+$app = Invoke-HtmlRendering -Url 'https://example.com/dashboard' `
+    -RenderProfile AppShell `
+    -WaitForSelector 'main' `
+    -Snapshot `
+    -IncludeLinkedScripts `
+    -IncludeStaticRenderedComparison
+
+# Network-focused pass for observed API calls and console errors
+$network = Invoke-HtmlRendering -Url 'https://example.com/search' `
+    -RenderProfile NetworkCapture `
+    -WaitForSelector '#results' `
+    -Snapshot `
+    -IncludeNetworkLog `
+    -IncludeResponseBody `
+    -RedactResponseBody
+
+# Session-style interaction with forgiving clicks and paced typing
+$session = Start-HtmlSession -Url 'https://example.com/search' -Session
+Invoke-HtmlOverlayDismissal -Session $session
+Set-HtmlInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25
+Invoke-HtmlKey -Session $session -Selector 'input[type=search]' -Key 'Enter'
+Wait-HtmlContent -Session $session -Text 'Results' -Selector 'main'
+Wait-HtmlContent -Session $session -Element -Selector 'main' -Visible -InViewport
+$items = Get-HtmlElement -Session $session -Selector '.result' -VisibleOnly -IncludeAttributes
+$items | Select-Object Text, Selector, Visible, InViewport, Width, Height
+Get-HtmlContent -Session $session -Selector 'main' -AsText
+$allTitles = Get-HtmlContent -Session $session -Selector '.result-title' -All -AsText
+$active = Get-HtmlActiveElement -Session $session -IncludeAttributes
+Set-HtmlStorage -Session $session -Scope Local -Key extractionMode -Value browser
+$storage = Get-HtmlStorage -Session $session -Scope All
+Save-HtmlContent -Session $session -Selector 'main' -OutFile .\rendered-main.html
+$diagnostics = Get-HtmlDiagnostics -Session $session
+$diagnostics.ConsistencyWarnings
+$diagnostics.ObservedApiCalls
+
+# Ask the planner which browser/content profile to use
+$plan = Test-HtmlExtractionPlan -Url 'https://example.com/app'
+$plan.SuggestedProfileCommand
+$plan | Get-HtmlExtractionProfile
+```
+
+Run [Examples/Example-BrowserExtractionModeLocal.ps1](Examples/Example-BrowserExtractionModeLocal.ps1) for an offline, self-contained version of the story. It stubs a local page and API with `Register-HtmlRoute`, then runs:
+
+```powershell
+Start-HtmlSession
+Invoke-HtmlNavigation
+Invoke-HtmlOverlayDismissal
+Set-HtmlInput -Type
+Invoke-HtmlKey
+Invoke-HtmlClick -Text
+Wait-HtmlContent
+Get-HtmlElement
+Test-HtmlElement
+Get-HtmlActiveElement
+Get-HtmlStorage
+Set-HtmlStorage
+Save-HtmlContent
+Get-HtmlDiagnostics
+Compare-HtmlStaticRendered
+Invoke-HtmlPageWorkbench -RenderedSnapshot
+Export-BrowserState
+```
+
+The matching C# example is [Sources/HtmlTinkerX.Examples/BrowserExtractionModeExample.cs](Sources/HtmlTinkerX.Examples/BrowserExtractionModeExample.cs). It follows the same sequence with `HtmlBrowser.OpenSessionAsync`, `RegisterRouteAsync`, `TypeInputAsync`, `PressKeysAsync`, `WaitForTextAsync`, `WaitForElementStateAsync`, `GetElementsAsync`, `TestElementAsync`, `GetActiveElementAsync`, `GetStorageAsync`, `SetStorageAsync`, `SaveContentAsync`, `GetDiagnosticsAsync`, `CreateSnapshotAsync`, `HtmlPageWorkbench.AnalyzeAsync`, and `ExportBrowserStateAsync`.
+
+Diagnostics are intentionally diagnostics, not stealth. `Get-HtmlDiagnostics` reports browser/runtime consistency, storage keys, failed or blocked requests, observed API calls, WebSockets, and console errors so you can understand why extraction did or did not work. It does not try to hide automation, defeat access controls, or bypass site protections.
+
+Browser extraction should stay browser-last where possible. Prefer `Test-HtmlExtractionPlan`, static parsers, `Find-HtmlDataSource`, `Invoke-HtmlDataExtraction`, endpoint discovery, linked JavaScript inspection, crawl profiles, and static-vs-rendered comparison before adding click-through automation.
+
+See [Examples/Example-BrowserExtractionMode.ps1](Examples/Example-BrowserExtractionMode.ps1) for longer workflow samples covering product search, lazy-loaded pages, app-shell snapshots, login state reuse, network capture, diagnostics, and docs crawling.
+
+#### Browserless Extraction Mode
+
+Browserless extraction mode is the Playwright-free path for pages where useful data already exists in static HTML, embedded framework state, JSON-LD, script data, or low-risk API endpoints. It does not imitate a browser; it inspects legitimate page artifacts and only performs direct HTTP reads when the source is a low-risk GET candidate or the caller explicitly opts in.
+
+```powershell
+$sources = Find-HtmlDataSource -Url 'https://example.com/products' -IncludeLinkedScripts -DirectOnly
+
+$result = $sources |
+    Where-Object Kind -In 'AppState', 'JsonLd', 'ScriptData' |
+    Select-Object -First 1 |
+    Invoke-HtmlDataExtraction
+
+$result.Mode
+$result.Source.Kind
+$result.Items | Select-Object Name, Type, Path, Value
+
+$source = $sources | Select-Object -First 1
+$source | Export-HtmlExtractionRecipe -Path .\product.recipe.json -IncludeRawContent
+Import-HtmlExtractionRecipe -Path .\product.recipe.json | Invoke-HtmlExtractionRecipe
+```
+
+Endpoint sources are guarded by default:
+
+```powershell
+$api = Find-HtmlDataSource -Url 'https://example.com/products' -IncludeLinkedScripts |
+    Where-Object { $_.Kind -eq 'ApiEndpoint' -and $_.CanExtractDirectly } |
+    Select-Object -First 1
+
+$api | Invoke-HtmlDataExtraction -AllowHttpFetch
+```
+
+The matching C# story uses the same core:
+
+```csharp
+var sources = await HtmlBrowserlessExtraction.DiscoverAsync(
+    html,
+    new HtmlBrowserlessDiscoveryOptions {
+        BaseUri = new Uri("https://example.com/products"),
+        IncludeLinkedScripts = true,
+        DirectOnly = true
+    });
+
+var source = sources.First();
+var result = await HtmlBrowserlessExtraction.ExtractAsync(source);
+var recipe = HtmlBrowserlessExtraction.CreateRecipe(source, includeRawContent: true);
+var replayed = await HtmlBrowserlessExtraction.ExtractRecipeAsync(recipe);
+```
+
+Run [Examples/Example-BrowserlessExtraction.ps1](Examples/Example-BrowserlessExtraction.ps1) or the C# [BrowserlessExtractionExample](Sources/HtmlTinkerX.Examples/BrowserlessExtractionExample.cs) for a self-contained app-state extraction and recipe round trip.
 
 ### Screenshots & Media
 - **Save-HTMLScreenshot** - Capture page screenshots with advanced options
@@ -1899,6 +2065,18 @@ dotnet add package HtmlTinkerX --version latest
 **⚠️ Important**: Always test updates in a development environment before deploying to production. Breaking changes may occur between versions.
 
 ## 🔧 Troubleshooting
+
+### Browser Extraction Mode
+
+- **Playwright browser missing**: run `Test-HtmlBrowser -Install` or retry the command with `-Clean` when the browser cache is corrupt.
+- **Corporate proxy or locked-down network**: pass `-Proxy` and `-ProxyCredential` on URL-based commands, or use `Set-HtmlHttpClientOption` for reusable module defaults.
+- **Timeouts on app shells**: prefer `-RenderProfile AppShell -WaitForSelector 'main'` or `Wait-HtmlContent -Stable` instead of relying on network idle for applications that keep long-polling or WebSocket connections open.
+- **Lazy content does not appear**: use `LazyLoadedContent`, `-AutoScroll`, `Invoke-HtmlScroll`, or a specific `-WaitForSelector` that represents the content you actually need.
+- **Login reuse fails**: create storage state with the same browser engine and profile assumptions, then pass `-StorageStatePath` to the later render. Keep state files out of source control.
+- **Response bodies contain secrets**: use `-IncludeResponseBody -RedactResponseBody`, keep `-ResponseBodyResourceType` narrow, and lower `-ResponseBodyMaxBytes` for large APIs.
+- **Static HTML is already enough**: do not start a browser. Use `Test-HtmlExtractionPlan`, `Find-HtmlDataSource`, `Invoke-HtmlDataExtraction`, `ConvertFrom-Html*`, `Find-HtmlApiEndpoint`, crawl profiles, or `Compare-HtmlStaticRendered` to prove whether rendering adds value.
+- **Endpoint extraction is skipped**: `Invoke-HtmlDataExtraction` does not fetch endpoint sources unless `-AllowHttpFetch` is supplied, and high-risk endpoints remain blocked. Review `RiskLevel`, `Warnings`, `IsExternal`, and `RequiresAuthenticationHint` before opting into endpoint reads.
+- **Diagnostics look noisy**: `Get-HtmlDiagnostics` reports evidence such as `navigator.webdriver`, failed requests, console errors, and storage keys. Treat these as reliability hints, not a score to game.
 
 ### Jint and JavaScript Parser Notes
 

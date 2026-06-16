@@ -163,11 +163,12 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         Page.RequestFailed += (_, req) => {
             if (_network.TryGetValue(req, out HtmlNetworkEntry? entry)) {
                 entry.Finished = System.DateTimeOffset.UtcNow;
+                entry.FailureText = req.Failure;
             }
         };
     }
 
-    internal async Task CaptureResponseBodiesAsync(int maxBytes, ISet<HtmlNetworkResourceType> resourceTypes, CancellationToken cancellationToken) {
+    internal async Task CaptureResponseBodiesAsync(int maxBytes, ISet<HtmlNetworkResourceType> resourceTypes, CancellationToken cancellationToken, bool redactSensitiveValues = false) {
         if (maxBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "Response body capture size must be greater than zero.");
         }
@@ -210,7 +211,15 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 }
 
                 string body = await readTask.ConfigureAwait(false);
-                item.Entry.ResponseBody = TruncateUtf8(body, maxBytes, out bool truncated);
+                string storedBody = TruncateUtf8(body, maxBytes, out bool truncated);
+                if (redactSensitiveValues) {
+                    storedBody = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(storedBody);
+                    item.Entry.ResponseBodyRedacted = true;
+                } else {
+                    item.Entry.ResponseBodyRedacted = false;
+                }
+
+                item.Entry.ResponseBody = storedBody;
                 item.Entry.ResponseBodyTruncated = truncated;
                 item.Entry.ResponseBodyError = null;
             } catch (Exception ex) when (ex is PlaywrightException || ex is InvalidOperationException) {

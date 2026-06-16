@@ -1,0 +1,138 @@
+[CmdletBinding()]
+param(
+    [string] $StatePath = (Join-Path $PSScriptRoot 'Output\browser-extraction-state.json')
+)
+
+Import-Module "$PSScriptRoot\..\PSParseHTML.psd1" -Force
+
+$storyUrl = 'https://psparsehtml.local/local-extraction.html'
+$staticHtml = @'
+<!doctype html>
+<html>
+<head>
+<title>Browser extraction local story</title>
+<script>
+window.__APP_CONFIG__ = { apiBase: "/api", feature: "browser-extraction" };
+document.addEventListener("DOMContentLoaded", () => {
+  const root = document.getElementById("root");
+  root.innerHTML = `
+<button id="cookieBanner" onclick="this.remove()">Accept</button>
+<main>
+<h1>Search demo</h1>
+<form id="searchForm">
+<input id="search" name="q" type="search" autocomplete="off">
+<button type="submit">Search</button>
+</form>
+<button id="loadMore" type="button">Load more</button>
+<section id="results">No results yet.</section>
+</main>`;
+  localStorage.setItem("storyLocal", "1");
+  sessionStorage.setItem("storySession", "1");
+  document.getElementById("searchForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const query = document.getElementById("search").value;
+    const response = await fetch("/api/products?q=" + encodeURIComponent(query));
+    const data = await response.json();
+    document.getElementById("results").innerHTML = data.items
+      .map(item => `<article class="product"><h2>${item.name}</h2><p>${item.description}</p></article>`)
+      .join("");
+  });
+  document.getElementById("loadMore").addEventListener("click", () => {
+    document.getElementById("results").insertAdjacentHTML(
+      "beforeend",
+      '<article class="product"><h2>Workbench profile sample</h2><p>Added after a click.</p></article>');
+  });
+});
+</script>
+</head>
+<body>
+<div id="root">Loading...</div>
+</body>
+</html>
+'@
+
+$session = Start-HtmlSession -Url 'about:blank' -Session
+try {
+    Register-HtmlRoute -Session $session -Pattern '**/local-extraction.html' -ScriptBlock {
+        param($route)
+        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+            Status      = 200
+            ContentType = 'text/html'
+            Body        = $staticHtml
+        }) | Out-Null
+    } | Out-Null
+
+    Register-HtmlRoute -Session $session -Pattern '**/api/products**' -ScriptBlock {
+        param($route)
+        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+            Status      = 200
+            ContentType = 'application/json'
+            Body        = '{"items":[{"name":"Found HtmlTinkerX guide","description":"Rendered from a local API call."}],"token":"local-secret-value"}'
+        }) | Out-Null
+    } | Out-Null
+
+    $plan = Test-HtmlExtractionPlan -Content $staticHtml
+    $profile = $plan | Get-HtmlExtractionProfile
+
+    Invoke-HtmlNavigation -Session $session -Url $storyUrl
+    Invoke-HtmlOverlayDismissal -Session $session | Out-Null
+    Set-HtmlInput -Session $session -Selector '#search' -Value 'HtmlTinkerX' -Type -DelayMs 0
+    Invoke-HtmlKey -Session $session -Selector '#search' -Key 'Enter'
+    Wait-HtmlContent -Session $session -Text 'Found HtmlTinkerX guide' -Selector '#results' -Exact
+    Invoke-HtmlClick -Session $session -Text 'Load more' -Exact
+    Wait-HtmlContent -Session $session -Text 'Workbench profile sample' -Selector '#results' -Exact
+    Wait-HtmlContent -Session $session -Element -Selector '#results' -Visible -InViewport
+    Wait-HtmlContent -Session $session -Stable -StableMilliseconds 100 -PollMilliseconds 25
+
+    $resultElements = Get-HtmlElement -Session $session -Selector '.product' -VisibleOnly -IncludeAttributes
+    $isResultsVisible = Test-HtmlElement -Session $session -Selector '#results' -Visible -InViewport
+    Invoke-HtmlClick -Session $session -Selector '#search'
+    $activeElement = Get-HtmlActiveElement -Session $session -IncludeAttributes
+    Set-HtmlStorage -Session $session -Scope Local -Key storyMode -Value browser-extraction
+    $storage = Get-HtmlStorage -Session $session -Scope All
+    $diagnostics = Get-HtmlDiagnostics -Session $session
+    $renderedHtml = Get-HtmlContent -Session $session
+    $renderedText = Get-HtmlContent -Session $session -AsText
+    $comparison = Compare-HtmlStaticRendered -StaticContent $staticHtml -RenderedContent $renderedHtml -BaseUrl $storyUrl
+    $savedContentPath = Join-Path (Split-Path -Parent $StatePath) 'browser-extraction-results.html'
+    Save-HtmlContent -Session $session -Selector '#results' -OutFile $savedContentPath -PassThru | Out-Null
+
+    $snapshot = [HtmlTinkerX.HtmlRenderedPageSnapshot]::new()
+    $snapshot.Url = $storyUrl
+    $snapshot.FinalUrl = $diagnostics.Url
+    $snapshot.Title = $diagnostics.Title
+    $snapshot.Html = $renderedHtml
+    $snapshot.Text = $renderedText
+    $snapshot.Content = $renderedHtml
+    $snapshot.ContentKind = 'DocumentHtml'
+    $snapshot.StaticRenderedComparison = $comparison
+    $snapshot.NetworkLog = [HtmlTinkerX.HtmlBrowser]::GetNetworkLog($session)
+
+    $workbench = Invoke-HtmlPageWorkbench -Content $staticHtml -BaseUrl $storyUrl -RenderedSnapshot $snapshot
+
+    $stateDirectory = Split-Path -Parent $StatePath
+    if ($stateDirectory -and -not (Test-Path -LiteralPath $stateDirectory)) {
+        New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
+    }
+    Export-BrowserState -Session $session -Path $StatePath
+
+    [pscustomobject] @{
+        PlannerMode              = $plan.RecommendedMode.ToString()
+        ProfileName              = $profile.Name
+        RenderProfile            = $profile.RenderProfile.ToString()
+        ResultText               = $renderedText
+        ProductElementCount      = @($resultElements).Count
+        ResultsVisible           = $isResultsVisible
+        ActiveElementId          = $activeElement.Id
+        StorageKeys              = @($storage).Key
+        WorkbenchMode            = $workbench.AnalysisMode
+        WorkbenchTitle           = $workbench.Title
+        ObservedApiCallCount     = @($diagnostics.ObservedApiCalls).Count
+        LocalStorageKeys         = $diagnostics.LocalStorageKeys
+        StaticRenderedDeltaCount = @($comparison.Deltas).Count
+        SavedContentPath         = $savedContentPath
+        StatePath                = $StatePath
+    }
+} finally {
+    Close-HtmlSession -Session $session
+}

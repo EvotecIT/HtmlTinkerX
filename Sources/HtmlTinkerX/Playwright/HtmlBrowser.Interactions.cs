@@ -80,6 +80,45 @@ public static partial class HtmlBrowser {
         return applied;
     }
 
+    /// <summary>
+    /// Attempts to click the first visible element matching text and returns false when the text is absent, hidden, or times out.
+    /// </summary>
+    public static async Task<bool> TryClickTextAsync(
+        HtmlBrowserSession session,
+        string text,
+        bool exact = false,
+        string? regex = null,
+        int timeout = 10000,
+        CancellationToken cancellationToken = default) {
+        if (session == null) {
+            throw new ArgumentNullException(nameof(session));
+        }
+
+        try {
+            ILocator locator = !string.IsNullOrEmpty(regex)
+                ? session.Page.GetByText(new System.Text.RegularExpressions.Regex(regex)).First
+                : exact
+                    ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true }).First
+                    : session.Page.GetByText(text).First;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await locator.WaitForAsync(new LocatorWaitForOptions {
+                State = WaitForSelectorState.Visible,
+                Timeout = timeout
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await locator.ClickAsync(new LocatorClickOptions {
+                Timeout = timeout
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (PlaywrightException) {
+            return false;
+        } catch (TimeoutException) {
+            return false;
+        }
+    }
+
     private static IEnumerable<string> NormalizeInteractionValues(IEnumerable<string>? values) =>
         values == null
             ? Array.Empty<string>()

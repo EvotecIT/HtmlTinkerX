@@ -251,6 +251,86 @@ Describe 'Invoke-HTMLRendering' {
         $text | Should -Be 'Dynamic Content'
     }
 
+    It 'Can use the interactive render profile for hydrated click targets' {
+        $htmlPath = Join-Path $TestDrive 'interactive-profile.html'
+        @'
+<!doctype html>
+<html>
+<body>
+<button id="load">Load</button>
+<main>loading</main>
+<script>
+setTimeout(() => {
+  document.getElementById('load').addEventListener('click', () => {
+    const item = document.createElement('div');
+    item.id = 'clicked';
+    item.textContent = 'Interactive profile clicked';
+    document.querySelector('main').appendChild(item);
+  });
+}, 75);
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -RenderProfile InteractivePage -ClickSelector '#load' -WaitForSelector '#clicked' -Selector '#clicked' -AsText -Timeout 3000
+
+        $text | Should -Be 'Interactive profile clicked'
+    }
+
+    It 'Can use the lazy-loaded render profile for scroll-revealed content' {
+        $htmlPath = Join-Path $TestDrive 'lazy-profile.html'
+        @'
+<!doctype html>
+<html>
+<body style="min-height:4000px">
+<main>loading</main>
+<script>
+window.addEventListener('scroll', () => {
+  if (!document.getElementById('lazy')) {
+    const item = document.createElement('div');
+    item.id = 'lazy';
+    item.textContent = 'Lazy profile loaded';
+    document.querySelector('main').appendChild(item);
+  }
+});
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -RenderProfile LazyLoadedPage -WaitForSelector '#lazy' -Selector '#lazy' -AsText -Timeout 3000
+
+        $text | Should -Be 'Lazy profile loaded'
+    }
+
+    It 'Can use the app-shell render profile for delayed hydration' {
+        $htmlPath = Join-Path $TestDrive 'app-shell-profile.html'
+        @'
+<!doctype html>
+<html>
+<body>
+<main>loading</main>
+<script>
+setTimeout(() => {
+  const item = document.createElement('div');
+  item.id = 'hydrated';
+  item.textContent = 'App shell hydrated';
+  document.querySelector('main').appendChild(item);
+}, 75);
+</script>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+        $uri = [System.Uri]::new($htmlPath).AbsoluteUri
+
+        $text = Invoke-HTMLRendering -Url $uri -RenderProfile AppShell -WaitForSelector '#hydrated' -Selector '#hydrated' -AsText -Timeout 3000
+
+        $text | Should -Be 'App shell hydrated'
+    }
+
     It 'Applies load delay before auto-scrolling lazy pages' {
         $htmlPath = Join-Path $TestDrive 'delayed-scroll.html'
         @'
@@ -500,6 +580,71 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    It 'Can redact captured response bodies when requested' {
+        $session = Invoke-HTMLRendering -Url 'about:blank' -Session
+        try {
+            Register-HTMLRoute -Session $session -Pattern '**/redacted-response.html' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                    Status = 200
+                    ContentType = 'text/html'
+                    Body = @'
+<!doctype html>
+<html>
+<head>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const response = await fetch('/api/secret');
+  document.querySelector('main').textContent = await response.text();
+});
+</script>
+</head>
+<body><main>loading</main></body>
+</html>
+'@
+                }) | Out-Null
+            }
+            Register-HTMLRoute -Session $session -Pattern '**/api/secret' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                    Status = 200
+                    ContentType = 'application/json'
+                    Body = '{"access_token":"super-secret","url":"https://example.com/callback?token=abc123&safe=1"}'
+                }) | Out-Null
+            }
+
+            Invoke-HTMLNavigation -Session $session -Url 'https://example.com/redacted-response.html'
+            $session.Page.WaitForFunctionAsync('() => document.querySelector("main").textContent.includes("access_token")', $null).GetAwaiter().GetResult()
+            [HtmlTinkerX.HtmlBrowser]::CaptureResponseBodiesAsync(
+                $session,
+                500,
+                [HtmlTinkerX.HtmlNetworkResourceType[]]@([HtmlTinkerX.HtmlNetworkResourceType]::Fetch),
+                [System.Threading.CancellationToken]::None,
+                $true).GetAwaiter().GetResult()
+            $snapshot = [HtmlTinkerX.HtmlBrowser]::CreateSnapshotAsync(
+                $session,
+                'https://example.com/redacted-response.html',
+                'main',
+                $false,
+                $true,
+                [string[]]@(),
+                $null,
+                $false,
+                $false,
+                $false,
+                $false,
+                [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+
+            $entry = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/api/secret' } | Select-Object -First 1
+            $entry.ResponseBody | Should -Match '<redacted>'
+            $entry.ResponseBody | Should -Not -Match 'super-secret'
+            $entry.ResponseBody | Should -Not -Match 'abc123'
+            $entry.ResponseBodyRedacted | Should -BeTrue
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'Can capture document response bodies when explicitly requested' {
         $session = Invoke-HTMLRendering -Url 'about:blank' -Session
         try {
@@ -703,6 +848,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { Invoke-HTMLRendering -Url $uri -IncludeLinkedScripts } | Should -Throw '*only valid with -Snapshot*'
         { Invoke-HTMLRendering -Url $uri -IncludeExternalLinkedScripts } | Should -Throw '*requires -IncludeLinkedScripts*'
         { Invoke-HTMLRendering -Url $uri -IncludeResponseBody } | Should -Throw '*only valid with -Snapshot*'
+        { Invoke-HTMLRendering -Url $uri -RedactResponseBody } | Should -Throw '*requires -IncludeResponseBody*'
         { Invoke-HTMLRendering -Url $uri -LoadState Commit } | Should -Throw '*requires Selector, WaitForSelector, WaitForFunction, WaitAfterLoadMs, or an interaction*'
         { Invoke-HTMLRendering -Url $uri -BlockResourceType Document } | Should -Throw '*would abort page navigation*'
     }

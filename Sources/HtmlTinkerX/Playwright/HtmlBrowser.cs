@@ -463,6 +463,8 @@ public static partial class HtmlBrowser {
             string? id = await el.GetAttributeAsync("id");
             string? cls = await el.GetAttributeAsync("class");
             bool visible = await el.IsVisibleAsync();
+            bool enabled = await el.IsEnabledAsync();
+            bool editable = await el.IsEditableAsync();
             bool potentiallyHidden = await el.EvaluateAsync<bool>(@"el => {
                 const check = node => {
                     if (!node) return false;
@@ -478,6 +480,12 @@ public static partial class HtmlBrowser {
                 }
                 return false;
             }");
+            HtmlBrowserElementInfo elementInfo = ParseElementInfo(await el.EvaluateAsync<string>(
+                ElementInfoScript,
+                new {
+                    includeAttributes = false,
+                    includeHtml = false
+                }).ConfigureAwait(false));
             cancellationToken.ThrowIfCancellationRequested();
             string selector = await el.EvaluateAsync<string>(@"el => {
                 const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
@@ -498,7 +506,14 @@ public static partial class HtmlBrowser {
                 Id = id,
                 Class = cls,
                 Visible = visible,
-                PotentiallyHidden = potentiallyHidden
+                PotentiallyHidden = potentiallyHidden,
+                Enabled = enabled,
+                Editable = editable,
+                InViewport = elementInfo.InViewport,
+                X = elementInfo.X,
+                Y = elementInfo.Y,
+                Width = elementInfo.Width,
+                Height = elementInfo.Height
             });
         }
         return list;
@@ -507,25 +522,33 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) {
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default, int? nth = null) {
+        ILocator locator = session.Page.Locator(selector);
+        if (nth.HasValue) {
+            locator = locator.Nth(nth.Value);
+        }
+
         if (waitForNavigation) {
             Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });
-            await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
             await waitTask.ConfigureAwait(false);
         } else {
-            await session.Page.ClickAsync(selector, new PageClickOptions { Timeout = timeout }).ConfigureAwait(false);
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).ConfigureAwait(false);
         }
     }
 
     /// <summary>
     /// Clicks an element specified by text content.
     /// </summary>
-    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) {
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default, int? nth = null) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact
                 ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true })
                 : session.Page.GetByText(text);
+        if (nth.HasValue) {
+            locator = locator.Nth(nth.Value);
+        }
 
         if (waitForNavigation) {
             Task waitTask = session.Page.WaitForURLAsync("**", new PageWaitForURLOptions { Timeout = timeout });

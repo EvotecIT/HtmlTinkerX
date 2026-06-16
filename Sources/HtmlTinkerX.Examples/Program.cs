@@ -7,7 +7,10 @@ namespace HtmlTinkerX.Examples;
 /// </summary>
 public static class Program {
     /// <summary>
-    /// Executes the <see cref="NetworkLogTimingExample"/>.
+    /// Executes the browser and browserless extraction examples.
     /// </summary>
-    public static Task Main() => NetworkLogTimingExample.RunAsync();
+    public static async Task Main() {
+        await BrowserExtractionModeExample.RunAsync().ConfigureAwait(false);
+        await BrowserlessExtractionExample.RunAsync().ConfigureAwait(false);
+    }
 }

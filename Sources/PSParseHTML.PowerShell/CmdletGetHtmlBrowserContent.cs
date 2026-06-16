@@ -32,6 +32,20 @@ public sealed class CmdletGetHtmlBrowserContent : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter AsText { get; set; }
 
+    /// <summary>Return content for all matching elements instead of only the first match.</summary>
+    [Parameter]
+    public SwitchParameter All { get; set; }
+
+    /// <summary>Maximum number of matching elements to return when using <see cref="All"/>.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int Limit { get; set; } = 100;
+
+    /// <summary>Timeout in milliseconds while waiting for the selector.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -51,11 +65,30 @@ public sealed class CmdletGetHtmlBrowserContent : AsyncPSCmdlet {
             return;
         }
 
+        if (All.IsPresent) {
+            if (string.IsNullOrWhiteSpace(Selector)) {
+                ThrowTerminatingError(new ErrorRecord(
+                    new PSInvalidOperationException("-All requires -Selector."),
+                    "MissingSelector",
+                    ErrorCategory.InvalidArgument,
+                    Selector));
+                return;
+            }
+
+            var elements = await HtmlBrowser.GetElementsAsync(session, Selector!, visibleOnly: false, includeAttributes: false, includeHtml: true, limit: Limit, timeout: Timeout, cancellationToken: token).ConfigureAwait(false);
+            string[] values = elements
+                .Select(element => AsText.IsPresent ? element.Text : InnerHtml.IsPresent ? element.InnerHtml ?? string.Empty : element.OuterHtml ?? string.Empty)
+                .ToArray();
+            WriteObject(values, true);
+            return;
+        }
+
         string result = await HtmlBrowser.GetContentAsync(
             session.Page,
             Selector,
             InnerHtml.IsPresent,
             AsText.IsPresent,
+            Timeout,
             token).ConfigureAwait(false);
 
         WriteObject(result);

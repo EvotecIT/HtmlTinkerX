@@ -33,6 +33,12 @@ public sealed class HtmlNetworkEntry {
     /// <summary>Error reported while capturing the response body, when capture was requested but unavailable.</summary>
     public string? ResponseBodyError { get; set; }
 
+    /// <summary>Whether captured response body text was redacted before being stored.</summary>
+    public bool ResponseBodyRedacted { get; set; }
+
+    /// <summary>Failure text reported by the browser when a request fails.</summary>
+    public string? FailureText { get; set; }
+
     /// <summary>Time when the request was issued.</summary>
     public System.DateTimeOffset Started { get; set; }
 

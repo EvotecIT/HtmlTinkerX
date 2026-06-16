@@ -206,11 +206,11 @@ public static class HtmlExtractionPlanner {
                 ? "Invoke-HtmlFormRelay -Content $html -BaseUrl '<current-response-url>'"
                 : $"Invoke-HtmlFormRelay -Url {target}",
             HtmlExtractionPlanMode.AuthRequired => url == null
-                ? "Invoke-HtmlRendering -Url '<login-protected-url>' -Session"
-                : $"Invoke-HtmlRendering -Url {target} -Session",
+                ? "Invoke-HtmlRendering -Url '<login-protected-url>' -Session -RenderProfile LoginProtected"
+                : $"Invoke-HtmlRendering -Url {target} -Session -RenderProfile LoginProtected",
             HtmlExtractionPlanMode.RenderedSnapshot => url == null
-                ? "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile HeavyDynamicPage"
-                : $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile HeavyDynamicPage",
+                ? "Invoke-HtmlRendering -Url '<page-url>' -Snapshot -RenderProfile AppShell"
+                : $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile AppShell",
             HtmlExtractionPlanMode.Crawl => url == null
                 ? "Invoke-HtmlCrawl -Url '<start-url>' -Scenario Dataset -AutoRender"
                 : $"Invoke-HtmlCrawl -Url {target} -Scenario Dataset -AutoRender",
@@ -228,8 +228,12 @@ public static class HtmlExtractionPlanner {
 
         return profile.Name switch {
             "auth-relay-page" => $"Invoke-HtmlFormRelay -Url {target}",
-            "login-protected-page" => $"Invoke-HtmlRendering -Url {target} -Session",
-            "app-shell" => $"$snapshot = Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile HeavyDynamicPage; Invoke-HtmlPageWorkbench -Url {target} -RenderedSnapshot $snapshot",
+            "login-protected-page" => $"Invoke-HtmlRendering -Url {target} -Session -RenderProfile LoginProtected",
+            "app-shell" => $"$snapshot = Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile AppShell; Invoke-HtmlPageWorkbench -Url {target} -RenderedSnapshot $snapshot",
+            "lazy-loaded-content" => $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile LazyLoadedContent -AutoScroll",
+            "interactive-page" => $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile InteractivePage -DismissText 'Accept'",
+            "network-capture" => $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile NetworkCapture -IncludeNetworkLog",
+            "low-bandwidth" => $"Invoke-HtmlRendering -Url {target} -Snapshot -RenderProfile LowBandwidth",
             "api-docs-content" => $"Invoke-HtmlCrawl -Url {target} -Scenario Dataset -Profile api-docs-content",
             "docs-content" => $"Invoke-HtmlCrawl -Url {target} -Scenario Dataset -Profile docs-content",
             "dataset-page" => $"ConvertTo-HtmlDatasetJsonL -Url {target}",

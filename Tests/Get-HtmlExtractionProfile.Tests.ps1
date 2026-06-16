@@ -20,7 +20,7 @@ Describe 'Get-HtmlExtractionProfile' {
 
         $profile = Get-HtmlExtractionProfile -Name 'app-shell'
         @($profile).Count | Should -Be 1
-        $profile.RenderProfile | Should -Be 'HeavyDynamicPage'
+        $profile.RenderProfile | Should -Be 'AppShell'
         $profile.SuggestedCommand | Should -Match 'Invoke-HtmlRendering'
     }
 
@@ -36,8 +36,17 @@ Describe 'Get-HtmlExtractionProfile' {
         $profile = $plan | Get-HtmlExtractionProfile
 
         $plan.SuggestedProfileName | Should -Be 'app-shell'
-        $plan.SuggestedProfileCommand | Should -Match 'HeavyDynamicPage'
+        $plan.SuggestedProfileCommand | Should -Match 'AppShell'
         $profile.Name | Should -Be 'app-shell'
         $profile.RecommendedMode | Should -Be 'RenderedSnapshot'
+    }
+
+    It 'lists browser extraction mode profiles' {
+        $profiles = Get-HtmlExtractionProfile
+
+        $profiles.Name | Should -Contain 'interactive-page'
+        $profiles.Name | Should -Contain 'lazy-loaded-content'
+        $profiles.Name | Should -Contain 'network-capture'
+        $profiles.Name | Should -Contain 'low-bandwidth'
     }
 }
