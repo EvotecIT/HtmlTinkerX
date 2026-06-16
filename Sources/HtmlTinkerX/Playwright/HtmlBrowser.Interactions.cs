@@ -83,14 +83,26 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Attempts to click the first visible element matching text and returns false when the text is absent, hidden, or times out.
     /// </summary>
-    public static async Task<bool> TryClickTextAsync(
+    public static Task<bool> TryClickTextAsync(
         HtmlBrowserSession session,
         string text,
         bool exact = false,
         string? regex = null,
         int timeout = 10000,
-        CancellationToken cancellationToken = default,
-        int? nth = null) {
+        CancellationToken cancellationToken = default) =>
+        TryClickTextAsync(session, text, exact, regex, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Attempts to click a visible element matching text and returns false when the text is absent, hidden, or times out.
+    /// </summary>
+    public static async Task<bool> TryClickTextAsync(
+        HtmlBrowserSession session,
+        string text,
+        bool exact,
+        string? regex,
+        int timeout,
+        CancellationToken cancellationToken,
+        int? nth) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }

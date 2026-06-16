@@ -522,7 +522,13 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element by CSS selector.
     /// </summary>
-    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default, int? nth = null) {
+    public static Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickSelectorAsync(session, selector, waitForNavigation, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element by CSS selector, optionally targeting a zero-based matching element.
+    /// </summary>
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, int timeout, CancellationToken cancellationToken, int? nth) {
         ILocator locator = session.Page.Locator(selector);
         if (nth.HasValue) {
             locator = locator.Nth(nth.Value);
@@ -540,7 +546,13 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Clicks an element specified by text content.
     /// </summary>
-    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default, int? nth = null) {
+    public static Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickTextAsync(session, text, exact, regex, waitForNavigation, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element specified by text content, optionally targeting a zero-based matching element.
+    /// </summary>
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, int timeout, CancellationToken cancellationToken, int? nth) {
         ILocator locator = !string.IsNullOrEmpty(regex)
             ? session.Page.GetByText(new Regex(regex))
             : exact

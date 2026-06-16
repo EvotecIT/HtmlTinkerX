@@ -211,14 +211,14 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 }
 
                 string body = await readTask.ConfigureAwait(false);
-                string storedBody = TruncateUtf8(body, maxBytes, out bool truncated);
                 if (redactSensitiveValues) {
-                    storedBody = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(storedBody);
+                    body = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(body);
                     item.Entry.ResponseBodyRedacted = true;
                 } else {
                     item.Entry.ResponseBodyRedacted = false;
                 }
 
+                string storedBody = TruncateUtf8(body, maxBytes, out bool truncated);
                 item.Entry.ResponseBody = storedBody;
                 item.Entry.ResponseBodyTruncated = truncated;
                 item.Entry.ResponseBodyError = null;

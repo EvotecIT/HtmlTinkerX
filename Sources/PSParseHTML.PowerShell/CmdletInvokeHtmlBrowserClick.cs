@@ -95,9 +95,9 @@ public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
 
         if (ParameterSetName == ParameterSetText) {
             if (IfVisible.IsPresent) {
-                _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout, nth: Nth).ConfigureAwait(false);
+                _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
             } else {
-                await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, waitForNavigation: false, Timeout, nth: Nth).ConfigureAwait(false);
+                await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
             }
         } else if (IfVisible.IsPresent) {
             if (Nth.HasValue) {
@@ -121,7 +121,7 @@ public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
             }
 
             if (Nth.HasValue) {
-                await HtmlBrowser.ClickSelectorAsync(session, Selector, waitForNavigation: false, Timeout, nth: Nth).ConfigureAwait(false);
+                await HtmlBrowser.ClickSelectorAsync(session, Selector, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
             } else {
                 await HtmlBrowser.MouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
             }

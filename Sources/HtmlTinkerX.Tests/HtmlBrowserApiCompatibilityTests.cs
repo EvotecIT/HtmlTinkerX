@@ -67,4 +67,76 @@ public class HtmlBrowserApiCompatibilityTests {
         Assert.NotNull(method);
         Assert.Equal(typeof(Task), method!.ReturnType);
     }
+
+    [Fact]
+    public void HtmlRenderProfile_PreservesOriginalHeavyDynamicPageValue() {
+        Assert.Equal(0, (int)HtmlRenderProfile.Custom);
+        Assert.Equal(1, (int)HtmlRenderProfile.HeavyDynamicPage);
+    }
+
+    [Fact]
+    public void ClickSelectorAsync_PreservesPreNthSignature() {
+        Type[] parameterTypes = {
+            typeof(HtmlBrowserSession),
+            typeof(string),
+            typeof(bool),
+            typeof(int),
+            typeof(CancellationToken)
+        };
+
+        MethodInfo? method = typeof(HtmlBrowser).GetMethod(
+            nameof(HtmlBrowser.ClickSelectorAsync),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task), method!.ReturnType);
+    }
+
+    [Fact]
+    public void ClickTextAsync_PreservesPreNthSignature() {
+        Type[] parameterTypes = {
+            typeof(HtmlBrowserSession),
+            typeof(string),
+            typeof(bool),
+            typeof(string),
+            typeof(bool),
+            typeof(int),
+            typeof(CancellationToken)
+        };
+
+        MethodInfo? method = typeof(HtmlBrowser).GetMethod(
+            nameof(HtmlBrowser.ClickTextAsync),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task), method!.ReturnType);
+    }
+
+    [Fact]
+    public void TryClickTextAsync_PreservesPreNthSignature() {
+        Type[] parameterTypes = {
+            typeof(HtmlBrowserSession),
+            typeof(string),
+            typeof(bool),
+            typeof(string),
+            typeof(int),
+            typeof(CancellationToken)
+        };
+
+        MethodInfo? method = typeof(HtmlBrowser).GetMethod(
+            nameof(HtmlBrowser.TryClickTextAsync),
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task<bool>), method!.ReturnType);
+    }
 }
