@@ -11,6 +11,9 @@ namespace HtmlTinkerX;
 /// Decodes JSON Web Tokens into safe, operator-friendly summaries.
 /// </summary>
 public static class HtmlJsonWebTokenParser {
+    private static readonly long MinUnixTimeSeconds = DateTimeOffset.MinValue.ToUnixTimeSeconds();
+    private static readonly long MaxUnixTimeSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
+
     private static readonly string[] SensitiveClaimNames = {
         "email",
         "family_name",
@@ -79,7 +82,11 @@ public static class HtmlJsonWebTokenParser {
                 }
 
                 PopulateHeader(summary, header!.RootElement);
-                PopulatePayload(summary, payload!.RootElement, includeSensitiveValues);
+                string? payloadValidationError = PopulatePayload(summary, payload!.RootElement, includeSensitiveValues);
+                if (payloadValidationError != null) {
+                    summary.ErrorMessage = payloadValidationError;
+                    return summary;
+                }
 
                 if (includeJson) {
                     summary.HeaderJson = headerJson;
@@ -100,14 +107,26 @@ public static class HtmlJsonWebTokenParser {
         summary.KeyId = GetJsonString(header, "kid");
     }
 
-    private static void PopulatePayload(HtmlJsonWebTokenSummary summary, JsonElement payload, bool includeSensitiveValues) {
+    private static string? PopulatePayload(HtmlJsonWebTokenSummary summary, JsonElement payload, bool includeSensitiveValues) {
         summary.Issuer = GetJsonString(payload, "iss");
         summary.Subject = GetClaimValue(payload, "sub", includeSensitiveValues, summary);
         summary.TenantId = FirstNonEmpty(GetJsonString(payload, "tid"), GetJsonString(payload, "tenant"));
         summary.ClientId = FirstNonEmpty(GetJsonString(payload, "azp"), GetJsonString(payload, "appid"), GetJsonString(payload, "client_id"), GetJsonString(payload, "aud"));
-        summary.Expires = GetUnixTime(payload, "exp");
-        summary.NotBefore = GetUnixTime(payload, "nbf");
-        summary.IssuedAt = GetUnixTime(payload, "iat");
+        if (!TryGetUnixTime(payload, "exp", out DateTimeOffset? expires, out string? errorMessage)) {
+            return errorMessage;
+        }
+
+        if (!TryGetUnixTime(payload, "nbf", out DateTimeOffset? notBefore, out errorMessage)) {
+            return errorMessage;
+        }
+
+        if (!TryGetUnixTime(payload, "iat", out DateTimeOffset? issuedAt, out errorMessage)) {
+            return errorMessage;
+        }
+
+        summary.Expires = expires;
+        summary.NotBefore = notBefore;
+        summary.IssuedAt = issuedAt;
         summary.Audiences.AddRange(GetClaimStringValues(payload, "aud"));
         summary.Scopes.AddRange(GetScopeValues(payload));
 
@@ -127,6 +146,8 @@ public static class HtmlJsonWebTokenParser {
                 Redacted = sensitive && !includeSensitiveValues
             });
         }
+
+        return null;
     }
 
     private static void AddWarnings(HtmlJsonWebTokenSummary summary, string[] parts, bool includeSensitiveValues, bool includeJson) {
@@ -258,21 +279,25 @@ public static class HtmlJsonWebTokenParser {
         return Convert.FromBase64String(padded);
     }
 
-    private static DateTimeOffset? GetUnixTime(JsonElement payload, string name) {
-        if (!payload.TryGetProperty(name, out JsonElement value)) {
-            return null;
+    private static bool TryGetUnixTime(JsonElement payload, string name, out DateTimeOffset? value, out string? errorMessage) {
+        value = null;
+        errorMessage = null;
+        if (!payload.TryGetProperty(name, out JsonElement element)) {
+            return true;
         }
 
         long seconds;
-        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out seconds)) {
-            return DateTimeOffset.FromUnixTimeSeconds(seconds);
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out seconds)
+            || element.ValueKind == JsonValueKind.String && long.TryParse(element.GetString(), out seconds)) {
+            if (seconds < MinUnixTimeSeconds || seconds > MaxUnixTimeSeconds) {
+                errorMessage = $"JWT claim '{name}' is outside the supported Unix time range.";
+                return false;
+            }
+
+            value = DateTimeOffset.FromUnixTimeSeconds(seconds);
         }
 
-        if (value.ValueKind == JsonValueKind.String && long.TryParse(value.GetString(), out seconds)) {
-            return DateTimeOffset.FromUnixTimeSeconds(seconds);
-        }
-
-        return null;
+        return true;
     }
 
     private static string GetJsonString(JsonElement element, string name) =>

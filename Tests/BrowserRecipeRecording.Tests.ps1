@@ -167,6 +167,44 @@ Describe 'Browser recipe recording' {
         $result.Steps[0].Succeeded | Should -BeTrue
     }
 
+    It 'records regex text clicks and replays the pattern' {
+        $pagePath = Join-Path $TestDrive 'recording-regex-click.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button onclick="document.getElementById('result').textContent = 'signed-in'">Sign in with Contoso</button>
+    <section id="result">waiting</section>
+  </main>
+</body>
+</html>
+'@
+        $recipePath = Join-Path $TestDrive 'recorded-regex.browser.recipe.json'
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'RegexRecording' -IncludeCurrentUrl | Out-Null
+            Invoke-HtmlBrowserClick -Session $session -Text 'Sign in|Log in' -Regex 'Sign in|Log in'
+            Wait-HtmlBrowserContent -Session $session -Selector '#result' -Text 'signed-in' -Exact
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
+        $clickStep = $recipe.Steps | Where-Object Action -eq 'ClickText' | Select-Object -First 1
+
+        $clickStep.Text | Should -Be 'Sign in|Log in'
+        $clickStep.Regex | Should -Be 'Sign in|Log in'
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath
+
+        $result.Succeeded | Should -BeTrue
+        $result.Steps[0].Succeeded | Should -BeTrue
+    }
+
     It 'exports a recording snapshot without stopping recording' {
         $pagePath = Join-Path $TestDrive 'recording-snapshot.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main><input id="q" /></main>'
@@ -385,5 +423,28 @@ Describe 'Browser recipe recording' {
         Test-Path -LiteralPath (Join-Path $replayEvidence 'evidence-manifest.json') | Should -BeFalse
         Get-Content -LiteralPath (Join-Path $replayEvidence 'recorded.txt') -Raw | Should -Not -Match 'abc\.def\.ghi'
         Get-Content -LiteralPath (Join-Path $replayEvidence 'sso-handoff-summary.json') -Raw | Should -Not -Match 'recorded-sso-secret'
+    }
+
+    It 'does not record diagnostic failure evidence as recipe steps' {
+        $pagePath = Join-Path $TestDrive 'recording-failure-evidence.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><html><body><main>ready</main></body></html>'
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $recipePath = Join-Path $TestDrive 'failure-evidence.browser.recipe.json'
+        $failureRoot = Join-Path $TestDrive 'recording-failure-evidence'
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'FailureEvidenceRecording' -IncludeCurrentUrl | Out-Null
+            {
+                Invoke-HtmlBrowserClick -Session $session -Selector '#missing' -Timeout 100 -OnFailureEvidence -FailureEvidenceFolder $failureRoot
+            } | Should -Throw
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
+        $recipe.Steps.Action | Should -Not -Contain 'Evidence'
+        @(Get-ChildItem -LiteralPath $failureRoot -Directory).Count | Should -Be 1
     }
 }

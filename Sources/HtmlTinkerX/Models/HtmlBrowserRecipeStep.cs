@@ -99,6 +99,9 @@ public sealed class HtmlBrowserRecipeStep {
     /// <summary>Use exact text matching where supported.</summary>
     public bool Exact { get; set; }
 
+    /// <summary>Regular expression pattern used by text click steps.</summary>
+    public string? Regex { get; set; }
+
     /// <summary>Zero-based occurrence targeted when a recorded selector or text click was disambiguated.</summary>
     public int? Nth { get; set; }
 

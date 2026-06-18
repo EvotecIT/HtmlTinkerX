@@ -145,7 +145,7 @@ public static partial class HtmlBrowser {
                     break;
                 case HtmlBrowserRecipeAction.ClickText:
                     Require(step.Text, nameof(step.Text), step.Action);
-                    await ClickTextAsync(session, step.Text!, step.Exact, regex: null, step.WaitForNavigation, step.LoadState, step.NavigationUrl, timeout, cancellationToken, step.Nth).ConfigureAwait(false);
+                    await ClickTextAsync(session, step.Text!, step.Exact, step.Regex, step.WaitForNavigation, step.LoadState, step.NavigationUrl, timeout, cancellationToken, step.Nth).ConfigureAwait(false);
                     break;
                 case HtmlBrowserRecipeAction.Input:
                     await ExecuteRecipeSelectorActionAsync(session, step, result, selector =>

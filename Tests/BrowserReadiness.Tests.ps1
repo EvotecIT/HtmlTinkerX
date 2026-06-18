@@ -38,6 +38,34 @@ Describe 'Browser readiness waits' {
         }
     }
 
+    It 'treats timeout zero as no timeout for DOM stability waits' {
+        $pagePath = Join-Path $TestDrive 'stable-zero-timeout-page.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<head><title>Stable Zero Timeout</title></head>
+<body>
+  <main id="app">Loading</main>
+  <script>
+    window.zeroTimeoutReady = false;
+    setTimeout(() => {
+      document.getElementById('app').textContent = 'Settled';
+      window.zeroTimeoutReady = true;
+    }, 120);
+  </script>
+</body>
+</html>
+'@
+        $session = Start-HtmlBrowserSession -Path $pagePath -LoadState DomContentLoaded
+        try {
+            Wait-HtmlBrowserReady -Session $session -NoLoadState -Function '() => window.zeroTimeoutReady === true' -Stable -StableMilliseconds 50 -PollMilliseconds 25 -Timeout 0
+
+            Get-HtmlBrowserContent -Session $session -Selector '#app' -AsText | Should -Be 'Settled'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'exports failure evidence when readiness fails' {
         $pagePath = Join-Path $TestDrive 'not-ready-page.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

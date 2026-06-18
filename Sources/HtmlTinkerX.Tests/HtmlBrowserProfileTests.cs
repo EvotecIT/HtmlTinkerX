@@ -84,6 +84,31 @@ public class HtmlBrowserPersistentProfileTests {
         }
     }
 
+    [Fact]
+    public async Task OpenSessionAsync_WithUserDataDirectory_AppliesHttpCredentials() {
+        string userDataDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        using HttpListener listener = StartBasicAuthPageServer(out string url, "auditor", "proof-secret");
+        HtmlBrowserLaunchOptions options = new() {
+            UserDataDirectory = userDataDirectory,
+            Username = "auditor",
+            Password = "proof-secret",
+            Headless = true,
+            LoadState = HtmlBrowserLoadState.DomContentLoaded,
+            Timeout = 10000
+        };
+
+        try {
+            await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(url, options);
+            string body = await session.Page.Locator("main").TextContentAsync() ?? string.Empty;
+
+            Assert.Equal("basic auth ready", body);
+        } finally {
+            if (Directory.Exists(userDataDirectory)) {
+                Directory.Delete(userDataDirectory, recursive: true);
+            }
+        }
+    }
+
     private static HttpListener StartLocalPageServer(out string url) {
         int port = GetFreePort();
         url = $"http://localhost:{port}/";
@@ -96,6 +121,41 @@ public class HtmlBrowserPersistentProfileTests {
                 try {
                     HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
                     byte[] body = Encoding.UTF8.GetBytes("<!doctype html><html><body><main>profile ready</main></body></html>");
+                    context.Response.ContentType = "text/html; charset=utf-8";
+                    context.Response.ContentLength64 = body.Length;
+                    await context.Response.OutputStream.WriteAsync(body, 0, body.Length).ConfigureAwait(false);
+                    context.Response.Close();
+                } catch (HttpListenerException) {
+                    break;
+                } catch (ObjectDisposedException) {
+                    break;
+                }
+            }
+        });
+
+        return listener;
+    }
+
+    private static HttpListener StartBasicAuthPageServer(out string url, string username, string password) {
+        int port = GetFreePort();
+        url = $"http://localhost:{port}/";
+        string expected = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
+        HttpListener listener = new();
+        listener.Prefixes.Add(url);
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            while (listener.IsListening) {
+                try {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    if (!string.Equals(context.Request.Headers["Authorization"], expected, StringComparison.Ordinal)) {
+                        context.Response.StatusCode = 401;
+                        context.Response.AddHeader("WWW-Authenticate", "Basic realm=\"HtmlTinkerX\"");
+                        context.Response.Close();
+                        continue;
+                    }
+
+                    byte[] body = Encoding.UTF8.GetBytes("<!doctype html><html><body><main>basic auth ready</main></body></html>");
                     context.Response.ContentType = "text/html; charset=utf-8";
                     context.Response.ContentLength64 = body.Length;
                     await context.Response.OutputStream.WriteAsync(body, 0, body.Length).ConfigureAwait(false);

@@ -54,7 +54,15 @@ public static partial class HtmlBrowser {
             Manifest = false
         };
 
-        HtmlBrowserEvidenceResult result = await ExportEvidenceAsync(session, outFolder, evidenceOptions, cancellationToken).ConfigureAwait(false);
+        bool previousRecordingSuppression = session.SuppressRecipeRecording;
+        HtmlBrowserEvidenceResult result;
+        session.SuppressRecipeRecording = true;
+        try {
+            result = await ExportEvidenceAsync(session, outFolder, evidenceOptions, cancellationToken).ConfigureAwait(false);
+        } finally {
+            session.SuppressRecipeRecording = previousRecordingSuppression;
+        }
+
         result.Purpose = "FailureEvidence";
         result.Operation = options.Operation;
         result.ErrorType = exception.GetType().FullName;

@@ -136,6 +136,28 @@ Describe 'Browser SSO handoff inspection' {
         ($analysis[0] | ConvertTo-Json -Depth 10) | Should -Not -Match 'secret-state'
     }
 
+    It 'detects OAuth handoffs from SPA hash-route query fragments' {
+        $pagePath = Join-Path $TestDrive 'oauth-hash-callback.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><html><head><title>OAuth Hash Callback</title></head><body><main>Signed in</main></body></html>'
+        $callbackUrl = ([System.Uri]::new($pagePath).AbsoluteUri) + '#/callback?code=hash-secret-code&state=hash-secret-state'
+
+        $handoff = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -LoadState DomContentLoaded)
+
+        $handoff.Count | Should -Be 1
+        $handoff[0].Kind | Should -Be 'OAuth2'
+        $handoff[0].FormSelector | Should -Be 'location'
+        $handoff[0].Method | Should -Be 'GET'
+        $handoff[0].PageUrl | Should -Not -Match 'hash-secret-code'
+        $handoff[0].PageUrl | Should -Match '#/callback\?code=<redacted>&state=<redacted>'
+        ($handoff[0].Fields | Where-Object Name -eq 'code').Type | Should -Be 'url-fragment'
+        $handoff[0].FormData['code'] | Should -Be '<redacted>'
+        $handoff[0].FormData['state'] | Should -Be '<redacted>'
+
+        $revealed = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -IncludeSensitiveValues -LoadState DomContentLoaded)
+        $revealed[0].FormData['code'] | Should -Be 'hash-secret-code'
+        $revealed[0].FormData['state'] | Should -Be 'hash-secret-state'
+    }
+
     It 'warns when handoff replay form data is truncated or has duplicate fields' {
         $pagePath = Join-Path $TestDrive 'saml-handoff-duplicate.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

@@ -122,6 +122,18 @@ Describe 'JSON Web Token inspection' {
         $summary.ErrorMessage | Should -Be 'JWT payload must decode to a JSON object.'
     }
 
+    It 'reports out-of-range Unix timestamp claims without throwing' {
+        $headerPart = ConvertTo-Base64Url '{"alg":"RS256","typ":"JWT"}'
+        $payloadPart = ConvertTo-Base64Url '{"exp":9223372036854775807,"sub":"user-subject-secret"}'
+        $signaturePart = ConvertTo-Base64Url 'signature'
+        $token = "$headerPart.$payloadPart.$signaturePart"
+
+        $summary = ConvertFrom-HtmlJsonWebToken -Token $token
+
+        $summary.IsValid | Should -BeFalse
+        $summary.ErrorMessage | Should -Be "JWT claim 'exp' is outside the supported Unix time range."
+    }
+
     It 'warns on expired or unsigned tokens' {
         $expired = ConvertFrom-HtmlJsonWebToken -Token (New-TestJwt -Expired)
         $unsigned = ConvertFrom-HtmlJsonWebToken -Token (New-TestJwt -Algorithm none)

@@ -228,10 +228,23 @@ public static partial class HtmlBrowser {
     private static List<HtmlBrowserSsoField> ReadUrlSsoFields(Uri uri, HtmlBrowserSsoHandoffOptions options) {
         List<HtmlBrowserSsoField> fields = new();
         AddUrlFields(fields, uri.Query, "url-query", options);
-        AddUrlFields(fields, uri.Fragment, "url-fragment", options);
+        AddFragmentUrlFields(fields, uri.Fragment, options);
         return fields
             .Where(static field => SsoHandoffFieldNames.Contains(field.Name.ToLowerInvariant()))
             .ToList();
+    }
+
+    private static void AddFragmentUrlFields(List<HtmlBrowserSsoField> fields, string fragment, HtmlBrowserSsoHandoffOptions options) {
+        if (string.IsNullOrWhiteSpace(fragment)) {
+            return;
+        }
+
+        string trimmed = fragment.TrimStart('#');
+        int queryIndex = trimmed.IndexOf('?');
+        string parameters = queryIndex >= 0
+            ? trimmed.Substring(queryIndex + 1)
+            : trimmed;
+        AddUrlFields(fields, parameters, "url-fragment", options);
     }
 
     private static void AddUrlFields(List<HtmlBrowserSsoField> fields, string component, string type, HtmlBrowserSsoHandoffOptions options) {
@@ -279,11 +292,20 @@ public static partial class HtmlBrowser {
             int queryEnd = fragmentIndex >= 0 ? fragmentIndex : redactedValue.Length;
             string prefix = redactedValue.Substring(0, queryIndex + 1);
             string query = redactedValue.Substring(queryIndex + 1, queryEnd - queryIndex - 1);
-            string fragment = fragmentIndex >= 0 ? "#" + RedactSsoParameterPairs(redactedValue.Substring(fragmentIndex + 1)) : string.Empty;
+            string fragment = fragmentIndex >= 0 ? "#" + RedactSsoFragmentParameterPairs(redactedValue.Substring(fragmentIndex + 1)) : string.Empty;
             return prefix + RedactSsoParameterPairs(query) + fragment;
         }
 
-        return redactedValue.Substring(0, fragmentIndex + 1) + RedactSsoParameterPairs(redactedValue.Substring(fragmentIndex + 1));
+        return redactedValue.Substring(0, fragmentIndex + 1) + RedactSsoFragmentParameterPairs(redactedValue.Substring(fragmentIndex + 1));
+    }
+
+    private static string RedactSsoFragmentParameterPairs(string fragment) {
+        int queryIndex = fragment.IndexOf('?');
+        if (queryIndex < 0) {
+            return RedactSsoParameterPairs(fragment);
+        }
+
+        return fragment.Substring(0, queryIndex + 1) + RedactSsoParameterPairs(fragment.Substring(queryIndex + 1));
     }
 
     private static string RedactSsoParameterPairs(string parameters) {

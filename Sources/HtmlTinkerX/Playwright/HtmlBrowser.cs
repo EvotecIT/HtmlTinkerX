@@ -21,7 +21,7 @@ public static partial class HtmlBrowser {
             CleanInstallDir();
         }
 
-        await EnsureInstalledAsync(options.Browser).ConfigureAwait(false);
+        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
         var playwright = PlaywrightFactory != null
@@ -67,7 +67,7 @@ public static partial class HtmlBrowser {
             CleanInstallDir();
         }
 
-        await EnsureInstalledAsync(options.Browser).ConfigureAwait(false);
+        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
 
         string userDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
 
@@ -94,6 +94,15 @@ public static partial class HtmlBrowser {
             HtmlBrowserEngine.WebKit => playwright.Webkit,
             _ => playwright.Chromium,
         };
+
+    internal static bool ShouldInstallBundledRuntime(HtmlBrowserLaunchOptions options) =>
+        string.IsNullOrWhiteSpace(options.BrowserChannel)
+        && string.IsNullOrWhiteSpace(options.BrowserExecutablePath);
+
+    private static Task EnsureBrowserRuntimeAvailableAsync(HtmlBrowserLaunchOptions options) =>
+        ShouldInstallBundledRuntime(options)
+            ? EnsureInstalledAsync(options.Browser)
+            : EnsureDriverInstalledAsync();
 
     private static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
         var launchOptions = new BrowserTypeLaunchOptions {
@@ -139,6 +148,13 @@ public static partial class HtmlBrowser {
             contextOptions,
             options,
             setStorageState: false);
+
+        if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
+            contextOptions.HttpCredentials = new HttpCredentials {
+                Username = options.Username!,
+                Password = options.Password!
+            };
+        }
 
         if (!string.IsNullOrEmpty(options.BrowserChannel)) {
             contextOptions.Channel = options.BrowserChannel;

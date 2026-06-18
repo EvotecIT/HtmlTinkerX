@@ -335,6 +335,37 @@ public static partial class HtmlBrowser {
         }
     }
 
+    /// <summary>
+    /// Ensures that the Playwright driver is present without installing bundled browser runtimes.
+    /// </summary>
+    /// <returns>A task that completes when the driver installation check/process is finished.</returns>
+    internal static async Task EnsureDriverInstalledAsync() {
+        if (IsDriverCorrupted()) {
+            CleanDriver();
+        }
+
+        if (IsDriverPresent()) {
+            EnsureDriverSearchPath();
+            return;
+        }
+
+        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
+        try {
+            if (IsDriverCorrupted()) {
+                CleanDriver();
+            }
+
+            if (IsDriverPresent()) {
+                EnsureDriverSearchPath();
+                return;
+            }
+
+            await DownloadAndInstallDriverAsync().ConfigureAwait(false);
+        } finally {
+            InstallationSemaphore.Release();
+        }
+    }
+
     private static string[] GetRuntimePrefixes(HtmlBrowserEngine engine) {
         if (engine == HtmlBrowserEngine.Chromium) {
             return new[] { "chromium-", "chromium_headless_shell-" };

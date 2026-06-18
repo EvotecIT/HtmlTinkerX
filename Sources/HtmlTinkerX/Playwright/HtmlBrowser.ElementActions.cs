@@ -122,11 +122,13 @@ public static partial class HtmlBrowser {
             throw new ArgumentOutOfRangeException(nameof(pollMilliseconds), "PollMilliseconds must be greater than zero.");
         }
 
-        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeout);
+        DateTimeOffset? deadline = timeout > 0
+            ? DateTimeOffset.UtcNow.AddMilliseconds(timeout)
+            : null;
         string? previous = null;
         DateTimeOffset stableSince = DateTimeOffset.UtcNow;
 
-        while (DateTimeOffset.UtcNow <= deadline) {
+        while (!deadline.HasValue || DateTimeOffset.UtcNow <= deadline.Value) {
             cancellationToken.ThrowIfCancellationRequested();
             string current = await session.Page.EvaluateAsync<string>("() => document.documentElement.outerHTML").ConfigureAwait(false);
             if (!string.Equals(previous, current, StringComparison.Ordinal)) {
@@ -413,6 +415,7 @@ public static partial class HtmlBrowser {
             Action = HtmlBrowserRecipeAction.ClickText,
             Text = text,
             Exact = exact,
+            Regex = regex,
             Nth = nth,
             WaitForNavigation = waitForNavigation,
             NavigationUrl = navigationUrl,

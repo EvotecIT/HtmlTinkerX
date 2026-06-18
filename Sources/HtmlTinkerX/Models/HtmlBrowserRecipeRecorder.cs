@@ -120,6 +120,7 @@ public sealed class HtmlBrowserRecipeRecorder {
             RedactSensitiveValues = step.RedactSensitiveValues,
             Manifest = step.Manifest,
             Exact = step.Exact,
+            Regex = step.Regex,
             Nth = step.Nth,
             WaitForNavigation = step.WaitForNavigation,
             NavigationUrl = step.NavigationUrl,
