@@ -461,11 +461,9 @@ public static partial class HtmlBrowser {
 
             string packageSrc = Path.Combine(tempDir, "package");
             string packageDest = Path.Combine(baseDir, "package");
-            string packageStage = Path.Combine(baseDir, "package.staging-" + Guid.NewGuid().ToString("N"));
             if (Directory.Exists(packageDest))
                 Directory.Delete(packageDest, true);
-            CopyDirectory(packageSrc, packageStage);
-            Directory.Move(packageStage, packageDest);
+            CopyDirectory(packageSrc, packageDest);
 
 #if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(VersionFile, DriverVersion);
