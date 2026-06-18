@@ -129,6 +129,44 @@ Describe 'Browser recipe recording' {
         @($inputStep.SelectorAlternates).Count | Should -Be 0
     }
 
+    It 'records Nth for disambiguated selector clicks and replays the same occurrence' {
+        $pagePath = Join-Path $TestDrive 'recording-nth-click.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button class="choice" onclick="document.getElementById('result').textContent = 'first'">Choose</button>
+    <button class="choice" onclick="document.getElementById('result').textContent = 'second'">Choose</button>
+    <section id="result">waiting</section>
+  </main>
+</body>
+</html>
+'@
+        $recipePath = Join-Path $TestDrive 'recorded-nth.browser.recipe.json'
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'NthRecording' -IncludeCurrentUrl | Out-Null
+            Invoke-HtmlBrowserClick -Session $session -Selector '.choice' -Nth 1
+            Wait-HtmlBrowserContent -Session $session -Selector '#result' -Text 'second' -Exact
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
+        $clickStep = $recipe.Steps | Where-Object Action -eq 'Click' | Select-Object -First 1
+
+        $clickStep.Nth | Should -Be 1
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath
+
+        $result.Succeeded | Should -BeTrue
+        $result.Steps[0].Succeeded | Should -BeTrue
+    }
+
     It 'exports a recording snapshot without stopping recording' {
         $pagePath = Join-Path $TestDrive 'recording-snapshot.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main><input id="q" /></main>'

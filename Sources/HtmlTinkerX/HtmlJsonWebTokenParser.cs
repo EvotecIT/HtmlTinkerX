@@ -68,6 +68,16 @@ public static class HtmlJsonWebTokenParser {
             }
 
             using (payload) {
+                if (header!.RootElement.ValueKind != JsonValueKind.Object) {
+                    summary.ErrorMessage = "JWT header must decode to a JSON object.";
+                    return summary;
+                }
+
+                if (payload!.RootElement.ValueKind != JsonValueKind.Object) {
+                    summary.ErrorMessage = "JWT payload must decode to a JSON object.";
+                    return summary;
+                }
+
                 PopulateHeader(summary, header!.RootElement);
                 PopulatePayload(summary, payload!.RootElement, includeSensitiveValues);
 

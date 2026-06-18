@@ -82,6 +82,28 @@ fetch('/api/never-ending');
         }
     }
 
+    It 'waits for selector click navigation when the page reloads to the same URL' {
+        $session = Start-HtmlBrowserSession -Url 'about:blank' -LoadState DomContentLoaded
+        try {
+            Register-HtmlRoute -Session $session -Pattern '**/reload.html' -ScriptBlock {
+                param($route)
+                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                    Status      = 200
+                    ContentType = 'text/html'
+                    Body        = '<!doctype html><button id="reload" onclick="location.reload()">Reload</button><main id="status">same-url-ready</main>'
+                }) | Out-Null
+            } | Out-Null
+
+            Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/reload.html' -LoadState DomContentLoaded -Timeout 2000
+            Invoke-HtmlBrowserNavigation -Session $session -Selector '#reload' -WaitForNavigation -LoadState DomContentLoaded -Timeout 2000
+            Wait-HtmlBrowserContent -Session $session -Selector '#status' -Text 'same-url-ready' -Exact -Timeout 1000
+
+            $session.Page.Url | Should -Be 'https://example.com/reload.html'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'waits for DomContentLoaded after text clicks when network activity stays open' {
         $session = Start-HtmlBrowserSession -Url 'about:blank' -LoadState DomContentLoaded
         try {

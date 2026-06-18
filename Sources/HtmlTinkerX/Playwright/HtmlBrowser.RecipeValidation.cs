@@ -201,7 +201,7 @@ public static partial class HtmlBrowser {
 
     private static void ValidateSelectValues(HtmlBrowserRecipeValidationResult result, HtmlBrowserRecipeStep step, int index, ISet<string> runtimeVariables) {
         if (!string.IsNullOrWhiteSpace(step.ValueVariable)) {
-            if (!runtimeVariables.Contains(step.ValueVariable!)) {
+            if (!runtimeVariables.Contains(step.ValueVariable!) && step.Values.Count == 0) {
                 AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Error, step, index, nameof(step.ValueVariable), $"Runtime variable '{step.ValueVariable}' was not supplied.", $"Run Invoke-HtmlBrowserRecipe with -Variable @{{ {step.ValueVariable} = '<value>' }}.");
             }
             return;
@@ -249,8 +249,9 @@ public static partial class HtmlBrowser {
 
     private static bool IsRecipeVariableRequired(HtmlBrowserRecipeStep step) =>
         step.ValueRedacted == true
-        || step.Action == HtmlBrowserRecipeAction.SelectOption
-        || (string.IsNullOrEmpty(step.Value) && step.Values.Count == 0);
+        || (step.Action == HtmlBrowserRecipeAction.SelectOption
+            ? step.Values.Count == 0
+            : string.IsNullOrEmpty(step.Value) && step.Values.Count == 0);
 
     private static bool IsSensitiveRecipeVariable(HtmlBrowserRecipeStep step, string name) =>
         step.ValueRedacted == true

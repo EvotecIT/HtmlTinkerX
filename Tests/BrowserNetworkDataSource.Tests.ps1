@@ -49,6 +49,7 @@ fetch('/api/items')
 
             $sources = Find-HtmlBrowserDataSource -Session $session -IncludeResponseBody -RedactResponseBody
             $source = $sources | Where-Object Url -like '*/api/items' | Select-Object -First 1
+            $sourcesWithDocument = Find-HtmlBrowserDataSource -Session $session -IncludeDocument
 
             $source | Should -Not -BeNullOrEmpty
             $source.Kind | Should -Be 'ObservedApiEndpoint'
@@ -68,6 +69,9 @@ fetch('/api/items')
             $recipeResult = Import-HtmlExtractionRecipe -Path $recipePath | Invoke-HtmlExtractionRecipe
             $recipeResult.Success | Should -BeTrue
             $recipeResult.Items.Name | Should -Contain 'Alpha'
+
+            ($sourcesWithDocument | Where-Object Url -like '*/api/items' | Select-Object -First 1) | Should -Not -BeNullOrEmpty
+            ($sourcesWithDocument | Where-Object { $_.Type -eq 'Document' -and $_.Url -like '*/observed.html' } | Select-Object -First 1) | Should -Not -BeNullOrEmpty
         } finally {
             Close-HtmlBrowserSession -Session $session
         }

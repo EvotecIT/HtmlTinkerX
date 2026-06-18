@@ -326,7 +326,7 @@ public static partial class HtmlBrowser {
         }
 
         IPlaywright playwright;
-        IBrowser browserInstance;
+        IBrowser? browserInstance;
         IBrowserContext context;
         IPage page;
         string? resolvedUserDataDirectory = null;
@@ -348,7 +348,7 @@ public static partial class HtmlBrowser {
         } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
             resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
             (playwright, context, page) = await LaunchPersistentContextAsync(options, cancellationToken).ConfigureAwait(false);
-            browserInstance = context.Browser ?? throw new InvalidOperationException("Persistent browser context did not expose an owning browser instance.");
+            browserInstance = context.Browser;
             closeBrowserOnDispose = false;
         } else {
             (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);

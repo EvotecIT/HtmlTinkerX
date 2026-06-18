@@ -110,6 +110,18 @@ Describe 'JSON Web Token inspection' {
         $summary.SuggestedCommand | Should -Be 'Get-HtmlBrowserSsoHandoff -Session $session -IncludeSensitiveValues | ConvertFrom-HtmlJsonWebToken'
     }
 
+    It 'reports non-object JWT payloads without throwing' {
+        $headerPart = ConvertTo-Base64Url '{"alg":"RS256","typ":"JWT"}'
+        $payloadPart = ConvertTo-Base64Url '[]'
+        $signaturePart = ConvertTo-Base64Url 'signature'
+        $token = "$headerPart.$payloadPart.$signaturePart"
+
+        $summary = ConvertFrom-HtmlJsonWebToken -Token $token
+
+        $summary.IsValid | Should -BeFalse
+        $summary.ErrorMessage | Should -Be 'JWT payload must decode to a JSON object.'
+    }
+
     It 'warns on expired or unsigned tokens' {
         $expired = ConvertFrom-HtmlJsonWebToken -Token (New-TestJwt -Expired)
         $unsigned = ConvertFrom-HtmlJsonWebToken -Token (New-TestJwt -Algorithm none)

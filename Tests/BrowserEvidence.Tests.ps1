@@ -1,5 +1,131 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
 
+if (-not ('PngEvidenceTestReader' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.IO.Compression;
+using System.Text;
+
+public static class PngEvidenceTestReader {
+    public static int CountGreenPixels(string path) {
+        byte[] bytes = File.ReadAllBytes(path);
+        int width = 0;
+        int height = 0;
+        int bitDepth = 0;
+        int colorType = 0;
+        MemoryStream compressed = new MemoryStream();
+        int offset = 8;
+        while (offset < bytes.Length) {
+            int length = ReadInt32BigEndian(bytes, offset);
+            string type = Encoding.ASCII.GetString(bytes, offset + 4, 4);
+            int dataOffset = offset + 8;
+            if (type == "IHDR") {
+                width = ReadInt32BigEndian(bytes, dataOffset);
+                height = ReadInt32BigEndian(bytes, dataOffset + 4);
+                bitDepth = bytes[dataOffset + 8];
+                colorType = bytes[dataOffset + 9];
+            } else if (type == "IDAT") {
+                compressed.Write(bytes, dataOffset, length);
+            } else if (type == "IEND") {
+                break;
+            }
+
+            offset = dataOffset + length + 4;
+        }
+
+        if (bitDepth != 8 || (colorType != 2 && colorType != 6)) {
+            throw new InvalidOperationException("Test PNG reader supports only 8-bit RGB/RGBA PNG files.");
+        }
+
+        byte[] zlib = compressed.ToArray();
+        MemoryStream deflateInput = new MemoryStream(zlib, 2, zlib.Length - 6);
+        DeflateStream deflate = new DeflateStream(deflateInput, CompressionMode.Decompress);
+        MemoryStream raw = new MemoryStream();
+        try {
+            deflate.CopyTo(raw);
+        } finally {
+            deflate.Dispose();
+            deflateInput.Dispose();
+            compressed.Dispose();
+        }
+
+        byte[] data = raw.ToArray();
+        int bytesPerPixel = colorType == 6 ? 4 : 3;
+        int rowLength = width * bytesPerPixel;
+        byte[] previous = new byte[rowLength];
+        int source = 0;
+        int greenPixels = 0;
+
+        for (int y = 0; y < height; y++) {
+            int filter = data[source++];
+            byte[] row = new byte[rowLength];
+            Array.Copy(data, source, row, 0, rowLength);
+            source += rowLength;
+            ApplyFilter(row, previous, bytesPerPixel, filter);
+
+            for (int x = 0; x < width; x++) {
+                int pixel = x * bytesPerPixel;
+                if (row[pixel] < 20 && row[pixel + 1] > 220 && row[pixel + 2] < 20) {
+                    greenPixels++;
+                }
+            }
+
+            previous = row;
+        }
+
+        return greenPixels;
+    }
+
+    private static void ApplyFilter(byte[] row, byte[] previous, int bytesPerPixel, int filter) {
+        for (int i = 0; i < row.Length; i++) {
+            int left = i >= bytesPerPixel ? row[i - bytesPerPixel] : 0;
+            int up = previous[i];
+            int upLeft = i >= bytesPerPixel ? previous[i - bytesPerPixel] : 0;
+            int add;
+            switch (filter) {
+                case 0:
+                    add = 0;
+                    break;
+                case 1:
+                    add = left;
+                    break;
+                case 2:
+                    add = up;
+                    break;
+                case 3:
+                    add = (left + up) / 2;
+                    break;
+                case 4:
+                    add = Paeth(left, up, upLeft);
+                    break;
+                default:
+                    throw new InvalidOperationException("Unsupported PNG filter.");
+            }
+            row[i] = unchecked((byte)(row[i] + add));
+        }
+    }
+
+    private static int Paeth(int left, int up, int upLeft) {
+        int p = left + up - upLeft;
+        int pa = Math.Abs(p - left);
+        int pb = Math.Abs(p - up);
+        int pc = Math.Abs(p - upLeft);
+        if (pa <= pb && pa <= pc) return left;
+        if (pb <= pc) return up;
+        return upLeft;
+    }
+
+    private static int ReadInt32BigEndian(byte[] bytes, int offset) {
+        return (bytes[offset] << 24)
+            | (bytes[offset + 1] << 16)
+            | (bytes[offset + 2] << 8)
+            | bytes[offset + 3];
+    }
+}
+'@
+}
+
 Describe 'Browser evidence exports' {
     It 'exports the evidence command' {
         (Get-Command Export-HtmlBrowserEvidence).Name | Should -Be 'Export-HtmlBrowserEvidence'
@@ -98,23 +224,7 @@ Describe 'Browser evidence exports' {
 
         Export-HtmlBrowserEvidence -Path $pagePath -OutFolder $outFolder -BaseFileName masked -Artifact Screenshot -ScreenshotMaskColor '#00ff00' -LoadState DomContentLoaded | Out-Null
 
-        Add-Type -AssemblyName System.Drawing
-        $bitmap = [System.Drawing.Bitmap]::new((Join-Path $outFolder 'masked.png'))
-        try {
-            $greenPixels = 0
-            for ($x = 0; $x -lt $bitmap.Width; $x++) {
-                for ($y = 0; $y -lt $bitmap.Height; $y++) {
-                    $pixel = $bitmap.GetPixel($x, $y)
-                    if ($pixel.R -lt 20 -and $pixel.G -gt 220 -and $pixel.B -lt 20) {
-                        $greenPixels++
-                    }
-                }
-            }
-
-            $greenPixels | Should -BeGreaterThan 100
-        } finally {
-            $bitmap.Dispose()
-        }
+        [PngEvidenceTestReader]::CountGreenPixels((Join-Path $outFolder 'masked.png')) | Should -BeGreaterThan 100
     }
 
     It 'masks PDF evidence without leaving temporary page attributes' {

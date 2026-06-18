@@ -99,6 +99,9 @@ public sealed class HtmlBrowserRecipeStep {
     /// <summary>Use exact text matching where supported.</summary>
     public bool Exact { get; set; }
 
+    /// <summary>Zero-based occurrence targeted when a recorded selector or text click was disambiguated.</summary>
+    public int? Nth { get; set; }
+
     /// <summary>Wait for a navigation event after click steps where supported.</summary>
     public bool WaitForNavigation { get; set; }
 

@@ -22,7 +22,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// <summary>
     /// Gets the browser instance opened for this session.
     /// </summary>
-    public IBrowser Browser { get; }
+    public IBrowser? Browser { get; }
 
     /// <summary>
     /// Gets the browser context used to create pages.
@@ -135,7 +135,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// </summary>
     public HtmlBrowserSession(
         IPlaywright playwright,
-        IBrowser browser,
+        IBrowser? browser,
         IBrowserContext context,
         IPage page,
         IVideo? video = null,

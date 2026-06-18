@@ -165,6 +165,13 @@ Describe 'Browser recipes' {
                     Action        = 'SelectOption'
                     Selector      = '#scope'
                     ValueVariable = 'scope'
+                },
+                [ordered]@{
+                    Name          = 'Choose stored scope'
+                    Action        = 'SelectOption'
+                    Selector      = '#storedScope'
+                    Values        = @('archive')
+                    ValueVariable = 'storedScope'
                 }
             )
         }
@@ -179,7 +186,9 @@ Describe 'Browser recipes' {
         ($validation.Variables | Where-Object Name -eq 'query').Required | Should -BeFalse
         ($validation.Variables | Where-Object Name -eq 'query').Supplied | Should -BeFalse
         ($validation.Variables | Where-Object Name -eq 'scope').Required | Should -BeTrue
+        ($validation.Variables | Where-Object Name -eq 'storedScope').Required | Should -BeFalse
         ($validation.Issues | Where-Object Message -eq "Runtime variable 'query' was not supplied.").Count | Should -Be 0
+        ($validation.Issues | Where-Object Message -eq "Runtime variable 'storedScope' was not supplied.").Count | Should -Be 0
     }
 
     It 'exports variable templates and validates from filled variable files' {

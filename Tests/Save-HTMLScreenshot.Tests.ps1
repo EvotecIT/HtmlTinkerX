@@ -1,5 +1,26 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
 
+if (-not ('PngScreenshotTestReader' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+
+public static class PngScreenshotTestReader {
+    public static int[] GetDimensions(string path) {
+        byte[] bytes = File.ReadAllBytes(path);
+        return new[] { ReadInt32BigEndian(bytes, 16), ReadInt32BigEndian(bytes, 20) };
+    }
+
+    private static int ReadInt32BigEndian(byte[] bytes, int offset) {
+        return (bytes[offset] << 24)
+            | (bytes[offset + 1] << 16)
+            | (bytes[offset + 2] << 8)
+            | bytes[offset + 3];
+    }
+}
+'@
+}
+
 Describe 'Save-HtmlBrowserScreenshot' {
     It 'exposes reusable launch profile parameters for one-shot captures' {
         (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'ProfilePath'
@@ -52,14 +73,9 @@ Describe 'Save-HtmlBrowserScreenshot' {
 
         Save-HtmlBrowserScreenshot -Path $path -OutFile $outfile -Scenario AuditProof -Selector '#loaded'
 
-        Add-Type -AssemblyName System.Drawing
-        $bitmap = [System.Drawing.Bitmap]::new($outfile)
-        try {
-            $bitmap.Width | Should -Be 1366
-            $bitmap.Height | Should -Be 900
-        } finally {
-            $bitmap.Dispose()
-        }
+        $dimensions = [PngScreenshotTestReader]::GetDimensions($outfile)
+        $dimensions[0] | Should -Be 1366
+        $dimensions[1] | Should -Be 900
     }
 
     It 'Creates a clipped screenshot' {

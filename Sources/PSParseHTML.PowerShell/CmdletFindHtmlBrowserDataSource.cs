@@ -92,6 +92,11 @@ public sealed class CmdletFindHtmlBrowserDataSource : AsyncPSCmdlet {
             options.ResourceTypes.Add(resourceType);
         }
 
+        if (IncludeDocument.IsPresent && options.ResourceTypes.Count == 0) {
+            options.ResourceTypes.Add(HtmlNetworkResourceType.XHR);
+            options.ResourceTypes.Add(HtmlNetworkResourceType.Fetch);
+        }
+
         if (IncludeDocument.IsPresent && !options.ResourceTypes.Contains(HtmlNetworkResourceType.Document)) {
             options.ResourceTypes.Add(HtmlNetworkResourceType.Document);
         }
