@@ -45,6 +45,11 @@ public static partial class HtmlBrowser {
             throw new ArgumentException("CDP attach is only supported for Chromium-based browsers. Use Browser Chromium with CdpEndpointUrl.", nameof(options));
         }
 
+        if (PlaywrightFactory == null) {
+            await EnsureDriverInstalledAsync().ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         var playwright = PlaywrightFactory != null
             ? await PlaywrightFactory().ConfigureAwait(false)
             : await Playwright.CreateAsync();

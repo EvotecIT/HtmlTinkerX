@@ -155,4 +155,53 @@ Describe 'Browser profiles' {
         $profileOptions.BlockResourceTypes | Should -Contain ([HtmlTinkerX.HtmlNetworkResourceType]::Script)
         $profileOptions.BlockResourcePatterns | Should -Contain '**/tracking/**'
     }
+
+    It 'clears scenario defaults when explicit scenario overrides a profile scenario' {
+        $profile = [HtmlTinkerX.HtmlBrowserProfile]::new()
+        $profile.Scenario = [HtmlTinkerX.HtmlBrowserScenario]::LowBandwidth
+        $profile.BlockResourceTypes.Add([HtmlTinkerX.HtmlNetworkResourceType]::Script)
+
+        $options = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $options.ApplyProfile($profile)
+        $options.ApplyScenario([HtmlTinkerX.HtmlBrowserScenario]::Custom)
+
+        $options.Scenario | Should -Be 'Custom'
+        $options.LoadState | Should -Be 'NetworkIdle'
+        $options.Timeout | Should -Be 10000
+        $options.BlockResourceTypes | Should -Contain ([HtmlTinkerX.HtmlNetworkResourceType]::Script)
+        $options.BlockResourceTypes | Should -Not -Contain ([HtmlTinkerX.HtmlNetworkResourceType]::Image)
+        $options.BlockResourceTypes | Should -Not -Contain ([HtmlTinkerX.HtmlNetworkResourceType]::Media)
+        $options.BlockResourceTypes | Should -Not -Contain ([HtmlTinkerX.HtmlNetworkResourceType]::Font)
+    }
+
+    It 'lets explicit state path and proxy parameters clear inherited profile launch values' {
+        $assembly = [PSParseHTML.PowerShell.CmdletStartHtmlBrowserSession].Assembly
+        $requestType = $assembly.GetType('PSParseHTML.PowerShell.HtmlBrowserLaunchOptionRequest', $true)
+        $factoryType = $assembly.GetType('PSParseHTML.PowerShell.HtmlBrowserLaunchOptionFactory', $true)
+        $method = $factoryType.GetMethod('CreateAsync', [System.Reflection.BindingFlags] 'Public,Static')
+
+        $baseOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $baseOptions.UserDataDirectory = Join-Path $TestDrive 'profile'
+        $baseOptions.Proxy = 'http://old-proxy:8080'
+        $baseOptions.ProxyUsername = 'old-user'
+        $baseOptions.ProxyPassword = 'old-password'
+
+        $request = [System.Activator]::CreateInstance($requestType, $true)
+        $requestType.GetProperty('BaseOptions').SetValue($request, $baseOptions)
+        $requestType.GetProperty('BoundParameters').SetValue($request, [hashtable] @{
+            StatePath = $true
+            Proxy     = $true
+        })
+        $requestType.GetProperty('StatePath').SetValue($request, (Join-Path $TestDrive 'state.json'))
+        $requestType.GetProperty('Proxy').SetValue($request, 'http://new-proxy:8080')
+
+        $task = $method.Invoke($null, @($request, [System.Threading.CancellationToken]::None))
+        $options = $task.GetAwaiter().GetResult()
+
+        $options.StorageStatePath | Should -Match 'state\.json$'
+        $options.UserDataDirectory | Should -BeNullOrEmpty
+        $options.Proxy | Should -Be 'http://new-proxy:8080'
+        $options.ProxyUsername | Should -BeNullOrEmpty
+        $options.ProxyPassword | Should -BeNullOrEmpty
+    }
 }

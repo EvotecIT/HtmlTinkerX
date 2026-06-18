@@ -12,6 +12,14 @@ using System.Collections.Generic;
 /// rules in PowerShell-specific code.
 /// </remarks>
 public sealed class HtmlBrowserLaunchOptions {
+    private readonly List<HtmlNetworkResourceType> _scenarioDefaultBlockResourceTypes = new();
+    private HtmlBrowserLoadState? _scenarioDefaultLoadState;
+    private int? _scenarioDefaultTimeout;
+    private int? _scenarioDefaultViewportWidth;
+    private int? _scenarioDefaultViewportHeight;
+    private int? _scenarioDefaultScreenWidth;
+    private int? _scenarioDefaultScreenHeight;
+
     /// <summary>Browser engine to use.</summary>
     public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
@@ -251,6 +259,7 @@ public sealed class HtmlBrowserLaunchOptions {
 
     /// <summary>Applies scenario defaults before profiles or explicit caller options refine the launch configuration.</summary>
     public void ApplyScenario(HtmlBrowserScenario scenario) {
+        ClearScenarioDefaults();
         if (scenario == HtmlBrowserScenario.Custom) {
             Scenario = scenario;
             return;
@@ -273,7 +282,7 @@ public sealed class HtmlBrowserLaunchOptions {
                 break;
             case HtmlBrowserScenario.LowBandwidth:
                 ApplyDomReadyDefaults(timeout: 30000);
-                AddMissing(BlockResourceTypes, new[] {
+                AddScenarioResourceDefaults(new[] {
                     HtmlNetworkResourceType.Image,
                     HtmlNetworkResourceType.Media,
                     HtmlNetworkResourceType.Font
@@ -289,21 +298,85 @@ public sealed class HtmlBrowserLaunchOptions {
     }
 
     private void ApplyEvidenceDefaults(int timeout) {
-        ViewportWidth ??= 1366;
-        ViewportHeight ??= 900;
-        ScreenWidth ??= ViewportWidth;
-        ScreenHeight ??= ViewportHeight;
+        if (!ViewportWidth.HasValue) {
+            ViewportWidth = 1366;
+            _scenarioDefaultViewportWidth = ViewportWidth;
+        }
+
+        if (!ViewportHeight.HasValue) {
+            ViewportHeight = 900;
+            _scenarioDefaultViewportHeight = ViewportHeight;
+        }
+
+        if (!ScreenWidth.HasValue) {
+            ScreenWidth = ViewportWidth;
+            _scenarioDefaultScreenWidth = ScreenWidth;
+        }
+
+        if (!ScreenHeight.HasValue) {
+            ScreenHeight = ViewportHeight;
+            _scenarioDefaultScreenHeight = ScreenHeight;
+        }
+
         ApplyDomReadyDefaults(timeout);
     }
 
     private void ApplyDomReadyDefaults(int timeout) {
         if (LoadState == HtmlBrowserLoadState.NetworkIdle) {
             LoadState = HtmlBrowserLoadState.DomContentLoaded;
+            _scenarioDefaultLoadState = LoadState;
         }
 
         if (Timeout <= 10000) {
             Timeout = timeout;
+            _scenarioDefaultTimeout = Timeout;
         }
+    }
+
+    private void AddScenarioResourceDefaults(IEnumerable<HtmlNetworkResourceType> values) {
+        foreach (HtmlNetworkResourceType value in values) {
+            if (!BlockResourceTypes.Contains(value)) {
+                BlockResourceTypes.Add(value);
+                _scenarioDefaultBlockResourceTypes.Add(value);
+            }
+        }
+    }
+
+    private void ClearScenarioDefaults() {
+        foreach (HtmlNetworkResourceType value in _scenarioDefaultBlockResourceTypes) {
+            BlockResourceTypes.Remove(value);
+        }
+        _scenarioDefaultBlockResourceTypes.Clear();
+
+        if (_scenarioDefaultLoadState.HasValue && LoadState == _scenarioDefaultLoadState.Value) {
+            LoadState = HtmlBrowserLoadState.NetworkIdle;
+        }
+        _scenarioDefaultLoadState = null;
+
+        if (_scenarioDefaultTimeout.HasValue && Timeout == _scenarioDefaultTimeout.Value) {
+            Timeout = 10000;
+        }
+        _scenarioDefaultTimeout = null;
+
+        if (_scenarioDefaultViewportWidth.HasValue && ViewportWidth == _scenarioDefaultViewportWidth.Value) {
+            ViewportWidth = null;
+        }
+        _scenarioDefaultViewportWidth = null;
+
+        if (_scenarioDefaultViewportHeight.HasValue && ViewportHeight == _scenarioDefaultViewportHeight.Value) {
+            ViewportHeight = null;
+        }
+        _scenarioDefaultViewportHeight = null;
+
+        if (_scenarioDefaultScreenWidth.HasValue && ScreenWidth == _scenarioDefaultScreenWidth.Value) {
+            ScreenWidth = null;
+        }
+        _scenarioDefaultScreenWidth = null;
+
+        if (_scenarioDefaultScreenHeight.HasValue && ScreenHeight == _scenarioDefaultScreenHeight.Value) {
+            ScreenHeight = null;
+        }
+        _scenarioDefaultScreenHeight = null;
     }
 
     private static void AddRange<T>(IList<T> target, IEnumerable<T>? values) {

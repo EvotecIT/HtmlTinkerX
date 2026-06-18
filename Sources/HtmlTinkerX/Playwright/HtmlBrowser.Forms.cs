@@ -172,6 +172,17 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Attempts to click a visible element in an existing browser session.
     /// </summary>
-    public static Task<bool> TryMouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default)
-        => TryMouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken);
+    public static async Task<bool> TryMouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default) {
+        bool clicked = await TryMouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken).ConfigureAwait(false);
+        if (clicked && button == MouseButton.Left && clickCount == 1 && (modifiers == null || modifiers.Length == 0)) {
+            await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+                Action = HtmlBrowserRecipeAction.Click,
+                Selector = selector,
+                Timeout = timeout,
+                ContinueOnError = true
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        return clicked;
+    }
 }

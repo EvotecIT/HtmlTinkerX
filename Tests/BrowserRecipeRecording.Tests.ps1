@@ -205,6 +205,44 @@ Describe 'Browser recipe recording' {
         $result.Steps[0].Succeeded | Should -BeTrue
     }
 
+    It 'records successful best-effort visible clicks' {
+        $pagePath = Join-Path $TestDrive 'recording-if-visible-clicks.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button id="accept" onclick="document.getElementById('status').textContent = 'accepted'">Accept</button>
+    <button id="load" onclick="document.getElementById('status').textContent = 'loaded'">Load more</button>
+    <section id="status">waiting</section>
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $recipePath = Join-Path $TestDrive 'recorded-if-visible.browser.recipe.json'
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'IfVisibleRecording' -IncludeCurrentUrl | Out-Null
+            Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -Exact -IfVisible
+            Invoke-HtmlBrowserClick -Session $session -Selector '#load' -IfVisible
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
+        $textClick = $recipe.Steps | Where-Object Action -eq 'ClickText' | Select-Object -First 1
+        $selectorClick = $recipe.Steps | Where-Object Action -eq 'Click' | Select-Object -First 1
+
+        $textClick.Text | Should -Be 'Accept'
+        $textClick.Exact | Should -BeTrue
+        $textClick.ContinueOnError | Should -BeTrue
+        $selectorClick.Selector | Should -Be '#load'
+        $selectorClick.ContinueOnError | Should -BeTrue
+    }
+
     It 'exports a recording snapshot without stopping recording' {
         $pagePath = Join-Path $TestDrive 'recording-snapshot.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main><input id="q" /></main>'

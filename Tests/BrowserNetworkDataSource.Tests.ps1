@@ -168,6 +168,11 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source.ReplayRequestHeaders.Keys | Should -Contain 'x-requested-with'
         $source.ReplayRequestHeaders.Keys | Should -Not -Contain 'authorization'
         $source.ReplayRequestHeaders.Keys | Should -Not -Contain 'cookie'
+        $recipe = [HtmlTinkerX.HtmlBrowserlessExtraction]::CreateRecipe($source)
+        $recipe.ReplayRequestHeaders.Keys | Should -Contain 'accept'
+        $recipe.ReplayRequestHeaders.Keys | Should -Contain 'x-requested-with'
+        $recipe.ReplayRequestHeaders.Keys | Should -Not -Contain 'authorization'
+        $recipe.ReplayRequestHeaders.Keys | Should -Not -Contain 'cookie'
         $source.SensitiveRequestHeaderNames | Should -Contain 'authorization'
         $source.SensitiveRequestHeaderNames | Should -Contain 'cookie'
         $source.SuggestedReplayCommand | Should -Match 'ConvertTo-HtmlWebRequestSession'

@@ -43,17 +43,68 @@ internal static class HtmlBrowserLaunchOptionFactory {
         if (IsBound(request.BoundParameters, nameof(request.SlowMo))) {
             options.SlowMo = request.SlowMo;
         }
-        options.Proxy = request.Proxy ?? options.Proxy;
-        options.ProxyUsername = request.ProxyCredential?.UserName ?? options.ProxyUsername;
-        options.ProxyPassword = request.ProxyCredential?.GetNetworkCredential().Password ?? options.ProxyPassword;
+        bool proxyBound = IsBound(request.BoundParameters, nameof(request.Proxy));
+        bool proxyCredentialBound = IsBound(request.BoundParameters, nameof(request.ProxyCredential));
+        if (proxyBound) {
+            options.Proxy = request.Proxy;
+            if (!proxyCredentialBound) {
+                options.ProxyUsername = null;
+                options.ProxyPassword = null;
+            }
+        }
+
+        if (proxyCredentialBound) {
+            options.ProxyUsername = request.ProxyCredential?.UserName;
+            options.ProxyPassword = request.ProxyCredential?.GetNetworkCredential().Password;
+        }
+
         options.LoadState = IsBound(request.BoundParameters, nameof(request.LoadState)) ? request.LoadState : options.LoadState;
         options.Timeout = IsBound(request.BoundParameters, request.TimeoutParameterName) ? request.Timeout : options.Timeout;
 
-        SetIfBound(request, nameof(request.UserDataDirectory), value => options.UserDataDirectory = value, request.UserDataDirectory?.ToFullPath());
-        SetIfBound(request, nameof(request.StatePath), value => options.StorageStatePath = value, request.StatePath?.ToFullPath());
+        bool userDataDirectoryBound = IsBound(request.BoundParameters, nameof(request.UserDataDirectory));
+        bool statePathBound = IsBound(request.BoundParameters, nameof(request.StatePath));
+        bool cdpEndpointBound = IsBound(request.BoundParameters, nameof(request.CdpEndpointUrl));
+        if (userDataDirectoryBound) {
+            options.UserDataDirectory = request.UserDataDirectory?.ToFullPath();
+            if (!statePathBound) {
+                options.StorageStatePath = null;
+            }
+            if (!cdpEndpointBound) {
+                options.CdpEndpointUrl = null;
+            }
+        }
+
+        if (statePathBound) {
+            options.StorageStatePath = request.StatePath?.ToFullPath();
+            if (!userDataDirectoryBound) {
+                options.UserDataDirectory = null;
+            }
+            if (!cdpEndpointBound) {
+                options.CdpEndpointUrl = null;
+            }
+        }
+
         SetIfBound(request, nameof(request.BrowserChannel), value => options.BrowserChannel = value, request.BrowserChannel);
         SetIfBound(request, nameof(request.BrowserExecutablePath), value => options.BrowserExecutablePath = value, request.BrowserExecutablePath?.ToFullPath());
-        SetIfBound(request, nameof(request.CdpEndpointUrl), value => options.CdpEndpointUrl = value, request.CdpEndpointUrl);
+        if (cdpEndpointBound) {
+            options.CdpEndpointUrl = request.CdpEndpointUrl;
+            if (!userDataDirectoryBound) {
+                options.UserDataDirectory = null;
+            }
+            if (!statePathBound) {
+                options.StorageStatePath = null;
+            }
+            if (!IsBound(request.BoundParameters, nameof(request.BrowserChannel))) {
+                options.BrowserChannel = null;
+            }
+            if (!IsBound(request.BoundParameters, nameof(request.BrowserExecutablePath))) {
+                options.BrowserExecutablePath = null;
+            }
+            if (!IsBound(request.BoundParameters, nameof(request.Clean))) {
+                options.Clean = false;
+            }
+        }
+
         SetIfBound(request, nameof(request.UserAgent), value => options.UserAgent = value, request.UserAgent);
         SetIfBound(request, nameof(request.Locale), value => options.Locale = value, request.Locale);
         SetIfBound(request, nameof(request.ViewportWidth), value => options.ViewportWidth = value, request.ViewportWidth);

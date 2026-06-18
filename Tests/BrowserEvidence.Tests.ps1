@@ -203,6 +203,46 @@ Describe 'Browser evidence exports' {
         $markdown | Should -Not -Match 'abc\.def\.ghi'
     }
 
+    It 'redacts OAuth state URLs and MFA values from evidence artifacts' {
+        $pagePath = Join-Path $TestDrive 'evidence-sensitive-callback.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<head><title>Sensitive Callback</title></head>
+<body>
+  <main>
+    <p>otp=123456 passcode=654321 pin=4321</p>
+    <input type="hidden" name="otp" value="111222" />
+    <input type="hidden" name="pwd" value="temporary-password" />
+    <script>window.mfa = { otp: "333444", passcode: "555666", pwd: "script-password" };</script>
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri + '#/callback?code=secret-code&state=secret-state'
+        $outFolder = Join-Path $TestDrive 'sensitive-callback-evidence'
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            $result = Export-HtmlBrowserEvidence -Session $session -OutFolder $outFolder -BaseFileName callback -Artifact Html,Text,Markdown -NetworkSummary
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $manifest = Get-Content -LiteralPath $result.ManifestPath -Raw | ConvertFrom-Json
+        $html = Get-Content -LiteralPath (Join-Path $outFolder 'callback.html') -Raw
+        $text = Get-Content -LiteralPath (Join-Path $outFolder 'callback.txt') -Raw
+        $markdown = Get-Content -LiteralPath (Join-Path $outFolder 'callback.md') -Raw
+
+        $manifest.Url | Should -Match 'state=<redacted>'
+        $manifest.FinalUrl | Should -Match 'code=<redacted>'
+        $manifest.Url | Should -Not -Match 'secret-state'
+        $manifest.FinalUrl | Should -Not -Match 'secret-code'
+        $html | Should -Not -Match '111222|temporary-password|333444|555666|script-password'
+        $text | Should -Not -Match '123456|654321|4321'
+        $markdown | Should -Not -Match '123456|654321|4321'
+    }
+
     It 'masks sensitive fields in screenshot evidence by default' {
         $pagePath = Join-Path $TestDrive 'masked-screenshot-page.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
