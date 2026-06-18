@@ -298,7 +298,7 @@ internal static class HtmlSensitiveValueRedactor {
 
         redacted = Regex.Replace(
             redacted,
-            "((?:[A-Za-z_$][A-Za-z0-9_$]*\\.)?\\bstate\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
+            "(?<![?&#A-Za-z0-9_])((?:[A-Za-z_$][A-Za-z0-9_$]*\\.)?\\bstate\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
             "$1<redacted>",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
