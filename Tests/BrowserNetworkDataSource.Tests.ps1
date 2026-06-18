@@ -182,7 +182,7 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
 
     It 'redacts OAuth state and fragment tokens from observed endpoint and page URLs' {
         $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
-        $entry.Url = 'https://example.com/api/items?state=api-state-secret&tenant=contoso#id_token=fragment-secret'
+        $entry.Url = 'https://example.com/api/items?state=api-state-secret&accessToken=camel-secret&tenant=contoso#idToken=fragment-secret'
         $entry.Method = [HtmlTinkerX.HtmlHttpMethod]::Get
         $entry.ResourceType = [HtmlTinkerX.HtmlNetworkResourceType]::Fetch
         $entry.Status = [System.Net.HttpStatusCode]::OK
@@ -197,11 +197,14 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source | Should -Not -BeNullOrEmpty
         $source.Url | Should -Match 'api-state-secret'
         $source.Url | Should -Match 'fragment-secret'
+        $source.Url | Should -Match 'camel-secret'
         $source.PageUrl | Should -Not -Match 'page-code-secret'
         $source.PageUrl | Should -Not -Match 'page-state-secret'
         $source.RedactedUrl | Should -Match 'state=<redacted>'
-        $source.RedactedUrl | Should -Match 'id_token=<redacted>'
+        $source.RedactedUrl | Should -Match 'accessToken=<redacted>'
+        $source.RedactedUrl | Should -Match 'idToken=<redacted>'
         $source.RedactedUrl | Should -Not -Match 'api-state-secret'
+        $source.RedactedUrl | Should -Not -Match 'camel-secret'
         $source.RedactedUrl | Should -Not -Match 'fragment-secret'
         $source.RequiresAuthenticationHint | Should -BeTrue
         $source.CanExtractDirectly | Should -BeFalse

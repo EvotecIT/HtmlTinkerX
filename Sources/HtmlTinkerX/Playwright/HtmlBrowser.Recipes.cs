@@ -212,17 +212,7 @@ public static partial class HtmlBrowser {
             result.ErrorMessage = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(ex.Message);
             result.SuggestedFix = BuildRecipeStepSuggestedFix(step, result);
             result.SuggestedCommand = BuildRecipeStepSuggestedCommand(step);
-            if (ShouldExportRecipeFailureEvidence(recipe, options)) {
-                result.Evidence = await ExportFailureEvidenceAsync(
-                    session,
-                    ex,
-                    new HtmlBrowserFailureEvidenceOptions {
-                        Operation = string.IsNullOrWhiteSpace(step.Name) ? step.Action.ToString() : step.Name,
-                        BaseFileName = $"recipe-step-{index}",
-                        OutFolder = GetRecipeFailureEvidenceFolder(recipe, options)
-                    },
-                    cancellationToken).ConfigureAwait(false);
-            }
+            result.Evidence = await TryExportRecipeFailureEvidenceAsync(session, recipe, step, index, options, ex, cancellationToken).ConfigureAwait(false);
         } finally {
             await PopulateRecipeStepPageContextAsync(session, result, cancellationToken).ConfigureAwait(false);
             result.CompletedAtUtc = DateTimeOffset.UtcNow;
@@ -387,6 +377,39 @@ public static partial class HtmlBrowser {
 
     private static bool ShouldExportRecipeFailureEvidence(HtmlBrowserRecipe recipe, HtmlBrowserRecipeRunOptions? options) =>
         recipe.OnFailureEvidence || options?.OnFailureEvidence == true;
+
+    private static async Task<HtmlBrowserEvidenceResult?> TryExportRecipeFailureEvidenceAsync(
+        HtmlBrowserSession session,
+        HtmlBrowserRecipe recipe,
+        HtmlBrowserRecipeStep step,
+        int index,
+        HtmlBrowserRecipeRunOptions? options,
+        Exception stepException,
+        CancellationToken cancellationToken) {
+        if (!ShouldExportRecipeFailureEvidence(recipe, options)) {
+            return null;
+        }
+
+        try {
+            return await ExportFailureEvidenceAsync(
+                session,
+                stepException,
+                new HtmlBrowserFailureEvidenceOptions {
+                    Operation = string.IsNullOrWhiteSpace(step.Name) ? step.Action.ToString() : step.Name,
+                    BaseFileName = $"recipe-step-{index}",
+                    OutFolder = GetRecipeFailureEvidenceFolder(recipe, options)
+                },
+                cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception evidenceException) when (evidenceException is PlaywrightException || evidenceException is IOException || evidenceException is UnauthorizedAccessException || evidenceException is InvalidOperationException || evidenceException is ArgumentException) {
+            return new HtmlBrowserEvidenceResult {
+                Purpose = "FailureEvidence",
+                Operation = string.IsNullOrWhiteSpace(step.Name) ? step.Action.ToString() : step.Name,
+                ErrorMessage = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(evidenceException.Message)
+            };
+        }
+    }
 
     private static string GetRecipeFailureEvidenceFolder(HtmlBrowserRecipe recipe, HtmlBrowserRecipeRunOptions? options) {
         string? optionsFolder = options?.FailureEvidenceFolder;

@@ -312,7 +312,7 @@ internal static class HtmlSensitiveValueRedactor {
 
         redacted = Regex.Replace(
             redacted,
-            @"(?i)((?:access[_-]?token|api[_-]?key|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|session[_-]?id|saml(?:request|response)|relaystate|wresult|wctx)\s*=\s*)[^\s&<>""']+",
+            @"(?i)((?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|session[_-]?id|saml(?:request|response)|state|relaystate|wresult|wctx)\s*=\s*)[^\s&<>""']+",
             "$1<redacted>",
             RegexOptions.CultureInvariant);
 
@@ -329,7 +329,7 @@ internal static class HtmlSensitiveValueRedactor {
         string tag = match.Value;
         if (!Regex.IsMatch(
             tag,
-            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
+            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
             return tag;
         }

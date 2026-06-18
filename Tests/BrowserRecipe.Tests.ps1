@@ -982,6 +982,39 @@ Describe 'Browser recipes' {
         ($locators.Candidates.Selector -join "`n") | Should -Match 'token=<redacted>'
     }
 
+    It 'keeps recipe failures best-effort when failure evidence cannot be written' {
+        $pagePath = Join-Path $TestDrive 'browser-recipe-unwritable-evidence.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>Ready</main>'
+        $blockedEvidencePath = Join-Path $TestDrive 'blocked-evidence-path'
+        Set-Content -LiteralPath $blockedEvidencePath -Encoding UTF8 -Value 'not a directory'
+        $recipePath = Join-Path $TestDrive 'browser-unwritable-evidence.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'UnwritableEvidenceRecipe'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 500
+            Steps         = @(
+                [ordered]@{
+                    Name     = 'Click missing button'
+                    Action   = 'Click'
+                    Selector = '#missing'
+                    Timeout  = 200
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath -OnFailureEvidence -FailureEvidenceFolder $blockedEvidencePath
+
+        $result.Succeeded | Should -BeFalse
+        $result.FailedStepIndex | Should -Be 0
+        $result.Steps[0].ErrorMessage | Should -Not -BeNullOrEmpty
+        $result.Steps[0].Evidence.Purpose | Should -Be 'FailureEvidence'
+        $result.Steps[0].Evidence.Operation | Should -Be 'Click missing button'
+        $result.Steps[0].Evidence.ErrorMessage | Should -Not -BeNullOrEmpty
+    }
+
     It 'does not leak sensitive selector values in recipe failure commands' {
         $pagePath = Join-Path $TestDrive 'browser-recipe-sensitive-failure.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

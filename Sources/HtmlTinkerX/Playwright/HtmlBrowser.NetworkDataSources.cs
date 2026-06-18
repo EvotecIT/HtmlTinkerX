@@ -9,27 +9,6 @@ namespace HtmlTinkerX;
 /// Helper methods for turning observed browser network traffic into extraction candidates.
 /// </summary>
 public static partial class HtmlBrowser {
-    private static readonly string[] SensitiveQueryNames = {
-        "access_token",
-        "apikey",
-        "api_key",
-        "auth",
-        "authorization",
-        "client_secret",
-        "code",
-        "id_token",
-        "key",
-        "password",
-        "refresh_token",
-        "secret",
-        "session",
-        "session_state",
-        "sig",
-        "signature",
-        "state",
-        "token"
-    };
-
     private static readonly string[] AuthenticationHeaderNames = {
         "authorization",
         "cookie",
@@ -431,7 +410,7 @@ public static partial class HtmlBrowser {
         string parameters = value.TrimStart('?', '#');
         foreach (string pair in parameters.Split('&')) {
             string name = pair.Split('=')[0];
-            if (SensitiveQueryNames.Contains(Uri.UnescapeDataString(name), StringComparer.OrdinalIgnoreCase)) {
+            if (HtmlSensitiveValueRedactor.IsSensitiveName(Uri.UnescapeDataString(name))) {
                 return true;
             }
         }
@@ -463,7 +442,7 @@ public static partial class HtmlBrowser {
         return string.Join("&", pairs.Select(static pair => {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = Uri.UnescapeDataString(keyValue[0]);
-            return SensitiveQueryNames.Contains(name, StringComparer.OrdinalIgnoreCase)
+            return HtmlSensitiveValueRedactor.IsSensitiveName(name)
                 ? keyValue[0] + "=<redacted>"
                 : pair;
         }));

@@ -64,6 +64,13 @@ internal static class HtmlBrowserLaunchOptionFactory {
         bool userDataDirectoryBound = IsBound(request.BoundParameters, nameof(request.UserDataDirectory));
         bool statePathBound = IsBound(request.BoundParameters, nameof(request.StatePath));
         bool cdpEndpointBound = IsBound(request.BoundParameters, nameof(request.CdpEndpointUrl));
+        bool browserChannelBound = IsBound(request.BoundParameters, nameof(request.BrowserChannel));
+        bool browserExecutablePathBound = IsBound(request.BoundParameters, nameof(request.BrowserExecutablePath));
+        bool cleanBound = IsBound(request.BoundParameters, nameof(request.Clean));
+        if (!cdpEndpointBound && (browserChannelBound || browserExecutablePathBound || cleanBound)) {
+            options.CdpEndpointUrl = null;
+        }
+
         if (userDataDirectoryBound) {
             options.UserDataDirectory = request.UserDataDirectory?.ToFullPath();
             if (!statePathBound) {
@@ -94,13 +101,13 @@ internal static class HtmlBrowserLaunchOptionFactory {
             if (!statePathBound) {
                 options.StorageStatePath = null;
             }
-            if (!IsBound(request.BoundParameters, nameof(request.BrowserChannel))) {
+            if (!browserChannelBound) {
                 options.BrowserChannel = null;
             }
-            if (!IsBound(request.BoundParameters, nameof(request.BrowserExecutablePath))) {
+            if (!browserExecutablePathBound) {
                 options.BrowserExecutablePath = null;
             }
-            if (!IsBound(request.BoundParameters, nameof(request.Clean))) {
+            if (!cleanBound) {
                 options.Clean = false;
             }
         }

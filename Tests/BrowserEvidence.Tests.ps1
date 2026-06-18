@@ -212,6 +212,8 @@ Describe 'Browser evidence exports' {
 <body>
   <main>
     <p>otp=123456 passcode=654321 pin=4321</p>
+    <input type="hidden" name="code" value="hidden-code-secret" />
+    <input type="hidden" name="state" value="hidden-state-secret" />
     <input type="hidden" name="otp" value="111222" />
     <input type="hidden" name="pwd" value="temporary-password" />
     <script>window.mfa = { otp: "333444", passcode: "555666", pwd: "script-password" };</script>
@@ -238,7 +240,7 @@ Describe 'Browser evidence exports' {
         $manifest.FinalUrl | Should -Match 'code=<redacted>'
         $manifest.Url | Should -Not -Match 'secret-state'
         $manifest.FinalUrl | Should -Not -Match 'secret-code'
-        $html | Should -Not -Match '111222|temporary-password|333444|555666|script-password'
+        $html | Should -Not -Match 'hidden-code-secret|hidden-state-secret|111222|temporary-password|333444|555666|script-password'
         $text | Should -Not -Match '123456|654321|4321'
         $markdown | Should -Not -Match '123456|654321|4321'
     }

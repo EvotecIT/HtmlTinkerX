@@ -91,6 +91,34 @@ Describe 'JSON Web Token inspection' {
         $summary.PayloadJson | Should -Match '<redacted>'
     }
 
+    It 'redacts nested sensitive values from decoded payload JSON' {
+        $headerPart = ConvertTo-Base64Url '{"alg":"RS256","typ":"JWT"}'
+        $payload = [ordered]@{
+            iss     = 'https://login.example/tenant/v2.0'
+            profile = [ordered]@{
+                email = 'nested@example.com'
+                name  = 'Nested User'
+            }
+            groups  = @(
+                [ordered]@{
+                    sub = 'nested-subject-secret'
+                }
+            )
+        }
+        $payloadPart = ConvertTo-Base64Url ($payload | ConvertTo-Json -Depth 6 -Compress)
+        $signaturePart = ConvertTo-Base64Url 'signature'
+        $token = "$headerPart.$payloadPart.$signaturePart"
+
+        $summary = ConvertFrom-HtmlJsonWebToken -Token $token -IncludeJson
+
+        $summary.PayloadJson | Should -Not -Match 'nested@example.com'
+        $summary.PayloadJson | Should -Not -Match 'Nested User'
+        $summary.PayloadJson | Should -Not -Match 'nested-subject-secret'
+        $summary.PayloadJson | Should -Match '<redacted>'
+        ($summary.Claims | Where-Object Name -eq 'profile').Value | Should -Not -Match 'nested@example.com|Nested User'
+        ($summary.Claims | Where-Object Name -eq 'groups').Value | Should -Not -Match 'nested-subject-secret'
+    }
+
     It 'accepts OIDC handoff objects from the pipeline' {
         $handoff = [HtmlTinkerX.HtmlBrowserSsoHandoff]::new()
         $handoff.Kind = [HtmlTinkerX.HtmlBrowserSsoHandoffKind]::OpenIdConnect

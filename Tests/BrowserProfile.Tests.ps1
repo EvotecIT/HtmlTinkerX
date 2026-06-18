@@ -203,5 +203,21 @@ Describe 'Browser profiles' {
         $options.Proxy | Should -Be 'http://new-proxy:8080'
         $options.ProxyUsername | Should -BeNullOrEmpty
         $options.ProxyPassword | Should -BeNullOrEmpty
+
+        $cdpOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $cdpOptions.CdpEndpointUrl = 'http://127.0.0.1:9222'
+
+        $cdpRequest = [System.Activator]::CreateInstance($requestType, $true)
+        $requestType.GetProperty('BaseOptions').SetValue($cdpRequest, $cdpOptions)
+        $requestType.GetProperty('BoundParameters').SetValue($cdpRequest, [hashtable] @{
+            BrowserChannel = $true
+        })
+        $requestType.GetProperty('BrowserChannel').SetValue($cdpRequest, 'chrome')
+
+        $cdpTask = $method.Invoke($null, @($cdpRequest, [System.Threading.CancellationToken]::None))
+        $cdpLaunch = $cdpTask.GetAwaiter().GetResult()
+
+        $cdpLaunch.CdpEndpointUrl | Should -BeNullOrEmpty
+        $cdpLaunch.BrowserChannel | Should -Be 'chrome'
     }
 }

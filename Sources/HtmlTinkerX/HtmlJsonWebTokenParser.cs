@@ -132,10 +132,13 @@ public static class HtmlJsonWebTokenParser {
 
         foreach (JsonProperty property in payload.EnumerateObject().OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase)) {
             bool sensitive = IsSensitiveClaimName(property.Name);
+            bool containsNestedSensitive = !sensitive && ContainsSensitiveJsonProperty(property.Value);
             string value = sensitive && !includeSensitiveValues
                 ? "<redacted>"
-                : FormatJsonValue(property.Value);
-            if (sensitive) {
+                : containsNestedSensitive && !includeSensitiveValues
+                    ? FormatRedactedJsonValue(property.Value)
+                    : FormatJsonValue(property.Value);
+            if (sensitive || containsNestedSensitive) {
                 summary.ContainsSensitiveValues = true;
             }
 
@@ -143,7 +146,7 @@ public static class HtmlJsonWebTokenParser {
                 Name = property.Name,
                 Value = value,
                 ValueKind = property.Value.ValueKind.ToString(),
-                Redacted = sensitive && !includeSensitiveValues
+                Redacted = (sensitive || containsNestedSensitive) && !includeSensitiveValues
             });
         }
 
@@ -227,9 +230,7 @@ public static class HtmlJsonWebTokenParser {
         using JsonDocument clone = JsonDocument.Parse(payload.GetRawText());
         Dictionary<string, object?> redacted = new(StringComparer.Ordinal);
         foreach (JsonProperty property in clone.RootElement.EnumerateObject()) {
-            redacted[property.Name] = IsSensitiveClaimName(property.Name)
-                ? "<redacted>"
-                : ConvertJsonElement(property.Value);
+            redacted[property.Name] = ConvertJsonElement(property.Value, property.Name);
         }
 
         return JsonSerializer.Serialize(redacted, new JsonSerializerOptions {
@@ -238,16 +239,34 @@ public static class HtmlJsonWebTokenParser {
         });
     }
 
-    private static object? ConvertJsonElement(JsonElement element) =>
-        element.ValueKind switch {
+    private static object? ConvertJsonElement(JsonElement element, string? propertyName = null) {
+        if (!string.IsNullOrWhiteSpace(propertyName) && IsSensitiveClaimName(propertyName!)) {
+            return "<redacted>";
+        }
+
+        return element.ValueKind switch {
             JsonValueKind.String => element.GetString(),
             JsonValueKind.Number when element.TryGetInt64(out long longValue) => longValue,
             JsonValueKind.Number when element.TryGetDouble(out double doubleValue) => doubleValue,
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElement).ToArray(),
-            JsonValueKind.Object => element.EnumerateObject().ToDictionary(property => property.Name, property => ConvertJsonElement(property.Value), StringComparer.Ordinal),
+            JsonValueKind.Array => element.EnumerateArray().Select(item => ConvertJsonElement(item)).ToArray(),
+            JsonValueKind.Object => element.EnumerateObject().ToDictionary(property => property.Name, property => ConvertJsonElement(property.Value, property.Name), StringComparer.Ordinal),
             _ => null
+        };
+    }
+
+    private static string FormatRedactedJsonValue(JsonElement element) =>
+        JsonSerializer.Serialize(ConvertJsonElement(element), new JsonSerializerOptions {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            WriteIndented = false
+        });
+
+    private static bool ContainsSensitiveJsonProperty(JsonElement element) =>
+        element.ValueKind switch {
+            JsonValueKind.Object => element.EnumerateObject().Any(property => IsSensitiveClaimName(property.Name) || ContainsSensitiveJsonProperty(property.Value)),
+            JsonValueKind.Array => element.EnumerateArray().Any(ContainsSensitiveJsonProperty),
+            _ => false
         };
 
     private static bool TryDecodeJsonSegment(string segment, out JsonDocument? document, out string json, out string errorMessage) {
