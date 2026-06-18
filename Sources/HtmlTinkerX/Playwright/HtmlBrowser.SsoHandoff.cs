@@ -181,7 +181,7 @@ public static partial class HtmlBrowser {
                     PageUrl = pageUrl,
                     Title = title,
                     FormSelector = GetJsonString(form, "selector") ?? string.Empty,
-                    Action = GetJsonString(form, "action") ?? string.Empty,
+                    Action = RedactSsoAction(GetJsonString(form, "action") ?? string.Empty, options),
                     Method = GetJsonString(form, "method") ?? string.Empty,
                     AutoSubmitPrevented = GetJsonBool(form, "autoSubmitPrevented"),
                     ContainsSensitiveValues = fields.Any(static field => field.IsSensitive),
@@ -298,6 +298,9 @@ public static partial class HtmlBrowser {
 
         return redactedValue.Substring(0, fragmentIndex + 1) + RedactSsoFragmentParameterPairs(redactedValue.Substring(fragmentIndex + 1));
     }
+
+    private static string RedactSsoAction(string value, HtmlBrowserSsoHandoffOptions options) =>
+        options.IncludeSensitiveValues ? value : RedactSsoUrlValues(value);
 
     private static string RedactSsoFragmentParameterPairs(string fragment) {
         int queryIndex = fragment.IndexOf('?');

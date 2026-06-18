@@ -1049,4 +1049,60 @@ Describe 'Browser recipes' {
         $result.Steps[0].SuggestedCommand | Should -Not -Match 'super-secret-token'
         $result.Steps[0].SuggestedCommand | Should -Match 'Format-List'
     }
+
+    It 'redacts sensitive final URLs from recipe results' {
+        $pagePath = Join-Path $TestDrive 'browser-recipe-final-url.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>callback ready</main>'
+        $recipePath = Join-Path $TestDrive 'browser-final-url.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'FinalUrlRedaction'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 3000
+            Steps         = @(
+                [ordered]@{
+                    Name   = 'Move to callback'
+                    Action = 'Script'
+                    Script = "() => { location.hash = '/callback?code=secret-code&state=secret-state'; return location.href; }"
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath
+
+        $result.Succeeded | Should -BeTrue
+        $result.FinalUrl | Should -Match 'code=<redacted>'
+        $result.FinalUrl | Should -Match 'state=<redacted>'
+        $result.FinalUrl | Should -Not -Match 'secret-code|secret-state'
+    }
+
+    It 'honors timeouts for script recipe steps' {
+        $pagePath = Join-Path $TestDrive 'browser-recipe-script-timeout.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>script timeout ready</main>'
+        $recipePath = Join-Path $TestDrive 'browser-script-timeout.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'ScriptTimeout'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 100
+            Steps         = @(
+                [ordered]@{
+                    Name   = 'Never resolves'
+                    Action = 'Script'
+                    Script = "() => new Promise(() => {})"
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath -SkipPreflight
+
+        $result.Succeeded | Should -BeFalse
+        $result.Steps[0].Succeeded | Should -BeFalse
+        $result.Steps[0].ErrorType | Should -Match 'TimeoutException'
+        $result.Steps[0].ErrorMessage | Should -Match 'Timed out after 100 ms executing recipe script step'
+    }
 }

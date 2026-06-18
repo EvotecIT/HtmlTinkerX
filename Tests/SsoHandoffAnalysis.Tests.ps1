@@ -132,9 +132,14 @@ Describe 'SSO handoff analysis' {
 
         $analysis.HasProtocolArtifact | Should -BeTrue
         $analysis.Error | Should -Be 'access_denied'
-        $analysis.ErrorDescription | Should -Be 'User canceled the sign-in prompt'
+        $analysis.ErrorDescription | Should -Be '<redacted>'
         $analysis.StatePresent | Should -BeTrue
-        $analysis.Warnings | Should -Contain 'OAuth/OpenID Connect error returned: access_denied (User canceled the sign-in prompt).'
+        $analysis.ContainsRedactedValues | Should -BeTrue
+        $analysis.Warnings | Should -Contain 'OAuth/OpenID Connect error returned: access_denied (<redacted>).'
+
+        $revealed = $handoff | ConvertFrom-HtmlSsoHandoff -IncludeSensitiveValues
+        $revealed.ErrorDescription | Should -Be 'User canceled the sign-in prompt'
+        $revealed.Warnings | Should -Contain 'OAuth/OpenID Connect error returned: access_denied (User canceled the sign-in prompt).'
     }
 
     It 'guides redacted handoffs toward explicit reveal before analysis' {

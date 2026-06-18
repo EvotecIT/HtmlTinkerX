@@ -176,6 +176,15 @@ public static partial class HtmlBrowser {
                 element.getAttribute('data-test')
             ].map(normalize).join(' ').toLowerCase();
             if (query && !haystack.includes(query)) return;
+            if (!selector.startsWith('text=')) {
+                try {
+                    const matches = Array.from(document.querySelectorAll(selector));
+                    if (matches.length !== 1 || matches[0] !== element) return;
+                } catch {
+                    return;
+                }
+            }
+
             const key = `${strategy}|${selector}|${locator}`;
             if (seen.has(key)) return;
             seen.add(key);

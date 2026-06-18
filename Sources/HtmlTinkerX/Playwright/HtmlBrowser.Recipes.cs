@@ -103,7 +103,7 @@ public static partial class HtmlBrowser {
                 }
             }
 
-            result.FinalUrl = session.Page.Url;
+            result.FinalUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(session.Page.Url ?? string.Empty);
             result.Title = await session.Page.TitleAsync().ConfigureAwait(false);
             result.Succeeded = result.Steps.TrueForAll(static step => step.Succeeded);
             PopulateRecipeRunFailureSummary(result);
@@ -183,8 +183,7 @@ public static partial class HtmlBrowser {
                     break;
                 case HtmlBrowserRecipeAction.Script:
                     Require(step.Script, nameof(step.Script), step.Action);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    object? output = await session.Page.EvaluateAsync<object?>(step.Script!).ConfigureAwait(false);
+                    object? output = await EvaluateRecipeScriptAsync(session.Page, step.Script!, timeout, cancellationToken).ConfigureAwait(false);
                     result.Output = output?.ToString();
                     break;
                 case HtmlBrowserRecipeAction.Screenshot:
@@ -251,6 +250,26 @@ public static partial class HtmlBrowser {
         }
 
         throw lastException ?? new InvalidOperationException("No recipe selector fallback matched the current page.");
+    }
+
+    private static async Task<object?> EvaluateRecipeScriptAsync(IPage page, string script, int timeout, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Task<object?> evaluation = page.EvaluateAsync<object?>(script);
+        if (timeout <= 0 && !cancellationToken.CanBeCanceled) {
+            return await evaluation.ConfigureAwait(false);
+        }
+
+        Task timeoutTask = timeout > 0
+            ? Task.Delay(timeout, cancellationToken)
+            : Task.Delay(Timeout.Infinite, cancellationToken);
+        Task completed = await Task.WhenAny(evaluation, timeoutTask).ConfigureAwait(false);
+        if (completed == evaluation) {
+            return await evaluation.ConfigureAwait(false);
+        }
+
+        _ = evaluation.ContinueWith(static completedTask => _ = completedTask.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new TimeoutException($"Timed out after {timeout} ms executing recipe script step.");
     }
 
     private static async Task ExecuteRecipeReadyWaitAsync(

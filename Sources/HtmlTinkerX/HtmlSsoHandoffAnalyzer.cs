@@ -34,9 +34,9 @@ public static class HtmlSsoHandoffAnalyzer {
             Kind = handoff.Kind,
             PageUrl = handoff.PageUrl,
             Title = handoff.Title,
-            Action = handoff.Action,
+            Action = includeSensitiveValues ? handoff.Action : HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(handoff.Action),
             Method = handoff.Method,
-            ContainsRedactedValues = handoff.Fields.Any(static field => field.Redacted),
+            ContainsRedactedValues = handoff.Fields.Any(field => field.Redacted || (!includeSensitiveValues && HtmlSensitiveValueRedactor.IsSensitiveName(field.Name))),
             ContainsTruncatedValues = handoff.Fields.Any(static field => field.Truncated)
         };
 
@@ -67,7 +67,7 @@ public static class HtmlSsoHandoffAnalyzer {
         analysis.StatePresent = !string.IsNullOrWhiteSpace(GetFieldValue(handoff, "state"))
             || !string.IsNullOrWhiteSpace(GetFieldValue(handoff, "RelayState"));
         analysis.Error = GetFieldValue(handoff, "error");
-        analysis.ErrorDescription = GetFieldValue(handoff, "error_description");
+        analysis.ErrorDescription = GetAnalysisFieldValue(handoff, "error_description", includeSensitiveValues);
         if (analysis.AuthorizationCodePresent) {
             analysis.HasProtocolArtifact = true;
         }
@@ -139,5 +139,14 @@ public static class HtmlSsoHandoffAnalyzer {
 
         HtmlBrowserSsoField? field = handoff.Fields.FirstOrDefault(field => string.Equals(field.Name, fieldName, StringComparison.OrdinalIgnoreCase));
         return field?.Value ?? string.Empty;
+    }
+
+    private static string GetAnalysisFieldValue(HtmlBrowserSsoHandoff handoff, string fieldName, bool includeSensitiveValues) {
+        string value = GetFieldValue(handoff, fieldName);
+        if (includeSensitiveValues || string.IsNullOrWhiteSpace(value) || string.Equals(value, "<redacted>", StringComparison.OrdinalIgnoreCase)) {
+            return value;
+        }
+
+        return HtmlSensitiveValueRedactor.IsSensitiveName(fieldName) ? "<redacted>" : HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(value);
     }
 }

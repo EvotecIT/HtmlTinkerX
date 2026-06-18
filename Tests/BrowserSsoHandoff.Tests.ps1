@@ -65,6 +65,31 @@ Describe 'Browser SSO handoff inspection' {
         }
     }
 
+    It 'redacts sensitive form action URLs unless explicitly requested' {
+        $pagePath = Join-Path $TestDrive 'sso-action-sensitive-url.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <form id="handoff" method="post" action="https://service-provider.example/callback?code=action-code-secret&state=action-state-secret">
+    <input type="hidden" name="SAMLResponse" value="sso-proof-secret" />
+  </form>
+</body>
+</html>
+'@
+
+        $handoff = @(Get-HtmlBrowserSsoHandoff -Path $pagePath -LoadState DomContentLoaded)
+
+        $handoff.Count | Should -Be 1
+        $handoff[0].Action | Should -Match 'code=<redacted>'
+        $handoff[0].Action | Should -Match 'state=<redacted>'
+        $handoff[0].Action | Should -Not -Match 'action-code-secret|action-state-secret'
+
+        $revealed = @(Get-HtmlBrowserSsoHandoff -Path $pagePath -IncludeSensitiveValues -LoadState DomContentLoaded)
+        $revealed[0].Action | Should -Match 'action-code-secret'
+        $revealed[0].Action | Should -Match 'action-state-secret'
+    }
+
     It 'can safely analyze a SAML handoff in one step without returning raw subject values' {
         $xml = @'
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_response" Version="2.0" IssueInstant="2026-01-02T03:04:05Z" Destination="https://service-provider.example/saml/consume">

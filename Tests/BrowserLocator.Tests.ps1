@@ -73,6 +73,33 @@ Describe 'Browser locator candidates' {
         }
     }
 
+    It 'does not suggest ambiguous CSS selector candidates' {
+        $pagePath = Join-Path $TestDrive 'locator-ambiguous-page.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button data-testid="save" class="shared">Save draft</button>
+    <button data-test="save" class="shared">Save final</button>
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+        try {
+            $candidates = @(Find-HtmlBrowserLocator -Session $session -Query 'Save draft' -Limit 10)
+
+            $candidates.Selector | Should -Not -Contain "[data-testid='save'],[data-test='save']"
+            $candidates.Selector | Should -Not -Contain 'button.shared'
+            ($candidates | Where-Object Selector -eq 'text=Save draft').Count | Should -Be 1
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'escapes selector quotes and warns before suggesting sensitive selectors' {
         $pagePath = Join-Path $TestDrive 'locator-escaping-page.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

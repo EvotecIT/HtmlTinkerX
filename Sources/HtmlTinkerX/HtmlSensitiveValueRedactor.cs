@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 namespace HtmlTinkerX;
 
 internal static class HtmlSensitiveValueRedactor {
+    private const string StructuredSensitiveNamePattern = "access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult";
+
     internal static readonly string[] SensitiveNames = {
         "access_token",
         "api_key",
@@ -13,6 +15,10 @@ internal static class HtmlSensitiveValueRedactor {
         "code",
         "credential",
         "csrf",
+        "error",
+        "error_description",
+        "error_uri",
+        "id_token",
         "key",
         "mfa",
         "otp",
@@ -26,6 +32,7 @@ internal static class HtmlSensitiveValueRedactor {
         "samlresponse",
         "secret",
         "session",
+        "session_state",
         "state",
         "token",
         "wctx",
@@ -273,19 +280,37 @@ internal static class HtmlSensitiveValueRedactor {
 
         string redacted = Regex.Replace(
             value,
-            "([A-Za-z_$][A-Za-z0-9_$.]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[A-Za-z0-9_$]*\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
+            "([A-Za-z_$][A-Za-z0-9_$.]*(?:" + StructuredSensitiveNamePattern + ")[A-Za-z0-9_$]*\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
             "$1<redacted>",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         redacted = Regex.Replace(
             redacted,
-            "((?:\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[^\"]*\"|'[^']*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "((?:\"[^\"]*(?:" + StructuredSensitiveNamePattern + ")[^\"]*\"|'[^']*(?:" + StructuredSensitiveNamePattern + ")[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         redacted = Regex.Replace(
             redacted,
-            "([A-Za-z_$][A-Za-z0-9_$]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "([A-Za-z_$][A-Za-z0-9_$]*(?:" + StructuredSensitiveNamePattern + ")[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "$1\"<redacted>\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "((?:[A-Za-z_$][A-Za-z0-9_$]*\\.)?\\bstate\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
+            "$1<redacted>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "((?:\"state\"|'state')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "$1\"<redacted>\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "(\\bstate\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 

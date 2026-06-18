@@ -78,9 +78,7 @@ public class HtmlBrowserPersistentProfileTests {
 
             Assert.Equal("sweet", value);
         } finally {
-            if (Directory.Exists(userDataDirectory)) {
-                Directory.Delete(userDataDirectory, recursive: true);
-            }
+            await DeleteDirectoryWithRetryAsync(userDataDirectory);
         }
     }
 
@@ -103,9 +101,28 @@ public class HtmlBrowserPersistentProfileTests {
 
             Assert.Equal("basic auth ready", body);
         } finally {
-            if (Directory.Exists(userDataDirectory)) {
-                Directory.Delete(userDataDirectory, recursive: true);
+            await DeleteDirectoryWithRetryAsync(userDataDirectory);
+        }
+    }
+
+    private static async Task DeleteDirectoryWithRetryAsync(string path) {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            if (!Directory.Exists(path)) {
+                return;
             }
+
+            try {
+                Directory.Delete(path, recursive: true);
+                return;
+            } catch (IOException) when (attempt < 9) {
+                await Task.Delay(250).ConfigureAwait(false);
+            } catch (UnauthorizedAccessException) when (attempt < 9) {
+                await Task.Delay(250).ConfigureAwait(false);
+            }
+        }
+
+        if (Directory.Exists(path)) {
+            Directory.Delete(path, recursive: true);
         }
     }
 
