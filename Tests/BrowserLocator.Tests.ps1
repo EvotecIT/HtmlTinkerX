@@ -44,6 +44,35 @@ Describe 'Browser locator candidates' {
         }
     }
 
+    It 'returns usable selectors for native role candidates' {
+        $pagePath = Join-Path $TestDrive 'locator-native-role-page.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button>Approve request</button>
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+        try {
+            $candidate = @(Find-HtmlBrowserLocator -Session $session -Query 'Approve request' -Limit 10) |
+                Where-Object Strategy -eq 'Role' |
+                Select-Object -First 1
+
+            $candidate | Should -Not -BeNullOrEmpty
+            $candidate.Selector | Should -Be 'button'
+            $candidate.Locator | Should -Be "GetByRole('button', Name='Approve request')"
+            Test-HtmlBrowserElement -Session $session -Selector $candidate.Selector -Visible | Should -BeTrue
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'escapes selector quotes and warns before suggesting sensitive selectors' {
         $pagePath = Join-Path $TestDrive 'locator-escaping-page.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

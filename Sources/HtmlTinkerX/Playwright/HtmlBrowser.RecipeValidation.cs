@@ -194,6 +194,13 @@ public static partial class HtmlBrowser {
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(step.ValueVariable)) {
+            if (!runtimeVariables.Contains(step.ValueVariable!) && string.IsNullOrEmpty(step.Value)) {
+                AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Error, step, index, nameof(step.ValueVariable), $"Runtime variable '{step.ValueVariable}' was not supplied.", $"Run Invoke-HtmlBrowserRecipe with -Variable @{{ {step.ValueVariable} = '<value>' }}.");
+            }
+            return;
+        }
+
         if (string.IsNullOrEmpty(step.Value) && string.IsNullOrWhiteSpace(step.ValueVariable)) {
             AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Warning, step, index, nameof(step.Value), "Input step will submit an empty value.", "Set Value or ValueVariable when an empty value is not intentional.");
         }

@@ -191,6 +191,53 @@ Describe 'Browser recipes' {
         ($validation.Issues | Where-Object Message -eq "Runtime variable 'storedScope' was not supplied.").Count | Should -Be 0
     }
 
+    It 'requires input runtime variables when no fallback value is stored' {
+        $pagePath = Join-Path $TestDrive 'missing-input-variable.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main><input id="search" /></main>
+</body>
+</html>
+'@
+        $recipePath = Join-Path $TestDrive 'missing-input-variable.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'MissingInputVariable'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 3000
+            Steps         = @(
+                [ordered]@{
+                    Name          = 'Type query'
+                    Action        = 'Input'
+                    Selector      = '#search'
+                    ValueVariable = 'query'
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $validation = Test-HtmlBrowserRecipe -Path $recipePath
+
+        $validation.IsValid | Should -BeFalse
+        $validation.RequiredVariables | Should -Be @('query')
+        $validation.MissingVariables | Should -Be @('query')
+        $validation.Issues.Message | Should -Contain "Runtime variable 'query' was not supplied."
+
+        $preflightResult = Invoke-HtmlBrowserRecipe -Path $recipePath
+        $preflightResult.Succeeded | Should -BeFalse
+        $preflightResult.SkippedBeforeExecution | Should -BeTrue
+        $preflightResult.Steps.Count | Should -Be 0
+
+        $runtimeResult = Invoke-HtmlBrowserRecipe -Path $recipePath -SkipPreflight
+        $runtimeResult.Succeeded | Should -BeFalse
+        $runtimeResult.Steps.Count | Should -Be 1
+        $runtimeResult.Steps[0].Succeeded | Should -BeFalse
+        $runtimeResult.Steps[0].ErrorMessage | Should -Match 'no fallback value is stored'
+    }
+
     It 'exports variable templates and validates from filled variable files' {
         $recipePath = Join-Path $TestDrive 'variable-template-source.recipe.json'
         $exportedRecipePath = Join-Path $TestDrive 'variable-template-exported.recipe.json'
@@ -563,6 +610,90 @@ Describe 'Browser recipes' {
         $result.Steps[0].AttemptedSelectors | Should -Be @('#old-search', '#searchBox')
         $result.Steps[1].SelectedSelector | Should -Be '[data-testid="load-results"]'
         $result.Steps[2].SelectedSelector | Should -Be '#results'
+    }
+
+    It 'tries selector alternates after a matching primary selector fails' {
+        $pagePath = Join-Path $TestDrive 'browser-recipe-selector-action-fallback.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button class="choice" onclick="document.getElementById('result').textContent = 'first'">Choose</button>
+    <button id="second" class="choice" onclick="document.getElementById('result').textContent = 'second'">Choose</button>
+    <section id="result">waiting</section>
+  </main>
+</body>
+</html>
+'@
+        $recipePath = Join-Path $TestDrive 'browser-selector-action-fallback.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'SelectorActionFallback'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 3000
+            Steps         = @(
+                [ordered]@{
+                    Name               = 'Click unique fallback'
+                    Action             = 'Click'
+                    Selector           = '.choice'
+                    SelectorAlternates = @('#second')
+                },
+                [ordered]@{
+                    Name     = 'Wait for fallback click'
+                    Action   = 'WaitText'
+                    Selector = '#result'
+                    Text     = 'second'
+                    Exact    = $true
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath
+
+        $result.Succeeded | Should -BeTrue
+        $result.Steps[0].AttemptedSelectors | Should -Be @('.choice', '#second')
+        $result.Steps[0].SelectedSelector | Should -Be '#second'
+    }
+
+    It 'records artifact IO failures as recipe step failures' {
+        $pagePath = Join-Path $TestDrive 'browser-recipe-artifact-io.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>artifact io ready</main>'
+        $blockedOutFolder = Join-Path $TestDrive 'blocked-evidence-target'
+        Set-Content -LiteralPath $blockedOutFolder -Encoding UTF8 -Value 'not a directory'
+        $recipePath = Join-Path $TestDrive 'browser-artifact-io.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'ArtifactIoFailure'
+            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 3000
+            Steps         = @(
+                [ordered]@{
+                    Name            = 'Capture evidence into blocked path'
+                    Action          = 'Evidence'
+                    OutFolder       = $blockedOutFolder
+                    ContinueOnError = $true
+                },
+                [ordered]@{
+                    Name   = 'Continue after artifact failure'
+                    Action = 'Script'
+                    Script = "() => document.body.innerText.trim()"
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $result = Invoke-HtmlBrowserRecipe -Path $recipePath
+
+        $result.Succeeded | Should -BeFalse
+        $result.Steps.Count | Should -Be 2
+        $result.Steps[0].Succeeded | Should -BeFalse
+        $result.Steps[0].ErrorType | Should -Match 'IOException|UnauthorizedAccessException'
+        $result.Steps[1].Succeeded | Should -BeTrue
+        $result.Steps[1].Output | Should -Be 'artifact io ready'
     }
 
     It 'preflights selector alternates and warns about sensitive fallback selectors' {

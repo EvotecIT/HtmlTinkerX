@@ -135,6 +135,15 @@ public static partial class HtmlBrowser {
         const limit = Number(args.limit || 25);
         const seen = new Set();
         const output = [];
+        const roleSelector = (element, tag, role, aria, href) => {
+            if (element.hasAttribute('role')) return `[role='${cssValue(role)}']`;
+            if (aria) return `${tag}[aria-label='${cssValue(aria)}']`;
+            if (element.id) return `${tag}#${esc(element.id)}`;
+            const name = element.getAttribute('name');
+            if (name) return `${tag}[name='${cssValue(name)}']`;
+            if (tag === 'a' && href) return `${tag}[href='${cssValue(href)}']`;
+            return tag;
+        };
 
         const add = (element, strategy, selector, locator, score, reason, textOverride) => {
             if (!selector || !locator) return;
@@ -193,6 +202,7 @@ public static partial class HtmlBrowser {
             const tag = element.tagName ? element.tagName.toLowerCase() : '';
             const text = normalize(element.innerText || element.textContent || element.value || '');
             const testId = element.getAttribute('data-testid') || element.getAttribute('data-test');
+            const href = element.getAttribute('href');
             if (testId) add(element, 'TestId', `[data-testid='${cssValue(testId)}'],[data-test='${cssValue(testId)}']`, `GetByTestId('${cssValue(testId)}')`, 100, 'test id attributes are usually the most stable automation hook', text);
 
             if (element.id) add(element, 'Id', `${tag}#${esc(element.id)}`, `${tag}#${esc(element.id)}`, 95, 'id selector is concise and usually stable', text);
@@ -200,7 +210,7 @@ public static partial class HtmlBrowser {
             const role = element.getAttribute('role') || (tag === 'button' ? 'button' : tag === 'a' ? 'link' : '');
             const aria = element.getAttribute('aria-label');
             const accessibleName = normalize(aria || text || element.getAttribute('value'));
-            if (role && accessibleName) add(element, 'Role', `[role='${cssValue(role)}']`, `GetByRole('${cssValue(role)}', Name='${cssValue(accessibleName)}')`, 92, 'role plus accessible name follows the user-visible UI contract', accessibleName);
+            if (role && accessibleName) add(element, 'Role', roleSelector(element, tag, role, aria, href), `GetByRole('${cssValue(role)}', Name='${cssValue(accessibleName)}')`, 92, 'role plus accessible name follows the user-visible UI contract', accessibleName);
 
             const name = element.getAttribute('name');
             if (name) add(element, 'Name', `${tag}[name='${cssValue(name)}']`, `${tag}[name='${cssValue(name)}']`, 88, 'name attribute is stable for forms', text);
@@ -216,7 +226,6 @@ public static partial class HtmlBrowser {
                 if (labelSelector) add(element, 'Label', labelSelector, `GetByLabel('${cssValue(label)}')`, 83, 'associated label matches what a user sees', label);
             }
 
-            const href = element.getAttribute('href');
             if (href) add(element, 'Href', `${tag}[href='${cssValue(href)}']`, `${tag}[href='${cssValue(href)}']`, 80, 'href selector is useful for navigation links', text);
 
             if (text) add(element, 'Text', `text=${text}`, `GetByText('${cssValue(text)}')`, 74, 'visible text is readable but may change with localization or content edits', text);

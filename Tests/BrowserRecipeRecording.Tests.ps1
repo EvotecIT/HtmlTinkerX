@@ -445,6 +445,7 @@ Describe 'Browser recipe recording' {
 
         $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
         $recipe.Steps.Action | Should -Not -Contain 'Evidence'
+        $recipe.Steps.Action | Should -Not -Contain 'Locator'
         @(Get-ChildItem -LiteralPath $failureRoot -Directory).Count | Should -Be 1
     }
 }

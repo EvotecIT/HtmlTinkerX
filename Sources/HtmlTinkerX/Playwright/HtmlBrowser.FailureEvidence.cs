@@ -55,53 +55,52 @@ public static partial class HtmlBrowser {
         };
 
         bool previousRecordingSuppression = session.SuppressRecipeRecording;
-        HtmlBrowserEvidenceResult result;
         session.SuppressRecipeRecording = true;
         try {
-            result = await ExportEvidenceAsync(session, outFolder, evidenceOptions, cancellationToken).ConfigureAwait(false);
+            HtmlBrowserEvidenceResult result = await ExportEvidenceAsync(session, outFolder, evidenceOptions, cancellationToken).ConfigureAwait(false);
+
+            result.Purpose = "FailureEvidence";
+            result.Operation = options.Operation;
+            result.ErrorType = exception.GetType().FullName;
+            result.ErrorMessage = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(exception.Message);
+
+            if (options.LocatorSuggestions) {
+                string locatorPath = Path.Combine(result.OutFolder, "locator-suggestions.json");
+                (object LocatorPayload, int Count) locatorSuggestions = await CreateFailureLocatorSuggestionsAsync(
+                    session,
+                    options.LocatorSuggestionLimit,
+                    cancellationToken).ConfigureAwait(false);
+                result.LocatorSuggestionCount = locatorSuggestions.Count;
+                string locatorJson = JsonSerializer.Serialize(locatorSuggestions.LocatorPayload, CreateJsonOptions());
+                await WriteTextAsync(locatorPath, locatorJson, cancellationToken).ConfigureAwait(false);
+                AddArtifact(result, result.OutFolder, "LocatorSuggestions", locatorPath, "application/json; charset=utf-8");
+            }
+
+            string contextPath = Path.Combine(result.OutFolder, "failure-context.json");
+            string contextJson = JsonSerializer.Serialize(new {
+                result.Purpose,
+                result.Operation,
+                result.ErrorType,
+                result.ErrorMessage,
+                result.Url,
+                result.FinalUrl,
+                result.Title,
+                result.CapturedAtUtc
+            }, CreateJsonOptions());
+            await WriteTextAsync(contextPath, contextJson, cancellationToken).ConfigureAwait(false);
+            AddArtifact(result, result.OutFolder, "FailureContext", contextPath, "application/json; charset=utf-8");
+
+            if (options.Manifest) {
+                string manifestPath = Path.Combine(result.OutFolder, "evidence-manifest.json");
+                result.ManifestPath = manifestPath;
+                string manifestJson = JsonSerializer.Serialize(result, CreateJsonOptions());
+                await WriteTextAsync(manifestPath, manifestJson, cancellationToken).ConfigureAwait(false);
+            }
+
+            return result;
         } finally {
             session.SuppressRecipeRecording = previousRecordingSuppression;
         }
-
-        result.Purpose = "FailureEvidence";
-        result.Operation = options.Operation;
-        result.ErrorType = exception.GetType().FullName;
-        result.ErrorMessage = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(exception.Message);
-
-        if (options.LocatorSuggestions) {
-            string locatorPath = Path.Combine(result.OutFolder, "locator-suggestions.json");
-            (object LocatorPayload, int Count) locatorSuggestions = await CreateFailureLocatorSuggestionsAsync(
-                session,
-                options.LocatorSuggestionLimit,
-                cancellationToken).ConfigureAwait(false);
-            result.LocatorSuggestionCount = locatorSuggestions.Count;
-            string locatorJson = JsonSerializer.Serialize(locatorSuggestions.LocatorPayload, CreateJsonOptions());
-            await WriteTextAsync(locatorPath, locatorJson, cancellationToken).ConfigureAwait(false);
-            AddArtifact(result, result.OutFolder, "LocatorSuggestions", locatorPath, "application/json; charset=utf-8");
-        }
-
-        string contextPath = Path.Combine(result.OutFolder, "failure-context.json");
-        string contextJson = JsonSerializer.Serialize(new {
-            result.Purpose,
-            result.Operation,
-            result.ErrorType,
-            result.ErrorMessage,
-            result.Url,
-            result.FinalUrl,
-            result.Title,
-            result.CapturedAtUtc
-        }, CreateJsonOptions());
-        await WriteTextAsync(contextPath, contextJson, cancellationToken).ConfigureAwait(false);
-        AddArtifact(result, result.OutFolder, "FailureContext", contextPath, "application/json; charset=utf-8");
-
-        if (options.Manifest) {
-            string manifestPath = Path.Combine(result.OutFolder, "evidence-manifest.json");
-            result.ManifestPath = manifestPath;
-            string manifestJson = JsonSerializer.Serialize(result, CreateJsonOptions());
-            await WriteTextAsync(manifestPath, manifestJson, cancellationToken).ConfigureAwait(false);
-        }
-
-        return result;
     }
 
     private static async Task<(object LocatorPayload, int Count)> CreateFailureLocatorSuggestionsAsync(

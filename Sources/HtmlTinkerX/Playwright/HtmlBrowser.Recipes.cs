@@ -206,7 +206,7 @@ public static partial class HtmlBrowser {
             }
 
             result.Succeeded = true;
-        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException || ex is ArgumentException || ex is ArgumentOutOfRangeException) {
+        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException || ex is ArgumentException || ex is ArgumentOutOfRangeException || ex is IOException || ex is UnauthorizedAccessException) {
             result.Succeeded = false;
             result.ErrorType = ex.GetType().FullName;
             result.ErrorMessage = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(ex.Message);
@@ -243,9 +243,24 @@ public static partial class HtmlBrowser {
         }
 
         result.AttemptedSelectors = selectors;
-        string selectedSelector = await ChooseRecipeSelectorAsync(session, selectors, cancellationToken).ConfigureAwait(false);
-        result.SelectedSelector = selectedSelector;
-        await action(selectedSelector).ConfigureAwait(false);
+        Exception? lastException = null;
+        foreach (string selector in selectors) {
+            cancellationToken.ThrowIfCancellationRequested();
+            try {
+                int count = await session.Page.Locator(selector).CountAsync().ConfigureAwait(false);
+                if (count <= 0) {
+                    continue;
+                }
+
+                result.SelectedSelector = selector;
+                await action(selector).ConfigureAwait(false);
+                return;
+            } catch (Exception ex) when (IsRecipeSelectorFallbackException(ex)) {
+                lastException = ex;
+            }
+        }
+
+        throw lastException ?? new InvalidOperationException("No recipe selector fallback matched the current page.");
     }
 
     private static async Task ExecuteRecipeReadyWaitAsync(
@@ -313,29 +328,6 @@ public static partial class HtmlBrowser {
             PollMilliseconds = step.PollMilliseconds,
             Timeout = timeout
         };
-
-    private static async Task<string> ChooseRecipeSelectorAsync(HtmlBrowserSession session, IReadOnlyList<string> selectors, CancellationToken cancellationToken) {
-        string? firstExisting = null;
-        foreach (string selector in selectors) {
-            cancellationToken.ThrowIfCancellationRequested();
-            ILocator locator = session.Page.Locator(selector).First;
-            int count = await session.Page.Locator(selector).CountAsync().ConfigureAwait(false);
-            if (count <= 0) {
-                continue;
-            }
-
-            firstExisting ??= selector;
-            try {
-                if (await locator.IsVisibleAsync().ConfigureAwait(false)) {
-                    return selector;
-                }
-            } catch (PlaywrightException) {
-                // Keep scanning; the action itself will surface a richer error if no fallback is usable.
-            }
-        }
-
-        return firstExisting ?? selectors[0];
-    }
 
     private static bool IsRecipeSelectorFallbackException(Exception ex) =>
         ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException || ex is ArgumentException || ex is ArgumentOutOfRangeException;
@@ -500,7 +492,7 @@ public static partial class HtmlBrowser {
             return variableValue ?? string.Empty;
         }
 
-        if (step.ValueRedacted == true) {
+        if (step.ValueRedacted == true || (!string.IsNullOrWhiteSpace(step.ValueVariable) && string.IsNullOrEmpty(step.Value))) {
             RequireRecipeVariable(step);
         }
 
@@ -512,7 +504,7 @@ public static partial class HtmlBrowser {
             return new[] { variableValue ?? string.Empty };
         }
 
-        if (step.ValueRedacted == true) {
+        if (step.ValueRedacted == true || (!string.IsNullOrWhiteSpace(step.ValueVariable) && step.Values.Count == 0)) {
             RequireRecipeVariable(step);
         }
 
@@ -521,7 +513,8 @@ public static partial class HtmlBrowser {
 
     private static void RequireRecipeVariable(HtmlBrowserRecipeStep step) {
         string variableName = string.IsNullOrWhiteSpace(step.ValueVariable) ? "<missing>" : step.ValueVariable!;
-        throw new InvalidOperationException($"Recipe step '{step.Action}' requires runtime variable '{variableName}' because the recorded value was redacted.");
+        string reason = step.ValueRedacted == true ? "the recorded value was redacted" : "no fallback value is stored";
+        throw new InvalidOperationException($"Recipe step '{step.Action}' requires runtime variable '{variableName}' because {reason}.");
     }
 
     private static HtmlBrowserEvidenceOptions CreateEvidenceOptions(HtmlBrowserRecipeStep step) {
