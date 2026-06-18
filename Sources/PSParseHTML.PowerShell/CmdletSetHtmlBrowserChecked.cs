@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
 using System.Management.Automation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,6 +34,14 @@ public sealed class CmdletSetHtmlBrowserChecked : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PassThru { get; set; }
 
+    /// <summary>Export screenshots, HTML, text, Markdown, network summary, locator suggestions, and failure context if setting checked state fails.</summary>
+    [Parameter]
+    public SwitchParameter OnFailureEvidence { get; set; }
+
+    /// <summary>Root folder where failure evidence is written when <see cref="OnFailureEvidence"/> is used.</summary>
+    [Parameter]
+    public string? FailureEvidenceFolder { get; set; }
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -45,7 +54,12 @@ public sealed class CmdletSetHtmlBrowserChecked : AsyncPSCmdlet {
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
 
-        await HtmlBrowser.SetCheckedAsync(session, Selector, !Uncheck.IsPresent, Timeout, token).ConfigureAwait(false);
+        try {
+            await HtmlBrowser.SetCheckedAsync(session, Selector, !Uncheck.IsPresent, Timeout, token).ConfigureAwait(false);
+        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
+            await ExportFailureEvidenceIfRequestedAsync(session, OnFailureEvidence.IsPresent, "Checked", ex, FailureEvidenceFolder, token).ConfigureAwait(false);
+            throw;
+        }
 
         if (PassThru.IsPresent) {
             WriteObject(session);

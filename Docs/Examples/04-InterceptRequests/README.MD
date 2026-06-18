@@ -1,8 +1,8 @@
-# `Register-HTMLRoute`
+# `Register-HtmlRoute`
 
 ## 📖 Summary
 
-`Register-HTMLRoute` lets you intercept network requests inside a browser session. Use it to block calls or return custom responses when testing pages.
+`Register-HtmlRoute` lets you intercept network requests inside a browser session. Use it to block calls or return custom responses when testing pages.
 
 ---
 
@@ -11,10 +11,10 @@
 ```powershell
 $page = Join-Path $PSScriptRoot 'route_page.html'
 $uri = [System.Uri]::new($page).AbsoluteUri
-$session = Start-HTMLSession -Url $uri
+$session = Start-HtmlBrowserSession -Url $uri
 
 # Return custom JSON instead of the real file
-$handler = Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
+$handler = Register-HtmlRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
     param($route)
     $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
         Status = 200
@@ -23,16 +23,16 @@ $handler = Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptB
     }) | Out-Null
 }
 
-Invoke-HTMLNavigation -Session $session -Url $uri
-Get-HTMLContent -Session $session -Selector '#result' -AsText
+Invoke-HtmlBrowserNavigation -Session $session -Url $uri
+Get-HtmlBrowserContent -Session $session -Selector '#result' -AsText
 # -> 'mock'
 
-Unregister-HTMLRoute -Session $session -Pattern '**/data.json' -Handler $handler
-Close-HTMLSession -Session $session
+Unregister-HtmlRoute -Session $session -Pattern '**/data.json' -Handler $handler
+Close-HtmlBrowserSession -Session $session
 ```
 
 To simply block a request:
 
 ```powershell
-Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
+Register-HtmlRoute -Session $session -Pattern '**/data.json' -ScriptBlock { param($route) $route.AbortAsync() | Out-Null }
 ```

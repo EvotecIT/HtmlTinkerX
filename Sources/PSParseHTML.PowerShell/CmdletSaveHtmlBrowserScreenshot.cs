@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System.Diagnostics;
 using System.IO;
 using System.Management.Automation;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -56,22 +57,99 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFileClip)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Optional browser profile JSON file used as launch defaults for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public string? ProfilePath { get; set; }
+
+    /// <summary>Intent-focused browser automation defaults used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public HtmlBrowserScenario Scenario { get; set; } = HtmlBrowserScenario.Custom;
+
+    /// <summary>Persistent browser user-data directory used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public string? UserDataDirectory { get; set; }
+
+    /// <summary>Playwright storage-state JSON file used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    [Alias("StorageStatePath")]
+    public string? StatePath { get; set; }
+
+    /// <summary>Browser distribution channel, such as chrome, msedge, chromium, chrome-beta, or msedge-dev.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public string? BrowserChannel { get; set; }
+
     /// <summary>Proxy server address used when launching the browser.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     public string? Proxy { get; set; }
 
     /// <summary>Credentials used for the <see cref="Proxy"/> server.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     public PSCredential? ProxyCredential { get; set; }
 
     /// <summary>Show the browser instead of running headless.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     public SwitchParameter Visible { get; set; }
 
     /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
+
+    /// <summary>Initial browser navigation readiness state for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
+
+    /// <summary>Timeout in milliseconds for navigation and browser operations.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    [ValidateRange(0, int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
+    /// <summary>Browser resource types to abort before navigation, such as Image, Media, Font, or Stylesheet.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public HtmlNetworkResourceType[] BlockResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
+
+    /// <summary>Playwright URL glob patterns to abort before navigation, such as **/analytics/**.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetClip)]
+    [Parameter(ParameterSetName = ParameterSetFileDefault)]
+    [Parameter(ParameterSetName = ParameterSetFileClip)]
+    public string[] BlockResourcePattern { get; set; } = System.Array.Empty<string>();
 
     /// <summary>Open the screenshot after saving.</summary>
     [Parameter]
@@ -99,6 +177,18 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
     /// <summary>CSS selectors of elements to highlight.</summary>
     [Parameter]
     public string[]? HighlightSelector { get; set; }
+
+    /// <summary>CSS selectors of elements to mask.</summary>
+    [Parameter]
+    public string[]? MaskSelector { get; set; }
+
+    /// <summary>Mask common sensitive fields such as password, token, SAML, MFA, OTP, and secret inputs.</summary>
+    [Parameter]
+    public SwitchParameter MaskSensitiveElement { get; set; }
+
+    /// <summary>CSS color used for masked elements.</summary>
+    [Parameter]
+    public string? MaskColor { get; set; }
 
     /// <summary>Text to overlay on the screenshot.</summary>
     [Parameter]
@@ -137,12 +227,16 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetFileClip)]
     public int Height { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
-        string? pUser = ProxyCredential?.UserName;
-        string? pPass = ProxyCredential?.GetNetworkCredential().Password;
 
         if (string.IsNullOrWhiteSpace(OutFile)) {
             if (Open.IsPresent) {
@@ -195,6 +289,9 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
             Selector = Selector,
             ElementSelector = ElementSelector,
             HighlightSelectors = HighlightSelector,
+            MaskSelectors = MaskSelector,
+            MaskSensitiveElements = MaskSensitiveElement.IsPresent,
+            MaskColor = MaskColor,
             OverlayText = OverlayText
         };
         if (clip) {
@@ -206,58 +303,30 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
 
         switch (ParameterSetName) {
             case ParameterSetClip:
-                await HtmlBrowser.CaptureScreenshotAsync(
-                    Url,
-                    OutFile!.ToFullPath(),
-                    Browser,
-                    Clean.IsPresent,
-                    options,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass).ConfigureAwait(false);
+                await CaptureOneShotAsync(Url, options, token).ConfigureAwait(false);
                 break;
             case ParameterSetFileClip:
-                await HtmlBrowser.CaptureScreenshotAsync(
-                    new System.Uri(Path!.ToFullPath()).AbsoluteUri,
-                    OutFile!.ToFullPath(),
-                    Browser,
-                    Clean.IsPresent,
-                    options,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass).ConfigureAwait(false);
+                await CaptureOneShotAsync(new System.Uri(Path!.ToFullPath()).AbsoluteUri, options, token).ConfigureAwait(false);
                 break;
             case ParameterSetSessionClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     OutFile!.ToFullPath(),
-                    options).ConfigureAwait(false);
+                    options,
+                    token).ConfigureAwait(false);
                 break;
             case ParameterSetSessionDefault:
                 await HtmlBrowser.CaptureScreenshotAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     OutFile!.ToFullPath(),
-                    options).ConfigureAwait(false);
+                    options,
+                    token).ConfigureAwait(false);
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
                     ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
                     : Url;
-                await HtmlBrowser.CaptureScreenshotAsync(
-                    target,
-                    OutFile!.ToFullPath(),
-                    Browser,
-                    Clean.IsPresent,
-                    options,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass).ConfigureAwait(false);
+                await CaptureOneShotAsync(target, options, token).ConfigureAwait(false);
                 break;
         }
 
@@ -271,5 +340,36 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
                 WriteVerbose($"Failed to open file '{OutFile}': {ex.Message}");
             }
         }
+    }
+
+    private async Task CaptureOneShotAsync(string target, ScreenshotOptions options, CancellationToken cancellationToken) {
+        HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(cancellationToken).ConfigureAwait(false);
+        await HtmlBrowser.CaptureScreenshotAsync(
+            target,
+            OutFile!.ToFullPath(),
+            launchOptions,
+            options,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HtmlBrowserLaunchOptions> CreateLaunchOptionsAsync(CancellationToken cancellationToken) {
+        return await HtmlBrowserLaunchOptionFactory.CreateAsync(new HtmlBrowserLaunchOptionRequest {
+            BoundParameters = MyInvocation.BoundParameters,
+            ProfilePath = ProfilePath,
+            Scenario = Scenario,
+            Browser = Browser,
+            Clean = Clean,
+            Visible = Visible,
+            SlowMo = SlowMo,
+            Timeout = Timeout,
+            LoadState = LoadState,
+            UserDataDirectory = UserDataDirectory,
+            StatePath = StatePath,
+            BrowserChannel = BrowserChannel,
+            Proxy = Proxy,
+            ProxyCredential = ProxyCredential,
+            BlockResourceType = BlockResourceType,
+            BlockResourcePattern = BlockResourcePattern
+        }, cancellationToken).ConfigureAwait(false);
     }
 }

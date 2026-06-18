@@ -16,6 +16,22 @@ namespace HtmlTinkerX.Tests;
 public class HtmlBrowserInstallerTests
 {
     [Fact]
+    public void ShouldInstallBundledRuntime_SkipsRuntimeForExternalBrowsers()
+    {
+        Assert.True(HtmlBrowser.ShouldInstallBundledRuntime(new HtmlBrowserLaunchOptions()));
+        Assert.False(HtmlBrowser.ShouldInstallBundledRuntime(new HtmlBrowserLaunchOptions
+        {
+            BrowserChannel = "chrome"
+        }));
+        Assert.False(HtmlBrowser.ShouldInstallBundledRuntime(new HtmlBrowserLaunchOptions
+        {
+            BrowserExecutablePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? @"C:\Program Files\Google\Chrome\Application\chrome.exe"
+                : "/usr/bin/google-chrome"
+        }));
+    }
+
+    [Fact]
     public async Task EnsureInstalledAsync_InstallsDepsOnLinux_WhenEnabled()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

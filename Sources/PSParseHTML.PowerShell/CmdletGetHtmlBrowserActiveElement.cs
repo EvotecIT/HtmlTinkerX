@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Inspect the element that receives keyboard input</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/search -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/search
 /// Invoke-HtmlBrowserClick -Session $session -Selector 'input[type=search]'
 /// Get-HtmlBrowserActiveElement -Session $session -IncludeAttributes
 ///   </code>

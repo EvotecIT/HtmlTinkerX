@@ -31,7 +31,7 @@ Describe 'Browser extraction mode helpers' {
             'Get-HtmlBrowserDiagnostics',
             'Invoke-HtmlBrowserHover',
             'Invoke-HtmlBrowserKey',
-            'Invoke-HtmlBrowserOverlayDismissal',
+            'Close-HtmlBrowserOverlay',
             'Invoke-HtmlBrowserScroll',
             'Wait-HtmlBrowserContent',
             'Set-HtmlBrowserInput',
@@ -49,6 +49,76 @@ Describe 'Browser extraction mode helpers' {
             $help | Should -Match $command
             $help | Should -Match 'Session'
         }
+    }
+
+    It 'exposes reusable launch profile parameters for one-shot interactable discovery' {
+        $parameters = (Get-Command Get-HtmlBrowserInteractable).Parameters.Keys
+
+        $parameters | Should -Contain 'ProfilePath'
+        $parameters | Should -Contain 'Scenario'
+        $parameters | Should -Contain 'UserDataDirectory'
+        $parameters | Should -Contain 'StatePath'
+        $parameters | Should -Contain 'BrowserChannel'
+        $parameters | Should -Contain 'LoadState'
+        $parameters | Should -Contain 'BlockResourceType'
+        $parameters | Should -Contain 'BlockResourcePattern'
+    }
+
+    It 'rejects document resource blocking for one-shot interactable discovery' {
+        $htmlPath = Join-Path $TestDrive 'document-block-interactable.html'
+        Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value '<!doctype html><button>Blocked</button>'
+
+        { Get-HtmlBrowserInteractable -Path $htmlPath -BlockResourceType Document } |
+            Should -Throw -ExpectedMessage '*BlockResourceType Document would abort page navigation*'
+    }
+
+    It 'discovers interactable elements directly from a file with scenario launch defaults' {
+        $htmlPath = Join-Path $TestDrive 'one-shot-interactable.html'
+        Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value '<!doctype html><main><button id="go">Start proof</button></main>'
+
+        $elements = Get-HtmlBrowserInteractable -Path $htmlPath -Scenario SinglePageApp -LoadState DomContentLoaded
+
+        $elements.Text | Should -Contain 'Start proof'
+    }
+
+    It 'exposes reusable launch profile parameters for one-shot content saves' {
+        $command = Get-Command Save-HtmlBrowserContent
+
+        $command.Parameters.Keys | Should -Contain 'ProfilePath'
+        $command.Parameters.Keys | Should -Contain 'Scenario'
+        $command.Parameters.Keys | Should -Contain 'UserDataDirectory'
+        $command.Parameters.Keys | Should -Contain 'StatePath'
+        $command.Parameters.Keys | Should -Contain 'Proxy'
+        $command.Parameters.Keys | Should -Contain 'ProxyCredential'
+        $command.Parameters.Keys | Should -Contain 'LoadState'
+        $command.Parameters.Keys | Should -Contain 'NavigationTimeout'
+        $command.Parameters.Keys | Should -Contain 'BlockResourceType'
+        $command.Parameters.Keys | Should -Contain 'BlockResourcePattern'
+    }
+
+    It 'rejects document resource blocking for one-shot content navigation' {
+        $htmlPath = Join-Path $TestDrive 'document-block-content.html'
+        $outPath = Join-Path $TestDrive 'document-block-content.html'
+        Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value '<!doctype html><main>blocked</main>'
+
+        { Save-HtmlBrowserContent -Path $htmlPath -OutFile $outPath -BlockResourceType Document } |
+            Should -Throw -ExpectedMessage '*BlockResourceType Document would abort page navigation*'
+    }
+
+    It 'can save rendered content directly from a file with scenario launch defaults' {
+        $htmlPath = Join-Path $TestDrive 'one-shot-content.html'
+        $outPath = Join-Path $TestDrive 'one-shot-content.txt'
+        @'
+<!doctype html>
+<html>
+<body>
+<main id="target">direct content ready</main>
+</body>
+</html>
+'@ | Set-Content -LiteralPath $htmlPath -Encoding UTF8
+
+        Save-HtmlBrowserContent -Path $htmlPath -Selector '#target' -AsText -Scenario AuditProof -OutFile $outPath -PassThru | Should -Be $outPath
+        Get-Content -LiteralPath $outPath -Raw | Should -Match 'direct content ready'
     }
 
     It 'Can inspect elements, storage, active focus, and save rendered content' {

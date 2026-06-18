@@ -2,8 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,12 +46,11 @@ public static partial class HtmlBrowser {
         string? proxy = null,
         string? proxyUsername = null,
         string? proxyPassword = null,
-        CancellationToken cancellationToken = default) {
-        if (delayMs < 0) {
-            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
-        }
-        await using HtmlBrowserSession session = await OpenSessionAsync(
-            url,
+        CancellationToken cancellationToken = default,
+        bool maskSensitiveElements = false,
+        IEnumerable<string>? maskSelectors = null,
+        string? maskColor = null) {
+        HtmlBrowserLaunchOptions launchOptions = HtmlBrowserLaunchOptions.FromLegacyParameters(
             browser,
             clean,
             username,
@@ -61,11 +58,78 @@ public static partial class HtmlBrowser {
             formLogin,
             headless,
             slowMo,
-            null,
             proxy: proxy,
             proxyUsername: proxyUsername,
-            proxyPassword: proxyPassword,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            proxyPassword: proxyPassword);
+
+        await SavePagePdfAsync(
+            url,
+            path,
+            launchOptions,
+            delayMs,
+            selector,
+            landscape,
+            printBackground,
+            format,
+            width,
+            height,
+            marginTop,
+            marginRight,
+            marginBottom,
+            marginLeft,
+            pageRanges,
+            scale,
+            displayHeaderFooter,
+            headerTemplate,
+            footerTemplate,
+            preferCssPageSize,
+            outline,
+            tagged,
+            cancellationToken,
+            maskSensitiveElements,
+            maskSelectors,
+            maskColor).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Saves a PDF of the specified page URL to disk using reusable browser launch options.
+    /// </summary>
+    public static async Task SavePagePdfAsync(
+        string url,
+        string path,
+        HtmlBrowserLaunchOptions launchOptions,
+        int delayMs = 0,
+        string? selector = null,
+        bool landscape = false,
+        bool printBackground = false,
+        PdfPageFormat? format = null,
+        string? width = null,
+        string? height = null,
+        string? marginTop = null,
+        string? marginRight = null,
+        string? marginBottom = null,
+        string? marginLeft = null,
+        string? pageRanges = null,
+        float? scale = null,
+        bool displayHeaderFooter = false,
+        string? headerTemplate = null,
+        string? footerTemplate = null,
+        bool preferCssPageSize = false,
+        bool outline = false,
+        bool tagged = false,
+        CancellationToken cancellationToken = default,
+        bool maskSensitiveElements = false,
+        IEnumerable<string>? maskSelectors = null,
+        string? maskColor = null) {
+        if (launchOptions == null) {
+            throw new ArgumentNullException(nameof(launchOptions));
+        }
+
+        if (delayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
+        }
+
+        await using HtmlBrowserSession session = await OpenSessionAsync(url, launchOptions, cancellationToken).ConfigureAwait(false);
 
         await SavePagePdfAsync(
             session.Page,
@@ -89,7 +153,10 @@ public static partial class HtmlBrowser {
             preferCssPageSize,
             outline,
             tagged,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            maskSensitiveElements,
+            maskSelectors,
+            maskColor).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -117,7 +184,10 @@ public static partial class HtmlBrowser {
         bool preferCssPageSize = false,
         bool outline = false,
         bool tagged = false,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool maskSensitiveElements = false,
+        IEnumerable<string>? maskSelectors = null,
+        string? maskColor = null) {
         if (delayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
         }
@@ -170,7 +240,16 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await page.PdfAsync(options).ConfigureAwait(false);
+        await ExecuteWithTemporaryVisualMaskAsync(
+            page,
+            maskSensitiveElements,
+            maskSelectors,
+            maskColor,
+            async () => {
+                await page.PdfAsync(options).ConfigureAwait(false);
+                return true;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -197,6 +276,9 @@ public static partial class HtmlBrowser {
     /// <param name="outline">Create tagged outline.</param>
     /// <param name="tagged">Produce tagged PDF.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="maskSensitiveElements">Mask common sensitive fields before generating the PDF.</param>
+    /// <param name="maskSelectors">Additional CSS selectors to mask before generating the PDF.</param>
+    /// <param name="maskColor">CSS color used for masked elements.</param>
     /// <returns>Generated PDF bytes.</returns>
     public static async Task<byte[]> GetPagePdfAsync(
         IPage page,
@@ -219,7 +301,10 @@ public static partial class HtmlBrowser {
         bool preferCssPageSize = false,
         bool outline = false,
         bool tagged = false,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool maskSensitiveElements = false,
+        IEnumerable<string>? maskSelectors = null,
+        string? maskColor = null) {
         if (delayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
         }
@@ -270,7 +355,13 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return await page.PdfAsync(options).ConfigureAwait(false);
+        return await ExecuteWithTemporaryVisualMaskAsync(
+            page,
+            maskSensitiveElements,
+            maskSelectors,
+            maskColor,
+            () => page.PdfAsync(options),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -307,7 +398,10 @@ public static partial class HtmlBrowser {
         string? proxy = null,
         string? proxyUsername = null,
         string? proxyPassword = null,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool maskSensitiveElements = false,
+        IEnumerable<string>? maskSelectors = null,
+        string? maskColor = null) {
         if (delayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
         }
@@ -347,6 +441,10 @@ public static partial class HtmlBrowser {
             preferCssPageSize,
             outline,
             tagged,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            maskSensitiveElements,
+            maskSelectors,
+            maskColor).ConfigureAwait(false);
     }
+
 }

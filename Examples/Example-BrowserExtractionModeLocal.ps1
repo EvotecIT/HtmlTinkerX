@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </html>
 '@
 
-$session = Start-HtmlSession -Url 'about:blank' -Session
+$session = Start-HtmlBrowserSession -Url 'about:blank'
 try {
     Register-HtmlRoute -Session $session -Pattern '**/local-extraction.html' -ScriptBlock {
         param($route)
@@ -71,31 +71,33 @@ try {
         }) | Out-Null
     } | Out-Null
 
-    $plan = Test-HtmlExtractionPlan -Content $staticHtml
-    $profile = $plan | Get-HtmlExtractionProfile
+    $extractionPlan = Test-HtmlExtractionPlan -Content $staticHtml
+    $extractionProfile = $extractionPlan | Get-HtmlExtractionProfile
 
-    Invoke-HtmlNavigation -Session $session -Url $storyUrl
-    Invoke-HtmlOverlayDismissal -Session $session | Out-Null
-    Set-HtmlInput -Session $session -Selector '#search' -Value 'HtmlTinkerX' -Type -DelayMs 0
-    Invoke-HtmlKey -Session $session -Selector '#search' -Key 'Enter'
-    Wait-HtmlContent -Session $session -Text 'Found HtmlTinkerX guide' -Selector '#results' -Exact
-    Invoke-HtmlClick -Session $session -Text 'Load more' -Exact
-    Wait-HtmlContent -Session $session -Text 'Workbench profile sample' -Selector '#results' -Exact
-    Wait-HtmlContent -Session $session -Element -Selector '#results' -Visible -InViewport
-    Wait-HtmlContent -Session $session -Stable -StableMilliseconds 100 -PollMilliseconds 25
+    Invoke-HtmlBrowserNavigation -Session $session -Url $storyUrl
+    Close-HtmlBrowserOverlay -Session $session | Out-Null
+    Set-HtmlBrowserInput -Session $session -Selector '#search' -Value 'HtmlTinkerX' -Type -DelayMs 0
+    Invoke-HtmlBrowserKey -Session $session -Selector '#search' -Key 'Enter'
+    Wait-HtmlBrowserReady -Session $session -Selector '#results' -Stable -StableMilliseconds 100 -PollMilliseconds 25
+    Wait-HtmlBrowserContent -Session $session -Text 'Found HtmlTinkerX guide' -Selector '#results' -Exact
+    Invoke-HtmlBrowserClick -Session $session -Text 'Load more' -Exact
+    Wait-HtmlBrowserContent -Session $session -Text 'Workbench profile sample' -Selector '#results' -Exact
+    Wait-HtmlBrowserContent -Session $session -Element -Selector '#results' -Visible -InViewport
 
-    $resultElements = Get-HtmlElement -Session $session -Selector '.product' -VisibleOnly -IncludeAttributes
-    $isResultsVisible = Test-HtmlElement -Session $session -Selector '#results' -Visible -InViewport
-    Invoke-HtmlClick -Session $session -Selector '#search'
-    $activeElement = Get-HtmlActiveElement -Session $session -IncludeAttributes
-    Set-HtmlStorage -Session $session -Scope Local -Key storyMode -Value browser-extraction
-    $storage = Get-HtmlStorage -Session $session -Scope All
-    $diagnostics = Get-HtmlDiagnostics -Session $session
-    $renderedHtml = Get-HtmlContent -Session $session
-    $renderedText = Get-HtmlContent -Session $session -AsText
+    $resultElements = Get-HtmlBrowserElement -Session $session -Selector '.product' -VisibleOnly -IncludeAttributes
+    $isResultsVisible = Test-HtmlBrowserElement -Session $session -Selector '#results' -Visible -InViewport
+    Invoke-HtmlBrowserClick -Session $session -Selector '#search'
+    $activeElement = Get-HtmlBrowserActiveElement -Session $session -IncludeAttributes
+    Set-HtmlBrowserStorage -Session $session -Scope Local -Key storyMode -Value browser-extraction
+    $storage = Get-HtmlBrowserStorage -Session $session -Scope All
+    $diagnostics = Get-HtmlBrowserDiagnostics -Session $session
+    $renderedHtml = Get-HtmlBrowserContent -Session $session
+    $renderedText = Get-HtmlBrowserContent -Session $session -AsText
     $comparison = Compare-HtmlStaticRendered -StaticContent $staticHtml -RenderedContent $renderedHtml -BaseUrl $storyUrl
     $savedContentPath = Join-Path (Split-Path -Parent $StatePath) 'browser-extraction-results.html'
-    Save-HtmlContent -Session $session -Selector '#results' -OutFile $savedContentPath -PassThru | Out-Null
+    Save-HtmlBrowserContent -Session $session -Selector '#results' -OutFile $savedContentPath -PassThru | Out-Null
+    $evidencePath = Join-Path (Split-Path -Parent $StatePath) 'browser-extraction-evidence'
+    $evidence = Export-HtmlBrowserEvidence -Session $session -OutFolder $evidencePath -BaseFileName results -NetworkSummary
 
     $snapshot = [HtmlTinkerX.HtmlRenderedPageSnapshot]::new()
     $snapshot.Url = $storyUrl
@@ -114,12 +116,12 @@ try {
     if ($stateDirectory -and -not (Test-Path -LiteralPath $stateDirectory)) {
         New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
     }
-    Export-BrowserState -Session $session -Path $StatePath
+    Export-HtmlBrowserState -Session $session -Path $StatePath
 
     [pscustomobject] @{
-        PlannerMode              = $plan.RecommendedMode.ToString()
-        ProfileName              = $profile.Name
-        RenderProfile            = $profile.RenderProfile.ToString()
+        PlannerMode              = $extractionPlan.RecommendedMode.ToString()
+        ProfileName              = $extractionProfile.Name
+        RenderProfile            = $extractionProfile.RenderProfile.ToString()
         ResultText               = $renderedText
         ProductElementCount      = @($resultElements).Count
         ResultsVisible           = $isResultsVisible
@@ -131,8 +133,10 @@ try {
         LocalStorageKeys         = $diagnostics.LocalStorageKeys
         StaticRenderedDeltaCount = @($comparison.Deltas).Count
         SavedContentPath         = $savedContentPath
+        EvidencePath             = $evidence.OutFolder
+        EvidenceArtifactCount    = @($evidence.Artifacts).Count
         StatePath                = $StatePath
     }
 } finally {
-    Close-HtmlSession -Session $session
+    Close-HtmlBrowserSession -Session $session
 }

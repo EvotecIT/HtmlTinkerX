@@ -335,6 +335,37 @@ public static partial class HtmlBrowser {
         }
     }
 
+    /// <summary>
+    /// Ensures that the Playwright driver is present without installing bundled browser runtimes.
+    /// </summary>
+    /// <returns>A task that completes when the driver installation check/process is finished.</returns>
+    internal static async Task EnsureDriverInstalledAsync() {
+        if (IsDriverCorrupted()) {
+            CleanDriver();
+        }
+
+        if (IsDriverPresent()) {
+            EnsureDriverSearchPath();
+            return;
+        }
+
+        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
+        try {
+            if (IsDriverCorrupted()) {
+                CleanDriver();
+            }
+
+            if (IsDriverPresent()) {
+                EnsureDriverSearchPath();
+                return;
+            }
+
+            await DownloadAndInstallDriverAsync().ConfigureAwait(false);
+        } finally {
+            InstallationSemaphore.Release();
+        }
+    }
+
     private static string[] GetRuntimePrefixes(HtmlBrowserEngine engine) {
         if (engine == HtmlBrowserEngine.Chromium) {
             return new[] { "chromium-", "chromium_headless_shell-" };
@@ -432,7 +463,7 @@ public static partial class HtmlBrowser {
             string packageDest = Path.Combine(baseDir, "package");
             if (Directory.Exists(packageDest))
                 Directory.Delete(packageDest, true);
-            Directory.Move(packageSrc, packageDest);
+            CopyDirectory(packageSrc, packageDest);
 
 #if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(VersionFile, DriverVersion);
@@ -461,6 +492,20 @@ public static partial class HtmlBrowser {
         }
 
         EnsureDriverSearchPath();
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string destinationDirectory) {
+        Directory.CreateDirectory(destinationDirectory);
+
+        foreach (string file in Directory.GetFiles(sourceDirectory)) {
+            string destinationFile = Path.Combine(destinationDirectory, Path.GetFileName(file));
+            File.Copy(file, destinationFile, overwrite: true);
+        }
+
+        foreach (string directory in Directory.GetDirectories(sourceDirectory)) {
+            string destinationSubdirectory = Path.Combine(destinationDirectory, Path.GetFileName(directory));
+            CopyDirectory(directory, destinationSubdirectory);
+        }
     }
 
     private static void InstallRuntime(HtmlBrowserEngine engine) {

@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
 using System.Management.Automation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Reveal hover-only content</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/products -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/products
 /// Invoke-HtmlBrowserHover -Session $session -Selector '.product-card'
 /// Wait-HtmlBrowserContent -Session $session -Text 'Quick view' -Selector 'main'
 ///   </code>
@@ -37,6 +38,14 @@ public sealed class CmdletInvokeHtmlBrowserHover : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PassThru { get; set; }
 
+    /// <summary>Export screenshots, HTML, text, Markdown, network summary, locator suggestions, and failure context if hover fails.</summary>
+    [Parameter]
+    public SwitchParameter OnFailureEvidence { get; set; }
+
+    /// <summary>Root folder where failure evidence is written when <see cref="OnFailureEvidence"/> is used.</summary>
+    [Parameter]
+    public string? FailureEvidenceFolder { get; set; }
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -46,7 +55,14 @@ public sealed class CmdletInvokeHtmlBrowserHover : AsyncPSCmdlet {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
-        await HtmlBrowser.HoverAsync(session, Selector, Timeout, linkedCts.Token).ConfigureAwait(false);
+        CancellationToken token = linkedCts.Token;
+        try {
+            await HtmlBrowser.HoverAsync(session, Selector, Timeout, token).ConfigureAwait(false);
+        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
+            await ExportFailureEvidenceIfRequestedAsync(session, OnFailureEvidence.IsPresent, "Hover", ex, FailureEvidenceFolder, token).ConfigureAwait(false);
+            throw;
+        }
+
         if (PassThru.IsPresent) {
             WriteObject(session);
         }

@@ -1,8 +1,47 @@
-﻿Import-Module .\PSParseHTML.psd1 -Force
+Import-Module .\PSParseHTML.psd1 -Force
 
-Format-HTML -File 'C:\Users\przemyslaw.klys\OneDrive - Evotec\Support\GitHub\PSWriteHTML\Examples\Example25-Toasts\Example25.html' -OutputFile $PSScriptRoot\Output\Example.Toasts.html
-Format-JavaScript -File 'C:\Users\przemyslaw.klys\OneDrive - Evotec\Support\GitHub\PSWriteHTML\Resources\JS\moment.min.js' -OutputFile $PSScriptRoot\Output\Example.Moment.js
-Optimize-CSS -File 'C:\Users\przemyslaw.klys\OneDrive - Evotec\Support\GitHub\PSWriteHTML\Resources\CSS\datatables.min.css' -OutputFile $PSScriptRoot\Output\Example.DataTables.css
-Optimize-JavaScript -File 'C:\Users\przemyslaw.klys\OneDrive - Evotec\Support\GitHub\PSWriteHTML\Resources\JS\HideSection.js' -OutputFile $PSScriptRoot\Output\Example.HideSection.js
-Optimize-JavaScript -File 'C:\Users\przemyslaw.klys\OneDrive - Evotec\Support\GitHub\PSWriteHTML\Resources\JS\SkeletonTabs.js' -OutputFile $PSScriptRoot\Output\Example.SkeletonTabs.js
-Optimize-HTML -File 'C:\Support\GitHub\PSParseHTML\Examples\Output\Example.Toasts.html' -OutputFile $PSScriptRoot\Output\Example.ToastsOptimized.html
+$inputPath = Join-Path $PSScriptRoot 'Input\Minification'
+$outputPath = Join-Path $PSScriptRoot 'Output'
+New-Item -ItemType Directory -Path $inputPath, $outputPath -Force | Out-Null
+
+$htmlPath = Join-Path $inputPath 'sample.html'
+$cssPath = Join-Path $inputPath 'sample.css'
+$javascriptPath = Join-Path $inputPath 'sample.js'
+
+Set-Content -LiteralPath $htmlPath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<head>
+  <title>Minification sample</title>
+  <link rel="stylesheet" href="sample.css">
+</head>
+<body>
+  <main class="content">
+    <h1>Mailbox export proof</h1>
+    <p>This small local file keeps the example portable.</p>
+  </main>
+  <script src="sample.js"></script>
+</body>
+</html>
+'@
+
+Set-Content -LiteralPath $cssPath -Encoding UTF8 -Value @'
+.content {
+    display: grid;
+    gap: 0.75rem;
+    color: #1f2937;
+}
+'@
+
+Set-Content -LiteralPath $javascriptPath -Encoding UTF8 -Value @'
+const heading = document.querySelector("h1");
+if (heading) {
+    heading.dataset.ready = "true";
+}
+'@
+
+Format-HTML -File $htmlPath -OutputFile (Join-Path $outputPath 'Example.Minification.Formatted.html')
+Format-JavaScript -File $javascriptPath -OutputFile (Join-Path $outputPath 'Example.Minification.Formatted.js')
+Optimize-CSS -File $cssPath -OutputFile (Join-Path $outputPath 'Example.Minification.Optimized.css')
+Optimize-JavaScript -File $javascriptPath -OutputFile (Join-Path $outputPath 'Example.Minification.Optimized.js')
+Optimize-HTML -File $htmlPath -OutputFile (Join-Path $outputPath 'Example.Minification.Optimized.html')

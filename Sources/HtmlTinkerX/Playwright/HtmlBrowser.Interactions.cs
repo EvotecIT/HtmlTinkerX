@@ -123,6 +123,15 @@ public static partial class HtmlBrowser {
             await locator.ClickAsync(new LocatorClickOptions {
                 Timeout = timeout
             }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+                Action = HtmlBrowserRecipeAction.ClickText,
+                Text = text,
+                Exact = exact,
+                Regex = regex,
+                Nth = nth,
+                Timeout = timeout,
+                ContinueOnError = true
+            }, cancellationToken).ConfigureAwait(false);
             return true;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;

@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,6 +90,10 @@ public static partial class HtmlBrowser {
         try {
             await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
             string url = session.Page.Url;
+            if (session.Browser == null) {
+                throw new InvalidOperationException("Cannot start video capture from a session whose browser instance is not exposed by Playwright. Start a new video session from a URL or file path instead.");
+            }
+
             HtmlBrowserEngine engine = session.Browser.BrowserType.Name switch {
                 "firefox" => HtmlBrowserEngine.Firefox,
                 "webkit" => HtmlBrowserEngine.WebKit,

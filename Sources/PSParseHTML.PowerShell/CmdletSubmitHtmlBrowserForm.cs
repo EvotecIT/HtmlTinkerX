@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using Microsoft.Playwright;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -48,6 +49,14 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetSession)]
     public SwitchParameter PassThru { get; set; }
 
+    /// <summary>Export screenshots, HTML, text, Markdown, network summary, locator suggestions, and failure context if browser form submission fails.</summary>
+    [Parameter(ParameterSetName = ParameterSetSession)]
+    public SwitchParameter OnFailureEvidence { get; set; }
+
+    /// <summary>Root folder where failure evidence is written when <see cref="OnFailureEvidence"/> is used.</summary>
+    [Parameter(ParameterSetName = ParameterSetSession)]
+    public string? FailureEvidenceFolder { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
@@ -77,7 +86,13 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
                 selector = "form";
             }
 
-            await HtmlFormSubmitter.SubmitAsync(session.Page, selector, fields, Timeout).ConfigureAwait(false);
+            try {
+                await HtmlFormSubmitter.SubmitAsync(session.Page, selector, fields, Timeout, CancelToken).ConfigureAwait(false);
+            } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
+                await ExportFailureEvidenceIfRequestedAsync(session, OnFailureEvidence.IsPresent, "SubmitForm", ex, FailureEvidenceFolder, CancelToken).ConfigureAwait(false);
+                throw;
+            }
+
             if (PassThru.IsPresent) {
                 WriteObject(session);
             }

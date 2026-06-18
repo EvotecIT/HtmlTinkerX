@@ -139,6 +139,7 @@ public static class HtmlBrowserlessExtraction {
             RiskLevel = source.RiskLevel,
             IsExternal = source.IsExternal,
             RequiresAuthenticationHint = source.RequiresAuthenticationHint,
+            ReplayRequestHeaders = source.ReplayRequestHeaders.ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase),
             Selector = source.Selector,
             RawContent = includeRawContent ? source.RawContent : string.Empty
         };
@@ -310,7 +311,12 @@ public static class HtmlBrowserlessExtraction {
         HttpClient effectiveClient = client ?? new HttpClient();
         try {
             using HttpRequestMessage request = new(HttpMethod.Get, source.ResolvedUrl);
+            foreach (KeyValuePair<string, string> header in source.ReplayRequestHeaders) {
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
             foreach (KeyValuePair<string, string> header in options.RequestHeaders) {
+                request.Headers.Remove(header.Key);
                 request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
 
@@ -646,7 +652,9 @@ public static class HtmlBrowserlessExtraction {
     }
 
     private static HtmlBrowserlessDataSource CreateSourceFromRecipe(HtmlBrowserlessExtractionRecipe recipe) {
-        bool isEndpoint = recipe.SourceKind.Equals("ApiEndpoint", StringComparison.OrdinalIgnoreCase);
+        bool isEndpoint = recipe.SourceKind.Equals("ApiEndpoint", StringComparison.OrdinalIgnoreCase)
+            || recipe.SourceKind.Equals("ObservedApiEndpoint", StringComparison.OrdinalIgnoreCase);
+        bool hasRawContent = !string.IsNullOrWhiteSpace(recipe.RawContent);
         return new HtmlBrowserlessDataSource {
             Kind = recipe.SourceKind,
             Name = recipe.SourceName,
@@ -658,12 +666,14 @@ public static class HtmlBrowserlessExtraction {
             RiskLevel = recipe.RiskLevel,
             IsExternal = recipe.IsExternal,
             RequiresAuthenticationHint = recipe.RequiresAuthenticationHint,
+            ReplayRequestHeaders = (recipe.ReplayRequestHeaders ?? new Dictionary<string, string>())
+                .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase),
             Selector = recipe.Selector,
             RawContent = recipe.RawContent,
-            RequiresHttpFetch = isEndpoint,
-            CanExtractDirectly = isEndpoint || !string.IsNullOrWhiteSpace(recipe.RawContent),
+            RequiresHttpFetch = isEndpoint && !hasRawContent,
+            CanExtractDirectly = isEndpoint || hasRawContent,
             Evidence = new[] { "Source recreated from browserless extraction recipe." },
-            Warnings = isEndpoint || !string.IsNullOrWhiteSpace(recipe.RawContent)
+            Warnings = isEndpoint || hasRawContent
                 ? Array.Empty<string>()
                 : new[] { "Static recipes require RawContent or rediscovery from the original page." }
         };

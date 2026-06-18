@@ -1,5 +1,7 @@
 namespace HtmlTinkerX;
 
+using System.Collections.Generic;
+
 /// <summary>
 /// Portable browserless extraction recipe produced from a discovered data source.
 /// </summary>
@@ -36,6 +38,9 @@ public sealed class HtmlBrowserlessExtractionRecipe {
 
     /// <summary>Whether the endpoint or page context contained authentication hints during discovery.</summary>
     public bool RequiresAuthenticationHint { get; set; }
+
+    /// <summary>Non-sensitive request headers captured during discovery that are safe to replay.</summary>
+    public IDictionary<string, string> ReplayRequestHeaders { get; set; } = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Selector or source hint.</summary>
     public string Selector { get; set; } = string.Empty;

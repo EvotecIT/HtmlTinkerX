@@ -2,7 +2,9 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -92,6 +94,40 @@ public class HtmlBrowserFileSavingTests {
 
         Assert.NotNull(options);
         Assert.Equal("A4", options!.Format);
+    }
+
+    [Fact]
+    public async Task SavePagePdfAsync_MasksAndRestoresVisualElements() {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "test.pdf");
+        var operations = new List<string>();
+        var evaluateArguments = new List<object?>();
+        var page = new Mock<IPage>();
+        page.Setup(p => p.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
+            .Callback<string, object?>((script, argument) => {
+                operations.Add(script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "restore" : "mask");
+                evaluateArguments.Add(argument);
+            })
+            .ReturnsAsync((JsonElement?)default);
+        page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>()))
+            .Callback<PagePdfOptions>(o => {
+                operations.Add("pdf");
+                File.WriteAllText(o.Path!, "pdf");
+            })
+            .ReturnsAsync(Array.Empty<byte>());
+
+        await HtmlBrowser.SavePagePdfAsync(
+            page.Object,
+            file,
+            maskSensitiveElements: true,
+            maskSelectors: new[] { "#token" },
+            maskColor: "#00ff00");
+
+        Assert.Equal(new[] { "mask", "pdf", "restore" }, operations);
+        string maskArgumentJson = JsonSerializer.Serialize(evaluateArguments[0]);
+        Assert.Contains("#token", maskArgumentJson, StringComparison.Ordinal);
+        Assert.Contains("#00ff00", maskArgumentJson, StringComparison.Ordinal);
+
+        Directory.Delete(Path.GetDirectoryName(file)!, true);
     }
 
     [Fact]

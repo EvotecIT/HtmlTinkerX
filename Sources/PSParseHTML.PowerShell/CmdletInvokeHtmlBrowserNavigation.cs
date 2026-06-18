@@ -47,9 +47,29 @@ public sealed class CmdletInvokeHtmlBrowserNavigation : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetSelector)]
     public SwitchParameter WaitForNavigation { get; set; }
 
+    /// <summary>Browser readiness state used for direct URL navigation and click-triggered navigation waits.</summary>
+    [Parameter]
+    [Alias("WaitUntil")]
+    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
+
+    /// <summary>Expected post-click navigation URL glob used with <see cref="WaitForNavigation"/>.</summary>
+    [Parameter(ParameterSetName = ParameterSetText)]
+    [Parameter(ParameterSetName = ParameterSetSelector)]
+    [Alias("WaitForUrl", "UrlPattern")]
+    public string? NavigationUrl { get; set; }
+
     /// <summary>Return the session object.</summary>
     [Parameter]
     public SwitchParameter PassThru { get; set; }
+
+    /// <summary>Export screenshots, HTML, text, Markdown, network summary, and failure context if navigation or click fails.</summary>
+    [Parameter]
+    public SwitchParameter OnFailureEvidence { get; set; }
+
+    /// <summary>Root folder where failure evidence is written when <see cref="OnFailureEvidence"/> is used.</summary>
+    [Parameter]
+    public string? FailureEvidenceFolder { get; set; }
+
     /// <summary>Timeout in milliseconds for navigation and clicks.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
@@ -69,16 +89,23 @@ public sealed class CmdletInvokeHtmlBrowserNavigation : AsyncPSCmdlet {
         try {
             switch (ParameterSetName) {
                 case ParameterSetUrl:
-                    await HtmlBrowser.NavigateAsync(session, Url!, Timeout, token).ConfigureAwait(false);
+                    await HtmlBrowser.NavigateAsync(session, Url!, LoadState, Timeout, token).ConfigureAwait(false);
                     break;
                 case ParameterSetSelector:
-                    await HtmlBrowser.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, Timeout, token).ConfigureAwait(false);
+                    await HtmlBrowser.ClickSelectorAsync(session, Selector!, WaitForNavigation.IsPresent, LoadState, NavigationUrl, Timeout, token).ConfigureAwait(false);
                     break;
                 case ParameterSetText:
-                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, Timeout, token).ConfigureAwait(false);
+                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, WaitForNavigation.IsPresent, LoadState, NavigationUrl, Timeout, token).ConfigureAwait(false);
                     break;
             }
         } catch (PlaywrightException ex) when (ex.Message.Contains("strict mode violation")) {
+            await ExportFailureEvidenceIfRequestedAsync(
+                session,
+                OnFailureEvidence.IsPresent,
+                "Navigation",
+                ex,
+                FailureEvidenceFolder,
+                token).ConfigureAwait(false);
             string query = ParameterSetName switch {
                 ParameterSetSelector => Selector!,
                 _ => Text!
@@ -86,6 +113,15 @@ public sealed class CmdletInvokeHtmlBrowserNavigation : AsyncPSCmdlet {
             string message = HtmlBrowser.FormatStrictModeMessage(query, ex);
             WriteError(new ErrorRecord(new InvalidOperationException(message), "StrictModeViolation", ErrorCategory.InvalidOperation, query));
             return;
+        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
+            await ExportFailureEvidenceIfRequestedAsync(
+                session,
+                OnFailureEvidence.IsPresent,
+                "Navigation",
+                ex,
+                FailureEvidenceFolder,
+                token).ConfigureAwait(false);
+            throw;
         }
 
         if (PassThru.IsPresent) {

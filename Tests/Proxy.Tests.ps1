@@ -1,6 +1,6 @@
 Describe 'Proxy parameters' {
     It 'Cmdlets expose proxy parameters' {
-        $cmdlets = 'ConvertFrom-HTML','ConvertFrom-HtmlTable','ConvertFrom-HtmlAttributes','ConvertFrom-HtmlList','Convert-HTMLToText','Invoke-HTMLRendering','Save-HtmlBrowserScreenshot'
+        $cmdlets = 'ConvertFrom-HTML','ConvertFrom-HtmlTable','ConvertFrom-HtmlAttributes','ConvertFrom-HtmlList','Convert-HTMLToText','Invoke-HTMLRendering','Save-HtmlBrowserScreenshot','Get-HtmlBrowserInteractable','Get-HtmlBrowserLoginForm','Get-HtmlBrowserSsoHandoff'
         foreach($cmd in $cmdlets){
             $params = (Get-Command $cmd).Parameters.Keys
             $params | Should -Contain 'Proxy'
@@ -12,7 +12,12 @@ Describe 'Proxy parameters' {
         $cred = New-Object PSCredential('u',(ConvertTo-SecureString 'p' -AsPlainText -Force))
         { Invoke-HTMLRendering -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
         { Get-HtmlBrowserInteractable -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        { Get-HtmlBrowserLoginForm -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        { Get-HtmlBrowserSsoHandoff -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        $recipe = [HtmlTinkerX.HtmlBrowserRecipe]::new()
+        $recipe.StartUrl = 'https://example.org/start'
+        { Invoke-HtmlBrowserRecipe -Recipe $recipe -ProxyCredential $cred -SkipPreflight } | Should -Throw
+        { Save-HtmlBrowserContent -Url 'http://example.com' -OutFile (Join-Path $TestDrive 'content.html') -ProxyCredential $cred } | Should -Throw
         { Set-HtmlBrowserClientOption -ProxyCredential $cred } | Should -Throw
     }
 }
-

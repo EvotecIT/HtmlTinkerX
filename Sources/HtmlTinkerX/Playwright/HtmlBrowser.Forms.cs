@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,14 +45,29 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Fills text into an element using an existing browser session.
     /// </summary>
-    public static Task FillInputAsync(HtmlBrowserSession session, string selector, string value, int timeout = 10000, CancellationToken cancellationToken = default)
-        => FillInputAsync(session.Page, selector, value, timeout, cancellationToken);
+    public static async Task FillInputAsync(HtmlBrowserSession session, string selector, string value, int timeout = 10000, CancellationToken cancellationToken = default) {
+        await FillInputAsync(session.Page, selector, value, timeout, cancellationToken).ConfigureAwait(false);
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.Input,
+            Selector = selector,
+            Value = value,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Replaces an input value using keyboard events through an existing browser session.
     /// </summary>
-    public static Task TypeInputAsync(HtmlBrowserSession session, string selector, string value, int delayMs = 40, int timeout = 10000, CancellationToken cancellationToken = default)
-        => TypeInputAsync(session.Page, selector, value, delayMs, timeout, cancellationToken);
+    public static async Task TypeInputAsync(HtmlBrowserSession session, string selector, string value, int delayMs = 40, int timeout = 10000, CancellationToken cancellationToken = default) {
+        await TypeInputAsync(session.Page, selector, value, delayMs, timeout, cancellationToken).ConfigureAwait(false);
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.TypeInput,
+            Selector = selector,
+            Value = value,
+            DelayMilliseconds = delayMs,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Sets the checked state of a checkbox or radio input.
@@ -72,8 +88,15 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Sets the checked state of a checkbox or radio input using a session.
     /// </summary>
-    public static Task SetCheckedAsync(HtmlBrowserSession session, string selector, bool check = true, int timeout = 10000, CancellationToken cancellationToken = default)
-        => SetCheckedAsync(session.Page, selector, check, timeout, cancellationToken);
+    public static async Task SetCheckedAsync(HtmlBrowserSession session, string selector, bool check = true, int timeout = 10000, CancellationToken cancellationToken = default) {
+        await SetCheckedAsync(session.Page, selector, check, timeout, cancellationToken).ConfigureAwait(false);
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.SetChecked,
+            Selector = selector,
+            Checked = check,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Selects option values from a &lt;select&gt; element.
@@ -89,8 +112,17 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Selects option values from a &lt;select&gt; element using a session.
     /// </summary>
-    public static Task SelectOptionAsync(HtmlBrowserSession session, string selector, IEnumerable<string> values, int timeout = 10000, CancellationToken cancellationToken = default)
-        => SelectOptionAsync(session.Page, selector, values, timeout, cancellationToken);
+    public static async Task SelectOptionAsync(HtmlBrowserSession session, string selector, IEnumerable<string> values, int timeout = 10000, CancellationToken cancellationToken = default) {
+        string[] selectedValues = values?.ToArray() ?? Array.Empty<string>();
+        await SelectOptionAsync(session.Page, selector, selectedValues, timeout, cancellationToken).ConfigureAwait(false);
+        HtmlBrowserRecipeStep step = new() {
+            Action = HtmlBrowserRecipeAction.SelectOption,
+            Selector = selector,
+            Timeout = timeout
+        };
+        step.Values.AddRange(selectedValues);
+        await RecordRecipeStepAsync(session, step, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Performs a mouse click on an element.
@@ -110,8 +142,16 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Performs a mouse click on an element using a session.
     /// </summary>
-    public static Task MouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default)
-        => MouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken);
+    public static async Task MouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default) {
+        await MouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken).ConfigureAwait(false);
+        if (button == MouseButton.Left && clickCount == 1 && (modifiers == null || modifiers.Length == 0)) {
+            await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+                Action = HtmlBrowserRecipeAction.Click,
+                Selector = selector,
+                Timeout = timeout
+            }, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <summary>
     /// Attempts to click a visible element and returns false when the selector is absent, hidden, or times out.
@@ -132,6 +172,17 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Attempts to click a visible element in an existing browser session.
     /// </summary>
-    public static Task<bool> TryMouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default)
-        => TryMouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken);
+    public static async Task<bool> TryMouseClickAsync(HtmlBrowserSession session, string selector, MouseButton button = MouseButton.Left, int clickCount = 1, KeyboardModifier[]? modifiers = null, int timeout = 10000, CancellationToken cancellationToken = default) {
+        bool clicked = await TryMouseClickAsync(session.Page, selector, button, clickCount, modifiers, timeout, cancellationToken).ConfigureAwait(false);
+        if (clicked && button == MouseButton.Left && clickCount == 1 && (modifiers == null || modifiers.Length == 0)) {
+            await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+                Action = HtmlBrowserRecipeAction.Click,
+                Selector = selector,
+                Timeout = timeout,
+                ContinueOnError = true
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        return clicked;
+    }
 }

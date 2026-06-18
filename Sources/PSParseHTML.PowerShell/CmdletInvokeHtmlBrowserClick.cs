@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Click a selector and keep the session alive</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Invoke-HtmlBrowserClick -Session $session -Selector '#loadMore'
 /// Wait-HtmlBrowserContent -Session $session -Text 'More results' -Selector 'main'
 ///   </code>
@@ -19,7 +19,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Click by visible text only when the target is present</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible
 ///   </code>
 /// </example>
@@ -80,6 +80,14 @@ public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PassThru { get; set; }
 
+    /// <summary>Export screenshots, HTML, text, Markdown, network summary, and failure context if the click fails.</summary>
+    [Parameter]
+    public SwitchParameter OnFailureEvidence { get; set; }
+
+    /// <summary>Root folder where failure evidence is written when <see cref="OnFailureEvidence"/> is used.</summary>
+    [Parameter]
+    public string? FailureEvidenceFolder { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (ClickCount < 1) {
@@ -93,38 +101,43 @@ public sealed class CmdletInvokeHtmlBrowserClick : AsyncPSCmdlet {
         HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
             ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
-        if (ParameterSetName == ParameterSetText) {
-            if (IfVisible.IsPresent) {
-                _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
-            } else {
-                await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
-            }
-        } else if (IfVisible.IsPresent) {
-            if (Nth.HasValue) {
-                ThrowTerminatingError(new ErrorRecord(
-                    new PSInvalidOperationException("-Nth with -IfVisible selector clicks is not supported. Use text clicks or omit -IfVisible."),
-                    "NthIfVisibleSelectorClickOptionConflict",
-                    ErrorCategory.InvalidArgument,
-                    Selector));
-                return;
-            }
+        try {
+            if (ParameterSetName == ParameterSetText) {
+                if (IfVisible.IsPresent) {
+                    _ = await HtmlBrowser.TryClickTextAsync(session, Text!, Exact.IsPresent, Regex, Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
+                } else {
+                    await HtmlBrowser.ClickTextAsync(session, Text!, Exact.IsPresent, Regex, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
+                }
+            } else if (IfVisible.IsPresent) {
+                if (Nth.HasValue) {
+                    ThrowTerminatingError(new ErrorRecord(
+                        new PSInvalidOperationException("-Nth with -IfVisible selector clicks is not supported. Use text clicks or omit -IfVisible."),
+                        "NthIfVisibleSelectorClickOptionConflict",
+                        ErrorCategory.InvalidArgument,
+                        Selector));
+                    return;
+                }
 
-            _ = await HtmlBrowser.TryMouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
-        } else {
-            if (Nth.HasValue && (ClickCount != 1 || Modifier is { Length: > 0 } || Button != MouseButton.Left)) {
-                ThrowTerminatingError(new ErrorRecord(
-                    new PSInvalidOperationException("-Nth with selector clicks supports the default left click only."),
-                    "NthClickOptionConflict",
-                    ErrorCategory.InvalidArgument,
-                    Selector));
-                return;
-            }
-
-            if (Nth.HasValue) {
-                await HtmlBrowser.ClickSelectorAsync(session, Selector, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
+                _ = await HtmlBrowser.TryMouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
             } else {
-                await HtmlBrowser.MouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
+                if (Nth.HasValue && (ClickCount != 1 || Modifier is { Length: > 0 } || Button != MouseButton.Left)) {
+                    ThrowTerminatingError(new ErrorRecord(
+                        new PSInvalidOperationException("-Nth with selector clicks supports the default left click only."),
+                        "NthClickOptionConflict",
+                        ErrorCategory.InvalidArgument,
+                        Selector));
+                    return;
+                }
+
+                if (Nth.HasValue) {
+                    await HtmlBrowser.ClickSelectorAsync(session, Selector, waitForNavigation: false, timeout: Timeout, cancellationToken: default, nth: Nth).ConfigureAwait(false);
+                } else {
+                    await HtmlBrowser.MouseClickAsync(session, Selector, Button, ClickCount, Modifier, Timeout).ConfigureAwait(false);
+                }
             }
+        } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
+            await ExportFailureEvidenceIfRequestedAsync(session, OnFailureEvidence.IsPresent, "Click", ex, FailureEvidenceFolder, CancelToken).ConfigureAwait(false);
+            throw;
         }
 
         if (PassThru.IsPresent) {

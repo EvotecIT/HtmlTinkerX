@@ -1,4 +1,4 @@
-﻿Import-Module PSWriteHTML -Force
+Import-Module PSWriteHTML -Force
 
 $ShapeTypes = @('circle', 'dot', 'diamond', 'ellipse', 'database', 'box', 'square', 'triangle', 'triangleDown', 'text', 'star', 'hexagon')
 
@@ -28,4 +28,4 @@ New-HTML -TitleText 'My Ubiquiti Network' -Online -FilePath $FilePath {
     }
 } -ShowHTML
 
-Save-HTMLScreenshot -Path $FilePath -OutFile "$PSScriptRoot\Output\Diargram.png" -Full -Open
+Save-HtmlBrowserScreenshot -Path $FilePath -OutFile "$PSScriptRoot\Output\Diargram.png" -Full -Open

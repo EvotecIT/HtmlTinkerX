@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>List storage entries after rendering</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Get-HtmlBrowserStorage -Session $session -Scope All
 ///   </code>
 /// </example>

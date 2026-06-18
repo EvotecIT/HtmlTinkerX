@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System.Diagnostics;
 using System.IO;
 using System.Management.Automation;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -50,15 +51,72 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Clean { get; set; }
 
+    /// <summary>Optional browser profile JSON file used as launch defaults for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? ProfilePath { get; set; }
+
+    /// <summary>Intent-focused browser automation defaults used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserScenario Scenario { get; set; } = HtmlBrowserScenario.Custom;
+
+    /// <summary>Persistent browser user-data directory used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? UserDataDirectory { get; set; }
+
+    /// <summary>Playwright storage-state JSON file used for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    [Alias("StorageStatePath")]
+    public string? StatePath { get; set; }
+
+    /// <summary>Browser distribution channel, such as chrome, msedge, chromium, chrome-beta, or msedge-dev.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? BrowserChannel { get; set; }
+
     /// <summary>Show the browser instead of running headless.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Visible { get; set; }
 
+    /// <summary>Proxy server address used when launching the browser.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? Proxy { get; set; }
+
+    /// <summary>Credentials used for the proxy server.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public PSCredential? ProxyCredential { get; set; }
+
     /// <summary>Slow down Playwright actions by the specified milliseconds.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int SlowMo { get; set; } = 0;
+
+    /// <summary>Initial browser navigation readiness state for URL or file captures.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
+
+    /// <summary>Timeout in milliseconds for navigation and browser operations.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    [ValidateRange(0, int.MaxValue)]
+    public int Timeout { get; set; } = 10000;
+
+    /// <summary>Browser resource types to abort before navigation, such as Image, Media, Font, or Stylesheet.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlNetworkResourceType[] BlockResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
+
+    /// <summary>Playwright URL glob patterns to abort before navigation, such as **/analytics/**.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string[] BlockResourcePattern { get; set; } = System.Array.Empty<string>();
 
     /// <summary>Open the PDF after saving.</summary>
     [Parameter]
@@ -72,6 +130,18 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
     /// <summary>CSS selector to wait for before generating the PDF.</summary>
     [Parameter]
     public string? Selector { get; set; }
+
+    /// <summary>CSS selectors of elements to mask before generating the PDF.</summary>
+    [Parameter]
+    public string[]? MaskSelector { get; set; }
+
+    /// <summary>Mask common sensitive fields such as password, token, SAML, MFA, OTP, and secret inputs before generating the PDF.</summary>
+    [Parameter]
+    public SwitchParameter MaskSensitiveElement { get; set; }
+
+    /// <summary>CSS color used for masked elements.</summary>
+    [Parameter]
+    public string? MaskColor { get; set; }
 
     /// <summary>Render the page in landscape orientation.</summary>
     [Parameter]
@@ -134,8 +204,15 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PreferCssPageSize { get; set; }
 
+    /// <summary>Token used to cancel the operation.</summary>
+    [Parameter]
+    public CancellationToken CancellationToken { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        ValidateProxy(Proxy, ProxyCredential);
+        using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+        CancellationToken token = linkedCts.Token;
         HtmlBrowserSession? session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession");
         string outPath = OutFile.ToFullPath();
         string? dir = System.IO.Path.GetDirectoryName(outPath);
@@ -165,63 +242,17 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
                     FooterTemplate,
                     PreferCssPageSize.IsPresent,
                     outline: false,
-                    tagged: false).ConfigureAwait(false);
+                    tagged: false,
+                    cancellationToken: token,
+                    maskSensitiveElements: MaskSensitiveElement.IsPresent,
+                    maskSelectors: MaskSelector,
+                    maskColor: MaskColor).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
-                await HtmlBrowser.SavePagePdfAsync(
-                    new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri,
-                    outPath,
-                    Browser,
-                    Clean.IsPresent,
-                    Delay,
-                    Selector,
-                    Landscape.IsPresent,
-                    PrintBackground.IsPresent,
-                    Format,
-                    Width,
-                    Height,
-                    MarginTop,
-                    MarginRight,
-                    MarginBottom,
-                    MarginLeft,
-                    PageRanges,
-                    Scale,
-                    DisplayHeaderFooter.IsPresent,
-                    HeaderTemplate,
-                    FooterTemplate,
-                    PreferCssPageSize.IsPresent,
-                    outline: false,
-                    tagged: false,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false);
+                await SaveOneShotAsync(new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri, outPath, token).ConfigureAwait(false);
                 break;
             default:
-                await HtmlBrowser.SavePagePdfAsync(
-                    Url,
-                    outPath,
-                    Browser,
-                    Clean.IsPresent,
-                    Delay,
-                    Selector,
-                    Landscape.IsPresent,
-                    PrintBackground.IsPresent,
-                    Format,
-                    Width,
-                    Height,
-                    MarginTop,
-                    MarginRight,
-                    MarginBottom,
-                    MarginLeft,
-                    PageRanges,
-                    Scale,
-                    DisplayHeaderFooter.IsPresent,
-                    HeaderTemplate,
-                    FooterTemplate,
-                    PreferCssPageSize.IsPresent,
-                    outline: false,
-                    tagged: false,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo).ConfigureAwait(false);
+                await SaveOneShotAsync(Url, outPath, token).ConfigureAwait(false);
                 break;
         }
 
@@ -231,5 +262,57 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
                 UseShellExecute = true,
             });
         }
+    }
+
+    private async Task SaveOneShotAsync(string target, string outPath, CancellationToken cancellationToken) {
+        HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(cancellationToken).ConfigureAwait(false);
+        await HtmlBrowser.SavePagePdfAsync(
+            target,
+            outPath,
+            launchOptions,
+            Delay,
+            Selector,
+            Landscape.IsPresent,
+            PrintBackground.IsPresent,
+            Format,
+            Width,
+            Height,
+            MarginTop,
+            MarginRight,
+            MarginBottom,
+            MarginLeft,
+            PageRanges,
+            Scale,
+            DisplayHeaderFooter.IsPresent,
+            HeaderTemplate,
+            FooterTemplate,
+            PreferCssPageSize.IsPresent,
+            outline: false,
+            tagged: false,
+            cancellationToken,
+            MaskSensitiveElement.IsPresent,
+            MaskSelector,
+            MaskColor).ConfigureAwait(false);
+    }
+
+    private async Task<HtmlBrowserLaunchOptions> CreateLaunchOptionsAsync(CancellationToken cancellationToken) {
+        return await HtmlBrowserLaunchOptionFactory.CreateAsync(new HtmlBrowserLaunchOptionRequest {
+            BoundParameters = MyInvocation.BoundParameters,
+            ProfilePath = ProfilePath,
+            Scenario = Scenario,
+            Browser = Browser,
+            Clean = Clean,
+            Visible = Visible,
+            SlowMo = SlowMo,
+            Timeout = Timeout,
+            LoadState = LoadState,
+            UserDataDirectory = UserDataDirectory,
+            StatePath = StatePath,
+            BrowserChannel = BrowserChannel,
+            Proxy = Proxy,
+            ProxyCredential = ProxyCredential,
+            BlockResourceType = BlockResourceType,
+            BlockResourcePattern = BlockResourcePattern
+        }, cancellationToken).ConfigureAwait(false);
     }
 }

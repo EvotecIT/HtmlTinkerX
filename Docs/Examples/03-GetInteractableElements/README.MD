@@ -1,8 +1,8 @@
-# `Get-HTMLInteractable`
+# `Get-HtmlBrowserInteractable`
 
 ## 📖 Summary
 
-`Get-HTMLInteractable` lists all visible or optionally hidden clickable/interactable elements from the current HTML page inside a browser session.  
+`Get-HtmlBrowserInteractable` lists all visible or optionally hidden clickable/interactable elements from the current HTML page inside a browser session.
 Typical use includes discovering links, buttons, or form elements a user or script might want to interact with — ideal for automation or semi-interactive scripting.
 
 ---
@@ -10,7 +10,7 @@ Typical use includes discovering links, buttons, or form elements a user or scri
 ## 🧰 Syntax
 
 ```powershell
-Get-HTMLInteractable
+Get-HtmlBrowserInteractable
     [-Session <BrowserSession>]
     [-Url <string>]
     [-Path <string>]
@@ -27,7 +27,7 @@ Get-HTMLInteractable
 
 | Name             | Type     | Required | Description                                                                 |
 |------------------|----------|----------|-----------------------------------------------------------------------------|
-| `-Session`       | BrowserSession | Yes* | The session object returned by `Start-HTMLSession`. |
+| `-Session`       | BrowserSession | Yes* | The session object returned by `Start-HtmlBrowserSession`. |
 | `-Url`           | string   | Yes* | Load a page at the specified URL and list elements. |
 | `-Path`          | string   | Yes* | Load a local HTML file. Alias: `-File`. |
 | `-Browser`       | BrowserEngine | No | Choose browser engine when using `-Url` or `-Path`. |
@@ -73,38 +73,38 @@ Index Text Visible Selector                                        Href         
 ### 🧪 Get interactable elements from current page
 
 ```powershell
-Get-HTMLInteractable -Session $Session
+Get-HtmlBrowserInteractable -Session $Session
 ```
 
 ### 🧪 Load a URL directly
 
 ```powershell
-Get-HTMLInteractable -Url 'https://example.com'
+Get-HtmlBrowserInteractable -Url 'https://example.com'
 ```
 
 ### 🧪 Parse a local HTML file
 
 ```powershell
-Get-HTMLInteractable -Path './report.html'
+Get-HtmlBrowserInteractable -Path './report.html'
 ```
 
 ### 🧪 Include hidden elements, limit results to 10
 
 ```powershell
-Get-HTMLInteractable -Session $Session -IncludeHidden -Limit 10
+Get-HtmlBrowserInteractable -Session $Session -IncludeHidden -Limit 10
 ```
 
 ### 🧪 Filter elements and show table output
 
 ```powershell
-Get-HTMLInteractable -Session $Session -Filter 'Media' -IncludeHidden | Format-Table
+Get-HtmlBrowserInteractable -Session $Session -Filter 'Media' -IncludeHidden | Format-Table
 ```
 
 ### 🧪 Use interactively with `Out-GridView`
 
 ```powershell
-$pick = Get-HTMLInteractable -Session $Session | Out-GridView -Title "Pick element" -PassThru
-Invoke-HTMLNavigation -Session $Session -Text $pick.Text
+$pick = Get-HtmlBrowserInteractable -Session $Session | Out-GridView -Title "Pick element" -PassThru
+Invoke-HtmlBrowserNavigation -Session $Session -Text $pick.Text
 ```
 
 ---
@@ -135,7 +135,7 @@ This provides a readable list of interactable elements useful for further automa
 
 ## 🧼 Notes
 
-- This cmdlet does not perform any interaction — use `Invoke-HTMLNavigation` to act on returned elements.
+- This cmdlet does not perform any interaction — use `Invoke-HtmlBrowserNavigation` to act on returned elements.
 - Use `-Limit` to avoid processing overly large DOM trees.
 - Visibility filtering uses bounding box and layout heuristics (`getClientRects()`).
 

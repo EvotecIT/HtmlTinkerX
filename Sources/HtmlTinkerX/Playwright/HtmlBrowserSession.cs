@@ -22,7 +22,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// <summary>
     /// Gets the browser instance opened for this session.
     /// </summary>
-    public IBrowser Browser { get; }
+    public IBrowser? Browser { get; }
 
     /// <summary>
     /// Gets the browser context used to create pages.
@@ -43,6 +43,30 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// Gets the path where the recorded video is stored.
     /// </summary>
     public string? VideoPath { get; internal set; }
+
+    /// <summary>
+    /// Gets the persistent user-data directory used by this session, when launched as a persistent profile.
+    /// </summary>
+    public string? UserDataDirectory { get; }
+
+    /// <summary>
+    /// Gets whether this session was launched with a persistent browser context.
+    /// </summary>
+    public bool IsPersistent => !string.IsNullOrWhiteSpace(UserDataDirectory);
+
+    /// <summary>
+    /// Gets the Chrome DevTools Protocol endpoint used by this session, when attached to an existing browser.
+    /// </summary>
+    public string? CdpEndpointUrl { get; }
+
+    /// <summary>
+    /// Gets whether this session is attached to an already-running browser through CDP.
+    /// </summary>
+    public bool IsCdpAttached => !string.IsNullOrWhiteSpace(CdpEndpointUrl);
+
+    private readonly bool _closeContextOnDispose;
+    private readonly bool _closeBrowserOnDispose;
+    private readonly bool _closePageOnDispose;
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
     private readonly ConcurrentDictionary<IRequest, IResponse> _responses = new();
     private ConcurrentQueue<IRequest>? _order;
@@ -101,16 +125,38 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// <summary>Captured console log entries.</summary>
     public IEnumerable<HtmlConsoleEntry> ConsoleLog => _console;
 
+    /// <summary>Current recipe recorder attached to this session, when recording is active or recently stopped.</summary>
+    public HtmlBrowserRecipeRecorder? RecipeRecorder { get; internal set; }
+
+    internal bool SuppressRecipeRecording { get; set; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="HtmlBrowserSession"/> class.
     /// </summary>
-    public HtmlBrowserSession(IPlaywright playwright, IBrowser browser, IBrowserContext context, IPage page, IVideo? video = null, string? videoPath = null, ConcurrentDictionary<IRequest, HtmlNetworkEntry>? network = null) {
+    public HtmlBrowserSession(
+        IPlaywright playwright,
+        IBrowser? browser,
+        IBrowserContext context,
+        IPage page,
+        IVideo? video = null,
+        string? videoPath = null,
+        ConcurrentDictionary<IRequest, HtmlNetworkEntry>? network = null,
+        string? userDataDirectory = null,
+        string? cdpEndpointUrl = null,
+        bool closeContextOnDispose = true,
+        bool closeBrowserOnDispose = true,
+        bool closePageOnDispose = false) {
         Playwright = playwright;
         Browser = browser;
         Context = context;
         Page = page;
         Video = video;
         VideoPath = videoPath;
+        UserDataDirectory = userDataDirectory;
+        CdpEndpointUrl = cdpEndpointUrl;
+        _closeContextOnDispose = closeContextOnDispose;
+        _closeBrowserOnDispose = closeBrowserOnDispose;
+        _closePageOnDispose = closePageOnDispose;
         _network = network ?? new ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
 
         Page.Console += (_, msg) => {
@@ -275,7 +321,15 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// Asynchronously disposes of the browser session, closing the page, context, and browser.
     /// </summary>
     public async ValueTask DisposeAsync() {
-        if (Context != null) {
+        if (_closePageOnDispose && Page != null && !Page.IsClosed) {
+            try {
+                await Page.CloseAsync().ConfigureAwait(false);
+            } catch (PlaywrightException) {
+                // CDP-attached browsers can be closed by the user outside this session.
+            }
+        }
+
+        if (_closeContextOnDispose && Context != null) {
             await Context.CloseAsync().ConfigureAwait(false);
         }
 
@@ -294,7 +348,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             }
         }
 
-        if (Browser != null) {
+        if (_closeBrowserOnDispose && Browser != null) {
             await Browser.CloseAsync().ConfigureAwait(false);
         }
         if (Playwright != null) {

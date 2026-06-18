@@ -50,12 +50,7 @@ public static partial class HtmlBrowser {
         string? proxyUsername = null,
         string? proxyPassword = null,
         CancellationToken cancellationToken = default) {
-        options ??= new ScreenshotOptions();
-        if (options.DelayMs < 0) {
-            throw new ArgumentOutOfRangeException(nameof(options.DelayMs), "Delay must be zero or positive.");
-        }
-        await using HtmlBrowserSession session = await OpenSessionAsync(
-            url,
+        HtmlBrowserLaunchOptions launchOptions = HtmlBrowserLaunchOptions.FromLegacyParameters(
             browser,
             clean,
             username,
@@ -63,11 +58,42 @@ public static partial class HtmlBrowser {
             formLogin,
             headless,
             slowMo,
-            null,
             proxy: proxy,
             proxyUsername: proxyUsername,
-            proxyPassword: proxyPassword,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            proxyPassword: proxyPassword);
+
+        await CaptureScreenshotAsync(
+            url,
+            path,
+            launchOptions,
+            options,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Captures a screenshot of the specified page using reusable browser launch options.
+    /// </summary>
+    /// <param name="url">URL to load.</param>
+    /// <param name="path">File path for the screenshot.</param>
+    /// <param name="launchOptions">Browser launch, profile, emulation, and network options.</param>
+    /// <param name="options">Screenshot capture options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task CaptureScreenshotAsync(
+        string url,
+        string path,
+        HtmlBrowserLaunchOptions launchOptions,
+        ScreenshotOptions? options = null,
+        CancellationToken cancellationToken = default) {
+        if (launchOptions == null) {
+            throw new ArgumentNullException(nameof(launchOptions));
+        }
+
+        options ??= new ScreenshotOptions();
+        if (options.DelayMs < 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.DelayMs), "Delay must be zero or positive.");
+        }
+
+        await using HtmlBrowserSession session = await OpenSessionAsync(url, launchOptions, cancellationToken).ConfigureAwait(false);
 
         string fullPath = path.ToFullPath();
         await CaptureScreenshotAsync(
@@ -126,6 +152,13 @@ public static partial class HtmlBrowser {
                 Width = options.ClipWidth.Value,
                 Height = options.ClipHeight.Value,
             };
+        }
+        ILocator[] maskLocators = CreateScreenshotMaskLocators(page, options);
+        if (maskLocators.Length > 0) {
+            pwOptions.Mask = maskLocators;
+            if (!string.IsNullOrWhiteSpace(options.MaskColor)) {
+                pwOptions.MaskColor = options.MaskColor;
+            }
         }
         cancellationToken.ThrowIfCancellationRequested();
         byte[] data = await page.ScreenshotAsync(pwOptions);
@@ -195,5 +228,22 @@ public static partial class HtmlBrowser {
             level = 9;
         }
         return level;
+    }
+
+    private static ILocator[] CreateScreenshotMaskLocators(IPage page, ScreenshotOptions options) {
+        List<ILocator> locators = new();
+        if (options.MaskSensitiveElements) {
+            foreach (string selector in DefaultSensitiveVisualMaskSelectors) {
+                locators.Add(page.Locator(selector));
+            }
+        }
+
+        if (options.MaskSelectors != null) {
+            foreach (string selector in options.MaskSelectors.Where(static selector => !string.IsNullOrWhiteSpace(selector))) {
+                locators.Add(page.Locator(selector));
+            }
+        }
+
+        return locators.ToArray();
     }
 }

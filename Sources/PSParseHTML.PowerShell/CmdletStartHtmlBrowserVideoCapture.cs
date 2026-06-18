@@ -149,6 +149,10 @@ public sealed class CmdletStartHtmlBrowserVideoCapture : AsyncPSCmdlet {
                 Session ??= (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                     ?? throw new PSInvalidOperationException("No session provided and no default session found.");
                 target = Session.Page.Url;
+                if (Session.Browser == null) {
+                    throw new PSInvalidOperationException("Cannot start video capture from a session whose browser instance is not exposed by Playwright. Start video capture from -Url or -Path instead.");
+                }
+
                 string browserType = Session.Browser.BrowserType.Name;
                 engine = browserType switch {
                     "firefox" => HtmlBrowserEngine.Firefox,

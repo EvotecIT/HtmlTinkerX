@@ -28,6 +28,9 @@ public sealed class HtmlBrowserlessDataSource {
     /// <summary>Resolved absolute URL when the source represents an HTTP endpoint.</summary>
     public string ResolvedUrl { get; set; } = string.Empty;
 
+    /// <summary>Resolved URL with sensitive user-info, query, or fragment values redacted for display and logging.</summary>
+    public string RedactedUrl { get; set; } = string.Empty;
+
     /// <summary>HTTP method when the source represents an endpoint.</summary>
     public string Method { get; set; } = string.Empty;
 
@@ -46,6 +49,15 @@ public sealed class HtmlBrowserlessDataSource {
     /// <summary>Whether the source has authentication or token-related hints.</summary>
     public bool RequiresAuthenticationHint { get; set; }
 
+    /// <summary>Observed request headers useful for understanding browser replay. Sensitive values are redacted.</summary>
+    public IReadOnlyDictionary<string, string> ObservedRequestHeaders { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Non-sensitive observed request headers that can be copied into a replay request.</summary>
+    public IReadOnlyDictionary<string, string> ReplayRequestHeaders { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Observed request header names whose values were redacted and should not be copied into scripts.</summary>
+    public IReadOnlyList<string> SensitiveRequestHeaderNames { get; set; } = Array.Empty<string>();
+
     /// <summary>CSS-like selector or source hint for the source element.</summary>
     public string Selector { get; set; } = string.Empty;
 
@@ -54,6 +66,15 @@ public sealed class HtmlBrowserlessDataSource {
 
     /// <summary>Raw JSON, text, or endpoint metadata available at discovery time.</summary>
     public string RawContent { get; set; } = string.Empty;
+
+    /// <summary>Suggested PowerShell command for extracting this source after assigning it to <c>$source</c>.</summary>
+    public string SuggestedCommand { get; set; } = string.Empty;
+
+    /// <summary>Suggested PowerShell command for saving this source as a reusable extraction recipe after assigning it to <c>$source</c>.</summary>
+    public string SuggestedRecipeCommand { get; set; } = string.Empty;
+
+    /// <summary>Suggested PowerShell command for replaying the observed endpoint with safe session and header handling.</summary>
+    public string SuggestedReplayCommand { get; set; } = string.Empty;
 
     /// <summary>Evidence explaining why this candidate is useful.</summary>
     public IReadOnlyList<string> Evidence { get; set; } = Array.Empty<string>();

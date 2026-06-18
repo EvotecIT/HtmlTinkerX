@@ -29,7 +29,7 @@ $htmlPath = Join-Path $env:TEMP 'psparsehtml-rendered-snapshot.html'
 
 # Use DOMContentLoaded or Commit for pages that keep background requests open.
 # Then wait for a page-specific selector or JavaScript predicate before extracting.
-$snapshot = Invoke-HTMLRendering `
+$snapshot = Invoke-HtmlRendering `
     -Path $htmlPath `
     -RenderProfile HeavyDynamicPage `
     -WaitForFunction '() => window.renderReady === true' `
@@ -100,7 +100,7 @@ $snapshot.InteractionSurface |
     Out-String
 
 # Network capture is opt-in because request and response headers can contain sensitive values.
-$networkSnapshot = Invoke-HTMLRendering `
+$networkSnapshot = Invoke-HtmlRendering `
     -Path $htmlPath `
     -LoadState Commit `
     -WaitForFunction '() => window.renderReady === true' `

@@ -200,6 +200,11 @@ public static partial class HtmlBrowser {
             Timeout = timeout,
             WaitUntil = WaitUntilState.NetworkIdle
         }).ConfigureAwait(false);
+        RecordRecipeStep(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.Navigate,
+            Url = url,
+            Timeout = timeout
+        });
     }
 
     /// <summary>
@@ -211,6 +216,12 @@ public static partial class HtmlBrowser {
             Timeout = timeout,
             WaitUntil = ToWaitUntilState(loadState)
         }).ConfigureAwait(false);
+        RecordRecipeStep(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.Navigate,
+            Url = url,
+            LoadState = loadState,
+            Timeout = timeout
+        });
     }
 
     private static WaitUntilState ToWaitUntilState(HtmlBrowserLoadState loadState) => loadState switch {

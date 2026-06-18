@@ -1,4 +1,48 @@
+Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+
+if (-not ('PngScreenshotTestReader' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+
+public static class PngScreenshotTestReader {
+    public static int[] GetDimensions(string path) {
+        byte[] bytes = File.ReadAllBytes(path);
+        return new[] { ReadInt32BigEndian(bytes, 16), ReadInt32BigEndian(bytes, 20) };
+    }
+
+    private static int ReadInt32BigEndian(byte[] bytes, int offset) {
+        return (bytes[offset] << 24)
+            | (bytes[offset + 1] << 16)
+            | (bytes[offset + 2] << 8)
+            | bytes[offset + 3];
+    }
+}
+'@
+}
+
 Describe 'Save-HtmlBrowserScreenshot' {
+    It 'exposes reusable launch profile parameters for one-shot captures' {
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'ProfilePath'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Scenario'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'UserDataDirectory'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'StatePath'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Proxy'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'ProxyCredential'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'LoadState'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Timeout'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'BlockResourceType'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'BlockResourcePattern'
+    }
+
+    It 'rejects document resource blocking for one-shot screenshot navigation' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $outfile = Join-Path $TestDrive 'blocked-document.png'
+
+        { Save-HtmlBrowserScreenshot -Path $path -OutFile $outfile -BlockResourceType Document } |
+            Should -Throw -ExpectedMessage '*BlockResourceType Document would abort page navigation*'
+    }
+
     It 'Creates a screenshot file' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -21,6 +65,17 @@ Describe 'Save-HtmlBrowserScreenshot' {
         $outfile = Join-Path $TestDrive 'full.png'
         Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Full -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
+    }
+
+    It 'applies scenario viewport defaults to direct screenshots' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $outfile = Join-Path $TestDrive 'audit-proof.png'
+
+        Save-HtmlBrowserScreenshot -Path $path -OutFile $outfile -Scenario AuditProof -Selector '#loaded'
+
+        $dimensions = [PngScreenshotTestReader]::GetDimensions($outfile)
+        $dimensions[0] | Should -Be 1366
+        $dimensions[1] | Should -Be 900
     }
 
     It 'Creates a clipped screenshot' {

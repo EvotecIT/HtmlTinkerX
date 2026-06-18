@@ -4,15 +4,16 @@ Import-Module "$PSScriptRoot\..\PSParseHTML.psd1" -Force
 # Replace example URLs and selectors with the target site's real controls.
 
 # Product/search workflow: dismiss overlays, type like a user, submit, then extract rendered text.
-$session = Start-HtmlSession -Url 'https://example.com/search' -Session
+$session = Start-HtmlBrowserSession -Url 'https://example.com/search'
 try {
-    Invoke-HtmlOverlayDismissal -Session $session | Out-Null
-    Set-HtmlInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25
-    Invoke-HtmlKey -Session $session -Selector 'input[type=search]' -Key 'Enter'
-    Wait-HtmlContent -Session $session -Text 'Results' -Selector 'main'
-    Get-HtmlContent -Session $session -Selector 'main' -AsText
+    Close-HtmlBrowserOverlay -Session $session | Out-Null
+    Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25
+    Invoke-HtmlBrowserKey -Session $session -Selector 'input[type=search]' -Key 'Enter'
+    Wait-HtmlBrowserReady -Session $session -Selector 'main' -Stable
+    Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'
+    Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText
 } finally {
-    Close-HtmlSession -Session $session
+    Close-HtmlBrowserSession -Session $session
 }
 
 # Lazy-loaded listing workflow.
@@ -37,15 +38,15 @@ $app.StaticRenderedComparison
 $app.LinkedJavaScriptEndpoints
 
 # Login reuse workflow: export storage state once, then use it in later sessions.
-$login = Start-HtmlSession -Url 'https://example.com/login' -Session -Visible
+$login = Start-HtmlBrowserSession -Url 'https://example.com/login' -Visible
 try {
-    Set-HtmlInput -Session $login -Selector '#username' -Value 'user@example.com' -Type -DelayMs 20
-    Set-HtmlInput -Session $login -Selector '#password' -Value 'REPLACE_WITH_SECRET' -Type -DelayMs 20
-    Invoke-HtmlClick -Session $login -Selector 'button[type=submit]'
-    Wait-HtmlContent -Session $login -Text 'Dashboard' -Selector 'body'
-    Export-BrowserState -Session $login -Path "$PSScriptRoot\Output\browser-state.json"
+    Set-HtmlBrowserInput -Session $login -Selector '#username' -Value 'user@example.com' -Type -DelayMs 20
+    Set-HtmlBrowserInput -Session $login -Selector '#password' -Value 'REPLACE_WITH_SECRET' -Type -DelayMs 20
+    Invoke-HtmlBrowserClick -Session $login -Selector 'button[type=submit]'
+    Wait-HtmlBrowserContent -Session $login -Text 'Dashboard' -Selector 'body'
+    Export-HtmlBrowserState -Session $login -Path "$PSScriptRoot\Output\browser-state.json"
 } finally {
-    Close-HtmlSession -Session $login
+    Close-HtmlBrowserSession -Session $login
 }
 
 $dashboard = Invoke-HtmlRendering -Url 'https://example.com/dashboard' `
@@ -71,15 +72,15 @@ $network = Invoke-HtmlRendering -Url 'https://example.com/search' `
 $network.NetworkLog | Where-Object ResourceType -In 'XHR', 'Fetch'
 
 # One-page diagnostics from an active session.
-$diagSession = Start-HtmlSession -Url 'https://example.com/app' -Session
+$diagSession = Start-HtmlBrowserSession -Url 'https://example.com/app'
 try {
-    Wait-HtmlContent -Session $diagSession -Stable -StableMilliseconds 500
-    $diagnostics = Get-HtmlDiagnostics -Session $diagSession
+    Wait-HtmlBrowserReady -Session $diagSession -Stable -StableMilliseconds 500
+    $diagnostics = Get-HtmlBrowserDiagnostics -Session $diagSession
     $diagnostics.ConsistencyWarnings
     $diagnostics.ObservedApiCalls
     $diagnostics.FailedRequests
 } finally {
-    Close-HtmlSession -Session $diagSession
+    Close-HtmlBrowserSession -Session $diagSession
 }
 
 # Planner-to-profile workflow.

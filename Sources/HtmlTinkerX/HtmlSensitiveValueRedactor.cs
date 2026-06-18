@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 namespace HtmlTinkerX;
 
 internal static class HtmlSensitiveValueRedactor {
+    private const string StructuredSensitiveNamePattern = "access_token|api_key|apikey|auth|code|credential|csrf|key|mfa|otp|passcode|password|pin|pwd|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult";
+
     internal static readonly string[] SensitiveNames = {
         "access_token",
         "api_key",
@@ -13,12 +15,28 @@ internal static class HtmlSensitiveValueRedactor {
         "code",
         "credential",
         "csrf",
+        "error",
+        "error_description",
+        "error_uri",
+        "id_token",
         "key",
+        "mfa",
+        "otp",
         "password",
+        "passcode",
+        "pin",
+        "pwd",
         "refresh_token",
+        "relaystate",
+        "samlrequest",
+        "samlresponse",
         "secret",
         "session",
-        "token"
+        "session_state",
+        "state",
+        "token",
+        "wctx",
+        "wresult"
     };
 
     internal static bool HasSensitiveQuery(Uri? uri) {
@@ -120,7 +138,8 @@ internal static class HtmlSensitiveValueRedactor {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = SafeUnescapeDataString(keyValue[0]);
             if (IsSensitiveName(name)) {
-                return keyValue[0] + "=<redacted>";
+                string suffix = keyValue.Length == 2 ? GetTrailingParameterValueDelimiter(keyValue[1]) : string.Empty;
+                return keyValue[0] + "=<redacted>" + suffix;
             }
 
             if (keyValue.Length == 2 && TryRedactNestedValue(keyValue[1], out string? nestedRedacted)) {
@@ -135,6 +154,29 @@ internal static class HtmlSensitiveValueRedactor {
 
     private static bool HasParameterPairs(string value) =>
         !string.IsNullOrWhiteSpace(value) && value.IndexOf('=') >= 0;
+
+    private static string GetTrailingParameterValueDelimiter(string value) {
+        const string RedactedMarker = "<redacted>";
+        if (value.StartsWith(RedactedMarker, StringComparison.OrdinalIgnoreCase)) {
+            return value.Substring(RedactedMarker.Length);
+        }
+
+        int index = value.Length;
+        while (index > 0 && IsParameterValueDelimiter(value[index - 1])) {
+            index--;
+        }
+
+        return index == value.Length ? string.Empty : value.Substring(index);
+    }
+
+    private static bool IsParameterValueDelimiter(char value) =>
+        char.IsWhiteSpace(value)
+        || value == '\''
+        || value == '"'
+        || value == ']'
+        || value == ')'
+        || value == '}'
+        || value == '>';
 
     private static string SafeUnescapeDataString(string value) {
         try {
@@ -238,13 +280,37 @@ internal static class HtmlSensitiveValueRedactor {
 
         string redacted = Regex.Replace(
             value,
-            "((?:\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^\"]*\"|'[^']*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "([A-Za-z_$][A-Za-z0-9_$.]*(?:" + StructuredSensitiveNamePattern + ")[A-Za-z0-9_$]*\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
+            "$1<redacted>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "((?:\"[^\"]*(?:" + StructuredSensitiveNamePattern + ")[^\"]*\"|'[^']*(?:" + StructuredSensitiveNamePattern + ")[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         redacted = Regex.Replace(
             redacted,
-            "([A-Za-z_$][A-Za-z0-9_$]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "([A-Za-z_$][A-Za-z0-9_$]*(?:" + StructuredSensitiveNamePattern + ")[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "$1\"<redacted>\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "(?<![?&#A-Za-z0-9_])((?:[A-Za-z_$][A-Za-z0-9_$]*\\.)?\\bstate\\s*=\\s*)(\\{[^;]*\\}|\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^;\\r\\n]+)",
+            "$1<redacted>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "((?:\"state\"|'state')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "$1\"<redacted>\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            "(\\bstate\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
@@ -256,6 +322,79 @@ internal static class HtmlSensitiveValueRedactor {
 
         return redacted;
     }
+
+    internal static string RedactSensitiveEvidenceText(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        string redacted = RedactSensitiveStructuredText(value);
+        redacted = Regex.Replace(
+            redacted,
+            @"(?i)(bearer\s+)[A-Za-z0-9._~+/\-]+=*",
+            "$1<redacted>",
+            RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            @"(?i)((?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|session[_-]?id|saml(?:request|response)|state|relaystate|wresult|wctx)\s*=\s*)[^\s&<>""']+",
+            "$1<redacted>",
+            RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            @"<input\b[^>]*>",
+            RedactSensitiveInputElement,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            @"<textarea\b[^>]*>.*?</textarea>",
+            RedactSensitiveTextAreaElement,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
+        return redacted;
+    }
+
+    private static string RedactSensitiveInputElement(Match match) {
+        string tag = match.Value;
+        if (!HasSensitiveFormFieldHint(tag) && !IsPasswordInputElement(tag)) {
+            return tag;
+        }
+
+        return Regex.Replace(
+            tag,
+            @"\bvalue\s*=\s*(?:(['""])(.*?)\1|([^\s""'=<>`]+))",
+            match => match.Groups[1].Success
+                ? $"value={match.Groups[1].Value}<redacted>{match.Groups[1].Value}"
+                : "value=<redacted>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static string RedactSensitiveTextAreaElement(Match match) {
+        string element = match.Value;
+        Match elementMatch = Regex.Match(
+            element,
+            @"^(<textarea\b[^>]*>)(.*?)(</textarea>)$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        if (!elementMatch.Success || !HasSensitiveFormFieldHint(elementMatch.Groups[1].Value)) {
+            return element;
+        }
+
+        return elementMatch.Groups[1].Value + "<redacted>" + elementMatch.Groups[3].Value;
+    }
+
+    private static bool HasSensitiveFormFieldHint(string tag) =>
+        Regex.IsMatch(
+            tag,
+            @"\b(?:name|id|autocomplete)\s*=\s*(?:(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1|[^\s""'=<>`]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^\s""'=<>`]*)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool IsPasswordInputElement(string tag) =>
+        Regex.IsMatch(
+            tag,
+            @"\btype\s*=\s*(['""])password\1",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string RedactSensitiveUrlLiteral(Match match) {
         string literal = match.Value;
