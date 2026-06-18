@@ -145,7 +145,6 @@ public sealed class CmdletSaveHtmlBrowserContent : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
         if (InnerHtml.IsPresent && AsText.IsPresent) {
             ThrowTerminatingError(new ErrorRecord(
                 new PSInvalidOperationException("Specify only one of -InnerHtml or -AsText."),
@@ -168,6 +167,7 @@ public sealed class CmdletSaveHtmlBrowserContent : AsyncPSCmdlet {
                 ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
                 : Url!;
             HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+            ValidateProxy(launchOptions.Proxy, ProxyCredential);
             await HtmlBrowser.SaveContentAsync(target, fullPath, launchOptions, Selector, InnerHtml.IsPresent, AsText.IsPresent, Timeout, token).ConfigureAwait(false);
         }
 

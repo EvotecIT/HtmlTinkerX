@@ -98,6 +98,7 @@ public sealed class HtmlBrowserRecipeRecorder {
             Text = step.Text,
             Value = step.Value,
             ValueRedacted = step.ValueRedacted,
+            ValueSensitive = step.ValueSensitive,
             ValueRedactionReason = step.ValueRedactionReason,
             ValueVariable = step.ValueVariable,
             Values = new List<string>(step.Values),
@@ -149,7 +150,7 @@ public sealed class HtmlBrowserRecipeRecorder {
             : HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value!));
 
     private static void RedactSensitiveRecordedValues(HtmlBrowserRecipeStep step) {
-        if (!IsValueRecordingAction(step.Action) || !IsSensitiveRecipeSelector(step.Selector)) {
+        if (!IsValueRecordingAction(step.Action) || !IsSensitiveRecipeStep(step)) {
             return;
         }
 
@@ -173,6 +174,9 @@ public sealed class HtmlBrowserRecipeRecorder {
         action == HtmlBrowserRecipeAction.Input
         || action == HtmlBrowserRecipeAction.TypeInput
         || action == HtmlBrowserRecipeAction.SelectOption;
+
+    private static bool IsSensitiveRecipeStep(HtmlBrowserRecipeStep step) =>
+        step.ValueSensitive == true || IsSensitiveRecipeSelector(step.Selector);
 
     private static bool IsSensitiveRecipeSelector(string? selector) {
         if (string.IsNullOrWhiteSpace(selector)) {

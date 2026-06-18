@@ -17,6 +17,7 @@ Describe 'Proxy parameters' {
         $recipe = [HtmlTinkerX.HtmlBrowserRecipe]::new()
         $recipe.StartUrl = 'https://example.org/start'
         { Invoke-HtmlBrowserRecipe -Recipe $recipe -ProxyCredential $cred -SkipPreflight } | Should -Throw
+        { Save-HtmlBrowserContent -Url 'http://example.com' -OutFile (Join-Path $TestDrive 'content.html') -ProxyCredential $cred } | Should -Throw
         { Set-HtmlBrowserClientOption -ProxyCredential $cred } | Should -Throw
     }
 }

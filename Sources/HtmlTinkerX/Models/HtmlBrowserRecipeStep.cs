@@ -30,6 +30,9 @@ public sealed class HtmlBrowserRecipeStep {
     /// <summary>Whether a recorded input value was redacted before the recipe was stored.</summary>
     public bool? ValueRedacted { get; set; }
 
+    /// <summary>Whether the matched element was recognized as sensitive when the value was recorded.</summary>
+    public bool? ValueSensitive { get; set; }
+
     /// <summary>Reason a recorded input value was redacted.</summary>
     public string? ValueRedactionReason { get; set; }
 

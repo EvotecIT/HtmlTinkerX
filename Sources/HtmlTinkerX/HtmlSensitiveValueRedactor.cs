@@ -364,8 +364,10 @@ internal static class HtmlSensitiveValueRedactor {
 
         return Regex.Replace(
             tag,
-            @"\bvalue\s*=\s*(['""])(.*?)\1",
-            "value=$1<redacted>$1",
+            @"\bvalue\s*=\s*(?:(['""])(.*?)\1|([^\s""'=<>`]+))",
+            match => match.Groups[1].Success
+                ? $"value={match.Groups[1].Value}<redacted>{match.Groups[1].Value}"
+                : "value=<redacted>",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
@@ -385,7 +387,7 @@ internal static class HtmlSensitiveValueRedactor {
     private static bool HasSensitiveFormFieldHint(string tag) =>
         Regex.IsMatch(
             tag,
-            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
+            @"\b(?:name|id|autocomplete)\s*=\s*(?:(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1|[^\s""'=<>`]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^\s""'=<>`]*)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static bool IsPasswordInputElement(string tag) =>

@@ -153,6 +153,42 @@ Describe 'Browser recipe recording' {
         $recipe.Steps[0].Url | Should -Match 'access_token=<redacted>'
     }
 
+    It 'redacts recorded input values when the matched element is sensitive but selector is generic' {
+        $pagePath = Join-Path $TestDrive 'recording-generic-password.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main class="login">
+    <input type="text" />
+    <input type="password" />
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $recipePath = Join-Path $TestDrive 'recorded-generic-password.browser.recipe.json'
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'GenericSensitiveRecording' -IncludeCurrentUrl | Out-Null
+            Set-HtmlBrowserInput -Session $session -Selector '.login input:nth-of-type(2)' -Value 'GenericPasswordSecret!'
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipeJson = Get-Content -LiteralPath $recipePath -Raw
+        $recipeJson | Should -Not -Match 'GenericPasswordSecret'
+        $recipe = $recipeJson | ConvertFrom-Json
+        $inputStep = $recipe.Steps | Where-Object Action -eq 'Input' | Select-Object -First 1
+        $inputStep.Selector | Should -Be '.login input:nth-of-type(2)'
+        $inputStep.Value | Should -Be '<redacted>'
+        $inputStep.ValueRedacted | Should -BeTrue
+        $inputStep.ValueSensitive | Should -BeTrue
+        $inputStep.ValueVariable | Should -Not -BeNullOrEmpty
+    }
+
     It 'records Nth for disambiguated selector clicks and replays the same occurrence' {
         $pagePath = Join-Path $TestDrive 'recording-nth-click.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

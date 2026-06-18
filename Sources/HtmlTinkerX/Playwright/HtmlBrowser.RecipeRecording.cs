@@ -131,7 +131,40 @@ public static partial class HtmlBrowser {
             }
         }
 
+        if (IsRecordedValueAction(step.Action) && !string.IsNullOrWhiteSpace(step.Selector)) {
+            try {
+                step.ValueSensitive = await IsSensitiveRecordedElementAsync(session, step.Selector!, step.Nth, cancellationToken).ConfigureAwait(false);
+            } catch (Exception ex) when (ex is PlaywrightException || ex is ArgumentException || ex is InvalidOperationException) {
+                step.ValueSensitive = step.ValueSensitive == true ? true : null;
+            }
+        }
+
         recorder.Record(step);
+    }
+
+    private static bool IsRecordedValueAction(HtmlBrowserRecipeAction action) =>
+        action == HtmlBrowserRecipeAction.Input
+        || action == HtmlBrowserRecipeAction.TypeInput
+        || action == HtmlBrowserRecipeAction.SelectOption;
+
+    private static async Task<bool> IsSensitiveRecordedElementAsync(HtmlBrowserSession session, string selector, int? nth, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await session.Page.EvaluateAsync<bool>(
+            @"(args) => {
+                const sensitive = /(access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)/i;
+                const fields = ['name', 'id', 'autocomplete', 'type', 'placeholder', 'aria-label'];
+                const value = item => String(item || '');
+                const matches = Array.from(document.querySelectorAll(args.selector));
+                const index = args.nth === null || args.nth === undefined ? 0 : Number(args.nth);
+                if (!Number.isInteger(index) || index < 0 || index >= matches.length) return false;
+                const element = matches[index];
+                if (!element) return false;
+                return fields.some(name => sensitive.test(value(element.getAttribute(name))));
+            }",
+            new {
+                selector,
+                nth
+            }).ConfigureAwait(false);
     }
 
     private static string FirstNonEmptyRecording(params string?[] values) {
