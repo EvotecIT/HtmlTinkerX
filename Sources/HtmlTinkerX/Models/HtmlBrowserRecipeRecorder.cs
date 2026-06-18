@@ -92,7 +92,7 @@ public sealed class HtmlBrowserRecipeRecorder {
         HtmlBrowserRecipeStep clone = new() {
             Name = step.Name,
             Action = step.Action,
-            Url = step.Url,
+            Url = RedactRecordedUrl(step.Url),
             Selector = step.Selector,
             SelectorAlternates = new List<string>(step.SelectorAlternates),
             Text = step.Text,
@@ -123,7 +123,7 @@ public sealed class HtmlBrowserRecipeRecorder {
             Regex = step.Regex,
             Nth = step.Nth,
             WaitForNavigation = step.WaitForNavigation,
-            NavigationUrl = step.NavigationUrl,
+            NavigationUrl = RedactRecordedUrl(step.NavigationUrl),
             DelayMilliseconds = step.DelayMilliseconds,
             Milliseconds = step.Milliseconds,
             NoLoadState = step.NoLoadState,
@@ -142,6 +142,11 @@ public sealed class HtmlBrowserRecipeRecorder {
         RedactSensitiveRecordedValues(clone);
         return clone;
     }
+
+    private static string? RedactRecordedUrl(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? value
+            : HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value!));
 
     private static void RedactSensitiveRecordedValues(HtmlBrowserRecipeStep step) {
         if (!IsValueRecordingAction(step.Action) || !IsSensitiveRecipeSelector(step.Selector)) {

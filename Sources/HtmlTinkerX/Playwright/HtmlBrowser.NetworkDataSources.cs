@@ -119,10 +119,10 @@ public static partial class HtmlBrowser {
         bool isExternal = endpointUri != null && pageUri != null && !HasSameOrigin(pageUri, endpointUri);
         bool isStateChanging = IsStateChanging(entry.Method);
         bool hasSensitiveUrl = endpointUri != null && HasSensitiveUrlParameters(endpointUri);
-        bool hasAuthenticationHint = HasAuthenticationHeader(entry.RequestHeaders) || hasSensitiveUrl;
         IReadOnlyDictionary<string, string> observedRequestHeaders = BuildObservedRequestHeaders(entry.RequestHeaders);
         IReadOnlyDictionary<string, string> replayRequestHeaders = BuildReplayRequestHeaders(entry.RequestHeaders);
         IReadOnlyList<string> sensitiveRequestHeaderNames = BuildSensitiveRequestHeaderNames(entry.RequestHeaders);
+        bool hasAuthenticationHint = HasAuthenticationHeader(entry.RequestHeaders) || hasSensitiveUrl || sensitiveRequestHeaderNames.Count > 0;
         HtmlApiEndpointRiskLevel riskLevel = ChooseNetworkRiskLevel(isExternal, isStateChanging, hasSensitiveUrl, hasAuthenticationHint);
         string responseBody = options.IncludeResponseBody ? entry.ResponseBody ?? string.Empty : string.Empty;
         bool hasResponseBody = !string.IsNullOrWhiteSpace(responseBody);

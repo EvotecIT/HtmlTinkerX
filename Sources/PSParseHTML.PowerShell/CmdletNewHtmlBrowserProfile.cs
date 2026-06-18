@@ -113,7 +113,7 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
 
         HtmlBrowserProfile profile = new() {
             Name = Name,
-            Browser = Browser,
+            Browser = MyInvocation.BoundParameters.ContainsKey(nameof(Browser)) ? Browser : null,
             Scenario = MyInvocation.BoundParameters.ContainsKey(nameof(Scenario)) ? Scenario : null,
             UserDataDirectory = UserDataDirectory?.ToFullPath(),
             BrowserChannel = BrowserChannel,

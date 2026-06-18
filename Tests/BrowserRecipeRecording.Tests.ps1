@@ -139,16 +139,18 @@ Describe 'Browser recipe recording' {
 
         try {
             Start-HtmlBrowserRecipeRecording -Session $session -Name 'SensitiveStartRecording' -IncludeCurrentUrl | Out-Null
+            Invoke-HtmlBrowserNavigation -Session $session -Url "${uri}#access_token=recording-step-token" -LoadState DomContentLoaded
             Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
         } finally {
             Close-HtmlBrowserSession -Session $session
         }
 
         $recipeJson = Get-Content -LiteralPath $recipePath -Raw
-        $recipeJson | Should -Not -Match 'recording-code|recording-state'
+        $recipeJson | Should -Not -Match 'recording-code|recording-state|recording-step-token'
         $recipe = $recipeJson | ConvertFrom-Json
         $recipe.StartUrl | Should -Match 'code=<redacted>'
         $recipe.StartUrl | Should -Match 'state=<redacted>'
+        $recipe.Steps[0].Url | Should -Match 'access_token=<redacted>'
     }
 
     It 'records Nth for disambiguated selector clicks and replays the same occurrence' {

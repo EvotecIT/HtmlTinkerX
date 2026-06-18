@@ -88,7 +88,7 @@ public static partial class HtmlBrowser {
             Name = recipe.Name,
             StartedAtUtc = now,
             CompletedAtUtc = now,
-            StartUrl = recipe.StartUrl ?? string.Empty,
+            StartUrl = RedactRecipePreflightUrl(recipe.StartUrl),
             Succeeded = false,
             CreatedSession = false,
             SkippedBeforeExecution = true,
@@ -100,6 +100,10 @@ public static partial class HtmlBrowser {
             SuggestedCommand = validation.SuggestedCommand
         };
     }
+
+    private static string RedactRecipePreflightUrl(string? value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(
+            HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value ?? string.Empty));
 
     private static void ValidateStep(HtmlBrowserRecipeValidationResult result, HtmlBrowserRecipeStep step, int index, ISet<string> runtimeVariables) {
         if (step.Timeout.HasValue && step.Timeout.Value < 0) {

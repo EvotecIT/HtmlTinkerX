@@ -457,11 +457,12 @@ Describe 'Browser recipes' {
     It 'skips browser launch when preflight validation fails unless explicitly bypassed' {
         $pagePath = Join-Path $TestDrive 'browser-preflight-bypass.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main><input id="password" type="password" /></main>'
+        $pageUri = [System.Uri]::new($pagePath).AbsoluteUri
         $recipePath = Join-Path $TestDrive 'browser-preflight-skip.recipe.json'
         $recipe = [ordered]@{
             SchemaVersion = 1
             Name          = 'PreflightSkip'
-            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            StartUrl      = "${pageUri}#code=preflight-code&state=preflight-state"
             LoadState     = 'DomContentLoaded'
             Timeout       = 3000
             Steps         = @(
@@ -482,6 +483,9 @@ Describe 'Browser recipes' {
         $result.CreatedSession | Should -BeFalse
         $result.SkippedBeforeExecution | Should -BeTrue
         $result.PreflightFailed | Should -BeTrue
+        $result.StartUrl | Should -Match 'code=<redacted>'
+        $result.StartUrl | Should -Match 'state=<redacted>'
+        $result.StartUrl | Should -Not -Match 'preflight-code|preflight-state'
         $result.Validation.ErrorCount | Should -Be 1
         $result.Validation.MissingVariables | Should -Be @('password')
         $result.FailureSummary | Should -Match 'Recipe preflight failed'

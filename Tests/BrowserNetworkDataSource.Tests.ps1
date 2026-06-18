@@ -208,6 +208,34 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source.Warnings -join "`n" | Should -Match 'do not copy Authorization, Cookie, CSRF, or token values'
     }
 
+    It 'treats sensitive replay headers as authentication hints' {
+        $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
+        $entry.Url = 'https://example.com/api/tenant'
+        $entry.Method = [HtmlTinkerX.HtmlHttpMethod]::Get
+        $entry.ResourceType = [HtmlTinkerX.HtmlNetworkResourceType]::Fetch
+        $entry.Status = [System.Net.HttpStatusCode]::OK
+        $entry.RequestHeaders = [System.Collections.Generic.Dictionary[string,string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $entry.RequestHeaders['accept'] = 'application/json'
+        $entry.RequestHeaders['x-api-key'] = 'secret-api-key'
+
+        $sources = [HtmlTinkerX.HtmlBrowser]::FindNetworkDataSources(
+            [HtmlTinkerX.HtmlNetworkEntry[]] @($entry),
+            $null,
+            'https://example.com/proof')
+
+        $source = $sources | Select-Object -First 1
+
+        $source | Should -Not -BeNullOrEmpty
+        $source.RequiresAuthenticationHint | Should -BeTrue
+        $source.RiskLevel | Should -Be ([HtmlTinkerX.HtmlApiEndpointRiskLevel]::Medium)
+        $source.CanExtractDirectly | Should -BeFalse
+        $source.SensitiveRequestHeaderNames | Should -Contain 'x-api-key'
+        $source.ObservedRequestHeaders['x-api-key'] | Should -Be '<redacted>'
+        $source.ReplayRequestHeaders.Keys | Should -Not -Contain 'x-api-key'
+        $source.SuggestedCommand | Should -Be '$source | Format-List RedactedUrl,Method,RiskLevel,Warnings'
+        $source.SuggestedCommand | Should -Not -Match 'AllowHttpFetch'
+    }
+
     It 'redacts OAuth state and fragment tokens from observed endpoint and page URLs' {
         $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
         $entry.Url = 'https://example.com/api/items?state=api-state-secret&accessToken=camel-secret&tenant=contoso#idToken=fragment-secret'

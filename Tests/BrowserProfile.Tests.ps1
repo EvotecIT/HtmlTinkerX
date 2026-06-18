@@ -82,6 +82,18 @@ Describe 'Browser profiles' {
         $options.PreventSsoAutoSubmit | Should -BeTrue
     }
 
+    It 'does not override an existing browser when a profile omits Browser' {
+        $profile = New-HtmlBrowserProfile -Name LocaleOnly -Locale en-US
+        $options = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $options.Browser = [HtmlTinkerX.HtmlBrowserEngine]::Firefox
+
+        $options.ApplyProfile($profile)
+
+        $profile.Browser | Should -BeNullOrEmpty
+        $options.Browser | Should -Be ([HtmlTinkerX.HtmlBrowserEngine]::Firefox)
+        $options.Locale | Should -Be 'en-US'
+    }
+
     It 'rejects mutually exclusive CDP attach launch options before connecting' {
         { Start-HtmlBrowserSession -Url 'about:blank' -CdpEndpointUrl 'http://127.0.0.1:9222' -UserDataDirectory (Join-Path $TestDrive 'profile') -NoDefault } |
             Should -Throw -ExpectedMessage '*do not combine CdpEndpointUrl with UserDataDirectory*'

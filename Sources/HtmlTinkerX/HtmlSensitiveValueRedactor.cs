@@ -347,15 +347,18 @@ internal static class HtmlSensitiveValueRedactor {
             RedactSensitiveInputElement,
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        redacted = Regex.Replace(
+            redacted,
+            @"<textarea\b[^>]*>.*?</textarea>",
+            RedactSensitiveTextAreaElement,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
         return redacted;
     }
 
     private static string RedactSensitiveInputElement(Match match) {
         string tag = match.Value;
-        if (!Regex.IsMatch(
-            tag,
-            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
+        if (!HasSensitiveFormFieldHint(tag) && !IsPasswordInputElement(tag)) {
             return tag;
         }
 
@@ -365,6 +368,31 @@ internal static class HtmlSensitiveValueRedactor {
             "value=$1<redacted>$1",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
+
+    private static string RedactSensitiveTextAreaElement(Match match) {
+        string element = match.Value;
+        Match elementMatch = Regex.Match(
+            element,
+            @"^(<textarea\b[^>]*>)(.*?)(</textarea>)$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        if (!elementMatch.Success || !HasSensitiveFormFieldHint(elementMatch.Groups[1].Value)) {
+            return element;
+        }
+
+        return elementMatch.Groups[1].Value + "<redacted>" + elementMatch.Groups[3].Value;
+    }
+
+    private static bool HasSensitiveFormFieldHint(string tag) =>
+        Regex.IsMatch(
+            tag,
+            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|code|mfa|otp|passcode|password|pin|pwd|secret|refresh[_-]?token|csrf|session|state|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool IsPasswordInputElement(string tag) =>
+        Regex.IsMatch(
+            tag,
+            @"\btype\s*=\s*(['""])password\1",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string RedactSensitiveUrlLiteral(Match match) {
         string literal = match.Value;

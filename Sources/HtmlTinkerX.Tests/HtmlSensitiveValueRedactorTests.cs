@@ -23,4 +23,17 @@ public class HtmlSensitiveValueRedactorTests {
         Assert.DoesNotContain("user-secret-detail", redacted, System.StringComparison.Ordinal);
         Assert.DoesNotContain("session-secret", redacted, System.StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void RedactSensitiveEvidenceText_RedactsSensitiveTextareasAndPasswordInputs() {
+        string redacted = HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(
+            "<form><textarea name=\"SAMLResponse\">textarea-saml-secret</textarea><textarea name=\"notes\">visible note</textarea><input type=\"password\" value=\"password-secret\"><input name=\"display\" value=\"visible-value\"></form>");
+
+        Assert.Contains("<textarea name=\"SAMLResponse\"><redacted></textarea>", redacted, System.StringComparison.Ordinal);
+        Assert.Contains("<textarea name=\"notes\">visible note</textarea>", redacted, System.StringComparison.Ordinal);
+        Assert.Contains("type=\"password\" value=\"<redacted>\"", redacted, System.StringComparison.Ordinal);
+        Assert.Contains("name=\"display\" value=\"visible-value\"", redacted, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("textarea-saml-secret", redacted, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("password-secret", redacted, System.StringComparison.Ordinal);
+    }
 }
