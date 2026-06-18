@@ -381,7 +381,7 @@ public static partial class HtmlBrowser {
     }
 
     private static HtmlBrowserSsoField BuildSsoField(string name, string type, string rawValue, HtmlBrowserSsoHandoffOptions options) {
-        bool isSensitive = IsSensitiveSsoField(name);
+        bool isSensitive = IsSensitiveSsoField(name, type);
         bool redacted = isSensitive && !options.IncludeSensitiveValues;
         bool truncated = false;
         string value = redacted ? "<redacted>" : rawValue;
@@ -422,7 +422,13 @@ public static partial class HtmlBrowser {
         return HtmlBrowserSsoHandoffKind.Unknown;
     }
 
-    private static bool IsSensitiveSsoField(string name) {
+    private static bool IsSensitiveSsoField(string name, string type) {
+        if (!string.IsNullOrWhiteSpace(type)
+            && (string.Equals(type, "password", StringComparison.OrdinalIgnoreCase)
+                || HtmlSensitiveValueRedactor.IsSensitiveName(type))) {
+            return true;
+        }
+
         if (string.IsNullOrWhiteSpace(name)) {
             return false;
         }

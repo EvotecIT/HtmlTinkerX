@@ -80,6 +80,10 @@ public static partial class HtmlBrowser {
             }
 
             HtmlBrowserLaunchOptions launchOptions = options?.LaunchOptions ?? CreateRecipeLaunchOptions(recipe);
+            if (launchOptions.ManualLogin && string.IsNullOrWhiteSpace(launchOptions.LoginSuccessSelector)) {
+                throw new ArgumentException("Manual login recipe replay requires LoginSuccessSelector so steps do not run before the operator has completed sign-in.", nameof(options));
+            }
+
             session = await OpenSessionAsync(recipe.StartUrl!, launchOptions, cancellationToken).ConfigureAwait(false);
         }
 

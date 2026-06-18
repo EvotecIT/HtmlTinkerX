@@ -118,7 +118,7 @@ public static partial class HtmlBrowser {
         Uri? pageUri = TryCreateAbsoluteUri(pageUrl);
         bool isExternal = endpointUri != null && pageUri != null && !HasSameOrigin(pageUri, endpointUri);
         bool isStateChanging = IsStateChanging(entry.Method);
-        bool hasSensitiveUrl = endpointUri != null && HasSensitiveUrlParameters(endpointUri);
+        bool hasSensitiveUrl = endpointUri != null && HasSensitiveUrlAuthentication(endpointUri);
         IReadOnlyDictionary<string, string> observedRequestHeaders = BuildObservedRequestHeaders(entry.RequestHeaders);
         IReadOnlyDictionary<string, string> replayRequestHeaders = BuildReplayRequestHeaders(entry.RequestHeaders);
         IReadOnlyList<string> sensitiveRequestHeaderNames = BuildSensitiveRequestHeaderNames(entry.RequestHeaders);
@@ -275,7 +275,7 @@ public static partial class HtmlBrowser {
         }
 
         if (hasSensitiveUrl) {
-            warnings.Add("Observed endpoint contains sensitive query or fragment parameter names.");
+            warnings.Add("Observed endpoint contains sensitive query or fragment parameter names or URL user-info credentials.");
         }
 
         if (entry.ResponseBodyTruncated) {
@@ -399,8 +399,9 @@ public static partial class HtmlBrowser {
         AuthenticationHeaderNames.Contains(name, StringComparer.OrdinalIgnoreCase)
         || HtmlSensitiveValueRedactor.IsSensitiveName(name);
 
-    private static bool HasSensitiveUrlParameters(Uri uri) =>
-        HtmlSensitiveValueRedactor.HasSensitiveQueryText(uri.Query)
+    private static bool HasSensitiveUrlAuthentication(Uri uri) =>
+        !string.IsNullOrWhiteSpace(uri.UserInfo)
+        || HtmlSensitiveValueRedactor.HasSensitiveQueryText(uri.Query)
         || HtmlSensitiveValueRedactor.HasSensitiveQueryText(uri.Fragment);
 
     private static string RedactNetworkUrlValues(string value) {

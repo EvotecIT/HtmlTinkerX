@@ -90,6 +90,31 @@ Describe 'Browser SSO handoff inspection' {
         $revealed[0].Action | Should -Match 'action-state-secret'
     }
 
+    It 'redacts password typed fields when all forms are included' {
+        $pagePath = Join-Path $TestDrive 'generic-login-form.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <form id="login" method="post" action="https://portal.example/login">
+    <input type="text" name="username" value="auditor@example.com" />
+    <input type="password" name="current" value="plain-password-secret" />
+  </form>
+</body>
+</html>
+'@
+
+        $handoff = @(Get-HtmlBrowserSsoHandoff -Path $pagePath -IncludeAllForms -LoadState DomContentLoaded)
+
+        $handoff.Count | Should -Be 1
+        $handoff[0].Kind | Should -Be 'Unknown'
+        ($handoff[0].Fields | Where-Object Name -eq 'username').Value | Should -Be 'auditor@example.com'
+        ($handoff[0].Fields | Where-Object Name -eq 'current').Value | Should -Be '<redacted>'
+        ($handoff[0].Fields | Where-Object Name -eq 'current').IsSensitive | Should -BeTrue
+        $handoff[0].FormData['current'] | Should -Be '<redacted>'
+        ($handoff[0] | ConvertTo-Json -Depth 8) | Should -Not -Match 'plain-password-secret'
+    }
+
     It 'can safely analyze a SAML handoff in one step without returning raw subject values' {
         $xml = @'
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_response" Version="2.0" IssueInstant="2026-01-02T03:04:05Z" Destination="https://service-provider.example/saml/consume">

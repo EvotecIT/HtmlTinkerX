@@ -28,6 +28,26 @@ Describe 'Browser recipes' {
         (Get-Command Export-HtmlBrowserRecipe).Parameters.Keys | Should -Contain 'IncludeOptionalVariables'
     }
 
+    It 'requires a login completion selector before manual-login recipe replay' {
+        $recipe = [HtmlTinkerX.HtmlBrowserRecipe]::new()
+        $recipe.Name = 'Manual Login Replay'
+        $recipe.StartUrl = 'https://portal.example/login'
+
+        $launchOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $launchOptions.ManualLogin = $true
+        $launchOptions.Headless = $false
+        $runOptions = [HtmlTinkerX.HtmlBrowserRecipeRunOptions]::new()
+        $runOptions.LaunchOptions = $launchOptions
+
+        {
+            [HtmlTinkerX.HtmlBrowser]::ExecuteRecipeAsync(
+                $recipe,
+                $null,
+                $runOptions,
+                [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+        } | Should -Throw -ExpectedMessage '*Manual login recipe replay requires LoginSuccessSelector*'
+    }
+
     It 'preflights valid browser recipes without launching a browser' {
         $recipePath = Join-Path $TestDrive 'valid-preflight.recipe.json'
         $recipe = [ordered]@{

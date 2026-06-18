@@ -236,6 +236,28 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source.SuggestedCommand | Should -Not -Match 'AllowHttpFetch'
     }
 
+    It 'treats URL user-info credentials as authentication hints' {
+        $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
+        $entry.Url = 'https://audit-user:audit-password@example.com/api/proof'
+        $entry.Method = [HtmlTinkerX.HtmlHttpMethod]::Get
+        $entry.ResourceType = [HtmlTinkerX.HtmlNetworkResourceType]::Fetch
+        $entry.Status = [System.Net.HttpStatusCode]::OK
+
+        $sources = [HtmlTinkerX.HtmlBrowser]::FindNetworkDataSources(
+            [HtmlTinkerX.HtmlNetworkEntry[]] @($entry),
+            $null,
+            'https://example.com/proof')
+
+        $source = $sources | Select-Object -First 1
+
+        $source | Should -Not -BeNullOrEmpty
+        $source.RequiresAuthenticationHint | Should -BeTrue
+        $source.CanExtractDirectly | Should -BeFalse
+        $source.Url | Should -Match 'https://<redacted>@example.com/api/proof'
+        $source.Url | Should -Not -Match 'audit-user|audit-password'
+        $source.Warnings -join "`n" | Should -Match 'URL user-info credentials'
+    }
+
     It 'redacts OAuth state and fragment tokens from observed endpoint and page URLs' {
         $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
         $entry.Url = 'https://example.com/api/items?state=api-state-secret&accessToken=camel-secret&tenant=contoso#idToken=fragment-secret'
@@ -269,7 +291,7 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source.RequiresAuthenticationHint | Should -BeTrue
         $source.CanExtractDirectly | Should -BeFalse
         $source.RiskLevel | Should -Be ([HtmlTinkerX.HtmlApiEndpointRiskLevel]::Medium)
-        $source.Warnings | Should -Contain 'Observed endpoint contains sensitive query or fragment parameter names.'
+        $source.Warnings | Should -Contain 'Observed endpoint contains sensitive query or fragment parameter names or URL user-info credentials.'
         $recipe = [HtmlTinkerX.HtmlBrowserlessExtraction]::CreateRecipe($source)
         ($recipe | ConvertTo-Json -Depth 8) | Should -Not -Match 'api-state-secret|camel-secret|fragment-secret'
     }

@@ -168,8 +168,6 @@ public sealed class CmdletGetHtmlBrowserSsoHandoff : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
-
         HtmlBrowserSsoHandoffOptions options = new() {
             IncludeSensitiveValues = IncludeSensitiveValues.IsPresent || Analyze.IsPresent,
             IncludeAllForms = IncludeAllForms.IsPresent,
@@ -185,6 +183,7 @@ public sealed class CmdletGetHtmlBrowserSsoHandoff : AsyncPSCmdlet {
         switch (ParameterSetName) {
             case ParameterSetUrl:
                 HtmlBrowserLaunchOptions urlOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                ValidateProxy(urlOptions.Proxy, ProxyCredential);
                 urlOptions.PreventSsoAutoSubmit = true;
                 await using (HtmlBrowserSession urlSession = await HtmlBrowser.OpenSessionAsync(Url!, urlOptions, token).ConfigureAwait(false)) {
                     handoffs = await HtmlBrowser.GetSsoHandoffsAsync(urlSession, options, token).ConfigureAwait(false);
@@ -193,6 +192,7 @@ public sealed class CmdletGetHtmlBrowserSsoHandoff : AsyncPSCmdlet {
             case ParameterSetFile:
                 string fileUrl = new Uri(Path!.ToFullPath()).AbsoluteUri;
                 HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                ValidateProxy(fileOptions.Proxy, ProxyCredential);
                 fileOptions.PreventSsoAutoSubmit = true;
                 await using (HtmlBrowserSession fileSession = await HtmlBrowser.OpenSessionAsync(fileUrl, fileOptions, token).ConfigureAwait(false)) {
                     handoffs = await HtmlBrowser.GetSsoHandoffsAsync(fileSession, options, token).ConfigureAwait(false);
