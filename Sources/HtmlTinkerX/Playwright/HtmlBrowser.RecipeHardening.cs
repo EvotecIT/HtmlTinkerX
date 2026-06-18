@@ -184,7 +184,7 @@ public static partial class HtmlBrowser {
         result.Eligible = true;
         IReadOnlyList<string> alternates;
         try {
-            alternates = await FindSelectorAlternatesAsync(session, selector, limit, cancellationToken).ConfigureAwait(false);
+            alternates = await FindSelectorAlternatesAsync(session, selector, limit, cancellationToken, step.Nth).ConfigureAwait(false);
         } catch (Exception ex) when (ex is PlaywrightException || ex is ArgumentException || ex is InvalidOperationException) {
             result.Reason = $"Could not inspect selector on the current page: {ex.Message}";
             return result;

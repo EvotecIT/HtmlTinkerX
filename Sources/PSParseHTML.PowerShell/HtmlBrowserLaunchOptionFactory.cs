@@ -93,6 +93,14 @@ internal static class HtmlBrowserLaunchOptionFactory {
 
         SetIfBound(request, nameof(request.BrowserChannel), value => options.BrowserChannel = value, request.BrowserChannel);
         SetIfBound(request, nameof(request.BrowserExecutablePath), value => options.BrowserExecutablePath = value, request.BrowserExecutablePath?.ToFullPath());
+        if (browserChannelBound && !browserExecutablePathBound) {
+            options.BrowserExecutablePath = null;
+        }
+
+        if (browserExecutablePathBound && !browserChannelBound) {
+            options.BrowserChannel = null;
+        }
+
         if (cdpEndpointBound) {
             options.CdpEndpointUrl = request.CdpEndpointUrl;
             if (!userDataDirectoryBound) {

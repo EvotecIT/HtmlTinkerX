@@ -136,8 +136,8 @@ Describe 'Browser recipe recording' {
 <html>
 <body>
   <main>
-    <button class="choice" onclick="document.getElementById('result').textContent = 'first'">Choose</button>
-    <button class="choice" onclick="document.getElementById('result').textContent = 'second'">Choose</button>
+    <button class="choice" data-testid="choice" id="firstChoice" onclick="document.getElementById('result').textContent = 'first'">Choose</button>
+    <button class="choice" data-testid="choice" id="secondChoice" onclick="document.getElementById('result').textContent = 'second'">Choose</button>
     <section id="result">waiting</section>
   </main>
 </body>
@@ -160,6 +160,9 @@ Describe 'Browser recipe recording' {
         $clickStep = $recipe.Steps | Where-Object Action -eq 'Click' | Select-Object -First 1
 
         $clickStep.Nth | Should -Be 1
+        $clickStep.SelectorAlternates | Should -Contain 'button#secondChoice'
+        $clickStep.SelectorAlternates | Should -Not -Contain 'button#firstChoice'
+        $clickStep.SelectorAlternates | Should -Not -Contain "[data-testid='choice']"
 
         $result = Invoke-HtmlBrowserRecipe -Path $recipePath
 

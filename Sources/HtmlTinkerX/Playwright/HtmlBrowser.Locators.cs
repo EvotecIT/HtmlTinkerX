@@ -90,12 +90,14 @@ public static partial class HtmlBrowser {
     /// <param name="selector">Existing selector whose first matched element should be analyzed.</param>
     /// <param name="limit">Maximum alternate selectors to return.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="nth">Optional zero-based match index for selectors that intentionally target a later occurrence.</param>
     /// <returns>Stable selector alternates that point at the same element and do not contain recognized sensitive values.</returns>
     public static async Task<IReadOnlyList<string>> FindSelectorAlternatesAsync(
         HtmlBrowserSession session,
         string selector,
         int limit = 5,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        int? nth = null) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
@@ -113,7 +115,8 @@ public static partial class HtmlBrowser {
             SelectorAlternateScript,
             new {
                 selector,
-                limit
+                limit,
+                nth
             }).ConfigureAwait(false);
 
         return selectors
@@ -248,8 +251,10 @@ public static partial class HtmlBrowser {
         const normalize = value => String(value || '').replace(/\s+/g, ' ').trim();
         const primary = normalize(args.selector);
         const limit = Number(args.limit || 5);
-        const element = document.querySelector(primary);
-        if (!element) return [];
+        const primaryMatches = Array.from(document.querySelectorAll(primary));
+        const nth = args.nth === null || args.nth === undefined ? 0 : Number(args.nth);
+        if (!Number.isInteger(nth) || nth < 0 || nth >= primaryMatches.length) return [];
+        const element = primaryMatches[nth];
 
         const tag = element.tagName ? element.tagName.toLowerCase() : '';
         const output = [];
@@ -258,7 +263,8 @@ public static partial class HtmlBrowser {
             selector = normalize(selector);
             if (!selector || selector === primary || seen.has(selector)) return;
             try {
-                if (document.querySelector(selector) !== element) return;
+                const matches = Array.from(document.querySelectorAll(selector));
+                if (matches.length !== 1 || matches[0] !== element) return;
             } catch {
                 return;
             }

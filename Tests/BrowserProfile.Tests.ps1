@@ -219,5 +219,38 @@ Describe 'Browser profiles' {
 
         $cdpLaunch.CdpEndpointUrl | Should -BeNullOrEmpty
         $cdpLaunch.BrowserChannel | Should -Be 'chrome'
+
+        $targetOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $targetOptions.BrowserExecutablePath = Join-Path $TestDrive 'profile-chrome.exe'
+
+        $channelRequest = [System.Activator]::CreateInstance($requestType, $true)
+        $requestType.GetProperty('BaseOptions').SetValue($channelRequest, $targetOptions)
+        $requestType.GetProperty('BoundParameters').SetValue($channelRequest, [hashtable] @{
+            BrowserChannel = $true
+        })
+        $requestType.GetProperty('BrowserChannel').SetValue($channelRequest, 'msedge')
+
+        $channelTask = $method.Invoke($null, @($channelRequest, [System.Threading.CancellationToken]::None))
+        $channelLaunch = $channelTask.GetAwaiter().GetResult()
+
+        $channelLaunch.BrowserChannel | Should -Be 'msedge'
+        $channelLaunch.BrowserExecutablePath | Should -BeNullOrEmpty
+
+        $pathOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $pathOptions.BrowserChannel = 'chrome'
+        $explicitPath = Join-Path $TestDrive 'explicit-browser.exe'
+
+        $pathRequest = [System.Activator]::CreateInstance($requestType, $true)
+        $requestType.GetProperty('BaseOptions').SetValue($pathRequest, $pathOptions)
+        $requestType.GetProperty('BoundParameters').SetValue($pathRequest, [hashtable] @{
+            BrowserExecutablePath = $true
+        })
+        $requestType.GetProperty('BrowserExecutablePath').SetValue($pathRequest, $explicitPath)
+
+        $pathTask = $method.Invoke($null, @($pathRequest, [System.Threading.CancellationToken]::None))
+        $pathLaunch = $pathTask.GetAwaiter().GetResult()
+
+        $pathLaunch.BrowserExecutablePath | Should -Match 'explicit-browser\.exe$'
+        $pathLaunch.BrowserChannel | Should -BeNullOrEmpty
     }
 }

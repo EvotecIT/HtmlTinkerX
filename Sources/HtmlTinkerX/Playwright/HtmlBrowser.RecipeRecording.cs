@@ -123,7 +123,8 @@ public static partial class HtmlBrowser {
                     session,
                     step.Selector!,
                     recorder.SelectorAlternateLimit,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    step.Nth).ConfigureAwait(false);
                 step.SelectorAlternates.AddRange(alternates);
             } catch (Exception ex) when (ex is PlaywrightException || ex is ArgumentException || ex is InvalidOperationException) {
                 // Selector alternate discovery is best-effort; recording the successful user action is more important.

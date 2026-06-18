@@ -54,6 +54,13 @@ Describe 'JSON Web Token inspection' {
         (Get-Command ConvertFrom-HtmlJsonWebToken).Name | Should -Be 'ConvertFrom-HtmlJsonWebToken'
     }
 
+    It 'binds positional raw token values to the token parameter set' {
+        $summary = ConvertFrom-HtmlJsonWebToken (New-TestJwt)
+
+        $summary.IsValid | Should -BeTrue
+        $summary.Subject | Should -Be '<redacted>'
+    }
+
     It 'summarizes a token without revealing user-identifying claims by default' {
         $summary = ConvertFrom-HtmlJsonWebToken -Token (New-TestJwt)
 

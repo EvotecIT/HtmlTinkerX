@@ -13,23 +13,23 @@ namespace PSParseHTML.PowerShell;
 ///   <summary>Inspect an OIDC token captured from an SSO handoff</summary>
 ///   <code>Get-HtmlBrowserSsoHandoff -Session $session -IncludeSensitiveValues | ConvertFrom-HtmlJsonWebToken</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlJsonWebToken", DefaultParameterSetName = ParameterSetHandoff)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlJsonWebToken", DefaultParameterSetName = ParameterSetToken)]
 [OutputType(typeof(HtmlJsonWebTokenSummary))]
 public sealed class CmdletConvertFromHtmlJsonWebToken : PSCmdlet {
     private const string ParameterSetToken = "Token";
     private const string ParameterSetHandoff = "Handoff";
 
     /// <summary>Raw compact JSON Web Token value.</summary>
-    [Parameter(Mandatory = true, ParameterSetName = ParameterSetToken, ValueFromPipelineByPropertyName = true, Position = 0)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetToken, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [Alias("Jwt", "JsonWebToken")]
-    public string? Token { get; set; }
+    public object? Token { get; set; }
 
     /// <summary>SSO handoff object returned by Get-HtmlBrowserSsoHandoff.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetHandoff, ValueFromPipeline = true, Position = 0)]
     public object? Handoff { get; set; }
 
     /// <summary>Specific handoff field name to inspect. Defaults to id_token and then access_token.</summary>
-    [Parameter(ParameterSetName = ParameterSetHandoff)]
+    [Parameter]
     public string? FieldName { get; set; }
 
     /// <summary>Include decoded header and payload JSON. Payload values remain redacted unless IncludeSensitiveValues is also set.</summary>
@@ -42,9 +42,10 @@ public sealed class CmdletConvertFromHtmlJsonWebToken : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string value = ParameterSetName == ParameterSetHandoff
-            ? GetTokenFromHandoff(Handoff!, FieldName)
-            : Token ?? string.Empty;
+        object? input = ParameterSetName == ParameterSetHandoff ? Handoff : Token;
+        string value = input is string token
+            ? token
+            : GetTokenFromHandoff(input!, FieldName);
 
         WriteObject(HtmlJsonWebTokenParser.Parse(value, IncludeSensitiveValues.IsPresent, IncludeJson.IsPresent));
     }
