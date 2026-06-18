@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -238,6 +239,92 @@ public static partial class HtmlBrowser {
     }
 
     /// <summary>
+    /// Retrieves a list of elements that can be interacted with (links, buttons, etc.).
+    /// </summary>
+    /// <param name="page">Playwright page instance.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of interactable element descriptions.</returns>
+    public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page, CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
+        var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]");
+        List<HtmlInteractableInfo> list = new();
+        int index = 0;
+        foreach (var el in elements) {
+            cancellationToken.ThrowIfCancellationRequested();
+            string rawText = await el.InnerTextAsync();
+            string text = Regex.Replace(rawText, "\\s+", " ").Trim();
+            string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+            string? href = await el.GetAttributeAsync("href");
+            string? id = await el.GetAttributeAsync("id");
+            string? cls = await el.GetAttributeAsync("class");
+            bool visible = await el.IsVisibleAsync();
+            bool enabled = await el.IsEnabledAsync();
+            bool editable = await el.EvaluateAsync<bool>(@"el => {
+                if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+                const tag = el.tagName ? el.tagName.toLowerCase() : '';
+                if (tag === 'textarea') return true;
+                if (tag === 'select') return true;
+                if (tag === 'input') {
+                    const type = (el.getAttribute('type') || 'text').toLowerCase();
+                    return !['button','checkbox','color','file','hidden','image','radio','range','reset','submit'].includes(type);
+                }
+                return el.isContentEditable === true || el.getAttribute('contenteditable') === 'true';
+            }");
+            bool potentiallyHidden = await el.EvaluateAsync<bool>(@"el => {
+                const check = node => {
+                    if (!node) return false;
+                    if (node.getAttribute('aria-hidden') === 'true' || node.hidden) {
+                        return true;
+                    }
+                    const style = window.getComputedStyle(node);
+                    if (!style) return false;
+                    return style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0;
+                };
+                for (let n = el; n; n = n.parentElement) {
+                    if (check(n)) return true;
+                }
+                return false;
+            }");
+            HtmlBrowserElementInfo elementInfo = ParseElementInfo(await el.EvaluateAsync<string>(
+                ElementInfoScript,
+                new {
+                    includeAttributes = false,
+                    includeHtml = false
+                }).ConfigureAwait(false));
+            cancellationToken.ThrowIfCancellationRequested();
+            string selector = await el.EvaluateAsync<string>(@"el => {
+                const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
+                let sel = el.tagName.toLowerCase();
+                if (el.id) return sel + '#' + esc(el.id);
+                const href = el.getAttribute('href');
+                if (href) return `${sel}[href='${href.replace(/'/g, ""\\'"")}']`;
+                const cls = el.className;
+                if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
+                return sel;
+            }");
+            list.Add(new HtmlInteractableInfo {
+                Index = index++,
+                Text = text,
+                Tag = tag,
+                Selector = selector,
+                Href = href,
+                Id = id,
+                Class = cls,
+                Visible = visible,
+                PotentiallyHidden = potentiallyHidden,
+                Enabled = enabled,
+                Editable = editable,
+                InViewport = elementInfo.InViewport,
+                X = elementInfo.X,
+                Y = elementInfo.Y,
+                Width = elementInfo.Width,
+                Height = elementInfo.Height
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
     /// Gets entries from localStorage, sessionStorage, or both scopes.
     /// </summary>
     public static async Task<IReadOnlyList<HtmlBrowserStorageItem>> GetStorageAsync(HtmlBrowserSession session, string scope = "All", string? key = null, CancellationToken cancellationToken = default) {
@@ -327,6 +414,34 @@ public static partial class HtmlBrowser {
 #else
         await System.IO.File.WriteAllTextAsync(fullPath, content, cancellationToken).ConfigureAwait(false);
 #endif
+    }
+
+    /// <summary>
+    /// Opens a page, saves rendered content to a file, and closes the temporary browser session.
+    /// </summary>
+    /// <param name="url">URL or file URI to render.</param>
+    /// <param name="path">Destination file path.</param>
+    /// <param name="launchOptions">Browser launch and context options.</param>
+    /// <param name="selector">Optional selector to save.</param>
+    /// <param name="innerHtml">Save inner HTML instead of outer HTML.</param>
+    /// <param name="asText">Save visible text instead of HTML.</param>
+    /// <param name="timeout">Timeout in milliseconds while waiting for the selector.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public static async Task SaveContentAsync(
+        string url,
+        string path,
+        HtmlBrowserLaunchOptions launchOptions,
+        string? selector = null,
+        bool innerHtml = false,
+        bool asText = false,
+        int? timeout = null,
+        CancellationToken cancellationToken = default) {
+        if (launchOptions == null) {
+            throw new ArgumentNullException(nameof(launchOptions));
+        }
+
+        await using HtmlBrowserSession session = await OpenSessionAsync(url, launchOptions, cancellationToken).ConfigureAwait(false);
+        await SaveContentAsync(session, path, selector, innerHtml, asText, timeout, cancellationToken).ConfigureAwait(false);
     }
 
     private static HtmlBrowserElementInfo ParseElementInfo(string json) {

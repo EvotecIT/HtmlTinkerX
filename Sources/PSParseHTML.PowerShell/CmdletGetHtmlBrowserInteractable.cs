@@ -37,6 +37,32 @@ public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
+    /// <summary>Optional browser profile JSON file used as launch defaults.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? ProfilePath { get; set; }
+
+    /// <summary>Intent-focused browser automation defaults to apply before explicit parameter values.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserScenario Scenario { get; set; } = HtmlBrowserScenario.Custom;
+
+    /// <summary>Persistent browser user-data directory for cookies, storage, cache, and permissions.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? UserDataDirectory { get; set; }
+
+    /// <summary>Playwright storage-state JSON file for cookies and local storage.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    [Alias("StorageStatePath")]
+    public string? StatePath { get; set; }
+
+    /// <summary>Browser distribution channel, such as chrome, msedge, chromium, chrome-beta, or msedge-dev.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? BrowserChannel { get; set; }
+
     /// <summary>Reinstall browser runtimes when using <see cref="Url"/> or <see cref="Path"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
@@ -66,6 +92,21 @@ public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
+
+    /// <summary>Initial browser navigation readiness state.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
+
+    /// <summary>Browser resource types to abort before navigation, such as Image, Media, Font, or Stylesheet.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlNetworkResourceType[] BlockResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
+
+    /// <summary>Playwright URL glob patterns to abort before navigation, such as **/analytics/**.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string[] BlockResourcePattern { get; set; } = System.Array.Empty<string>();
 
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
@@ -116,62 +157,22 @@ public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         List<HtmlInteractableInfo> list;
-        string? pUser = ProxyCredential?.UserName;
-        string? pPass = ProxyCredential?.GetNetworkCredential().Password;
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
         switch (ParameterSetName) {
             case ParameterSetUrl:
-                string? user = Credential?.UserName ?? Username;
-                string? pass = Credential?.GetNetworkCredential().Password ?? Password;
-                HtmlFormLogin? form = null;
-                if (!string.IsNullOrEmpty(LoginUrl) &&
-                    !string.IsNullOrEmpty(UsernameSelector) &&
-                    !string.IsNullOrEmpty(PasswordSelector) &&
-                    !string.IsNullOrEmpty(SubmitSelector)) {
-                    form = new HtmlFormLogin {
-                        LoginUrl = LoginUrl!,
-                        UsernameSelector = UsernameSelector!,
-                        PasswordSelector = PasswordSelector!,
-                        SubmitSelector = SubmitSelector!
-                    };
-                }
-
-                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
-                    Url!,
-                    Browser,
-                    Clean.IsPresent,
-                    user,
-                    pass,
-                    form,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    storageStatePath: null,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass,
-                    timeout: Timeout,
-                    cancellationToken: token).ConfigureAwait(false)) {
+                HtmlBrowserLaunchOptions urlOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                urlOptions.Username = Credential?.UserName ?? Username ?? urlOptions.Username;
+                urlOptions.Password = Credential?.GetNetworkCredential().Password ?? Password ?? urlOptions.Password;
+                urlOptions.FormLogin = CreateFormLogin() ?? urlOptions.FormLogin;
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(Url!, urlOptions, token).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
             case ParameterSetFile:
                 string fileUrl = new Uri(Path!.ToFullPath()).AbsoluteUri;
-                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
-                    fileUrl,
-                    Browser,
-                    Clean.IsPresent,
-                    null,
-                    null,
-                    null,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    storageStatePath: null,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass,
-                    timeout: Timeout,
-                    cancellationToken: token).ConfigureAwait(false)) {
+                HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(fileUrl, fileOptions, token).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
@@ -193,5 +194,50 @@ public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
         }
 
         WriteObject(list, true);
+    }
+
+    private async Task<HtmlBrowserLaunchOptions> CreateLaunchOptionsAsync(CancellationToken cancellationToken) {
+        return await HtmlBrowserLaunchOptionFactory.CreateAsync(new HtmlBrowserLaunchOptionRequest {
+            BoundParameters = MyInvocation.BoundParameters,
+            ProfilePath = ProfilePath,
+            Scenario = Scenario,
+            Browser = Browser,
+            Clean = Clean,
+            Visible = Visible,
+            SlowMo = SlowMo,
+            Timeout = Timeout,
+            UserDataDirectory = UserDataDirectory,
+            StatePath = StatePath,
+            BrowserChannel = BrowserChannel,
+            Proxy = Proxy,
+            ProxyCredential = ProxyCredential,
+            LoadState = LoadState,
+            BlockResourceType = BlockResourceType,
+            BlockResourcePattern = BlockResourcePattern
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private HtmlFormLogin? CreateFormLogin() {
+        bool hasAnyLoginParameter = !string.IsNullOrWhiteSpace(LoginUrl)
+            || !string.IsNullOrWhiteSpace(UsernameSelector)
+            || !string.IsNullOrWhiteSpace(PasswordSelector)
+            || !string.IsNullOrWhiteSpace(SubmitSelector);
+        if (!hasAnyLoginParameter) {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(LoginUrl)
+            || string.IsNullOrWhiteSpace(UsernameSelector)
+            || string.IsNullOrWhiteSpace(PasswordSelector)
+            || string.IsNullOrWhiteSpace(SubmitSelector)) {
+            throw new PSArgumentException("LoginUrl, UsernameSelector, PasswordSelector, and SubmitSelector must be specified together.");
+        }
+
+        return new HtmlFormLogin {
+            LoginUrl = LoginUrl!,
+            UsernameSelector = UsernameSelector!,
+            PasswordSelector = PasswordSelector!,
+            SubmitSelector = SubmitSelector!
+        };
     }
 }

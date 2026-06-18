@@ -5,10 +5,10 @@ $data = "example.com`tFALSE`t/`tTRUE`t1704067199`tSessionId`tabc123xyz"
 $cookies = ConvertFrom-HTMLCookie -Content $data -Format Netscape
 
 # Add cookies to a browser session
-$session = Invoke-HTMLRendering -Url 'about:blank' -Session
-Set-HTMLCookie -Session $session -Cookie $cookies
-Get-HTMLCookie -Session $session
-Close-HTMLSession -Session $session
+$session = Start-HtmlBrowserSession -Url 'about:blank'
+Set-HtmlBrowserCookie -Session $session -Cookie $cookies
+Get-HtmlBrowserCookie -Session $session
+Close-HtmlBrowserSession -Session $session
 
 # Parse a Set-Cookie header
 $header = 'Set-Cookie: id=abc; Path=/; Secure'

@@ -11,14 +11,14 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Wait for rendered search results</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/search -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/search
 /// Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'
 ///   </code>
 /// </example>
 /// <example>
 ///   <summary>Wait until the DOM stops changing</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Wait-HtmlBrowserContent -Session $session -Stable -StableMilliseconds 500
 ///   </code>
 /// </example>

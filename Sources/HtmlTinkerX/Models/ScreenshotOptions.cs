@@ -39,6 +39,15 @@ public sealed class ScreenshotOptions {
     /// <summary>Selectors to highlight in the screenshot.</summary>
     public IEnumerable<string>? HighlightSelectors { get; set; }
 
+    /// <summary>Selectors to mask in the screenshot.</summary>
+    public IEnumerable<string>? MaskSelectors { get; set; }
+
+    /// <summary>Mask common sensitive inputs such as password, token, SAML, MFA, and secret fields.</summary>
+    public bool MaskSensitiveElements { get; set; }
+
+    /// <summary>CSS color used for masked elements.</summary>
+    public string? MaskColor { get; set; }
+
     /// <summary>Text to overlay on the image.</summary>
     public string? OverlayText { get; set; }
 }

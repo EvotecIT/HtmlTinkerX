@@ -1,8 +1,8 @@
-# `Get-HTMLConsoleLog`
+# `Get-HtmlBrowserConsoleLog`
 
 ## 📖 Summary
 
-`Get-HTMLConsoleLog` returns messages printed to the browser console during a session.
+`Get-HtmlBrowserConsoleLog` returns messages printed to the browser console during a session.
 
 ---
 
@@ -11,8 +11,8 @@
 ```powershell
 $path = Join-Path $PSScriptRoot 'Input/console_page.html'
 $uri = [System.Uri]::new($path).AbsoluteUri
-$session = Start-HTMLSession -Url $uri
-Get-HTMLConsoleLog -Session $session
-Close-HTMLSession -Session $session
+$session = Start-HtmlBrowserSession -Url $uri
+Get-HtmlBrowserConsoleLog -Session $session
+Close-HtmlBrowserSession -Session $session
 ```
 

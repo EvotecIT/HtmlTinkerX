@@ -10,8 +10,8 @@ Describe 'Packaged browser extraction mode' {
         }
 
         $manifest = Test-ModuleManifest -Path $packagedManifest -ErrorAction Stop
-        if (-not $manifest.ExportedCmdlets.ContainsKey('Get-HtmlBrowserDiagnostics')) {
-            Set-ItResult -Skipped -Because 'packaged artifact predates browser extraction mode commands'
+        if (-not $manifest.ExportedCmdlets.ContainsKey('Get-HtmlBrowserDiagnostics') -or -not $manifest.ExportedCmdlets.ContainsKey('Export-HtmlBrowserEvidence')) {
+            Set-ItResult -Skipped -Because 'packaged artifact predates current browser automation commands'
             return
         }
 
@@ -23,13 +23,69 @@ Describe 'Packaged browser extraction mode' {
 `$env:PSModulePath = `$moduleRoot + [IO.Path]::PathSeparator + `$env:PSModulePath
 
 Import-Module PSParseHTML -Force
-`$commands = Get-Command Get-HtmlBrowserDiagnostics, Get-HtmlBrowserElement, Test-HtmlBrowserElement, Get-HtmlBrowserActiveElement, Get-HtmlBrowserStorage, Set-HtmlBrowserStorage, Save-HtmlBrowserContent, Invoke-HtmlBrowserHover, Invoke-HtmlBrowserKey, Invoke-HtmlBrowserOverlayDismissal, Invoke-HtmlBrowserScroll, Wait-HtmlBrowserContent, Set-HtmlBrowserInput, Invoke-HtmlBrowserClick, Find-HtmlDataSource, Invoke-HtmlDataExtraction, Export-HtmlExtractionRecipe, Import-HtmlExtractionRecipe, Invoke-HtmlExtractionRecipe |
+`$expectedCommands = @(
+    'Start-HtmlBrowserSession',
+    'New-HtmlBrowserProfile',
+    'Import-HtmlBrowserProfile',
+    'Export-HtmlBrowserProfile',
+    'Wait-HtmlBrowserReady',
+    'Find-HtmlBrowserLocator',
+    'Export-HtmlBrowserEvidence',
+    'Get-HtmlBrowserDiagnostics',
+    'Get-HtmlBrowserElement',
+    'Test-HtmlBrowserElement',
+    'Get-HtmlBrowserActiveElement',
+    'Get-HtmlBrowserStorage',
+    'Set-HtmlBrowserStorage',
+    'Save-HtmlBrowserContent',
+    'Invoke-HtmlBrowserHover',
+    'Invoke-HtmlBrowserKey',
+    'Close-HtmlBrowserOverlay',
+    'Invoke-HtmlBrowserScroll',
+    'Wait-HtmlBrowserContent',
+    'Set-HtmlBrowserInput',
+    'Invoke-HtmlBrowserClick',
+    'Find-HtmlDataSource',
+    'Find-HtmlBrowserDataSource',
+    'Get-HtmlBrowserSsoHandoff',
+    'Invoke-HtmlDataExtraction',
+    'Export-HtmlExtractionRecipe',
+    'Import-HtmlExtractionRecipe',
+    'Invoke-HtmlExtractionRecipe',
+    'Start-HtmlBrowserRecipeRecording',
+    'Stop-HtmlBrowserRecipeRecording',
+    'Export-HtmlBrowserRecipe',
+    'Invoke-HtmlBrowserRecipe'
+)
+`$expectedAliases = @(
+    'Start-HtmlSession',
+    'Open-HtmlSession',
+    'Wait-HtmlReady',
+    'Get-HtmlSsoHandoff',
+    'Get-HtmlDiagnostics',
+    'Get-HtmlElement',
+    'Test-HtmlElement',
+    'Get-HtmlActiveElement',
+    'Get-HtmlStorage',
+    'Set-HtmlStorage',
+    'Save-HtmlContent',
+    'Invoke-HtmlHover',
+    'Invoke-HtmlKey',
+    'Invoke-HtmlOverlayDismissal',
+    'Invoke-HtmlScroll',
+    'Wait-HtmlContent',
+    'Set-HtmlInput',
+    'Invoke-HtmlClick'
+)
+`$commands = Get-Command -Name `$expectedCommands |
     Select-Object -ExpandProperty Name
-`$aliases = Get-Alias Get-HtmlDiagnostics, Get-HtmlElement, Test-HtmlElement, Get-HtmlActiveElement, Get-HtmlStorage, Set-HtmlStorage, Save-HtmlContent, Invoke-HtmlHover, Invoke-HtmlKey, Invoke-HtmlOverlayDismissal, Invoke-HtmlScroll, Wait-HtmlContent, Set-HtmlInput, Invoke-HtmlClick |
+`$aliases = Get-Alias -Name `$expectedAliases |
     Select-Object Name, Definition
 `$help = Get-Help Get-HtmlBrowserDiagnostics -Examples | Out-String
 
 [pscustomobject]@{
+    ExpectedCommands = @(`$expectedCommands)
+    ExpectedAliases = @(`$expectedAliases)
     Commands = @(`$commands)
     Aliases = @(`$aliases)
     DiagnosticsHelp = `$help
@@ -43,21 +99,17 @@ Import-Module PSParseHTML -Force
         $json | Should -Not -BeNullOrEmpty -Because ($output -join [Environment]::NewLine)
         $result = $json | ConvertFrom-Json
 
-        $result.Commands | Should -Contain 'Get-HtmlBrowserDiagnostics'
-        $result.Commands | Should -Contain 'Get-HtmlBrowserElement'
-        $result.Commands | Should -Contain 'Test-HtmlBrowserElement'
-        $result.Commands | Should -Contain 'Get-HtmlBrowserStorage'
-        $result.Commands | Should -Contain 'Save-HtmlBrowserContent'
-        $result.Commands | Should -Contain 'Wait-HtmlBrowserContent'
-        $result.Commands | Should -Contain 'Find-HtmlDataSource'
-        $result.Commands | Should -Contain 'Invoke-HtmlDataExtraction'
-        $result.Commands | Should -Contain 'Export-HtmlExtractionRecipe'
-        $result.Commands | Should -Contain 'Import-HtmlExtractionRecipe'
-        $result.Commands | Should -Contain 'Invoke-HtmlExtractionRecipe'
+        foreach ($commandName in $result.ExpectedCommands) {
+            $result.Commands | Should -Contain $commandName
+        }
         ($result.Aliases | Where-Object Name -eq 'Get-HtmlDiagnostics').Definition | Should -Be 'Get-HtmlBrowserDiagnostics'
         ($result.Aliases | Where-Object Name -eq 'Get-HtmlElement').Definition | Should -Be 'Get-HtmlBrowserElement'
         ($result.Aliases | Where-Object Name -eq 'Save-HtmlContent').Definition | Should -Be 'Save-HtmlBrowserContent'
         ($result.Aliases | Where-Object Name -eq 'Wait-HtmlContent').Definition | Should -Be 'Wait-HtmlBrowserContent'
+        ($result.Aliases | Where-Object Name -eq 'Start-HtmlSession').Definition | Should -Be 'Start-HtmlBrowserSession'
+        ($result.Aliases | Where-Object Name -eq 'Open-HtmlSession').Definition | Should -Be 'Start-HtmlBrowserSession'
+        ($result.Aliases | Where-Object Name -eq 'Wait-HtmlReady').Definition | Should -Be 'Wait-HtmlBrowserReady'
+        ($result.Aliases | Where-Object Name -eq 'Get-HtmlSsoHandoff').Definition | Should -Be 'Get-HtmlBrowserSsoHandoff'
         $result.DiagnosticsHelp | Should -Match 'Get-HtmlBrowserDiagnostics'
         $result.DiagnosticsHelp | Should -Match 'ObservedApiCalls'
     }

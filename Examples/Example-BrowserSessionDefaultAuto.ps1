@@ -1,31 +1,30 @@
-﻿Import-Module .\PSParseHTML.psd1 -Force
+Import-Module .\PSParseHTML.psd1 -Force
 
 $Credentials = [PSCredential]::new('TestUser', (ConvertTo-SecureString -String $Env:WordpressPassword -AsPlainText -Force))
-# Use Invoke-HTMLRendering to create a session, alternatively use Start-HTMLSession, Open-HTMLSession which should be an alias for Invoke-HTMLRendering
-$invokeHTMLRenderingSplat = @{
+# Start a reusable browser session with the canonical session cmdlet.
+$browserSessionSplat = @{
     Url     = 'https://evotec.xyz/wp-admin'
-    Session = $true
 }
-# When using Session, you can either save $Session variable or use the "default" session
-# Default session is always used unless you specify NoSession
-$null = Open-HTMLSession @invokeHTMLRenderingSplat
-Invoke-HTMLLogin -Username $Credentials.UserName -Password ($Credentials.GetNetworkCredential().Password)
+# You can save the returned session object or let subsequent commands use the default session.
+# The default session is used unless you pass -NoDefault when starting a separate session.
+$null = Start-HtmlBrowserSession @browserSessionSplat
+Invoke-HtmlBrowserLogin -Username $Credentials.UserName -Password ($Credentials.GetNetworkCredential().Password)
 
-Get-HTMLInteractable -Filter "Media" -IncludeHidden | Format-Table
+Get-HtmlBrowserInteractable -Filter "Media" -IncludeHidden | Format-Table
 
-Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\WP1.png" -Open
+Save-HtmlBrowserScreenshot -OutFile "$PSScriptRoot\Output\WP1.png" -Open
 
-Save-HTMLPdf -OutFile "$PSScriptRoot\Output\WP1.pdf" -Open
+Save-HtmlBrowserPdf -OutFile "$PSScriptRoot\Output\WP1.pdf" -Open
 
-Get-HTMLInteractable -Filter "Galleries" -IncludeHidden | Format-Table
+Get-HtmlBrowserInteractable -Filter "Galleries" -IncludeHidden | Format-Table
 
-Invoke-HTMLNavigation -Text "Galleries" -Exact
+Invoke-HtmlBrowserNavigation -Text "Galleries" -Exact
 
-Invoke-HTMLNavigation -Selector "a[href='edit.php?post_type=thegem_gallery']"
+Invoke-HtmlBrowserNavigation -Selector "a[href='edit.php?post_type=thegem_gallery']"
 
-Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\WP2.png" -Open
+Save-HtmlBrowserScreenshot -OutFile "$PSScriptRoot\Output\WP2.png" -Open
 
-$HTML = Get-HTMLContent
+$HTML = Get-HtmlBrowserContent
 $Tables = $HTML | ConvertFrom-HTMLTable
 foreach ($Table in $Tables) {
     $Table | Format-Table -AutoSize *

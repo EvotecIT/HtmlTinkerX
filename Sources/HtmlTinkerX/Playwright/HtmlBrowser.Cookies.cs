@@ -25,7 +25,7 @@ public static partial class HtmlBrowser {
                 Value = c.Value,
                 Domain = c.Domain,
                 Path = c.Path,
-                Expires = c.Expires != 0 ? (long)c.Expires : (long?)null,
+                Expires = c.Expires > 0 ? (long)c.Expires : (long?)null,
                 HttpOnly = c.HttpOnly,
                 Secure = c.Secure,
                 SameSite = c.SameSite

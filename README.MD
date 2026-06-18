@@ -1,4 +1,4 @@
-﻿# HtmlTinkerX & PSParseHTML - Modern HTML Processing for .NET and PowerShell
+# HtmlTinkerX & PSParseHTML - Modern HTML Processing for .NET and PowerShell
 
 HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerShell module from PSGallery
 
@@ -78,48 +78,48 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 ### Browser Automation & Sessions
 | PowerShell Cmdlet       | C# Method                          | Description                      |
 | ----------------------- | ---------------------------------- | -------------------------------- |
-| `Start-HTMLSession`     | `HtmlBrowser.OpenSessionAsync()`   | Create browser session           |
-| `Close-HTMLSession`     | `session.DisposeAsync()`           | Close browser session            |
-| `Invoke-HTMLRendering`  | `HtmlBrowser.OpenSessionAsync()`   | Render pages with authentication |
-| `Invoke-HTMLNavigation` | `HtmlBrowser.NavigateAsync()`      | Navigate to different URLs       |
-| `Invoke-HTMLScript`     | `HtmlBrowser.ExecuteScriptAsync()` | Execute JavaScript in browser    |
-| `Invoke-HTMLDomScript`  | `HtmlScriptRunner.ExecuteScript()` | Run JavaScript with AngleSharp   |
-| `Export-BrowserState`   | `HtmlBrowser.ExportStateAsync()`   | Save browser state               |
-| `Import-BrowserState`   | `HtmlBrowser.ImportStateAsync()`   | Restore browser state            |
-| `Export-HTMLSession`    | `HtmlBrowser.ExportSessionAsync()` | Export session data              |
-| `Import-HTMLSession`    | `HtmlBrowser.ImportSessionAsync()` | Import session data              |
+| `Start-HtmlBrowserSession` | `HtmlBrowser.OpenSessionAsync()` | Create browser session           |
+| `Close-HtmlBrowserSession` | `session.DisposeAsync()`         | Close browser session            |
+| `Invoke-HtmlRendering`  | `HtmlBrowser.OpenSessionAsync()`   | Render pages with authentication |
+| `Invoke-HtmlBrowserNavigation` | `HtmlBrowser.NavigateAsync()` | Navigate to different URLs       |
+| `Invoke-HtmlBrowserScript` | `HtmlBrowser.ExecuteScriptAsync()` | Execute JavaScript in browser    |
+| `Invoke-HtmlBrowserDomScript` | `HtmlScriptRunner.ExecuteScript()` | Run JavaScript with AngleSharp   |
+| `Export-HtmlBrowserState` | `HtmlBrowser.ExportStateAsync()` | Save browser state               |
+| `Import-HtmlBrowserState` | `HtmlBrowser.ImportStateAsync()` | Restore browser state            |
+| `Export-HtmlBrowserSession` | `HtmlBrowser.ExportSessionAsync()` | Export session data              |
+| `Import-HtmlBrowserSession` | `HtmlBrowser.ImportSessionAsync()` | Import session data              |
 
 ### Screenshots & Media
 | PowerShell Cmdlet          | C# Method                                | Description                     |
 | -------------------------- | ---------------------------------------- | ------------------------------- |
-| `Save-HTMLScreenshot`      | `HtmlBrowser.SaveScreenshotAsync()`      | Capture page screenshots        |
-| `Save-HTMLPdf`             | `HtmlBrowser.SavePdfAsync()`             | Generate PDFs from pages        |
-| `Start-HTMLVideoRecording` | `HtmlBrowser.StartVideoRecordingAsync()` | Start recording browser session |
-| `Stop-HTMLVideoRecording`  | `HtmlBrowser.StopVideoRecordingAsync()`  | Stop video recording            |
+| `Save-HtmlBrowserScreenshot` | `HtmlBrowser.SaveScreenshotAsync()`    | Capture page screenshots        |
+| `Save-HtmlBrowserPdf`     | `HtmlBrowser.SavePdfAsync()`             | Generate PDFs from pages        |
+| `Start-HtmlBrowserVideoCapture` | `HtmlBrowser.StartVideoRecordingAsync()` | Start recording browser session |
+| `Stop-HtmlBrowserVideoCapture` | `HtmlBrowser.StopVideoRecordingAsync()` | Stop video recording            |
 
 ### Element Interaction
 | PowerShell Cmdlet      | C# Method                                    | Description                    |
 | ---------------------- | -------------------------------------------- | ------------------------------ |
-| `Invoke-HTMLClick`     | `HtmlBrowser.ClickAsync()`                   | Click elements                 |
-| `Set-HTMLInput`        | `HtmlBrowser.SetInputAsync()`                | Set input field values         |
-| `Set-HTMLSelectOption` | `HtmlBrowser.SetSelectAsync()`               | Select dropdown options        |
-| `Set-HTMLChecked`      | `HtmlBrowser.SetCheckedAsync()`              | Check/uncheck checkboxes       |
-| `Submit-HTMLForm`      | `HtmlBrowser.SubmitFormAsync()`              | Submit forms                   |
-| `Get-HTMLInteractable` | `HtmlBrowser.GetInteractableElementsAsync()` | List clickable elements        |
-| `Get-HTMLFormField`    | `HtmlFormExtractor.GetFormFields()`          | Extract form field information |
-| `Get-HTMLLoginForm`    | `HtmlFormExtractor.DetectLoginForms()`       | Detect login forms             |
+| `Invoke-HtmlBrowserClick` | `HtmlBrowser.ClickAsync()`                | Click elements                 |
+| `Set-HtmlBrowserInput` | `HtmlBrowser.SetInputAsync()`                | Set input field values         |
+| `Set-HtmlBrowserSelectOption` | `HtmlBrowser.SetSelectAsync()`       | Select dropdown options        |
+| `Set-HtmlBrowserChecked` | `HtmlBrowser.SetCheckedAsync()`            | Check/uncheck checkboxes       |
+| `Submit-HtmlBrowserForm` | `HtmlBrowser.SubmitFormAsync()`            | Submit forms                   |
+| `Get-HtmlBrowserInteractable` | `HtmlBrowser.GetInteractableElementsAsync()` | List clickable elements        |
+| `Get-HtmlBrowserFormField` | `HtmlFormExtractor.GetFormFields()`      | Extract form field information |
+| `Get-HtmlBrowserLoginForm` | `HtmlFormExtractor.DetectLoginForms()`   | Detect login forms             |
 
 ### Network & Debugging
 | PowerShell Cmdlet      | C# Method                            | Description                     |
 | ---------------------- | ------------------------------------ | ------------------------------- |
-| `Get-HTMLNetworkLog`   | `HtmlBrowser.GetNetworkLog()`        | View network requests/responses |
-| `Get-HTMLConsoleLog`   | `HtmlBrowser.GetConsoleLog()`        | Retrieve console messages       |
-| `Save-HTMLHar`         | `HtmlBrowser.SaveHarAsync()`         | Export network traffic to HAR   |
-| `Start-HTMLTracing`    | `HtmlBrowser.StartTracingAsync()`    | Start Playwright tracing        |
-| `Stop-HTMLTracing`     | `HtmlBrowser.StopTracingAsync()`     | Stop tracing and save           |
-| `Register-HTMLRoute`   | `HtmlBrowser.RegisterRouteAsync()`   | Intercept requests              |
-| `Unregister-HTMLRoute` | `HtmlBrowser.UnregisterRouteAsync()` | Remove route handler            |
-| `Show-HTMLHar`         | `HtmlHarViewer.ShowHar()`            | Visualize HAR files             |
+| `Get-HtmlBrowserNetworkLog` | `HtmlBrowser.GetNetworkLog()`  | View network requests/responses |
+| `Get-HtmlBrowserConsoleLog` | `HtmlBrowser.GetConsoleLog()`  | Retrieve console messages       |
+| `Export-HtmlBrowserHar` | `HtmlBrowser.SaveHarAsync()`         | Export network traffic to HAR   |
+| `Start-HtmlBrowserTracing` | `HtmlBrowser.StartTracingAsync()` | Start Playwright tracing        |
+| `Stop-HtmlBrowserTracing` | `HtmlBrowser.StopTracingAsync()` | Stop tracing and save           |
+| `Register-HtmlRoute`   | `HtmlBrowser.RegisterRouteAsync()`   | Intercept requests              |
+| `Unregister-HtmlRoute` | `HtmlBrowser.UnregisterRouteAsync()` | Remove route handler            |
+| `Show-HtmlBrowserHar`  | `HtmlHarViewer.ShowHar()`            | Visualize HAR files             |
 
 ### Browser Testing
 | PowerShell Cmdlet        | C# Method                                    | Description                                     |
@@ -134,9 +134,9 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 ### Cookies & State
 | PowerShell Cmdlet | C# Method                       | Description              |
 | ----------------- | ------------------------------- | ------------------------ |
-| `Get-HTMLCookie`  | `HtmlBrowser.GetCookiesAsync()` | Retrieve session cookies |
-| `Set-HTMLCookie`  | `HtmlBrowser.SetCookieAsync()`  | Add cookies to session   |
-| `New-HTMLCookie`  | `new HtmlCookie()`              | Create cookie objects    |
+| `Get-HtmlBrowserCookie` | `HtmlBrowser.GetCookiesAsync()` | Retrieve session cookies |
+| `Set-HtmlBrowserCookie` | `HtmlBrowser.SetCookieAsync()`  | Add cookies to session   |
+| `New-HtmlBrowserCookie` | `new HtmlCookie()`              | Create cookie objects    |
 
 ### Content & Resources
 | PowerShell Cmdlet          | C# Method                               | Description                   |
@@ -146,8 +146,8 @@ This comprehensive table shows how PowerShell cmdlets map to C# methods, making 
 | `Select-HtmlAsset`         | `HtmlWorkflowParser.SelectAssets()`     | Extract scripts, stylesheets, images, preloads, manifests, and icons |
 | `Measure-HtmlCompatibility` | `HtmlWorkflowParser.MeasureCompatibility()` | Find common HTML compatibility issues |
 | `Invoke-HTMLCrawl`         | `HtmlCrawler.CrawlAsync()`              | Crawl a site offline          |
-| `Save-HTMLAttachment`      | `HtmlBrowser.SaveAttachmentsAsync()`    | Download files from pages     |
-| `Get-HTMLContent`          | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
+| `Save-HtmlBrowserAttachment` | `HtmlBrowser.SaveAttachmentsAsync()`  | Download files from pages     |
+| `Get-HtmlBrowserContent`  | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
 | `Export-HTMLOutline`       | `HtmlOutlineBuilder.BuildOutline()`     | Generate document outlines    |
 | `Set-HTMLHttpClientOption` | `HttpClientFactory.ConfigureClient()`   | Configure HTTP client options |
 
@@ -435,9 +435,9 @@ $formatted = Format-HTML -Path 'page.html'
 $minified = Optimize-HTML -Path 'page.html'
 
 # Browser automation
-$session = Start-HTMLSession -Url 'https://example.com'
-Save-HTMLScreenshot -Session $session -OutFile 'screenshot.png'
-Close-HTMLSession -Session $session
+$session = Start-HtmlBrowserSession -Url 'https://example.com'
+Save-HtmlBrowserScreenshot -Session $session -OutFile 'screenshot.png'
+Close-HtmlBrowserSession -Session $session
 
 # Offline crawl
 $crawl = Invoke-HTMLCrawl -Url 'https://example.com/docs' -MaxDepth 1 -MaxPages 10 -DeduplicatePages
@@ -688,42 +688,76 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Optimize-JavaScript** - Minify JavaScript
 
 ### Browser Automation & Interaction
-- **Start-HTMLSession** / **Invoke-HTMLRendering** - Create browser sessions with authentication support
-- **Close-HTMLSession** - Dispose browser sessions
-- **Invoke-HTMLNavigation** - Navigate to different URLs
-- **Invoke-HTMLScript** - Execute JavaScript in browser context
-- **Invoke-HTMLDomScript** - Run JavaScript with AngleSharp (no browser required)
-- **Invoke-HTMLClick** - Click elements in the browser
-- **Get-HTMLInteractable** - List clickable elements
-- **Set-HTMLInput** - Set input field values
-- **Invoke-HtmlKey** - Send keyboard input such as `Enter`, `Control+A`, or `ArrowDown`
-- **Invoke-HtmlHover** - Hover over an element
-- **Invoke-HtmlScroll** - Scroll an element into view
-- **Wait-HtmlContent** - Wait for text or a stable DOM
-- **Invoke-HtmlOverlayDismissal** - Try common cookie/modal dismissals
-- **Get-HtmlDiagnostics** - Inspect navigator, viewport, storage, console errors, observed API calls, and WebSockets
-- **Get-HtmlElement** / **Test-HtmlElement** - Inspect selector matches, geometry, attributes, and state
-- **Get-HtmlActiveElement** - Inspect the focused element after clicks or keyboard navigation
-- **Get-HtmlStorage** / **Set-HtmlStorage** - Read or update local/session storage entries
-- **Save-HtmlContent** - Save rendered session HTML or text to disk
+- **Start-HtmlBrowserSession** / **Invoke-HtmlRendering** - Create browser sessions with authentication support
+- **Close-HtmlBrowserSession** - Dispose browser sessions
+- **Invoke-HtmlBrowserNavigation** - Navigate to different URLs
+- **Invoke-HtmlBrowserScript** - Execute JavaScript in browser context
+- **Invoke-HtmlBrowserDomScript** - Run JavaScript with AngleSharp (no browser required)
+- **Invoke-HtmlBrowserClick** - Click elements in the browser
+- **Get-HtmlBrowserInteractable** - List clickable elements
+- **Set-HtmlBrowserInput** - Set input field values
+- **Invoke-HtmlBrowserKey** - Send keyboard input such as `Enter`, `Control+A`, or `ArrowDown`
+- **Invoke-HtmlBrowserHover** - Hover over an element
+- **Invoke-HtmlBrowserScroll** - Scroll an element into view
+- **Wait-HtmlBrowserReady** - Wait for load state, selector, JavaScript readiness, and/or DOM stability
+- **Find-HtmlBrowserLocator** - Rank resilient selector and Playwright-style locator candidates for visible controls
+- **Wait-HtmlBrowserContent** - Wait for text or a target element state
+- **Close-HtmlBrowserOverlay** - Try common cookie/modal dismissals
+- **Get-HtmlBrowserDiagnostics** - Inspect navigator, viewport, storage, console errors, observed API calls, and WebSockets
+- **Get-HtmlBrowserElement** / **Test-HtmlBrowserElement** - Inspect selector matches, geometry, attributes, and state
+- **Get-HtmlBrowserActiveElement** - Inspect the focused element after clicks or keyboard navigation
+- **Get-HtmlBrowserStorage** / **Set-HtmlBrowserStorage** - Read or update local/session storage entries
+- **Save-HtmlBrowserContent** - Save rendered session or one-shot URL/file HTML or text to disk
+- **Export-HtmlBrowserEvidence** - Save screenshots, PDFs, rendered content, text/Markdown, optional network summary, redacted SSO handoff summary, and manifest hashes; text artifacts and manifest URLs redact common secrets by default, and visual artifacts mask common sensitive fields by default; use `-Artifact` for minimal packs, `-NoRedaction` only when exact raw proof is required, and `-NoVisualMask` only when image/PDF masking is not appropriate
+- **New-HtmlBrowserProfile -Scenario** / **Start-HtmlBrowserSession -Scenario** - Apply intent-focused browser defaults for audit proof, mailbox proof, login-protected pages, SPAs, low bandwidth, network capture, and download evidence
+- **Start-HtmlBrowserSession -ManualLogin** - Open a visible persistent session for enterprise SSO/MFA and optionally wait for a post-login selector before returning
+- **Start-HtmlBrowserSession -PreventSsoAutoSubmit** / **Get-HtmlBrowserSsoHandoff -Wait** - Pause and inspect SAML, WS-Federation, OAuth, or OpenID Connect handoff forms after user-attended login; assertion and token fields are redacted by default and require `-IncludeSensitiveValues` to reveal
+- **Find-HtmlBrowserDataSource** - Convert observed browser XHR/fetch traffic into browserless extraction sources and recipes
 - **Find-HtmlDataSource** - Discover static, app-state, JSON, and endpoint sources before opening a browser
 - **Invoke-HtmlDataExtraction** - Extract a discovered browserless source
 - **Export-HtmlExtractionRecipe** / **Import-HtmlExtractionRecipe** / **Invoke-HtmlExtractionRecipe** - Save and rerun browserless extraction recipes
-- **Set-HTMLSelectOption** - Select dropdown options
-- **Set-HTMLChecked** - Check/uncheck checkboxes and radio buttons
-- **Submit-HTMLForm** - Submit forms
+- **Start-HtmlBrowserRecipeRecording** / **Stop-HtmlBrowserRecipeRecording** / **Export-HtmlBrowserRecipe** / **Optimize-HtmlBrowserRecipe** / **Invoke-HtmlBrowserRecipe** - Record successful session actions, harden selector alternates from the live page, save JSON browser recipes, and replay them with step results, locator output, evidence packs, optional failure evidence, and recorder-side redaction for sensitive input fields
+- **Set-HtmlBrowserSelectOption** - Select dropdown options
+- **Set-HtmlBrowserChecked** - Check/uncheck checkboxes and radio buttons
+- **Submit-HtmlBrowserForm** - Submit forms
 
 #### Browser Extraction Mode
 
 Browser extraction mode is the rendering-backed path for pages where static HTML is not enough. The intended workflow is: plan the page, choose the lightest render profile that matches the problem, interact only as needed, snapshot the rendered state, inspect diagnostics, and feed the same rendered snapshot into the workbench.
 
+Browser scenarios are a higher-level starting point for admin automation. They set practical defaults first, then profile JSON and explicit parameters can refine them. `AuditProof`, `MailboxProof`, and `DownloadEvidence` use a stable 1366x900 evidence viewport and DOM-ready navigation. `LoginProtected` extends timeouts for SSO/MFA work. `SinglePageApp` avoids waiting forever on busy app traffic. `LowBandwidth` skips heavy images, media, and fonts. `NetworkCapture` keeps rendered output and observed traffic together for diagnostics.
+
+For Azure AD, Okta, ADFS, and other enterprise SSO pages, prefer a real browser session over rebuilding the login flow with `Invoke-WebRequest`. SAML and WS-Federation often use a hidden auto-submitting form that appears only after JavaScript, redirects, MFA, and policy checks finish, so `-PreventSsoAutoSubmit` can hold recognized handoff forms while `Get-HtmlBrowserSsoHandoff -Wait -Timeout 60000` reports protocol, action URL, field names, original value lengths, and redacted values. OAuth and OpenID Connect redirects can also put `code`, `state`, `id_token`, `access_token`, or `error` fields in the current URL query or fragment; those are returned as a `location` handoff with the page URL and field values redacted by default. Use `-IncludeSensitiveValues` only for your own authorized workflow when the raw assertion or token is genuinely required.
+
+When the site only works from a seeded real browser profile, attach to Chrome or Edge over the Chrome DevTools Protocol instead of launching a fresh Playwright browser. Start the browser yourself with a remote debugging port and the profile/history/session state you want to reuse, then pass `-CdpEndpointUrl` directly or save it in a profile JSON. HtmlTinkerX creates and owns only the automation page; closing the PowerShell session does not close the attached browser or profile.
+
+```powershell
+$userDataPath = Join-Path $PWD 'real-chrome-user-data'
+chrome.exe --remote-debugging-port=9222 --user-data-dir="$userDataPath"
+
+New-HtmlBrowserProfile `
+    -Name 'RealChromeCdp' `
+    -Path '.\real-chrome-cdp.profile.json' `
+    -CdpEndpointUrl 'http://127.0.0.1:9222' `
+    -PreventSsoAutoSubmit | Out-Null
+
+$session = Start-HtmlBrowserSession `
+    -Url 'https://example.com/protected' `
+    -ProfilePath '.\real-chrome-cdp.profile.json' `
+    -NoDefault
+```
+
+When a captured handoff needs inspection rather than replay, start with `Get-HtmlBrowserSsoHandoff -Analyze`. It auto-detects `SAMLResponse`, `id_token`, `access_token`, authorization code, `state`, and `RelayState` fields and routes known artifacts through safe protocol summaries without returning raw assertion or token values. If you already have a saved/deserialized handoff object, pipe it to `ConvertFrom-HtmlSsoHandoff` for the same analysis. For deeper protocol-specific inspection, use `ConvertFrom-HtmlSamlResponse` for SAML assertions or `ConvertFrom-HtmlJsonWebToken` for OpenID Connect/OAuth tokens. These report issuer, destination or audience, validity window, status or scopes, key id, and claim or attribute names while redacting subject, assertion, and user-identifying values by default. Add `-IncludeSensitiveValues` only for authorized troubleshooting, and `-IncludeXml` or `-IncludeJson` only when you need decoded payloads.
+
+Evidence screenshots and PDFs mask common sensitive fields by default, including password, token, SAML, MFA, OTP, PIN, credential, and secret inputs. Add `-VisualMaskSelector` for app-specific fields, change the mask color with `-VisualMaskColor`, or use `-NoVisualMask` only when the visual proof must intentionally show those fields. The older `-ScreenshotMaskSelector`, `-ScreenshotMaskColor`, and `-NoScreenshotMask` names remain available. Direct `Save-HtmlBrowserScreenshot`, `Save-HtmlBrowserPdf`, `Save-HtmlBrowserContent`, and `Export-HtmlBrowserEvidence` calls can reuse one-shot launch defaults such as `-Scenario`, `-ProfilePath`, `-StatePath`, `-UserDataDirectory`, `-LoadState`, `-Proxy`, and resource blocking. Screenshot and PDF calls also expose opt-in masking through `-MaskSensitiveElement`, `-MaskSelector`, and `-MaskColor`. `BlockResourceType Document` is intentionally rejected because it would abort the page itself rather than only blocking subresources.
+
 | Profile | Use when | PowerShell story | C# story |
 | --- | --- | --- | --- |
 | `FastStaticFallback` | static extraction is likely enough but a cheap browser fallback is useful | `Invoke-HtmlRendering -RenderProfile FastStaticFallback` | `HtmlBrowser.GetPageContentAsync(...)` with blocked heavy resources |
-| `InteractivePage` | forms, buttons, search boxes, or reactive inputs reveal content | `Start-HtmlSession`, `Set-HtmlInput`, `Invoke-HtmlKey`, `Wait-HtmlContent` | `HtmlBrowser.TypeInputAsync`, `PressKeysAsync`, `WaitForTextAsync` |
+| `InteractivePage` | forms, buttons, search boxes, or reactive inputs reveal content | `Start-HtmlBrowserSession`, `Set-HtmlBrowserInput`, `Invoke-HtmlBrowserKey`, `Wait-HtmlBrowserReady`, `Wait-HtmlBrowserContent` | `HtmlBrowser.TypeInputAsync`, `PressKeysAsync`, `WaitUntilReadyAsync`, `WaitForTextAsync` |
 | `LazyLoadedContent` | content appears after scrolling or delayed viewport work | `Invoke-HtmlRendering -RenderProfile LazyLoadedContent -AutoScroll` | `HtmlBrowser.CreateSnapshotAsync(...)` after scroll/wait helpers |
 | `AppShell` | the original HTML is a thin JavaScript shell | `Invoke-HtmlRendering -RenderProfile AppShell -Snapshot` | planner recommends `HtmlRenderProfile.AppShell` before workbench analysis |
-| `LoginProtected` | storage state or a visible login session is needed | `Start-HtmlSession`, `Export-BrowserState`, `-StorageStatePath` | `HtmlBrowser.ExportBrowserStateAsync` and `ImportBrowserStateAsync` |
+| `LoginProtected` | storage state or a visible login session is needed | `Start-HtmlBrowserSession`, `Export-HtmlBrowserState`, `-StatePath` / `-UserDataDirectory` | `HtmlBrowser.ExportBrowserStateAsync`, `ImportBrowserStateAsync`, and persistent launch options |
 | `NetworkCapture` | API calls, response bodies, console errors, or WebSockets explain the page | `-IncludeNetworkLog -IncludeResponseBody -RedactResponseBody` | `HtmlBrowser.GetNetworkLog`, `GetDiagnosticsAsync` |
 | `LowBandwidth` | bandwidth is constrained or media/fonts/styles are not needed | `Invoke-HtmlRendering -RenderProfile LowBandwidth` | browser content with aggressive resource blocking |
 | `HeavyDynamicPage` | legacy broad dynamic-page profile is still needed | `Invoke-HtmlRendering -RenderProfile HeavyDynamicPage` | existing high-wait dynamic rendering behavior |
@@ -761,24 +795,82 @@ $network = Invoke-HtmlRendering -Url 'https://example.com/search' `
     -IncludeResponseBody `
     -RedactResponseBody
 
-# Session-style interaction with forgiving clicks and paced typing
-$session = Start-HtmlSession -Url 'https://example.com/search' -Session
-Invoke-HtmlOverlayDismissal -Session $session
-Set-HtmlInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25
-Invoke-HtmlKey -Session $session -Selector 'input[type=search]' -Key 'Enter'
-Wait-HtmlContent -Session $session -Text 'Results' -Selector 'main'
-Wait-HtmlContent -Session $session -Element -Selector 'main' -Visible -InViewport
-$items = Get-HtmlElement -Session $session -Selector '.result' -VisibleOnly -IncludeAttributes
+# Session-style interaction with readiness waits and paced typing
+$session = Start-HtmlBrowserSession -Url 'https://example.com/search' -Scenario SinglePageApp
+Close-HtmlBrowserOverlay -Session $session
+Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25
+Invoke-HtmlBrowserKey -Session $session -Selector 'input[type=search]' -Key 'Enter'
+Wait-HtmlBrowserReady -Session $session -Selector 'main' -Stable
+Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'
+Wait-HtmlBrowserContent -Session $session -Element -Selector 'main' -Visible -InViewport
+$items = Get-HtmlBrowserElement -Session $session -Selector '.result' -VisibleOnly -IncludeAttributes
 $items | Select-Object Text, Selector, Visible, InViewport, Width, Height
-Get-HtmlContent -Session $session -Selector 'main' -AsText
-$allTitles = Get-HtmlContent -Session $session -Selector '.result-title' -All -AsText
-$active = Get-HtmlActiveElement -Session $session -IncludeAttributes
-Set-HtmlStorage -Session $session -Scope Local -Key extractionMode -Value browser
-$storage = Get-HtmlStorage -Session $session -Scope All
-Save-HtmlContent -Session $session -Selector 'main' -OutFile .\rendered-main.html
-$diagnostics = Get-HtmlDiagnostics -Session $session
+Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText
+$allTitles = Get-HtmlBrowserContent -Session $session -Selector '.result-title' -All -AsText
+$active = Get-HtmlBrowserActiveElement -Session $session -IncludeAttributes
+Set-HtmlBrowserStorage -Session $session -Scope Local -Key extractionMode -Value browser
+$storage = Get-HtmlBrowserStorage -Session $session -Scope All
+Save-HtmlBrowserContent -Session $session -Selector 'main' -OutFile .\rendered-main.html
+$evidence = Export-HtmlBrowserEvidence -Session $session -OutFolder .\evidence\search -NetworkSummary -SsoHandoffSummary -VisualMaskSelector '.account-secret'
+$diagnostics = Get-HtmlBrowserDiagnostics -Session $session
 $diagnostics.ConsistencyWarnings
 $diagnostics.ObservedApiCalls
+$apiSource = Find-HtmlBrowserDataSource -Session $session -IncludeResponseBody | Select-Object -First 1
+$apiSource | Export-HtmlExtractionRecipe -Path .\observed-api.recipe.json -IncludeRawContent
+$apiResult = $apiSource | Invoke-HtmlDataExtraction
+Close-HtmlBrowserSession -Session $session
+
+# Record a manual session into a replayable browser recipe
+$recorded = Start-HtmlBrowserSession -Url 'https://example.com/search' -Scenario SinglePageApp
+Start-HtmlBrowserRecipeRecording -Session $recorded -Name 'SearchProof' -IncludeCurrentUrl
+Set-HtmlBrowserInput -Session $recorded -Selector 'input[type=search]' -Value 'HtmlTinkerX'
+Invoke-HtmlBrowserClick -Session $recorded -Text 'Search' -Exact
+Wait-HtmlBrowserContent -Session $recorded -Text 'Results' -Selector 'main'
+Export-HtmlBrowserEvidence -Session $recorded -OutFolder .\evidence\recorded-search -BaseFileName search-proof -Artifact Html,Text -NoManifest
+Stop-HtmlBrowserRecipeRecording -Session $recorded -Path .\search-proof.browser.recipe.json -VariableTemplatePath .\search-proof.browser.variables.json -HardenSelectors -HardeningReportPath .\search-proof.browser.hardening.json
+Close-HtmlBrowserSession -Session $recorded
+Invoke-HtmlBrowserRecipe -Path .\search-proof.browser.recipe.json
+
+Browser recipe recording redacts values entered into selectors that look sensitive, such as password, token, SAML, MFA, OTP, or secret fields. The recipe step keeps `ValueRedacted`, `ValueRedactionReason`, and `ValueVariable` so you can see that a value was intentionally omitted and provide it at replay time. Keep real credentials in a vault or provide them at runtime instead of committing them into recipe JSON.
+
+```powershell
+$validation = Test-HtmlBrowserRecipe -Path .\search-proof.browser.recipe.json
+$validation.RequiredVariables
+$validation.VariableTemplate
+$validation.BlockingIssues | Format-Table Severity, StepIndex, Action, Property, Message, SuggestedFix, SuggestedCommand -AutoSize
+
+Test-HtmlBrowserRecipe -Path .\search-proof.browser.recipe.json -StrictPreflight -ThrowOnFailure
+
+$reviewSession = Start-HtmlBrowserSession -Url 'https://example.com/search' -Scenario SinglePageApp
+$review = Optimize-HtmlBrowserRecipe -Session $reviewSession -Path .\search-proof.browser.recipe.json -OutPath .\search-proof.browser.hardened.recipe.json -ReportPath .\search-proof.browser.hardening.json
+$review.Steps | Where-Object Changed | Select-Object StepIndex, Action, AddedAlternates, Reason
+Close-HtmlBrowserSession -Session $reviewSession
+
+$secret = Read-Host -AsSecureString -Prompt 'Portal password'
+Invoke-HtmlBrowserRecipe -Path .\search-proof.browser.recipe.json -VariablePath .\search-proof.browser.variables.json -Variable @{ password = $secret }
+```
+
+`Test-HtmlBrowserRecipe` returns CI-friendly fields such as `Passed`, `BlockingIssues`, `BlockingIssueCount`, `RecommendedExitCode`, and `Summary`. Each issue includes `SuggestedFix`, `SuggestedCommand`, and `DocumentationHint`, so the next repair step is visible without opening DevTools or guessing which browser cmdlet applies. Use `-StrictPreflight` when CI or a scheduled run should also block on warnings such as `ContinueOnError`, long fixed waits, or sensitive selectors, and add `-ThrowOnFailure` when the validation command itself should fail the job. `Invoke-HtmlBrowserRecipe` also preflights before opening a browser. Missing runtime variables, empty steps, invalid timeouts, and missing selectors return a failed recipe run result with `SkippedBeforeExecution`, `Validation`, `FailureSummary`, and `SuggestedCommand` populated, so scheduled jobs can fail fast without launching Chromium. Use `-SkipPreflight` only when you intentionally want to reproduce the old replay-time failure path.
+
+# Visible enterprise login with persistent browser profile and evidence output
+$browserProfilePath = Join-Path $PWD 'browser-profile.json'
+$userDataPath = Join-Path $PWD 'browser-user-data'
+New-HtmlBrowserProfile -Name 'EnterpriseLogin' -Scenario LoginProtected -Path $browserProfilePath -UserDataDirectory $userDataPath
+$loginSession = Start-HtmlBrowserSession -Url 'https://example.com/protected' -ProfilePath $browserProfilePath -ManualLogin -LoginSuccessSelector 'main'
+Export-HtmlBrowserState -Session $loginSession -Path (Join-Path $PWD 'browser-state.json')
+Export-HtmlBrowserEvidence -Session $loginSession -OutFolder (Join-Path $PWD 'evidence\login') -NetworkSummary -SsoHandoffSummary
+Close-HtmlBrowserSession -Session $loginSession
+
+# Pause an enterprise SSO handoff form long enough to inspect it safely
+$ssoSession = Start-HtmlBrowserSession -Url 'https://example.com/protected' -Scenario LoginProtected -Visible -ManualLogin -PreventSsoAutoSubmit
+try {
+    Get-HtmlBrowserSsoHandoff -Session $ssoSession -Wait -Timeout 60000
+    Get-HtmlBrowserSsoHandoff -Session $ssoSession -Analyze
+    Export-HtmlBrowserEvidence -Session $ssoSession -OutFolder (Join-Path $PWD 'evidence\sso') -SsoHandoffSummary
+    Get-HtmlBrowserSsoHandoff -Session $ssoSession -IncludeSensitiveValues
+} finally {
+    Close-HtmlBrowserSession -Session $ssoSession
+}
 
 # Ask the planner which browser/content profile to use
 $plan = Test-HtmlExtractionPlan -Url 'https://example.com/app'
@@ -789,28 +881,44 @@ $plan | Get-HtmlExtractionProfile
 Run [Examples/Example-BrowserExtractionModeLocal.ps1](Examples/Example-BrowserExtractionModeLocal.ps1) for an offline, self-contained version of the story. It stubs a local page and API with `Register-HtmlRoute`, then runs:
 
 ```powershell
-Start-HtmlSession
+Start-HtmlBrowserSession
 Invoke-HtmlNavigation
-Invoke-HtmlOverlayDismissal
-Set-HtmlInput -Type
-Invoke-HtmlKey
-Invoke-HtmlClick -Text
-Wait-HtmlContent
-Get-HtmlElement
-Test-HtmlElement
-Get-HtmlActiveElement
-Get-HtmlStorage
-Set-HtmlStorage
-Save-HtmlContent
-Get-HtmlDiagnostics
+Close-HtmlBrowserOverlay
+Set-HtmlBrowserInput -Type
+Invoke-HtmlBrowserKey
+Invoke-HtmlBrowserClick -Text
+Wait-HtmlBrowserReady
+Wait-HtmlBrowserContent
+Get-HtmlBrowserElement
+Test-HtmlBrowserElement
+Get-HtmlBrowserActiveElement
+Get-HtmlBrowserStorage
+Set-HtmlBrowserStorage
+Save-HtmlBrowserContent
+Export-HtmlBrowserEvidence
+Get-HtmlBrowserDiagnostics
 Compare-HtmlStaticRendered
 Invoke-HtmlPageWorkbench -RenderedSnapshot
-Export-BrowserState
+Export-HtmlBrowserState
 ```
+
+Run [Examples/Example-BrowserEvidenceProofPack.ps1](Examples/Example-BrowserEvidenceProofPack.ps1) for a self-contained proof-pack workflow with a reusable browser profile, persistent user-data directory, readiness wait, masked screenshot evidence, and evidence manifest.
+
+Run [Examples/Example-BrowserManualLogin.ps1](Examples/Example-BrowserManualLogin.ps1) for a visible enterprise login workflow that reuses a persistent profile, waits for a post-login selector, exports browser state, and writes an evidence pack.
+
+Run [Examples/Example-BrowserSsoHandoff.ps1](Examples/Example-BrowserSsoHandoff.ps1) for an offline SAML handoff workflow. It waits for a delayed auto-submitting handoff form, reports redacted field values by default, and demonstrates the explicit reveal switch without using a real tenant.
+
+Run [Examples/Example-BrowserNetworkToRecipe.ps1](Examples/Example-BrowserNetworkToRecipe.ps1) for an offline network-to-recipe workflow. It observes a browser fetch, captures the JSON body, turns it into a browserless data source, exports a recipe, and replays the recipe without navigating the page again.
+
+Run [Examples/Example-BrowserRecipeRecording.ps1](Examples/Example-BrowserRecipeRecording.ps1) for an offline recorder workflow. It performs normal HtmlTinkerX session actions, redacts a password-like recorded input, records a minimal HTML/text evidence pack, saves the successful steps as a browser recipe, then replays that recipe in a fresh browser session with the same evidence artifact choices.
+
+Run [Examples/Example-BrowserFailureEvidenceAndLocators.ps1](Examples/Example-BrowserFailureEvidenceAndLocators.ps1) for an offline locator-discovery and failure-evidence workflow. It ranks locator candidates, uses the best candidate for a click, then intentionally fails a wait with `-OnFailureEvidence` so the screenshot, HTML, text, network summary, failure context, and manifest can be inspected.
+
+Run [Examples/Example-BrowserRecipe.ps1](Examples/Example-BrowserRecipe.ps1) for an offline browser recipe workflow. It writes a JSON recipe, replays it with `Invoke-HtmlBrowserRecipe`, records locator candidates in the step results, and exports an evidence manifest.
 
 The matching C# example is [Sources/HtmlTinkerX.Examples/BrowserExtractionModeExample.cs](Sources/HtmlTinkerX.Examples/BrowserExtractionModeExample.cs). It follows the same sequence with `HtmlBrowser.OpenSessionAsync`, `RegisterRouteAsync`, `TypeInputAsync`, `PressKeysAsync`, `WaitForTextAsync`, `WaitForElementStateAsync`, `GetElementsAsync`, `TestElementAsync`, `GetActiveElementAsync`, `GetStorageAsync`, `SetStorageAsync`, `SaveContentAsync`, `GetDiagnosticsAsync`, `CreateSnapshotAsync`, `HtmlPageWorkbench.AnalyzeAsync`, and `ExportBrowserStateAsync`.
 
-Diagnostics are intentionally diagnostics, not stealth. `Get-HtmlDiagnostics` reports browser/runtime consistency, storage keys, failed or blocked requests, observed API calls, WebSockets, and console errors so you can understand why extraction did or did not work. It does not try to hide automation, defeat access controls, or bypass site protections.
+Diagnostics are intentionally diagnostics, not stealth. `Get-HtmlBrowserDiagnostics` reports browser/runtime consistency, storage keys, failed or blocked requests, observed API calls, WebSockets, and console errors so you can understand why extraction did or did not work. It does not try to hide automation, defeat access controls, or bypass site protections.
 
 Browser extraction should stay browser-last where possible. Prefer `Test-HtmlExtractionPlan`, static parsers, `Find-HtmlDataSource`, `Invoke-HtmlDataExtraction`, endpoint discovery, linked JavaScript inspection, crawl profiles, and static-vs-rendered comparison before adding click-through automation.
 
@@ -867,36 +975,36 @@ var replayed = await HtmlBrowserlessExtraction.ExtractRecipeAsync(recipe);
 Run [Examples/Example-BrowserlessExtraction.ps1](Examples/Example-BrowserlessExtraction.ps1) or the C# [BrowserlessExtractionExample](Sources/HtmlTinkerX.Examples/BrowserlessExtractionExample.cs) for a self-contained app-state extraction and recipe round trip.
 
 ### Screenshots & Media
-- **Save-HTMLScreenshot** - Capture page screenshots with advanced options
-- **Save-HTMLPdf** - Generate PDFs from rendered pages
-- **Start-HTMLVideoRecording** / **Stop-HTMLVideoRecording** - Record browser sessions
+- **Save-HtmlBrowserScreenshot** - Capture page screenshots with advanced options, including explicit sensitive-field masking
+- **Save-HtmlBrowserPdf** - Generate PDFs from rendered pages
+- **Start-HtmlBrowserVideoCapture** / **Stop-HtmlBrowserVideoCapture** - Record browser sessions
 
 ### Network & Debugging
-- **Get-HTMLNetworkLog** - View captured network requests and responses
-- **Get-HTMLConsoleLog** - Retrieve browser console messages
-- **Save-HTMLHar** - Export network traffic to HAR files
-- **Start-HTMLTracing** / **Stop-HTMLTracing** - Record Playwright traces
-- **Register-HTMLRoute** / **Unregister-HTMLRoute** - Intercept and mock requests
+- **Get-HtmlBrowserNetworkLog** - View captured network requests and responses
+- **Get-HtmlBrowserConsoleLog** - Retrieve browser console messages
+- **Export-HtmlBrowserHar** - Export network traffic to HAR files
+- **Start-HtmlBrowserTracing** / **Stop-HtmlBrowserTracing** - Record Playwright traces
+- **Register-HtmlRoute** / **Unregister-HtmlRoute** - Intercept and mock requests
 - **Test-HtmlBrowser** - Comprehensive browser testing for errors, performance, and resources
 - **Clear-HtmlBrowserCache** - Clean Playwright browser downloads
 
 ### Cookies & State Management
-- **Get-HTMLCookie** - Retrieve cookies from sessions
-- **Set-HTMLCookie** - Add cookies to sessions
-- **New-HTMLCookie** - Create cookie objects
-- **Export-BrowserState** / **Import-BrowserState** - Save/restore browser state
-- **Export-HTMLSession** / **Import-HTMLSession** - Session state management
+- **Get-HtmlBrowserCookie** - Retrieve cookies from sessions
+- **Set-HtmlBrowserCookie** - Add cookies to sessions
+- **New-HtmlBrowserCookie** - Create cookie objects
+- **Export-HtmlBrowserState** / **Import-HtmlBrowserState** - Save/restore browser state
+- **Export-HtmlBrowserSession** / **Import-HtmlBrowserSession** - Session state management
 
 ### Content & Resources
 - **Get-HTMLResource** - Extract script and CSS resources
 - **Invoke-HTMLCrawl** - Crawl sites offline with optional browser rendering
 : supports sitemap discovery, `robots.txt`, filtering, auth, and selector-based extraction
-- **Save-HTMLAttachment** - Download files from pages
-- **Get-HTMLContent** - Retrieve page content
-- **Get-HTMLFormField** - Extract form field information
-- **Get-HTMLLoginForm** - Detect login forms
+- **Save-HtmlBrowserAttachment** - Download files from pages
+- **Get-HtmlBrowserContent** - Retrieve page content
+- **Get-HtmlBrowserFormField** - Extract form field information
+- **Get-HtmlBrowserLoginForm** - Detect login forms
 - **Export-HTMLOutline** - Generate document outlines
-- **Show-HTMLHar** - Visualize HAR files
+- **Show-HtmlBrowserHar** - Visualize HAR files
 - **Compare-HTML** - Compare HTML documents
 - **Measure-HTMLDocument** - Analyze document metrics
 
@@ -1165,7 +1273,7 @@ $optimized = Optimize-Email -Body $emailHtml -UseEmailFormatter -DownloadRemoteC
 ```powershell
 # Authenticated session with form login
 $cred = Get-Credential
-$session = Start-HTMLSession -Url 'https://example.com/protected' `
+$session = Start-HtmlBrowserSession -Url 'https://example.com/protected' `
     -Credential $cred `
     -LoginUrl 'https://example.com/login' `
     -UsernameSelector 'input[name=username]' `
@@ -1173,20 +1281,20 @@ $session = Start-HTMLSession -Url 'https://example.com/protected' `
     -SubmitSelector 'button[type=submit]'
 
 # Take screenshots with different options
-Save-HTMLScreenshot -Session $session -OutFile 'full-page.png' -Full
-Save-HTMLScreenshot -Session $session -OutFile 'element.png' -ElementSelector '#content'
-Save-HTMLScreenshot -Session $session -OutFile 'highlighted.png' -HighlightSelector '.important'
+Save-HtmlBrowserScreenshot -Session $session -OutFile 'full-page.png' -Full
+Save-HtmlBrowserScreenshot -Session $session -OutFile 'element.png' -ElementSelector '#content'
+Save-HtmlBrowserScreenshot -Session $session -OutFile 'highlighted.png' -HighlightSelector '.important'
 
 # Download files
-Save-HTMLAttachment -Session $session -Path './downloads' -Filter '.pdf'
+Save-HtmlBrowserAttachment -Session $session -Path './downloads' -Filter '.pdf'
 
 # Network monitoring
-Start-HTMLTracing -Session $session
-Invoke-HTMLNavigation -Session $session -Url 'https://example.com/api/data'
-Stop-HTMLTracing -Session $session -OutFile 'trace.zip'
-Save-HTMLHar -Session $session -OutFile 'network.har'
+Start-HtmlBrowserTracing -Session $session
+Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/api/data'
+Stop-HtmlBrowserTracing -Session $session -OutFile 'trace.zip'
+Export-HtmlBrowserHar -Session $session -OutFile 'network.har'
 
-Close-HTMLSession -Session $session
+Close-HtmlBrowserSession -Session $session
 ```
 
 ### C# Examples
@@ -1979,7 +2087,7 @@ Describe "Website Health Check" {
 ### Browser Configuration
 ```powershell
 # Custom browser settings
-$session = Start-HTMLSession -Url 'https://example.com' `
+$session = Start-HtmlBrowserSession -Url 'https://example.com' `
     -UserAgent 'Custom Bot 1.0' `
     -ViewportWidth 1920 `
     -ViewportHeight 1080 `
@@ -1991,7 +2099,7 @@ $session = Start-HTMLSession -Url 'https://example.com' `
 ### Request Interception
 ```powershell
 # Mock API responses
-$handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
+$handler = Register-HtmlRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
     param($route)
     $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
         Status = 200
@@ -2001,17 +2109,17 @@ $handler = Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBl
 }
 
 # Navigate and test
-Invoke-HTMLNavigation -Session $session -Url 'https://example.com/app'
-Unregister-HTMLRoute -Session $session -Pattern '**/api/data' -Handler $handler
+Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/app'
+Unregister-HtmlRoute -Session $session -Pattern '**/api/data' -Handler $handler
 ```
 
 ### State Management
 ```powershell
 # Save browser state
-Export-BrowserState -Session $session -Path 'session-state.json'
+Export-HtmlBrowserState -Session $session -Path 'session-state.json'
 
 # Restore in new session
-$newSession = Import-BrowserState -Path 'session-state.json' -Url 'https://example.com/dashboard'
+$newSession = Import-HtmlBrowserState -Path 'session-state.json' -Url 'https://example.com/dashboard'
 ```
 
 ## 🏗️ Third-Party Dependencies
@@ -2070,13 +2178,13 @@ dotnet add package HtmlTinkerX --version latest
 
 - **Playwright browser missing**: run `Test-HtmlBrowser -Install` or retry the command with `-Clean` when the browser cache is corrupt.
 - **Corporate proxy or locked-down network**: pass `-Proxy` and `-ProxyCredential` on URL-based commands, or use `Set-HtmlHttpClientOption` for reusable module defaults.
-- **Timeouts on app shells**: prefer `-RenderProfile AppShell -WaitForSelector 'main'` or `Wait-HtmlContent -Stable` instead of relying on network idle for applications that keep long-polling or WebSocket connections open.
-- **Lazy content does not appear**: use `LazyLoadedContent`, `-AutoScroll`, `Invoke-HtmlScroll`, or a specific `-WaitForSelector` that represents the content you actually need.
+- **Timeouts on app shells**: prefer `-RenderProfile AppShell -WaitForSelector 'main'` or `Wait-HtmlBrowserReady -Stable` instead of relying on network idle for applications that keep long-polling or WebSocket connections open.
+- **Lazy content does not appear**: use `LazyLoadedContent`, `-AutoScroll`, `Invoke-HtmlBrowserScroll`, or a specific `-WaitForSelector` that represents the content you actually need.
 - **Login reuse fails**: create storage state with the same browser engine and profile assumptions, then pass `-StorageStatePath` to the later render. Keep state files out of source control.
 - **Response bodies contain secrets**: use `-IncludeResponseBody -RedactResponseBody`, keep `-ResponseBodyResourceType` narrow, and lower `-ResponseBodyMaxBytes` for large APIs.
 - **Static HTML is already enough**: do not start a browser. Use `Test-HtmlExtractionPlan`, `Find-HtmlDataSource`, `Invoke-HtmlDataExtraction`, `ConvertFrom-Html*`, `Find-HtmlApiEndpoint`, crawl profiles, or `Compare-HtmlStaticRendered` to prove whether rendering adds value.
 - **Endpoint extraction is skipped**: `Invoke-HtmlDataExtraction` does not fetch endpoint sources unless `-AllowHttpFetch` is supplied, and high-risk endpoints remain blocked. Review `RiskLevel`, `Warnings`, `IsExternal`, and `RequiresAuthenticationHint` before opting into endpoint reads.
-- **Diagnostics look noisy**: `Get-HtmlDiagnostics` reports evidence such as `navigator.webdriver`, failed requests, console errors, and storage keys. Treat these as reliability hints, not a score to game.
+- **Diagnostics look noisy**: `Get-HtmlBrowserDiagnostics` reports evidence such as `navigator.webdriver`, failed requests, console errors, and storage keys. Treat these as reliability hints, not a score to game.
 
 ### Jint and JavaScript Parser Notes
 

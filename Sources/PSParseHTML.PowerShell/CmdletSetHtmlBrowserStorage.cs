@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Set a localStorage value before navigating an app</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value enabled
 ///   </code>
 /// </example>

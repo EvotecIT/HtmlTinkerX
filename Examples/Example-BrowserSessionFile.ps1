@@ -1,13 +1,13 @@
-﻿Import-Module .\PSParseHTML.psd1 -Force
+Import-Module .\PSParseHTML.psd1 -Force
 
-# When using Session, you can either save $Session variable or use the "default" session
-# Default session is always used unless you specify NoSession
-$null = Open-HTMLSession -Path "$PSScriptRoot\Input\Example-HierarchicalLayout01.html" -Session
+# You can save the returned session object or let subsequent commands use the default session.
+# The default session is used unless you pass -NoDefault when starting a separate session.
+$null = Start-HtmlBrowserSession -Path "$PSScriptRoot\Input\Example-HierarchicalLayout01.html"
 
-Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\HierarchicalLayout01.png" -Full -Open
+Save-HtmlBrowserScreenshot -OutFile "$PSScriptRoot\Output\HierarchicalLayout01.png" -Full -Open
 
-Get-HTMLInteractable -IncludeHidden | Format-Table
+Get-HtmlBrowserInteractable -IncludeHidden | Format-Table
 
-Invoke-HTMLNavigation -Selector "a#hide_anchor-y4b615h"
+Invoke-HtmlBrowserNavigation -Selector "a#hide_anchor-y4b615h"
 
-Save-HTMLScreenshot -OutFile "$PSScriptRoot\Output\HierarchicalLayout02.png" -Full -Open
+Save-HtmlBrowserScreenshot -OutFile "$PSScriptRoot\Output\HierarchicalLayout02.png" -Full -Open

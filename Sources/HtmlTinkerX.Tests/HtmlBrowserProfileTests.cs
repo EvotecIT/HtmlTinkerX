@@ -1,0 +1,121 @@
+using Microsoft.Playwright;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace HtmlTinkerX.Tests;
+
+public class HtmlBrowserProfileTests {
+    [Fact]
+    public async Task BrowserProfile_RoundTripsJsonAndAppliesDefaults() {
+        string dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        string profilePath = Path.Combine(dir, "profile.json");
+        HtmlBrowserProfile profile = new() {
+            Name = "work-chrome",
+            Browser = HtmlBrowserEngine.Chromium,
+            UserDataDirectory = Path.Combine(dir, "user-data"),
+            BrowserChannel = "chrome",
+            Locale = "en-US",
+            Timezone = "America/New_York",
+            ViewportWidth = 1365,
+            ViewportHeight = 768,
+            PreventSsoAutoSubmit = true
+        };
+        profile.BrowserArguments.Add("--disable-dev-shm-usage");
+        profile.Permissions.Add("geolocation");
+
+        try {
+            await profile.SaveAsync(profilePath);
+            HtmlBrowserProfile loaded = await HtmlBrowserProfile.LoadAsync(profilePath);
+
+            HtmlBrowserLaunchOptions options = new();
+            options.ApplyProfile(loaded);
+
+            Assert.Equal("work-chrome", loaded.Name);
+            Assert.Equal("chrome", options.BrowserChannel);
+            Assert.Equal("en-US", options.Locale);
+            Assert.Equal("America/New_York", options.Timezone);
+            Assert.Equal(1365, options.ViewportWidth);
+            Assert.Equal(768, options.ViewportHeight);
+            Assert.True(options.PreventSsoAutoSubmit);
+            Assert.Contains("--disable-dev-shm-usage", options.BrowserArguments);
+            Assert.Contains("geolocation", options.Permissions);
+        } finally {
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+    }
+}
+
+[Collection("Playwright collection")]
+public class HtmlBrowserPersistentProfileTests {
+    [Fact]
+    public async Task OpenSessionAsync_WithUserDataDirectory_PreservesLocalStorageBetweenSessions() {
+        string userDataDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        using HttpListener listener = StartLocalPageServer(out string url);
+        HtmlBrowserLaunchOptions options = new() {
+            UserDataDirectory = userDataDirectory,
+            Headless = true,
+            LoadState = HtmlBrowserLoadState.Load,
+            Timeout = 10000
+        };
+
+        try {
+            await using (HtmlBrowserSession first = await HtmlBrowser.OpenSessionAsync(url, options)) {
+                await first.Page.EvaluateAsync("() => localStorage.setItem('persist', 'sweet')");
+                Assert.True(first.IsPersistent);
+                Assert.Equal(Path.GetFullPath(userDataDirectory), first.UserDataDirectory);
+            }
+
+            await using HtmlBrowserSession second = await HtmlBrowser.OpenSessionAsync(url, options);
+            string value = await second.Page.EvaluateAsync<string>("() => localStorage.getItem('persist') || ''");
+
+            Assert.Equal("sweet", value);
+        } finally {
+            if (Directory.Exists(userDataDirectory)) {
+                Directory.Delete(userDataDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static HttpListener StartLocalPageServer(out string url) {
+        int port = GetFreePort();
+        url = $"http://localhost:{port}/";
+        HttpListener listener = new();
+        listener.Prefixes.Add(url);
+        listener.Start();
+
+        _ = Task.Run(async () => {
+            while (listener.IsListening) {
+                try {
+                    HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
+                    byte[] body = Encoding.UTF8.GetBytes("<!doctype html><html><body><main>profile ready</main></body></html>");
+                    context.Response.ContentType = "text/html; charset=utf-8";
+                    context.Response.ContentLength64 = body.Length;
+                    await context.Response.OutputStream.WriteAsync(body, 0, body.Length).ConfigureAwait(false);
+                    context.Response.Close();
+                } catch (HttpListenerException) {
+                    break;
+                } catch (ObjectDisposedException) {
+                    break;
+                }
+            }
+        });
+
+        return listener;
+    }
+
+    private static int GetFreePort() {
+        TcpListener listener = new(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+}

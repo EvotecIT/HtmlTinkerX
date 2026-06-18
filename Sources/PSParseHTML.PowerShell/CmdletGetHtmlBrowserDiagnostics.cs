@@ -16,7 +16,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Inspect an active browser extraction session</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/app -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/app
 /// Wait-HtmlBrowserContent -Session $session -Stable
 /// $diagnostics = Get-HtmlBrowserDiagnostics -Session $session
 /// $diagnostics.ObservedApiCalls

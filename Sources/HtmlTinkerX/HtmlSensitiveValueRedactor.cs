@@ -14,11 +14,21 @@ internal static class HtmlSensitiveValueRedactor {
         "credential",
         "csrf",
         "key",
+        "mfa",
+        "otp",
         "password",
+        "passcode",
+        "pin",
+        "pwd",
         "refresh_token",
+        "relaystate",
+        "samlrequest",
+        "samlresponse",
         "secret",
         "session",
-        "token"
+        "token",
+        "wctx",
+        "wresult"
     };
 
     internal static bool HasSensitiveQuery(Uri? uri) {
@@ -120,7 +130,8 @@ internal static class HtmlSensitiveValueRedactor {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = SafeUnescapeDataString(keyValue[0]);
             if (IsSensitiveName(name)) {
-                return keyValue[0] + "=<redacted>";
+                string suffix = keyValue.Length == 2 ? GetTrailingParameterValueDelimiter(keyValue[1]) : string.Empty;
+                return keyValue[0] + "=<redacted>" + suffix;
             }
 
             if (keyValue.Length == 2 && TryRedactNestedValue(keyValue[1], out string? nestedRedacted)) {
@@ -135,6 +146,29 @@ internal static class HtmlSensitiveValueRedactor {
 
     private static bool HasParameterPairs(string value) =>
         !string.IsNullOrWhiteSpace(value) && value.IndexOf('=') >= 0;
+
+    private static string GetTrailingParameterValueDelimiter(string value) {
+        const string RedactedMarker = "<redacted>";
+        if (value.StartsWith(RedactedMarker, StringComparison.OrdinalIgnoreCase)) {
+            return value.Substring(RedactedMarker.Length);
+        }
+
+        int index = value.Length;
+        while (index > 0 && IsParameterValueDelimiter(value[index - 1])) {
+            index--;
+        }
+
+        return index == value.Length ? string.Empty : value.Substring(index);
+    }
+
+    private static bool IsParameterValueDelimiter(char value) =>
+        char.IsWhiteSpace(value)
+        || value == '\''
+        || value == '"'
+        || value == ']'
+        || value == ')'
+        || value == '}'
+        || value == '>';
 
     private static string SafeUnescapeDataString(string value) {
         try {
@@ -238,13 +272,13 @@ internal static class HtmlSensitiveValueRedactor {
 
         string redacted = Regex.Replace(
             value,
-            "((?:\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^\"]*\"|'[^']*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "((?:\"[^\"]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[^\"]*\"|'[^']*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[^']*')\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         redacted = Regex.Replace(
             redacted,
-            "([A-Za-z_$][A-Za-z0-9_$]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|secret|session|token)[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
+            "([A-Za-z_$][A-Za-z0-9_$]*(?:access_token|api_key|apikey|auth|code|credential|csrf|key|password|refresh_token|relaystate|samlrequest|samlresponse|secret|session|token|wctx|wresult)[A-Za-z0-9_$]*\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^,}\\]]+)",
             "$1\"<redacted>\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
@@ -255,6 +289,49 @@ internal static class HtmlSensitiveValueRedactor {
             RegexOptions.CultureInvariant);
 
         return redacted;
+    }
+
+    internal static string RedactSensitiveEvidenceText(string value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return string.Empty;
+        }
+
+        string redacted = RedactSensitiveStructuredText(value);
+        redacted = Regex.Replace(
+            redacted,
+            @"(?i)(bearer\s+)[A-Za-z0-9._~+/\-]+=*",
+            "$1<redacted>",
+            RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            @"(?i)((?:access[_-]?token|api[_-]?key|password|secret|refresh[_-]?token|session[_-]?id|saml(?:request|response)|relaystate|wresult|wctx)\s*=\s*)[^\s&<>""']+",
+            "$1<redacted>",
+            RegexOptions.CultureInvariant);
+
+        redacted = Regex.Replace(
+            redacted,
+            @"<input\b[^>]*>",
+            RedactSensitiveInputElement,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        return redacted;
+    }
+
+    private static string RedactSensitiveInputElement(Match match) {
+        string tag = match.Value;
+        if (!Regex.IsMatch(
+            tag,
+            @"\b(?:name|id|autocomplete)\s*=\s*(['""])[^'""]*(?:access[_-]?token|api[_-]?key|password|secret|refresh[_-]?token|csrf|session|token|saml(?:request|response)|relaystate|wresult|wctx)[^'""]*\1",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) {
+            return tag;
+        }
+
+        return Regex.Replace(
+            tag,
+            @"\bvalue\s*=\s*(['""])(.*?)\1",
+            "value=$1<redacted>$1",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     private static string RedactSensitiveUrlLiteral(Match match) {

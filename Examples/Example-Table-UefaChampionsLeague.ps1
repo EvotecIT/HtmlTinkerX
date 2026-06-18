@@ -1,4 +1,4 @@
-﻿Import-Module .\PSParseHTML.psd1 -Force
+Import-Module .\PSParseHTML.psd1 -Force
 
 $Urls = @(
     'https://www.goal.com/en-us/champions-league/4oogyu6o156iphvdvphwpck10'
@@ -7,7 +7,7 @@ $Urls = @(
     'https://www.goal.com/en-us/champions-league/top-players/4oogyu6o156iphvdvphwpck10'
 )
 foreach ($Url in $Urls) {
-    $HTML = Invoke-HTMLRendering -Url $Url -Browser Chromium
+    $HTML = Invoke-HtmlRendering -Url $Url -Browser Chromium
 
     $Tables = ConvertFrom-HtmlTable -Content $HTML
     for ($Count = 0; $Count -lt $Tables.Count; $Count++) {

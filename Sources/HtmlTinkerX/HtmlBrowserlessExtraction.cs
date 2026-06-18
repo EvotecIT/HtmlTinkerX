@@ -646,7 +646,9 @@ public static class HtmlBrowserlessExtraction {
     }
 
     private static HtmlBrowserlessDataSource CreateSourceFromRecipe(HtmlBrowserlessExtractionRecipe recipe) {
-        bool isEndpoint = recipe.SourceKind.Equals("ApiEndpoint", StringComparison.OrdinalIgnoreCase);
+        bool isEndpoint = recipe.SourceKind.Equals("ApiEndpoint", StringComparison.OrdinalIgnoreCase)
+            || recipe.SourceKind.Equals("ObservedApiEndpoint", StringComparison.OrdinalIgnoreCase);
+        bool hasRawContent = !string.IsNullOrWhiteSpace(recipe.RawContent);
         return new HtmlBrowserlessDataSource {
             Kind = recipe.SourceKind,
             Name = recipe.SourceName,
@@ -660,10 +662,10 @@ public static class HtmlBrowserlessExtraction {
             RequiresAuthenticationHint = recipe.RequiresAuthenticationHint,
             Selector = recipe.Selector,
             RawContent = recipe.RawContent,
-            RequiresHttpFetch = isEndpoint,
-            CanExtractDirectly = isEndpoint || !string.IsNullOrWhiteSpace(recipe.RawContent),
+            RequiresHttpFetch = isEndpoint && !hasRawContent,
+            CanExtractDirectly = isEndpoint || hasRawContent,
             Evidence = new[] { "Source recreated from browserless extraction recipe." },
-            Warnings = isEndpoint || !string.IsNullOrWhiteSpace(recipe.RawContent)
+            Warnings = isEndpoint || hasRawContent
                 ? Array.Empty<string>()
                 : new[] { "Static recipes require RawContent or rediscovery from the original page." }
         };

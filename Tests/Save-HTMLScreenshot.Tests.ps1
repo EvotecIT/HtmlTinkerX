@@ -1,4 +1,27 @@
+Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+
 Describe 'Save-HtmlBrowserScreenshot' {
+    It 'exposes reusable launch profile parameters for one-shot captures' {
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'ProfilePath'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Scenario'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'UserDataDirectory'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'StatePath'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Proxy'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'ProxyCredential'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'LoadState'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'Timeout'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'BlockResourceType'
+        (Get-Command Save-HtmlBrowserScreenshot).Parameters.Keys | Should -Contain 'BlockResourcePattern'
+    }
+
+    It 'rejects document resource blocking for one-shot screenshot navigation' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $outfile = Join-Path $TestDrive 'blocked-document.png'
+
+        { Save-HtmlBrowserScreenshot -Path $path -OutFile $outfile -BlockResourceType Document } |
+            Should -Throw -ExpectedMessage '*BlockResourceType Document would abort page navigation*'
+    }
+
     It 'Creates a screenshot file' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
@@ -21,6 +44,22 @@ Describe 'Save-HtmlBrowserScreenshot' {
         $outfile = Join-Path $TestDrive 'full.png'
         Save-HtmlBrowserScreenshot -Url $uri -OutFile $outfile -Full -Selector '#loaded'
         (Test-Path $outfile) | Should -BeTrue
+    }
+
+    It 'applies scenario viewport defaults to direct screenshots' {
+        $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
+        $outfile = Join-Path $TestDrive 'audit-proof.png'
+
+        Save-HtmlBrowserScreenshot -Path $path -OutFile $outfile -Scenario AuditProof -Selector '#loaded'
+
+        Add-Type -AssemblyName System.Drawing
+        $bitmap = [System.Drawing.Bitmap]::new($outfile)
+        try {
+            $bitmap.Width | Should -Be 1366
+            $bitmap.Height | Should -Be 900
+        } finally {
+            $bitmap.Dispose()
+        }
     }
 
     It 'Creates a clipped screenshot' {

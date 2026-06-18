@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>List visible product cards with attributes and geometry</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/catalog -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/catalog
 /// Get-HtmlBrowserElement -Session $session -Selector '.product-card' -VisibleOnly -IncludeAttributes
 ///   </code>
 /// </example>

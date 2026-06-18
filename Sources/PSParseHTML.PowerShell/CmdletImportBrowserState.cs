@@ -8,8 +8,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that restores a browser session from a previously exported state file.
 /// </summary>
-[Cmdlet(VerbsData.Import, "BrowserState")]
+[Cmdlet(VerbsData.Import, "HtmlBrowserState")]
 [OutputType(typeof(HtmlBrowserSession))]
+[Alias("Import-BrowserState")]
 public sealed class CmdletImportBrowserState : AsyncPSCmdlet {
     /// <summary>Path to the saved state.</summary>
     [Parameter(Mandatory = true, Position = 0)]

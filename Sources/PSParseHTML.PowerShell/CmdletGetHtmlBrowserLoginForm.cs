@@ -34,6 +34,32 @@ public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public HtmlBrowserEngine Browser { get; set; } = HtmlBrowserEngine.Chromium;
 
+    /// <summary>Optional browser profile JSON file used as launch defaults.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? ProfilePath { get; set; }
+
+    /// <summary>Intent-focused browser automation defaults to apply before explicit parameter values.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserScenario Scenario { get; set; } = HtmlBrowserScenario.Custom;
+
+    /// <summary>Persistent browser user-data directory for cookies, storage, cache, and permissions.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? UserDataDirectory { get; set; }
+
+    /// <summary>Playwright storage-state JSON file for cookies and local storage.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    [Alias("StorageStatePath")]
+    public string? StatePath { get; set; }
+
+    /// <summary>Browser distribution channel, such as chrome, msedge, chromium, chrome-beta, or msedge-dev.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string? BrowserChannel { get; set; }
+
     /// <summary>Force re-download of browser runtimes.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [Parameter(ParameterSetName = ParameterSetFile)]
@@ -64,6 +90,21 @@ public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Initial browser navigation readiness state.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlBrowserLoadState LoadState { get; set; } = HtmlBrowserLoadState.NetworkIdle;
+
+    /// <summary>Browser resource types to abort before navigation, such as Image, Media, Font, or Stylesheet.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public HtmlNetworkResourceType[] BlockResourceType { get; set; } = System.Array.Empty<HtmlNetworkResourceType>();
+
+    /// <summary>Playwright URL glob patterns to abort before navigation, such as **/analytics/**.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public string[] BlockResourcePattern { get; set; } = System.Array.Empty<string>();
+
     /// <summary>Token used to cancel the operation.</summary>
     [Parameter]
     public CancellationToken CancellationToken { get; set; }
@@ -72,47 +113,19 @@ public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         HtmlFormLogin? result;
-        string? pUser = ProxyCredential?.UserName;
-        string? pPass = ProxyCredential?.GetNetworkCredential().Password;
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
         switch (ParameterSetName) {
             case ParameterSetUrl:
-                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
-                    Url!,
-                    Browser,
-                    Clean.IsPresent,
-                    username: null,
-                    password: null,
-                    formLogin: null,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    storageStatePath: null,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass,
-                    timeout: Timeout,
-                    cancellationToken: token).ConfigureAwait(false)) {
+                HtmlBrowserLaunchOptions urlOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(Url!, urlOptions, token).ConfigureAwait(false)) {
                     result = await HtmlBrowser.DetectLoginFormAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
             case ParameterSetFile:
                 string fileUrl = new System.Uri(Path!.ToFullPath()).AbsoluteUri;
-                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(
-                    fileUrl,
-                    Browser,
-                    Clean.IsPresent,
-                    username: null,
-                    password: null,
-                    formLogin: null,
-                    headless: !Visible.IsPresent,
-                    slowMo: SlowMo,
-                    storageStatePath: null,
-                    proxy: Proxy,
-                    proxyUsername: pUser,
-                    proxyPassword: pPass,
-                    timeout: Timeout,
-                    cancellationToken: token).ConfigureAwait(false)) {
+                HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+                await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(fileUrl, fileOptions, token).ConfigureAwait(false)) {
                     result = await HtmlBrowser.DetectLoginFormAsync(sess.Page, token).ConfigureAwait(false);
                 }
                 break;
@@ -126,5 +139,26 @@ public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
         if (result != null) {
             WriteObject(result);
         }
+    }
+
+    private async Task<HtmlBrowserLaunchOptions> CreateLaunchOptionsAsync(CancellationToken cancellationToken) {
+        return await HtmlBrowserLaunchOptionFactory.CreateAsync(new HtmlBrowserLaunchOptionRequest {
+            BoundParameters = MyInvocation.BoundParameters,
+            ProfilePath = ProfilePath,
+            Scenario = Scenario,
+            Browser = Browser,
+            Clean = Clean,
+            Visible = Visible,
+            SlowMo = SlowMo,
+            Timeout = Timeout,
+            UserDataDirectory = UserDataDirectory,
+            StatePath = StatePath,
+            BrowserChannel = BrowserChannel,
+            Proxy = Proxy,
+            ProxyCredential = ProxyCredential,
+            LoadState = LoadState,
+            BlockResourceType = BlockResourceType,
+            BlockResourcePattern = BlockResourcePattern
+        }, cancellationToken).ConfigureAwait(false);
     }
 }

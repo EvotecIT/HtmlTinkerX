@@ -16,14 +16,14 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Dismiss a cookie banner before reading content</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/article -Session
-/// Invoke-HtmlBrowserOverlayDismissal -Session $session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/article
+/// Close-HtmlBrowserOverlay -Session $session
 /// Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText
 ///   </code>
 /// </example>
-[Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserOverlayDismissal")]
+[Cmdlet(VerbsCommon.Close, "HtmlBrowserOverlay")]
 [OutputType(typeof(string))]
-[Alias("Invoke-HtmlOverlayDismissal")]
+[Alias("Invoke-HtmlBrowserOverlayDismissal", "Invoke-HtmlOverlayDismissal", "Close-HtmlOverlay")]
 public sealed class CmdletInvokeHtmlBrowserOverlayDismissal : AsyncPSCmdlet {
     /// <summary>Existing browser session.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]

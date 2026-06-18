@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 ///   <summary>Check whether results are visible</summary>
 ///   <code>
-/// $session = Start-HtmlSession -Url https://example.org/search -Session
+/// $session = Start-HtmlBrowserSession -Url https://example.org/search
 /// Test-HtmlBrowserElement -Session $session -Selector '#results' -Visible
 ///   </code>
 /// </example>

@@ -1,6 +1,6 @@
-﻿Import-Module .\PSParseHTML.psd1 -Force
+Import-Module .\PSParseHTML.psd1 -Force
 
-$HTML = Invoke-HTMLRendering -Url "https://portal.assessor.lacounty.gov/parceldetail/5130020021" -Browser Chromium
+$HTML = Invoke-HtmlRendering -Url "https://portal.assessor.lacounty.gov/parceldetail/5130020021" -Browser Chromium
 
 $PageHTMLUrl2 = ConvertFrom-HTMLTag -Content $HTML -Class 'MuiTypography-root'
 $PageHTMLUrl2 | Format-Table

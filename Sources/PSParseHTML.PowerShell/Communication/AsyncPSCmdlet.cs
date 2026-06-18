@@ -244,6 +244,39 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
     }
 
     /// <summary>
+    /// Exports a browser evidence bundle for a failed automation operation and writes a warning with the manifest path.
+    /// </summary>
+    /// <param name="session">Browser session to capture.</param>
+    /// <param name="enabled">Whether failure evidence was requested by the caller.</param>
+    /// <param name="operation">Logical operation name.</param>
+    /// <param name="exception">Failure exception.</param>
+    /// <param name="outFolder">Optional evidence root folder.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    protected async Task ExportFailureEvidenceIfRequestedAsync(
+        HtmlBrowserSession session,
+        bool enabled,
+        string operation,
+        Exception exception,
+        string? outFolder,
+        CancellationToken cancellationToken) {
+        if (!enabled) {
+            return;
+        }
+
+        try {
+            HtmlBrowserFailureEvidenceOptions options = new() {
+                Operation = operation,
+                BaseFileName = operation,
+                OutFolder = string.IsNullOrWhiteSpace(outFolder) ? "HtmlBrowserFailureEvidence" : outFolder!
+            };
+            HtmlBrowserEvidenceResult evidence = await HtmlBrowser.ExportFailureEvidenceAsync(session, exception, options, cancellationToken).ConfigureAwait(false);
+            WriteWarning($"Browser failure evidence saved to '{evidence.OutFolder}'. Manifest: '{evidence.ManifestPath}'.");
+        } catch (Exception evidenceException) when (evidenceException is IOException || evidenceException is UnauthorizedAccessException || evidenceException is InvalidOperationException || evidenceException is PlaywrightException) {
+            WriteWarning($"Browser failure evidence could not be saved: {evidenceException.Message}");
+        }
+    }
+
+    /// <summary>
     /// Throws a <see cref="PipelineStoppedException"/> if the cmdlet has been stopped.
     /// </summary>
     internal void ThrowIfStopped() {

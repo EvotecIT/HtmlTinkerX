@@ -17,7 +17,7 @@ describe 'HTML Tracing and HAR' {
         $session = Invoke-HTMLRendering -Url $uri -Session
         Invoke-HTMLNavigation -Session $session -Url $uri
         $har = Join-Path $TestDrive 'out.har'
-        Save-HtmlBrowserHar -Session $session -OutFile $har
+        Export-HtmlBrowserHar -Session $session -OutFile $har
         (Test-Path $har) | Should -BeTrue
         Close-HtmlBrowserSession -Session $session
     }
@@ -28,10 +28,10 @@ describe 'HTML Tracing and HAR' {
         $session = Invoke-HTMLRendering -Url $uri -Session
         Invoke-HTMLNavigation -Session $session -Url $uri
         $harTemp = Join-Path $TestDrive 'temp.har'
-        Save-HtmlBrowserHar -Session $session -OutFile $harTemp
+        Export-HtmlBrowserHar -Session $session -OutFile $harTemp
         $harObj = Show-HtmlBrowserHar -Path $harTemp
         $copy = Join-Path $TestDrive 'copy.har'
-        Save-HtmlBrowserHar -Har $harObj -OutFile $copy
+        Export-HtmlBrowserHar -Har $harObj -OutFile $copy
         (Test-Path $copy) | Should -BeTrue
         Close-HtmlBrowserSession -Session $session
     }

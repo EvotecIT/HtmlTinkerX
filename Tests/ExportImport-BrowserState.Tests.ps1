@@ -1,5 +1,7 @@
+Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
+
 Describe 'Browser state persistence' {
-    if (Get-Command Export-BrowserState -ErrorAction SilentlyContinue) {
+    if (Get-Command Export-HtmlBrowserState -ErrorAction SilentlyContinue) {
         It 'Reuses cookies from exported state' {
             $url = 'about:blank'
             $state = Join-Path $TestDrive 'state.json'
@@ -8,10 +10,10 @@ Describe 'Browser state persistence' {
 
         $s1 = Invoke-HTMLRendering -Url $url -Session
         Set-HtmlBrowserCookie -Session $s1 -Cookie ([HtmlTinkerX.HtmlCookie[]]@($cookie))
-        Export-BrowserState -Session $s1 -Path $state
+        Export-HtmlBrowserState -Session $s1 -Path $state
         Close-HtmlBrowserSession -Session $s1
 
-        $s2 = Import-BrowserState -Path $state -Url $url
+        $s2 = Import-HtmlBrowserState -Path $state -Url $url
         $cookies = Get-HtmlBrowserCookie -Session $s2
         Close-HtmlBrowserSession -Session $s2
 

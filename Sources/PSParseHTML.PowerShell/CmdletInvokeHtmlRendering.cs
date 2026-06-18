@@ -16,7 +16,6 @@ namespace PSParseHTML.PowerShell;
 /// <code>Invoke-HtmlRendering -Url https://example.com -Browser Chromium -Clean</code>
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlRendering", DefaultParameterSetName = ParameterSetDefault)]
-[Alias("Start-HtmlSession", "Open-HtmlSession")]
 [OutputType(typeof(string), typeof(HtmlBrowserSession), typeof(HtmlRenderedPageSnapshot))]
 public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private const string ParameterSetDefault = "Default";

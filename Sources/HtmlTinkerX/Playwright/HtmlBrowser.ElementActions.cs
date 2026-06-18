@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -43,6 +44,12 @@ public static partial class HtmlBrowser {
         cancellationToken.ThrowIfCancellationRequested();
         await locator.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         await locator.PressAsync(keys, new LocatorPressOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.Key,
+            Selector = selector,
+            Keys = keys,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -90,6 +97,13 @@ public static partial class HtmlBrowser {
             State = WaitForSelectorState.Visible,
             Timeout = timeout
         }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.WaitText,
+            Selector = selector,
+            Text = text,
+            Exact = exact,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -284,5 +298,150 @@ public static partial class HtmlBrowser {
         }
 
         return warnings;
+    }
+
+    /// <summary>
+    /// Clicks an element by CSS selector.
+    /// </summary>
+    public static Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickSelectorAsync(session, selector, waitForNavigation, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element by CSS selector and optionally waits for the requested navigation load state.
+    /// </summary>
+    public static Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, HtmlBrowserLoadState loadState, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickSelectorAsync(session, selector, waitForNavigation, loadState, navigationUrl: null, timeout, cancellationToken);
+
+    /// <summary>
+    /// Clicks an element by CSS selector and optionally waits for the requested navigation load state and URL glob.
+    /// </summary>
+    public static Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickSelectorAsync(session, selector, waitForNavigation, loadState, navigationUrl, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element by CSS selector, optionally targeting a zero-based matching element.
+    /// </summary>
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, int timeout, CancellationToken cancellationToken, int? nth) {
+        await ClickSelectorAsync(session, selector, waitForNavigation, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken, nth).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element by CSS selector, optionally targeting a zero-based matching element and waiting for a navigation load state.
+    /// </summary>
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, HtmlBrowserLoadState loadState, int timeout, CancellationToken cancellationToken, int? nth) {
+        await ClickSelectorAsync(session, selector, waitForNavigation, loadState, navigationUrl: null, timeout, cancellationToken, nth).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element by CSS selector, optionally targeting a zero-based matching element and waiting for a navigation load state and URL glob.
+    /// </summary>
+    public static async Task ClickSelectorAsync(HtmlBrowserSession session, string selector, bool waitForNavigation, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken, int? nth) {
+        ILocator locator = session.Page.Locator(selector);
+        if (nth.HasValue) {
+            locator = locator.Nth(nth.Value);
+        }
+
+        if (waitForNavigation) {
+            Task waitTask = WaitForUrlChangeAsync(session, loadState, navigationUrl, timeout);
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await waitTask.WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        } else {
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await RecordRecipeStepAsync(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.Click,
+            Selector = selector,
+            WaitForNavigation = waitForNavigation,
+            NavigationUrl = navigationUrl,
+            LoadState = loadState,
+            Timeout = timeout
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element specified by text content.
+    /// </summary>
+    public static Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact = false, string? regex = null, bool waitForNavigation = false, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickTextAsync(session, text, exact, regex, waitForNavigation, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element specified by text content and optionally waits for the requested navigation load state.
+    /// </summary>
+    public static Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, HtmlBrowserLoadState loadState, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickTextAsync(session, text, exact, regex, waitForNavigation, loadState, navigationUrl: null, timeout, cancellationToken);
+
+    /// <summary>
+    /// Clicks an element specified by text content and optionally waits for the requested navigation load state and URL glob.
+    /// </summary>
+    public static Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout = 10000, CancellationToken cancellationToken = default) =>
+        ClickTextAsync(session, text, exact, regex, waitForNavigation, loadState, navigationUrl, timeout, cancellationToken, nth: null);
+
+    /// <summary>
+    /// Clicks an element specified by text content, optionally targeting a zero-based matching element.
+    /// </summary>
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, int timeout, CancellationToken cancellationToken, int? nth) {
+        await ClickTextAsync(session, text, exact, regex, waitForNavigation, HtmlBrowserLoadState.NetworkIdle, timeout, cancellationToken, nth).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element specified by text content, optionally targeting a zero-based matching element and waiting for a navigation load state.
+    /// </summary>
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, HtmlBrowserLoadState loadState, int timeout, CancellationToken cancellationToken, int? nth) {
+        await ClickTextAsync(session, text, exact, regex, waitForNavigation, loadState, navigationUrl: null, timeout, cancellationToken, nth).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clicks an element specified by text content, optionally targeting a zero-based matching element and waiting for a navigation load state and URL glob.
+    /// </summary>
+    public static async Task ClickTextAsync(HtmlBrowserSession session, string text, bool exact, string? regex, bool waitForNavigation, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken, int? nth) {
+        ILocator locator = !string.IsNullOrEmpty(regex)
+            ? session.Page.GetByText(new Regex(regex))
+            : exact
+                ? session.Page.GetByText(text, new PageGetByTextOptions { Exact = true })
+                : session.Page.GetByText(text);
+        if (nth.HasValue) {
+            locator = locator.Nth(nth.Value);
+        }
+
+        if (waitForNavigation) {
+            Task waitTask = WaitForUrlChangeAsync(session, loadState, navigationUrl, timeout);
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            await waitTask.WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        } else {
+            await locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        RecordRecipeStep(session, new HtmlBrowserRecipeStep {
+            Action = HtmlBrowserRecipeAction.ClickText,
+            Text = text,
+            Exact = exact,
+            WaitForNavigation = waitForNavigation,
+            NavigationUrl = navigationUrl,
+            LoadState = loadState,
+            Timeout = timeout
+        });
+    }
+
+    private static Task WaitForUrlChangeAsync(HtmlBrowserSession session, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout) {
+        string startingUrl = session.Page.Url;
+        return session.Page.WaitForURLAsync(
+            url => !string.Equals(url, startingUrl, StringComparison.Ordinal) && MatchesNavigationUrl(url, navigationUrl),
+            new PageWaitForURLOptions {
+                Timeout = timeout,
+                WaitUntil = ToWaitUntilState(loadState)
+            });
+    }
+
+    private static bool MatchesNavigationUrl(string url, string? navigationUrl) {
+        if (string.IsNullOrWhiteSpace(navigationUrl)) {
+            return true;
+        }
+
+        string trimmedNavigationUrl = navigationUrl!.Trim();
+        string pattern = "^" + Regex.Escape(trimmedNavigationUrl)
+            .Replace("\\*\\*", ".*")
+            .Replace("\\*", "[^/]*") + "$";
+        return Regex.IsMatch(url, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 }
