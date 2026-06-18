@@ -129,6 +129,28 @@ Describe 'Browser recipe recording' {
         @($inputStep.SelectorAlternates).Count | Should -Be 0
     }
 
+    It 'redacts tokenized current URLs from recording StartUrl' {
+        $pagePath = Join-Path $TestDrive 'recording-sensitive-start.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>recording ready</main>'
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+        $sensitiveUri = "${uri}#code=recording-code&state=recording-state"
+        $recipePath = Join-Path $TestDrive 'recorded-sensitive-start.browser.recipe.json'
+        $session = Start-HtmlBrowserSession -Url $sensitiveUri -LoadState DomContentLoaded
+
+        try {
+            Start-HtmlBrowserRecipeRecording -Session $session -Name 'SensitiveStartRecording' -IncludeCurrentUrl | Out-Null
+            Stop-HtmlBrowserRecipeRecording -Session $session -Path $recipePath | Out-Null
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+
+        $recipeJson = Get-Content -LiteralPath $recipePath -Raw
+        $recipeJson | Should -Not -Match 'recording-code|recording-state'
+        $recipe = $recipeJson | ConvertFrom-Json
+        $recipe.StartUrl | Should -Match 'code=<redacted>'
+        $recipe.StartUrl | Should -Match 'state=<redacted>'
+    }
+
     It 'records Nth for disambiguated selector clicks and replays the same occurrence' {
         $pagePath = Join-Path $TestDrive 'recording-nth-click.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

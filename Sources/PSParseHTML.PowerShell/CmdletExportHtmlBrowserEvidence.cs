@@ -182,7 +182,6 @@ public sealed class CmdletExportHtmlBrowserEvidence : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
         HtmlBrowserEvidenceOptions options = CreateEvidenceOptions();
@@ -196,6 +195,7 @@ public sealed class CmdletExportHtmlBrowserEvidence : AsyncPSCmdlet {
         }
 
         HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
+        ValidateProxy(launchOptions.Proxy, ProxyCredential);
         if (PreventSsoAutoSubmit.IsPresent || ShouldCaptureSsoHandoffSummary()) {
             launchOptions.PreventSsoAutoSubmit = true;
         }

@@ -89,7 +89,7 @@ public static partial class HtmlBrowser {
         HtmlBrowserRecipeRunResult result = new() {
             Name = recipe.Name,
             StartedAtUtc = DateTimeOffset.UtcNow,
-            StartUrl = recipe.StartUrl ?? session.Page.Url,
+            StartUrl = RedactRecipeTarget(recipe.StartUrl ?? session.Page.Url),
             CreatedSession = createdSession
         };
 
@@ -493,14 +493,18 @@ public static partial class HtmlBrowser {
         || !string.Equals(selector, HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(selector), StringComparison.Ordinal);
 
     private static string GetRecipeStepTarget(HtmlBrowserRecipeStep step)
-        => step.Url
+        => RedactRecipeTarget(step.Url
             ?? step.Selector
             ?? step.SelectorAlternates.FirstOrDefault()
             ?? step.Text
             ?? step.Keys
             ?? step.OutFile
             ?? step.OutFolder
-            ?? step.Action.ToString();
+            ?? step.Action.ToString());
+
+    private static string RedactRecipeTarget(string? value) =>
+        HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(
+            HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value ?? string.Empty));
 
     private static IReadOnlyList<string> GetRecipeSelectors(HtmlBrowserRecipeStep step) {
         List<string> selectors = new();

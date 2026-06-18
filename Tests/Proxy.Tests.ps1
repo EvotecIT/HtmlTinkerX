@@ -14,6 +14,9 @@ Describe 'Proxy parameters' {
         { Get-HtmlBrowserInteractable -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
         { Get-HtmlBrowserLoginForm -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
         { Get-HtmlBrowserSsoHandoff -Url 'http://example.com' -ProxyCredential $cred } | Should -Throw
+        $recipe = [HtmlTinkerX.HtmlBrowserRecipe]::new()
+        $recipe.StartUrl = 'https://example.org/start'
+        { Invoke-HtmlBrowserRecipe -Recipe $recipe -ProxyCredential $cred -SkipPreflight } | Should -Throw
         { Set-HtmlBrowserClientOption -ProxyCredential $cred } | Should -Throw
     }
 }

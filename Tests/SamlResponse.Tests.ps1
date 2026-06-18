@@ -54,6 +54,13 @@ Describe 'SAML response inspection' {
         $summary.Xml | Should -Be ''
     }
 
+    It 'binds a positional raw SAMLResponse string to the SAMLResponse parameter set' {
+        $summary = ConvertFrom-HtmlSamlResponse (New-TestSamlResponse)
+
+        $summary.IsValid | Should -BeTrue
+        $summary.AssertionId | Should -Be '_assertion'
+    }
+
     It 'reveals sensitive subject only when explicitly requested' {
         $summary = ConvertFrom-HtmlSamlResponse -SamlResponse (New-TestSamlResponse) -IncludeSensitiveValues
 

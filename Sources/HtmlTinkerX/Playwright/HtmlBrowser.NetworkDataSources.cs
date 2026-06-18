@@ -400,23 +400,8 @@ public static partial class HtmlBrowser {
         || HtmlSensitiveValueRedactor.IsSensitiveName(name);
 
     private static bool HasSensitiveUrlParameters(Uri uri) =>
-        HasSensitiveParameterText(uri.Query) || HasSensitiveParameterText(uri.Fragment);
-
-    private static bool HasSensitiveParameterText(string value) {
-        if (string.IsNullOrWhiteSpace(value)) {
-            return false;
-        }
-
-        string parameters = value.TrimStart('?', '#');
-        foreach (string pair in parameters.Split('&')) {
-            string name = pair.Split('=')[0];
-            if (HtmlSensitiveValueRedactor.IsSensitiveName(Uri.UnescapeDataString(name))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+        HtmlSensitiveValueRedactor.HasSensitiveQueryText(uri.Query)
+        || HtmlSensitiveValueRedactor.HasSensitiveQueryText(uri.Fragment);
 
     private static string RedactNetworkUrlValues(string value) {
         string redactedValue = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value);

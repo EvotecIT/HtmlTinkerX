@@ -1087,13 +1087,20 @@ Describe 'Browser recipes' {
         $pagePath = Join-Path $TestDrive 'browser-recipe-final-url.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><main>callback ready</main>'
         $recipePath = Join-Path $TestDrive 'browser-final-url.recipe.json'
+        $pageUri = [System.Uri]::new($pagePath).AbsoluteUri
         $recipe = [ordered]@{
             SchemaVersion = 1
             Name          = 'FinalUrlRedaction'
-            StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
+            StartUrl      = "${pageUri}#code=start-secret&state=start-state"
             LoadState     = 'DomContentLoaded'
             Timeout       = 3000
             Steps         = @(
+                [ordered]@{
+                    Name      = 'Move to tokenized target'
+                    Action    = 'Navigate'
+                    Url       = "${pageUri}#access_token=target-secret-token"
+                    LoadState = 'DomContentLoaded'
+                },
                 [ordered]@{
                     Name   = 'Move to callback'
                     Action = 'Script'
@@ -1106,9 +1113,14 @@ Describe 'Browser recipes' {
         $result = Invoke-HtmlBrowserRecipe -Path $recipePath
 
         $result.Succeeded | Should -BeTrue
+        $result.StartUrl | Should -Match 'code=<redacted>'
+        $result.StartUrl | Should -Match 'state=<redacted>'
+        $result.StartUrl | Should -Not -Match 'start-secret|start-state'
+        $result.Steps[0].Target | Should -Match 'access_token=<redacted>'
+        $result.Steps[0].Target | Should -Not -Match 'target-secret-token'
         $result.FinalUrl | Should -Match 'code=<redacted>'
         $result.FinalUrl | Should -Match 'state=<redacted>'
-        $result.FinalUrl | Should -Not -Match 'secret-code|secret-state'
+        $result.FinalUrl | Should -Not -Match 'secret-code|secret-state|target-secret-token'
     }
 
     It 'honors timeouts for script recipe steps' {

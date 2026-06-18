@@ -137,6 +137,29 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         }
     }
 
+    It 'detects nested tokenized callback URLs before suggesting browserless replay' {
+        $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
+        $entry.Url = 'https://example.com/api/items?returnUrl=%2Fcallback%3Fcode%3Dnested-secret-code%26state%3Dnested-secret-state&tenant=contoso'
+        $entry.Method = [HtmlTinkerX.HtmlHttpMethod]::Get
+        $entry.ResourceType = [HtmlTinkerX.HtmlNetworkResourceType]::Fetch
+        $entry.Status = [System.Net.HttpStatusCode]::OK
+
+        $sources = [HtmlTinkerX.HtmlBrowser]::FindNetworkDataSources(
+            [HtmlTinkerX.HtmlNetworkEntry[]] @($entry),
+            $null,
+            'https://example.com/proof')
+
+        $source = $sources | Select-Object -First 1
+
+        $source | Should -Not -BeNullOrEmpty
+        $source.RequiresAuthenticationHint | Should -BeTrue
+        $source.CanExtractDirectly | Should -BeFalse
+        $source.SuggestedCommand | Should -Be '$source | Format-List RedactedUrl,Method,RiskLevel,Warnings'
+        $source.RedactedUrl | Should -Match 'redacted'
+        $source.RedactedUrl | Should -Not -Match 'nested-secret-code|nested-secret-state'
+        $source.Warnings -join "`n" | Should -Match 'sensitive query or fragment parameter names'
+    }
+
     It 'surfaces safe replay headers while redacting sensitive request headers' {
         $entry = [HtmlTinkerX.HtmlNetworkEntry]::new()
         $entry.Url = 'https://example.com/api/audit/mailbox'

@@ -64,7 +64,7 @@ public sealed class CmdletConvertFromHtmlJsonWebToken : PSCmdlet {
         if (formData is IDictionary dictionary) {
             foreach (string name in names) {
                 foreach (DictionaryEntry entry in dictionary) {
-                    if (entry.Key != null && string.Equals(entry.Key.ToString(), name, StringComparison.OrdinalIgnoreCase)) {
+                    if (entry.Key != null && MatchesSsoFieldName(entry.Key.ToString() ?? string.Empty, name)) {
                         return entry.Value?.ToString() ?? string.Empty;
                     }
                 }
@@ -77,7 +77,7 @@ public sealed class CmdletConvertFromHtmlJsonWebToken : PSCmdlet {
                 foreach (object field in enumerable) {
                     PSObject fieldObject = PSObject.AsPSObject(field);
                     string observedName = fieldObject.Properties["Name"]?.Value?.ToString() ?? string.Empty;
-                    if (string.Equals(observedName, name, StringComparison.OrdinalIgnoreCase)) {
+                    if (MatchesSsoFieldName(observedName, name)) {
                         return fieldObject.Properties["Value"]?.Value?.ToString() ?? string.Empty;
                     }
                 }
@@ -93,12 +93,33 @@ public sealed class CmdletConvertFromHtmlJsonWebToken : PSCmdlet {
                 return value;
             }
 
-            HtmlBrowserSsoField? field = handoff.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase));
+            foreach (System.Collections.Generic.KeyValuePair<string, string> item in handoff.FormData) {
+                if (MatchesSsoFieldName(item.Key, name)) {
+                    return item.Value;
+                }
+            }
+
+            HtmlBrowserSsoField? field = handoff.Fields.FirstOrDefault(field => MatchesSsoFieldName(field.Name, name));
             if (field != null) {
                 return field.Value;
             }
         }
 
         return string.Empty;
+    }
+
+    private static bool MatchesSsoFieldName(string observedName, string expectedName) =>
+        string.Equals(observedName, expectedName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(NormalizeSsoFieldName(observedName), NormalizeSsoFieldName(expectedName), StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeSsoFieldName(string name) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            return string.Empty;
+        }
+
+        return new string(name
+            .Where(static character => char.IsLetterOrDigit(character))
+            .Select(static character => char.ToLowerInvariant(character))
+            .ToArray());
     }
 }

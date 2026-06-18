@@ -137,6 +137,17 @@ Describe 'JSON Web Token inspection' {
         $summary.Issuer | Should -Be 'https://login.example/tenant/v2.0'
     }
 
+    It 'accepts camelCase OIDC handoff token field aliases' {
+        $handoff = [HtmlTinkerX.HtmlBrowserSsoHandoff]::new()
+        $handoff.Kind = [HtmlTinkerX.HtmlBrowserSsoHandoffKind]::OpenIdConnect
+        $handoff.FormData['idToken'] = New-TestJwt
+
+        $summary = $handoff | ConvertFrom-HtmlJsonWebToken
+
+        $summary.IsValid | Should -BeTrue
+        $summary.Issuer | Should -Be 'https://login.example/tenant/v2.0'
+    }
+
     It 'reports redacted handoff values with a recovery command' {
         $summary = ConvertFrom-HtmlJsonWebToken -Token '<redacted>'
 

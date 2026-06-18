@@ -13,19 +13,19 @@ namespace PSParseHTML.PowerShell;
 ///   <summary>Inspect a captured SAML handoff without revealing subject or attribute values</summary>
 ///   <code>Get-HtmlBrowserSsoHandoff -Session $session -IncludeSensitiveValues | ConvertFrom-HtmlSamlResponse</code>
 /// </example>
-[Cmdlet(VerbsData.ConvertFrom, "HtmlSamlResponse", DefaultParameterSetName = ParameterSetHandoff)]
+[Cmdlet(VerbsData.ConvertFrom, "HtmlSamlResponse", DefaultParameterSetName = ParameterSetSamlResponse)]
 [OutputType(typeof(HtmlSamlResponseSummary))]
 public sealed class CmdletConvertFromHtmlSamlResponse : PSCmdlet {
     private const string ParameterSetSamlResponse = "SamlResponse";
     private const string ParameterSetHandoff = "Handoff";
 
     /// <summary>Raw, URL-encoded, base64-encoded, or XML SAMLResponse value.</summary>
-    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSamlResponse, ValueFromPipelineByPropertyName = true, Position = 0)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetSamlResponse, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [Alias("Response")]
-    public string? SamlResponse { get; set; }
+    public object? SamlResponse { get; set; }
 
     /// <summary>SSO handoff object returned by Get-HtmlBrowserSsoHandoff.</summary>
-    [Parameter(Mandatory = true, ParameterSetName = ParameterSetHandoff, ValueFromPipeline = true, Position = 0)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetHandoff, Position = 0)]
     public object? Handoff { get; set; }
 
     /// <summary>Include decoded XML in the output. Values remain redacted unless IncludeSensitiveValues is also set.</summary>
@@ -38,9 +38,10 @@ public sealed class CmdletConvertFromHtmlSamlResponse : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        string value = ParameterSetName == ParameterSetHandoff
-            ? GetSamlResponseFromHandoff(Handoff!)
-            : SamlResponse ?? string.Empty;
+        object? input = ParameterSetName == ParameterSetHandoff ? Handoff : SamlResponse;
+        string value = input is string samlResponse
+            ? samlResponse
+            : GetSamlResponseFromHandoff(input!);
 
         WriteObject(HtmlSamlResponseParser.Parse(value, IncludeSensitiveValues.IsPresent, IncludeXml.IsPresent));
     }

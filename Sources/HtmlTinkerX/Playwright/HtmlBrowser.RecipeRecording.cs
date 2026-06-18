@@ -37,7 +37,7 @@ public static partial class HtmlBrowser {
 
         HtmlBrowserRecipe recipe = new() {
             Name = name ?? string.Empty,
-            StartUrl = includeCurrentUrl ? FirstNonEmptyRecording(startUrl, session.Page.Url) : startUrl,
+            StartUrl = RedactRecordingUrl(includeCurrentUrl ? FirstNonEmptyRecording(startUrl, session.Page.Url) : startUrl),
             Timeout = timeout
         };
         session.RecipeRecorder = new HtmlBrowserRecipeRecorder(recipe, captureSelectorAlternates, selectorAlternateLimit);
@@ -143,4 +143,7 @@ public static partial class HtmlBrowser {
 
         return string.Empty;
     }
+
+    private static string? RedactRecordingUrl(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? value : HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(value!);
 }

@@ -414,7 +414,29 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrWhiteSpace(options.BrowserChannel) || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath) || options.Clean) {
             throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used.");
         }
+
+        if (HasCdpContextOnlyOptions(options)) {
+            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. Launch Chrome with those settings before attaching.");
+        }
     }
+
+    private static bool HasCdpContextOnlyOptions(HtmlBrowserLaunchOptions options) =>
+        !string.IsNullOrWhiteSpace(options.Proxy)
+        || !string.IsNullOrWhiteSpace(options.ProxyUsername)
+        || !string.IsNullOrWhiteSpace(options.ProxyPassword)
+        || !string.IsNullOrWhiteSpace(options.UserAgent)
+        || !string.IsNullOrWhiteSpace(options.Locale)
+        || options.ViewportWidth.HasValue
+        || options.ViewportHeight.HasValue
+        || options.ScreenWidth.HasValue
+        || options.ScreenHeight.HasValue
+        || options.DeviceScaleFactor.HasValue
+        || options.IsMobile.HasValue
+        || options.HasTouch.HasValue
+        || options.GeoLatitude.HasValue
+        || options.GeoLongitude.HasValue
+        || !string.IsNullOrWhiteSpace(options.Timezone)
+        || options.Permissions.Count > 0;
 
     private static async Task ApplyInitScriptsAsync(IBrowserContext context, HtmlBrowserLaunchOptions options, CancellationToken cancellationToken) {
         if (options.PreventSsoAutoSubmit) {

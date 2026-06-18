@@ -91,6 +91,9 @@ Describe 'Browser profiles' {
 
         { Start-HtmlBrowserSession -Url 'about:blank' -CdpEndpointUrl 'http://127.0.0.1:9222' -BrowserChannel chrome -NoDefault } |
             Should -Throw -ExpectedMessage '*BrowserChannel, BrowserExecutablePath, and Clean are not used*'
+
+        { Start-HtmlBrowserSession -Url 'about:blank' -CdpEndpointUrl 'http://127.0.0.1:9222' -UserAgent 'IgnoredUserAgent' -NoDefault } |
+            Should -Throw -ExpectedMessage '*context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied*'
     }
 
     It 'rejects document resource blocking in reusable browser profiles' {

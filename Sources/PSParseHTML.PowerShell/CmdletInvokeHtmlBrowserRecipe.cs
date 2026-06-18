@@ -362,6 +362,7 @@ public sealed class CmdletInvokeHtmlBrowserRecipe : AsyncPSCmdlet {
         }, cancellationToken).ConfigureAwait(false);
 
         ApplyRecipeSessionParameters(launchOptions);
+        ValidateProxy(launchOptions.Proxy, ProxyCredential);
         return launchOptions;
     }
 
