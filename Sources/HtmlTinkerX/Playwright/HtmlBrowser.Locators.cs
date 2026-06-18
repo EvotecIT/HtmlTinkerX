@@ -176,7 +176,11 @@ public static partial class HtmlBrowser {
                 element.getAttribute('data-test')
             ].map(normalize).join(' ').toLowerCase();
             if (query && !haystack.includes(query)) return;
-            if (!selector.startsWith('text=')) {
+            if (selector.startsWith('text=')) {
+                const textMatches = elements.filter(candidate =>
+                    normalize(candidate.innerText || candidate.textContent || candidate.value || '') === text);
+                if (textMatches.length !== 1 || textMatches[0] !== element) return;
+            } else {
                 try {
                     const matches = Array.from(document.querySelectorAll(selector));
                     if (matches.length !== 1 || matches[0] !== element) return;

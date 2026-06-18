@@ -227,12 +227,12 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         CancellationToken token = linkedCts.Token;
 
         HtmlBrowserLaunchOptions options = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
         ApplySessionParameters(options);
+        ValidateProxy(options.Proxy, ProxyCredential);
 
         string target = ParameterSetName == ParameterSetFile
             ? new System.Uri(Path!.ToFullPath()).AbsoluteUri

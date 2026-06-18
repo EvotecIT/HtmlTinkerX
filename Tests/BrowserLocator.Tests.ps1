@@ -100,6 +100,32 @@ Describe 'Browser locator candidates' {
         }
     }
 
+    It 'does not suggest ambiguous visible text locator candidates' {
+        $pagePath = Join-Path $TestDrive 'locator-ambiguous-text-page.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
+<!doctype html>
+<html>
+<body>
+  <main>
+    <button>Save</button>
+    <button>Save</button>
+  </main>
+</body>
+</html>
+'@
+        $uri = [System.Uri]::new($pagePath).AbsoluteUri
+
+        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+        try {
+            $candidates = @(Find-HtmlBrowserLocator -Session $session -Query 'Save' -Limit 10)
+
+            $candidates.Selector | Should -Not -Contain 'text=Save'
+            ($candidates | Where-Object Strategy -eq 'Text').Count | Should -Be 0
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'escapes selector quotes and warns before suggesting sensitive selectors' {
         $pagePath = Join-Path $TestDrive 'locator-escaping-page.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'

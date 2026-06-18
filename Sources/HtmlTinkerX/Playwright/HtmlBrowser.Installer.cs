@@ -461,9 +461,11 @@ public static partial class HtmlBrowser {
 
             string packageSrc = Path.Combine(tempDir, "package");
             string packageDest = Path.Combine(baseDir, "package");
+            string packageStage = Path.Combine(baseDir, "package.staging-" + Guid.NewGuid().ToString("N"));
             if (Directory.Exists(packageDest))
                 Directory.Delete(packageDest, true);
-            Directory.Move(packageSrc, packageDest);
+            CopyDirectory(packageSrc, packageStage);
+            Directory.Move(packageStage, packageDest);
 
 #if NETSTANDARD2_0 || NETFRAMEWORK
             File.WriteAllText(VersionFile, DriverVersion);
@@ -492,6 +494,20 @@ public static partial class HtmlBrowser {
         }
 
         EnsureDriverSearchPath();
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string destinationDirectory) {
+        Directory.CreateDirectory(destinationDirectory);
+
+        foreach (string file in Directory.GetFiles(sourceDirectory)) {
+            string destinationFile = Path.Combine(destinationDirectory, Path.GetFileName(file));
+            File.Copy(file, destinationFile, overwrite: true);
+        }
+
+        foreach (string directory in Directory.GetDirectories(sourceDirectory)) {
+            string destinationSubdirectory = Path.Combine(destinationDirectory, Path.GetFileName(directory));
+            CopyDirectory(directory, destinationSubdirectory);
+        }
     }
 
     private static void InstallRuntime(HtmlBrowserEngine engine) {

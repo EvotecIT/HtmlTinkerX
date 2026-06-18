@@ -21,20 +21,26 @@ public static partial class HtmlBrowser {
         "wctx",
         "code",
         "id_token",
+        "idtoken",
         "access_token",
+        "accesstoken",
         "refresh_token",
+        "refreshtoken",
         "state",
         "error",
         "error_description",
         "error_uri",
-        "session_state"
+        "errordescription",
+        "erroruri",
+        "session_state",
+        "sessionstate"
     };
 
     /// <summary>
     /// JavaScript installed before page scripts when SSO handoff forms should be held for inspection.
     /// </summary>
     public const string PreventSsoAutoSubmitInitScript = @"(() => {
-        const names = new Set(['samlresponse', 'samlrequest', 'relaystate', 'wa', 'wresult', 'wctx', 'code', 'id_token', 'access_token', 'refresh_token', 'state']);
+        const names = new Set(['samlresponse', 'samlrequest', 'relaystate', 'wa', 'wresult', 'wctx', 'code', 'id_token', 'idtoken', 'access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'state', 'error', 'error_description', 'errordescription', 'error_uri', 'erroruri', 'session_state', 'sessionstate']);
         const hasSsoField = form => {
             if (!form || !form.elements) return false;
             return Array.from(form.elements).some(element => element && element.name && names.has(String(element.name).toLowerCase()));
@@ -230,7 +236,7 @@ public static partial class HtmlBrowser {
         AddUrlFields(fields, uri.Query, "url-query", options);
         AddFragmentUrlFields(fields, uri.Fragment, options);
         return fields
-            .Where(static field => SsoHandoffFieldNames.Contains(field.Name.ToLowerInvariant()))
+            .Where(static field => IsKnownSsoHandoffField(field.Name))
             .ToList();
     }
 
@@ -316,7 +322,7 @@ public static partial class HtmlBrowser {
         return string.Join("&", pairs.Select(static pair => {
             string[] keyValue = pair.Split(new[] { '=' }, 2);
             string name = WebUtility.UrlDecode(keyValue[0]) ?? string.Empty;
-            return SsoHandoffFieldNames.Contains(name.ToLowerInvariant())
+            return IsKnownSsoHandoffField(name)
                 ? keyValue[0] + "=<redacted>"
                 : pair;
         }));
@@ -396,7 +402,7 @@ public static partial class HtmlBrowser {
     }
 
     private static HtmlBrowserSsoHandoffKind ClassifySsoHandoff(IReadOnlyCollection<HtmlBrowserSsoField> fields) {
-        HashSet<string> names = new(fields.Select(static field => field.Name), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> names = new(fields.Select(static field => NormalizeSsoFieldName(field.Name)), StringComparer.OrdinalIgnoreCase);
         if (names.Contains("samlresponse") || names.Contains("samlrequest") || names.Contains("relaystate")) {
             return HtmlBrowserSsoHandoffKind.Saml;
         }
@@ -405,11 +411,11 @@ public static partial class HtmlBrowser {
             return HtmlBrowserSsoHandoffKind.WsFederation;
         }
 
-        if (names.Contains("id_token")) {
+        if (names.Contains("idtoken")) {
             return HtmlBrowserSsoHandoffKind.OpenIdConnect;
         }
 
-        if (names.Contains("code") || names.Contains("access_token") || names.Contains("refresh_token") || names.Contains("error")) {
+        if (names.Contains("code") || names.Contains("accesstoken") || names.Contains("refreshtoken") || names.Contains("error")) {
             return HtmlBrowserSsoHandoffKind.OAuth2;
         }
 
@@ -421,9 +427,29 @@ public static partial class HtmlBrowser {
             return false;
         }
 
-        string normalized = name.ToLowerInvariant();
-        return SsoHandoffFieldNames.Contains(normalized)
+        return IsKnownSsoHandoffField(name)
             || HtmlSensitiveValueRedactor.IsSensitiveName(name);
+    }
+
+    private static bool IsKnownSsoHandoffField(string name) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            return false;
+        }
+
+        string lowered = name.ToLowerInvariant();
+        return SsoHandoffFieldNames.Contains(lowered)
+            || SsoHandoffFieldNames.Contains(NormalizeSsoFieldName(name));
+    }
+
+    private static string NormalizeSsoFieldName(string name) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            return string.Empty;
+        }
+
+        return new string(name
+            .Where(static c => char.IsLetterOrDigit(c))
+            .Select(static c => char.ToLowerInvariant(c))
+            .ToArray());
     }
 
     private const string SsoHandoffScript = @"() => {

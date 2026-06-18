@@ -161,6 +161,31 @@ Describe 'Browser SSO handoff inspection' {
         ($analysis[0] | ConvertTo-Json -Depth 10) | Should -Not -Match 'secret-state'
     }
 
+    It 'detects camelCase OpenID Connect callback fields without leaking values' {
+        $pagePath = Join-Path $TestDrive 'oidc-camel-callback.html'
+        Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><html><head><title>OIDC Callback</title></head><body><main>Signed in</main></body></html>'
+        $callbackUrl = ([System.Uri]::new($pagePath).AbsoluteUri) + '?accessToken=access-secret&sessionState=session-secret#idToken=id-secret'
+
+        $handoff = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -LoadState DomContentLoaded)
+
+        $handoff.Count | Should -Be 1
+        $handoff[0].Kind | Should -Be 'OpenIdConnect'
+        $handoff[0].FormSelector | Should -Be 'location'
+        $handoff[0].PageUrl | Should -Not -Match 'access-secret|session-secret|id-secret'
+        $handoff[0].PageUrl | Should -Match 'accessToken=<redacted>'
+        $handoff[0].PageUrl | Should -Match 'sessionState=<redacted>'
+        $handoff[0].PageUrl | Should -Match 'idToken=<redacted>'
+        $handoff[0].FormData['accessToken'] | Should -Be '<redacted>'
+        $handoff[0].FormData['sessionState'] | Should -Be '<redacted>'
+        $handoff[0].FormData['idToken'] | Should -Be '<redacted>'
+
+        $analysis = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -Analyze -LoadState DomContentLoaded)
+        $analysis.Count | Should -Be 1
+        $analysis[0].ContainsRedactedValues | Should -BeTrue
+        $analysis[0].HasProtocolArtifact | Should -BeTrue
+        ($analysis[0] | ConvertTo-Json -Depth 10) | Should -Not -Match 'access-secret|session-secret|id-secret'
+    }
+
     It 'detects OAuth handoffs from SPA hash-route query fragments' {
         $pagePath = Join-Path $TestDrive 'oauth-hash-callback.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><html><head><title>OAuth Hash Callback</title></head><body><main>Signed in</main></body></html>'
@@ -266,6 +291,36 @@ Describe 'Browser SSO handoff inspection' {
         ($handoff[0].Fields | Where-Object Name -eq 'SAMLResponse').Value | Should -Be '<redacted>'
         ($handoff[0].Fields | Where-Object Name -eq 'RelayState').Value | Should -Be '<redacted>'
         ($handoff[0].Fields | Where-Object Name -eq 'display').Value | Should -Be 'proof'
+    }
+
+    It 'captures auto-submitted OpenID Connect error handoffs directly from a file' {
+        $submitPath = Join-Path $TestDrive 'direct-auto-submit-oidc-error.html'
+        $targetPath = Join-Path $TestDrive 'direct-oidc-error-after-submit.html'
+        Set-Content -LiteralPath $targetPath -Encoding UTF8 -Value '<!doctype html><title>After Error Submit</title><main>Submitted</main>'
+        Set-Content -LiteralPath $submitPath -Encoding UTF8 -Value @"
+<!doctype html>
+<html>
+<head><title>Direct Auto Submit OIDC Error</title></head>
+<body>
+  <form id="auto" method="get" action="$([System.Uri]::new($targetPath).AbsoluteUri)">
+    <input type="hidden" name="error" value="interaction_required" />
+    <input type="hidden" name="errorDescription" value="mfa-required-secret" />
+    <input type="hidden" name="sessionState" value="session-state-secret" />
+  </form>
+  <script>document.getElementById('auto').submit();</script>
+</body>
+</html>
+"@
+
+        $handoff = @(Get-HtmlBrowserSsoHandoff -Path $submitPath -Wait -Timeout 2000 -PollMilliseconds 50 -LoadState DomContentLoaded)
+
+        $handoff.Count | Should -Be 1
+        $handoff[0].Kind | Should -Be 'OAuth2'
+        $handoff[0].PageUrl | Should -Match 'direct-auto-submit-oidc-error\.html'
+        $handoff[0].AutoSubmitPrevented | Should -BeTrue
+        $handoff[0].FormData['error'] | Should -Be '<redacted>'
+        $handoff[0].FormData['errorDescription'] | Should -Be '<redacted>'
+        $handoff[0].FormData['sessionState'] | Should -Be '<redacted>'
     }
 
     It 'reveals one-shot SAML field values only when explicitly requested' {

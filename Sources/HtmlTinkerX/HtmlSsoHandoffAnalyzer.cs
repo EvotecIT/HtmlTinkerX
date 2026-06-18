@@ -137,7 +137,19 @@ public static class HtmlSsoHandoffAnalyzer {
             return value ?? string.Empty;
         }
 
+        string canonicalFieldName = NormalizeSsoFieldName(fieldName);
+        foreach (KeyValuePair<string, string> item in handoff.FormData) {
+            if (string.Equals(NormalizeSsoFieldName(item.Key), canonicalFieldName, StringComparison.OrdinalIgnoreCase)) {
+                return item.Value ?? string.Empty;
+            }
+        }
+
         HtmlBrowserSsoField? field = handoff.Fields.FirstOrDefault(field => string.Equals(field.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+        if (field != null) {
+            return field.Value ?? string.Empty;
+        }
+
+        field = handoff.Fields.FirstOrDefault(field => string.Equals(NormalizeSsoFieldName(field.Name), canonicalFieldName, StringComparison.OrdinalIgnoreCase));
         return field?.Value ?? string.Empty;
     }
 
@@ -148,5 +160,16 @@ public static class HtmlSsoHandoffAnalyzer {
         }
 
         return HtmlSensitiveValueRedactor.IsSensitiveName(fieldName) ? "<redacted>" : HtmlSensitiveValueRedactor.RedactSensitiveEvidenceText(value);
+    }
+
+    private static string NormalizeSsoFieldName(string name) {
+        if (string.IsNullOrWhiteSpace(name)) {
+            return string.Empty;
+        }
+
+        return new string(name
+            .Where(static c => char.IsLetterOrDigit(c))
+            .Select(static c => char.ToLowerInvariant(c))
+            .ToArray());
     }
 }

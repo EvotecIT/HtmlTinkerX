@@ -120,12 +120,17 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
                 Select-Object -First 1
 
             $source | Should -Not -BeNullOrEmpty
-            $source.Url | Should -Match 'super-secret-token'
+            $source.Url | Should -Match 'access_token=<redacted>'
+            $source.Url | Should -Not -Match 'super-secret-token'
+            $source.ResolvedUrl | Should -Match 'access_token=<redacted>'
+            $source.ResolvedUrl | Should -Not -Match 'super-secret-token'
             $source.RedactedUrl | Should -Match 'access_token=<redacted>'
             $source.RedactedUrl | Should -Match 'tenant=contoso'
             $source.RedactedUrl | Should -Not -Match 'super-secret-token'
             $source.SuggestedCommand | Should -Not -Match 'super-secret-token'
             $source.SuggestedRecipeCommand | Should -Not -Match 'super-secret-token'
+            $recipe = [HtmlTinkerX.HtmlBrowserlessExtraction]::CreateRecipe($source)
+            ($recipe | ConvertTo-Json -Depth 8) | Should -Not -Match 'super-secret-token'
             $source.RawContent | Should -Match 'Secure Alpha'
         } finally {
             Close-HtmlBrowserSession -Session $session
@@ -195,9 +200,13 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source = $sources | Select-Object -First 1
 
         $source | Should -Not -BeNullOrEmpty
-        $source.Url | Should -Match 'api-state-secret'
-        $source.Url | Should -Match 'fragment-secret'
-        $source.Url | Should -Match 'camel-secret'
+        $source.Url | Should -Match 'state=<redacted>'
+        $source.Url | Should -Match 'accessToken=<redacted>'
+        $source.Url | Should -Match 'idToken=<redacted>'
+        $source.Url | Should -Not -Match 'api-state-secret'
+        $source.Url | Should -Not -Match 'fragment-secret'
+        $source.Url | Should -Not -Match 'camel-secret'
+        $source.ResolvedUrl | Should -Be $source.Url
         $source.PageUrl | Should -Not -Match 'page-code-secret'
         $source.PageUrl | Should -Not -Match 'page-state-secret'
         $source.RedactedUrl | Should -Match 'state=<redacted>'
@@ -210,6 +219,8 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
         $source.CanExtractDirectly | Should -BeFalse
         $source.RiskLevel | Should -Be ([HtmlTinkerX.HtmlApiEndpointRiskLevel]::Medium)
         $source.Warnings | Should -Contain 'Observed endpoint contains sensitive query or fragment parameter names.'
+        $recipe = [HtmlTinkerX.HtmlBrowserlessExtraction]::CreateRecipe($source)
+        ($recipe | ConvertTo-Json -Depth 8) | Should -Not -Match 'api-state-secret|camel-secret|fragment-secret'
     }
 
     It 'requires IncludeResponseBody before response-body redaction is enabled' {

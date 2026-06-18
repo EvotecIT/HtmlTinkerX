@@ -207,6 +207,16 @@ public static partial class HtmlBrowser {
     }
 
     private static void ValidateSelectValues(HtmlBrowserRecipeValidationResult result, HtmlBrowserRecipeStep step, int index, ISet<string> runtimeVariables) {
+        if (step.ValueRedacted == true) {
+            if (string.IsNullOrWhiteSpace(step.ValueVariable)) {
+                AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Error, step, index, nameof(step.ValueVariable), "Redacted select step is missing ValueVariable.", "Set ValueVariable so replay can supply the selected secret at runtime.");
+            } else if (!runtimeVariables.Contains(step.ValueVariable!)) {
+                AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Error, step, index, nameof(step.ValueVariable), $"Runtime variable '{step.ValueVariable}' was not supplied.", $"Run Invoke-HtmlBrowserRecipe with -Variable @{{ {step.ValueVariable} = '<value>' }}.");
+            }
+
+            return;
+        }
+
         if (!string.IsNullOrWhiteSpace(step.ValueVariable)) {
             if (!runtimeVariables.Contains(step.ValueVariable!) && step.Values.Count == 0) {
                 AddStepIssue(result, HtmlBrowserRecipeValidationSeverity.Error, step, index, nameof(step.ValueVariable), $"Runtime variable '{step.ValueVariable}' was not supplied.", $"Run Invoke-HtmlBrowserRecipe with -Variable @{{ {step.ValueVariable} = '<value>' }}.");

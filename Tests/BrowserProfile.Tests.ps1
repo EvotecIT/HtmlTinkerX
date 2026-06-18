@@ -204,6 +204,23 @@ Describe 'Browser profiles' {
         $options.ProxyUsername | Should -BeNullOrEmpty
         $options.ProxyPassword | Should -BeNullOrEmpty
 
+        $profileProxyOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
+        $profileProxyOptions.Proxy = 'http://profile-proxy:8080'
+        $profileProxyRequest = [System.Activator]::CreateInstance($requestType, $true)
+        $requestType.GetProperty('BaseOptions').SetValue($profileProxyRequest, $profileProxyOptions)
+        $requestType.GetProperty('BoundParameters').SetValue($profileProxyRequest, [hashtable] @{
+            ProxyCredential = $true
+        })
+        $proxyCredential = [pscredential]::new('profile-user', (ConvertTo-SecureString 'profile-password' -AsPlainText -Force))
+        $requestType.GetProperty('ProxyCredential').SetValue($profileProxyRequest, $proxyCredential)
+
+        $profileProxyTask = $method.Invoke($null, @($profileProxyRequest, [System.Threading.CancellationToken]::None))
+        $profileProxyLaunch = $profileProxyTask.GetAwaiter().GetResult()
+
+        $profileProxyLaunch.Proxy | Should -Be 'http://profile-proxy:8080'
+        $profileProxyLaunch.ProxyUsername | Should -Be 'profile-user'
+        $profileProxyLaunch.ProxyPassword | Should -Be 'profile-password'
+
         $cdpOptions = [HtmlTinkerX.HtmlBrowserLaunchOptions]::new()
         $cdpOptions.CdpEndpointUrl = 'http://127.0.0.1:9222'
 

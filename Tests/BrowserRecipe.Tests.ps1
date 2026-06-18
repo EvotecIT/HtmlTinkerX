@@ -191,6 +191,39 @@ Describe 'Browser recipes' {
         ($validation.Issues | Where-Object Message -eq "Runtime variable 'storedScope' was not supplied.").Count | Should -Be 0
     }
 
+    It 'requires runtime variables for redacted select option steps even when redacted placeholders are stored' {
+        $recipePath = Join-Path $TestDrive 'redacted-select-preflight.recipe.json'
+        $recipe = [ordered]@{
+            SchemaVersion = 1
+            Name          = 'RedactedSelectPreflight'
+            StartUrl      = 'https://example.org/app'
+            LoadState     = 'DomContentLoaded'
+            Timeout       = 3000
+            Steps         = @(
+                [ordered]@{
+                    Name          = 'Choose confidential scope'
+                    Action        = 'SelectOption'
+                    Selector      = '#scope'
+                    Values        = @('<redacted>')
+                    ValueRedacted = $true
+                    ValueVariable = 'scope'
+                }
+            )
+        }
+        $recipe | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recipePath -Encoding UTF8
+
+        $validation = Test-HtmlBrowserRecipe -Path $recipePath
+
+        $validation.IsValid | Should -BeFalse
+        $validation.RequiredVariables | Should -Be @('scope')
+        $validation.MissingVariables | Should -Be @('scope')
+        ($validation.Issues | Where-Object Property -eq 'ValueVariable').Message | Should -Contain "Runtime variable 'scope' was not supplied."
+
+        $supplied = Test-HtmlBrowserRecipe -Path $recipePath -Variable @{ scope = 'openid' }
+        $supplied.IsValid | Should -BeTrue
+        $supplied.MissingVariables.Count | Should -Be 0
+    }
+
     It 'requires input runtime variables when no fallback value is stored' {
         $pagePath = Join-Path $TestDrive 'missing-input-variable.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value @'
