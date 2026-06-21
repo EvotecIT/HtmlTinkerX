@@ -131,6 +131,9 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath (Join-Path $PSScriptRoot 'project.build.json') -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed
+    New-ConfigurationRelease -StageRoot (Join-Path $PSScriptRoot '..\Artefacts\UploadReady') -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
+
     $newConfigurationArtefactSplat = @{
         Type                = 'Unpacked'
         Enable              = $true
