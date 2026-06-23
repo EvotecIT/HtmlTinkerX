@@ -139,7 +139,13 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
-    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath "$PSScriptRoot\project.build.json" -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
+    $projectBuildOptions = @{
+        Manifest = $null
+        Build    = @{ CertificateThumbprint = $null }
+        Publish  = $null
+    }[$ConfigurationGateMode]
+
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath "$PSScriptRoot\project.build.json" -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub -Options $projectBuildOptions
     New-ConfigurationRelease -StageRoot "$PSScriptRoot\..\Artefacts\UploadReady" -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
     $newConfigurationArtefactSplat = @{
