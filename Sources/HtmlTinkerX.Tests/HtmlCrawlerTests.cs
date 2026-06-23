@@ -10,6 +10,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Playwright collection")]
 public class HtmlCrawlerTests {
     [Fact]
     public void HtmlCrawlOptions_CloneAndClearSensitiveData_WorkIndependently() {

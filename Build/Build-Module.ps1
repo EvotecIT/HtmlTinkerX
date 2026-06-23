@@ -1,3 +1,12 @@
+param(
+    [ValidateSet('Manifest', 'Build', 'Publish')]
+    [string] $ConfigurationGateMode = 'Build',
+
+    [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
+
+    [string] $GitHubApiKeyPath = 'C:\Support\Important\GitHubAPI.txt'
+)
+
 Import-Module PSPublishModule -Force -ErrorAction Stop
 
 Build-Module -ModuleName 'PSParseHTML' {
@@ -92,7 +101,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
-        NETProjectPath                    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj')).Path
+        NETProjectPath                    = 'Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
@@ -125,27 +134,29 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-        RefreshPSD1Only                   = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
         NETBinaryModuleDocumentation      = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
+    New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
+
     $newConfigurationArtefactSplat = @{
         Type                = 'Unpacked'
         Enable              = $true
-        Path                = "$PSScriptRoot\..\Artefacts\Unpacked"
-        ModulesPath         = "$PSScriptRoot\..\Artefacts\Unpacked\Modules"
-        RequiredModulesPath = "$PSScriptRoot\..\Artefacts\Unpacked\Modules"
+        Path                = 'Artefacts\Unpacked'
+        ModulesPath         = 'Artefacts\Unpacked\Modules'
+        RequiredModulesPath = 'Artefacts\Unpacked\Modules'
         AddRequiredModules  = $true
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat -CopyFilesRelative
     $newConfigurationArtefactSplat = @{
         Type                = 'Packed'
         Enable              = $true
-        Path                = "$PSScriptRoot\..\Artefacts\Packed"
-        ModulesPath         = "$PSScriptRoot\..\Artefacts\Packed\Modules"
-        RequiredModulesPath = "$PSScriptRoot\..\Artefacts\Packed\Modules"
+        Path                = 'Artefacts\Packed'
+        ModulesPath         = 'Artefacts\Packed\Modules'
+        RequiredModulesPath = 'Artefacts\Packed\Modules'
         AddRequiredModules  = $true
         ArtefactName        = 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>.zip'
         IncludeTagName      = $true
@@ -154,7 +165,8 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
-    # global options for publishing to github/psgallery
-    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -RepositoryName "HtmlTinkerX" -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
+    New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
+
+    New-ConfigurationGate -Mode $ConfigurationGateMode
 } -ExitCode
