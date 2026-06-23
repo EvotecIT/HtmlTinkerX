@@ -1,6 +1,10 @@
 param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
-    [string] $ConfigurationGateMode = 'Build'
+    [string] $ConfigurationGateMode = 'Build',
+
+    [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
+
+    [string] $GitHubApiKeyPath = 'C:\Support\Important\GitHubAPI.txt'
 )
 
 Import-Module PSPublishModule -Force -ErrorAction Stop
@@ -161,9 +165,19 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
-    # global options for publishing to github/psgallery
-    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$false -UseAsDependencyVersionSource
-    New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
+    $publishCredential = @{
+        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
+        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
+        Publish  = @{ FilePath = $PowerShellGalleryApiKeyPath }
+    }[$ConfigurationGateMode]
+    $githubCredential = @{
+        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
+        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
+        Publish  = @{ FilePath = $GitHubApiKeyPath }
+    }[$ConfigurationGateMode]
+
+    New-ConfigurationPublish -Type PowerShellGallery @publishCredential -Enabled:$false -UseAsDependencyVersionSource
+    New-ConfigurationPublish -Type GitHub @githubCredential -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
 
     New-ConfigurationGate -Mode $ConfigurationGateMode
 } -ExitCode
