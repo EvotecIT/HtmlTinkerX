@@ -91,14 +91,6 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
-    $repositoryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, '..'))
-    $binaryProjectPath = [System.IO.Path]::Combine($repositoryRoot, 'Sources', 'PSParseHTML.PowerShell', 'PSParseHTML.PowerShell.csproj')
-    $projectBuildConfigPath = [System.IO.Path]::Combine($PSScriptRoot, 'project.build.json')
-    $artefactsRoot = [System.IO.Path]::Combine($repositoryRoot, 'Artefacts')
-    $uploadReadyPath = [System.IO.Path]::Combine($artefactsRoot, 'UploadReady')
-    $unpackedArtefactsPath = [System.IO.Path]::Combine($artefactsRoot, 'Unpacked')
-    $packedArtefactsPath = [System.IO.Path]::Combine($artefactsRoot, 'Packed')
-
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
@@ -109,7 +101,7 @@ Build-Module -ModuleName 'PSParseHTML' {
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'PSParseHTML.PowerShell'
         NETProjectName                    = 'PSParseHTML.PowerShell'
-        NETProjectPath                    = $binaryProjectPath
+        NETProjectPath                    = 'Sources\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
@@ -153,24 +145,24 @@ Build-Module -ModuleName 'PSParseHTML' {
         Publish  = $null
     }[$ConfigurationGateMode]
 
-    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath $projectBuildConfigPath -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub -Options $projectBuildOptions
-    New-ConfigurationRelease -StageRoot $uploadReadyPath -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub -Options $projectBuildOptions
+    New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
     $newConfigurationArtefactSplat = @{
         Type                = 'Unpacked'
         Enable              = $true
-        Path                = $unpackedArtefactsPath
-        ModulesPath         = [System.IO.Path]::Combine($unpackedArtefactsPath, 'Modules')
-        RequiredModulesPath = [System.IO.Path]::Combine($unpackedArtefactsPath, 'Modules')
+        Path                = 'Artefacts\Unpacked'
+        ModulesPath         = 'Artefacts\Unpacked\Modules'
+        RequiredModulesPath = 'Artefacts\Unpacked\Modules'
         AddRequiredModules  = $true
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat -CopyFilesRelative
     $newConfigurationArtefactSplat = @{
         Type                = 'Packed'
         Enable              = $true
-        Path                = $packedArtefactsPath
-        ModulesPath         = [System.IO.Path]::Combine($packedArtefactsPath, 'Modules')
-        RequiredModulesPath = [System.IO.Path]::Combine($packedArtefactsPath, 'Modules')
+        Path                = 'Artefacts\Packed'
+        ModulesPath         = 'Artefacts\Packed\Modules'
+        RequiredModulesPath = 'Artefacts\Packed\Modules'
         AddRequiredModules  = $true
         ArtefactName        = 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>.zip'
         IncludeTagName      = $true
