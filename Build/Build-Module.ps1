@@ -139,13 +139,7 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
-    $projectBuildOptions = @{
-        Manifest = $null
-        Build    = @{ CertificateThumbprint = $null }
-        Publish  = $null
-    }[$ConfigurationGateMode]
-
-    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub -Options $projectBuildOptions
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
     $newConfigurationArtefactSplat = @{
@@ -171,19 +165,8 @@ Build-Module -ModuleName 'PSParseHTML' {
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
-    $publishCredential = @{
-        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Publish  = @{ FilePath = $PowerShellGalleryApiKeyPath }
-    }[$ConfigurationGateMode]
-    $githubCredential = @{
-        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Publish  = @{ FilePath = $GitHubApiKeyPath }
-    }[$ConfigurationGateMode]
-
-    New-ConfigurationPublish -Type PowerShellGallery @publishCredential -Enabled:$false -UseAsDependencyVersionSource
-    New-ConfigurationPublish -Type GitHub @githubCredential -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
+    New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
 
     New-ConfigurationGate -Mode $ConfigurationGateMode
 } -ExitCode
