@@ -9,14 +9,14 @@ schema: 2.0.0
 Decodes an OAuth or OpenID Connect JSON Web Token into a safe metadata summary.
 
 ## SYNTAX
-### Handoff (Default)
+### Token (Default)
 ```powershell
-ConvertFrom-HtmlJsonWebToken [-Handoff] <Object> [-FieldName <string>] [-IncludeJson] [-IncludeSensitiveValues] [<CommonParameters>]
+ConvertFrom-HtmlJsonWebToken [-Token] <Object> [-FieldName <string>] [-IncludeJson] [-IncludeSensitiveValues] [<CommonParameters>]
 ```
 
-### Token
+### Handoff
 ```powershell
-ConvertFrom-HtmlJsonWebToken [-Token] <string> [-IncludeJson] [-IncludeSensitiveValues] [<CommonParameters>]
+ConvertFrom-HtmlJsonWebToken [-Handoff] <Object> [-FieldName <string>] [-IncludeJson] [-IncludeSensitiveValues] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -37,7 +37,7 @@ Specific handoff field name to inspect. Defaults to id_token and then access_tok
 
 ```yaml
 Type: String
-Parameter Sets: Handoff
+Parameter Sets: Token, Handoff
 Aliases: None
 Possible values:
 
@@ -69,7 +69,7 @@ Include decoded header and payload JSON. Payload values remain redacted unless I
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Handoff, Token
+Parameter Sets: Token, Handoff
 Aliases: None
 Possible values:
 
@@ -85,7 +85,7 @@ Reveal subject and user-identifying claim values. Use only for authorized troubl
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Handoff, Token
+Parameter Sets: Token, Handoff
 Aliases: None
 Possible values:
 
@@ -100,7 +100,7 @@ Accept wildcard characters: True
 Raw compact JSON Web Token value.
 
 ```yaml
-Type: String
+Type: Object
 Parameter Sets: Token
 Aliases: Jwt, JsonWebToken
 Possible values:
@@ -108,7 +108,7 @@ Possible values:
 Required: True
 Position: 0
 Default value: None
-Accept pipeline input: True (ByPropertyName)
+Accept pipeline input: True (ByValue, ByPropertyName)
 Accept wildcard characters: True
 ```
 
@@ -117,8 +117,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `System.String
-System.Object`
+- `System.Object`
 
 ## OUTPUTS
 

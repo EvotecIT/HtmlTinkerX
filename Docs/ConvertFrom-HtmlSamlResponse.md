@@ -9,14 +9,14 @@ schema: 2.0.0
 Decodes a SAMLResponse value into a safe metadata summary.
 
 ## SYNTAX
-### Handoff (Default)
+### SamlResponse (Default)
 ```powershell
-ConvertFrom-HtmlSamlResponse [-Handoff] <Object> [-IncludeXml] [-IncludeSensitiveValues] [<CommonParameters>]
+ConvertFrom-HtmlSamlResponse [-SamlResponse] <Object> [-IncludeXml] [-IncludeSensitiveValues] [<CommonParameters>]
 ```
 
-### SamlResponse
+### Handoff
 ```powershell
-ConvertFrom-HtmlSamlResponse [-SamlResponse] <string> [-IncludeXml] [-IncludeSensitiveValues] [<CommonParameters>]
+ConvertFrom-HtmlSamlResponse [-Handoff] <Object> [-IncludeXml] [-IncludeSensitiveValues] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -44,7 +44,7 @@ Possible values:
 Required: True
 Position: 0
 Default value: None
-Accept pipeline input: True (ByValue)
+Accept pipeline input: False
 Accept wildcard characters: True
 ```
 
@@ -53,7 +53,7 @@ Reveal subject values and unredacted XML. Use only for authorized troubleshootin
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Handoff, SamlResponse
+Parameter Sets: SamlResponse, Handoff
 Aliases: None
 Possible values:
 
@@ -69,7 +69,7 @@ Include decoded XML in the output. Values remain redacted unless IncludeSensitiv
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Handoff, SamlResponse
+Parameter Sets: SamlResponse, Handoff
 Aliases: None
 Possible values:
 
@@ -84,7 +84,7 @@ Accept wildcard characters: True
 Raw, URL-encoded, base64-encoded, or XML SAMLResponse value.
 
 ```yaml
-Type: String
+Type: Object
 Parameter Sets: SamlResponse
 Aliases: Response
 Possible values:
@@ -92,7 +92,7 @@ Possible values:
 Required: True
 Position: 0
 Default value: None
-Accept pipeline input: True (ByPropertyName)
+Accept pipeline input: True (ByValue, ByPropertyName)
 Accept wildcard characters: True
 ```
 
@@ -101,8 +101,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `System.String
-System.Object`
+- `System.Object`
 
 ## OUTPUTS
 
