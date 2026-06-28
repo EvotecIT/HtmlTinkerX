@@ -38,12 +38,12 @@ jobs:
       - name: Setup PowerShell modules
         shell: pwsh
         run: |
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.33 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38.10 -Force -Scope CurrentUser -AllowClobber
 
       - name: Refresh module manifest
         shell: pwsh
         run: |
-          .\Build\Build-Module.ps1 -ConfigurationGateMode Manifest
+          .\Build\Build-Module.ps1 -RunMode Manifest
 
       - name: Commit refreshed PSD1
         env:
@@ -52,7 +52,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add PSParseHTML.psd1
+          git add PSParseHTML.psd1 PSParseHTML.psm1
           git commit -m "chore: regenerate psd1" || echo "No changes to commit"
           git push origin HEAD:$Env:HEAD_BRANCH
 
@@ -121,14 +121,14 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.33 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38.10 -Force -Scope CurrentUser -AllowClobber
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PwshSpectreConsole -Repository PSGallery -RequiredVersion 2.6.3 -Force -SkipPublisherCheck -AllowClobber
 
       - name: Build packaged module
         shell: pwsh
-        run: .\Build\Build-Module.ps1 -ConfigurationGateMode Build
+        run: .\Build\Build-Module.ps1 -RunMode Build
         timeout-minutes: 15
 
       - name: Run packaged ALC conflict smoke test

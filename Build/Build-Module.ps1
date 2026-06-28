@@ -1,6 +1,7 @@
 param(
+    [Alias('ConfigurationGateMode')]
     [ValidateSet('Manifest', 'Build', 'Publish')]
-    [string] $ConfigurationGateMode = 'Build',
+    [string] $RunMode = 'Build',
 
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
@@ -135,6 +136,10 @@ Build-Module -ModuleName 'PSParseHTML' {
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumentation      = $true
+        NETDevelopmentBinaries            = $true
+        NETDevelopmentBinariesMode        = 'Environment'
+        NETDevelopmentBinariesPath        = 'Sources\PSParseHTML.PowerShell\bin'
+        NETDevelopmentSourceBootstrapperMode = 'ReplaceSingleFile'
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
@@ -168,5 +173,5 @@ Build-Module -ModuleName 'PSParseHTML' {
     New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
     New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
 
-    New-ConfigurationGate -Mode $ConfigurationGateMode
+    New-ConfigurationGate -Mode $RunMode
 } -ExitCode
