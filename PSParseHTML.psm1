@@ -164,7 +164,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
 
                     $Mode = 'Assembly'
                     $RequestedTypes = @()
-                    $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'PSParseHTML.PowerShell')
+                    $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'Microsoft.Playwright', 'PSParseHTML.PowerShell')
 
                     if ($null -eq $ModuleAssembly) {
                         Write-Warning -Message 'Module assembly was not available. ALC dependency type exposure is disabled.'
@@ -528,7 +528,7 @@ if (-not $PowerForgeDevelopmentBinaryLoaded) {
 
                 $Mode = 'Assembly'
                 $RequestedTypes = @()
-                $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'PSParseHTML.PowerShell')
+                $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'Microsoft.Playwright', 'PSParseHTML.PowerShell')
 
                 if ($null -eq $ModuleAssembly) {
                     Write-Warning -Message 'Module assembly was not available. ALC dependency type exposure is disabled.'
@@ -797,7 +797,11 @@ if (-not $PowerForgeDevelopmentBinaryLoaded) {
             & $ImportModule -Force -Assembly ($Type.Assembly)
         }
     } catch {
-        throw "Importing module $Library failed. Fix errors before continuing. Error: $($_.Exception.Message)"
+        if ($ErrorActionPreference -eq 'Stop') {
+            throw
+        } else {
+            Write-Warning -Message "Importing module $Library failed. Fix errors before continuing. Error: $($_.Exception.Message)"
+        }
     }
 
     if ($PSEdition -ne 'Core') {

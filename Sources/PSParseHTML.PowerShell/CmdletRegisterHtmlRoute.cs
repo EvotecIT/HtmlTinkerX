@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using System;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,12 +37,81 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
         CancellationToken token = linkedCts.Token;
 
         ScriptBlock block = ScriptBlock ?? throw new PSArgumentNullException(nameof(ScriptBlock));
-        Func<IRoute, Task> handler = route => {
-            object? result = block.InvokeReturnAsIs(route);
-            return result is Task t ? t : Task.CompletedTask;
+        Runspace? runspace = Runspace.DefaultRunspace;
+        object syncRoot = new();
+        Func<IRoute, Task> handler = async route => {
+            PowerShellHtmlRoute psRoute = new(route);
+            object? result;
+            lock (syncRoot) {
+                Runspace? previousRunspace = Runspace.DefaultRunspace;
+                try {
+                    if (runspace is not null) {
+                        Runspace.DefaultRunspace = runspace;
+                    }
+
+                    result = block.InvokeReturnAsIs(psRoute);
+                } finally {
+                    Runspace.DefaultRunspace = previousRunspace;
+                }
+            }
+
+            if (result is PSObject psObject) {
+                result = psObject.BaseObject;
+            }
+
+            if (result is Task task) {
+                await task.ConfigureAwait(false);
+            }
+
+            await psRoute.ExecuteAsync().ConfigureAwait(false);
         };
 
         await HtmlBrowser.RegisterRouteAsync(session, Pattern, handler, token).ConfigureAwait(false);
         WriteObject(handler);
     }
+}
+
+/// <summary>
+/// PowerShell-friendly Playwright route wrapper that records the requested route action.
+/// </summary>
+public sealed class PowerShellHtmlRoute {
+    private readonly IRoute _route;
+    private Func<Task>? _action;
+
+    /// <summary>Creates a route wrapper for scriptblock handlers.</summary>
+    public PowerShellHtmlRoute(IRoute route) {
+        _route = route ?? throw new ArgumentNullException(nameof(route));
+    }
+
+    /// <summary>Original Playwright route for advanced scenarios.</summary>
+    public IRoute Route => _route;
+
+    /// <summary>Request associated with the route.</summary>
+    public IRequest Request => _route.Request;
+
+    /// <summary>Records a fulfill action for the route.</summary>
+    public Task FulfillAsync(RouteFulfillOptions options) {
+        _action = () => _route.FulfillAsync(options);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Records an abort action for the route.</summary>
+    public Task AbortAsync(string? errorCode = null) {
+        _action = () => _route.AbortAsync(errorCode);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Records a continue action for the route.</summary>
+    public Task ContinueAsync(RouteContinueOptions? options = null) {
+        _action = () => _route.ContinueAsync(options);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Records a fallback action for the route.</summary>
+    public Task FallbackAsync(RouteFallbackOptions? options = null) {
+        _action = () => _route.FallbackAsync(options);
+        return Task.CompletedTask;
+    }
+
+    internal Task ExecuteAsync() => _action is null ? _route.FallbackAsync() : _action();
 }

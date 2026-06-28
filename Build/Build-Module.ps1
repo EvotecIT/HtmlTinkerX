@@ -112,6 +112,7 @@ Build-Module -ModuleName 'PSParseHTML' {
             'Acornima'
             'HtmlTinkerX'
             'HtmlAgilityPack'
+            'Microsoft.Playwright'
             'PSParseHTML.PowerShell'
         )
         DotSourceLibraries                = $true

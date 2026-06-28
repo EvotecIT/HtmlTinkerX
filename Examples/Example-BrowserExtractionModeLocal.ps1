@@ -59,7 +59,7 @@ try {
             Status      = 200
             ContentType = 'text/html'
             Body        = $staticHtml
-        }) | Out-Null
+        })
     } | Out-Null
 
     Register-HtmlRoute -Session $session -Pattern '**/api/products**' -ScriptBlock {
@@ -68,13 +68,13 @@ try {
             Status      = 200
             ContentType = 'application/json'
             Body        = '{"items":[{"name":"Found HtmlTinkerX guide","description":"Rendered from a local API call."}],"token":"local-secret-value"}'
-        }) | Out-Null
+        })
     } | Out-Null
 
     $extractionPlan = Test-HtmlExtractionPlan -Content $staticHtml
     $extractionProfile = $extractionPlan | Get-HtmlExtractionProfile
 
-    Invoke-HtmlBrowserNavigation -Session $session -Url $storyUrl
+    Invoke-HtmlBrowserNavigation -Session $session -Url $storyUrl -LoadState DomContentLoaded
     Close-HtmlBrowserOverlay -Session $session | Out-Null
     Set-HtmlBrowserInput -Session $session -Selector '#search' -Value 'HtmlTinkerX' -Type -DelayMs 0
     Invoke-HtmlBrowserKey -Session $session -Selector '#search' -Key 'Enter'
