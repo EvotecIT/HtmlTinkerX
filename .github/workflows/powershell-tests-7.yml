@@ -71,7 +71,7 @@ jobs:
     runs-on: windows-latest
     env:
       PSPARSEHTML_USE_DEVELOPMENT_BINARIES: 'true'
-      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: ${{ env.BUILD_CONFIGURATION }}
+      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: Debug
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -154,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PSPARSEHTML_USE_DEVELOPMENT_BINARIES: 'true'
-      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: ${{ env.BUILD_CONFIGURATION }}
+      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: Debug
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -200,7 +200,7 @@ jobs:
     runs-on: macos-latest
     env:
       PSPARSEHTML_USE_DEVELOPMENT_BINARIES: 'true'
-      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: ${{ env.BUILD_CONFIGURATION }}
+      PSPARSEHTML_DEVELOPMENT_CONFIGURATION: Debug
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
