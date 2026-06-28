@@ -107,30 +107,12 @@ Build-Module -ModuleName 'PSParseHTML' {
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
         NETAssemblyLoadContext            = $true
-        NETAssemblyTypeAcceleratorMode    = 'AllowList'
-        NETAssemblyTypeAccelerators       = @(
-            'Acornima.Parser'
-            'Acornima.ParserOptions'
-            'Acornima.AstVisitor'
-            'Acornima.Ast.ClassBody'
-            'Acornima.Ast.Expression'
-            'Acornima.Ast.FunctionDeclaration'
-            'Acornima.Ast.Identifier'
-            'Acornima.Ast.Literal'
-            'Acornima.Ast.Module'
-            'Acornima.Ast.Node'
-            'Acornima.Ast.ObjectExpression'
-            'Acornima.Ast.Program'
-            'Acornima.Ast.Property'
-            'Acornima.Ast.Script'
-            'Acornima.Ast.Statement'
-            'Acornima.Ast.VariableDeclaration'
-            'Acornima.Ast.VariableDeclarator'
-            'HtmlAgilityPack.HtmlDocument'
-            'HtmlAgilityPack.HtmlEntity'
-            'HtmlAgilityPack.HtmlNode'
-            'HtmlAgilityPack.HtmlNodeType'
-            'HtmlAgilityPack.HtmlAttribute'
+        NETAssemblyTypeAcceleratorMode       = 'Assembly'
+        NETAssemblyTypeAcceleratorAssemblies = @(
+            'Acornima'
+            'HtmlTinkerX'
+            'HtmlAgilityPack'
+            'PSParseHTML.PowerShell'
         )
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true

@@ -162,9 +162,9 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                         [Parameter(Mandatory = $true)][string] $LibFolder
                     )
 
-                    $Mode = 'AllowList'
-                    $RequestedTypes = @('Acornima.Parser', 'Acornima.ParserOptions', 'Acornima.AstVisitor', 'Acornima.Ast.ClassBody', 'Acornima.Ast.Expression', 'Acornima.Ast.FunctionDeclaration', 'Acornima.Ast.Identifier', 'Acornima.Ast.Literal', 'Acornima.Ast.Module', 'Acornima.Ast.Node', 'Acornima.Ast.ObjectExpression', 'Acornima.Ast.Program', 'Acornima.Ast.Property', 'Acornima.Ast.Script', 'Acornima.Ast.Statement', 'Acornima.Ast.VariableDeclaration', 'Acornima.Ast.VariableDeclarator', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlEntity', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlNodeType', 'HtmlAgilityPack.HtmlAttribute')
-                    $RequestedAssemblies = @()
+                    $Mode = 'Assembly'
+                    $RequestedTypes = @()
+                    $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'PSParseHTML.PowerShell')
 
                     if ($null -eq $ModuleAssembly) {
                         Write-Warning -Message 'Module assembly was not available. ALC dependency type exposure is disabled.'
@@ -526,9 +526,9 @@ if (-not $PowerForgeDevelopmentBinaryLoaded) {
                     [Parameter(Mandatory = $true)][string] $LibFolder
                 )
 
-                $Mode = 'AllowList'
-                $RequestedTypes = @('Acornima.Parser', 'Acornima.ParserOptions', 'Acornima.AstVisitor', 'Acornima.Ast.ClassBody', 'Acornima.Ast.Expression', 'Acornima.Ast.FunctionDeclaration', 'Acornima.Ast.Identifier', 'Acornima.Ast.Literal', 'Acornima.Ast.Module', 'Acornima.Ast.Node', 'Acornima.Ast.ObjectExpression', 'Acornima.Ast.Program', 'Acornima.Ast.Property', 'Acornima.Ast.Script', 'Acornima.Ast.Statement', 'Acornima.Ast.VariableDeclaration', 'Acornima.Ast.VariableDeclarator', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlEntity', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlNodeType', 'HtmlAgilityPack.HtmlAttribute')
-                $RequestedAssemblies = @()
+                $Mode = 'Assembly'
+                $RequestedTypes = @()
+                $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack', 'PSParseHTML.PowerShell')
 
                 if ($null -eq $ModuleAssembly) {
                     Write-Warning -Message 'Module assembly was not available. ALC dependency type exposure is disabled.'
