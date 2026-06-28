@@ -38,7 +38,7 @@ jobs:
       - name: Setup PowerShell modules
         shell: pwsh
         run: |
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38.10 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38 -Force -Scope CurrentUser -AllowClobber
 
       - name: Refresh module manifest
         shell: pwsh
@@ -124,7 +124,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38.10 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.38 -Force -Scope CurrentUser -AllowClobber
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PwshSpectreConsole -Repository PSGallery -RequiredVersion 2.6.3 -Force -SkipPublisherCheck -AllowClobber
