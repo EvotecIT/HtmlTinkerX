@@ -52,15 +52,18 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add PSParseHTML.psd1 PSParseHTML.psm1
+          git add PSParseHTML.psd1 PSParseHTML.psm1 PSParseHTML.Libraries.ps1
           git commit -m "chore: regenerate psd1" || echo "No changes to commit"
           git push origin HEAD:$Env:HEAD_BRANCH
 
-      - name: Upload refreshed manifest
+      - name: Upload refreshed module entry files
         uses: actions/upload-artifact@v4
         with:
-          name: psd1
-          path: PSParseHTML.psd1
+          name: module-entry
+          path: |
+            PSParseHTML.psd1
+            PSParseHTML.psm1
+            PSParseHTML.Libraries.ps1
 
   test-windows-ps7:
     needs: refresh-psd1
@@ -70,10 +73,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download manifest
+      - name: Download refreshed module entry files
         uses: actions/download-artifact@v4
         with:
-          name: psd1
+          name: module-entry
           path: .
 
       - name: Setup .NET
@@ -106,10 +109,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download manifest
+      - name: Download refreshed module entry files
         uses: actions/download-artifact@v4
         with:
-          name: psd1
+          name: module-entry
           path: .
 
       - name: Setup .NET
@@ -150,10 +153,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download manifest
+      - name: Download refreshed module entry files
         uses: actions/download-artifact@v4
         with:
-          name: psd1
+          name: module-entry
           path: .
 
       - name: Setup .NET
@@ -193,10 +196,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download manifest
+      - name: Download refreshed module entry files
         uses: actions/download-artifact@v4
         with:
-          name: psd1
+          name: module-entry
           path: .
 
       - name: Setup .NET
