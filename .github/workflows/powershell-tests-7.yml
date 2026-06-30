@@ -16,7 +16,7 @@ on:
       - v2-speedygonzales
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   DOTNET_VERSION: |
@@ -38,23 +38,31 @@ jobs:
       - name: Setup PowerShell modules
         shell: pwsh
         run: |
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.33 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
 
       - name: Refresh module manifest
         shell: pwsh
         run: |
           .\Build\Build-Module.ps1 -ConfigurationGateMode Manifest
 
-      - name: Commit refreshed PSD1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HEAD_BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+      - name: Report refreshed PSD1
+        shell: pwsh
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add PSParseHTML.psd1
-          git commit -m "chore: regenerate psd1" || echo "No changes to commit"
-          git push origin HEAD:$Env:HEAD_BRANCH
+          $changes = git status --short -- PSParseHTML.psd1
+          if ([string]::IsNullOrWhiteSpace($changes)) {
+            "### PSParseHTML.psd1" >> $env:GITHUB_STEP_SUMMARY
+            "" >> $env:GITHUB_STEP_SUMMARY
+            "No manifest changes were produced by the refresh step." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            Write-Warning "PSParseHTML.psd1 changed during refresh. The test jobs will use the refreshed artifact, but CI will not push generated commits."
+            "### PSParseHTML.psd1 refreshed" >> $env:GITHUB_STEP_SUMMARY
+            "" >> $env:GITHUB_STEP_SUMMARY
+            "The manifest changed during the refresh step. Test jobs will use the refreshed manifest artifact. Commit the generated change in the PR when the manifest update is intentional." >> $env:GITHUB_STEP_SUMMARY
+            "" >> $env:GITHUB_STEP_SUMMARY
+            '```diff' >> $env:GITHUB_STEP_SUMMARY
+            git diff -- PSParseHTML.psd1 >> $env:GITHUB_STEP_SUMMARY
+            '```' >> $env:GITHUB_STEP_SUMMARY
+          }
 
       - name: Upload refreshed manifest
         uses: actions/upload-artifact@v4
@@ -121,7 +129,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          Install-Module -Name PSPublishModule -Repository PSGallery -MinimumVersion 3.0.33 -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PwshSpectreConsole -Repository PSGallery -RequiredVersion 2.6.3 -Force -SkipPublisherCheck -AllowClobber
