@@ -59,9 +59,9 @@ jobs:
             "" >> $env:GITHUB_STEP_SUMMARY
             "The manifest changed during the refresh step. Test jobs will use the refreshed manifest artifact. Commit the generated change in the PR when the manifest update is intentional." >> $env:GITHUB_STEP_SUMMARY
             "" >> $env:GITHUB_STEP_SUMMARY
-            "```diff" >> $env:GITHUB_STEP_SUMMARY
+            '```diff' >> $env:GITHUB_STEP_SUMMARY
             git diff -- PSParseHTML.psd1 >> $env:GITHUB_STEP_SUMMARY
-            "```" >> $env:GITHUB_STEP_SUMMARY
+            '```' >> $env:GITHUB_STEP_SUMMARY
           }
 
       - name: Upload refreshed manifest
