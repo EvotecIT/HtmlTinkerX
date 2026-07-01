@@ -136,6 +136,8 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
             'HtmlAgilityPack.HtmlNode'
             'HtmlAgilityPack.HtmlAttribute'
             'Microsoft.Playwright.IRoute'
+            'Microsoft.Playwright.RouteContinueOptions'
+            'Microsoft.Playwright.RouteFallbackOptions'
             'Microsoft.Playwright.RouteFulfillOptions'
         )
         DotSourceLibraries                = $true

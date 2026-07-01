@@ -7,8 +7,8 @@ $PowerForgeDevelopmentBinaryRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PS
 $PowerForgeDevelopmentBinaryMode = 'Auto'
 $PowerForgeDevelopmentBinaryEnvironmentVariable = 'PSPARSEHTML_USE_DEVELOPMENT_BINARIES'
 $PowerForgeDevelopmentConfigurationEnvironmentVariable = 'PSPARSEHTML_DEVELOPMENT_CONFIGURATION'
-$PowerForgeDevelopmentCoreFrameworks = @('net8.0', 'net472')
-$PowerForgeDevelopmentDesktopFrameworks = @('net472', 'net8.0')
+$PowerForgeDevelopmentCoreFrameworks = @('net8.0')
+$PowerForgeDevelopmentDesktopFrameworks = @('net472')
 $PowerForgeDevelopmentUseAssemblyLoadContext = $true
 $PowerForgeDevelopmentEnabled = $false
 if ($PowerForgeDevelopmentBinaryMode -eq 'Auto') {
@@ -153,6 +153,19 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                 }
                 $PowerForgeDevelopmentModuleAssembly = [PSParseHTML.DevelopmentModuleLoadContext.ModuleAssemblyLoadContext]::LoadModule($PowerForgeDevelopmentBinaryPath, 'PSParseHTML.Development')
                 $PowerForgeDevelopmentInnerModule = & $ImportModule -Assembly $PowerForgeDevelopmentModuleAssembly -Force -PassThru -ErrorAction Stop
+                $PowerForgeDevelopmentImportedModule = $PowerForgeDevelopmentInnerModule
+                $PreviousPowerForgeDevelopmentOnRemove = $ExecutionContext.SessionState.Module.OnRemove
+                $ExecutionContext.SessionState.Module.OnRemove = {
+                    try {
+                        if ($null -ne $PowerForgeDevelopmentImportedModule) {
+                            Remove-Module -ModuleInfo $PowerForgeDevelopmentImportedModule -Force -ErrorAction SilentlyContinue
+                        }
+                    } finally {
+                        if ($null -ne $PreviousPowerForgeDevelopmentOnRemove) {
+                            & $PreviousPowerForgeDevelopmentOnRemove @args
+                        }
+                    }
+                }.GetNewClosure()
                 $ModuleAssembly = $PowerForgeDevelopmentModuleAssembly
                 $LibFolder = [IO.Path]::GetDirectoryName($PowerForgeDevelopmentBinaryPath)
                 # Type accelerator registration relies on $ModuleAssembly and $LibFolder from this ALC loader scope.
@@ -163,7 +176,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                     )
 
                     $Mode = 'Enums'
-                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.IRoute', 'Microsoft.Playwright.RouteFulfillOptions')
+                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.IRoute', 'Microsoft.Playwright.RouteContinueOptions', 'Microsoft.Playwright.RouteFallbackOptions', 'Microsoft.Playwright.RouteFulfillOptions')
                     $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack')
 
                     if ($null -eq $ModuleAssembly) {
