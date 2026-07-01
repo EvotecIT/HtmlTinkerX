@@ -131,9 +131,11 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
             'HtmlTinkerX.HtmlOptimizer'
             'HtmlTinkerX.HtmlParser'
             'HtmlTinkerX.HtmlRenderedPageSnapshot'
+            'HtmlTinkerX.HtmlResourceLink'
             'HtmlAgilityPack.HtmlDocument'
             'HtmlAgilityPack.HtmlNode'
             'HtmlAgilityPack.HtmlAttribute'
+            'Microsoft.Playwright.RouteFulfillOptions'
         )
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true

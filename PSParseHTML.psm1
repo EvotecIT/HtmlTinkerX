@@ -163,7 +163,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                     )
 
                     $Mode = 'Enums'
-                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute')
+                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.RouteFulfillOptions')
                     $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack')
 
                     if ($null -eq $ModuleAssembly) {
