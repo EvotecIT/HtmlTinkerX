@@ -135,6 +135,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
             'HtmlAgilityPack.HtmlDocument'
             'HtmlAgilityPack.HtmlNode'
             'HtmlAgilityPack.HtmlAttribute'
+            'Microsoft.Playwright.IRoute'
             'Microsoft.Playwright.RouteFulfillOptions'
         )
         DotSourceLibraries                = $true
@@ -142,7 +143,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumentation      = $true
         NETDevelopmentBinaries            = $true
-        NETDevelopmentBinariesMode        = 'Environment'
+        NETDevelopmentBinariesMode        = 'Auto'
         NETDevelopmentBinariesPath        = 'Sources\PSParseHTML.PowerShell\bin'
         NETDevelopmentSourceBootstrapperMode = 'ReplaceSingleFile'
     }

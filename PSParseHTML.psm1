@@ -4,7 +4,7 @@
 $PowerForgeDevelopmentBinaryLoaded = $false
 # Source development binary loader
 $PowerForgeDevelopmentBinaryRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, 'Sources', 'PSParseHTML.PowerShell', 'bin'))
-$PowerForgeDevelopmentBinaryMode = 'Environment'
+$PowerForgeDevelopmentBinaryMode = 'Auto'
 $PowerForgeDevelopmentBinaryEnvironmentVariable = 'PSPARSEHTML_USE_DEVELOPMENT_BINARIES'
 $PowerForgeDevelopmentConfigurationEnvironmentVariable = 'PSPARSEHTML_DEVELOPMENT_CONFIGURATION'
 $PowerForgeDevelopmentCoreFrameworks = @('net8.0', 'net472')
@@ -163,7 +163,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                     )
 
                     $Mode = 'Enums'
-                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.RouteFulfillOptions')
+                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.IRoute', 'Microsoft.Playwright.RouteFulfillOptions')
                     $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack')
 
                     if ($null -eq $ModuleAssembly) {

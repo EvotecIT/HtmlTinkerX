@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using System;
 using System.Management.Automation;
+using System.Management.Automation.Language;
 using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,10 +38,12 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
         CancellationToken token = linkedCts.Token;
 
         ScriptBlock block = ScriptBlock ?? throw new PSArgumentNullException(nameof(ScriptBlock));
+        bool usePlaywrightRoute = ExpectsPlaywrightRoute(block);
         Runspace? runspace = Runspace.DefaultRunspace;
         object syncRoot = new();
         Func<IRoute, Task> handler = async route => {
             PowerShellHtmlRoute psRoute = new(route);
+            object routeArgument = usePlaywrightRoute ? route : psRoute;
             object? result;
             lock (syncRoot) {
                 Runspace? previousRunspace = Runspace.DefaultRunspace;
@@ -49,7 +52,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
                         Runspace.DefaultRunspace = runspace;
                     }
 
-                    result = block.InvokeReturnAsIs(psRoute);
+                    result = block.InvokeReturnAsIs(routeArgument);
                 } finally {
                     Runspace.DefaultRunspace = previousRunspace;
                 }
@@ -63,11 +66,27 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
                 await task.ConfigureAwait(false);
             }
 
-            await psRoute.ExecuteAsync().ConfigureAwait(false);
+            if (!usePlaywrightRoute) {
+                await psRoute.ExecuteAsync().ConfigureAwait(false);
+            }
         };
 
         await HtmlBrowser.RegisterRouteAsync(session, Pattern, handler, token).ConfigureAwait(false);
         WriteObject(handler);
+    }
+
+    private static bool ExpectsPlaywrightRoute(ScriptBlock block) {
+        if (block.Ast is not ScriptBlockAst scriptBlockAst) {
+            return false;
+        }
+
+        var parameters = scriptBlockAst.ParamBlock?.Parameters;
+        if (parameters is null || parameters.Count == 0) {
+            return false;
+        }
+
+        Type? firstType = parameters[0].StaticType;
+        return firstType is not null && typeof(IRoute).IsAssignableFrom(firstType);
     }
 }
 
@@ -113,5 +132,5 @@ public sealed class PowerShellHtmlRoute {
         return Task.CompletedTask;
     }
 
-    internal Task ExecuteAsync() => _action is null ? _route.FallbackAsync() : _action();
+    internal Task ExecuteAsync() => _action is null ? Task.CompletedTask : _action();
 }
