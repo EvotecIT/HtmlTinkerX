@@ -38,12 +38,12 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
         CancellationToken token = linkedCts.Token;
 
         ScriptBlock block = ScriptBlock ?? throw new PSArgumentNullException(nameof(ScriptBlock));
-        bool usePlaywrightRoute = ExpectsPlaywrightRoute(block);
+        bool usePowerShellRoute = ExpectsPowerShellRoute(block);
         Runspace? runspace = Runspace.DefaultRunspace;
         object syncRoot = new();
         Func<IRoute, Task> handler = async route => {
             PowerShellHtmlRoute psRoute = new(route);
-            object routeArgument = usePlaywrightRoute ? route : psRoute;
+            object routeArgument = usePowerShellRoute ? psRoute : route;
             object? result;
             lock (syncRoot) {
                 Runspace? previousRunspace = Runspace.DefaultRunspace;
@@ -66,7 +66,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
                 await task.ConfigureAwait(false);
             }
 
-            if (!usePlaywrightRoute) {
+            if (usePowerShellRoute) {
                 await psRoute.ExecuteAsync().ConfigureAwait(false);
             }
         };
@@ -75,7 +75,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
         WriteObject(handler);
     }
 
-    private static bool ExpectsPlaywrightRoute(ScriptBlock block) {
+    private static bool ExpectsPowerShellRoute(ScriptBlock block) {
         if (block.Ast is not ScriptBlockAst scriptBlockAst) {
             return false;
         }
@@ -86,7 +86,7 @@ public sealed class CmdletRegisterHtmlRoute : AsyncPSCmdlet {
         }
 
         Type? firstType = parameters[0].StaticType;
-        return firstType is not null && typeof(IRoute).IsAssignableFrom(firstType);
+        return firstType is not null && typeof(PowerShellHtmlRoute).IsAssignableFrom(firstType);
     }
 }
 
