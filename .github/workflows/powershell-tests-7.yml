@@ -43,7 +43,7 @@ jobs:
       - name: Refresh module manifest
         shell: pwsh
         run: |
-          .\Build\Build-Module.ps1 -ConfigurationGateMode Manifest
+          .\Build\Build-Module.ps1 -RunMode Manifest
 
       - name: Report refreshed PSD1
         shell: pwsh
@@ -136,7 +136,7 @@ jobs:
 
       - name: Build packaged module
         shell: pwsh
-        run: .\Build\Build-Module.ps1 -ConfigurationGateMode Build
+        run: .\Build\Build-Module.ps1 -RunMode Build
         timeout-minutes: 15
 
       - name: Run packaged ALC conflict smoke test

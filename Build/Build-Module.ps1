@@ -1,6 +1,6 @@
 param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
-    [string] $ConfigurationGateMode = 'Build',
+    [string] $RunMode = 'Build',
 
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
@@ -9,7 +9,7 @@ param(
 
 Import-Module PSPublishModule -Force -ErrorAction Stop
 
-Build-Module -ModuleName 'PSParseHTML' {
+Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
         # Minimum version of the Windows PowerShell engine required by this module
@@ -106,29 +106,17 @@ Build-Module -ModuleName 'PSParseHTML' {
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
         NETAssemblyLoadContext            = $true
-        NETAssemblyTypeAcceleratorMode    = 'AllowList'
+        NETAssemblyTypeAcceleratorMode    = 'Enums'
+        NETAssemblyTypeAcceleratorAssemblies = @(
+            'Acornima'
+            'HtmlAgilityPack'
+        )
         NETAssemblyTypeAccelerators       = @(
-            'Acornima.Parser'
-            'Acornima.ParserOptions'
-            'Acornima.AstVisitor'
-            'Acornima.Ast.ClassBody'
-            'Acornima.Ast.Expression'
-            'Acornima.Ast.FunctionDeclaration'
-            'Acornima.Ast.Identifier'
-            'Acornima.Ast.Literal'
-            'Acornima.Ast.Module'
             'Acornima.Ast.Node'
-            'Acornima.Ast.ObjectExpression'
             'Acornima.Ast.Program'
-            'Acornima.Ast.Property'
             'Acornima.Ast.Script'
-            'Acornima.Ast.Statement'
-            'Acornima.Ast.VariableDeclaration'
-            'Acornima.Ast.VariableDeclarator'
             'HtmlAgilityPack.HtmlDocument'
-            'HtmlAgilityPack.HtmlEntity'
             'HtmlAgilityPack.HtmlNode'
-            'HtmlAgilityPack.HtmlNodeType'
             'HtmlAgilityPack.HtmlAttribute'
         )
         DotSourceLibraries                = $true
@@ -146,8 +134,8 @@ Build-Module -ModuleName 'PSParseHTML' {
         Type                = 'Unpacked'
         Enable              = $true
         Path                = 'Artefacts\Unpacked'
-        ModulesPath         = 'Artefacts\Unpacked\Modules'
-        RequiredModulesPath = 'Artefacts\Unpacked\Modules'
+        ModulesPath         = 'Modules'
+        RequiredModulesPath = 'Modules'
         AddRequiredModules  = $true
     }
     New-ConfigurationArtefact @newConfigurationArtefactSplat -CopyFilesRelative
@@ -155,8 +143,8 @@ Build-Module -ModuleName 'PSParseHTML' {
         Type                = 'Packed'
         Enable              = $true
         Path                = 'Artefacts\Packed'
-        ModulesPath         = 'Artefacts\Packed\Modules'
-        RequiredModulesPath = 'Artefacts\Packed\Modules'
+        ModulesPath         = 'Modules'
+        RequiredModulesPath = 'Modules'
         AddRequiredModules  = $true
         ArtefactName        = 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>.zip'
         IncludeTagName      = $true
@@ -168,5 +156,4 @@ Build-Module -ModuleName 'PSParseHTML' {
     New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
     New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'HtmlTinkerX' -OverwriteTagName 'PSParseHTML-PowerShellModule.<TagModuleVersionWithPreRelease>'
 
-    New-ConfigurationGate -Mode $ConfigurationGateMode
 } -ExitCode
