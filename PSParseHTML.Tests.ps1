@@ -46,16 +46,23 @@ foreach ($Module in $PSDInformation.RequiredModules) {
 }
 Write-Color
 
-Import-Module $PSScriptRoot\*.psd1 -Force
-Import-Module Pester -Force
-$Configuration = [PesterConfiguration]::Default
-$Configuration.Run.Path = "$PSScriptRoot\Tests"
-$Configuration.Run.Exit = $true
-$Configuration.Should.ErrorAction = 'Continue'
-$Configuration.CodeCoverage.Enabled = $false
-$Configuration.Output.Verbosity = 'Detailed'
-$Result = Invoke-Pester -Configuration $Configuration
-#$result = Invoke-Pester -Script $PSScriptRoot\Tests -Verbose -Output Detailed #-EnableExit
+try {
+    $originalDevelopmentBinaries = $env:PSPARSEHTML_USE_DEVELOPMENT_BINARIES
+    $env:PSPARSEHTML_USE_DEVELOPMENT_BINARIES = 'true'
+
+    Import-Module $PSScriptRoot\*.psd1 -Force
+    Import-Module Pester -Force
+    $Configuration = [PesterConfiguration]::Default
+    $Configuration.Run.Path = "$PSScriptRoot\Tests"
+    $Configuration.Run.Exit = $true
+    $Configuration.Should.ErrorAction = 'Continue'
+    $Configuration.CodeCoverage.Enabled = $false
+    $Configuration.Output.Verbosity = 'Detailed'
+    $Result = Invoke-Pester -Configuration $Configuration
+    #$result = Invoke-Pester -Script $PSScriptRoot\Tests -Verbose -Output Detailed #-EnableExit
+} finally {
+    $env:PSPARSEHTML_USE_DEVELOPMENT_BINARIES = $originalDevelopmentBinaries
+}
 
 if ($Result.FailedCount -gt 0) {
     throw "$($Result.FailedCount) tests failed."

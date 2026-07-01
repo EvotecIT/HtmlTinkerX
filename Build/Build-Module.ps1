@@ -1,4 +1,5 @@
 param(
+    [Alias('ConfigurationGateMode')]
     [ValidateSet('Manifest', 'Build', 'Publish')]
     [string] $RunMode = 'Build',
 
@@ -109,25 +110,50 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
         NETAssemblyTypeAcceleratorMode    = 'Enums'
         NETAssemblyTypeAcceleratorAssemblies = @(
             'Acornima'
+            'HtmlTinkerX'
             'HtmlAgilityPack'
         )
         NETAssemblyTypeAccelerators       = @(
             'Acornima.Ast.Node'
             'Acornima.Ast.Program'
             'Acornima.Ast.Script'
+            'HtmlTinkerX.HtmlBrowser'
+            'HtmlTinkerX.HtmlBrowserLaunchOptions'
+            'HtmlTinkerX.HtmlBrowserlessExtraction'
+            'HtmlTinkerX.HtmlBrowserProfile'
+            'HtmlTinkerX.HtmlBrowserRecipe'
+            'HtmlTinkerX.HtmlBrowserRecipeRunOptions'
+            'HtmlTinkerX.HtmlBrowserSsoField'
+            'HtmlTinkerX.HtmlBrowserSsoHandoff'
+            'HtmlTinkerX.HtmlCookie'
+            'HtmlTinkerX.HtmlHttpClientFactory'
+            'HtmlTinkerX.HtmlNetworkEntry'
+            'HtmlTinkerX.HtmlOptimizer'
+            'HtmlTinkerX.HtmlParser'
+            'HtmlTinkerX.HtmlRenderedPageSnapshot'
+            'HtmlTinkerX.HtmlResourceLink'
             'HtmlAgilityPack.HtmlDocument'
             'HtmlAgilityPack.HtmlNode'
             'HtmlAgilityPack.HtmlAttribute'
+            'PSParseHTML.PowerShell.PowerShellHtmlRoute'
+            'Microsoft.Playwright.IRoute'
+            'Microsoft.Playwright.RouteContinueOptions'
+            'Microsoft.Playwright.RouteFallbackOptions'
+            'Microsoft.Playwright.RouteFulfillOptions'
         )
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumentation      = $true
+        NETDevelopmentBinaries            = $true
+        NETDevelopmentBinariesMode        = 'Auto'
+        NETDevelopmentBinariesPath        = 'Sources\PSParseHTML.PowerShell\bin'
+        NETDevelopmentSourceBootstrapperMode = 'ReplaceSingleFile'
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat
 
-    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
+    New-ConfigurationProjectBuild -Name 'HtmlTinkerX' -ConfigPath 'Build\project.build.json' -Enabled:$true -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'HtmlTinkerX' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
     $newConfigurationArtefactSplat = @{

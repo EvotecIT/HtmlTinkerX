@@ -20,6 +20,38 @@ $($ignoredTables -join "`n")
 "@
         }
 
+        function New-EscapeSequenceTableHtml {
+            $ignoredTables = for ($i = 0; $i -lt 12; $i++) {
+                "<table><tr><td>Ignored $i</td></tr></table>"
+            }
+            $ignoredMarkup = $ignoredTables -join "`n"
+
+            @'
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>PowerShell escape sequence fixture</title></head>
+<body>
+<table><tr><th>Name</th></tr><tr><td>Summary</td></tr></table>
+__IGNORED_TABLES__
+<table>
+    <tr><th>Sequence</th><th>Meaning</th></tr>
+    <tr><td>`n</td><td>Newline</td></tr>
+    <tr><td>`r</td><td>Carriage return</td></tr>
+    <tr><td>`t</td><td>Horizontal tab</td></tr>
+    <tr><td>`0</td><td>Null</td></tr>
+    <tr><td>`a</td><td>Alert</td></tr>
+    <tr><td>`b</td><td>Backspace</td></tr>
+    <tr><td>`e</td><td>Escape</td></tr>
+    <tr><td>`f</td><td>Form feed</td></tr>
+    <tr><td>`v</td><td>Vertical tab</td></tr>
+    <tr><td>``</td><td>Backtick</td></tr>
+    <tr><td>`"</td><td>Double quote</td></tr>
+</table>
+</body>
+</html>
+'@.Replace('__IGNORED_TABLES__', $ignoredMarkup)
+        }
+
     }
 
     It 'Given a HTML table fixture with polish chars - Should convert it to a PowerShell object' {
@@ -286,23 +318,16 @@ $($ignoredTables -join "`n")
         $Table.Rows[0]['Name'] | Should -Be 'North'
     }
 
-    It 'Parses Wikipedia escape sequence table with correct columns' {
-        [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['User-Agent'] = 'HtmlTinkerX.Tests'
-        try {
-            $Tables = ConvertFrom-HtmlTable -Url 'https://en.wikipedia.org/wiki/PowerShell'
-            $Tables.Count | Should -BeGreaterOrEqual 2
+    It 'Parses escape sequence table with correct columns' {
+        $Tables = ConvertFrom-HtmlTable -Content (New-EscapeSequenceTableHtml)
+        $Tables.Count | Should -BeGreaterOrEqual 2
 
-            $Table = $Tables[1]
-            $Columns = $Table[0].PSObject.Properties.Name
-            $Columns[0] | Should -Be 'Sequence'
-            $Columns[1] | Should -Be 'Meaning'
+        $Table = $Tables[-1]
+        $Columns = $Table[0].PSObject.Properties.Name
+        $Columns[0] | Should -Be 'Sequence'
+        $Columns[1] | Should -Be 'Meaning'
 
-            ($Table | Where-Object Sequence -eq '`n').Meaning | Should -Be 'Newline'
-            $Table.Count | Should -BeGreaterOrEqual 10
-        }
-        finally {
-            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.Remove('User-Agent') | Out-Null
-            [HtmlTinkerX.HtmlHttpClientFactory]::ResetShared()
-        }
+        ($Table | Where-Object Sequence -eq '`n').Meaning | Should -Be 'Newline'
+        $Table.Count | Should -BeGreaterOrEqual 10
     }
 }

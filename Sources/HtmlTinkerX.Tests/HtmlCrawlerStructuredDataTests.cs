@@ -424,8 +424,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal(1, result.Summary.StructuredRateLimitedApiEndpointCount);
             Assert.Equal(1, result.Summary.StructuredApiErrorResponseCount);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -465,8 +464,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Contains("Dataset page", page.StructuredJson!.Document.Text, StringComparison.Ordinal);
             Assert.Contains("# Dataset page", page.StructuredJson.Document.Markdown, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -682,8 +680,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IList<HtmlCrawlStructuredPrimaryAction> primaryActions = Assert.IsAssignableFrom<IList<HtmlCrawlStructuredPrimaryAction>>(page.StructuredJson.Extracted["primaryActions"]);
             Assert.Single(primaryActions);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -861,8 +858,7 @@ public class HtmlCrawlerStructuredJsonTests {
             string indexHtml = File.ReadAllText(result.IndexHtmlPath!);
             Assert.Contains("OpenAPI JSON", indexHtml, StringComparison.OrdinalIgnoreCase);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -918,8 +914,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Contains("\"paths\": {}", openApiJson, StringComparison.Ordinal);
             Assert.Contains("\"skippedOperationCount\": 1", openApiJson, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -1022,8 +1017,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("/v1/webhooks", requestExample.Path);
             Assert.Contains("https://hooks.example.com/incoming", requestExample.Body, StringComparison.Ordinal);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1076,8 +1070,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
             Assert.True(paths.ContainsKey("/"));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1130,8 +1123,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(usersPath["get"]);
             Assert.False(getOperation.ContainsKey("requestBody"));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1185,8 +1177,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IDictionary<string, object?> postOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(widgetsPath["post"]);
             Assert.True(postOperation.ContainsKey("requestBody"));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1240,8 +1231,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("session_id", strictCookieParameter["name"] as string);
             Assert.Equal("cookie", strictCookieParameter["in"] as string);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1291,8 +1281,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IDictionary<string, object?> strictCookieParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
             Assert.Equal("cookie", strictCookieParameter["in"] as string);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1366,8 +1355,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("id", idParameter["name"] as string);
             Assert.Equal("path", idParameter["in"] as string);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1413,8 +1401,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(itemsPath["get"]);
             Assert.False(getOperation.ContainsKey("requestBody"));
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
         }
     }
 
@@ -1475,8 +1462,7 @@ public class HtmlCrawlerStructuredJsonTests {
             IList<HtmlCrawlStructuredPrimaryAction> primaryActions = Assert.IsAssignableFrom<IList<HtmlCrawlStructuredPrimaryAction>>(page.StructuredJson.Extracted["primaryActions"]);
             Assert.Single(primaryActions);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
@@ -1554,8 +1540,7 @@ public class HtmlCrawlerStructuredJsonTests {
             Assert.Equal("Schema page", page.StructuredJson.Extracted["firstHeading"]);
             Assert.Equal(true, page.StructuredJson.Extracted["hasFooter"]);
         } finally {
-            server.Stop();
-            server.Close();
+            DisposeListenerSafely(server);
             if (Directory.Exists(outputPath)) {
                 Directory.Delete(outputPath, recursive: true);
             }
