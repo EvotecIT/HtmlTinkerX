@@ -1120,15 +1120,13 @@ Runnable examples are available in `Examples\Example-ModernParsing.ps1` and `Sou
 
 These helpers are static parsers. They do not execute application JavaScript and they return PSParseHTML/HtmlTinkerX objects rather than exposed dependency implementation types.
 
-For lower-level exploration, the packaged PowerShell module exposes selected dependency type accelerators through its AssemblyLoadContext boundary, including `[Acornima.Parser]`, `[Acornima.ParserOptions]`, `[Acornima.AstVisitor]`, and common `[Acornima.Ast.*]` node types.
+For lower-level exploration, the packaged PowerShell module exposes a small dependency type accelerator surface through its AssemblyLoadContext boundary: common HtmlAgilityPack document/node types, core Acornima AST document types, and public dependency enums.
 
 ```powershell
-$parser = [Acornima.Parser]::new()
-$script = $parser.ParseScript('const answer = 42;')
-$visitor = [Acornima.AstVisitor]::new()
-$visitor.Visit($script)
+$script = ConvertFrom-JavaScriptAst -Content 'const answer = 42;'
 $script | Select-JavaScriptAstNode -Type VariableDeclaration
 $script | Select-JavaScriptAstNode -Type Script -IncludeRoot
+[HtmlAgilityPack.HtmlNodeType]::Element
 ```
 
 ## 🎯 C# API Reference

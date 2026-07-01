@@ -31,8 +31,8 @@ Import-Module PSParseHTML -Force
 `$variable = ConvertFrom-JavaScriptAst -Content 'const reportToken = "abc";' | Select-JavaScriptVariable -Name reportToken
 `$objectExpression = ConvertFrom-JavaScriptAst -Content 'const settings = { apiKey: "abc" };' | Select-JavaScriptAstNode -Type ObjectExpression | Select-Object -First 1
 `$htmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
-`$acornimaAccelerator = [Acornima.Parser].FullName
-`$acornimaAstVisitorAccelerator = [Acornima.AstVisitor].FullName
+`$htmlNodeTypeAccelerator = [HtmlAgilityPack.HtmlNodeType].FullName
+`$acornimaScriptAccelerator = [Acornima.Ast.Script].FullName
 `$command = Get-Command ConvertFrom-HtmlTable -ErrorAction Stop
 `$commandAssembly = `$command.ImplementingType.Assembly
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
@@ -66,8 +66,8 @@ Import-Module PSParseHTML -Force
     JavaScriptVariableValue = `$variable.Value
     JavaScriptAstNodeType = `$objectExpression.TypeText
     HtmlNodeAccelerator = `$htmlNodeAccelerator
-    AcornimaParserAccelerator = `$acornimaAccelerator
-    AcornimaAstVisitorAccelerator = `$acornimaAstVisitorAccelerator
+    HtmlNodeTypeAccelerator = `$htmlNodeTypeAccelerator
+    AcornimaScriptAccelerator = `$acornimaScriptAccelerator
     LoadedAssemblies = @(`$loadedAssemblies)
 } | ConvertTo-Json -Depth 6 -Compress
 "@
@@ -90,8 +90,8 @@ Import-Module PSParseHTML -Force
         $result.JavaScriptVariableValue | Should -Be 'abc'
         $result.JavaScriptAstNodeType | Should -Be 'ObjectExpression'
         $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
-        $result.AcornimaParserAccelerator | Should -Be 'Acornima.Parser'
-        $result.AcornimaAstVisitorAccelerator | Should -Be 'Acornima.AstVisitor'
+        $result.HtmlNodeTypeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNodeType'
+        $result.AcornimaScriptAccelerator | Should -Be 'Acornima.Ast.Script'
         $result.ConvertFromHtmlTableAssembly | Should -BeLike '*\Artefacts\Unpacked\Modules\PSParseHTML\Lib\Core\PSParseHTML.PowerShell.dll'
         $result.ConvertFromHtmlTableALC | Should -Be 'PSParseHTML'
         $result.ConvertFromHtmlTableALCIsDefault | Should -BeFalse
