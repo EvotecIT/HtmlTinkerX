@@ -163,8 +163,8 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                     )
 
                     $Mode = 'Enums'
-                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute')
-                    $RequestedAssemblies = @('Acornima', 'HtmlAgilityPack')
+                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute')
+                    $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack')
 
                     if ($null -eq $ModuleAssembly) {
                         Write-Warning -Message 'Module assembly was not available. ALC dependency type exposure is disabled.'
