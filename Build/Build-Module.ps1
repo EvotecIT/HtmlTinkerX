@@ -135,6 +135,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
             'HtmlAgilityPack.HtmlDocument'
             'HtmlAgilityPack.HtmlNode'
             'HtmlAgilityPack.HtmlAttribute'
+            'PSParseHTML.PowerShell.PowerShellHtmlRoute'
             'Microsoft.Playwright.IRoute'
             'Microsoft.Playwright.RouteContinueOptions'
             'Microsoft.Playwright.RouteFallbackOptions'

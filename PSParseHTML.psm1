@@ -176,7 +176,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                     )
 
                     $Mode = 'Enums'
-                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'Microsoft.Playwright.IRoute', 'Microsoft.Playwright.RouteContinueOptions', 'Microsoft.Playwright.RouteFallbackOptions', 'Microsoft.Playwright.RouteFulfillOptions')
+                    $RequestedTypes = @('Acornima.Ast.Node', 'Acornima.Ast.Program', 'Acornima.Ast.Script', 'HtmlTinkerX.HtmlBrowser', 'HtmlTinkerX.HtmlBrowserLaunchOptions', 'HtmlTinkerX.HtmlBrowserlessExtraction', 'HtmlTinkerX.HtmlBrowserProfile', 'HtmlTinkerX.HtmlBrowserRecipe', 'HtmlTinkerX.HtmlBrowserRecipeRunOptions', 'HtmlTinkerX.HtmlBrowserSsoField', 'HtmlTinkerX.HtmlBrowserSsoHandoff', 'HtmlTinkerX.HtmlCookie', 'HtmlTinkerX.HtmlHttpClientFactory', 'HtmlTinkerX.HtmlNetworkEntry', 'HtmlTinkerX.HtmlOptimizer', 'HtmlTinkerX.HtmlParser', 'HtmlTinkerX.HtmlRenderedPageSnapshot', 'HtmlTinkerX.HtmlResourceLink', 'HtmlAgilityPack.HtmlDocument', 'HtmlAgilityPack.HtmlNode', 'HtmlAgilityPack.HtmlAttribute', 'PSParseHTML.PowerShell.PowerShellHtmlRoute', 'Microsoft.Playwright.IRoute', 'Microsoft.Playwright.RouteContinueOptions', 'Microsoft.Playwright.RouteFallbackOptions', 'Microsoft.Playwright.RouteFulfillOptions')
                     $RequestedAssemblies = @('Acornima', 'HtmlTinkerX', 'HtmlAgilityPack')
 
                     if ($null -eq $ModuleAssembly) {
@@ -467,6 +467,28 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                 Write-Warning -Message "Importing development binary $PowerForgeDevelopmentBinaryPath failed. Falling back to packaged loader when available. Error: $($_.Exception.Message)"
             }
         }
+    }
+}
+
+if (-not $PowerForgeDevelopmentBinaryLoaded) {
+    $PowerForgeLibrariesPath = [IO.Path]::Combine($PSScriptRoot, 'PSParseHTML.Libraries.ps1')
+    if (Test-Path -LiteralPath $PowerForgeLibrariesPath) {
+        . $PowerForgeLibrariesPath
+    }
+
+    $PowerForgePackagedLibFolder = if (-not [string]::IsNullOrWhiteSpace($LibFolder)) {
+        $LibFolder
+    } elseif ($PSEdition -eq 'Core') {
+        'Core'
+    } else {
+        'Default'
+    }
+    $PowerForgePackagedBinaryPath = [IO.Path]::Combine($PSScriptRoot, 'Lib', $PowerForgePackagedLibFolder, 'PSParseHTML.PowerShell.dll')
+    if (Test-Path -LiteralPath $PowerForgePackagedBinaryPath) {
+        Import-Module -Name $PowerForgePackagedBinaryPath -Force -ErrorAction Stop
+        $PowerForgeDevelopmentBinaryLoaded = $true
+    } else {
+        throw "No development or packaged PSParseHTML.PowerShell binary was found. Expected packaged binary at '$PowerForgePackagedBinaryPath'."
     }
 }
 
