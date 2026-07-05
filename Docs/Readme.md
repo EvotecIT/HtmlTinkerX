@@ -2,7 +2,7 @@
 Module Name: PSParseHTML
 Module Guid: f0387960-7034-4918-a1e1-d5847cbf90df
 Download Help Link: https://github.com/EvotecIT/PSParseHTML
-Help Version: 2.0.16
+Help Version: 2.0.17
 Locale: en-US
 ---
 # PSParseHTML Module
@@ -24,6 +24,9 @@ Cmdlet that compares HTML content and returns differences.
 
 ### [Compare-HtmlStaticRendered](Compare-HtmlStaticRendered.md)
 Compares static HTML with browser-rendered HTML using parsing-friendly signatures.
+
+### [Complete-HtmlRoute](Complete-HtmlRoute.md)
+Cmdlet that fulfills an intercepted browser route with a mocked response.
 
 ### [Convert-HtmlToMarkdown](Convert-HtmlToMarkdown.md)
 Converts HTML content to Markdown.
