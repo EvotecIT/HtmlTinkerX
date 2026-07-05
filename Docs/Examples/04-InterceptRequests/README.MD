@@ -16,11 +16,11 @@ $session = Start-HtmlBrowserSession -Url $uri
 # Return custom JSON instead of the real file
 $handler = Register-HtmlRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
     param($route)
-    $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+    Complete-HtmlRoute -Route $route -Options @{
         Status = 200
         ContentType = 'application/json'
         Body = '{"message":"mock"}'
-    }) | Out-Null
+    }
 }
 
 Invoke-HtmlBrowserNavigation -Session $session -Url $uri

@@ -2099,11 +2099,11 @@ $session = Start-HtmlBrowserSession -Url 'https://example.com' `
 # Mock API responses
 $handler = Register-HtmlRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
     param($route)
-    $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+    Complete-HtmlRoute -Route $route -Options @{
         Status = 200
         ContentType = 'application/json'
         Body = '{"status": "success", "data": []}'
-    }) | Out-Null
+    }
 }
 
 # Navigate and test

@@ -16,7 +16,7 @@ Describe 'Browser navigation' {
         try {
             Register-HtmlRoute -Session $session -Pattern '**/streaming.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = @'
@@ -30,7 +30,7 @@ fetch('/api/never-ending');
 </body>
 </html>
 '@
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/api/never-ending' -ScriptBlock {
@@ -52,20 +52,20 @@ fetch('/api/never-ending');
         try {
             Register-HtmlRoute -Session $session -Pattern '**/click-start.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = '<!doctype html><button id="go" onclick="location.href=''/click-finish.html''">Continue</button>'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/click-finish.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = '<!doctype html><main id="status">selector-click-ready</main><script>fetch(''/api/selector-never-ending'');</script>'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/api/selector-never-ending' -ScriptBlock {
@@ -87,11 +87,11 @@ fetch('/api/never-ending');
         try {
             Register-HtmlRoute -Session $session -Pattern '**/reload.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = '<!doctype html><button id="reload" onclick="location.reload()">Reload</button><main id="status">same-url-ready</main>'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/reload.html' -LoadState DomContentLoaded -Timeout 2000
@@ -109,20 +109,20 @@ fetch('/api/never-ending');
         try {
             Register-HtmlRoute -Session $session -Pattern '**/text-start.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = '<!doctype html><button onclick="location.href=''/text-finish.html''">Continue with SSO</button>'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/text-finish.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = '<!doctype html><main id="status">text-click-ready</main><script>fetch(''/api/text-never-ending'');</script>'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/api/text-never-ending' -ScriptBlock {

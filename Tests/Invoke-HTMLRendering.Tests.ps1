@@ -515,7 +515,7 @@ setTimeout(() => {
         try {
             Register-HTMLRoute -Session $session -Pattern '**/response-body.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/html'
                     Body = @'
@@ -535,15 +535,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 <body><main>loading</main></body>
 </html>
 '@
-                }) | Out-Null
+                }
             }
             Register-HTMLRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'application/json'
                     Body = '{"message":"ticket-data-response-body-that-is-long-enough-to-truncate"}'
-                }) | Out-Null
+                }
             }
 
             Invoke-HTMLNavigation -Session $session -Url 'https://example.com/response-body.html'
@@ -585,7 +585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             Register-HTMLRoute -Session $session -Pattern '**/redacted-response.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/html'
                     Body = @'
@@ -602,15 +602,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 <body><main>loading</main></body>
 </html>
 '@
-                }) | Out-Null
+                }
             }
             Register-HTMLRoute -Session $session -Pattern '**/api/secret' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'application/json'
                     Body = '{"access_token":"super-secret","url":"https://example.com/callback?token=abc123&safe=1"}'
-                }) | Out-Null
+                }
             }
 
             Invoke-HTMLNavigation -Session $session -Url 'https://example.com/redacted-response.html'
@@ -650,11 +650,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             Register-HTMLRoute -Session $session -Pattern '**/document-body.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/html'
                     Body = '<!doctype html><html><body><main>document-body</main></body></html>'
-                }) | Out-Null
+                }
             }
 
             Invoke-HTMLNavigation -Session $session -Url 'https://example.com/document-body.html'
@@ -691,7 +691,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             Register-HTMLRoute -Session $session -Pattern '**/utf8-body.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/html'
                     Body = @'
@@ -710,15 +710,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 <body><main>loading</main></body>
 </html>
 '@
-                }) | Out-Null
+                }
             }
             Register-HTMLRoute -Session $session -Pattern '**/api/utf8' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/plain; charset=utf-8'
                     Body = 'éx'
-                }) | Out-Null
+                }
             }
 
             Invoke-HTMLNavigation -Session $session -Url 'https://example.com/utf8-body.html'

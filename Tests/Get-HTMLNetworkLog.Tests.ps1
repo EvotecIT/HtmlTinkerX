@@ -6,11 +6,11 @@ Describe 'Get-HTMLNetworkLog' {
         $session = Invoke-HTMLRendering -Url 'about:blank' -Session
         Register-HTMLRoute -Session $session -Pattern '**/data.json' -ScriptBlock {
             param($route)
-            $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+            Complete-HtmlRoute -Route $route -Options @{
                 Status = 200
                 ContentType = 'application/json'
                 Body = '{"message":"mock"}'
-            }) | Out-Null
+            }
         }
         Invoke-HTMLNavigation -Session $session -Url $uri
         Start-Sleep -Milliseconds 500

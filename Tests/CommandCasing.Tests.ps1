@@ -8,6 +8,7 @@ Describe 'Html and Css command casing' {
         (Get-Command Invoke-HtmlCrawl).Name | Should -Be 'Invoke-HtmlCrawl'
         (Get-Command Format-Css).Name | Should -Be 'Format-Css'
         (Get-Command Optimize-Html).Name | Should -Be 'Optimize-Html'
+        (Get-Command Complete-HtmlRoute).Name | Should -Be 'Complete-HtmlRoute'
         (Get-Command Register-HtmlRoute).Name | Should -Be 'Register-HtmlRoute'
     }
 
@@ -16,6 +17,7 @@ Describe 'Html and Css command casing' {
         (Get-Command Invoke-HTMLRendering).Name | Should -Be 'Invoke-HtmlRendering'
         (Get-Command Invoke-HTMLCrawl).Name | Should -Be 'Invoke-HtmlCrawl'
         (Get-Command Format-CSS).Name | Should -Be 'Format-Css'
+        (Get-Command Complete-HTMLRoute).Name | Should -Be 'Complete-HtmlRoute'
         (Get-Command Register-HTMLRoute).Name | Should -Be 'Register-HtmlRoute'
     }
 

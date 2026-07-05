@@ -55,20 +55,20 @@ $session = Start-HtmlBrowserSession -Url 'about:blank'
 try {
     Register-HtmlRoute -Session $session -Pattern '**/local-extraction.html' -ScriptBlock {
         param($route)
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'text/html'
             Body        = $staticHtml
-        })
+        }
     } | Out-Null
 
     Register-HtmlRoute -Session $session -Pattern '**/api/products**' -ScriptBlock {
         param($route)
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'application/json'
             Body        = '{"items":[{"name":"Found HtmlTinkerX guide","description":"Rendered from a local API call."}],"token":"local-secret-value"}'
-        })
+        }
     } | Out-Null
 
     $extractionPlan = Test-HtmlExtractionPlan -Content $staticHtml

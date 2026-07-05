@@ -14,7 +14,7 @@ $session = Start-HtmlBrowserSession -Url 'about:blank' -Scenario NetworkCapture
 try {
     Register-HtmlRoute -Session $session -Pattern '**/orders.html' -ScriptBlock {
         param($route)
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'text/html'
             Body        = @'
@@ -38,26 +38,26 @@ fetch('/api/orders', {
 </body>
 </html>
 '@
-        }) | Out-Null
+        }
     } | Out-Null
 
     Register-HtmlRoute -Session $session -Pattern '**/api/orders' -ScriptBlock {
         param($route)
         $request = $route.Request
         if (-not $request.Headers.ContainsKey('x-csrf-token')) {
-            $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+            Complete-HtmlRoute -Route $route -Options @{
                 Status      = 403
                 ContentType = 'application/json'
                 Body        = '{"error":"missing csrf"}'
-            }) | Out-Null
+            }
             return
         }
 
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'application/json'
             Body        = '[{"name":"Quarterly export confirmation","id":42},{"name":"Audit evidence","id":43}]'
-        }) | Out-Null
+        }
     } | Out-Null
 
     Invoke-HtmlBrowserNavigation -Session $session -Url 'https://proof.local/orders.html' -LoadState DomContentLoaded
