@@ -33,6 +33,7 @@ Import-Module PSParseHTML -Force
 `$htmlNodeAccelerator = [HtmlAgilityPack.HtmlNode].FullName
 `$htmlNodeTypeAccelerator = [HtmlAgilityPack.HtmlNodeType].FullName
 `$acornimaScriptAccelerator = [Acornima.Ast.Script].FullName
+`$routeFulfillOptionsAccelerator = [Microsoft.Playwright.RouteFulfillOptions].FullName
 `$command = Get-Command ConvertFrom-HtmlTable -ErrorAction Stop
 `$commandAssembly = `$command.ImplementingType.Assembly
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
@@ -68,6 +69,7 @@ Import-Module PSParseHTML -Force
     HtmlNodeAccelerator = `$htmlNodeAccelerator
     HtmlNodeTypeAccelerator = `$htmlNodeTypeAccelerator
     AcornimaScriptAccelerator = `$acornimaScriptAccelerator
+    RouteFulfillOptionsAccelerator = `$routeFulfillOptionsAccelerator
     LoadedAssemblies = @(`$loadedAssemblies)
 } | ConvertTo-Json -Depth 6 -Compress
 "@
@@ -92,6 +94,7 @@ Import-Module PSParseHTML -Force
         $result.HtmlNodeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNode'
         $result.HtmlNodeTypeAccelerator | Should -Be 'HtmlAgilityPack.HtmlNodeType'
         $result.AcornimaScriptAccelerator | Should -Be 'Acornima.Ast.Script'
+        $result.RouteFulfillOptionsAccelerator | Should -Be 'Microsoft.Playwright.RouteFulfillOptions'
         $result.ConvertFromHtmlTableAssembly | Should -BeLike '*\Artefacts\Unpacked\Modules\PSParseHTML\Lib\Core\PSParseHTML.PowerShell.dll'
         $result.ConvertFromHtmlTableALC | Should -Be 'PSParseHTML'
         $result.ConvertFromHtmlTableALCIsDefault | Should -BeFalse

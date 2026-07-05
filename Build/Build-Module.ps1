@@ -3,6 +3,8 @@ param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
     [string] $RunMode = 'Build',
 
+    [bool] $SignModule = $false,
+
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
     [string] $GitHubApiKeyPath = 'C:\Support\Important\GitHubAPI.txt'
@@ -95,7 +97,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
     $newConfigurationBuildSplat = @{
         Enable                            = $true
         # lets sign module only on my machine for now
-        SignModule                        = $true
+        SignModule                        = $SignModule
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '92e95fb58effa6a4a75e77a33cdd6bfe6dd30f1a'

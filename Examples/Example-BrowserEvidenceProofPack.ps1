@@ -58,20 +58,20 @@ $session = Start-HtmlBrowserSession -Url 'about:blank' -ProfilePath $BrowserProf
 try {
     Register-HtmlRoute -Session $session -Pattern '**/mailbox.html' -ScriptBlock {
         param($route)
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'text/html'
             Body        = $proofHtml
-        }) | Out-Null
+        }
     } | Out-Null
 
     Register-HtmlRoute -Session $session -Pattern '**/api/mailbox-proof' -ScriptBlock {
         param($route)
-        $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+        Complete-HtmlRoute -Route $route -Options @{
             Status      = 200
             ContentType = 'application/json'
             Body        = '{"mailbox":"audit@example.com","subject":"Quarterly export confirmation","timestamp":"2026-06-17T08:00:00Z"}'
-        }) | Out-Null
+        }
     } | Out-Null
 
     Invoke-HtmlBrowserNavigation -Session $session -Url $proofUrl

@@ -14,7 +14,7 @@ Describe 'Browser network data sources' {
         try {
             Register-HtmlRoute -Session $session -Pattern '**/observed.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = @'
@@ -32,16 +32,16 @@ fetch('/api/items')
 </body>
 </html>
 '@
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/api/items' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'application/json'
                     Body        = '[{"name":"Alpha","id":1},{"name":"Beta","id":2}]'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/observed.html' -LoadState DomContentLoaded
@@ -82,7 +82,7 @@ fetch('/api/items')
         try {
             Register-HtmlRoute -Session $session -Pattern '**/secure.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'text/html'
                     Body        = @'
@@ -100,16 +100,16 @@ fetch('/api/secure?access_token=super-secret-token&tenant=contoso')
 </body>
 </html>
 '@
-                }) | Out-Null
+                }
             } | Out-Null
 
             Register-HtmlRoute -Session $session -Pattern '**/api/secure?*' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions] @{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status      = 200
                     ContentType = 'application/json'
                     Body        = '{"name":"Secure Alpha"}'
-                }) | Out-Null
+                }
             } | Out-Null
 
             Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/secure.html' -LoadState DomContentLoaded

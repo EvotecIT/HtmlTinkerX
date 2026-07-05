@@ -235,7 +235,7 @@ sessionStorage.setItem('existingSession', '2');
         try {
             Register-HtmlRoute -Session $session -Pattern '**/diagnostics.html' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/html'
                     Body = @'
@@ -255,15 +255,15 @@ fetch('/api/diagnostics').then(() => {
 </body>
 </html>
 '@
-                }) | Out-Null
+                }
             }
             Register-HtmlRoute -Session $session -Pattern '**/api/diagnostics' -ScriptBlock {
                 param($route)
-                $route.FulfillAsync([Microsoft.Playwright.RouteFulfillOptions]@{
+                Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'application/json'
                     Body = '{"ok":true}'
-                }) | Out-Null
+                }
             }
             Register-HtmlRoute -Session $session -Pattern '**/blocked.png' -ScriptBlock {
                 param($route)
