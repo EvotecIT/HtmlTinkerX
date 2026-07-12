@@ -8,7 +8,7 @@
     Description          = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
     FunctionsToExport    = @()
     GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
-    ModuleVersion        = '2.0.17'
+    ModuleVersion        = '2.0.18'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{

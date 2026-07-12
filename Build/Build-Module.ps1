@@ -3,7 +3,7 @@ param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
     [string] $RunMode = 'Build',
 
-    [bool] $SignModule = $false,
+    [bool] $SignModule = $true,
 
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 

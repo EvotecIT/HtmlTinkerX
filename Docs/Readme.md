@@ -2,7 +2,7 @@
 Module Name: PSParseHTML
 Module Guid: f0387960-7034-4918-a1e1-d5847cbf90df
 Download Help Link: https://github.com/EvotecIT/PSParseHTML
-Help Version: 2.0.17
+Help Version: 2.0.18
 Locale: en-US
 ---
 # PSParseHTML Module
