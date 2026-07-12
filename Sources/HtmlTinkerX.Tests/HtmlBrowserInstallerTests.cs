@@ -16,6 +16,31 @@ namespace HtmlTinkerX.Tests;
 public class HtmlBrowserInstallerTests
 {
     [Fact]
+    public async Task EnsureDriverInstalledAsync_UsesBundledDriverWithoutNetworkDownload()
+    {
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalFactory = HtmlBrowser.HttpClientFactory;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            HtmlBrowser.HttpClientFactory = () => throw new InvalidOperationException("Bundled driver should avoid network download.");
+
+            await HtmlBrowser.EnsureDriverInstalledAsync();
+
+            string configuredRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH")!);
+            string nodeExecutable = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
+            string nodePath = Path.Combine(configuredRoot, ".playwright", "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId(), nodeExecutable);
+            Assert.True(File.Exists(nodePath), $"Expected the bundled Playwright driver at '{nodePath}'.");
+        }
+        finally
+        {
+            HtmlBrowser.HttpClientFactory = originalFactory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+        }
+    }
+
+    [Fact]
     public void ShouldInstallBundledRuntime_SkipsRuntimeForExternalBrowsers()
     {
         Assert.True(HtmlBrowser.ShouldInstallBundledRuntime(new HtmlBrowserLaunchOptions()));
