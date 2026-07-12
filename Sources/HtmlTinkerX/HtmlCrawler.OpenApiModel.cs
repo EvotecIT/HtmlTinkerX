@@ -35,6 +35,7 @@ public static partial class HtmlCrawler {
             }
 
             HtmlCrawlStructuredApiEndpoint endpoint = GetOrCreateStructuredApiEndpoint(endpoints, method!, path!);
+            AppendStructuredApiServer(endpoint.Servers, text);
             endpoint.Title ??= text;
             endpoint.Description ??= FindFollowingParagraphText(heading);
             endpoint.SelectorHint ??= BuildElementSelectorHint(heading);
@@ -75,6 +76,7 @@ public static partial class HtmlCrawler {
 
         foreach (HtmlCrawlStructuredCodeSample sample in codeSamples.Where(sample => !string.IsNullOrWhiteSpace(sample.Method) && !string.IsNullOrWhiteSpace(sample.Path))) {
             HtmlCrawlStructuredApiEndpoint endpoint = GetOrCreateStructuredApiEndpoint(endpoints, sample.Method!, sample.Path!);
+            AppendStructuredApiServer(endpoint.Servers, sample.Code);
             endpoint.Title ??= sample.Title;
             endpoint.SelectorHint ??= sample.SelectorHint;
             if (!string.IsNullOrWhiteSpace(sample.Language)) {
@@ -196,7 +198,9 @@ public static partial class HtmlCrawler {
         HtmlCrawlStructuredOpenApiLike openApiLike = new() {
             Title = metadata.Title,
             Description = metadata.Description,
-            Servers = BuildStructuredOpenApiServers(page, metadata),
+            Servers = BuildStructuredOpenApiServers(
+                BuildStructuredOpenApiServers(page, metadata)
+                    .Concat(endpoints.SelectMany(endpoint => endpoint.Servers))),
             Tags = endpoints.SelectMany(endpoint => endpoint.Tags)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -256,7 +260,9 @@ public static partial class HtmlCrawler {
         HtmlCrawlStructuredOpenApiLike openApiLike = new() {
             Title = primaryMetadata?.Title,
             Description = primaryMetadata?.Description,
-            Servers = BuildStructuredOpenApiServers(result.Pages.Select(page => page.Url)),
+            Servers = BuildStructuredOpenApiServers(
+                result.Pages.Select(page => page.Url)
+                    .Concat(endpointEntries.SelectMany(entry => entry.Endpoint.Servers))),
             Tags = endpointEntries.SelectMany(item => item.Endpoint.Tags)
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

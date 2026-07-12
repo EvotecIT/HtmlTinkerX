@@ -519,7 +519,7 @@ public static partial class HtmlCrawler {
             ApplyStrictOpenApiNullable(schema);
         }
         if (field.EnumValues.Count > 0) {
-            schema["enum"] = field.EnumValues.Cast<object>().ToList();
+            schema["enum"] = BuildStrictOpenApiEnumValues(field.EnumValues, field.Nullable == true);
         }
         if (!string.IsNullOrWhiteSpace(field.ExampleValue)) {
             schema["example"] = ParseStrictOpenApiExampleValue(field.ExampleValue);

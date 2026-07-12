@@ -484,6 +484,9 @@ public partial class HtmlCrawlerStructuredJsonTests {
             List<object> parameters = Assert.IsAssignableFrom<List<object>>(deleteOperation["parameters"]);
             IDictionary<string, object?> strictCookieParameter = Assert.IsAssignableFrom<IDictionary<string, object?>>(Assert.Single(parameters));
             Assert.Equal("cookie", strictCookieParameter["in"] as string);
+            IDictionary<string, object?> responsesDocument = Assert.IsAssignableFrom<IDictionary<string, object?>>(deleteOperation["responses"]);
+            IDictionary<string, object?> noContentResponse = Assert.IsAssignableFrom<IDictionary<string, object?>>(responsesDocument["204"]);
+            Assert.False(noContentResponse.ContainsKey("content"));
         } finally {
             DisposeListenerSafely(server);
         }

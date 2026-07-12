@@ -551,6 +551,26 @@ public static partial class HtmlCrawler {
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
+    private static void AppendStructuredApiServer(IList<string> servers, string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return;
+        }
+
+        string? target = null;
+        Match directMatch = Regex.Match(value!, @"(?im)\b(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(https?://[^\s'""?]+(?:\?[^\s'""]*)?)");
+        if (directMatch.Success) {
+            target = directMatch.Groups[1].Value;
+        } else if (TryExtractCurlTarget(value!, out string? curlTarget)) {
+            target = curlTarget;
+        }
+
+        if (Uri.TryCreate(target, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))) {
+            AppendDistinct(servers, uri.GetLeftPart(UriPartial.Authority));
+        }
+    }
+
     private static bool LooksLikeJson(string code) {
         string trimmed = code.Trim();
         return (trimmed.StartsWith("{", StringComparison.Ordinal) && trimmed.EndsWith("}", StringComparison.Ordinal))

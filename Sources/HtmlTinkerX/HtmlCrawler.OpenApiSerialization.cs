@@ -189,7 +189,7 @@ public static partial class HtmlCrawler {
             schema["pattern"] = parameter.Pattern;
         }
         if (parameter.EnumValues.Count > 0) {
-            schema["enum"] = parameter.EnumValues.Cast<object>().ToList();
+            schema["enum"] = BuildStrictOpenApiEnumValues(parameter.EnumValues, parameter.Nullable == true);
         }
 
         return schema;
@@ -263,11 +263,18 @@ public static partial class HtmlCrawler {
             response["headers"] = headers;
         }
 
-        string? contentType = examples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        List<HtmlCrawlStructuredResponseExample> bodyExamples = examples
+            .Where(example => !string.IsNullOrWhiteSpace(example.Body))
+            .ToList();
+        if (bodyExamples.Count == 0) {
+            return response;
+        }
+
+        string? contentType = bodyExamples.Select(example => example.ContentType).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
         object? schema = BuildStrictOpenApiSchemaReference(
             isError ? operation.ErrorResponseFieldsRef : operation.SuccessResponseFieldsRef,
             isError ? operation.ErrorResponseSchemaRef : operation.SuccessResponseSchemaRef);
-        Dictionary<string, object?> exampleEntries = BuildStrictOpenApiResponseExamples(examples);
+        Dictionary<string, object?> exampleEntries = BuildStrictOpenApiResponseExamples(bodyExamples);
         if (schema != null || exampleEntries.Count > 0) {
             Dictionary<string, object?> mediaType = new(StringComparer.OrdinalIgnoreCase);
             if (schema != null) {
@@ -283,6 +290,14 @@ public static partial class HtmlCrawler {
         }
 
         return response;
+    }
+
+    private static List<object?> BuildStrictOpenApiEnumValues(IEnumerable<string> values, bool nullable) {
+        List<object?> result = values.Cast<object?>().ToList();
+        if (nullable) {
+            result.Add(null);
+        }
+        return result;
     }
 
     private static Dictionary<string, object?> BuildStrictOpenApiComponents(HtmlCrawlStructuredOpenApiLike openApiLike) {

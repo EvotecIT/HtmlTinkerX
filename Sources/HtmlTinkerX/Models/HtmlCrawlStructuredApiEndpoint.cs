@@ -12,6 +12,9 @@ public sealed class HtmlCrawlStructuredApiEndpoint {
     /// <summary>Normalized endpoint path or URL path.</summary>
     public string Path { get; set; } = string.Empty;
 
+    /// <summary>Absolute API server origins discovered from endpoint headings or request examples.</summary>
+    public IList<string> Servers { get; set; } = new List<string>();
+
     /// <summary>Short title, typically from a nearby heading.</summary>
     public string? Title { get; set; }
 
