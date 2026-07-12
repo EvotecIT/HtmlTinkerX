@@ -43,7 +43,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Maximum number of bytes accepted for each downloaded asset response.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
-    public int MaximumAssetResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+    public int MaximumAssetResponseBytes { get; set; } = HtmlCrawlOptions.DefaultMaximumAssetResponseBytes;
 
     /// <summary>Render pages through Playwright before extraction.</summary>
     [Parameter]

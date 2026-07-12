@@ -95,7 +95,7 @@ fetch('/api/never-ending');
             } | Out-Null
 
             Invoke-HtmlBrowserNavigation -Session $session -Url 'https://example.com/reload.html' -LoadState DomContentLoaded -Timeout 2000
-            Invoke-HtmlBrowserNavigation -Session $session -Selector '#reload' -WaitForNavigation -LoadState DomContentLoaded -Timeout 2000
+            Invoke-HtmlBrowserNavigation -Session $session -Selector '#reload' -WaitForNavigation -LoadState DomContentLoaded -NavigationUrl '**/reload.html' -Timeout 2000
             Wait-HtmlBrowserContent -Session $session -Selector '#status' -Text 'same-url-ready' -Exact -Timeout 1000
 
             $session.Page.Url | Should -Be 'https://example.com/reload.html'

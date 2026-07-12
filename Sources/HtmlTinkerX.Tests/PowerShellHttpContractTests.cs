@@ -2,10 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using PSParseHTML.PowerShell;
 
 namespace HtmlTinkerX.Tests;
 
 public class PowerShellHttpContractTests {
+    [Fact]
+    public void InvokeHtmlCrawl_UsesCrawlerResponseLimitDefaults() {
+        CmdletInvokeHtmlCrawl cmdlet = new();
+
+        Assert.Equal(HtmlHttpFetchOptions.DefaultMaximumResponseBytes, cmdlet.MaximumPageResponseBytes);
+        Assert.Equal(HtmlCrawlOptions.DefaultMaximumAssetResponseBytes, cmdlet.MaximumAssetResponseBytes);
+    }
+
     [Fact]
     public void CmdletUrlReads_UseBoundedHttpUtilityOverloads() {
         string repositoryRoot = FindRepositoryRoot();

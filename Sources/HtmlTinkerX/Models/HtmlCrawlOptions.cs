@@ -8,6 +8,9 @@ namespace HtmlTinkerX;
 /// Configures an offline crawl run.
 /// </summary>
 public sealed class HtmlCrawlOptions {
+    /// <summary>Default maximum size in bytes for each downloaded crawl asset.</summary>
+    public const int DefaultMaximumAssetResponseBytes = 64 * 1024 * 1024;
+
     /// <summary>Maximum link depth to traverse from the starting page.</summary>
     public int MaxDepth { get; set; } = 1;
 
@@ -18,7 +21,7 @@ public sealed class HtmlCrawlOptions {
     public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
 
     /// <summary>Maximum size in bytes for each downloaded crawl asset.</summary>
-    public int MaximumAssetResponseBytes { get; set; } = 64 * 1024 * 1024;
+    public int MaximumAssetResponseBytes { get; set; } = DefaultMaximumAssetResponseBytes;
 
     /// <summary>When true, pages are rendered through Playwright before extraction.</summary>
     public bool Render { get; set; }

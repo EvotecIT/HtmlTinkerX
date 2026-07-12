@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -257,7 +258,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                         Source = endpoint.Source
                     });
                 }
-            } catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException)) {
+            } catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException || ex is InvalidDataException)) {
                 endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                     Index = endpoints.Count,
                     ScriptIndex = scriptIndex,

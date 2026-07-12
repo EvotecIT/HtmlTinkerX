@@ -425,15 +425,21 @@ public static partial class HtmlBrowser {
     }
 
     private static async Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) {
-        if (string.IsNullOrWhiteSpace(navigationUrl)) {
+        bool navigationUrlAlreadyMatches = !string.IsNullOrWhiteSpace(navigationUrl)
+            && MatchesNavigationUrl(session.Page.Url, navigationUrl);
+        if (string.IsNullOrWhiteSpace(navigationUrl) || navigationUrlAlreadyMatches) {
             // WaitForURLAsync can complete against the current URL before the click and cannot
-            // distinguish a same-URL reload. The event-based helper is required for this case.
+            // distinguish a same-URL reload. The event-based helper is required when no target
+            // is supplied or the target already matches the current page.
 #pragma warning disable CS0612
             await session.Page.RunAndWaitForNavigationAsync(
                 () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
                 new PageRunAndWaitForNavigationOptions {
                     Timeout = timeout,
-                    WaitUntil = ToWaitUntilState(loadState)
+                    WaitUntil = ToWaitUntilState(loadState),
+                    UrlFunc = navigationUrlAlreadyMatches
+                        ? url => MatchesNavigationUrl(url, navigationUrl)
+                        : null
                 }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 #pragma warning restore CS0612
             return;
