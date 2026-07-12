@@ -424,14 +424,19 @@ public static partial class HtmlBrowser {
         });
     }
 
-    private static Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) =>
-        session.Page.RunAndWaitForNavigationAsync(
-            () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
-            new PageRunAndWaitForNavigationOptions {
-                UrlFunc = url => MatchesNavigationUrl(url, navigationUrl),
+    private static async Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) {
+        Task navigationTask = session.Page.WaitForURLAsync(
+            url => MatchesNavigationUrl(url, navigationUrl),
+            new PageWaitForURLOptions {
                 Timeout = timeout,
                 WaitUntil = ToWaitUntilState(loadState)
             }).WaitWithCancellationAsync(cancellationToken);
+        Task clickTask = locator
+            .ClickAsync(new LocatorClickOptions { Timeout = timeout })
+            .WaitWithCancellationAsync(cancellationToken);
+
+        await Task.WhenAll(clickTask, navigationTask).ConfigureAwait(false);
+    }
 
     private static bool MatchesNavigationUrl(string url, string? navigationUrl) {
         if (string.IsNullOrWhiteSpace(navigationUrl)) {

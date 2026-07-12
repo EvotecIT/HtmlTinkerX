@@ -66,6 +66,21 @@ public sealed class HarResponse {
 /// Utility methods for working with HAR files.
 /// </summary>
 public static class HtmlHarViewer {
+    private static readonly JsonSerializerOptions ReadOptions = new() {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static readonly JsonSerializerOptions ViewerOptions = new() {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.Default
+    };
+
+    private static readonly JsonSerializerOptions WriteOptions = new() {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     /// <summary>
     /// Reads a HAR file from disk.
     /// </summary>
@@ -81,12 +96,8 @@ public static class HtmlHarViewer {
             throw new FileNotFoundException($"File not found: {path}", path);
         }
         string json = await HtmlUtilities.ReadFileCheckedAsync(path).ConfigureAwait(false);
-        var opts = new JsonSerializerOptions {
-            PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
         try {
-            Har? har = JsonSerializer.Deserialize<Har>(json, opts);
+            Har? har = JsonSerializer.Deserialize<Har>(json, ReadOptions);
             return har ?? throw new InvalidDataException("Invalid HAR content");
         } catch (JsonException e) {
             throw new InvalidDataException("Invalid HAR content", e);
@@ -106,11 +117,7 @@ public static class HtmlHarViewer {
     /// </code>
     /// </example>
     public static string BuildViewerHtml(Har har) {
-        var opts = new JsonSerializerOptions {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Encoder = JavaScriptEncoder.Default
-        };
-        string json = JsonSerializer.Serialize(har, opts);
+        string json = JsonSerializer.Serialize(har, ViewerOptions);
         string encodedJson = HtmlEncoder.Default.Encode(json);
         return $$"""
 <!DOCTYPE html>
@@ -175,11 +182,7 @@ for (const e of entries) {
             har.Log = new HarLog();
         }
 
-        var opts = new JsonSerializerOptions {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        string json = JsonSerializer.Serialize(har, opts);
+        string json = JsonSerializer.Serialize(har, WriteOptions);
 #if NETSTANDARD2_0 || NETFRAMEWORK
         using (var writer = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false), 1024, leaveOpen: true)) {
             await writer.WriteAsync(json).ConfigureAwait(false);

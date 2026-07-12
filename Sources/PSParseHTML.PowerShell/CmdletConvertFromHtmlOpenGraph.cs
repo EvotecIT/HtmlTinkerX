@@ -53,7 +53,7 @@ public sealed class CmdletConvertFromHtmlOpenGraph : AsyncPSCmdlet {
         HtmlOpenGraph graph;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            graph = await HtmlParser.ParseUrlOpenGraphAsync(Url.ToString(), client).ConfigureAwait(false);
+            graph = await HtmlParser.ParseUrlOpenGraphAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else if (ParameterSetName == ParameterSetNode) {
             graph = HtmlParser.ParseOpenGraph(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {

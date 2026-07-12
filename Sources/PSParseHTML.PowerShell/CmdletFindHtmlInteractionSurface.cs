@@ -84,7 +84,7 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
+                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
             case ParameterSetNode:
                 return HtmlPipelineInput.ToHtmlMarkup(HtmlNode);
             default:

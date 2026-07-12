@@ -496,7 +496,7 @@ public static class HtmlFormatter {
                 .MoveCssInlineAsync(html, options, cancellationToken)
                 .ConfigureAwait(false);
             return result.Html;
-        } catch (TaskCanceledException) {
+        } catch (OperationCanceledException) {
             throw;
         } catch (Exception ex) when (options?.DownloadRemoteCss == true) {
             LoggingMessages.Logger.WriteWarning(

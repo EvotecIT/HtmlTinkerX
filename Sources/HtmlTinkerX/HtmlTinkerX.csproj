@@ -3,10 +3,17 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.18</VersionPrefix>
+        <Version>2.1.0-beta.1</Version>
         <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <AssemblyName>HtmlTinkerX</AssemblyName>
         <AssemblyTitle>HtmlTinkerX</AssemblyTitle>
+        <Description>HTML, CSS, and JavaScript parsing, extraction, auditing, formatting, and browser automation for .NET and PowerShell.</Description>
+        <PackageProjectUrl>https://github.com/EvotecIT/HtmlTinkerX</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/EvotecIT/HtmlTinkerX.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>html;css;javascript;web-scraping;web-audit;playwright;anglesharp;powershell</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
@@ -16,10 +23,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.4.1-beta.523" />
-        <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.213" />
+        <PackageReference Include="AngleSharp" Version="1.5.2" />
+        <PackageReference Include="AngleSharp.Css" Version="1.0.0-beta.216" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
-        <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.47" />
+        <PackageReference Include="AngleSharp.Js" Version="1.0.0-beta.49" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="Jint" Version="4.8.0" />
         <PackageReference Include="NUglify" Version="1.21.17" />
@@ -50,6 +57,11 @@
 
     <ItemGroup>
         <PackageReference Include="OfficeIMO.Markdown.Html" Version="$(OfficeImoMarkdownHtmlVersion)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>

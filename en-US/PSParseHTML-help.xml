@@ -36056,6 +36056,18 @@ HtmlTinkerX.HtmlRenderedPageSnapshot</maml:name>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HttpClient</maml:name>
+          <maml:description>
+            <maml:para>HTTP client used to download linked stylesheets. The caller retains ownership of the client.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">HttpClient</command:parameterValue>
+          <dev:type>
+            <maml:name>HttpClient</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="False" position="named" aliases="None">
           <maml:name>IgnoreElements</maml:name>
           <maml:description>
             <maml:para>CSS selector for elements to ignore.</maml:para>
@@ -36246,6 +36258,18 @@ HtmlTinkerX.HtmlRenderedPageSnapshot</maml:name>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HttpClient</maml:name>
+          <maml:description>
+            <maml:para>HTTP client used to download linked stylesheets. The caller retains ownership of the client.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">HttpClient</command:parameterValue>
+          <dev:type>
+            <maml:name>HttpClient</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -36465,6 +36489,18 @@ HtmlTinkerX.HtmlRenderedPageSnapshot</maml:name>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
           <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="False" position="named" aliases="None">
+        <maml:name>HttpClient</maml:name>
+        <maml:description>
+          <maml:para>HTTP client used to download linked stylesheets. The caller retains ownership of the client.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">HttpClient</command:parameterValue>
+        <dev:type>
+          <maml:name>HttpClient</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

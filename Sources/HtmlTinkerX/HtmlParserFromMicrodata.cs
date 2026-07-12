@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -34,13 +35,15 @@ public static class HtmlParserFromMicrodata {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of microdata items.</returns>
-    public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null) {
+    public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseMicrodataItems(content);
     }
 

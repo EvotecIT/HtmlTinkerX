@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -53,7 +54,11 @@ public class PreMailerClient {
     /// </summary>
     public PreMailerResult MoveCssInline() {
         try {
-            string cssContent = Options.Css ?? string.Empty;
+            StringBuilder cssContent = new();
+            if (!string.IsNullOrEmpty(Options.Css)) {
+                cssContent.AppendLine(Options.Css);
+            }
+            List<IReadOnlyList<KeyValuePair<string, string>>> preservedStylesheetLinks = new();
             string htmlToProcess = _html;
 
             var document = HtmlParser.ParseWithAngleSharp(_html);
@@ -70,33 +75,16 @@ public class PreMailerClient {
                     continue;
                 }
 
-                if (Options.DownloadRemoteCss && href != null) {
-                    try {
-                        Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
-                        if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
-                            uri = new Uri(Options.BaseUri, uri);
-                        }
-
-                        if (uri.IsFile) {
-                            string localPath = NormalizeFileUriPath(uri);
-                            cssContent += HtmlUtilities.ReadFileChecked(localPath);
-                        } else if (uri.IsAbsoluteUri) {
-                            using HttpClient client = new();
-                            cssContent += HtmlUtilities
-                                .GetStringWithProperEncodingAsync(client, uri.ToString())
-                                .GetAwaiter().GetResult();
-                        }
-                    } catch (Exception ex) {
-                        LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
-                    }
+                bool inlined = Options.DownloadRemoteCss && href != null && TryAppendLinkedStylesheet(cssContent, href);
+                if (!inlined) {
+                    preservedStylesheetLinks.Add(CaptureAttributes(link));
                 }
-
                 link.Remove();
             }
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                cssContent += HtmlUtilities.ReadFileChecked(Options.CssFilePath!);
+                cssContent.AppendLine(HtmlUtilities.ReadFileChecked(Options.CssFilePath!));
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
@@ -115,7 +103,7 @@ public class PreMailerClient {
             InlineResult result = preMailer.MoveCssInline(
                 Options.RemoveStyleElements,
                 Options.IgnoreElements,
-                cssContent,
+                cssContent.ToString(),
                 Options.StripIdAndClassAttributes,
                 Options.RemoveComments,
                 Options.CustomFormatter,
@@ -130,7 +118,7 @@ public class PreMailerClient {
                 }
             }
 
-            return new PreMailerResult(result.Html, warnings);
+            return new PreMailerResult(RestoreStylesheetLinks(result.Html, preservedStylesheetLinks), warnings);
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("MoveCssInline failed with error: {0}", ex.Message);
             throw;
@@ -145,7 +133,11 @@ public class PreMailerClient {
             return await Task.FromCanceled<PreMailerResult>(cancellationToken).ConfigureAwait(false);
         }
         try {
-            string cssContent = Options.Css ?? string.Empty;
+            StringBuilder cssContent = new();
+            if (!string.IsNullOrEmpty(Options.Css)) {
+                cssContent.AppendLine(Options.Css);
+            }
+            List<IReadOnlyList<KeyValuePair<string, string>>> preservedStylesheetLinks = new();
             string htmlToProcess = _html;
 
             var document = HtmlParser.ParseWithAngleSharp(_html);
@@ -162,37 +154,18 @@ public class PreMailerClient {
                     continue;
                 }
 
-                if (Options.DownloadRemoteCss && href != null) {
-                    try {
-                        Uri uri = new Uri(href, UriKind.RelativeOrAbsolute);
-                        if (!uri.IsAbsoluteUri && Options.BaseUri != null) {
-                            uri = new Uri(Options.BaseUri, uri);
-                        }
-
-                        if (uri.IsFile) {
-                            string localPath = NormalizeFileUriPath(uri);
-#if NETSTANDARD2_0 || NETFRAMEWORK
-                            cssContent += await Task.Run(() => File.ReadAllText(localPath), cancellationToken).ConfigureAwait(false);
-#else
-                            cssContent += await File.ReadAllTextAsync(localPath, cancellationToken).ConfigureAwait(false);
-#endif
-                        } else if (uri.IsAbsoluteUri) {
-                            using HttpClient client = new();
-                            cssContent += await HtmlUtilities
-                                .GetStringWithProperEncodingAsync(client, uri.ToString(), cancellationToken)
-                                .ConfigureAwait(false);
-                        }
-                    } catch (Exception ex) {
-                        LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
-                    }
+                bool inlined = Options.DownloadRemoteCss
+                    && href != null
+                    && await TryAppendLinkedStylesheetAsync(cssContent, href, cancellationToken).ConfigureAwait(false);
+                if (!inlined) {
+                    preservedStylesheetLinks.Add(CaptureAttributes(link));
                 }
-
                 link.Remove();
             }
 
             htmlToProcess = document.DocumentElement.OuterHtml;
             if (!string.IsNullOrEmpty(Options.CssFilePath)) {
-                cssContent += await HtmlUtilities.ReadFileCheckedAsync(Options.CssFilePath!, cancellationToken).ConfigureAwait(false);
+                cssContent.AppendLine(await HtmlUtilities.ReadFileCheckedAsync(Options.CssFilePath!, cancellationToken).ConfigureAwait(false));
             }
 
             PreMailer.Net.PreMailer preMailer = Options.BaseUri != null
@@ -211,7 +184,7 @@ public class PreMailerClient {
             InlineResult result = preMailer.MoveCssInline(
                 Options.RemoveStyleElements,
                 Options.IgnoreElements,
-                cssContent,
+                cssContent.ToString(),
                 Options.StripIdAndClassAttributes,
                 Options.RemoveComments,
                 Options.CustomFormatter,
@@ -226,11 +199,96 @@ public class PreMailerClient {
                 }
             }
 
-            return new PreMailerResult(result.Html, warnings);
+            return new PreMailerResult(RestoreStylesheetLinks(result.Html, preservedStylesheetLinks), warnings);
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("MoveCssInlineAsync failed with error: {0}", ex.Message);
             throw;
         }
+    }
+
+    private bool TryAppendLinkedStylesheet(StringBuilder cssContent, string href) {
+        try {
+            Uri uri = ResolveStylesheetUri(href);
+            string downloadedCss;
+            if (uri.IsFile) {
+                downloadedCss = HtmlUtilities.ReadFileChecked(NormalizeFileUriPath(uri));
+            } else {
+                downloadedCss = HtmlUtilities
+                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri)
+                    .GetAwaiter().GetResult();
+            }
+
+            cssContent.AppendLine(downloadedCss);
+            return true;
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
+            return false;
+        }
+    }
+
+    private async Task<bool> TryAppendLinkedStylesheetAsync(StringBuilder cssContent, string href, CancellationToken cancellationToken) {
+        try {
+            Uri uri = ResolveStylesheetUri(href);
+            string downloadedCss;
+            if (uri.IsFile) {
+                downloadedCss = await HtmlUtilities.ReadFileCheckedAsync(NormalizeFileUriPath(uri), cancellationToken).ConfigureAwait(false);
+            } else {
+                downloadedCss = await HtmlUtilities
+                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            cssContent.AppendLine(downloadedCss);
+            return true;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteError("Failed to download CSS from {0}: {1}", href, ex.Message);
+            return false;
+        }
+    }
+
+    private Uri ResolveStylesheetUri(string href) {
+        Uri uri = new(href, UriKind.RelativeOrAbsolute);
+        if (uri.IsAbsoluteUri) {
+            return uri;
+        }
+
+        if (Options.BaseUri == null) {
+            throw new InvalidOperationException("A base URI is required to resolve a relative stylesheet URL.");
+        }
+
+        return new Uri(Options.BaseUri, uri);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> CaptureAttributes(IElement element) {
+        List<KeyValuePair<string, string>> attributes = new(element.Attributes.Length);
+        foreach (IAttr attribute in element.Attributes) {
+            attributes.Add(new KeyValuePair<string, string>(attribute.Name, attribute.Value));
+        }
+        return attributes;
+    }
+
+    private static string RestoreStylesheetLinks(string html, IReadOnlyList<IReadOnlyList<KeyValuePair<string, string>>> links) {
+        if (links.Count == 0) {
+            return html;
+        }
+
+        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        IElement? head = document.QuerySelector("head");
+        if (head == null) {
+            return html;
+        }
+
+        foreach (IReadOnlyList<KeyValuePair<string, string>> attributes in links) {
+            IElement link = document.CreateElement("link");
+            foreach (KeyValuePair<string, string> attribute in attributes) {
+                link.SetAttribute(attribute.Key, attribute.Value);
+            }
+            head.AppendChild(link);
+        }
+
+        return document.DocumentElement.OuterHtml;
     }
 
     /// <summary>

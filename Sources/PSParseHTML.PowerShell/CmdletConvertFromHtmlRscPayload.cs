@@ -81,7 +81,7 @@ public sealed class CmdletConvertFromHtmlRscPayload : AsyncPSCmdlet {
                 return HtmlReactFlightParser.Parse(html);
             case ParameterSetUrl:
                 using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
-                    return await HtmlReactFlightParser.ParseUrlAsync(Url.ToString(), client).ConfigureAwait(false);
+                    return await HtmlReactFlightParser.ParseUrlAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:
                 return HtmlReactFlightParser.Parse(Content);

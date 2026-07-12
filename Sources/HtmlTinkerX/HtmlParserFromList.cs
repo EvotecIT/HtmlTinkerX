@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -100,14 +101,16 @@ public static class HtmlParserFromList {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseListsWithAngleSharpDetailed(content, tagPlaceholder);
     }
 
@@ -116,10 +119,12 @@ public static class HtmlParserFromList {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of lists with joined item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
-        var detailed = await ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client).ConfigureAwait(false);
+    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        var detailed = await ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         List<List<string>> result = new();
         foreach (var list in detailed) {
             result.Add(list.Items.Select(i => string.Join(tagPlaceholder, i)).ToList());
@@ -222,14 +227,16 @@ public static class HtmlParserFromList {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseListsWithHtmlAgilityPackDetailed(content, tagPlaceholder);
     }
 
@@ -238,10 +245,12 @@ public static class HtmlParserFromList {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of lists with joined item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null) {
-        var detailed = await ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client).ConfigureAwait(false);
+    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string? url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        var detailed = await ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         List<List<string>> result = new();
         foreach (var list in detailed) {
             result.Add(list.Items.Select(i => string.Join(tagPlaceholder, i)).ToList());

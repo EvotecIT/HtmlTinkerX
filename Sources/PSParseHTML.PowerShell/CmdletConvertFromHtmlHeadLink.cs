@@ -72,7 +72,7 @@ public sealed class CmdletConvertFromHtmlHeadLink : AsyncPSCmdlet {
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
                 using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
-                    return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString()).ConfigureAwait(false);
+                    return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
                 }
             case ParameterSetNode:
                 return HtmlPipelineInput.ToHtmlMarkup(HtmlNode);

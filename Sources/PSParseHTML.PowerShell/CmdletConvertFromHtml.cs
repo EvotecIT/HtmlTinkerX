@@ -65,11 +65,11 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine == HtmlParserEngine.AngleSharp) {
-                IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
+                IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);
                 return;
             }
-            HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+            HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
             WriteObject(Raw.IsPresent ? doc2 : doc2.DocumentNode);
             return;
         }

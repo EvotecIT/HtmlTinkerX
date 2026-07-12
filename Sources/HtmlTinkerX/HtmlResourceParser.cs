@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -86,7 +87,13 @@ public static class HtmlResourceParser {
     }
 
     /// <summary>Downloads and parses resources from a URL.</summary>
-    public static async Task<List<HtmlResourceLink>> ParseUrlAsync(string url, bool includeCss = false, bool includeInline = false, HttpClient? client = null) {
+    /// <param name="url">Absolute page URL.</param>
+    /// <param name="includeCss">Include stylesheet references.</param>
+    /// <param name="includeInline">Include inline script and style content.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<List<HtmlResourceLink>> ParseUrlAsync(string url, bool includeCss = false, bool includeInline = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -96,12 +103,24 @@ public static class HtmlResourceParser {
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString()).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString(), fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(content, includeCss, includeInline);
     }
 
     /// <summary>Downloads resources referenced by the provided links.</summary>
-    public static async Task<List<string>> DownloadResourcesAsync(IEnumerable<HtmlResourceLink> links, Uri baseUri, string directory, HttpClient? client = null) {
+    /// <param name="links">Resources to download.</param>
+    /// <param name="baseUri">Base URI used to resolve relative resource links.</param>
+    /// <param name="directory">Destination directory.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy applied to each resource.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<List<string>> DownloadResourcesAsync(
+        IEnumerable<HtmlResourceLink> links,
+        Uri baseUri,
+        string directory,
+        HttpClient? client = null,
+        HtmlHttpFetchOptions? fetchOptions = null,
+        CancellationToken cancellationToken = default) {
         if (links == null) {
             throw new ArgumentNullException(nameof(links));
         }
@@ -118,31 +137,22 @@ public static class HtmlResourceParser {
             if (!srcUri.IsAbsoluteUri) {
                 srcUri = new Uri(baseUri, srcUri);
             }
-#if NETSTANDARD2_0 || NETFRAMEWORK
-            using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false)) {
-                response.EnsureSuccessStatusCode();
-                using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                string filePath = Path.Combine(dir, Path.GetFileName(srcUri.AbsolutePath));
-                using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
-                paths.Add(filePath);
-            }
-#else
-            using HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            await using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             string filePath = Path.Combine(dir, Path.GetFileName(srcUri.AbsolutePath));
-            await using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
+            await HtmlUtilities.DownloadToFileAsync(http, srcUri, filePath, fetchOptions, cancellationToken).ConfigureAwait(false);
             paths.Add(filePath);
-#endif
         }
 
         return paths;
     }
 
     /// <summary>Downloads resources referenced by the page at the given URL.</summary>
-    public static async Task<List<string>> DownloadResourcesFromUrlAsync(string url, string directory, bool includeCss = false, HttpClient? client = null) {
+    /// <param name="url">Absolute page URL.</param>
+    /// <param name="directory">Destination directory.</param>
+    /// <param name="includeCss">Include stylesheet references.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<List<string>> DownloadResourcesFromUrlAsync(string url, string directory, bool includeCss = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -152,8 +162,8 @@ public static class HtmlResourceParser {
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        List<HtmlResourceLink> links = await ParseUrlAsync(baseUri.ToString(), includeCss, includeInline: false, client: http).ConfigureAwait(false);
-        return await DownloadResourcesAsync(links, baseUri, directory, http).ConfigureAwait(false);
+        List<HtmlResourceLink> links = await ParseUrlAsync(baseUri.ToString(), includeCss, includeInline: false, client: http, fetchOptions: fetchOptions, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return await DownloadResourcesAsync(links, baseUri, directory, http, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static string GetFileNameFromUrl(string url) {

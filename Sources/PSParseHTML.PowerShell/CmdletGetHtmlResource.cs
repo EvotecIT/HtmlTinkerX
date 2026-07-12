@@ -67,10 +67,10 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
         switch (ParameterSetName) {
             case ParameterSetUrl:
                 client = HttpClientHelper.Create(Proxy, ProxyCredential);
-                links = await HtmlResourceParser.ParseUrlAsync(Url.ToString(), IncludeCss.IsPresent, IncludeInline.IsPresent, client).ConfigureAwait(false);
+                links = await HtmlResourceParser.ParseUrlAsync(Url.ToString(), IncludeCss.IsPresent, IncludeInline.IsPresent, client, cancellationToken: CancelToken).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
-                string html = await HtmlUtilities.ReadFileCheckedAsync(Path).ConfigureAwait(false);
+                string html = await HtmlUtilities.ReadFileCheckedAsync(Path, CancelToken).ConfigureAwait(false);
                 links = HtmlResourceParser.Parse(html, IncludeCss.IsPresent, IncludeInline.IsPresent);
                 break;
             default:
@@ -94,7 +94,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
                         link.Content = await File.ReadAllTextAsync(srcUri.LocalPath).ConfigureAwait(false);
 #endif
                     } else {
-                        link.Content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, srcUri.ToString()).ConfigureAwait(false);
+                        link.Content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, srcUri.ToString(), CancelToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -111,7 +111,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
             }
             var paths = new List<string>();
             foreach (var link in links) {
-                paths.Add(await link.SaveAsync(OutDirectory!, Url, client!).ConfigureAwait(false));
+                paths.Add(await link.SaveAsync(OutDirectory!, Url, client!, cancellationToken: CancelToken).ConfigureAwait(false));
             }
             WriteObject(paths.ToArray(), true);
         } else {

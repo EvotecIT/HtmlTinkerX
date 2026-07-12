@@ -39,6 +39,7 @@ public static class HtmlParser {
     /// Downloads and parses HTML markup from a URL using AngleSharp.
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
     /// <returns>The parsed <see cref="IDocument"/>.</returns>
     /// <example>
     /// <code>
@@ -47,12 +48,12 @@ public static class HtmlParser {
     /// </example>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
+    public static async Task<IDocument> ParseUrlWithAngleSharpAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, cancellationToken).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseWithAngleSharp(content);
     }
 
@@ -76,13 +77,14 @@ public static class HtmlParser {
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
     /// <returns>The parsed <see cref="HtmlDocument"/>.</returns>
-    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null, CancellationToken cancellationToken = default) {
+    public static async Task<HtmlDocument> ParseUrlWithHtmlAgilityPackAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, cancellationToken).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseWithHtmlAgilityPack(content);
     }
 
@@ -267,6 +269,8 @@ public static class HtmlParser {
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithAngleSharpAsync(
         string url,
@@ -274,8 +278,10 @@ public static class HtmlParser {
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
         HttpClient? client = null,
-        Func<HttpClient>? clientFactory = null) {
-        return await HtmlParserFromTable.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client, clientFactory);
+        Func<HttpClient>? clientFactory = null,
+        HtmlHttpFetchOptions? fetchOptions = null,
+        CancellationToken cancellationToken = default) {
+        return await HtmlParserFromTable.ParseUrlTablesWithAngleSharpAsync(url, replaceContent, replaceHeaders, allProperties, client, clientFactory, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -474,6 +480,8 @@ public static class HtmlParser {
     /// <param name="allProperties">Whether to pad rows with missing cells.</param>
     /// <param name="client">Optional HTTP client used for downloading the page.</param>
     /// <param name="clientFactory">Factory used to create a temporary <see cref="HttpClient"/> when one is not supplied.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of tables with rows represented as dictionaries.</returns>
     public static async Task<List<List<Dictionary<string, string?>>>> ParseUrlTablesWithHtmlAgilityPackAsync(
         string url,
@@ -482,8 +490,10 @@ public static class HtmlParser {
         IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false,
         HttpClient? client = null,
-        Func<HttpClient>? clientFactory = null) {
-        return await HtmlParserFromTable.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client, clientFactory);
+        Func<HttpClient>? clientFactory = null,
+        HtmlHttpFetchOptions? fetchOptions = null,
+        CancellationToken cancellationToken = default) {
+        return await HtmlParserFromTable.ParseUrlTablesWithHtmlAgilityPackAsync(url, reverseTable, replaceContent, replaceHeaders, allProperties, client, clientFactory, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -501,10 +511,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of lists with item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
-        return await HtmlParserFromList.ParseUrlListsWithAngleSharpAsync(url, tagPlaceholder, client);
+    public static async Task<List<List<string>>> ParseUrlListsWithAngleSharpAsync(string url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromList.ParseUrlListsWithAngleSharpAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -522,10 +534,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of lists with item texts.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
-        return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackAsync(url, tagPlaceholder, client);
+    public static async Task<List<List<string>>> ParseUrlListsWithHtmlAgilityPackAsync(string url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -543,10 +557,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
-        return await HtmlParserFromList.ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client);
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithAngleSharpDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromList.ParseUrlListsWithAngleSharpDetailedAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -564,10 +580,12 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="tagPlaceholder">Placeholder inserted between text segments.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List parse results with metadata.</returns>
     /// <param name="client">Optional HTTP client.</param>
-    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null) {
-        return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client);
+    public static async Task<List<HtmlListResult>> ParseUrlListsWithHtmlAgilityPackDetailedAsync(string url, string tagPlaceholder = " ", HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromList.ParseUrlListsWithHtmlAgilityPackDetailedAsync(url, tagPlaceholder, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -584,9 +602,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of form parse results.</returns>
-    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null) {
-        return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client);
+    public static async Task<List<HtmlFormResult>> ParseUrlFormsWithAngleSharpAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromForm.ParseUrlFormsWithAngleSharpAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -603,9 +623,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of meta tag name/content pairs.</returns>
-    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsAsync(string url, HttpClient? client = null) {
-        return await HtmlParserFromMeta.ParseUrlMetaTagsAsync(url, client).ConfigureAwait(false);
+    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromMeta.ParseUrlMetaTagsAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -622,9 +644,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Parsed Open Graph metadata.</returns>
-    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string url, HttpClient? client = null) {
-        return await HtmlParserFromOpenGraph.ParseUrlOpenGraphAsync(url, client).ConfigureAwait(false);
+    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await HtmlParserFromOpenGraph.ParseUrlOpenGraphAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -651,9 +675,11 @@ public static class HtmlParser {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of microdata items.</returns>
-      public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null) {
-          return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client).ConfigureAwait(false);
+      public static async Task<List<HtmlMicrodataItem>> ParseUrlMicrodataItemsAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+          return await HtmlParserFromMicrodata.ParseUrlMicrodataItemsAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
       }
 
       /// <summary>

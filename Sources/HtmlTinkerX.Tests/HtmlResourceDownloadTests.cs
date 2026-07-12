@@ -1,5 +1,6 @@
 using HtmlTinkerX;
 using System.Net.Http;
+using System.Threading;
 
 namespace HtmlTinkerX.Tests;
 
@@ -72,5 +73,44 @@ public class HtmlResourceDownloadTests {
         Assert.Equal("file1", c1);
         Assert.Equal("file2", c2);
         Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RejectsResourceAboveConfiguredLimitWithoutLeavingPartialFile() {
+        using var server = CreateServer();
+        using HttpClient client = server.CreateClient();
+        HtmlResourceLink link = new() { Source = server.BaseAddress + "file1.txt" };
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => link.SaveAsync(
+            dir,
+            client: client,
+            fetchOptions: new HtmlHttpFetchOptions { MaximumResponseBytes = 4 }));
+
+        Assert.False(File.Exists(Path.Combine(dir, "file1.txt")));
+        if (Directory.Exists(dir)) {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadResourcesAsync_HonorsCancellation() {
+        using var server = CreateServer();
+        using HttpClient client = server.CreateClient();
+        var links = new List<HtmlResourceLink> { new() { Source = "file1.txt" } };
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => HtmlResourceParser.DownloadResourcesAsync(
+            links,
+            server.BaseAddress!,
+            dir,
+            client,
+            cancellationToken: cancellation.Token));
+
+        if (Directory.Exists(dir)) {
+            Directory.Delete(dir, true);
+        }
     }
 }

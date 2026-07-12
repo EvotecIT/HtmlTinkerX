@@ -36,7 +36,7 @@ public static class HtmlDiscoveryParser {
 
                 bool isExternal = baseUri != null
                     && Uri.TryCreate(resolved, UriKind.Absolute, out Uri? resolvedUri)
-                    && !string.Equals(resolvedUri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase);
+                    && !HtmlUriUtility.HasSameOrigin(baseUri, resolvedUri);
 
                 return new HtmlDiscoveredLink {
                     Url = resolved,

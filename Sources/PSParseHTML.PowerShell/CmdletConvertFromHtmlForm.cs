@@ -46,7 +46,7 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
         List<HtmlFormResult> forms;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false);
+            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
             forms = HtmlParser.ParseFormsWithAngleSharp(Content);
         }

@@ -15,6 +15,7 @@ namespace HtmlTinkerX;
 /// </summary>
 public static partial class HtmlBrowser {
     private const string PlaywrightWithDepsEnvVar = "HTMLTINKERX_PLAYWRIGHT_WITH_DEPS";
+    private const long MaximumDriverArchiveBytes = 512L * 1024 * 1024;
 
     /// <summary>
     /// Semaphore to ensure thread-safe Playwright installation.
@@ -469,6 +470,9 @@ public static partial class HtmlBrowser {
         response.EnsureSuccessStatusCode();
 
         var total = response.Content.Headers.ContentLength ?? -1L;
+        if (total > MaximumDriverArchiveBytes) {
+            throw new InvalidDataException($"The Playwright driver archive reported {total} bytes, exceeding the {MaximumDriverArchiveBytes}-byte safety limit.");
+        }
         using var mem = new MemoryStream();
         var buffer = new byte[81920];
         using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
@@ -479,6 +483,9 @@ public static partial class HtmlBrowser {
             int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
             if (n == 0)
                 break;
+            if (mem.Length + n > MaximumDriverArchiveBytes) {
+                throw new InvalidDataException($"The Playwright driver archive exceeded the {MaximumDriverArchiveBytes}-byte safety limit while downloading.");
+            }
             await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
             if (total > 0) {
                 read += n;

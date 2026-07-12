@@ -3,6 +3,7 @@ using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -32,16 +33,18 @@ public static class HtmlOutlineBuilder {
     /// <param name="url">URL of the page.</param>
     /// <param name="engine">Parsing engine.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Collection of outline items.</returns>
-    public static async Task<List<HtmlOutlineItem>> BuildFromUrlAsync(string url, HtmlParserEngine engine = HtmlParserEngine.AgilityPack, HttpClient? client = null) {
+    public static async Task<List<HtmlOutlineItem>> BuildFromUrlAsync(string url, HtmlParserEngine engine = HtmlParserEngine.AgilityPack, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         if (engine == HtmlParserEngine.AngleSharp) {
-            IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(url, client).ConfigureAwait(false);
+            IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
             return Build(doc);
         }
-        HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client).ConfigureAwait(false);
+        HtmlDocument doc2 = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Build(doc2);
     }
 

@@ -82,13 +82,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        string html = ParameterSetName switch {
-            ParameterSetFile => HtmlUtilities.ReadFileChecked(Path.ToFullPath()),
-            ParameterSetUrl => await HtmlUtilities.GetStringWithProperEncodingAsync(
-                HttpClientHelper.Create(Proxy, ProxyCredential),
-                Url.ToString()).ConfigureAwait(false),
-            _ => Content
-        };
+        string html = await ReadInputHtmlAsync().ConfigureAwait(false);
 
         if (Readable.IsPresent || IncludeMetadata.IsPresent || !string.IsNullOrWhiteSpace(Selector)) {
             HtmlReadableTextResult result = HtmlParserToText.ExtractReadableText(html, Selector);
@@ -103,6 +97,19 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
 
         string text = HtmlParserToText.ConvertToText(html);
         await WriteOutputAsync(text).ConfigureAwait(false);
+    }
+
+    private async Task<string> ReadInputHtmlAsync() {
+        if (ParameterSetName == ParameterSetFile) {
+            return HtmlUtilities.ReadFileChecked(Path.ToFullPath());
+        }
+
+        if (ParameterSetName == ParameterSetUrl) {
+            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
+        }
+
+        return Content;
     }
 
     private async Task WriteOutputAsync(string text) {

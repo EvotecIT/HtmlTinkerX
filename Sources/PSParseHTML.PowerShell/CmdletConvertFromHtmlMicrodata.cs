@@ -53,7 +53,7 @@ public sealed class CmdletConvertFromHtmlMicrodata : AsyncPSCmdlet {
         List<HtmlMicrodataItem> items;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            items = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client).ConfigureAwait(false);
+            items = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else if (ParameterSetName == ParameterSetNode) {
             items = HtmlParser.ParseMicrodataItems(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {

@@ -411,15 +411,10 @@ public static class HtmlBrowserlessExtraction {
             return EndpointOriginState.Unknown;
         }
 
-        return HasSameOrigin(pageUri, endpointUri)
+        return HtmlUriUtility.HasSameOrigin(pageUri, endpointUri)
             ? EndpointOriginState.SameOrigin
             : EndpointOriginState.External;
     }
-
-    private static bool HasSameOrigin(Uri left, Uri right) =>
-        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
-        && left.Port == right.Port;
 
     private static async Task<string> ReadResponseContentBoundedAsync(HttpResponseMessage response, int maxBytes, List<string> warnings, CancellationToken cancellationToken) {
         if (maxBytes <= 0) {

@@ -49,7 +49,7 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
         List<HtmlOutlineItem> outline;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            outline = await HtmlOutlineBuilder.BuildFromUrlAsync(Url.ToString(), Engine, client).ConfigureAwait(false);
+            outline = await HtmlOutlineBuilder.BuildFromUrlAsync(Url.ToString(), Engine, client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
             outline = HtmlOutlineBuilder.Build(Content, Engine);
         }

@@ -116,7 +116,7 @@ public static partial class HtmlBrowser {
         HtmlBrowserNetworkDataSourceOptions options) {
         Uri? endpointUri = TryCreateAbsoluteUri(entry.Url);
         Uri? pageUri = TryCreateAbsoluteUri(pageUrl);
-        bool isExternal = endpointUri != null && pageUri != null && !HasSameOrigin(pageUri, endpointUri);
+        bool isExternal = endpointUri != null && pageUri != null && !HtmlUriUtility.HasSameOrigin(pageUri, endpointUri);
         bool isStateChanging = IsStateChanging(entry.Method);
         bool hasSensitiveUrl = endpointUri != null && HasSensitiveUrlAuthentication(endpointUri);
         IReadOnlyDictionary<string, string> observedRequestHeaders = BuildObservedRequestHeaders(entry.RequestHeaders);
@@ -436,11 +436,6 @@ public static partial class HtmlBrowser {
 
     private static Uri? TryCreateAbsoluteUri(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) ? uri : null;
-
-    private static bool HasSameOrigin(Uri left, Uri right) =>
-        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
-        && left.Port == right.Port;
 
     private static string BuildEndpointName(Uri? uri, string fallback) {
         if (uri == null) {

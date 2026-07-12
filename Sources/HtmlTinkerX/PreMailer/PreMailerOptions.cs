@@ -1,5 +1,6 @@
 using global::AngleSharp;
 using System;
+using System.Net.Http;
 
 namespace HtmlTinkerX;
 
@@ -41,6 +42,12 @@ public class PreMailerOptions {
     /// When enabled, CSS from <c>&lt;link&gt;</c> tags will be downloaded and inlined.
     /// </summary>
     public bool DownloadRemoteCss { get; set; }
+
+    /// <summary>
+    /// Optional HTTP client used to download linked stylesheets. The caller retains ownership of the client.
+    /// When omitted, <see cref="HtmlHttpClientFactory.Shared"/> is used.
+    /// </summary>
+    public HttpClient? HttpClient { get; set; }
 
     // Analytics configuration
     /// <summary>Add Google Analytics tags.</summary>

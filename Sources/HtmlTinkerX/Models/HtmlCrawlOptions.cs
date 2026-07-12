@@ -14,6 +14,12 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Maximum number of pages to fetch during the crawl.</summary>
     public int MaxPages { get; set; } = 25;
 
+    /// <summary>Maximum static page or robots.txt response size in bytes.</summary>
+    public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+
+    /// <summary>Maximum size in bytes for each downloaded crawl asset.</summary>
+    public int MaximumAssetResponseBytes { get; set; } = 64 * 1024 * 1024;
+
     /// <summary>When true, pages are rendered through Playwright before extraction.</summary>
     public bool Render { get; set; }
 
@@ -306,6 +312,8 @@ public sealed class HtmlCrawlOptions {
         return new HtmlCrawlOptions {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
+            MaximumPageResponseBytes = MaximumPageResponseBytes,
+            MaximumAssetResponseBytes = MaximumAssetResponseBytes,
             Render = Render,
             AutoRender = AutoRender,
             RestrictToHost = RestrictToHost,
