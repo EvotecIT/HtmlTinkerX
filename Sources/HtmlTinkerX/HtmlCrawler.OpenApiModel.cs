@@ -544,10 +544,10 @@ public static partial class HtmlCrawler {
         MergeStructuredApiRateLimit(target.RateLimit, source.RateLimit);
 
         foreach (HtmlCrawlStructuredApiParameter parameter in source.Parameters) {
-            string incomingLocation = ResolveStructuredApiParameterLocation(target.Path, parameter);
+            string incomingLocation = ResolveStructuredApiParameterLocation(target.Path, target.Method, parameter);
             HtmlCrawlStructuredApiParameter? existing = target.Parameters.FirstOrDefault(current =>
                 string.Equals(current.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(ResolveStructuredApiParameterLocation(target.Path, current), incomingLocation, StringComparison.OrdinalIgnoreCase));
+                && string.Equals(ResolveStructuredApiParameterLocation(target.Path, target.Method, current), incomingLocation, StringComparison.OrdinalIgnoreCase));
             if (existing == null) {
                 target.Parameters.Add(CloneStructuredApiParameter(parameter));
                 continue;

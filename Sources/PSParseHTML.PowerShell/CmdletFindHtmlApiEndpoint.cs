@@ -111,7 +111,7 @@ public sealed class CmdletFindHtmlApiEndpoint : AsyncPSCmdlet {
 
     private async Task<string> ReadHtmlAsync(HttpClient client) {
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpResponseMessage response = await client.GetAsync(Url, CancelToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(Url, HttpCompletionOption.ResponseHeadersRead, CancelToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             downloadedResponseUri = response.RequestMessage?.RequestUri ?? Url;
             return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);

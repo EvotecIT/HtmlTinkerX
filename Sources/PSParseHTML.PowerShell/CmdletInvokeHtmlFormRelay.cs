@@ -86,7 +86,7 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
 
     private async Task<string> GetInitialHtmlAsync(HttpClient client) {
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpResponseMessage response = await client.GetAsync(Url, CancelToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.GetAsync(Url, HttpCompletionOption.ResponseHeadersRead, CancelToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             initialResponseUri = response.RequestMessage?.RequestUri ?? Url;
             return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);

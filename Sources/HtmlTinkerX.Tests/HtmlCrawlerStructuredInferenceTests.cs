@@ -11,6 +11,65 @@ namespace HtmlTinkerX.Tests;
 public partial class HtmlCrawlerStructuredJsonTests {
 
     [Fact]
+    public async Task CrawlAsync_GetParameterTables_PreserveQueryLocationsCompoundNamesAndPublicAuth() {
+        Dictionary<string, string> responses = new() {
+            ["/docs/search"] = """
+            <html>
+              <body>
+                <main>
+                  <h1>Search API</h1>
+                  <h2>GET /v1/search</h2>
+                  <p>No API key required.</p>
+                  <h3>Parameters</h3>
+                  <table class="parameters">
+                    <tr><th>Parameter Name</th><th>Location</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                    <tr><td>search</td><td></td><td>string</td><td>No</td><td>Search phrase.</td></tr>
+                    <tr><td>limit</td><td>Query parameter</td><td>integer</td><td>No</td><td>Maximum results.</td></tr>
+                  </table>
+                  <pre><code class="language-http">GET /v1/search?search=alpha&amp;limit=10 HTTP/1.1
+                  Accept: application/json</code></pre>
+                  <h3>Response 200</h3>
+                  <pre><code class="language-json">[{ "id": "item-1" }]</code></pre>
+                </main>
+              </body>
+            </html>
+            """
+        };
+
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl + "docs/search", new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 1,
+                Selector = "main",
+                IncludeStructuredJson = true
+            });
+
+            HtmlCrawlStructuredApiEndpoint endpoint = Assert.Single(Assert.Single(result.Pages).StructuredJson!.ApiEndpoints);
+            Assert.Equal(2, endpoint.Parameters.Count);
+            Assert.Equal(2, endpoint.QueryParameters.Count);
+            Assert.Empty(endpoint.BodyParameters);
+            Assert.Contains(endpoint.QueryParameters, parameter => string.Equals(parameter.Name, "search", StringComparison.Ordinal));
+            Assert.Contains(endpoint.QueryParameters, parameter => string.Equals(parameter.Name, "limit", StringComparison.Ordinal));
+            Assert.True(
+                endpoint.Authentication.Headers.Count == 0,
+                $"Unexpected auth: required={endpoint.Authentication.Required}; headers={string.Join(",", endpoint.Authentication.Headers)}; schemes={string.Join(",", endpoint.Authentication.Schemes)}; summary={endpoint.Authentication.Summary}");
+            Assert.Empty(endpoint.Authentication.Schemes);
+            Assert.False(endpoint.Authentication.Required);
+
+            IDictionary<string, object?> paths = Assert.IsAssignableFrom<IDictionary<string, object?>>(result.OpenApiDocument["paths"]);
+            IDictionary<string, object?> searchPath = Assert.IsAssignableFrom<IDictionary<string, object?>>(paths["/v1/search"]);
+            IDictionary<string, object?> getOperation = Assert.IsAssignableFrom<IDictionary<string, object?>>(searchPath["get"]);
+            List<object> strictParameters = Assert.IsAssignableFrom<List<object>>(getOperation["parameters"]);
+            Assert.Equal(2, strictParameters.Count);
+            Assert.DoesNotContain("requestBody", getOperation.Keys);
+            Assert.DoesNotContain("security", getOperation.Keys);
+        } finally {
+            DisposeListenerSafely(server);
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_IncludeStructuredJson_KeepsWeakEndpointsInOpenApiLikeButSkipsStrictPromotion() {
         Dictionary<string, string> responses = new() {
             ["/docs/mystery-widget"] = """

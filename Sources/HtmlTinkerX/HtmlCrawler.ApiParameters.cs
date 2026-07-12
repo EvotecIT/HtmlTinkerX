@@ -95,7 +95,7 @@ public static partial class HtmlCrawler {
     }
 
     private static HtmlCrawlStructuredApiParameter? BuildStructuredApiParameter(Dictionary<string, string?> row, string? fallbackLocation, string? selectorHint) {
-        string? name = GetStructuredRowValue(row, "parameter", "name", "field");
+        string? name = GetStructuredRowValue(row, "parameter", "parameter name", "name", "field", "field name");
         if (string.IsNullOrWhiteSpace(name)) {
             return null;
         }
@@ -141,6 +141,7 @@ public static partial class HtmlCrawler {
         IEnumerable<HtmlCrawlStructuredApiParameter> parameters) {
         HtmlCrawlStructuredApiAuthentication authentication = new();
         string sectionText = NormalizeWhitespace(sectionDocument.DocumentElement?.TextContent);
+        bool apiKeyNegated = IsStructuredApiKeyNegated(sectionText);
 
         foreach (HtmlCrawlStructuredApiParameter parameter in parameters) {
             AppendStructuredApiAuthenticationSignals(authentication, parameter.Name);
@@ -162,6 +163,14 @@ public static partial class HtmlCrawler {
         }
 
         AppendStructuredApiAuthenticationSignals(authentication, sectionText);
+
+        if (apiKeyNegated) {
+            RemoveStructuredAuthenticationSignal(authentication.Headers, "X-API-Key");
+            RemoveStructuredAuthenticationSignal(authentication.Schemes, "api-key");
+            if (authentication.Headers.Count == 0 && authentication.Schemes.Count == 0) {
+                authentication.Required = false;
+            }
+        }
 
         if (!authentication.Required.HasValue
             && (authentication.Schemes.Count > 0 || authentication.Headers.Count > 0)) {
@@ -245,16 +254,16 @@ public static partial class HtmlCrawler {
 
     private static void ApplyStructuredApiParameterGrouping(HtmlCrawlStructuredApiEndpoint endpoint, string pageUrl) {
         endpoint.PathParameters = endpoint.Parameters
-            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "path", StringComparison.OrdinalIgnoreCase))
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, endpoint.Method, parameter), "path", StringComparison.OrdinalIgnoreCase))
             .ToList();
         endpoint.QueryParameters = endpoint.Parameters
-            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "query", StringComparison.OrdinalIgnoreCase))
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, endpoint.Method, parameter), "query", StringComparison.OrdinalIgnoreCase))
             .ToList();
         endpoint.HeaderParameters = endpoint.Parameters
-            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "header", StringComparison.OrdinalIgnoreCase))
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, endpoint.Method, parameter), "header", StringComparison.OrdinalIgnoreCase))
             .ToList();
         endpoint.BodyParameters = endpoint.Parameters
-            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, parameter), "body", StringComparison.OrdinalIgnoreCase))
+            .Where(parameter => string.Equals(ResolveStructuredApiParameterLocation(endpoint.Path, endpoint.Method, parameter), "body", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         endpoint.RequestBodySchema = endpoint.BodyParameters
@@ -285,13 +294,27 @@ public static partial class HtmlCrawler {
             && (endpoint.Authentication.Schemes.Count > 0 || endpoint.Authentication.Headers.Count > 0)) {
             endpoint.Authentication.Required = true;
         }
+
+        ApplyStructuredAuthenticationNegations(endpoint.Authentication);
     }
 
-    private static string ResolveStructuredApiParameterLocation(string endpointPath, HtmlCrawlStructuredApiParameter parameter) {
+    private static string ResolveStructuredApiParameterLocation(string endpointPath, string? endpointMethod, HtmlCrawlStructuredApiParameter parameter) {
         if (!string.IsNullOrWhiteSpace(parameter.Location)) {
             string explicitLocation = parameter.Location!.Trim().ToLowerInvariant();
-            if (explicitLocation is "path" or "query" or "header" or "cookie" or "body") {
-                return explicitLocation;
+            if (ContainsAnyToken(explicitLocation, "path")) {
+                return "path";
+            }
+            if (ContainsAnyToken(explicitLocation, "query")) {
+                return "query";
+            }
+            if (ContainsAnyToken(explicitLocation, "header")) {
+                return "header";
+            }
+            if (ContainsAnyToken(explicitLocation, "cookie")) {
+                return "cookie";
+            }
+            if (ContainsAnyToken(explicitLocation, "body", "payload")) {
+                return "body";
             }
         }
 
@@ -300,7 +323,9 @@ public static partial class HtmlCrawler {
             return "path";
         }
 
-        return "body";
+        return endpointMethod?.Trim().ToUpperInvariant() is "GET" or "HEAD" or "DELETE" or "OPTIONS"
+            ? "query"
+            : "body";
     }
 
     private static string? DetectApiParameterLocation(IElement tableElement, HtmlTableResult table) {

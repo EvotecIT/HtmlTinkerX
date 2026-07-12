@@ -155,11 +155,11 @@ public static partial class HtmlCrawler {
 
     private static List<object> BuildStrictOpenApiParameters(HtmlCrawlStructuredOpenApiOperation operation) {
         return operation.Parameters
-            .Where(parameter => !string.Equals(ResolveStructuredApiParameterLocation(operation.Path, parameter), "body", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(parameter => ResolveStructuredApiParameterLocation(operation.Path, parameter), StringComparer.OrdinalIgnoreCase)
+            .Where(parameter => !string.Equals(ResolveStructuredApiParameterLocation(operation.Path, operation.Method, parameter), "body", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(parameter => ResolveStructuredApiParameterLocation(operation.Path, operation.Method, parameter), StringComparer.OrdinalIgnoreCase)
             .ThenBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
             .Select(parameter => {
-                string location = ResolveStructuredApiParameterLocation(operation.Path, parameter);
+                string location = ResolveStructuredApiParameterLocation(operation.Path, operation.Method, parameter);
                 Dictionary<string, object?> value = new(StringComparer.OrdinalIgnoreCase) {
                     ["name"] = parameter.Name,
                     ["in"] = NormalizeStrictOpenApiParameterLocation(location),
@@ -223,7 +223,7 @@ public static partial class HtmlCrawler {
         }
 
         return new Dictionary<string, object?> {
-            ["required"] = operation.Parameters.Any(parameter => string.Equals(ResolveStructuredApiParameterLocation(operation.Path, parameter), "body", StringComparison.OrdinalIgnoreCase) && parameter.Required == true),
+            ["required"] = operation.Parameters.Any(parameter => string.Equals(ResolveStructuredApiParameterLocation(operation.Path, operation.Method, parameter), "body", StringComparison.OrdinalIgnoreCase) && parameter.Required == true),
             ["content"] = new Dictionary<string, object?> {
                 [contentType] = mediaType
             }

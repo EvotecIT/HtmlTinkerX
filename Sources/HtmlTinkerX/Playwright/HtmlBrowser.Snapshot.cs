@@ -30,7 +30,7 @@ public static partial class HtmlBrowser {
     /// <param name="extractionTimeout">Optional selector wait timeout in milliseconds.</param>
     /// <param name="externalHttpClient">Optional HTTP client used only for cross-origin linked JavaScript downloads.</param>
     /// <returns>A rendered page snapshot with common parsing outputs.</returns>
-    public static async Task<HtmlRenderedPageSnapshot> CreateSnapshotAsync(
+    public static Task<HtmlRenderedPageSnapshot> CreateSnapshotAsync(
         HtmlBrowserSession session,
         string requestedUrl,
         string? selector = null,
@@ -45,7 +45,102 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken = default,
         HttpClient? httpClient = null,
         int? extractionTimeout = null,
-        HttpClient? externalHttpClient = null) {
+        HttpClient? externalHttpClient = null) =>
+        CreateSnapshotCoreAsync(
+            session,
+            requestedUrl,
+            selector,
+            innerHtml,
+            asText,
+            appliedInteractions,
+            staticHtml,
+            includeStaticRenderedComparison,
+            includeLinkedScripts,
+            includeExternalLinkedScripts,
+            includeNetworkLog,
+            cancellationToken,
+            httpClient,
+            extractionTimeout,
+            externalHttpClient,
+            linkedScriptFetchOptions: null);
+
+    /// <summary>
+    /// Builds a structured snapshot while applying a caller-provided response-size policy to linked JavaScript downloads.
+    /// </summary>
+    /// <param name="session">Browser session containing a rendered page.</param>
+    /// <param name="requestedUrl">Original URL requested by the caller.</param>
+    /// <param name="linkedScriptFetchOptions">Response-size policy for linked JavaScript downloads.</param>
+    /// <param name="selector">Optional selector used to focus <see cref="HtmlRenderedPageSnapshot.Content"/>.</param>
+    /// <param name="innerHtml">Return inner HTML for the focused content.</param>
+    /// <param name="asText">Return text for the focused content.</param>
+    /// <param name="appliedInteractions">Descriptions of rendered-page interactions applied before extraction.</param>
+    /// <param name="staticHtml">Original static HTML used for optional static-vs-rendered comparison.</param>
+    /// <param name="includeStaticRenderedComparison">Compares static and rendered HTML when <paramref name="staticHtml"/> is available.</param>
+    /// <param name="includeLinkedScripts">Downloads and inspects same-origin linked JavaScript files for endpoints.</param>
+    /// <param name="includeExternalLinkedScripts">Allows cross-origin linked JavaScript downloads when linked-script inspection is enabled.</param>
+    /// <param name="includeNetworkLog">Include captured browser network entries.</param>
+    /// <param name="httpClient">Optional HTTP client reused for linked JavaScript downloads.</param>
+    /// <param name="extractionTimeout">Optional selector wait timeout in milliseconds.</param>
+    /// <param name="externalHttpClient">Optional HTTP client used only for cross-origin linked JavaScript downloads.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A rendered page snapshot with common parsing outputs.</returns>
+    public static Task<HtmlRenderedPageSnapshot> CreateSnapshotAsync(
+        HtmlBrowserSession session,
+        string requestedUrl,
+        HtmlHttpFetchOptions linkedScriptFetchOptions,
+        string? selector = null,
+        bool innerHtml = false,
+        bool asText = false,
+        IEnumerable<string>? appliedInteractions = null,
+        string? staticHtml = null,
+        bool includeStaticRenderedComparison = false,
+        bool includeLinkedScripts = false,
+        bool includeExternalLinkedScripts = false,
+        bool includeNetworkLog = false,
+        HttpClient? httpClient = null,
+        int? extractionTimeout = null,
+        HttpClient? externalHttpClient = null,
+        CancellationToken cancellationToken = default) {
+        if (linkedScriptFetchOptions == null) {
+            throw new ArgumentNullException(nameof(linkedScriptFetchOptions));
+        }
+
+        return CreateSnapshotCoreAsync(
+            session,
+            requestedUrl,
+            selector,
+            innerHtml,
+            asText,
+            appliedInteractions,
+            staticHtml,
+            includeStaticRenderedComparison,
+            includeLinkedScripts,
+            includeExternalLinkedScripts,
+            includeNetworkLog,
+            cancellationToken,
+            httpClient,
+            extractionTimeout,
+            externalHttpClient,
+            linkedScriptFetchOptions);
+    }
+
+    private static async Task<HtmlRenderedPageSnapshot> CreateSnapshotCoreAsync(
+        HtmlBrowserSession session,
+        string requestedUrl,
+        string? selector,
+        bool innerHtml,
+        bool asText,
+        IEnumerable<string>? appliedInteractions,
+        string? staticHtml,
+        bool includeStaticRenderedComparison,
+        bool includeLinkedScripts,
+        bool includeExternalLinkedScripts,
+        bool includeNetworkLog,
+        CancellationToken cancellationToken,
+        HttpClient? httpClient,
+        int? extractionTimeout,
+        HttpClient? externalHttpClient,
+        HtmlHttpFetchOptions? linkedScriptFetchOptions) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
@@ -64,7 +159,7 @@ public static partial class HtmlBrowser {
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
         IReadOnlyList<HtmlLinkedJavaScriptEndpoint> linkedJavaScriptEndpoints = includeLinkedScripts && baseUri != null
-            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient, externalHttpClient, null, null, cancellationToken).ConfigureAwait(false)
+            ? await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, includeExternalLinkedScripts, httpClient, externalHttpClient, null, linkedScriptFetchOptions, cancellationToken).ConfigureAwait(false)
             : Array.Empty<HtmlLinkedJavaScriptEndpoint>();
         IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = HtmlParsingToolbox.FindInteractionSurface(html, baseUri, linkedJavaScriptEndpoints);
         HtmlStaticRenderedComparison? comparison = includeStaticRenderedComparison && staticHtml != null

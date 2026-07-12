@@ -513,7 +513,9 @@ public static partial class HtmlCrawler {
             if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
                 RemoveHiddenElements(document);
             }
-            StripBoilerplateElements(document, options);
+            if (options.SmartContentCleanup) {
+                StripBoilerplateElements(document, options);
+            }
             RemoveConfiguredElements(document, options);
             return document.DocumentElement?.OuterHtml ?? html;
         }
@@ -527,7 +529,9 @@ public static partial class HtmlCrawler {
         if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
             RemoveHiddenElements(wrapper);
         }
-        StripBoilerplateElements(wrapper, options);
+        if (options.SmartContentCleanup) {
+            StripBoilerplateElements(wrapper, options);
+        }
         RemoveConfiguredElements(wrapper, options);
         return wrapper.InnerHtml;
     }
@@ -538,7 +542,8 @@ public static partial class HtmlCrawler {
         }
 
         bool hasConfiguredCleanup = options.ExcludeSelectors.Count > 0 || options.ExcludeClasses.Count > 0 || options.ExcludeIds.Count > 0;
-        if (!hasConfiguredCleanup && !options.SmartContentCleanup) {
+        bool filterHiddenContent = options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden;
+        if (!hasConfiguredCleanup && !options.SmartContentCleanup && !filterHiddenContent) {
             return html;
         }
 

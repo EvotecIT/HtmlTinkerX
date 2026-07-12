@@ -23,6 +23,13 @@ public class PowerShellHttpContractTests {
     }
 
     [Fact]
+    public void InvokeHtmlRendering_UsesBoundedLinkedScriptResponseDefault() {
+        CmdletInvokeHtmlRendering cmdlet = new();
+
+        Assert.Equal(HtmlHttpFetchOptions.DefaultMaximumResponseBytes, cmdlet.LinkedScriptMaximumResponseBytes);
+    }
+
+    [Fact]
     public void CmdletUrlReads_UseBoundedHttpUtilityOverloads() {
         string repositoryRoot = FindRepositoryRoot();
         string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
@@ -39,6 +46,23 @@ public class PowerShellHttpContractTests {
         Assert.True(
             unboundedCalls.Count == 0,
             $"PowerShell URL reads must use the bounded overloads.{Environment.NewLine}{string.Join(Environment.NewLine, unboundedCalls)}");
+    }
+
+    [Fact]
+    public void CmdletResponseReads_StreamBeforeApplyingBodyLimits() {
+        string repositoryRoot = FindRepositoryRoot();
+        string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
+        List<string> bufferedReads = Directory
+            .EnumerateFiles(cmdletRoot, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => File.ReadLines(path).Select((line, index) => new { Path = path, Line = line, Number = index + 1 }))
+            .Where(item => item.Line.IndexOf("GetAsync(Url", StringComparison.Ordinal) >= 0
+                && item.Line.IndexOf("ResponseHeadersRead", StringComparison.Ordinal) < 0)
+            .Select(item => $"{Path.GetFileName(item.Path)}:{item.Number}")
+            .ToList();
+
+        Assert.True(
+            bufferedReads.Count == 0,
+            $"PowerShell URL responses must stream before bounded body reads.{Environment.NewLine}{string.Join(Environment.NewLine, bufferedReads)}");
     }
 
     private static string FindRepositoryRoot() {
