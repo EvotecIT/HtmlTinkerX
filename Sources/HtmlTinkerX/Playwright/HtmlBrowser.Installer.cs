@@ -95,7 +95,64 @@ public static partial class HtmlBrowser {
     /// This directory contains the Playwright driver executable and other related files.
     /// </summary>
     private static string GetDriverPath() {
+        string? explicitRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        if (string.IsNullOrWhiteSpace(explicitRoot)) {
+            string bundledPath = GetBundledDriverPath();
+            if (HasDriverLayout(bundledPath)) {
+                return bundledPath;
+            }
+        }
+
         return Path.Combine(GetDriverRoot(), ".playwright");
+    }
+
+    private static string GetBundledDriverPath() {
+        string assemblyDirectory = Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location) ?? AppContext.BaseDirectory;
+        string assemblyPath = Path.Combine(assemblyDirectory, ".playwright");
+        if (HasDriverLayout(assemblyPath)) {
+            return assemblyPath;
+        }
+
+#if NETFRAMEWORK
+#pragma warning disable SYSLIB0012
+        string? codeBase = typeof(HtmlBrowser).Assembly.CodeBase;
+#pragma warning restore SYSLIB0012
+        if (!string.IsNullOrWhiteSpace(codeBase) && Uri.TryCreate(codeBase, UriKind.Absolute, out Uri? assemblyUri) && assemblyUri.IsFile) {
+            string? originalDirectory = Path.GetDirectoryName(assemblyUri.LocalPath);
+            if (!string.IsNullOrWhiteSpace(originalDirectory)) {
+                string originalPath = Path.Combine(originalDirectory, ".playwright");
+                if (HasDriverLayout(originalPath)) {
+                    return originalPath;
+                }
+            }
+        }
+#endif
+
+        string appBasePath = Path.Combine(AppContext.BaseDirectory, ".playwright");
+        return HasDriverLayout(appBasePath) ? appBasePath : assemblyPath;
+    }
+
+    internal static bool HasDriverLayout(string driverPath) {
+        string nodePath = Path.Combine(driverPath, "node", PlatformId, NodeExecutable);
+        string packagePath = Path.Combine(driverPath, "package");
+        if (!File.Exists(nodePath) || !Directory.Exists(packagePath)) {
+            return false;
+        }
+
+        try {
+            return new FileInfo(nodePath).Length > 0 && Directory.EnumerateFileSystemEntries(packagePath).Any();
+        } catch (IOException) {
+            return false;
+        } catch (UnauthorizedAccessException) {
+            return false;
+        }
+    }
+
+    private static bool IsBundledDriverPath(string driverPath) {
+        return string.Equals(
+            Path.GetFullPath(driverPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(GetBundledDriverPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -110,10 +167,10 @@ public static partial class HtmlBrowser {
     /// <returns></returns>
     private static bool IsDriverPresent() {
         string baseDir = GetDriverPath();
-        string nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-        string packageDir = Path.Combine(baseDir, "package");
-        if (!File.Exists(nodePath) || !Directory.Exists(packageDir))
+        if (!HasDriverLayout(baseDir))
             return false;
+        if (IsBundledDriverPath(baseDir))
+            return true;
         if (!File.Exists(VersionFile))
             return false;
         string version = File.ReadAllText(VersionFile).Trim();
@@ -168,6 +225,10 @@ public static partial class HtmlBrowser {
     /// the driver is no longer needed.
     /// </summary>
     internal static void CleanDriver() {
+        if (IsBundledDriverPath(GetDriverPath())) {
+            return;
+        }
+
         string root = GetDriverRoot();
         if (Directory.Exists(root)) {
             try {
@@ -226,7 +287,11 @@ public static partial class HtmlBrowser {
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
             CleanInstallDir();
-            await DownloadAndInstallDriverAsync().ConfigureAwait(false);
+            if (!IsDriverPresent()) {
+                await DownloadAndInstallDriverAsync().ConfigureAwait(false);
+            } else {
+                EnsureDriverSearchPath();
+            }
             InstallRuntime(engine);
         } finally {
             InstallationSemaphore.Release();
@@ -384,7 +449,9 @@ public static partial class HtmlBrowser {
     }
 
     private static void EnsureDriverSearchPath() {
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", GetDriverRoot());
+        string driverPath = GetDriverPath();
+        string driverRoot = Path.GetDirectoryName(driverPath) ?? GetDriverRoot();
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driverRoot);
     }
 
     private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
