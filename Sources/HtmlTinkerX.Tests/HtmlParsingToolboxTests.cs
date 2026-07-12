@@ -60,6 +60,35 @@ public class HtmlParsingToolboxTests {
     }
 
     [Fact]
+    public async Task FindInteractionSurfaceAsync_AppliesLinkedScriptFetchOptions() {
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            await context.Response.WriteAsync("fetch('/api/items');");
+        }, null, null);
+        using var client = server.CreateClient();
+        string html = """<script src="/app.js"></script>""";
+
+        IReadOnlyList<HtmlInteractionSurfaceItem> limited = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            html,
+            server.BaseAddress,
+            includeLinkedScripts: true,
+            includeExternalLinkedScripts: false,
+            client,
+            new HtmlHttpFetchOptions { MaximumResponseBytes = 4 });
+        IReadOnlyList<HtmlInteractionSurfaceItem> allowed = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
+            html,
+            server.BaseAddress,
+            includeLinkedScripts: true,
+            includeExternalLinkedScripts: false,
+            client,
+            new HtmlHttpFetchOptions { MaximumResponseBytes = 1024 });
+
+        HtmlInteractionSurfaceItem failedDownload = Assert.Single(limited, item => item.Kind == "LinkedEndpoint");
+        Assert.Contains("4-byte limit", failedDownload.Metadata, StringComparison.OrdinalIgnoreCase);
+        HtmlInteractionSurfaceItem endpoint = Assert.Single(allowed, item => item.Kind == "LinkedEndpoint");
+        Assert.Equal("/api/items", endpoint.Url);
+    }
+
+    [Fact]
     public async Task FindInteractionSurfaceAsync_UsesActualInlineScriptSelector() {
         string html = """<script>console.log("inline")</script><script>fetch("/api/items", { method: "POST" });</script>""";
 

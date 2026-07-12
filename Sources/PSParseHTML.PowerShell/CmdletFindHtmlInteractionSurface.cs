@@ -62,6 +62,11 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeExternalLinkedScripts { get; set; }
 
+    /// <summary>Maximum number of bytes accepted for the page and each linked JavaScript response.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+
     /// <summary>Proxy server address used when downloading by URL.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public string? Proxy { get; set; }
@@ -74,17 +79,18 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        string html = await ReadHtmlAsync(client).ConfigureAwait(false);
+        HtmlHttpFetchOptions fetchOptions = new() { MaximumResponseBytes = MaximumResponseBytes };
+        string html = await ReadHtmlAsync(client, fetchOptions).ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);
-        WriteObject((await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, IncludeLinkedScripts.IsPresent, IncludeExternalLinkedScripts.IsPresent, client).ConfigureAwait(false)).ToArray(), true);
+        WriteObject((await HtmlParsingToolbox.FindInteractionSurfaceAsync(html, baseUri, IncludeLinkedScripts.IsPresent, IncludeExternalLinkedScripts.IsPresent, client, fetchOptions, CancelToken).ConfigureAwait(false)).ToArray(), true);
     }
 
-    private async Task<string> ReadHtmlAsync(HttpClient client) {
+    private async Task<string> ReadHtmlAsync(HttpClient client, HtmlHttpFetchOptions fetchOptions) {
         switch (ParameterSetName) {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
+                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: fetchOptions, cancellationToken: CancelToken).ConfigureAwait(false);
             case ParameterSetNode:
                 return HtmlPipelineInput.ToHtmlMarkup(HtmlNode);
             default:

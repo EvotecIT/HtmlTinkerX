@@ -48,6 +48,8 @@ public class PublicHttpApiContractTests {
         AssertMethod(typeof(HtmlScriptDataParser), nameof(HtmlScriptDataParser.ParseUrlAsync), typeof(string), typeof(HttpClient));
         AssertMethod(typeof(HtmlLinkedJavaScriptEndpointParser), nameof(HtmlLinkedJavaScriptEndpointParser.ParseAsync), typeof(string), typeof(Uri), typeof(bool), typeof(HttpClient));
         AssertMethod(typeof(HtmlLinkedJavaScriptEndpointParser), nameof(HtmlLinkedJavaScriptEndpointParser.ParseUrlAsync), typeof(string), typeof(bool), typeof(HttpClient));
+        AssertMethod(typeof(HtmlParsingToolbox), nameof(HtmlParsingToolbox.FindInteractionSurfaceAsync), typeof(string), typeof(Uri), typeof(bool), typeof(bool), typeof(HttpClient));
+        AssertMethod(typeof(HtmlParsingToolbox), nameof(HtmlParsingToolbox.FindInteractionSurfaceAsync), typeof(string), typeof(Uri), typeof(bool), typeof(bool), typeof(HttpClient), typeof(CancellationToken));
         AssertMethod(typeof(HtmlImageCandidateParser), nameof(HtmlImageCandidateParser.ParseUrlAsync), typeof(string), typeof(HttpClient));
         AssertMethod(typeof(HtmlWebManifestParser), nameof(HtmlWebManifestParser.ParseUrlAsync), typeof(string), typeof(HttpClient));
         AssertMethod(typeof(HtmlWellKnownParser), nameof(HtmlWellKnownParser.ParseUrlAsync), typeof(string), typeof(string), typeof(HttpClient));

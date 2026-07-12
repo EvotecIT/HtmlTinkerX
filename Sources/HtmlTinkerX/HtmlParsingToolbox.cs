@@ -213,7 +213,7 @@ public static class HtmlParsingToolbox {
     /// <param name="client">Optional HTTP client reused for linked JavaScript downloads, including caller-specified proxy settings.</param>
     /// <returns>Interaction surface records in source-family order.</returns>
     public static Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri = null, bool includeLinkedScripts = false, bool includeExternalLinkedScripts = false, HttpClient? client = null) {
-        return FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts, client, CancellationToken.None);
+        return FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts, client, null, CancellationToken.None);
     }
 
     /// <summary>
@@ -227,12 +227,27 @@ public static class HtmlParsingToolbox {
     /// <param name="cancellationToken">Cancellation token used while downloading linked JavaScript files.</param>
     /// <returns>Interaction surface records in source-family order.</returns>
     public static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri, bool includeLinkedScripts, bool includeExternalLinkedScripts, HttpClient? client, CancellationToken cancellationToken) {
+        return await FindInteractionSurfaceAsync(html, baseUri, includeLinkedScripts, includeExternalLinkedScripts, client, null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Finds form posts, hidden fields, tokens, inline endpoints, and optional linked-script endpoints in an HTML document.
+    /// </summary>
+    /// <param name="html">HTML content to inspect.</param>
+    /// <param name="baseUri">Optional page URL used for linked script downloads and relative URL context.</param>
+    /// <param name="includeLinkedScripts">Downloads and inspects linked JavaScript files when a base URI is available.</param>
+    /// <param name="includeExternalLinkedScripts">Allows cross-origin linked JavaScript downloads.</param>
+    /// <param name="client">Optional HTTP client reused for linked JavaScript downloads, including caller-specified proxy settings.</param>
+    /// <param name="fetchOptions">Optional response-size policy for each linked JavaScript download.</param>
+    /// <param name="cancellationToken">Cancellation token used while downloading linked JavaScript files.</param>
+    /// <returns>Interaction surface records in source-family order.</returns>
+    public static async Task<IReadOnlyList<HtmlInteractionSurfaceItem>> FindInteractionSurfaceAsync(string html, Uri? baseUri, bool includeLinkedScripts, bool includeExternalLinkedScripts, HttpClient? client, HtmlHttpFetchOptions? fetchOptions, CancellationToken cancellationToken = default) {
         IReadOnlyList<HtmlLinkedJavaScriptEndpoint>? linkedEndpoints = null;
         if (includeLinkedScripts) {
             Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
             if (effectiveBaseUri != null) {
                 Uri linkedScriptPageBaseUri = baseUri ?? effectiveBaseUri;
-                linkedEndpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, linkedScriptPageBaseUri, includeExternalLinkedScripts, client, effectiveBaseUri, null, cancellationToken).ConfigureAwait(false);
+                linkedEndpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, linkedScriptPageBaseUri, includeExternalLinkedScripts, client, effectiveBaseUri, fetchOptions, cancellationToken).ConfigureAwait(false);
             }
         }
 

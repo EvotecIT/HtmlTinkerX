@@ -16,6 +16,13 @@ public class PowerShellHttpContractTests {
     }
 
     [Fact]
+    public void FindHtmlInteractionSurface_UsesBoundedResponseDefault() {
+        CmdletFindHtmlInteractionSurface cmdlet = new();
+
+        Assert.Equal(HtmlHttpFetchOptions.DefaultMaximumResponseBytes, cmdlet.MaximumResponseBytes);
+    }
+
+    [Fact]
     public void CmdletUrlReads_UseBoundedHttpUtilityOverloads() {
         string repositoryRoot = FindRepositoryRoot();
         string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
