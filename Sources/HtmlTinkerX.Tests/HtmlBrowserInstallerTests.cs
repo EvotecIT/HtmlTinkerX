@@ -15,6 +15,35 @@ namespace HtmlTinkerX.Tests;
 [Collection("Playwright collection")]
 public class HtmlBrowserInstallerTests
 {
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void HasDriverLayout_RejectsIncompleteBundledAssets(bool hasHealthyNode, bool hasPackageContent)
+    {
+        string driverPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string nodeDir = Path.Combine(driverPath, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId());
+        string packageDir = Path.Combine(driverPath, "package");
+
+        try
+        {
+            Directory.CreateDirectory(nodeDir);
+            Directory.CreateDirectory(packageDir);
+            File.WriteAllText(
+                Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"),
+                hasHealthyNode ? "node" : string.Empty);
+            if (hasPackageContent)
+            {
+                File.WriteAllText(Path.Combine(packageDir, "package.json"), "{}");
+            }
+
+            Assert.False(HtmlBrowser.HasDriverLayout(driverPath));
+        }
+        finally
+        {
+            if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
+        }
+    }
+
     [Fact]
     public async Task EnsureDriverInstalledAsync_UsesBundledDriverWithoutNetworkDownload()
     {
@@ -74,14 +103,7 @@ public class HtmlBrowserInstallerTests
 
         try
         {
-            // prepare fake driver so IsDriverPresent returns true
-            string baseDir = Path.Combine(tempDriver, ".playwright");
-            string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
-            string nodeDir = Path.Combine(baseDir, "node", platformId);
-            Directory.CreateDirectory(nodeDir);
-            Directory.CreateDirectory(Path.Combine(baseDir, "package"));
-            File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "");
-            File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
+            CreateHealthyDriver(tempDriver);
 
             string[]? captured = null;
             HtmlBrowser.PlaywrightInstaller = args => captured = args;
@@ -120,14 +142,7 @@ public class HtmlBrowserInstallerTests
 
         try
         {
-            // prepare fake driver so IsDriverPresent returns true
-            string baseDir = Path.Combine(tempDriver, ".playwright");
-            string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
-            string nodeDir = Path.Combine(baseDir, "node", platformId);
-            Directory.CreateDirectory(nodeDir);
-            Directory.CreateDirectory(Path.Combine(baseDir, "package"));
-            File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "");
-            File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
+            CreateHealthyDriver(tempDriver);
 
             string[]? captured = null;
             HtmlBrowser.PlaywrightInstaller = args => captured = args;
@@ -314,6 +329,18 @@ public class HtmlBrowserInstallerTests
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
+    }
+
+    private static void CreateHealthyDriver(string driverRoot)
+    {
+        string baseDir = Path.Combine(driverRoot, ".playwright");
+        string nodeDir = Path.Combine(baseDir, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId());
+        string packageDir = Path.Combine(baseDir, "package");
+        Directory.CreateDirectory(nodeDir);
+        Directory.CreateDirectory(packageDir);
+        File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "node");
+        File.WriteAllText(Path.Combine(packageDir, "package.json"), "{}");
+        File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
     }
 
     private static byte[] CreateDriverArchive()

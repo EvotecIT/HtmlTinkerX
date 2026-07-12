@@ -132,9 +132,20 @@ public static partial class HtmlBrowser {
         return HasDriverLayout(appBasePath) ? appBasePath : assemblyPath;
     }
 
-    private static bool HasDriverLayout(string driverPath) {
+    internal static bool HasDriverLayout(string driverPath) {
         string nodePath = Path.Combine(driverPath, "node", PlatformId, NodeExecutable);
-        return File.Exists(nodePath) && Directory.Exists(Path.Combine(driverPath, "package"));
+        string packagePath = Path.Combine(driverPath, "package");
+        if (!File.Exists(nodePath) || !Directory.Exists(packagePath)) {
+            return false;
+        }
+
+        try {
+            return new FileInfo(nodePath).Length > 0 && Directory.EnumerateFileSystemEntries(packagePath).Any();
+        } catch (IOException) {
+            return false;
+        } catch (UnauthorizedAccessException) {
+            return false;
+        }
     }
 
     private static bool IsBundledDriverPath(string driverPath) {
