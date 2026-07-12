@@ -19,7 +19,7 @@ public partial class HtmlCrawlerStructuredJsonTests {
                 <main>
                   <h1>Search API</h1>
                   <h2>GET /v1/search</h2>
-                  <p>No API key required.</p>
+                  <p>No authorization required.</p>
                   <h3>Parameters</h3>
                   <table class="parameters">
                     <tr><th>Parameter Name</th><th>Location</th><th>Type</th><th>Required</th><th>Description</th></tr>
@@ -141,7 +141,7 @@ public partial class HtmlCrawlerStructuredJsonTests {
                   <h3>Parameters</h3>
                   <table class="parameters">
                     <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                    <tr><td>id</td><td>string</td><td>Yes</td><td>Widget identifier.</td></tr>
+                    <tr><td>{id}</td><td>string</td><td>Yes</td><td>Widget identifier.</td></tr>
                   </table>
                   <h3>Response 200</h3>
                   <pre><code class="language-json">{ "id": "wid_123", "name": "Alpha" }</code></pre>

@@ -120,7 +120,7 @@ public static partial class HtmlCrawler {
         nullable ??= InferStructuredApiNullable(description);
 
         return new HtmlCrawlStructuredApiParameter {
-            Name = NormalizeWhitespace(name),
+            Name = NormalizeStructuredApiParameterName(name),
             Type = NormalizeWhitespace(type),
             Format = NormalizeWhitespace(format),
             Location = NormalizeWhitespace(location),
@@ -274,7 +274,7 @@ public static partial class HtmlCrawler {
                 group => group.Select(parameter => parameter.Type).FirstOrDefault(type => !string.IsNullOrWhiteSpace(type)),
                 StringComparer.OrdinalIgnoreCase);
         endpoint.RequestBodyFields = FinalizeStructuredFieldConfidence(FinalizeStructuredFieldRelationships(endpoint.BodyParameters
-            .Select(parameter => BuildStructuredRequestBodyField(parameter, pageUrl)))
+            .Select(parameter => BuildStructuredRequestBodyField(parameter, pageUrl)), preserveOrphansAsRoot: true)
             )
             .OrderBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -318,8 +318,9 @@ public static partial class HtmlCrawler {
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(parameter.Name)
-            && endpointPath.IndexOf("{" + parameter.Name + "}", StringComparison.OrdinalIgnoreCase) >= 0) {
+        string? parameterName = NormalizeStructuredApiParameterName(parameter.Name);
+        if (!string.IsNullOrWhiteSpace(parameterName)
+            && endpointPath.IndexOf("{" + parameterName + "}", StringComparison.OrdinalIgnoreCase) >= 0) {
             return "path";
         }
 
@@ -389,11 +390,11 @@ public static partial class HtmlCrawler {
         }
 
         string normalized = NormalizeWhitespace(description);
+        if (Regex.IsMatch(normalized, @"\b(not null|not nullable|non-?nullable|non-null|must not be null|cannot be null)\b", RegexOptions.IgnoreCase)) {
+            return false;
+        }
         if (Regex.IsMatch(normalized, @"\b(nullable|may be null|can be null|or null)\b", RegexOptions.IgnoreCase)) {
             return true;
-        }
-        if (Regex.IsMatch(normalized, @"\b(not null|non-null|must not be null|cannot be null)\b", RegexOptions.IgnoreCase)) {
-            return false;
         }
 
         return null;
@@ -809,13 +810,24 @@ public static partial class HtmlCrawler {
         return field;
     }
 
-    private static List<HtmlCrawlStructuredField> FinalizeStructuredFieldRelationships(IEnumerable<HtmlCrawlStructuredField> fields) {
+    private static List<HtmlCrawlStructuredField> FinalizeStructuredFieldRelationships(
+        IEnumerable<HtmlCrawlStructuredField> fields,
+        bool preserveOrphansAsRoot = false) {
         Dictionary<string, HtmlCrawlStructuredField> byPath = fields
             .GroupBy(field => field.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
         foreach (HtmlCrawlStructuredField field in byPath.Values) {
-            field.ParentPath ??= GetStructuredParentPath(field.Path);
+            string? parentPath = field.ParentPath ?? GetStructuredParentPath(field.Path);
+            if (preserveOrphansAsRoot
+                && !string.IsNullOrWhiteSpace(parentPath)
+                && !byPath.ContainsKey(parentPath!)) {
+                field.ParentPath = null;
+                field.Depth = 1;
+                continue;
+            }
+
+            field.ParentPath = parentPath;
             field.Depth = field.Depth > 0 ? field.Depth : GetStructuredFieldDepth(field.Path);
         }
 
@@ -848,6 +860,17 @@ public static partial class HtmlCrawler {
         }
 
         return normalized.Substring(0, separatorIndex);
+    }
+
+    private static string NormalizeStructuredApiParameterName(string? value) {
+        string normalized = NormalizeWhitespace(value) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized)) {
+            return normalized;
+        }
+
+        return normalized.Length > 2 && normalized[0] == '{' && normalized[normalized.Length - 1] == '}'
+            ? normalized.Substring(1, normalized.Length - 2).Trim()
+            : normalized;
     }
 
     private static int GetStructuredFieldDepth(string? path) {

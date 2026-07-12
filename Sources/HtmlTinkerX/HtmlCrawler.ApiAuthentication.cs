@@ -15,7 +15,7 @@ public static partial class HtmlCrawler {
             return;
         }
 
-        if (Regex.IsMatch(normalized, @"\b(no authentication required|without authentication|public endpoint|anonymous access)\b", RegexOptions.IgnoreCase)) {
+        if (IsStructuredAuthorizationNegated(normalized)) {
             authentication.Required = false;
             return;
         }
@@ -70,6 +70,13 @@ public static partial class HtmlCrawler {
             @"\b(no api[- ]?key (?:is )?required|api[- ]?key (?:is )?not required|does not require (?:an? )?api[- ]?key|without (?:an? )?api[- ]?key)\b",
             RegexOptions.IgnoreCase);
 
+    private static bool IsStructuredAuthorizationNegated(string? text) =>
+        !string.IsNullOrWhiteSpace(text)
+        && Regex.IsMatch(
+            text!,
+            @"\b(no (?:authentication|authorization) required|(?:authentication|authorization) (?:is )?not required|without (?:authentication|authorization)|public endpoint|anonymous access)\b",
+            RegexOptions.IgnoreCase);
+
     private static void RemoveStructuredAuthenticationSignal(IList<string> values, string value) {
         for (int index = values.Count - 1; index >= 0; index--) {
             if (string.Equals(values[index], value, StringComparison.OrdinalIgnoreCase)) {
@@ -79,12 +86,19 @@ public static partial class HtmlCrawler {
     }
 
     private static void ApplyStructuredAuthenticationNegations(HtmlCrawlStructuredApiAuthentication authentication) {
-        if (!IsStructuredApiKeyNegated(authentication.Summary)) {
+        bool apiKeyNegated = IsStructuredApiKeyNegated(authentication.Summary);
+        bool authorizationNegated = IsStructuredAuthorizationNegated(authentication.Summary);
+        if (!apiKeyNegated && !authorizationNegated) {
             return;
         }
 
-        RemoveStructuredAuthenticationSignal(authentication.Headers, "X-API-Key");
-        RemoveStructuredAuthenticationSignal(authentication.Schemes, "api-key");
+        if (apiKeyNegated) {
+            RemoveStructuredAuthenticationSignal(authentication.Headers, "X-API-Key");
+            RemoveStructuredAuthenticationSignal(authentication.Schemes, "api-key");
+        }
+        if (authorizationNegated) {
+            RemoveStructuredAuthenticationSignal(authentication.Headers, "Authorization");
+        }
         if (authentication.Headers.Count == 0 && authentication.Schemes.Count == 0) {
             authentication.Required = false;
         }

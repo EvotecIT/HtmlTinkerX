@@ -65,6 +65,24 @@ public class PowerShellHttpContractTests {
             $"PowerShell URL responses must stream before bounded body reads.{Environment.NewLine}{string.Join(Environment.NewLine, bufferedReads)}");
     }
 
+    [Fact]
+    public void CmdletStreamedUrlReads_PreserveHttpClientTimeouts() {
+        string repositoryRoot = FindRepositoryRoot();
+        string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
+        List<string> unprotectedReads = Directory
+            .EnumerateFiles(cmdletRoot, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => File.ReadLines(path).Select((line, index) => new { Path = path, Line = line, Number = index + 1 }))
+            .Where(item => item.Line.IndexOf("GetAsync(Url", StringComparison.Ordinal) >= 0
+                && item.Line.IndexOf("ResponseHeadersRead", StringComparison.Ordinal) >= 0
+                && item.Line.IndexOf("requestToken", StringComparison.Ordinal) < 0)
+            .Select(item => $"{Path.GetFileName(item.Path)}:{item.Number}")
+            .ToList();
+
+        Assert.True(
+            unprotectedReads.Count == 0,
+            $"Streamed PowerShell URL reads must preserve HttpClient timeout coverage for the response body.{Environment.NewLine}{string.Join(Environment.NewLine, unprotectedReads)}");
+    }
+
     private static string FindRepositoryRoot() {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
         while (directory != null) {

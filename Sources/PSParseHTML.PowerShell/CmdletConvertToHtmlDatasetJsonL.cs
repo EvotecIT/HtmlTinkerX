@@ -113,10 +113,12 @@ public sealed class CmdletConvertToHtmlDatasetJsonL : AsyncPSCmdlet {
 
     private async Task<string> ReadHtmlAsync(HttpClient client) {
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpResponseMessage response = await client.GetAsync(Url, HttpCompletionOption.ResponseHeadersRead, CancelToken).ConfigureAwait(false);
+            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, CancelToken);
+            CancellationToken requestToken = requestTimeout.Token;
+            using HttpResponseMessage response = await client.GetAsync(Url, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             downloadedResponseUri = response.RequestMessage?.RequestUri ?? Url;
-            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: requestToken).ConfigureAwait(false);
         }
 
         if (ParameterSetName == ParameterSetPath) {
