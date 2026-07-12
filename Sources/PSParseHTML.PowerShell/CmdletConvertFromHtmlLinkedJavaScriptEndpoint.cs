@@ -64,7 +64,7 @@ public sealed class CmdletConvertFromHtmlLinkedJavaScriptEndpoint : AsyncPSCmdle
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
+                return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
             default:
                 return Content;
         }

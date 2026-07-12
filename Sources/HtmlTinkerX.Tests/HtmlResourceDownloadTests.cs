@@ -1,5 +1,7 @@
 using HtmlTinkerX;
+using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 
 namespace HtmlTinkerX.Tests;
@@ -94,6 +96,25 @@ public class HtmlResourceDownloadTests {
     }
 
     [Fact]
+    public async Task SaveAsync_FailedDownloadPreservesExistingDestination() {
+        using HttpClient client = new(new StaticResponseHandler(new UnknownLengthContent("file1")));
+        HtmlResourceLink link = new() { Source = "https://example.test/file1.txt", Name = "file1.txt" };
+        string dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        string destination = Path.Combine(dir, "file1.txt");
+        File.WriteAllText(destination, "existing");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => link.SaveAsync(
+            dir,
+            client: client,
+            fetchOptions: new HtmlHttpFetchOptions { MaximumResponseBytes = 4 }));
+
+        Assert.Equal("existing", File.ReadAllText(destination));
+        Assert.Empty(Directory.GetFiles(dir, "*.tmp"));
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task DownloadResourcesAsync_HonorsCancellation() {
         using var server = CreateServer();
         using HttpClient client = server.CreateClient();
@@ -111,6 +132,35 @@ public class HtmlResourceDownloadTests {
 
         if (Directory.Exists(dir)) {
             Directory.Delete(dir, true);
+        }
+    }
+
+    private sealed class StaticResponseHandler : HttpMessageHandler {
+        private readonly HttpContent _content;
+
+        public StaticResponseHandler(HttpContent content) {
+            _content = content;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = _content });
+        }
+    }
+
+    private sealed class UnknownLengthContent : HttpContent {
+        private readonly byte[] _content;
+
+        public UnknownLengthContent(string content) {
+            _content = Encoding.UTF8.GetBytes(content);
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) {
+            return stream.WriteAsync(_content, 0, _content.Length);
+        }
+
+        protected override bool TryComputeLength(out long length) {
+            length = 0;
+            return false;
         }
     }
 }

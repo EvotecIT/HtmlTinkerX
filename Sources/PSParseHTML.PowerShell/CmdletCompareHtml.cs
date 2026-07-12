@@ -42,7 +42,7 @@ public sealed class CmdletCompareHtml : AsyncPSCmdlet {
 
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input, CancelToken)
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input, fetchOptions: null, cancellationToken: CancelToken)
                 .ConfigureAwait(false);
         }
 

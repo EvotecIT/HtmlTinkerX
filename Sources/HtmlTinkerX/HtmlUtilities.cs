@@ -286,13 +286,21 @@ public static class HtmlUtilities {
             throw CreateResponseTooLargeException(maximumBytes, declaredLength);
         }
 
+        string temporaryPath = filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try {
             using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            using FileStream fileStream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             await CopyBoundedStreamAsync(contentStream, fileStream, maximumBytes, cancellationToken).ConfigureAwait(false);
-        } catch {
+
+            fileStream.Close();
             if (File.Exists(filePath)) {
-                File.Delete(filePath);
+                File.Replace(temporaryPath, filePath, null);
+            } else {
+                File.Move(temporaryPath, filePath);
+            }
+        } catch {
+            if (File.Exists(temporaryPath)) {
+                File.Delete(temporaryPath);
             }
             throw;
         }

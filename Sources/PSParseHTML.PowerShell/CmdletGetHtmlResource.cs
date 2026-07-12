@@ -94,7 +94,7 @@ public sealed class CmdletGetHtmlResource : AsyncPSCmdlet {
                         link.Content = await File.ReadAllTextAsync(srcUri.LocalPath).ConfigureAwait(false);
 #endif
                     } else {
-                        link.Content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, srcUri.ToString(), CancelToken).ConfigureAwait(false);
+                        link.Content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, srcUri.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                     }
                 }
             }

@@ -673,10 +673,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         if (client != null) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, fetchOptions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         using HttpClient localClient = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(localClient, target, cancellationToken).ConfigureAwait(false);
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(localClient, target, fetchOptions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }

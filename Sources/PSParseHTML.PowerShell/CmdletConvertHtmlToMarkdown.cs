@@ -96,7 +96,7 @@ public sealed class CmdletConvertHtmlToMarkdown : AsyncPSCmdlet {
 
     private async Task<string> GetUrlContentAsync() {
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), CancelToken).ConfigureAwait(false);
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
     }
 
     private async Task WriteOutputAsync(string markdown) {

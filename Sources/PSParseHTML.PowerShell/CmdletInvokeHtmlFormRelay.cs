@@ -89,7 +89,7 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
             using HttpResponseMessage response = await client.GetAsync(Url, CancelToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             initialResponseUri = response.RequestMessage?.RequestUri ?? Url;
-            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, CancelToken).ConfigureAwait(false);
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
         }
 
         if (ParameterSetName == ParameterSetPath) {

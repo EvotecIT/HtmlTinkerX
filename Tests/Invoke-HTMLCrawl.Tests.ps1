@@ -165,6 +165,25 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'exposes and enforces page and asset response limits' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body>$('x' * 128)</body></html>"
+        }
+
+        try {
+            $command = Get-Command Invoke-HTMLCrawl
+            $command.Parameters.Keys | Should -Contain 'MaximumPageResponseBytes'
+            $command.Parameters.Keys | Should -Contain 'MaximumAssetResponseBytes'
+
+            $result = Invoke-HTMLCrawl -Url $server.Prefix -MaxDepth 0 -MaximumPageResponseBytes 64 -MaximumAssetResponseBytes 32
+
+            $result.FailedPageCount | Should -Be 1
+            $result.Pages[0].Error | Should -Match '64-byte limit'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Uses sitemap and skips robots-blocked pages' {
         $prefix = New-TestServerPrefix
         $server = Start-TestHttpServer -Prefix $prefix -Responses @{
