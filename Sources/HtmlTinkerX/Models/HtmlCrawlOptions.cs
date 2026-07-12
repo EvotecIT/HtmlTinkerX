@@ -8,6 +8,20 @@ namespace HtmlTinkerX;
 /// Configures an offline crawl run.
 /// </summary>
 public sealed class HtmlCrawlOptions {
+    private readonly HashSet<string> _explicitScenarioOptions = new(System.StringComparer.Ordinal);
+    private bool _applyingScenarioDefaults;
+    private bool _useCanonicalUrls;
+    private bool _deduplicatePages;
+    private bool _downloadAssets;
+    private bool _includeMarkdown;
+    private bool _includeStructuredJson;
+    private HtmlCrawlStructuredJsonPreset _structuredJsonPreset;
+    private HtmlCrawlContentMode _contentMode = HtmlCrawlContentMode.Focused;
+    private bool _compareContentModes;
+    private int _readerMinimumWordCount = 20;
+    private double _readerMinimumScore = 25;
+    private bool _smartContentCleanup = true;
+
     /// <summary>Default maximum size in bytes for each downloaded crawl asset.</summary>
     public const int DefaultMaximumAssetResponseBytes = 64 * 1024 * 1024;
 
@@ -39,10 +53,16 @@ public sealed class HtmlCrawlOptions {
     public string? PathPrefix { get; set; }
 
     /// <summary>When true, stores and prefers canonical URLs discovered from pages.</summary>
-    public bool UseCanonicalUrls { get; set; }
+    public bool UseCanonicalUrls {
+        get => _useCanonicalUrls;
+        set => SetScenarioOption(ref _useCanonicalUrls, value, nameof(UseCanonicalUrls));
+    }
 
     /// <summary>When true, skips fetched pages whose selected content duplicates an earlier page.</summary>
-    public bool DeduplicatePages { get; set; }
+    public bool DeduplicatePages {
+        get => _deduplicatePages;
+        set => SetScenarioOption(ref _deduplicatePages, value, nameof(DeduplicatePages));
+    }
 
     /// <summary>When true, removes common tracking query parameters during URL normalization.</summary>
     public bool IgnoreTrackingQueryParameters { get; set; } = true;
@@ -54,7 +74,10 @@ public sealed class HtmlCrawlOptions {
     public bool SkipKnownAssetUrls { get; set; } = true;
 
     /// <summary>When true, downloads asset URLs discovered from fetched pages into the crawl dataset.</summary>
-    public bool DownloadAssets { get; set; }
+    public bool DownloadAssets {
+        get => _downloadAssets;
+        set => SetScenarioOption(ref _downloadAssets, value, nameof(DownloadAssets));
+    }
 
     /// <summary>When true, rewrites downloaded asset references in stored HTML to local relative paths.</summary>
     public bool RewriteAssetReferencesToLocal { get; set; } = true;
@@ -96,7 +119,10 @@ public sealed class HtmlCrawlOptions {
     public bool IncludeText { get; set; } = true;
 
     /// <summary>Stores Markdown converted from the selected page content in the result.</summary>
-    public bool IncludeMarkdown { get; set; }
+    public bool IncludeMarkdown {
+        get => _includeMarkdown;
+        set => SetScenarioOption(ref _includeMarkdown, value, nameof(IncludeMarkdown));
+    }
 
     /// <summary>
     /// Controls which markdown dialect profile is used when selected HTML is converted to markdown.
@@ -114,10 +140,16 @@ public sealed class HtmlCrawlOptions {
     public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Stores structured JSON-friendly page data extracted from the crawl.</summary>
-    public bool IncludeStructuredJson { get; set; }
+    public bool IncludeStructuredJson {
+        get => _includeStructuredJson;
+        set => SetScenarioOption(ref _includeStructuredJson, value, nameof(IncludeStructuredJson));
+    }
 
     /// <summary>Optional built-in structured JSON preset that adds flattened extracted fields for common page types.</summary>
-    public HtmlCrawlStructuredJsonPreset StructuredJsonPreset { get; set; }
+    public HtmlCrawlStructuredJsonPreset StructuredJsonPreset {
+        get => _structuredJsonPreset;
+        set => SetScenarioOption(ref _structuredJsonPreset, value, nameof(StructuredJsonPreset));
+    }
 
     /// <summary>Optional inline JSON schema describing caller-defined extracted fields for structured crawl output.</summary>
     public string? StructuredJsonSchema { get; set; }
@@ -129,16 +161,28 @@ public sealed class HtmlCrawlOptions {
     public string? Selector { get; set; }
 
     /// <summary>Controls how the crawler chooses the HTML region used for stored content and text extraction.</summary>
-    public HtmlCrawlContentMode ContentMode { get; set; } = HtmlCrawlContentMode.Focused;
+    public HtmlCrawlContentMode ContentMode {
+        get => _contentMode;
+        set => SetScenarioOption(ref _contentMode, value, nameof(ContentMode));
+    }
 
     /// <summary>When true, the crawler also evaluates raw, focused, and reader extraction alternatives for diagnostics and persisted manifests.</summary>
-    public bool CompareContentModes { get; set; }
+    public bool CompareContentModes {
+        get => _compareContentModes;
+        set => SetScenarioOption(ref _compareContentModes, value, nameof(CompareContentModes));
+    }
 
     /// <summary>Minimum word count a reader-mode candidate must have before it is considered article-like content.</summary>
-    public int ReaderMinimumWordCount { get; set; } = 20;
+    public int ReaderMinimumWordCount {
+        get => _readerMinimumWordCount;
+        set => SetScenarioOption(ref _readerMinimumWordCount, value, nameof(ReaderMinimumWordCount));
+    }
 
     /// <summary>Minimum score a reader-mode candidate must reach before it is preferred over the reader root element.</summary>
-    public double ReaderMinimumScore { get; set; } = 25;
+    public double ReaderMinimumScore {
+        get => _readerMinimumScore;
+        set => SetScenarioOption(ref _readerMinimumScore, value, nameof(ReaderMinimumScore));
+    }
 
     /// <summary>Optional CSS selectors removed from extracted HTML and text before storage.</summary>
     public IList<string> ExcludeSelectors { get; set; } = new List<string>();
@@ -150,7 +194,10 @@ public sealed class HtmlCrawlOptions {
     public IList<string> ExcludeIds { get; set; } = new List<string>();
 
     /// <summary>When true, applies conservative cleanup heuristics to remove low-value boilerplate inside the selected content area.</summary>
-    public bool SmartContentCleanup { get; set; } = true;
+    public bool SmartContentCleanup {
+        get => _smartContentCleanup;
+        set => SetScenarioOption(ref _smartContentCleanup, value, nameof(SmartContentCleanup));
+    }
 
     /// <summary>
     /// Controls whether extraction should respect or include obviously hidden DOM content.
@@ -312,7 +359,7 @@ public sealed class HtmlCrawlOptions {
     /// </summary>
     /// <returns>A copy of the current crawl options.</returns>
     public HtmlCrawlOptions Clone() {
-        return new HtmlCrawlOptions {
+        HtmlCrawlOptions clone = new() {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
             MaximumPageResponseBytes = MaximumPageResponseBytes,
@@ -400,6 +447,28 @@ public sealed class HtmlCrawlOptions {
             IgnoredQueryParameterPatterns = new List<string>(IgnoredQueryParameterPatterns),
             BlockResourcePatterns = new List<string>(BlockResourcePatterns)
         };
+        clone._explicitScenarioOptions.Clear();
+        clone._explicitScenarioOptions.UnionWith(_explicitScenarioOptions);
+        return clone;
+    }
+
+    internal bool IsScenarioOptionExplicit(string optionName) => _explicitScenarioOptions.Contains(optionName);
+
+    internal void ApplyScenarioDefaults(System.Action apply) {
+        bool wasApplyingDefaults = _applyingScenarioDefaults;
+        _applyingScenarioDefaults = true;
+        try {
+            apply();
+        } finally {
+            _applyingScenarioDefaults = wasApplyingDefaults;
+        }
+    }
+
+    private void SetScenarioOption<T>(ref T field, T value, string optionName) {
+        field = value;
+        if (!_applyingScenarioDefaults) {
+            _explicitScenarioOptions.Add(optionName);
+        }
     }
 
     /// <summary>

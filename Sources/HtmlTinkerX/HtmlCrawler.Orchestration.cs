@@ -42,7 +42,8 @@ public static partial class HtmlCrawler {
         HtmlCrawlOptions resolvedOptions = options?.Clone() ?? new HtmlCrawlOptions();
         HtmlCrawlScenarios.Apply(resolvedOptions, resolvedOptions.Scenario);
         IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema = await LoadStructuredSchemaAsync(resolvedOptions, cancellationToken).ConfigureAwait(false);
-        if (structuredSchema.Count > 0 || resolvedOptions.StructuredJsonPreset != HtmlCrawlStructuredJsonPreset.None) {
+        if (!resolvedOptions.IsScenarioOptionExplicit(nameof(HtmlCrawlOptions.IncludeStructuredJson))
+            && (structuredSchema.Count > 0 || resolvedOptions.StructuredJsonPreset != HtmlCrawlStructuredJsonPreset.None)) {
             resolvedOptions.IncludeStructuredJson = true;
         }
         IReadOnlyList<HtmlCrawlProfile> customProfiles = string.IsNullOrWhiteSpace(resolvedOptions.ProfilePath)
@@ -567,13 +568,15 @@ public static partial class HtmlCrawler {
         }.Uri;
 
         try {
-            using HttpResponseMessage response = await client.GetAsync(robotsUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
+            CancellationToken requestToken = requestTimeout.Token;
+            using HttpResponseMessage response = await client.GetAsync(robotsUri, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) {
                 cache[hostKey] = new RobotsDocument();
                 return cache[hostKey];
             }
 
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, cancellationToken).ConfigureAwait(false);
+            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
             string text = Encoding.UTF8.GetString(bytes);
             RobotsDocument robots = ParseRobots(text, options.RobotsUserAgent);
             cache[hostKey] = robots;

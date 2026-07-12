@@ -183,7 +183,7 @@ public static partial class HtmlCrawler {
         Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase);
         ApplyStrictOpenApiType(schema, parameter.Type, parameter.Format);
         if (parameter.Nullable == true) {
-            schema["nullable"] = true;
+            ApplyStrictOpenApiNullable(schema);
         }
         if (!string.IsNullOrWhiteSpace(parameter.Pattern)) {
             schema["pattern"] = parameter.Pattern;

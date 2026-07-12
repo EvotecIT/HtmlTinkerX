@@ -35,12 +35,14 @@ public static partial class HtmlCrawler {
         };
 
         try {
-            using HttpResponseMessage response = await client.GetAsync(request.Uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
+            CancellationToken requestToken = requestTimeout.Token;
+            using HttpResponseMessage response = await client.GetAsync(request.Uri, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             page.StatusCode = (int)response.StatusCode;
             page.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
             response.EnsureSuccessStatusCode();
 
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, cancellationToken).ConfigureAwait(false);
+            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
             string html = DecodeResponse(bytes, response.Content.Headers.ContentType?.CharSet);
             if (!IsAllowedPageContent(page.ContentType, html, options)) {
                 page.Status = HtmlCrawlPageStatus.Skipped;

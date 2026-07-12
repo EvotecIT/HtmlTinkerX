@@ -73,6 +73,16 @@ public class HtmlUtilitiesHttpTests {
     }
 
     [Fact]
+    public async Task GetStringWithProperEncoding_AppliesHttpClientTimeoutDuringBodyRead() {
+        using HttpClient client = new(new StreamingResponseHandler()) {
+            Timeout = TimeSpan.FromMilliseconds(100)
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            HtmlUtilities.GetStringWithProperEncodingAsync(client, "https://example.test/slow-body"));
+    }
+
+    [Fact]
     public async Task PublicUrlParser_ForwardsCallerFetchLimit() {
         using HttpClient client = new(new ResponseHandler(new byte[11]));
 
@@ -91,6 +101,14 @@ public class HtmlUtilitiesHttpTests {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
                 Content = new ByteArrayContent(_content),
+                RequestMessage = request
+            });
+    }
+
+    private sealed class StreamingResponseHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StreamContent(new BlockingReadStream()),
                 RequestMessage = request
             });
     }

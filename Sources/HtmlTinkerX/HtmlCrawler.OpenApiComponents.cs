@@ -516,7 +516,7 @@ public static partial class HtmlCrawler {
         Dictionary<string, object?> schema = new(StringComparer.OrdinalIgnoreCase);
         ApplyStrictOpenApiType(schema, field.Type, field.Format);
         if (field.Nullable == true) {
-            schema["nullable"] = true;
+            ApplyStrictOpenApiNullable(schema);
         }
         if (field.EnumValues.Count > 0) {
             schema["enum"] = field.EnumValues.Cast<object>().ToList();
@@ -619,6 +619,13 @@ public static partial class HtmlCrawler {
         if (!string.IsNullOrWhiteSpace(format)) {
             schema["format"] = format;
         }
+    }
+
+    private static void ApplyStrictOpenApiNullable(Dictionary<string, object?> schema) {
+        string type = schema.TryGetValue("type", out object? value) && value is string schemaType
+            ? schemaType
+            : "string";
+        schema["type"] = new[] { type, "null" };
     }
 
     private static string GetStrictOpenApiResponseCode(int? statusCode) =>

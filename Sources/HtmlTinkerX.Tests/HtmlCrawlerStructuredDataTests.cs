@@ -712,6 +712,7 @@ public partial class HtmlCrawlerStructuredJsonTests {
                   <table class="parameters">
                     <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
                     <tr><td>name</td><td>string</td><td>Yes</td><td>Name of the widget.</td></tr>
+                    <tr><td>description</td><td>string</td><td>No</td><td>Optional description that may be null.</td></tr>
                   </table>
                   <pre><code class="language-http">POST /v1/widgets HTTP/1.1
                   Content-Type: application/json
@@ -853,6 +854,9 @@ public partial class HtmlCrawlerStructuredJsonTests {
             Assert.Contains("\"x-htmltinkerx-confidence\"", openApiJson, StringComparison.Ordinal);
             Assert.Contains("\"x-htmltinkerx-evidenceCount\"", openApiJson, StringComparison.Ordinal);
             Assert.Contains("\"x-htmltinkerx-confidenceSummary\"", openApiJson, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"nullable\"", openApiJson, StringComparison.Ordinal);
+            Assert.Contains("\"type\": [", openApiJson, StringComparison.Ordinal);
+            Assert.Contains("\"null\"", openApiJson, StringComparison.Ordinal);
 
             Assert.False(string.IsNullOrWhiteSpace(result.IndexHtmlPath));
             string indexHtml = File.ReadAllText(result.IndexHtmlPath!);

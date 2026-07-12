@@ -464,6 +464,24 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'Preserves explicit false and default-valued overrides after applying a scenario' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><head><title>Dataset</title></head><body><main><h1>Dataset</h1><p>Focused content remains selected when explicitly requested by the caller.</p></main></body></html>"
+        }
+
+        try {
+            $result = Invoke-HTMLCrawl -Url $server.Prefix -MaxDepth 0 -MaxPages 1 -Scenario Dataset -ContentMode Focused -CompareContentModes:$false -IncludeMarkdown:$false -IncludeStructuredJson:$false -UseCanonicalUrls:$false -DeduplicatePages:$false
+            $page = $result.Pages | Select-Object -First 1
+
+            $page.ContentModeUsed | Should -Be 'Focused'
+            $page.ContentComparisons.Count | Should -Be 0
+            $page.Markdown | Should -BeNullOrEmpty
+            $page.StructuredJson | Should -BeNullOrEmpty
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Can auto-apply the api docs profile from api documentation markers' {
         $server = Start-TestHttpServer -Responses @{
             '/' = "<html><head><title>API</title></head><body><main><div class='swagger-ui'><div class='topbar'>Swagger UI</div></div><article><h1>Users API</h1><p>API reference body with enough words to keep reader mode useful for extraction testing.</p><a href='/openapi.json'>OpenAPI</a><button>Try it out</button></article></main></body></html>"

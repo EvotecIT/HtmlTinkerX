@@ -66,12 +66,14 @@ public static partial class HtmlCrawler {
         };
 
         try {
-            using HttpResponseMessage response = await client.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
+            CancellationToken requestToken = requestTimeout.Token;
+            using HttpResponseMessage response = await client.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             asset.StatusCode = (int)response.StatusCode;
             asset.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
             response.EnsureSuccessStatusCode();
 
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumAssetResponseBytes, cancellationToken).ConfigureAwait(false);
+            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumAssetResponseBytes, requestToken).ConfigureAwait(false);
             asset.ContentLength = bytes.LongLength;
 
             if (!string.IsNullOrEmpty(assetsDirectory)) {

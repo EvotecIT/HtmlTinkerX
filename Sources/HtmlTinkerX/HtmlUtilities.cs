@@ -109,12 +109,14 @@ public static class HtmlUtilities {
             throw new ArgumentNullException(nameof(url));
         }
 
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
         using HttpRequestMessage request = new(HttpMethod.Get, url);
         using HttpResponseMessage response = await client
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+        return await ReadResponseContentWithProperEncodingAsync(response, requestToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -137,12 +139,14 @@ public static class HtmlUtilities {
             throw new ArgumentNullException(nameof(url));
         }
 
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
         using HttpRequestMessage request = new(HttpMethod.Get, url);
         using HttpResponseMessage response = await client
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, cancellationToken).ConfigureAwait(false);
+        return await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -275,9 +279,11 @@ public static class HtmlUtilities {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         int maximumBytes = fetchOptions?.GetValidatedMaximumResponseBytes() ?? HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
         using HttpRequestMessage request = new(HttpMethod.Get, uri);
         using HttpResponseMessage response = await client
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
@@ -290,7 +296,7 @@ public static class HtmlUtilities {
         try {
             using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             using FileStream fileStream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            await CopyBoundedStreamAsync(contentStream, fileStream, maximumBytes, cancellationToken).ConfigureAwait(false);
+            await CopyBoundedStreamAsync(contentStream, fileStream, maximumBytes, requestToken).ConfigureAwait(false);
 
             fileStream.Close();
             if (File.Exists(filePath)) {
@@ -304,6 +310,18 @@ public static class HtmlUtilities {
             }
             throw;
         }
+    }
+
+    internal static CancellationTokenSource CreateRequestTimeoutTokenSource(HttpClient client, CancellationToken cancellationToken) {
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+
+        CancellationTokenSource requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (client.Timeout != Timeout.InfiniteTimeSpan) {
+            requestTimeout.CancelAfter(client.Timeout);
+        }
+        return requestTimeout;
     }
 
     private static async Task CopyBoundedStreamAsync(Stream source, Stream destination, int maximumBytes, CancellationToken cancellationToken) {
