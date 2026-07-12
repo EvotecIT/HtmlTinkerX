@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting all input fields from HTML forms.
 /// </summary>
-public static class HtmlFormFieldExtractor {
+public static partial class HtmlFormFieldExtractor {
     /// <summary>
     /// Extracts form fields using AngleSharp from provided HTML.
     /// </summary>

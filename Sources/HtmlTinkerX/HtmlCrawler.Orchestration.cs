@@ -426,6 +426,10 @@ public static partial class HtmlCrawler {
             }
         }
 
+        HtmlHttpFetchOptions sitemapFetchOptions = new() {
+            MaximumResponseBytes = options.MaximumPageResponseBytes
+        };
+
         while (sitemapQueue.Count > 0) {
             cancellationToken.ThrowIfCancellationRequested();
             Uri sitemapUri = sitemapQueue.Dequeue();
@@ -433,7 +437,9 @@ public static partial class HtmlCrawler {
 
             string xml;
             try {
-                xml = await HtmlUtilities.GetStringWithProperEncodingAsync(client, sitemapUri.AbsoluteUri, cancellationToken).ConfigureAwait(false);
+                xml = await HtmlUtilities.GetStringWithProperEncodingAsync(client, sitemapUri.AbsoluteUri, sitemapFetchOptions, cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch {
                 continue;
             }

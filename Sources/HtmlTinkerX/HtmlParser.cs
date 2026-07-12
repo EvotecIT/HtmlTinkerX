@@ -15,7 +15,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for parsing HTML content using either AngleSharp or HtmlAgilityPack.
 /// </summary>
-public static class HtmlParser {
+public static partial class HtmlParser {
 
     /// <summary>
     /// Parses HTML markup from a string using AngleSharp.

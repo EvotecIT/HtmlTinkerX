@@ -44,6 +44,27 @@ public partial class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_AppliesPageResponseLimitToSitemaps() {
+        Dictionary<string, string> responses = new() {
+            ["/"] = "<html><body>home</body></html>",
+            ["/sitemap.xml"] = "<urlset><url><loc>/from-sitemap</loc></url>" + new string(' ', 128) + "</urlset>",
+            ["/from-sitemap"] = "<html><body>mapped</body></html>"
+        };
+
+        using HttpListener server = StartServer(responses, out string rootUrl);
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+            MaxDepth = 0,
+            MaxPages = 5,
+            RespectRobotsTxt = false,
+            UseSitemaps = true,
+            MaximumPageResponseBytes = 64
+        });
+
+        Assert.DoesNotContain(result.Pages, page => page.Url == rootUrl + "from-sitemap");
+        Assert.Contains(rootUrl + "sitemap.xml", result.SitemapUrls);
+    }
+
+    [Fact]
     public void ShouldRetryWithRendering_DetectsThinJavascriptShells() {
         HtmlCrawlPage page = new() {
             Status = HtmlCrawlPageStatus.Success,

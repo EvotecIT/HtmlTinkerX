@@ -12,7 +12,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides functionality for parsing HTML lists.
 /// </summary>
-public static class HtmlParserFromList {
+public static partial class HtmlParserFromList {
     /// <summary>
     /// Extracts list items from HTML using AngleSharp with metadata.
     /// </summary>

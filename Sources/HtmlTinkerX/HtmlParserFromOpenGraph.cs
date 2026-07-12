@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting Open Graph metadata from HTML documents.
 /// </summary>
-public static class HtmlParserFromOpenGraph {
+public static partial class HtmlParserFromOpenGraph {
     /// <summary>
     /// Parses Open Graph metadata from HTML markup.
     /// </summary>

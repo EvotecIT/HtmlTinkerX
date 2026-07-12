@@ -34,7 +34,7 @@ public enum HtmlResourceType {
 /// <summary>
 /// Represents a script or stylesheet resource found in HTML.
 /// </summary>
-public sealed class HtmlResourceLink {
+public sealed partial class HtmlResourceLink {
     /// <summary>Index of the element within the document.</summary>
     public int Index { get; set; }
 

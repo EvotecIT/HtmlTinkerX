@@ -102,7 +102,19 @@ public static class HtmlUtilities {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
     public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
-        return await GetStringWithProperEncodingAsync(client, url, null, cancellationToken).ConfigureAwait(false);
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+        if (url == null) {
+            throw new ArgumentNullException(nameof(url));
+        }
+
+        using HttpRequestMessage request = new(HttpMethod.Get, url);
+        using HttpResponseMessage response = await client
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -140,7 +152,12 @@ public static class HtmlUtilities {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
     public static async Task<string> ReadResponseContentWithProperEncodingAsync(HttpResponseMessage response, CancellationToken cancellationToken = default) {
-        return await ReadResponseContentWithProperEncodingAsync(response, null, cancellationToken).ConfigureAwait(false);
+        if (response == null) {
+            throw new ArgumentNullException(nameof(response));
+        }
+
+        byte[] bytes = await ReadUnboundedContentAsync(response.Content, cancellationToken).ConfigureAwait(false);
+        return DecodeResponseContent(response, bytes);
     }
 
     /// <summary>
@@ -165,6 +182,10 @@ public static class HtmlUtilities {
         }
 
         byte[] bytes = await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
+        return DecodeResponseContent(response, bytes);
+    }
+
+    private static string DecodeResponseContent(HttpResponseMessage response, byte[] bytes) {
 
         // Try to get encoding from Content-Type header
         var contentType = response.Content.Headers.ContentType;
@@ -204,6 +225,23 @@ public static class HtmlUtilities {
 
         // Default to UTF-8 if no encoding could be determined
         return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    private static async Task<byte[]> ReadUnboundedContentAsync(HttpContent content, CancellationToken cancellationToken) {
+        using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+        using MemoryStream buffer = new();
+        byte[] chunk = new byte[81920];
+
+        while (true) {
+            int bytesRead = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0) {
+                break;
+            }
+
+            await buffer.WriteAsync(chunk, 0, bytesRead, cancellationToken).ConfigureAwait(false);
+        }
+
+        return buffer.ToArray();
     }
 
     internal static async Task<byte[]> ReadResponseBytesAsync(

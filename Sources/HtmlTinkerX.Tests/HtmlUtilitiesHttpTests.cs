@@ -51,6 +51,17 @@ public class HtmlUtilitiesHttpTests {
     }
 
     [Fact]
+    public async Task LegacyReadResponseContent_StillAllowsExplicitUnboundedReads() {
+        using ByteArrayContent content = new(System.Text.Encoding.UTF8.GetBytes("ok"));
+        content.Headers.ContentLength = HtmlHttpFetchOptions.DefaultMaximumResponseBytes + 1L;
+        using HttpResponseMessage response = new(HttpStatusCode.OK) { Content = content };
+
+        string result = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, CancellationToken.None);
+
+        Assert.Equal("ok", result);
+    }
+
+    [Fact]
     public async Task GetStringWithProperEncoding_UsesCallerLimitAndCancellationContract() {
         using HttpClient client = new(new ResponseHandler(new byte[11]));
 

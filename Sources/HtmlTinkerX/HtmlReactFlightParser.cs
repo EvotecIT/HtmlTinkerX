@@ -130,7 +130,7 @@ public sealed class HtmlReactFlightRow {
 /// <summary>
 /// Extracts inline Next.js React Flight payloads from HTML.
 /// </summary>
-public static class HtmlReactFlightParser {
+public static partial class HtmlReactFlightParser {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     /// <summary>Parses inline React Flight payloads from HTML markup.</summary>

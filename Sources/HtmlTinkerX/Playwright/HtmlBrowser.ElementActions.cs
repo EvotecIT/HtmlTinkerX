@@ -425,6 +425,20 @@ public static partial class HtmlBrowser {
     }
 
     private static async Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) {
+        if (string.IsNullOrWhiteSpace(navigationUrl)) {
+            // WaitForURLAsync can complete against the current URL before the click and cannot
+            // distinguish a same-URL reload. The event-based helper is required for this case.
+#pragma warning disable CS0612
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions {
+                    Timeout = timeout,
+                    WaitUntil = ToWaitUntilState(loadState)
+                }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+#pragma warning restore CS0612
+            return;
+        }
+
         Task navigationTask = session.Page.WaitForURLAsync(
             url => MatchesNavigationUrl(url, navigationUrl),
             new PageWaitForURLOptions {
@@ -439,10 +453,6 @@ public static partial class HtmlBrowser {
     }
 
     private static bool MatchesNavigationUrl(string url, string? navigationUrl) {
-        if (string.IsNullOrWhiteSpace(navigationUrl)) {
-            return true;
-        }
-
         string trimmedNavigationUrl = navigationUrl!.Trim();
         string pattern = "^" + Regex.Escape(trimmedNavigationUrl)
             .Replace("\\*\\*", ".*")

@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting &lt;meta&gt; tags from HTML.
 /// </summary>
-public static class HtmlParserFromMeta {
+public static partial class HtmlParserFromMeta {
     /// <summary>
     /// Parses meta tags from HTML content.
     /// </summary>

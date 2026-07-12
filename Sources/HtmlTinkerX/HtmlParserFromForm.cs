@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides functionality for extracting form information from HTML.
 /// </summary>
-public static class HtmlParserFromForm {
+public static partial class HtmlParserFromForm {
     /// <summary>
     /// Parses HTML and extracts forms with their fields using AngleSharp.
     /// </summary>

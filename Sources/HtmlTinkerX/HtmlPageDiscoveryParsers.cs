@@ -128,6 +128,10 @@ public static class HtmlScriptDataParser {
         return items;
     }
 
+    /// <summary>Preserves the 2.0.x binary signature for URL script-data parsing.</summary>
+    public static Task<IReadOnlyList<HtmlScriptDataItem>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
     public static async Task<IReadOnlyList<HtmlScriptDataItem>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html);
@@ -170,6 +174,10 @@ public static class HtmlScriptDataParser {
 }
 
 public static class HtmlLinkedJavaScriptEndpointParser {
+    /// <summary>Preserves the 2.0.x binary signature for linked JavaScript parsing.</summary>
+    public static Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal, HttpClient? client) =>
+        ParseAsync(html, baseUri, includeExternal, client, null, null, default);
+
     public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         return await ParseAsync(html, baseUri, includeExternal, client, null, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
@@ -267,6 +275,10 @@ public static class HtmlLinkedJavaScriptEndpointParser {
         return endpoints;
     }
 
+    /// <summary>Preserves the 2.0.x binary signature for URL linked JavaScript parsing.</summary>
+    public static Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseUrlAsync(string url, bool includeExternal, HttpClient? client) =>
+        ParseUrlAsync(url, includeExternal, client, null, default);
+
     public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseUrlAsync(string url, bool includeExternal = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return await ParseAsync(html, new Uri(url, UriKind.Absolute), includeExternal, client, fetchOptions, cancellationToken).ConfigureAwait(false);
@@ -324,6 +336,10 @@ public static class HtmlImageCandidateParser {
 
         return candidates;
     }
+
+    /// <summary>Preserves the 2.0.x binary signature for URL image-candidate parsing.</summary>
+    public static Task<IReadOnlyList<HtmlImageCandidate>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
 
     public static async Task<IReadOnlyList<HtmlImageCandidate>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
@@ -441,6 +457,10 @@ public static class HtmlWebManifestParser {
         return manifest;
     }
 
+    /// <summary>Preserves the 2.0.x binary signature for URL web-manifest parsing.</summary>
+    public static Task<HtmlWebManifestDocument> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
     public static async Task<HtmlWebManifestDocument> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         string json = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(json, new Uri(url, UriKind.Absolute));
@@ -508,6 +528,10 @@ public static class HtmlWellKnownParser {
             _ => throw new ArgumentException("Unsupported well-known file kind.", nameof(kind))
         };
     }
+
+    /// <summary>Preserves the 2.0.x binary signature for well-known URL parsing.</summary>
+    public static Task<IReadOnlyList<HtmlWellKnownRecord>> ParseUrlAsync(string url, string kind, HttpClient? client) =>
+        ParseUrlAsync(url, kind, client, null, default);
 
     public static async Task<IReadOnlyList<HtmlWellKnownRecord>> ParseUrlAsync(string url, string kind, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         string content = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);

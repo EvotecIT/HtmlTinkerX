@@ -12,7 +12,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Helpers for extracting script and stylesheet references from HTML documents.
 /// </summary>
-public static class HtmlResourceParser {
+public static partial class HtmlResourceParser {
     /// <summary>Parses external and inline resources from HTML.</summary>
     /// <param name="html">HTML markup.</param>
     /// <param name="includeCss">Include CSS resources.</param>

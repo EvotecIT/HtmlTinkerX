@@ -11,7 +11,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Builds a hierarchical outline of headings found in HTML content.
 /// </summary>
-public static class HtmlOutlineBuilder {
+public static partial class HtmlOutlineBuilder {
     /// <summary>
     /// Builds an outline from the provided HTML markup using the specified engine.
     /// </summary>

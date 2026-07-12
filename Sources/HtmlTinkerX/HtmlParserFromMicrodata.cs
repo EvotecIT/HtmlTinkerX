@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting microdata items from HTML documents.
 /// </summary>
-public static class HtmlParserFromMicrodata {
+public static partial class HtmlParserFromMicrodata {
     /// <summary>
     /// Parses microdata items from HTML content.
     /// </summary>
