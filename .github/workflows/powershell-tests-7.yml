@@ -154,7 +154,7 @@ jobs:
 
       - name: Build packaged module
         shell: pwsh
-        run: .\Build\Build-Module.ps1 -RunMode Build
+        run: .\Build\Build-Module.ps1 -RunMode Build -SignModule:$false
         timeout-minutes: 15
 
       - name: Run packaged ALC conflict smoke test
