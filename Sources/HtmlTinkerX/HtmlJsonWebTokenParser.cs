@@ -13,6 +13,10 @@ namespace HtmlTinkerX;
 public static class HtmlJsonWebTokenParser {
     private static readonly long MinUnixTimeSeconds = DateTimeOffset.MinValue.ToUnixTimeSeconds();
     private static readonly long MaxUnixTimeSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
+    private static readonly JsonSerializerOptions CompactJsonOptions = new() {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = false
+    };
 
     private static readonly string[] SensitiveClaimNames = {
         "email",
@@ -233,10 +237,7 @@ public static class HtmlJsonWebTokenParser {
             redacted[property.Name] = ConvertJsonElement(property.Value, property.Name);
         }
 
-        return JsonSerializer.Serialize(redacted, new JsonSerializerOptions {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            WriteIndented = false
-        });
+        return JsonSerializer.Serialize(redacted, CompactJsonOptions);
     }
 
     private static object? ConvertJsonElement(JsonElement element, string? propertyName = null) {
@@ -257,10 +258,7 @@ public static class HtmlJsonWebTokenParser {
     }
 
     private static string FormatRedactedJsonValue(JsonElement element) =>
-        JsonSerializer.Serialize(ConvertJsonElement(element), new JsonSerializerOptions {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-            WriteIndented = false
-        });
+        JsonSerializer.Serialize(ConvertJsonElement(element), CompactJsonOptions);
 
     private static bool ContainsSensitiveJsonProperty(JsonElement element) =>
         element.ValueKind switch {

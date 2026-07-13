@@ -48,7 +48,9 @@ Describe 'HTML parsing toolbox cmdlets' {
         Get-Command Select-HtmlJavaScriptConfig | Should -Not -BeNullOrEmpty
         Get-Command Select-HtmlJSConfig | Should -Not -BeNullOrEmpty
         Get-Command Select-HtmlStyleUsage | Should -Not -BeNullOrEmpty
-        Get-Command Find-HtmlInteractionSurface | Should -Not -BeNullOrEmpty
+        $interactionCommand = Get-Command Find-HtmlInteractionSurface
+        $interactionCommand | Should -Not -BeNullOrEmpty
+        $interactionCommand.Parameters.Keys | Should -Contain 'MaximumResponseBytes'
         Get-Command Compare-HtmlStaticRendered | Should -Not -BeNullOrEmpty
     }
 

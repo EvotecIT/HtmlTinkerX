@@ -67,7 +67,7 @@ public static class HtmlApiEndpointInventory {
     private static HtmlApiEndpointRecord CreateRecord(HtmlInteractionSurfaceItem item, Uri? resolutionBaseUri, Uri? pageUri, HtmlPageWorkbenchResult workbench) {
         Uri? resolvedUri = ResolveUri(item.Url, resolutionBaseUri);
         string method = NormalizeMethod(item.Method, item.Kind);
-        bool isExternal = resolvedUri != null && pageUri != null && !HasSameOrigin(pageUri, resolvedUri);
+        bool isExternal = resolvedUri != null && pageUri != null && !HtmlUriUtility.HasSameOrigin(pageUri, resolvedUri);
         bool isStateChanging = StateChangingMethods.Contains(method);
         bool hasUnknownMethod = method.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase);
         bool hasSensitiveGetFormFields = IsGetForm(item, method) && HasSensitiveFormFieldMetadata(item.Metadata);
@@ -217,11 +217,6 @@ public static class HtmlApiEndpointInventory {
 
     private static Uri? TryCreateUri(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) ? uri : null;
-
-    private static bool HasSameOrigin(Uri left, Uri right) =>
-        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
-        && left.Port == right.Port;
 
     private static bool HasAuthHint(HtmlInteractionSurfaceItem item, Uri? uri, HtmlPageWorkbenchResult workbench) {
         if (workbench.ExtractionPlan?.HasLoginForm == true || workbench.ExtractionPlan?.HasAutoSubmitForm == true) {

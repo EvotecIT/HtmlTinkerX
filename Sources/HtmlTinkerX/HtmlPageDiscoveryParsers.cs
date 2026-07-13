@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -128,8 +129,12 @@ public static class HtmlScriptDataParser {
         return items;
     }
 
-    public static async Task<IReadOnlyList<HtmlScriptDataItem>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL script-data parsing.</summary>
+    public static Task<IReadOnlyList<HtmlScriptDataItem>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlScriptDataItem>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html);
     }
 
@@ -170,19 +175,23 @@ public static class HtmlScriptDataParser {
 }
 
 public static class HtmlLinkedJavaScriptEndpointParser {
-    public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal = false, HttpClient? client = null) {
-        return await ParseAsync(html, baseUri, includeExternal, client, CancellationToken.None).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for linked JavaScript parsing.</summary>
+    public static Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal, HttpClient? client) =>
+        ParseAsync(html, baseUri, includeExternal, client, null, null, default);
+
+    public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await ParseAsync(html, baseUri, includeExternal, client, null, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri baseUri, bool includeExternal, HttpClient? client, CancellationToken cancellationToken) {
-        return await ParseAsync(html, baseUri, includeExternal, client, null, cancellationToken).ConfigureAwait(false);
+        return await ParseAsync(html, baseUri, includeExternal, client, null, null, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? client, Uri? effectiveBaseUriOverride, CancellationToken cancellationToken = default) {
-        return await ParseAsync(html, pageBaseUri, includeExternal, client, client, effectiveBaseUriOverride, cancellationToken).ConfigureAwait(false);
+    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? client, Uri? effectiveBaseUriOverride, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        return await ParseAsync(html, pageBaseUri, includeExternal, client, client, effectiveBaseUriOverride, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? sameOriginClient, HttpClient? externalClient, Uri? effectiveBaseUriOverride, CancellationToken cancellationToken = default) {
+    internal static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseAsync(string html, Uri pageBaseUri, bool includeExternal, HttpClient? sameOriginClient, HttpClient? externalClient, Uri? effectiveBaseUriOverride, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
@@ -233,7 +242,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
 
             try {
                 HttpClient http = (isExternal ? externalClient : sameOriginClient) ?? HtmlHttpClientFactory.Shared;
-                string scriptContent = await HtmlUtilities.GetStringWithProperEncodingAsync(http, scriptUrl, cancellationToken).ConfigureAwait(false);
+                string scriptContent = await HtmlUtilities.GetStringWithProperEncodingAsync(http, scriptUrl, fetchOptions, cancellationToken).ConfigureAwait(false);
                 foreach (HtmlJavaScriptEndpoint endpoint in HtmlJavaScriptEndpointParser.ParseJavaScript(scriptContent)) {
                     endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                         Index = endpoints.Count,
@@ -249,7 +258,7 @@ public static class HtmlLinkedJavaScriptEndpointParser {
                         Source = endpoint.Source
                     });
                 }
-            } catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException)) {
+            } catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException || ex is InvalidDataException)) {
                 endpoints.Add(new HtmlLinkedJavaScriptEndpoint {
                     Index = endpoints.Count,
                     ScriptIndex = scriptIndex,
@@ -267,9 +276,13 @@ public static class HtmlLinkedJavaScriptEndpointParser {
         return endpoints;
     }
 
-    public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseUrlAsync(string url, bool includeExternal = false, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
-        return await ParseAsync(html, new Uri(url, UriKind.Absolute), includeExternal, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL linked JavaScript parsing.</summary>
+    public static Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseUrlAsync(string url, bool includeExternal, HttpClient? client) =>
+        ParseUrlAsync(url, includeExternal, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlLinkedJavaScriptEndpoint>> ParseUrlAsync(string url, bool includeExternal = false, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
+        return await ParseAsync(html, new Uri(url, UriKind.Absolute), includeExternal, client, fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsJavaScriptScriptType(string type) {
@@ -325,8 +338,12 @@ public static class HtmlImageCandidateParser {
         return candidates;
     }
 
-    public static async Task<IReadOnlyList<HtmlImageCandidate>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL image-candidate parsing.</summary>
+    public static Task<IReadOnlyList<HtmlImageCandidate>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlImageCandidate>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html, new Uri(url, UriKind.Absolute));
     }
 
@@ -441,8 +458,12 @@ public static class HtmlWebManifestParser {
         return manifest;
     }
 
-    public static async Task<HtmlWebManifestDocument> ParseUrlAsync(string url, HttpClient? client = null) {
-        string json = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL web-manifest parsing.</summary>
+    public static Task<HtmlWebManifestDocument> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<HtmlWebManifestDocument> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string json = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(json, new Uri(url, UriKind.Absolute));
     }
 
@@ -509,8 +530,12 @@ public static class HtmlWellKnownParser {
         };
     }
 
-    public static async Task<IReadOnlyList<HtmlWellKnownRecord>> ParseUrlAsync(string url, string kind, HttpClient? client = null) {
-        string content = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for well-known URL parsing.</summary>
+    public static Task<IReadOnlyList<HtmlWellKnownRecord>> ParseUrlAsync(string url, string kind, HttpClient? client) =>
+        ParseUrlAsync(url, kind, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlWellKnownRecord>> ParseUrlAsync(string url, string kind, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string content = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(content, kind, new Uri(url, UriKind.Absolute));
     }
 

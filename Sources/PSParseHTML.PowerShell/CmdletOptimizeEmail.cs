@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using System;
 using System.IO;
 using System.Management.Automation;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -71,6 +72,10 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter DownloadRemoteCss { get; set; }
 
+    /// <summary>HTTP client used to download linked stylesheets. The caller retains ownership of the client.</summary>
+    [Parameter]
+    public HttpClient? HttpClient { get; set; }
+
     /// <summary>Add Google Analytics tags.</summary>
     [Parameter]
     public SwitchParameter AddAnalyticsTags { get; set; }
@@ -136,6 +141,7 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
             PreserveMediaQueries = PreserveMediaQueries,
             UseEmailFormatter = UseEmailFormatter,
             DownloadRemoteCss = DownloadRemoteCss,
+            HttpClient = HttpClient,
             AddAnalyticsTags = AddAnalyticsTags,
             AnalyticsSource = AnalyticsSource,
             AnalyticsMedium = AnalyticsMedium,

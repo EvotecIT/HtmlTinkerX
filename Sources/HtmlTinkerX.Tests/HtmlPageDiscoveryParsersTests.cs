@@ -65,6 +65,26 @@ public class HtmlPageDiscoveryParsersTests {
             HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, new Uri("https://example.org/"), includeExternal: false, client: client, cancellationToken: cts.Token));
     }
 
+    [Fact]
+    public async Task LinkedJavaScriptEndpointParserRecordsOversizedScriptsAsFailedDownloads() {
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            await context.Response.WriteAsync("fetch('/api/items');");
+        }, null, null);
+        using var client = server.CreateClient();
+        string html = """<script src="/app.js"></script>""";
+
+        var endpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(
+            html,
+            server.BaseAddress,
+            includeExternal: false,
+            client: client,
+            fetchOptions: new HtmlHttpFetchOptions { MaximumResponseBytes = 4 });
+
+        HtmlLinkedJavaScriptEndpoint endpoint = Assert.Single(endpoints);
+        Assert.False(endpoint.IsDownloaded);
+        Assert.Contains("4-byte limit", endpoint.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class BlockingHandler : HttpMessageHandler {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);

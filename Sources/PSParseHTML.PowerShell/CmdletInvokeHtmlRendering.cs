@@ -124,6 +124,11 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeExternalLinkedScripts { get; set; }
 
+    /// <summary>Maximum number of bytes accepted for each linked JavaScript response included in Snapshot discovery.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int LinkedScriptMaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+
     /// <summary>Capture response bodies for selected network requests in Snapshot output. Bodies may contain sensitive values.</summary>
     [Parameter]
     public SwitchParameter IncludeResponseBody { get; set; }
@@ -448,6 +453,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                     HtmlRenderedPageSnapshot snapshot = await HtmlBrowser.CreateSnapshotAsync(
                         sess,
                         target,
+                        new HtmlHttpFetchOptions { MaximumResponseBytes = LinkedScriptMaximumResponseBytes },
                         Selector,
                         InnerHtml.IsPresent,
                         AsText.IsPresent,
@@ -457,10 +463,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
                         IncludeLinkedScripts.IsPresent,
                         IncludeExternalLinkedScripts.IsPresent,
                         IncludeNetworkLog.IsPresent,
-                        token,
                         snapshotHttpClient,
                         Timeout,
-                        externalSnapshotHttpClient).ConfigureAwait(false);
+                        externalSnapshotHttpClient,
+                        token).ConfigureAwait(false);
                     WriteObject(snapshot);
                 } finally {
                     externalSnapshotHttpClient?.Dispose();
@@ -673,10 +679,10 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         if (client != null) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, cancellationToken).ConfigureAwait(false);
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(client, target, fetchOptions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         using HttpClient localClient = HttpClientHelper.Create(Proxy, ProxyCredential, Credential, Username, Password);
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(localClient, target, cancellationToken).ConfigureAwait(false);
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(localClient, target, fetchOptions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }

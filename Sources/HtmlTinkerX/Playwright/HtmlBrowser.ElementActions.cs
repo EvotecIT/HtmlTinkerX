@@ -424,20 +424,41 @@ public static partial class HtmlBrowser {
         });
     }
 
-    private static Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) =>
-        session.Page.RunAndWaitForNavigationAsync(
-            () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
-            new PageRunAndWaitForNavigationOptions {
-                UrlFunc = url => MatchesNavigationUrl(url, navigationUrl),
+    private static async Task ClickAndWaitForNavigationAsync(HtmlBrowserSession session, ILocator locator, HtmlBrowserLoadState loadState, string? navigationUrl, int timeout, CancellationToken cancellationToken) {
+        bool navigationUrlAlreadyMatches = !string.IsNullOrWhiteSpace(navigationUrl)
+            && MatchesNavigationUrl(session.Page.Url, navigationUrl);
+        if (string.IsNullOrWhiteSpace(navigationUrl) || navigationUrlAlreadyMatches) {
+            // WaitForURLAsync can complete against the current URL before the click and cannot
+            // distinguish a same-URL reload. The event-based helper is required when no target
+            // is supplied or the target already matches the current page.
+#pragma warning disable CS0612
+            await session.Page.RunAndWaitForNavigationAsync(
+                () => locator.ClickAsync(new LocatorClickOptions { Timeout = timeout }),
+                new PageRunAndWaitForNavigationOptions {
+                    Timeout = timeout,
+                    WaitUntil = ToWaitUntilState(loadState),
+                    UrlFunc = navigationUrlAlreadyMatches
+                        ? url => MatchesNavigationUrl(url, navigationUrl)
+                        : null
+                }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+#pragma warning restore CS0612
+            return;
+        }
+
+        Task navigationTask = session.Page.WaitForURLAsync(
+            url => MatchesNavigationUrl(url, navigationUrl),
+            new PageWaitForURLOptions {
                 Timeout = timeout,
                 WaitUntil = ToWaitUntilState(loadState)
             }).WaitWithCancellationAsync(cancellationToken);
+        Task clickTask = locator
+            .ClickAsync(new LocatorClickOptions { Timeout = timeout })
+            .WaitWithCancellationAsync(cancellationToken);
+
+        await Task.WhenAll(clickTask, navigationTask).ConfigureAwait(false);
+    }
 
     private static bool MatchesNavigationUrl(string url, string? navigationUrl) {
-        if (string.IsNullOrWhiteSpace(navigationUrl)) {
-            return true;
-        }
-
         string trimmedNavigationUrl = navigationUrl!.Trim();
         string pattern = "^" + Regex.Escape(trimmedNavigationUrl)
             .Replace("\\*\\*", ".*")

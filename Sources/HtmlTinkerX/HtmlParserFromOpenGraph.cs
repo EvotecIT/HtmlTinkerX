@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -9,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting Open Graph metadata from HTML documents.
 /// </summary>
-public static class HtmlParserFromOpenGraph {
+public static partial class HtmlParserFromOpenGraph {
     /// <summary>
     /// Parses Open Graph metadata from HTML markup.
     /// </summary>
@@ -56,13 +57,15 @@ public static class HtmlParserFromOpenGraph {
     /// </summary>
     /// <param name="url">URL of the page to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The parsed Open Graph metadata.</returns>
-    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string? url, HttpClient? client = null) {
+    public static async Task<HtmlOpenGraph> ParseUrlOpenGraphAsync(string? url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseOpenGraph(content);
     }
 }

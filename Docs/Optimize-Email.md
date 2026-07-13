@@ -1,7 +1,7 @@
 ---
 external help file: PSParseHTML-help.xml
 Module Name: PSParseHTML
-online version: https://github.com/EvotecIT/PSParseHTML
+online version: https://github.com/EvotecIT/HtmlTinkerX
 schema: 2.0.0
 ---
 # Optimize-Email
@@ -11,12 +11,12 @@ Cmdlet that inlines CSS for email bodies using PreMailer.Net.
 ## SYNTAX
 ### Body (Default)
 ```powershell
-Optimize-Email -Body <string> [-BaseUri <uri>] [-RemoveStyleElements] [-IgnoreElements <string>] [-Css <string>] [-CssFilePath <string>] [-StripIdAndClassAttributes] [-RemoveComments] [-PreserveMediaQueries] [-UseEmailFormatter] [-DownloadRemoteCss] [-AddAnalyticsTags] [-AnalyticsSource <string>] [-AnalyticsMedium <string>] [-AnalyticsCampaign <string>] [-AnalyticsContent <string>] [-AnalyticsDomain <string>] [<CommonParameters>]
+Optimize-Email -Body <string> [-BaseUri <uri>] [-RemoveStyleElements] [-IgnoreElements <string>] [-Css <string>] [-CssFilePath <string>] [-StripIdAndClassAttributes] [-RemoveComments] [-PreserveMediaQueries] [-UseEmailFormatter] [-DownloadRemoteCss] [-HttpClient <HttpClient>] [-AddAnalyticsTags] [-AnalyticsSource <string>] [-AnalyticsMedium <string>] [-AnalyticsCampaign <string>] [-AnalyticsContent <string>] [-AnalyticsDomain <string>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Optimize-Email -Path <string> [-BaseUri <uri>] [-RemoveStyleElements] [-IgnoreElements <string>] [-Css <string>] [-CssFilePath <string>] [-StripIdAndClassAttributes] [-RemoveComments] [-PreserveMediaQueries] [-UseEmailFormatter] [-DownloadRemoteCss] [-AddAnalyticsTags] [-AnalyticsSource <string>] [-AnalyticsMedium <string>] [-AnalyticsCampaign <string>] [-AnalyticsContent <string>] [-AnalyticsDomain <string>] [<CommonParameters>]
+Optimize-Email -Path <string> [-BaseUri <uri>] [-RemoveStyleElements] [-IgnoreElements <string>] [-Css <string>] [-CssFilePath <string>] [-StripIdAndClassAttributes] [-RemoveComments] [-PreserveMediaQueries] [-UseEmailFormatter] [-DownloadRemoteCss] [-HttpClient <HttpClient>] [-AddAnalyticsTags] [-AnalyticsSource <string>] [-AnalyticsMedium <string>] [-AnalyticsCampaign <string>] [-AnalyticsContent <string>] [-AnalyticsDomain <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -197,6 +197,22 @@ Download CSS from <link> elements.
 
 ```yaml
 Type: SwitchParameter
+Parameter Sets: Body, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: True
+```
+
+### -HttpClient
+HTTP client used to download linked stylesheets. The caller retains ownership of the client.
+
+```yaml
+Type: HttpClient
 Parameter Sets: Body, File
 Aliases: None
 Possible values:

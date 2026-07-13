@@ -64,9 +64,9 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine == HtmlParserEngine.AngleSharp) {
-                results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
+                results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client, cancellationToken: CancelToken).ConfigureAwait(false);
             } else {
-                results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client).ConfigureAwait(false);
+                results = await HtmlParser.ParseUrlListsWithHtmlAgilityPackDetailedAsync(Url.ToString(), TagPlaceholder, client, cancellationToken: CancelToken).ConfigureAwait(false);
             }
         } else {
             if (Engine == HtmlParserEngine.AngleSharp) {

@@ -13,6 +13,9 @@ namespace HtmlTinkerX;
 public static class HtmlUtilities {
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TagWhitespaceRegex = new(@">\s+<", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex MetaCharsetRegex = new(
+        @"<meta[^>]+charset\s*=\s*[""']?(?<charset>[^""'>\s]+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 #if !NETFRAMEWORK
     private static int CodePagesEncodingProviderRegistered;
 #endif
@@ -99,9 +102,51 @@ public static class HtmlUtilities {
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
     public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
-        using var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+        if (url == null) {
+            throw new ArgumentNullException(nameof(url));
+        }
+
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
+        using HttpRequestMessage request = new(HttpMethod.Get, url);
+        using HttpResponseMessage response = await client
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
+            .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+        return await ReadResponseContentWithProperEncodingAsync(response, requestToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Downloads bounded content from a URL with proper encoding detection.
+    /// </summary>
+    /// <param name="client">HTTP client to use for the request.</param>
+    /// <param name="url">URL to download from.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Content as a string with proper encoding.</returns>
+    public static async Task<string> GetStringWithProperEncodingAsync(
+        HttpClient client,
+        string url,
+        HtmlHttpFetchOptions? fetchOptions,
+        CancellationToken cancellationToken = default) {
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+        if (url == null) {
+            throw new ArgumentNullException(nameof(url));
+        }
+
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
+        using HttpRequestMessage request = new(HttpMethod.Get, url);
+        using HttpResponseMessage response = await client
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -115,8 +160,36 @@ public static class HtmlUtilities {
             throw new ArgumentNullException(nameof(response));
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
+        byte[] bytes = await ReadUnboundedContentAsync(response.Content, cancellationToken).ConfigureAwait(false);
+        return DecodeResponseContent(response, bytes);
+    }
+
+    /// <summary>
+    /// Reads a bounded HTTP response body with header, BOM, and HTML meta charset detection.
+    /// </summary>
+    /// <param name="response">HTTP response to read.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Content as a string with proper encoding.</returns>
+    public static async Task<string> ReadResponseContentWithProperEncodingAsync(
+        HttpResponseMessage response,
+        HtmlHttpFetchOptions? fetchOptions,
+        CancellationToken cancellationToken = default) {
+        if (response == null) {
+            throw new ArgumentNullException(nameof(response));
+        }
+
+        int maximumBytes = fetchOptions?.GetValidatedMaximumResponseBytes() ?? HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+        long? declaredLength = response.Content.Headers.ContentLength;
+        if (declaredLength > maximumBytes) {
+            throw CreateResponseTooLargeException(maximumBytes, declaredLength);
+        }
+
+        byte[] bytes = await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
+        return DecodeResponseContent(response, bytes);
+    }
+
+    private static string DecodeResponseContent(HttpResponseMessage response, byte[] bytes) {
 
         // Try to get encoding from Content-Type header
         var contentType = response.Content.Headers.ContentType;
@@ -143,10 +216,7 @@ public static class HtmlUtilities {
 
         // Try to detect encoding from HTML meta tag
         var asciiContent = System.Text.Encoding.ASCII.GetString(bytes);
-        var metaMatch = System.Text.RegularExpressions.Regex.Match(
-            asciiContent,
-            @"<meta[^>]+charset\s*=\s*[""']?(?<charset>[^""'>\s]+)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        Match metaMatch = MetaCharsetRegex.Match(asciiContent);
 
         if (metaMatch.Success) {
             try {
@@ -159,6 +229,123 @@ public static class HtmlUtilities {
 
         // Default to UTF-8 if no encoding could be determined
         return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    private static async Task<byte[]> ReadUnboundedContentAsync(HttpContent content, CancellationToken cancellationToken) {
+        using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+        using MemoryStream buffer = new();
+        byte[] chunk = new byte[81920];
+
+        while (true) {
+            int bytesRead = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0) {
+                break;
+            }
+
+            await buffer.WriteAsync(chunk, 0, bytesRead, cancellationToken).ConfigureAwait(false);
+        }
+
+        return buffer.ToArray();
+    }
+
+    internal static async Task<byte[]> ReadResponseBytesAsync(
+        HttpResponseMessage response,
+        int maximumBytes,
+        CancellationToken cancellationToken) {
+        if (maximumBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maximumBytes), maximumBytes, "Maximum response bytes must be greater than zero.");
+        }
+
+        long? declaredLength = response.Content.Headers.ContentLength;
+        if (declaredLength > maximumBytes) {
+            throw CreateResponseTooLargeException(maximumBytes, declaredLength);
+        }
+
+        return await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<byte[]> ReadBoundedContentAsync(HttpContent content, int maximumBytes, CancellationToken cancellationToken) {
+        using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+        using MemoryStream buffer = new(Math.Min(maximumBytes, 81920));
+        await CopyBoundedStreamAsync(stream, buffer, maximumBytes, cancellationToken).ConfigureAwait(false);
+        return buffer.ToArray();
+    }
+
+    internal static async Task DownloadToFileAsync(
+        HttpClient client,
+        Uri uri,
+        string filePath,
+        HtmlHttpFetchOptions? fetchOptions,
+        CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        int maximumBytes = fetchOptions?.GetValidatedMaximumResponseBytes() ?? HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
+        CancellationToken requestToken = requestTimeout.Token;
+        using HttpRequestMessage request = new(HttpMethod.Get, uri);
+        using HttpResponseMessage response = await client
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        long? declaredLength = response.Content.Headers.ContentLength;
+        if (declaredLength > maximumBytes) {
+            throw CreateResponseTooLargeException(maximumBytes, declaredLength);
+        }
+
+        string temporaryPath = filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try {
+            using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using FileStream fileStream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            await CopyBoundedStreamAsync(contentStream, fileStream, maximumBytes, requestToken).ConfigureAwait(false);
+
+            fileStream.Close();
+            if (File.Exists(filePath)) {
+                File.Replace(temporaryPath, filePath, null);
+            } else {
+                File.Move(temporaryPath, filePath);
+            }
+        } catch {
+            if (File.Exists(temporaryPath)) {
+                File.Delete(temporaryPath);
+            }
+            throw;
+        }
+    }
+
+    internal static CancellationTokenSource CreateRequestTimeoutTokenSource(HttpClient client, CancellationToken cancellationToken) {
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+
+        CancellationTokenSource requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (client.Timeout != Timeout.InfiniteTimeSpan) {
+            requestTimeout.CancelAfter(client.Timeout);
+        }
+        return requestTimeout;
+    }
+
+    private static async Task CopyBoundedStreamAsync(Stream source, Stream destination, int maximumBytes, CancellationToken cancellationToken) {
+        byte[] chunk = new byte[81920];
+        int totalBytes = 0;
+
+        while (true) {
+            int bytesRead = await source.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0) {
+                break;
+            }
+
+            totalBytes = checked(totalBytes + bytesRead);
+            if (totalBytes > maximumBytes) {
+                throw CreateResponseTooLargeException(maximumBytes, totalBytes);
+            }
+
+            await destination.WriteAsync(chunk, 0, bytesRead, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static InvalidDataException CreateResponseTooLargeException(int maximumBytes, long? actualBytes) {
+        string actual = actualBytes.HasValue ? $" The response reported or supplied {actualBytes.Value} bytes." : string.Empty;
+        return new InvalidDataException($"The HTTP response exceeded the configured {maximumBytes}-byte limit.{actual}");
     }
 
     private static System.Text.Encoding GetEncodingWithCodePagesFallback(string charset) {

@@ -201,11 +201,11 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client).ConfigureAwait(false)).DocumentElement.OuterHtml;
+                string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false)).DocumentElement.OuterHtml;
                 return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
             }
 
-            var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client).ConfigureAwait(false);
+            var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
             return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
         }
 

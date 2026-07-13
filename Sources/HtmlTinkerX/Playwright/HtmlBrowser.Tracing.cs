@@ -11,6 +11,8 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private static readonly JsonSerializerOptions HarJsonOptions = new() { WriteIndented = true };
+
     /// <summary>
     /// Starts Playwright tracing for the given session.
     /// </summary>
@@ -67,8 +69,7 @@ public static partial class HtmlBrowser {
                 })
             }
         };
-        var opts = new JsonSerializerOptions { WriteIndented = true };
-        string json = JsonSerializer.Serialize(log, opts);
+        string json = JsonSerializer.Serialize(log, HarJsonOptions);
 #if NETSTANDARD2_0 || NETFRAMEWORK
         File.WriteAllText(full, json);
         return Task.CompletedTask;

@@ -55,7 +55,7 @@ public static class HtmlFormRelayClient {
             }
 
             bool isCrossHost = !string.Equals(currentUri.Host, request.ActionUri.Host, StringComparison.OrdinalIgnoreCase);
-            bool isCrossOrigin = !HasSameOrigin(currentUri, request.ActionUri);
+            bool isCrossOrigin = !HtmlUriUtility.HasSameOrigin(currentUri, request.ActionUri);
             HtmlFormRelayStep step = CreateStep(index, request, isCrossHost, isCrossOrigin);
             if (isCrossOrigin && !IsCrossOriginAllowed(request.ActionUri, effectiveOptions)) {
                 step.Blocked = true;
@@ -68,7 +68,7 @@ public static class HtmlFormRelayClient {
             Uri nextUri = GetNextUri(response, request.ActionUri);
             step.ResponseUrl = RedactUrl(nextUri.AbsoluteUri);
             bool responseCrossHost = !string.Equals(currentUri.Host, nextUri.Host, StringComparison.OrdinalIgnoreCase);
-            bool responseCrossOrigin = !HasSameOrigin(currentUri, nextUri);
+            bool responseCrossOrigin = !HtmlUriUtility.HasSameOrigin(currentUri, nextUri);
             if (responseCrossOrigin && !IsCrossOriginAllowed(nextUri, effectiveOptions)) {
                 step.IsCrossHost = responseCrossHost;
                 step.IsCrossOrigin = responseCrossOrigin;
@@ -108,11 +108,6 @@ public static class HtmlFormRelayClient {
             IsCrossHost = isCrossHost,
             IsCrossOrigin = isCrossOrigin
         };
-
-    private static bool HasSameOrigin(Uri currentUri, Uri actionUri) =>
-        string.Equals(currentUri.Scheme, actionUri.Scheme, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(currentUri.Host, actionUri.Host, StringComparison.OrdinalIgnoreCase)
-        && currentUri.Port == actionUri.Port;
 
     private static bool IsCrossOriginAllowed(Uri actionUri, HtmlFormRelayOptions options) =>
         options.AllowCrossHost

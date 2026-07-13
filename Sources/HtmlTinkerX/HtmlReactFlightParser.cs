@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using AcornimaNode = Acornima.Ast.Node;
 
@@ -129,7 +130,7 @@ public sealed class HtmlReactFlightRow {
 /// <summary>
 /// Extracts inline Next.js React Flight payloads from HTML.
 /// </summary>
-public static class HtmlReactFlightParser {
+public static partial class HtmlReactFlightParser {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     /// <summary>Parses inline React Flight payloads from HTML markup.</summary>
@@ -180,7 +181,11 @@ public static class HtmlReactFlightParser {
     }
 
     /// <summary>Downloads HTML from a URL and parses inline React Flight payloads.</summary>
-    public static async Task<HtmlReactFlightDocument> ParseUrlAsync(string url, HttpClient? client = null) {
+    /// <param name="url">Absolute page URL.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<HtmlReactFlightDocument> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -190,7 +195,7 @@ public static class HtmlReactFlightParser {
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString()).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString(), fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(content);
     }
 

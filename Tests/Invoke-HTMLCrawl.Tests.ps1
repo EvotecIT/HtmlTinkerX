@@ -165,6 +165,25 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'exposes and enforces page and asset response limits' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><body>$('x' * 128)</body></html>"
+        }
+
+        try {
+            $command = Get-Command Invoke-HTMLCrawl
+            $command.Parameters.Keys | Should -Contain 'MaximumPageResponseBytes'
+            $command.Parameters.Keys | Should -Contain 'MaximumAssetResponseBytes'
+
+            $result = Invoke-HTMLCrawl -Url $server.Prefix -MaxDepth 0 -MaximumPageResponseBytes 64 -MaximumAssetResponseBytes 32
+
+            $result.FailedPageCount | Should -Be 1
+            $result.Pages[0].Error | Should -Match '64-byte limit'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Uses sitemap and skips robots-blocked pages' {
         $prefix = New-TestServerPrefix
         $server = Start-TestHttpServer -Prefix $prefix -Responses @{
@@ -440,6 +459,24 @@ public sealed class PesterTestHttpServer : IDisposable {
             $page.ContentComparisons.Count | Should -Be 3
             $page.Text | Should -Not -Match 'On this page'
             $page.Text | Should -Match 'Documentation body'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
+    It 'Preserves explicit false and default-valued overrides after applying a scenario' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<html><head><title>Dataset</title></head><body><main><h1>Dataset</h1><p>Focused content remains selected when explicitly requested by the caller.</p></main></body></html>"
+        }
+
+        try {
+            $result = Invoke-HTMLCrawl -Url $server.Prefix -MaxDepth 0 -MaxPages 1 -Scenario Dataset -ContentMode Focused -CompareContentModes:$false -IncludeMarkdown:$false -IncludeStructuredJson:$false -UseCanonicalUrls:$false -DeduplicatePages:$false
+            $page = $result.Pages | Select-Object -First 1
+
+            $page.ContentModeUsed | Should -Be 'Focused'
+            $page.ContentComparisons.Count | Should -Be 0
+            $page.Markdown | Should -BeNullOrEmpty
+            $page.StructuredJson | Should -BeNullOrEmpty
         } finally {
             Stop-TestHttpServer $server
         }

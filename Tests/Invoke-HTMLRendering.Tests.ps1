@@ -738,6 +738,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     It 'Can report linked script discovery in snapshots' {
+        (Get-Command Invoke-HTMLRendering).Parameters.Keys | Should -Contain 'LinkedScriptMaximumResponseBytes'
+
         $scriptPath = Join-Path $TestDrive 'linked-app.js'
         $htmlPath = Join-Path $TestDrive 'linked-script.html'
         'fetch("/api/linked", { method: "POST" });' | Set-Content -LiteralPath $scriptPath -Encoding UTF8

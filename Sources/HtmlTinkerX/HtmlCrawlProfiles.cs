@@ -205,16 +205,16 @@ public static class HtmlCrawlProfiles {
         if (string.IsNullOrWhiteSpace(options.Selector) && !string.IsNullOrWhiteSpace(profile.Selector)) {
             options.Selector = profile.Selector;
         }
-        if (options.ContentMode == HtmlCrawlContentMode.Focused && profile.ContentMode.HasValue) {
+        if (!options.IsScenarioOptionExplicit(nameof(HtmlCrawlOptions.ContentMode)) && options.ContentMode == HtmlCrawlContentMode.Focused && profile.ContentMode.HasValue) {
             options.ContentMode = profile.ContentMode.Value;
         }
-        if (options.ReaderMinimumWordCount == defaults.ReaderMinimumWordCount && profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0) {
+        if (!options.IsScenarioOptionExplicit(nameof(HtmlCrawlOptions.ReaderMinimumWordCount)) && options.ReaderMinimumWordCount == defaults.ReaderMinimumWordCount && profile.ReaderMinimumWordCount.HasValue && profile.ReaderMinimumWordCount.Value > 0) {
             options.ReaderMinimumWordCount = profile.ReaderMinimumWordCount.Value;
         }
-        if (Math.Abs(options.ReaderMinimumScore - defaults.ReaderMinimumScore) < 0.0001 && profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0) {
+        if (!options.IsScenarioOptionExplicit(nameof(HtmlCrawlOptions.ReaderMinimumScore)) && Math.Abs(options.ReaderMinimumScore - defaults.ReaderMinimumScore) < 0.0001 && profile.ReaderMinimumScore.HasValue && profile.ReaderMinimumScore.Value > 0) {
             options.ReaderMinimumScore = profile.ReaderMinimumScore.Value;
         }
-        if (options.CompareContentModes == defaults.CompareContentModes && profile.CompareContentModes.HasValue) {
+        if (!options.IsScenarioOptionExplicit(nameof(HtmlCrawlOptions.CompareContentModes)) && options.CompareContentModes == defaults.CompareContentModes && profile.CompareContentModes.HasValue) {
             options.CompareContentModes = profile.CompareContentModes.Value;
         }
         if (string.IsNullOrWhiteSpace(options.WaitForSelector) && !string.IsNullOrWhiteSpace(profile.WaitForSelector)) {

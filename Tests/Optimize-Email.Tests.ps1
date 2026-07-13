@@ -39,4 +39,16 @@ Describe 'Optimize-Email' {    It 'Given HTML content - Should inline CSS and re
         $normalizedExpected = $expected -replace '\r\n', "`n" -replace '\r', "`n"
         $normalizedResult | Should -Be $normalizedExpected
     }
+
+    It 'Preserves linked stylesheets when remote CSS download is disabled' {
+        $html = "<html><head><link rel='stylesheet' href='https://example.org/site.css'></head><body><p>Link</p></body></html>"
+
+        $result = Optimize-Email -Body $html
+
+        $result | Should -Match 'https://example.org/site.css'
+    }
+
+    It 'Accepts a caller-owned HttpClient for linked stylesheet downloads' {
+        (Get-Command Optimize-Email).Parameters.Keys | Should -Contain 'HttpClient'
+    }
 }

@@ -39,7 +39,7 @@ public sealed class CmdletGetHtmlBrowserFormField : AsyncPSCmdlet {
         List<HtmlFormField> fields;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            fields = await HtmlFormFieldExtractor.ExtractUrlFieldsAsync(Url.ToString(), client).ConfigureAwait(false);
+            fields = await HtmlFormFieldExtractor.ExtractUrlFieldsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
             fields = HtmlFormFieldExtractor.ExtractFields(Content);
         }

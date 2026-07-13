@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -9,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for extracting &lt;meta&gt; tags from HTML.
 /// </summary>
-public static class HtmlParserFromMeta {
+public static partial class HtmlParserFromMeta {
     /// <summary>
     /// Parses meta tags from HTML content.
     /// </summary>
@@ -56,13 +57,15 @@ public static class HtmlParserFromMeta {
     /// </summary>
     /// <param name="url">URL to download.</param>
     /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of meta tags.</returns>
-    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsAsync(string url, HttpClient? client = null) {
+    public static async Task<List<HtmlMetaTag>> ParseUrlMetaTagsAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url).ConfigureAwait(false);
+        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
         return ParseMetaTags(content);
     }
 }

@@ -53,7 +53,7 @@ public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
         List<HtmlMetaTag> tags;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            tags = await HtmlParser.ParseUrlMetaTagsAsync(Url.ToString(), client).ConfigureAwait(false);
+            tags = await HtmlParser.ParseUrlMetaTagsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else if (ParameterSetName == ParameterSetNode) {
             tags = HtmlParser.ParseMetaTags(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));
         } else {

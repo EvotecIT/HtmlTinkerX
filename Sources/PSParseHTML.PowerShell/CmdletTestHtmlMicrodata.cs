@@ -50,7 +50,7 @@ public sealed class CmdletTestHtmlMicrodata : AsyncPSCmdlet {
             _items.AddRange(HtmlParser.ParseMicrodataItems(Content));
         } else if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            var list = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client).ConfigureAwait(false);
+            var list = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
             _items.AddRange(list);
         } else {
             _items.AddRange(Items);

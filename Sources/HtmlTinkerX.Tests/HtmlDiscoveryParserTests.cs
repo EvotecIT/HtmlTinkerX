@@ -28,6 +28,21 @@ public class HtmlDiscoveryParserTests {
     }
 
     [Fact]
+    public void ParseLinks_TreatsSchemeAndPortChangesAsExternalOrigins() {
+        const string html = """
+<a href="https://example.org/app">same origin</a>
+<a href="http://example.org/app">different scheme</a>
+<a href="https://example.org:8443/app">different port</a>
+""";
+
+        IReadOnlyList<HtmlDiscoveredLink> links = HtmlDiscoveryParser.ParseLinks(html, new Uri("https://example.org/root"));
+
+        Assert.False(links[0].IsExternal);
+        Assert.True(links[1].IsExternal);
+        Assert.True(links[2].IsExternal);
+    }
+
+    [Fact]
     public void ParseLinks_RemovesStyleScriptAndSvgTextFromContext() {
         const string html = """
 <html>

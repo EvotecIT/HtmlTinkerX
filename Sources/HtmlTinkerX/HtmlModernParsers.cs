@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using AcornimaNode = Acornima.Ast.Node;
 
@@ -150,8 +151,12 @@ public static class HtmlJsonLdParser {
         return items;
     }
 
-    public static async Task<IReadOnlyList<HtmlJsonLdItem>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL JSON-LD parsing.</summary>
+    public static Task<IReadOnlyList<HtmlJsonLdItem>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlJsonLdItem>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html);
     }
 
@@ -253,8 +258,12 @@ public static class HtmlAppStateParser {
         return entries;
     }
 
-    public static async Task<IReadOnlyList<HtmlAppStateEntry>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL application-state parsing.</summary>
+    public static Task<IReadOnlyList<HtmlAppStateEntry>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlAppStateEntry>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html);
     }
 
@@ -380,8 +389,12 @@ public static class HtmlHeadLinkParser {
         return links;
     }
 
-    public static async Task<IReadOnlyList<HtmlHeadLink>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL head-link parsing.</summary>
+    public static Task<IReadOnlyList<HtmlHeadLink>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlHeadLink>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html, new Uri(url));
     }
 
@@ -481,8 +494,12 @@ public static class HtmlTokenParser {
         return tokens;
     }
 
-    public static async Task<IReadOnlyList<HtmlToken>> ParseUrlAsync(string url, string[]? names = null, HttpClient? client = null) {
-        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL token parsing.</summary>
+    public static Task<IReadOnlyList<HtmlToken>> ParseUrlAsync(string url, string[]? names, HttpClient? client) =>
+        ParseUrlAsync(url, names, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlToken>> ParseUrlAsync(string url, string[]? names = null, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string html = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(html, names);
     }
 
@@ -731,8 +748,12 @@ public static class HtmlRobotsParser {
         return rules;
     }
 
-    public static async Task<IReadOnlyList<HtmlRobotsRule>> ParseUrlAsync(string url, HttpClient? client = null) {
-        string content = await HtmlModernParserUtilities.GetUrlStringAsync(url, client).ConfigureAwait(false);
+    /// <summary>Preserves the 2.0.x binary signature for URL robots parsing.</summary>
+    public static Task<IReadOnlyList<HtmlRobotsRule>> ParseUrlAsync(string url, HttpClient? client) =>
+        ParseUrlAsync(url, client, null, default);
+
+    public static async Task<IReadOnlyList<HtmlRobotsRule>> ParseUrlAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
+        string content = await HtmlModernParserUtilities.GetUrlStringAsync(url, client, fetchOptions, cancellationToken).ConfigureAwait(false);
         return Parse(content, new Uri(url));
     }
 
@@ -767,7 +788,7 @@ internal static class HtmlModernParserUtilities {
         CommentHandling = JsonCommentHandling.Skip
     };
 
-    internal static async Task<string> GetUrlStringAsync(string url, HttpClient? client = null) {
+    internal static async Task<string> GetUrlStringAsync(string url, HttpClient? client = null, HtmlHttpFetchOptions? fetchOptions = null, CancellationToken cancellationToken = default) {
         if (url == null) {
             throw new ArgumentNullException(nameof(url));
         }
@@ -777,7 +798,7 @@ internal static class HtmlModernParserUtilities {
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        return await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString()).ConfigureAwait(false);
+        return await HtmlUtilities.GetStringWithProperEncodingAsync(http, uri.ToString(), fetchOptions, cancellationToken).ConfigureAwait(false);
     }
 
     internal static string ResolveUrl(string value, Uri? baseUri) {
@@ -812,9 +833,7 @@ internal static class HtmlModernParserUtilities {
             return false;
         }
 
-        return !string.Equals(uri.Scheme, baseUri.Scheme, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(uri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase)
-            || uri.Port != baseUri.Port;
+        return !HtmlUriUtility.HasSameOrigin(baseUri, uri);
     }
 
     internal static string? GetJsonString(JsonElement element, string propertyName) {

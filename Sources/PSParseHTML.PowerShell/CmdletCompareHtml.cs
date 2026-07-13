@@ -35,14 +35,14 @@ public sealed class CmdletCompareHtml : AsyncPSCmdlet {
         }
     }
 
-    private static async Task<string> GetContentAsync(string input) {
+    private async Task<string> GetContentAsync(string input) {
         if (TryReadFile(input, out string fileContent)) {
             return fileContent;
         }
 
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)) {
-            return await HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input)
+            return await HtmlUtilities.GetStringWithProperEncodingAsync(HtmlHttpClientFactory.Shared, input, fetchOptions: null, cancellationToken: CancelToken)
                 .ConfigureAwait(false);
         }
 

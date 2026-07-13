@@ -35,6 +35,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int MaxPages { get; set; } = 25;
 
+    /// <summary>Maximum number of bytes accepted for a page or sitemap response.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+
+    /// <summary>Maximum number of bytes accepted for each downloaded asset response.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumAssetResponseBytes { get; set; } = HtmlCrawlOptions.DefaultMaximumAssetResponseBytes;
+
     /// <summary>Render pages through Playwright before extraction.</summary>
     [Parameter]
     public SwitchParameter Render { get; set; }
@@ -392,17 +402,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
         HtmlCrawlOptions options = new() {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
+            MaximumPageResponseBytes = MaximumPageResponseBytes,
+            MaximumAssetResponseBytes = MaximumAssetResponseBytes,
             Render = Render.IsPresent,
             AutoRender = AutoRender.IsPresent,
             RestrictToHost = !IncludeExternal.IsPresent,
             IncludeSubdomains = IncludeSubdomains.IsPresent,
             PathPrefix = PathPrefix,
-            UseCanonicalUrls = UseCanonicalUrls.IsPresent,
-            DeduplicatePages = DeduplicatePages.IsPresent,
             IgnoreTrackingQueryParameters = !KeepTrackingQueryParameters.IsPresent,
             RestrictToAllowedContentTypes = !AllowAnyContentType.IsPresent,
             SkipKnownAssetUrls = !AllowAssetUrls.IsPresent,
-            DownloadAssets = DownloadAssets.IsPresent,
             RewriteAssetReferencesToLocal = !KeepRemoteAssetUrls.IsPresent,
             RewritePageLinksToLocal = !KeepRemotePageUrls.IsPresent,
             UseSitemaps = !NoSitemaps.IsPresent,
@@ -416,23 +425,15 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Scenario = Scenario,
             IncludeHtml = IncludeHtml.IsPresent,
             IncludeText = IncludeText.IsPresent,
-            IncludeMarkdown = IncludeMarkdown.IsPresent,
             MarkdownProfile = MarkdownProfile,
             MarkdownImageMode = MarkdownImageMode,
             ListingCardMetadataMode = ListingCardMetadataMode,
-            IncludeStructuredJson = IncludeStructuredJson.IsPresent,
-            StructuredJsonPreset = StructuredJsonPreset,
             StructuredJsonSchema = StructuredJsonSchema,
             StructuredJsonSchemaPath = StructuredJsonSchemaPath?.ToFullPath(),
             Selector = Selector,
-            ContentMode = ContentMode,
-            CompareContentModes = CompareContentModes.IsPresent,
-            ReaderMinimumWordCount = ReaderMinimumWordCount,
-            ReaderMinimumScore = ReaderMinimumScore,
             ExcludeSelectors = new List<string>(ExcludeSelector),
             ExcludeClasses = new List<string>(ExcludeClass),
             ExcludeIds = new List<string>(ExcludeId),
-            SmartContentCleanup = !DisableSmartContentCleanup.IsPresent,
             HiddenContentMode = HiddenContentMode,
             ClickSelectors = new List<string>(ClickSelector),
             ClickTexts = new List<string>(ClickText),
@@ -460,6 +461,40 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Headless = !Visible.IsPresent,
             CleanBrowserInstall = Clean.IsPresent
         };
+
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(UseCanonicalUrls))) {
+            options.UseCanonicalUrls = UseCanonicalUrls.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(DeduplicatePages))) {
+            options.DeduplicatePages = DeduplicatePages.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(DownloadAssets))) {
+            options.DownloadAssets = DownloadAssets.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(IncludeMarkdown))) {
+            options.IncludeMarkdown = IncludeMarkdown.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(IncludeStructuredJson))) {
+            options.IncludeStructuredJson = IncludeStructuredJson.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(StructuredJsonPreset))) {
+            options.StructuredJsonPreset = StructuredJsonPreset;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(ContentMode))) {
+            options.ContentMode = ContentMode;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(CompareContentModes))) {
+            options.CompareContentModes = CompareContentModes.IsPresent;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(ReaderMinimumWordCount))) {
+            options.ReaderMinimumWordCount = ReaderMinimumWordCount;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(ReaderMinimumScore))) {
+            options.ReaderMinimumScore = ReaderMinimumScore;
+        }
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(DisableSmartContentCleanup))) {
+            options.SmartContentCleanup = !DisableSmartContentCleanup.IsPresent;
+        }
 
         if (Header != null) {
             foreach (DictionaryEntry entry in Header) {

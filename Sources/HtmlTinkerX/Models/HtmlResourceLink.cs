@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -33,7 +34,7 @@ public enum HtmlResourceType {
 /// <summary>
 /// Represents a script or stylesheet resource found in HTML.
 /// </summary>
-public sealed class HtmlResourceLink {
+public sealed partial class HtmlResourceLink {
     /// <summary>Index of the element within the document.</summary>
     public int Index { get; set; }
 
@@ -53,7 +54,17 @@ public sealed class HtmlResourceLink {
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Saves the resource to the specified path and returns the created path.</summary>
-    public async Task<string> SaveAsync(string path, Uri? baseUri = null, HttpClient? client = null) {
+    /// <param name="path">Destination file or directory.</param>
+    /// <param name="baseUri">Optional base URI used to resolve a relative source.</param>
+    /// <param name="client">Optional HTTP client.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<string> SaveAsync(
+        string path,
+        Uri? baseUri = null,
+        HttpClient? client = null,
+        HtmlHttpFetchOptions? fetchOptions = null,
+        CancellationToken cancellationToken = default) {
         if (path == null) {
             throw new ArgumentNullException(nameof(path));
         }
@@ -68,9 +79,9 @@ public sealed class HtmlResourceLink {
 
         if (!string.IsNullOrEmpty(Content)) {
 #if NETSTANDARD2_0 || NETFRAMEWORK
-            await Task.Run(() => File.WriteAllText(resolved, Content)).ConfigureAwait(false);
+            await Task.Run(() => File.WriteAllText(resolved, Content), cancellationToken).ConfigureAwait(false);
 #else
-            await File.WriteAllTextAsync(resolved, Content).ConfigureAwait(false);
+            await File.WriteAllTextAsync(resolved, Content, cancellationToken).ConfigureAwait(false);
 #endif
             return resolved;
         }
@@ -87,28 +98,15 @@ public sealed class HtmlResourceLink {
 
         if (srcUri.IsFile) {
 #if NETSTANDARD2_0 || NETFRAMEWORK
-            await Task.Run(() => File.Copy(srcUri.LocalPath, resolved, overwrite: true)).ConfigureAwait(false);
+            await Task.Run(() => File.Copy(srcUri.LocalPath, resolved, overwrite: true), cancellationToken).ConfigureAwait(false);
 #else
-            await Task.Run(() => File.Copy(srcUri.LocalPath, resolved, true)).ConfigureAwait(false);
+            await Task.Run(() => File.Copy(srcUri.LocalPath, resolved, true), cancellationToken).ConfigureAwait(false);
 #endif
             return resolved;
         }
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-#if NETSTANDARD2_0 || NETFRAMEWORK
-        using (HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false)) {
-            response.EnsureSuccessStatusCode();
-            using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            using FileStream fileStream = new(resolved, FileMode.Create, FileAccess.Write, FileShare.None);
-            await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
-        }
-#else
-        using HttpResponseMessage response = await http.GetAsync(srcUri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        await using Stream contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        await using FileStream fileStream = new(resolved, FileMode.Create, FileAccess.Write, FileShare.None);
-        await contentStream.CopyToAsync(fileStream).ConfigureAwait(false);
-#endif
+        await HtmlUtilities.DownloadToFileAsync(http, srcUri, resolved, fetchOptions, cancellationToken).ConfigureAwait(false);
         return resolved;
     }
 }
