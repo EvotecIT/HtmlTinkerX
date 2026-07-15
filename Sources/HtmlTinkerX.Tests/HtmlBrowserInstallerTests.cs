@@ -164,6 +164,71 @@ public class HtmlBrowserInstallerTests
     }
 
     [Fact]
+    public async Task EnsureInstalledAsync_ReplacesStaleBrowserRevision()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            CreateHealthyDriver(tempDriver);
+            CreateCompleteChromiumRuntime(tempBrowsers, "1194");
+
+            string[]? captured = null;
+            HtmlBrowser.PlaywrightInstaller = args => captured = args;
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
+            Assert.NotNull(captured);
+            Assert.Contains("install", captured!);
+            Assert.Contains("chromium", captured!);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_SkipsCurrentCompleteBrowserRevision()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            CreateHealthyDriver(tempDriver);
+            CreateCompleteChromiumRuntime(tempBrowsers, "1217");
+
+            HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("Current browser runtime should not be reinstalled.");
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
     public async Task EnsureInstalledAsync_ReinstallsCorruptedDriver()
     {
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -340,7 +405,27 @@ public class HtmlBrowserInstallerTests
         Directory.CreateDirectory(packageDir);
         File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "node");
         File.WriteAllText(Path.Combine(packageDir, "package.json"), "{}");
+        File.WriteAllText(Path.Combine(packageDir, "browsers.json"), """
+            {
+              "browsers": [
+                { "name": "chromium", "revision": "1217" },
+                { "name": "chromium-headless-shell", "revision": "1217" },
+                { "name": "firefox", "revision": "1511" },
+                { "name": "webkit", "revision": "2272" }
+              ]
+            }
+            """);
         File.WriteAllText(Path.Combine(baseDir, ".version"), typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0");
+    }
+
+    private static void CreateCompleteChromiumRuntime(string browserRoot, string revision)
+    {
+        foreach (string name in new[] { "chromium", "chromium_headless_shell" })
+        {
+            string directory = Path.Combine(browserRoot, $"{name}-{revision}");
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "INSTALLATION_COMPLETE"), string.Empty);
+        }
     }
 
     private static byte[] CreateDriverArchive()

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -326,19 +328,88 @@ public static partial class HtmlBrowser {
         string path = GetBrowserInstallPath();
         if (!Directory.Exists(path))
             return false;
-        var prefixes = GetRuntimePrefixes(engine);
-        foreach (string prefix in prefixes) {
-            bool found = false;
-            foreach (string dir in Directory.GetDirectories(path)) {
-                if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
+
+        IReadOnlyDictionary<string, IReadOnlyList<string>> expectedDirectories = GetExpectedRuntimeDirectories(path, engine);
+        if (expectedDirectories.Count == 0)
+            return false;
+
+        foreach (IReadOnlyList<string> candidates in expectedDirectories.Values) {
+            if (!candidates.Any(IsCompleteBrowserRuntime))
                 return false;
         }
+
         return true;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> GetExpectedRuntimeDirectories(string browserRoot, HtmlBrowserEngine engine) {
+        string manifestPath = Path.Combine(GetDriverPath(), "package", "browsers.json");
+        if (!File.Exists(manifestPath))
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+
+        string[] requiredNames = engine == HtmlBrowserEngine.Chromium
+            ? new[] { "chromium", "chromium-headless-shell" }
+            : new[] { engine.ToString().ToLowerInvariant() };
+        var required = new HashSet<string>(requiredNames, StringComparer.OrdinalIgnoreCase);
+        var expected = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+
+        try {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            if (!document.RootElement.TryGetProperty("browsers", out JsonElement browsers) || browsers.ValueKind != JsonValueKind.Array)
+                return expected;
+
+            foreach (JsonElement browser in browsers.EnumerateArray()) {
+                if (!browser.TryGetProperty("name", out JsonElement nameElement) || nameElement.ValueKind != JsonValueKind.String ||
+                    !browser.TryGetProperty("revision", out JsonElement revisionElement) || revisionElement.ValueKind != JsonValueKind.String) {
+                    continue;
+                }
+
+                string? name = nameElement.GetString();
+                string? revision = revisionElement.GetString();
+                if (name is null || name.Trim().Length == 0 || revision is null || revision.Trim().Length == 0 || !required.Contains(name))
+                    continue;
+
+                var candidates = new List<string> {
+                    BuildRuntimeDirectory(browserRoot, name, revision)
+                };
+
+                if (browser.TryGetProperty("revisionOverrides", out JsonElement overrides) && overrides.ValueKind == JsonValueKind.Object) {
+                    foreach (JsonProperty revisionOverride in overrides.EnumerateObject()) {
+                        if (revisionOverride.Value.ValueKind != JsonValueKind.String)
+                            continue;
+
+                        string? overrideRevision = revisionOverride.Value.GetString();
+                        if (overrideRevision is null || overrideRevision.Trim().Length == 0)
+                            continue;
+
+                        candidates.Add(BuildRuntimeDirectory(
+                            browserRoot,
+                            $"{name}_{revisionOverride.Name}_special",
+                            overrideRevision));
+                    }
+                }
+
+                expected[name] = candidates;
+            }
+        } catch (IOException) {
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        } catch (UnauthorizedAccessException) {
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        } catch (JsonException) {
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return expected.Count == required.Count
+            ? expected
+            : new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string BuildRuntimeDirectory(string browserRoot, string name, string revision) {
+        string directoryName = name.Replace('-', '_') + "-" + revision;
+        return Path.Combine(browserRoot, directoryName);
+    }
+
+    private static bool IsCompleteBrowserRuntime(string directory) {
+        return Directory.Exists(directory) && File.Exists(Path.Combine(directory, "INSTALLATION_COMPLETE"));
     }
 
     private static bool IsBrowserRuntimeCorrupted(HtmlBrowserEngine engine) {
