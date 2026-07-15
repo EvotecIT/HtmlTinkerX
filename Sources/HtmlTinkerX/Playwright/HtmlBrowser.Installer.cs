@@ -144,10 +144,24 @@ public static partial class HtmlBrowser {
         }
 
         try {
-            return new FileInfo(nodePath).Length > 0 && new FileInfo(browsersManifestPath).Length > 0;
+            return new FileInfo(nodePath).Length > 0 && IsValidBrowserManifest(browsersManifestPath);
         } catch (IOException) {
             return false;
         } catch (UnauthorizedAccessException) {
+            return false;
+        }
+    }
+
+    private static bool IsValidBrowserManifest(string manifestPath) {
+        try {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            return document.RootElement.TryGetProperty("browsers", out JsonElement browsers) &&
+                   browsers.ValueKind == JsonValueKind.Array;
+        } catch (IOException) {
+            return false;
+        } catch (UnauthorizedAccessException) {
+            return false;
+        } catch (JsonException) {
             return false;
         }
     }
@@ -248,15 +262,14 @@ public static partial class HtmlBrowser {
                 return;
             }
 
-            bool runtimeInstalled = IsBrowserRuntimeInstalled(engine);
-
             if (!IsDriverPresent()) {
                 await DownloadAndInstallDriverAsync().ConfigureAwait(false);
             } else {
                 EnsureDriverSearchPath();
             }
 
-            if (!runtimeInstalled) {
+            // A repaired driver provides the manifest needed to identify an already-installed exact runtime.
+            if (!IsBrowserRuntimeInstalled(engine)) {
                 InstallRuntime(engine);
             }
         } finally {
@@ -405,16 +418,7 @@ public static partial class HtmlBrowser {
             return "<unknown>";
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
-            int darwinMajor = Environment.OSVersion.Version.Major;
-            string macVersion = darwinMajor switch {
-                < 18 => "mac10.13",
-                18 => "mac10.14",
-                19 => "mac10.15",
-                _ => "mac" + Math.Min(darwinMajor - 9, 15)
-            };
-            return architecture == "arm64" && darwinMajor >= 20
-                ? macVersion + "-arm64"
-                : macVersion;
+            return GetMacPlaywrightHostPlatform(RuntimeInformation.OSArchitecture, GetDarwinMajorVersion());
         }
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -447,6 +451,52 @@ public static partial class HtmlBrowser {
         return "ubuntu24.04" + suffix;
     }
 
+    internal static string GetMacPlaywrightHostPlatform(Architecture architecture, int darwinMajor) {
+        string macVersion = darwinMajor switch {
+            < 18 => "mac10.13",
+            18 => "mac10.14",
+            19 => "mac10.15",
+            _ => "mac" + Math.Min(darwinMajor - 9, 15)
+        };
+        return architecture == Architecture.Arm64 && darwinMajor >= 20
+            ? macVersion + "-arm64"
+            : macVersion;
+    }
+
+    private static int GetDarwinMajorVersion() {
+        try {
+            var startInfo = new ProcessStartInfo {
+                FileName = "/usr/bin/uname",
+                Arguments = "-r",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            using Process? process = Process.Start(startInfo);
+            if (process is not null) {
+                string release = process.StandardOutput.ReadToEnd().Trim();
+                if (process.WaitForExit(5000) && process.ExitCode == 0 &&
+                    int.TryParse(release.Split('.')[0], out int darwinMajor)) {
+                    return darwinMajor;
+                }
+            }
+        } catch (InvalidOperationException) {
+            // Fall back to Environment.OSVersion when uname cannot be started.
+        } catch (System.ComponentModel.Win32Exception) {
+            // Fall back to Environment.OSVersion when uname is unavailable.
+        }
+
+        Version version = Environment.OSVersion.Version;
+        if (version.Major >= 20)
+            return version.Major;
+        if (version.Major >= 11)
+            return version.Major + 9;
+        if (version.Major == 10 && version.Minor >= 13)
+            return version.Minor + 4;
+        return version.Major;
+    }
+
     private static IReadOnlyDictionary<string, string> ReadLinuxOsRelease() {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         try {
@@ -470,6 +520,11 @@ public static partial class HtmlBrowser {
         string path = GetBrowserInstallPath();
         if (!Directory.Exists(path))
             return false;
+        IReadOnlyDictionary<string, IReadOnlyList<string>> expectedDirectories = GetExpectedRuntimeDirectories(path, engine);
+        if (expectedDirectories.Values.SelectMany(static candidates => candidates)
+            .Any(directory => Directory.Exists(directory) && !IsCompleteBrowserRuntime(directory))) {
+            return true;
+        }
         var prefixes = GetRuntimePrefixes(engine);
         foreach (string prefix in prefixes) {
             var candidates = Directory.GetDirectories(path).Where(dir =>
@@ -512,16 +567,24 @@ public static partial class HtmlBrowser {
         if (!Directory.Exists(path))
             return;
 
+        var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string expectedDirectory in GetExpectedRuntimeDirectories(path, engine).Values.SelectMany(static candidates => candidates)) {
+            directories.Add(expectedDirectory);
+        }
         var prefixes = GetRuntimePrefixes(engine);
         foreach (string prefix in prefixes) {
             foreach (string dir in Directory.GetDirectories(path)) {
-                if (!Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                try {
-                    Directory.Delete(dir, true);
-                } catch {
-                    // Ignore cleanup errors - best effort only.
-                }
+                if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    directories.Add(dir);
+            }
+        }
+        foreach (string directory in directories) {
+            if (!Directory.Exists(directory))
+                continue;
+            try {
+                Directory.Delete(directory, true);
+            } catch {
+                // Ignore cleanup errors - best effort only.
             }
         }
     }
@@ -559,9 +622,10 @@ public static partial class HtmlBrowser {
 
     private static string[] GetRuntimePrefixes(HtmlBrowserEngine engine) {
         if (engine == HtmlBrowserEngine.Chromium) {
-            return new[] { "chromium-", "chromium_headless_shell-" };
+            return new[] { "chromium-", "chromium_" };
         }
-        return new[] { engine.ToString().ToLowerInvariant() + "-" };
+        string name = engine.ToString().ToLowerInvariant();
+        return new[] { name + "-", name + "_" };
     }
 
     private static void ValidateExistingInstallation(HtmlBrowserEngine engine) {

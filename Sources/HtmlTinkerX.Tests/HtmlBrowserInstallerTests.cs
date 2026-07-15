@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -287,6 +288,58 @@ public class HtmlBrowserInstallerTests
     }
 
     [Fact]
+    public async Task EnsureInstalledAsync_CleansIncompleteCurrentPlatformRevisionOverride()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        string? originalHostOverride = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+        string overrideDirectory = Path.Combine(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", "ubuntu20.04-x64");
+            CreateHealthyDriver(tempDriver);
+            File.WriteAllText(Path.Combine(tempDriver, ".playwright", "package", "browsers.json"), """
+                {
+                  "browsers": [
+                    {
+                      "name": "webkit",
+                      "revision": "2272",
+                      "revisionOverrides": { "ubuntu20.04-x64": "2092" }
+                    }
+                  ]
+                }
+                """);
+            Directory.CreateDirectory(overrideDirectory);
+            File.WriteAllText(Path.Combine(overrideDirectory, "partial-download"), "incomplete");
+
+            HtmlBrowser.PlaywrightInstaller = _ =>
+            {
+                Assert.False(Directory.Exists(overrideDirectory));
+                CreateCompleteRuntime(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
+            };
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
+
+            Assert.True(File.Exists(Path.Combine(overrideDirectory, "INSTALLATION_COMPLETE")));
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", originalHostOverride);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
     public async Task EnsureInstalledAsync_ReinstallsDriverWithMissingBrowserManifest()
     {
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -322,6 +375,84 @@ public class HtmlBrowserInstallerTests
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_ReinstallsDriverWithMalformedBrowserManifest()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+        var originalFactory = HtmlBrowser.HttpClientFactory;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            CreateHealthyDriver(tempDriver);
+            string manifestPath = Path.Combine(tempDriver, ".playwright", "package", "browsers.json");
+            File.WriteAllText(manifestPath, "{not-json");
+            HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
+            HtmlBrowser.PlaywrightInstaller = _ => CreateCompleteChromiumRuntime(tempBrowsers, "1217");
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            Assert.Equal(JsonValueKind.Array, manifest.RootElement.GetProperty("browsers").ValueKind);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            HtmlBrowser.HttpClientFactory = originalFactory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_RechecksExistingRuntimeAfterDriverDownload()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+        var originalFactory = HtmlBrowser.HttpClientFactory;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            CreateCompleteChromiumRuntime(tempBrowsers, "1217");
+            HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
+            HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("An existing exact runtime should not be reinstalled.");
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
+            Assert.True(HtmlBrowser.HasDriverLayout(Path.Combine(tempDriver, ".playwright")));
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            HtmlBrowser.HttpClientFactory = originalFactory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(23, Architecture.X64, "mac14")]
+    [InlineData(24, Architecture.Arm64, "mac15-arm64")]
+    [InlineData(19, Architecture.X64, "mac10.15")]
+    public void GetMacPlaywrightHostPlatform_UsesDarwinMajor(int darwinMajor, Architecture architecture, string expected)
+    {
+        Assert.Equal(expected, HtmlBrowser.GetMacPlaywrightHostPlatform(architecture, darwinMajor));
     }
 
     [Fact]
