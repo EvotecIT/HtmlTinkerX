@@ -229,6 +229,102 @@ public class HtmlBrowserInstallerTests
     }
 
     [Fact]
+    public async Task EnsureInstalledAsync_UsesOnlyCurrentPlatformRevisionOverride()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        string? originalHostOverride = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", "ubuntu20.04-x64");
+            CreateHealthyDriver(tempDriver);
+            string packageDirectory = Path.Combine(tempDriver, ".playwright", "package");
+            File.WriteAllText(Path.Combine(packageDirectory, "browsers.json"), """
+                {
+                  "browsers": [
+                    {
+                      "name": "webkit",
+                      "revision": "2272",
+                      "revisionOverrides": {
+                        "debian11-x64": "2105",
+                        "ubuntu20.04-x64": "2092"
+                      }
+                    }
+                  ]
+                }
+                """);
+            CreateCompleteRuntime(tempBrowsers, "webkit-2272");
+            CreateCompleteRuntime(tempBrowsers, "webkit_debian11_x64_special-2105");
+
+            string[]? captured = null;
+            HtmlBrowser.PlaywrightInstaller = args => captured = args;
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
+
+            Assert.NotNull(captured);
+            Assert.Contains("webkit", captured!);
+
+            CreateCompleteRuntime(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
+            HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("The current host override should be accepted.");
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", originalHostOverride);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureInstalledAsync_ReinstallsDriverWithMissingBrowserManifest()
+    {
+        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+        var originalFactory = HtmlBrowser.HttpClientFactory;
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
+            CreateHealthyDriver(tempDriver);
+            string manifestPath = Path.Combine(tempDriver, ".playwright", "package", "browsers.json");
+            File.Delete(manifestPath);
+            HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
+
+            string[]? captured = null;
+            HtmlBrowser.PlaywrightInstaller = args => captured = args;
+
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+
+            Assert.True(File.Exists(manifestPath));
+            Assert.NotNull(captured);
+        }
+        finally
+        {
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            HtmlBrowser.HttpClientFactory = originalFactory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
+            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+        }
+    }
+
+    [Fact]
     public async Task EnsureInstalledAsync_ReinstallsCorruptedDriver()
     {
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -422,10 +518,15 @@ public class HtmlBrowserInstallerTests
     {
         foreach (string name in new[] { "chromium", "chromium_headless_shell" })
         {
-            string directory = Path.Combine(browserRoot, $"{name}-{revision}");
-            Directory.CreateDirectory(directory);
-            File.WriteAllText(Path.Combine(directory, "INSTALLATION_COMPLETE"), string.Empty);
+            CreateCompleteRuntime(browserRoot, $"{name}-{revision}");
         }
+    }
+
+    private static void CreateCompleteRuntime(string browserRoot, string directoryName)
+    {
+        string directory = Path.Combine(browserRoot, directoryName);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "INSTALLATION_COMPLETE"), string.Empty);
     }
 
     private static byte[] CreateDriverArchive()
@@ -447,6 +548,18 @@ public class HtmlBrowserInstallerTests
             using (var packageStream = new StreamWriter(archive.CreateEntry("package/package.json").Open()))
             {
                 packageStream.Write("{}");
+            }
+
+            using (var browsersStream = new StreamWriter(archive.CreateEntry("package/browsers.json").Open()))
+            {
+                browsersStream.Write("""
+                    {
+                      "browsers": [
+                        { "name": "chromium", "revision": "1217" },
+                        { "name": "chromium-headless-shell", "revision": "1217" }
+                      ]
+                    }
+                    """);
             }
         }
 

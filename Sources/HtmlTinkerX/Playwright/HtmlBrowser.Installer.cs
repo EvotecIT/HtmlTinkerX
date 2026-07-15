@@ -138,12 +138,13 @@ public static partial class HtmlBrowser {
     internal static bool HasDriverLayout(string driverPath) {
         string nodePath = Path.Combine(driverPath, "node", PlatformId, NodeExecutable);
         string packagePath = Path.Combine(driverPath, "package");
-        if (!File.Exists(nodePath) || !Directory.Exists(packagePath)) {
+        string browsersManifestPath = Path.Combine(packagePath, "browsers.json");
+        if (!File.Exists(nodePath) || !Directory.Exists(packagePath) || !File.Exists(browsersManifestPath)) {
             return false;
         }
 
         try {
-            return new FileInfo(nodePath).Length > 0 && Directory.EnumerateFileSystemEntries(packagePath).Any();
+            return new FileInfo(nodePath).Length > 0 && new FileInfo(browsersManifestPath).Length > 0;
         } catch (IOException) {
             return false;
         } catch (UnauthorizedAccessException) {
@@ -188,27 +189,8 @@ public static partial class HtmlBrowser {
         if (!Directory.Exists(baseDir))
             return false;
 
-        string nodePath = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-        if (!File.Exists(nodePath))
+        if (!HasDriverLayout(baseDir))
             return true;
-
-        try {
-            if (new FileInfo(nodePath).Length == 0)
-                return true;
-        } catch {
-            return true;
-        }
-
-        string packageDir = Path.Combine(baseDir, "package");
-        if (!Directory.Exists(packageDir))
-            return true;
-
-        try {
-            if (!Directory.EnumerateFileSystemEntries(packageDir).Any())
-                return true;
-        } catch {
-            return true;
-        }
 
         if (!File.Exists(VersionFile))
             return true;
@@ -368,27 +350,21 @@ public static partial class HtmlBrowser {
                 if (name is null || name.Trim().Length == 0 || revision is null || revision.Trim().Length == 0 || !required.Contains(name))
                     continue;
 
-                var candidates = new List<string> {
-                    BuildRuntimeDirectory(browserRoot, name, revision)
-                };
-
-                if (browser.TryGetProperty("revisionOverrides", out JsonElement overrides) && overrides.ValueKind == JsonValueKind.Object) {
-                    foreach (JsonProperty revisionOverride in overrides.EnumerateObject()) {
-                        if (revisionOverride.Value.ValueKind != JsonValueKind.String)
-                            continue;
-
-                        string? overrideRevision = revisionOverride.Value.GetString();
-                        if (overrideRevision is null || overrideRevision.Trim().Length == 0)
-                            continue;
-
-                        candidates.Add(BuildRuntimeDirectory(
-                            browserRoot,
-                            $"{name}_{revisionOverride.Name}_special",
-                            overrideRevision));
+                string selectedName = name;
+                string selectedRevision = revision;
+                string hostPlatform = GetCurrentPlaywrightHostPlatform();
+                if (browser.TryGetProperty("revisionOverrides", out JsonElement overrides) &&
+                    overrides.ValueKind == JsonValueKind.Object &&
+                    overrides.TryGetProperty(hostPlatform, out JsonElement revisionOverride) &&
+                    revisionOverride.ValueKind == JsonValueKind.String) {
+                    string? overrideRevision = revisionOverride.GetString();
+                    if (overrideRevision is not null && overrideRevision.Trim().Length > 0) {
+                        selectedName = $"{name}_{hostPlatform}_special";
+                        selectedRevision = overrideRevision;
                     }
                 }
 
-                expected[name] = candidates;
+                expected[name] = new[] { BuildRuntimeDirectory(browserRoot, selectedName, selectedRevision) };
             }
         } catch (IOException) {
             return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
@@ -410,6 +386,84 @@ public static partial class HtmlBrowser {
 
     private static bool IsCompleteBrowserRuntime(string directory) {
         return Directory.Exists(directory) && File.Exists(Path.Combine(directory, "INSTALLATION_COMPLETE"));
+    }
+
+    private static string GetCurrentPlaywrightHostPlatform() {
+        string? overridePlatform = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
+        if (!string.IsNullOrWhiteSpace(overridePlatform))
+            return overridePlatform.Trim();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return "win64";
+
+        string? architecture = RuntimeInformation.OSArchitecture switch {
+            Architecture.X64 => "x64",
+            Architecture.Arm64 => "arm64",
+            _ => null
+        };
+        if (architecture is null)
+            return "<unknown>";
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            int darwinMajor = Environment.OSVersion.Version.Major;
+            string macVersion = darwinMajor switch {
+                < 18 => "mac10.13",
+                18 => "mac10.14",
+                19 => "mac10.15",
+                _ => "mac" + Math.Min(darwinMajor - 9, 15)
+            };
+            return architecture == "arm64" && darwinMajor >= 20
+                ? macVersion + "-arm64"
+                : macVersion;
+        }
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return "<unknown>";
+
+        string suffix = "-" + architecture;
+        IReadOnlyDictionary<string, string> release = ReadLinuxOsRelease();
+        release.TryGetValue("ID", out string? id);
+        release.TryGetValue("VERSION_ID", out string? version);
+        id = id?.ToLowerInvariant() ?? string.Empty;
+        version ??= string.Empty;
+        int.TryParse(version.Split('.')[0], out int major);
+
+        if (id is "ubuntu" or "pop" or "neon" or "tuxedo") {
+            if (major < 20) return "ubuntu18.04" + suffix;
+            if (major < 22) return "ubuntu20.04" + suffix;
+            if (major < 24) return "ubuntu22.04" + suffix;
+            if (major < 26) return "ubuntu24.04" + suffix;
+            return "ubuntu" + version + suffix;
+        }
+        if (id == "linuxmint") {
+            if (major <= 20) return "ubuntu20.04" + suffix;
+            if (major == 21) return "ubuntu22.04" + suffix;
+            return "ubuntu24.04" + suffix;
+        }
+        if (id is "debian" or "raspbian") {
+            if (version is "11" or "12" or "13") return "debian" + version + suffix;
+            if (version.Length == 0) return "debian13" + suffix;
+        }
+        return "ubuntu24.04" + suffix;
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadLinuxOsRelease() {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try {
+            foreach (string line in File.ReadLines("/etc/os-release")) {
+                int separator = line.IndexOf('=');
+                if (separator <= 0)
+                    continue;
+                string key = line.Substring(0, separator).Trim();
+                string value = line.Substring(separator + 1).Trim().Trim('"', '\'');
+                values[key] = value;
+            }
+        } catch (IOException) {
+            // Playwright falls back to the current Ubuntu platform for unknown Linux distributions.
+        } catch (UnauthorizedAccessException) {
+            // Playwright falls back to the current Ubuntu platform for unreadable release metadata.
+        }
+        return values;
     }
 
     private static bool IsBrowserRuntimeCorrupted(HtmlBrowserEngine engine) {
