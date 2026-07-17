@@ -72,7 +72,7 @@ public static partial class HtmlParser {
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
         string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
-        return ParseWithAngleSharp(content);
+        return await ParseWithAngleSharpAsync(content, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
