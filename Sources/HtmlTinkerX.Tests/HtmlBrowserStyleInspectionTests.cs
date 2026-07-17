@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 
 namespace HtmlTinkerX.Tests;
 
@@ -25,6 +26,22 @@ public class HtmlBrowserStyleInspectionTests {
             Assert.Equal("rgb(1, 2, 3)", styles["color"]);
             Assert.Equal("#123456", variables["--brand"]);
             Assert.True(audit.IsValid);
+        } finally {
+            await HtmlBrowser.CloseSessionAsync(session);
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task StyleInspection_CancelsWhileLocatorIsWaiting() {
+        string file = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
+        File.WriteAllText(file, "<!doctype html><html><head><title>Cancel</title></head><body></body></html>");
+
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(new Uri(file).AbsoluteUri);
+        try {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                HtmlBrowser.GetComputedStylesAsync(session, "#never-created", new[] { "color" }, cancellation.Token));
         } finally {
             await HtmlBrowser.CloseSessionAsync(session);
             File.Delete(file);

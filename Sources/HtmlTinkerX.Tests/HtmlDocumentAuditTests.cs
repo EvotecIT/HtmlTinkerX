@@ -97,4 +97,19 @@ public class HtmlDocumentAuditTests {
 
         Assert.Equal(2, result.Issues.Count(issue => issue.Code == "form-label-missing"));
     }
+
+    [Fact]
+    public void Analyze_LegacySvgExecutableLink_IsRejected() {
+        string html = """
+        <!doctype html>
+        <html lang="en">
+        <head><title>Audit</title></head>
+        <body><svg><a xlink:href="javascript:alert(1)"><text>Unsafe</text></a></svg></body>
+        </html>
+        """;
+
+        HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
+
+        Assert.Contains(result.Issues, issue => issue.Code == "unsafe-url-scheme" && issue.Element == "a");
+    }
 }

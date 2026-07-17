@@ -9,7 +9,7 @@ namespace HtmlTinkerX;
 /// Audits static or rendered HTML with one reusable correctness, safety, and accessibility contract.
 /// </summary>
 public static class HtmlDocumentAudit {
-    private static readonly string[] UrlAttributes = { "href", "src", "action", "formaction" };
+    private static readonly string[] UrlAttributes = { "href", "xlink:href", "src", "action", "formaction" };
 
     /// <summary>
     /// Audits HTML markup using the supplied checks.

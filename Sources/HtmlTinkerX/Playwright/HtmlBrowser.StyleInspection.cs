@@ -46,7 +46,7 @@ public static partial class HtmlBrowser {
     /// <param name="attributeName">Attribute name to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The attribute value, or <see langword="null"/> when it is absent.</returns>
-    public static Task<string?> GetAttributeAsync(
+    public static async Task<string?> GetAttributeAsync(
         HtmlBrowserSession session,
         string selector,
         string attributeName,
@@ -64,7 +64,9 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return session.Page.Locator(selector).First.GetAttributeAsync(attributeName);
+        return await session.Page.Locator(selector).First.GetAttributeAsync(attributeName)
+            .WaitWithCancellationAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -83,7 +85,9 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        string html = await session.Page.ContentAsync().ConfigureAwait(false);
+        string html = await session.Page.ContentAsync()
+            .WaitWithCancellationAsync(cancellationToken)
+            .ConfigureAwait(false);
         return HtmlDocumentAudit.Analyze(html, options);
     }
 
@@ -115,7 +119,7 @@ public static partial class HtmlBrowser {
         cancellationToken.ThrowIfCancellationRequested();
         string json = await session.Page.Locator(selector).First.EvaluateAsync<string>(
             "(element, names) => JSON.stringify(Object.fromEntries(names.map(name => [name, getComputedStyle(element).getPropertyValue(name).trim()])))",
-            names).ConfigureAwait(false);
+            names).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         Dictionary<string, string>? values = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
         return values ?? new Dictionary<string, string>(StringComparer.Ordinal);
