@@ -138,9 +138,12 @@ public static class HtmlDocumentAudit {
         }
 
         string? type = element.GetAttribute("type");
-        return (string.Equals(type, "button", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(type, "submit", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(type, "reset", StringComparison.OrdinalIgnoreCase)) &&
+        if (string.Equals(type, "submit", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(type, "reset", StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        return string.Equals(type, "button", StringComparison.OrdinalIgnoreCase) &&
                !string.IsNullOrWhiteSpace(element.GetAttribute("value"));
     }
 
@@ -148,7 +151,7 @@ public static class HtmlDocumentAudit {
         foreach (IElement element in document.All) {
             foreach (string attribute in UrlAttributes) {
                 string? value = element.GetAttribute(attribute);
-                if (!IsUnsafeUrl(value)) {
+                if (!IsUnsafeUrl(attribute, value)) {
                     continue;
                 }
 
@@ -162,15 +165,29 @@ public static class HtmlDocumentAudit {
         }
     }
 
-    private static bool IsUnsafeUrl(string? value) {
+    private static bool IsUnsafeUrl(string attribute, string? value) {
         if (string.IsNullOrWhiteSpace(value)) {
             return false;
         }
 
         string normalized = new(value.Where(static character => !char.IsControl(character) && !char.IsWhiteSpace(character)).ToArray());
-        return normalized.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
-               normalized.StartsWith("vbscript:", StringComparison.OrdinalIgnoreCase) ||
-               normalized.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase);
+        if (!Uri.TryCreate(normalized, UriKind.RelativeOrAbsolute, out Uri? uri)) {
+            return true;
+        }
+
+        if (!uri.IsAbsoluteUri) {
+            return false;
+        }
+
+        bool isAsset = attribute.Equals("src", StringComparison.OrdinalIgnoreCase);
+        if (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+            uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        return isAsset ||
+               (!uri.Scheme.Equals(Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase) &&
+                !uri.Scheme.Equals("tel", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void AuditHeadingOrder(IDocument document, ICollection<HtmlDocumentAuditIssue> issues) {

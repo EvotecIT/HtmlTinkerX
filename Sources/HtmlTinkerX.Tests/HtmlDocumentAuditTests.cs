@@ -46,6 +46,7 @@ public class HtmlDocumentAuditTests {
 <a href="/home"><img src="home.png" alt="Home"></a>
 <label for="query">Query</label><input id="query">
 <input type="image" src="submit.png" alt="Submit">
+<input type="submit"><input type="reset">
 </main>
 </body>
 </html>
@@ -55,5 +56,24 @@ public class HtmlDocumentAuditTests {
 
         Assert.True(result.IsValid);
         Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public void Analyze_UnsupportedAbsoluteSchemes_AgreeWithGeneratedHtmlPolicy() {
+        string html = """
+<!doctype html>
+<html lang="en">
+<head><title>Audit</title></head>
+<body>
+<a href="data:image/svg+xml,&lt;svg onload='alert(1)'&gt;">Unsafe navigation</a>
+<img src="data:image/png;base64,AAAA" alt="Unsafe asset">
+<form action="mailto:ops@example.com"><button>Send</button></form>
+</body>
+</html>
+""";
+
+        HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
+
+        Assert.Equal(2, result.Issues.Count(issue => issue.Code == "unsafe-url-scheme"));
     }
 }
