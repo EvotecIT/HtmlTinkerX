@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace HtmlTinkerX.Tests;
 
 public class HtmlDocumentAuditTests {
@@ -111,5 +113,34 @@ public class HtmlDocumentAuditTests {
         HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
 
         Assert.Contains(result.Issues, issue => issue.Code == "unsafe-url-scheme" && issue.Element == "a");
+    }
+
+    [Fact]
+    public void Analyze_MetaRefreshExecutableTarget_IsRejected() {
+        string html = """
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <title>Audit</title>
+          <meta http-equiv="refresh" content="0; URL = 'javascript:alert(1)'">
+        </head>
+        <body><main><h1>Audit</h1></main></body>
+        </html>
+        """;
+
+        HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
+
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == "unsafe-url-scheme" &&
+            issue.Message.Contains("meta refresh", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_PreCanceledToken_StopsBeforeParsing() {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            HtmlDocumentAudit.AnalyzeAsync("<html><body></body></html>", cancellationToken: cancellation.Token));
     }
 }

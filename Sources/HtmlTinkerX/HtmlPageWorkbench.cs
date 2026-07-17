@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using AngleSharp.Dom;
 
 namespace HtmlTinkerX;
 
@@ -30,11 +31,16 @@ public static class HtmlPageWorkbench {
 
         HtmlPageWorkbenchOptions effectiveOptions = options ?? new HtmlPageWorkbenchOptions();
         Uri? baseUri = effectiveOptions.BaseUri;
-        Uri? staticEffectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
+        IDocument staticDocument = await HtmlParser.ParseWithAngleSharpAsync(html, cancellationToken).ConfigureAwait(false);
+        Uri? staticEffectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(staticDocument, baseUri);
         HtmlReadableTextResult staticReadableText = HtmlParserToText.ExtractReadableText(html);
+        cancellationToken.ThrowIfCancellationRequested();
         string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, staticEffectiveBaseUri?.AbsoluteUri);
+        cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<HtmlDataItem> staticData = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
+        cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<HtmlJavaScriptConfigItem> staticJavaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
+        cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<HtmlInteractionSurfaceItem> staticInteractionSurface = await HtmlParsingToolbox.FindInteractionSurfaceAsync(
             html,
             baseUri,
@@ -46,7 +52,12 @@ public static class HtmlPageWorkbench {
         HtmlRenderedPageSnapshot? renderedSnapshot = effectiveOptions.RenderedSnapshot;
         bool hasRenderedSnapshot = renderedSnapshot != null && !string.IsNullOrWhiteSpace(renderedSnapshot.Html);
         Uri? renderedBaseUri = GetRenderedBaseUri(renderedSnapshot, baseUri);
-        Uri? renderedEffectiveBaseUri = hasRenderedSnapshot ? GetEffectiveBaseUri(renderedSnapshot!.Html, renderedBaseUri) : null;
+        IDocument? renderedDocument = hasRenderedSnapshot
+            ? await HtmlParser.ParseWithAngleSharpAsync(renderedSnapshot!.Html, cancellationToken).ConfigureAwait(false)
+            : null;
+        Uri? renderedEffectiveBaseUri = renderedDocument == null
+            ? null
+            : HtmlModernParserUtilities.GetEffectiveBaseUri(renderedDocument, renderedBaseUri);
         IReadOnlyList<HtmlDataItem> renderedData = hasRenderedSnapshot
             ? NormalizeList(renderedSnapshot!.Data, () => HtmlParsingToolbox.SelectData(renderedSnapshot.Html, baseUri: renderedBaseUri))
             : Array.Empty<HtmlDataItem>();
@@ -66,12 +77,20 @@ public static class HtmlPageWorkbench {
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = hasRenderedSnapshot ? renderedJavaScriptConfig : staticJavaScriptConfig;
         IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = hasRenderedSnapshot ? renderedInteractionSurface : staticInteractionSurface;
         HtmlStaticRenderedComparison? staticRenderedComparison = CreateStaticRenderedComparison(html, renderedSnapshot, renderedBaseUri, effectiveOptions);
+        cancellationToken.ThrowIfCancellationRequested();
+        IDocument analysisDocument = renderedDocument ?? staticDocument;
+        string analysisHtml = hasRenderedSnapshot ? renderedSnapshot!.Html : html;
+        Uri? analysisBaseUri = hasRenderedSnapshot ? renderedBaseUri : baseUri;
         HtmlDocumentAuditResult? documentAudit = effectiveOptions.IncludeDocumentAudit
-            ? HtmlDocumentAudit.Analyze(hasRenderedSnapshot ? renderedSnapshot!.Html : html, effectiveOptions.DocumentAuditOptions)
+            ? HtmlDocumentAudit.Analyze(analysisDocument, effectiveOptions.DocumentAuditOptions, cancellationToken)
             : null;
         HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(
-            hasRenderedSnapshot ? renderedSnapshot!.Html : html,
-            hasRenderedSnapshot ? renderedBaseUri : baseUri);
+            analysisHtml,
+            analysisDocument,
+            readableText,
+            data,
+            analysisBaseUri,
+            cancellationToken);
 
         IReadOnlyList<HtmlDataItem> forms = FilterData(data, "Form");
         IReadOnlyList<HtmlDataItem> links = FilterData(data, "Link");
@@ -193,15 +212,6 @@ public static class HtmlPageWorkbench {
         }
 
         return fallback;
-    }
-
-    private static Uri? GetEffectiveBaseUri(string html, Uri? baseUri) {
-        if (string.IsNullOrWhiteSpace(html)) {
-            return baseUri;
-        }
-
-        var document = HtmlParser.ParseWithAngleSharp(html);
-        return HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
     }
 
     private static IReadOnlyList<T> NormalizeList<T>(IReadOnlyList<T>? source, Func<IReadOnlyList<T>> fallback) =>

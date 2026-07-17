@@ -36,6 +36,24 @@ public static partial class HtmlParser {
     }
 
     /// <summary>
+    /// Parses HTML markup using AngleSharp with cooperative cancellation.
+    /// </summary>
+    /// <param name="html">HTML content to parse.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The parsed document.</returns>
+    public static async Task<IDocument> ParseWithAngleSharpAsync(
+        string html,
+        CancellationToken cancellationToken = default) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var parser = new global::AngleSharp.Html.Parser.HtmlParser();
+        return await parser.ParseDocumentAsync(html, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Downloads and parses HTML markup from a URL using AngleSharp.
     /// </summary>
     /// <param name="url">URL of the page to download.</param>

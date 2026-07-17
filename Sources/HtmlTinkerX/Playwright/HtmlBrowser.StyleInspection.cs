@@ -88,7 +88,7 @@ public static partial class HtmlBrowser {
         string html = await session.Page.ContentAsync()
             .WaitWithCancellationAsync(cancellationToken)
             .ConfigureAwait(false);
-        return HtmlDocumentAudit.Analyze(html, options);
+        return await HtmlDocumentAudit.AnalyzeAsync(html, options, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<IReadOnlyDictionary<string, string>> GetStyleValuesAsync(
