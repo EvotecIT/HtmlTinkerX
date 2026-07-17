@@ -66,6 +66,9 @@ public static class HtmlPageWorkbench {
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = hasRenderedSnapshot ? renderedJavaScriptConfig : staticJavaScriptConfig;
         IReadOnlyList<HtmlInteractionSurfaceItem> interactionSurface = hasRenderedSnapshot ? renderedInteractionSurface : staticInteractionSurface;
         HtmlStaticRenderedComparison? staticRenderedComparison = CreateStaticRenderedComparison(html, renderedSnapshot, renderedBaseUri, effectiveOptions);
+        HtmlDocumentAuditResult? documentAudit = effectiveOptions.IncludeDocumentAudit
+            ? HtmlDocumentAudit.Analyze(hasRenderedSnapshot ? renderedSnapshot!.Html : html, effectiveOptions.DocumentAuditOptions)
+            : null;
         HtmlExtractionPlan plan = HtmlExtractionPlanner.Analyze(
             hasRenderedSnapshot ? renderedSnapshot!.Html : html,
             hasRenderedSnapshot ? renderedBaseUri : baseUri);
@@ -95,6 +98,7 @@ public static class HtmlPageWorkbench {
             ExtractionPlan = plan,
             RenderedSnapshot = renderedSnapshot,
             StaticRenderedComparison = staticRenderedComparison,
+            DocumentAudit = documentAudit,
             SuggestedNextCommand = plan.SuggestedCommand,
             Warnings = warnings,
             Data = data,
