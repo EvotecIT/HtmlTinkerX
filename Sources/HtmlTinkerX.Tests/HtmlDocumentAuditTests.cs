@@ -67,6 +67,7 @@ public class HtmlDocumentAuditTests {
 <body>
 <a href="data:image/svg+xml,&lt;svg onload='alert(1)'&gt;">Unsafe navigation</a>
 <img src="data:image/png;base64,AAAA" alt="Unsafe asset">
+<object data="data:text/html,&lt;script&gt;alert(1)&lt;/script&gt;"></object>
 <form action="mailto:ops@example.com"><button>Send</button></form>
 </body>
 </html>
@@ -74,6 +75,6 @@ public class HtmlDocumentAuditTests {
 
         HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
 
-        Assert.Equal(2, result.Issues.Count(issue => issue.Code == "unsafe-url-scheme"));
+        Assert.Equal(3, result.Issues.Count(issue => issue.Code == "unsafe-url-scheme"));
     }
 }

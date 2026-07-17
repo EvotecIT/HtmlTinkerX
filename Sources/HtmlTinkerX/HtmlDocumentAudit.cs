@@ -151,7 +151,7 @@ public static class HtmlDocumentAudit {
         foreach (IElement element in document.All) {
             foreach (string attribute in UrlAttributes) {
                 string? value = element.GetAttribute(attribute);
-                if (!IsUnsafeUrl(attribute, value)) {
+                if (!IsUnsafeUrl(element, attribute, value)) {
                     continue;
                 }
 
@@ -162,10 +162,35 @@ public static class HtmlDocumentAudit {
                     $"The {attribute} attribute uses an executable URL scheme.",
                     Describe(element));
             }
+
+            AuditElementSpecificUrl(element, "object", "data", issues);
+            AuditElementSpecificUrl(element, "video", "poster", issues);
         }
     }
 
-    private static bool IsUnsafeUrl(string attribute, string? value) {
+    private static void AuditElementSpecificUrl(
+        IElement element,
+        string elementName,
+        string attribute,
+        ICollection<HtmlDocumentAuditIssue> issues) {
+        if (!element.LocalName.Equals(elementName, StringComparison.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        string? value = element.GetAttribute(attribute);
+        if (!IsUnsafeUrl(element, attribute, value)) {
+            return;
+        }
+
+        Add(
+            issues,
+            "unsafe-url-scheme",
+            HtmlDocumentAuditSeverity.Error,
+            $"The {attribute} attribute uses an executable URL scheme.",
+            Describe(element));
+    }
+
+    private static bool IsUnsafeUrl(IElement element, string attribute, string? value) {
         if (string.IsNullOrWhiteSpace(value)) {
             return false;
         }
@@ -179,7 +204,10 @@ public static class HtmlDocumentAudit {
             return false;
         }
 
-        bool isAsset = attribute.Equals("src", StringComparison.OrdinalIgnoreCase);
+        bool isAsset = attribute.Equals("src", StringComparison.OrdinalIgnoreCase) ||
+                       (element.LocalName.Equals("link", StringComparison.OrdinalIgnoreCase) && attribute.Equals("href", StringComparison.OrdinalIgnoreCase)) ||
+                       (element.LocalName.Equals("object", StringComparison.OrdinalIgnoreCase) && attribute.Equals("data", StringComparison.OrdinalIgnoreCase)) ||
+                       (element.LocalName.Equals("video", StringComparison.OrdinalIgnoreCase) && attribute.Equals("poster", StringComparison.OrdinalIgnoreCase));
         if (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
             uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) {
             return false;
