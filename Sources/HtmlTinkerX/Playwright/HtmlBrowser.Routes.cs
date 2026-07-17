@@ -34,6 +34,73 @@ public static partial class HtmlBrowser {
         => RegisterRouteAsync(session.Page, pattern, handler, cancellationToken);
 
     /// <summary>
+    /// Registers a static browser response without exposing Playwright route plumbing to the caller.
+    /// </summary>
+    /// <param name="page">Target page.</param>
+    /// <param name="pattern">Matching URL pattern.</param>
+    /// <param name="body">Response body.</param>
+    /// <param name="contentType">Response content type.</param>
+    /// <param name="status">HTTP response status.</param>
+    /// <param name="headers">Optional additional response headers.</param>
+    /// <param name="cancellationToken">Token used to cancel registration.</param>
+    public static Task RegisterResponseRouteAsync(
+        IPage page,
+        string pattern,
+        string? body,
+        string contentType = "text/plain; charset=utf-8",
+        int status = 200,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default) {
+        if (page == null) {
+            throw new ArgumentNullException(nameof(page));
+        }
+
+        if (status < 100 || status > 599) {
+            throw new ArgumentOutOfRangeException(nameof(status), "HTTP status must be between 100 and 599.");
+        }
+
+        if (string.IsNullOrWhiteSpace(contentType)) {
+            throw new ArgumentException("Content type cannot be empty.", nameof(contentType));
+        }
+
+        return RegisterRouteAsync(
+            page,
+            pattern,
+            route => route.FulfillAsync(new RouteFulfillOptions {
+                Status = status,
+                ContentType = contentType,
+                Body = body ?? string.Empty,
+                Headers = headers?.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase)
+            }),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Registers a static browser response on an active HtmlTinkerX session.
+    /// </summary>
+    public static Task RegisterResponseRouteAsync(
+        HtmlBrowserSession session,
+        string pattern,
+        string? body,
+        string contentType = "text/plain; charset=utf-8",
+        int status = 200,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default) {
+        if (session == null) {
+            throw new ArgumentNullException(nameof(session));
+        }
+
+        return RegisterResponseRouteAsync(
+            session.Page,
+            pattern,
+            body,
+            contentType,
+            status,
+            headers,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Removes a previously registered route handler from the page.
     /// </summary>
     /// <param name="page">Target page.</param>
