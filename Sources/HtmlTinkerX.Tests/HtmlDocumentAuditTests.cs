@@ -66,7 +66,8 @@ public class HtmlDocumentAuditTests {
 <head><title>Audit</title></head>
 <body>
 <a href="data:image/svg+xml,&lt;svg onload='alert(1)'&gt;">Unsafe navigation</a>
-<img src="data:image/png;base64,AAAA" alt="Unsafe asset">
+<img src="data:image/png;base64,AAAA" alt="Safe embedded asset">
+<link rel="icon" href="data:image/png;base64,AAAA">
 <object data="data:text/html,&lt;script&gt;alert(1)&lt;/script&gt;"></object>
 <form action="mailto:ops@example.com"><button>Send</button></form>
 </body>
@@ -75,6 +76,25 @@ public class HtmlDocumentAuditTests {
 
         HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
 
-        Assert.Equal(3, result.Issues.Count(issue => issue.Code == "unsafe-url-scheme"));
+        Assert.Equal(2, result.Issues.Count(issue => issue.Code == "unsafe-url-scheme"));
+    }
+
+    [Fact]
+    public void Analyze_SelectAndTextareaContent_DoesNotReplaceAFormLabel() {
+        string html = """
+        <!doctype html>
+        <html lang="en">
+        <head><title>Audit</title></head>
+        <body>
+        <select><option>Visible option</option></select>
+        <textarea>Default value</textarea>
+        <span id="query-label">Query</span><input aria-labelledby="query-label">
+        </body>
+        </html>
+        """;
+
+        HtmlDocumentAuditResult result = HtmlDocumentAudit.Analyze(html);
+
+        Assert.Equal(2, result.Issues.Count(issue => issue.Code == "form-label-missing"));
     }
 }

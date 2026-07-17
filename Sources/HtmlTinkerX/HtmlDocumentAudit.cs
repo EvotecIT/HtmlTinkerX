@@ -75,6 +75,10 @@ public static class HtmlDocumentAudit {
     }
 
     private static void AuditAccessibleNames(IDocument document, ICollection<HtmlDocumentAuditIssue> issues) {
+        IReadOnlyDictionary<string, IElement> elementsById = document.All
+            .Where(static element => !string.IsNullOrWhiteSpace(element.Id))
+            .GroupBy(static element => element.Id!, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.Ordinal);
         Dictionary<string, string> explicitLabels = document.QuerySelectorAll("label[for]")
             .Where(static label => !string.IsNullOrWhiteSpace(label.GetAttribute("for")))
             .GroupBy(static label => label.GetAttribute("for")!, StringComparer.Ordinal)
@@ -87,22 +91,26 @@ public static class HtmlDocumentAudit {
         }
 
         foreach (IElement element in document.QuerySelectorAll("button, a[href], [role=button], [role=link]")) {
-            if (!HasAccessibleName(element, document, explicitLabels)) {
+            if (!HasAccessibleName(element, explicitLabels, elementsById, allowElementText: true)) {
                 Add(issues, "interactive-name-missing", HtmlDocumentAuditSeverity.Error, "The interactive element has no accessible name.", Describe(element));
             }
         }
 
         foreach (IElement control in document.QuerySelectorAll("input:not([type=hidden]), select, textarea")) {
-            if (!HasAccessibleName(control, document, explicitLabels)) {
+            if (!HasAccessibleName(control, explicitLabels, elementsById, allowElementText: false)) {
                 Add(issues, "form-label-missing", HtmlDocumentAuditSeverity.Error, "The form control has no associated label or accessible name.", Describe(control));
             }
         }
     }
 
-    private static bool HasAccessibleName(IElement element, IDocument document, IReadOnlyDictionary<string, string> explicitLabels) {
+    private static bool HasAccessibleName(
+        IElement element,
+        IReadOnlyDictionary<string, string> explicitLabels,
+        IReadOnlyDictionary<string, IElement> elementsById,
+        bool allowElementText) {
         if (!string.IsNullOrWhiteSpace(element.GetAttribute("aria-label")) ||
             !string.IsNullOrWhiteSpace(element.GetAttribute("title")) ||
-            !string.IsNullOrWhiteSpace(element.TextContent)) {
+            (allowElementText && !string.IsNullOrWhiteSpace(element.TextContent))) {
             return true;
         }
 
@@ -119,8 +127,7 @@ public static class HtmlDocumentAudit {
         string? labelledBy = element.GetAttribute("aria-labelledby");
         if (labelledBy is string labelledByValue && !string.IsNullOrWhiteSpace(labelledByValue)) {
             foreach (string id in labelledByValue.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) {
-                IElement? label = document.All.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
-                if (label != null && !string.IsNullOrWhiteSpace(label.TextContent)) {
+                if (elementsById.TryGetValue(id, out IElement? label) && !string.IsNullOrWhiteSpace(label.TextContent)) {
                     return true;
                 }
             }
@@ -204,6 +211,10 @@ public static class HtmlDocumentAudit {
             return false;
         }
 
+        if (IsImageSourceContext(element, attribute) && IsSafeEmbeddedImage(normalized)) {
+            return false;
+        }
+
         bool isAsset = attribute.Equals("src", StringComparison.OrdinalIgnoreCase) ||
                        (element.LocalName.Equals("link", StringComparison.OrdinalIgnoreCase) && attribute.Equals("href", StringComparison.OrdinalIgnoreCase)) ||
                        (element.LocalName.Equals("object", StringComparison.OrdinalIgnoreCase) && attribute.Equals("data", StringComparison.OrdinalIgnoreCase)) ||
@@ -216,6 +227,42 @@ public static class HtmlDocumentAudit {
         return isAsset ||
                (!uri.Scheme.Equals(Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase) &&
                 !uri.Scheme.Equals("tel", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsImageSourceContext(IElement element, string attribute) {
+        if (attribute.Equals("href", StringComparison.OrdinalIgnoreCase) &&
+            element.LocalName.Equals("link", StringComparison.OrdinalIgnoreCase)) {
+            string? relation = element.GetAttribute("rel");
+            return !string.IsNullOrWhiteSpace(relation) && relation!
+                .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(static token => token.EndsWith("icon", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (attribute.Equals("poster", StringComparison.OrdinalIgnoreCase)) {
+            return element.LocalName.Equals("video", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!attribute.Equals("src", StringComparison.OrdinalIgnoreCase)) {
+            return false;
+        }
+
+        return element.LocalName.Equals("img", StringComparison.OrdinalIgnoreCase) ||
+               element.LocalName.Equals("image", StringComparison.OrdinalIgnoreCase) ||
+               element.LocalName.Equals("source", StringComparison.OrdinalIgnoreCase) ||
+               element.LocalName.Equals("input", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSafeEmbeddedImage(string normalized) {
+        return normalized.StartsWith("data:image/png;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/jpeg;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/jpg;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/gif;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/webp;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/avif;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/bmp;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/x-icon;base64,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/svg+xml,", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("data:image/svg+xml;base64,", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AuditHeadingOrder(IDocument document, ICollection<HtmlDocumentAuditIssue> issues) {
