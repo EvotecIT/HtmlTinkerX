@@ -3,7 +3,7 @@
   "RootPath": "..\\Sources",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "HtmlTinkerX": "2.0.X"
+    "HtmlTinkerX": "2.2.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,
