@@ -1,7 +1,7 @@
 ---
 external help file: PSParseHTML-help.xml
 Module Name: PSParseHTML
-online version: https://github.com/EvotecIT/PSParseHTML
+online version: https://github.com/EvotecIT/HtmlTinkerX
 schema: 2.0.0
 ---
 # Find-HtmlInteractionSurface
@@ -11,22 +11,22 @@ Finds forms, hidden fields, tokens, inline endpoints, and optional linked-script
 ## SYNTAX
 ### Node (Default)
 ```powershell
-Find-HtmlInteractionSurface [-HtmlNode] <Object> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [<CommonParameters>]
+Find-HtmlInteractionSurface [-HtmlNode] <Object> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ### Content
 ```powershell
-Find-HtmlInteractionSurface -Content <string> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [<CommonParameters>]
+Find-HtmlInteractionSurface -Content <string> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Find-HtmlInteractionSurface -Path <string> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [<CommonParameters>]
+Find-HtmlInteractionSurface -Path <string> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Find-HtmlInteractionSurface -Url <uri> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Find-HtmlInteractionSurface -Url <uri> [-BaseUrl <uri>] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-MaximumResponseBytes <int>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -123,6 +123,22 @@ Downloads and inspects same-origin linked JavaScript files when BaseUrl, Url, or
 
 ```yaml
 Type: SwitchParameter
+Parameter Sets: Node, Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: True
+```
+
+### -MaximumResponseBytes
+Maximum number of bytes accepted for the page and each linked JavaScript response.
+
+```yaml
+Type: Int32
 Parameter Sets: Node, Content, File, Url
 Aliases: None
 Possible values:

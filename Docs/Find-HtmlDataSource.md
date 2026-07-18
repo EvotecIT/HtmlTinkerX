@@ -1,7 +1,7 @@
 ---
 external help file: PSParseHTML-help.xml
 Module Name: PSParseHTML
-online version: https://github.com/EvotecIT/PSParseHTML
+online version: https://github.com/EvotecIT/HtmlTinkerX
 schema: 2.0.0
 ---
 # Find-HtmlDataSource

@@ -1,7 +1,7 @@
 ---
 external help file: PSParseHTML-help.xml
 Module Name: PSParseHTML
-online version: https://github.com/EvotecIT/PSParseHTML
+online version: https://github.com/EvotecIT/HtmlTinkerX
 schema: 2.0.0
 ---
 # Invoke-HtmlRendering
@@ -11,12 +11,12 @@ Cmdlet that retrieves HTML content after executing JavaScript using a headless b
 ## SYNTAX
 ### Default (Default)
 ```powershell
-Invoke-HtmlRendering [-Url] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
+Invoke-HtmlRendering [-Url] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Invoke-HtmlRendering [-Path] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
+Invoke-HtmlRendering [-Path] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -418,6 +418,22 @@ Accept wildcard characters: True
 
 ### -InteractionRepeatCount
 Number of times click interactions should be retried on rendered pages.
+
+```yaml
+Type: Int32
+Parameter Sets: Default, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: True
+```
+
+### -LinkedScriptMaximumResponseBytes
+Maximum number of bytes accepted for each linked JavaScript response included in Snapshot discovery.
 
 ```yaml
 Type: Int32
