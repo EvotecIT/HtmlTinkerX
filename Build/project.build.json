@@ -3,13 +3,13 @@
   "RootPath": "..\\Sources",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "HtmlTinkerX": "2.1.0-beta.1"
+    "HtmlTinkerX": "2.0.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,
   "ExcludeProjects": [],
   "NugetSource": [],
-  "IncludePrerelease": true,
+  "IncludePrerelease": false,
   "Configuration": "Release",
   "OutputPath": null,
   "StagingPath": "../Artefacts/ProjectBuild",
@@ -30,7 +30,7 @@
   "GitHubAccessTokenFilePath": "C:\\Support\\Important\\GithubAPI.txt",
   "GitHubUsername": "EvotecIT",
   "GitHubRepositoryName": "HtmlTinkerX",
-  "GitHubIsPreRelease": true,
+  "GitHubIsPreRelease": false,
   "GitHubIncludeProjectNameInTag": true,
   "GitHubGenerateReleaseNotes": true,
   "GitHubReleaseMode": "Single",

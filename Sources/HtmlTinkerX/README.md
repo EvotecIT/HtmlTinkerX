@@ -5,11 +5,10 @@ HtmlTinkerX is a .NET library for parsing and inspecting HTML, CSS, and JavaScri
 ## Install
 
 ```shell
-dotnet add package HtmlTinkerX --version 2.1.0-beta.2
+dotnet add package HtmlTinkerX
 ```
 
-HtmlTinkerX 2.1.0-beta.2 consumes prerelease AngleSharp CSS and JavaScript
-integration packages. Pin the HtmlTinkerX version when reproducible restores matter.
+Pin a stable HtmlTinkerX version when reproducible restores matter.
 
 ## Parse HTML
 
@@ -108,5 +107,5 @@ The crawler restricts requests to the starting host, honors `robots.txt`, and us
 
 See the [repository](https://github.com/EvotecIT/HtmlTinkerX) for PowerShell examples, browser automation, API discovery, SSO handoff analysis, and package documentation.
 
-Copyright (c) 2011-2026 Przemyslaw Klys, Evotec. All rights reserved. See the
-LICENSE file included in this package.
+HtmlTinkerX is available under the MIT License. See the LICENSE file included
+in the package.

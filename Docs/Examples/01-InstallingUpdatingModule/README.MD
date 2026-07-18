@@ -1,10 +1,11 @@
-﻿### Install from PSGallery
+### Install from PSGallery
 
-```PowerShell
+```powershell
 Install-Module -Name PSParseHTML -AllowClobber -Force
 ```
 
-Force and AllowClobber aren't necessary, but they do skip errors in case some appear.
+`-Force` reinstalls the selected version when necessary. `-AllowClobber` permits
+commands with the same names as commands already available in the session.
 
 ### Update from PSGallery
 
@@ -12,6 +13,6 @@ Force and AllowClobber aren't necessary, but they do skip errors in case some ap
 Update-Module -Name PSParseHTML
 ```
 
-That's it. Whenever there's a new version you simply run the command and you can enjoy it. Remember, that you may need to close, and reopen the **PowerShell** session if you have already used module before updating it.
-
-**The important thing** is if something works for you on production, keep using it till you test the new version on a test computer. I do changes that may not be big, but big enough that auto-update will break your code. For example, a small rename to a parameter and your code stops working! Be responsible!
+If the module is already imported, start a new PowerShell session before using
+the newly installed version. Pin a tested version in production automation when
+parameter or behavior changes would be disruptive.

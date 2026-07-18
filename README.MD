@@ -1,6 +1,8 @@
-# HtmlTinkerX & PSParseHTML - Modern HTML Processing for .NET and PowerShell
+# HtmlTinkerX & PSParseHTML - HTML processing for .NET and PowerShell
 
-HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerShell module from PSGallery
+HtmlTinkerX is the shared .NET engine for parsing, extracting, auditing,
+formatting, crawling, and rendering web content. PSParseHTML exposes the same
+engine as PowerShell cmdlets.
 
 ## 📦 NuGet Package
 [![nuget downloads](https://img.shields.io/nuget/dt/HtmlTinkerX?label=nuget%20downloads)](https://www.nuget.org/packages/HtmlTinkerX)
@@ -8,7 +10,6 @@ HtmlTinkerX is available as NuGet from the Nuget Gallery and PSParseHTML PowerSh
 
 ## 💻 PowerShell Module
 [![powershell gallery version](https://img.shields.io/powershellgallery/v/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
-[![powershell gallery preview](https://img.shields.io/powershellgallery/v/PSParseHTML.svg?include_prereleases&label=powershell%20gallery%20preview&color=yellow)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery platforms](https://img.shields.io/powershellgallery/p/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/PSParseHTML.svg)](https://www.powershellgallery.com/packages/PSParseHTML)
 
@@ -26,130 +27,47 @@ Dependency guardrails, including the ChartForgeX-backed screenshot image-process
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn)](https://www.linkedin.com/in/pklys)
 [![Discord](https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat)](https://evo.yt/discord)
 
-## What it's all about
+## What it covers
 
-**HtmlTinkerX** is a powerful async C# library for HTML, CSS, and JavaScript processing, parsing, formatting, and optimization. It provides comprehensive web content processing capabilities including browser automation with Playwright, document parsing with multiple engines, resource optimization, and much more. **PSParseHTML** is the PowerShell module that exposes HtmlTinkerX functionality through easy-to-use cmdlets.
+- HTML parsing with AngleSharp and Html Agility Pack
+- tables, lists, forms, metadata, JSON-LD, microdata, Open Graph, application
+  state, tokens, image candidates, and API endpoint extraction
+- static and rendered document audits for duplicate IDs, document metadata,
+  accessible names, unsafe URL schemes, and heading order
+- bounded website crawling to offline HTML, text, Markdown, JSON, JSONL, graph,
+  and asset datasets
+- Playwright sessions, interaction, screenshots, PDFs, HAR files, traces,
+  browser recipes, cookies, storage, and SSO handoff inspection
+- HTML, CSS, JavaScript, and email formatting or optimization
+- .NET Framework 4.7.2, .NET 8, and .NET 10
 
-Whether you're working in C# or PowerShell, you get access to:
-- 🔍 **HTML Parsing** - Multiple parsing engines (AngleSharp, HtmlAgilityPack)
-- 🎨 **Resource Optimization** - Minify and format HTML, CSS, JavaScript
-- 🌐 **Browser Automation** - Full Playwright integration for screenshots, PDFs, interaction
-- 📊 **Data Extraction** - Tables, forms, metadata, microdata, Open Graph
-- 📧 **Email Processing** - CSS inlining for email compatibility
-- 🔧 **Network Tools** - HAR export, request interception, console logging
-- 🍪 **State Management** - Cookie handling, session persistence
-- 📱 **Multi-Platform** - .NET Framework 4.7.2, .NET 8.0, .NET 10.0
+## PowerShell and C# entry points
 
-## 🔄 PowerShell to C# Method Mapping
+The PowerShell commands are thin surfaces over HtmlTinkerX. The generated
+[command reference](Docs/Readme.md) covers every cmdlet.
 
-This comprehensive table shows how PowerShell cmdlets map to C# methods, making it easy to transition between platforms:
-
-### HTML Parsing & Processing
-| PowerShell Cmdlet            | C# Method                                | Description                                 |
-| ---------------------------- | ---------------------------------------- | ------------------------------------------- |
-| `ConvertFrom-HTML`           | `HtmlParser.ParseWithAngleSharp()`       | Parse HTML documents                        |
-| `ConvertFrom-HtmlTable`      | `HtmlParser.ParseTablesWithAngleSharp()` | Extract tables with rowspan/colspan support |
-| `ConvertFrom-HTMLAttributes` | `HtmlParserExtensions.GetElements()`     | Query elements by tag, class, id, or name   |
-| `ConvertFrom-HtmlForm`       | `HtmlFormExtractor.ExtractForms()`       | Extract form data and structure             |
-| `ConvertFrom-HtmlList`       | `HtmlListParser.ParseLists()`            | Parse list elements into structured data    |
-| `ConvertFrom-HtmlMeta`       | `HtmlMetaParser.ExtractMeta()`           | Extract meta tag name/content pairs         |
-| `ConvertFrom-HtmlMicrodata`  | `HtmlMicrodataParser.ExtractMicrodata()` | Extract schema.org structured data          |
-| `ConvertFrom-HtmlOpenGraph`  | `HtmlOpenGraphParser.ExtractOpenGraph()` | Extract Open Graph metadata                 |
-| `Convert-HTMLToText`         | `HtmlUtilities.ConvertToText()`          | Convert HTML to plain text                  |
-| `Compare-HTML`               | `HtmlDiffer.Compare()`                   | Compare HTML documents                      |
-| `Measure-HTMLDocument`       | `HtmlParser.AnalyzeDocument()`           | Analyze document metrics                    |
-
-### Resource Formatting & Optimization
-| PowerShell Cmdlet     | C# Method                            | Description                        |
-| --------------------- | ------------------------------------ | ---------------------------------- |
-| `Format-HTML`         | `HtmlFormatter.FormatHtml()`         | Pretty-print HTML markup           |
-| `Format-CSS`          | `HtmlFormatter.FormatCss()`          | Format CSS stylesheets             |
-| `Format-JavaScript`   | `HtmlFormatter.FormatJavaScript()`   | Beautify JavaScript with options   |
-| `Optimize-HTML`       | `HtmlOptimizer.OptimizeHtml()`       | Minify HTML content                |
-| `Optimize-CSS`        | `HtmlOptimizer.OptimizeCss()`        | Minify CSS stylesheets             |
-| `Optimize-JavaScript` | `HtmlOptimizer.OptimizeJavaScript()` | Minify JavaScript code             |
-| `Optimize-Email`      | `PreMailerClient.MoveCssInline()`    | Inline CSS for email compatibility |
-| `Select-CssRule`      | `HtmlCssQueryParser.SelectRules()`   | Query CSS rules by selector        |
-| `Select-CssDeclaration` | `HtmlCssQueryParser.SelectDeclarations()` | Query CSS declarations       |
-| `Get-CssVariable`     | `HtmlCssQueryParser.SelectVariables()` | Extract CSS custom properties    |
-| `ConvertFrom-CssUrl`  | `HtmlCssQueryParser.SelectUrls()`    | Extract and resolve CSS URLs       |
-| `Measure-CssSpecificity` | `HtmlCssQueryParser.MeasureSpecificity()` | Measure selector specificity |
-
-### Browser Automation & Sessions
-| PowerShell Cmdlet       | C# Method                          | Description                      |
-| ----------------------- | ---------------------------------- | -------------------------------- |
-| `Start-HtmlBrowserSession` | `HtmlBrowser.OpenSessionAsync()` | Create browser session           |
-| `Close-HtmlBrowserSession` | `session.DisposeAsync()`         | Close browser session            |
-| `Invoke-HtmlRendering`  | `HtmlBrowser.OpenSessionAsync()`   | Render pages with authentication |
-| `Invoke-HtmlBrowserNavigation` | `HtmlBrowser.NavigateAsync()` | Navigate to different URLs       |
-| `Invoke-HtmlBrowserScript` | `HtmlBrowser.ExecuteScriptAsync()` | Execute JavaScript in browser    |
-| `Invoke-HtmlBrowserDomScript` | `HtmlScriptRunner.ExecuteScript()` | Run JavaScript with AngleSharp   |
-| `Export-HtmlBrowserState` | `HtmlBrowser.ExportStateAsync()` | Save browser state               |
-| `Import-HtmlBrowserState` | `HtmlBrowser.ImportStateAsync()` | Restore browser state            |
-| `Export-HtmlBrowserSession` | `HtmlBrowser.ExportSessionAsync()` | Export session data              |
-| `Import-HtmlBrowserSession` | `HtmlBrowser.ImportSessionAsync()` | Import session data              |
-
-### Screenshots & Media
-| PowerShell Cmdlet          | C# Method                                | Description                     |
-| -------------------------- | ---------------------------------------- | ------------------------------- |
-| `Save-HtmlBrowserScreenshot` | `HtmlBrowser.SaveScreenshotAsync()`    | Capture page screenshots        |
-| `Save-HtmlBrowserPdf`     | `HtmlBrowser.SavePdfAsync()`             | Generate PDFs from pages        |
-| `Start-HtmlBrowserVideoCapture` | `HtmlBrowser.StartVideoRecordingAsync()` | Start recording browser session |
-| `Stop-HtmlBrowserVideoCapture` | `HtmlBrowser.StopVideoRecordingAsync()` | Stop video recording            |
-
-### Element Interaction
-| PowerShell Cmdlet      | C# Method                                    | Description                    |
-| ---------------------- | -------------------------------------------- | ------------------------------ |
-| `Invoke-HtmlBrowserClick` | `HtmlBrowser.ClickAsync()`                | Click elements                 |
-| `Set-HtmlBrowserInput` | `HtmlBrowser.SetInputAsync()`                | Set input field values         |
-| `Set-HtmlBrowserSelectOption` | `HtmlBrowser.SetSelectAsync()`       | Select dropdown options        |
-| `Set-HtmlBrowserChecked` | `HtmlBrowser.SetCheckedAsync()`            | Check/uncheck checkboxes       |
-| `Submit-HtmlBrowserForm` | `HtmlBrowser.SubmitFormAsync()`            | Submit forms                   |
-| `Get-HtmlBrowserInteractable` | `HtmlBrowser.GetInteractableElementsAsync()` | List clickable elements        |
-| `Get-HtmlBrowserFormField` | `HtmlFormExtractor.GetFormFields()`      | Extract form field information |
-| `Get-HtmlBrowserLoginForm` | `HtmlFormExtractor.DetectLoginForms()`   | Detect login forms             |
-
-### Network & Debugging
-| PowerShell Cmdlet      | C# Method                            | Description                     |
-| ---------------------- | ------------------------------------ | ------------------------------- |
-| `Get-HtmlBrowserNetworkLog` | `HtmlBrowser.GetNetworkLog()`  | View network requests/responses |
-| `Get-HtmlBrowserConsoleLog` | `HtmlBrowser.GetConsoleLog()`  | Retrieve console messages       |
-| `Export-HtmlBrowserHar` | `HtmlBrowser.SaveHarAsync()`         | Export network traffic to HAR   |
-| `Start-HtmlBrowserTracing` | `HtmlBrowser.StartTracingAsync()` | Start Playwright tracing        |
-| `Stop-HtmlBrowserTracing` | `HtmlBrowser.StopTracingAsync()` | Stop tracing and save           |
-| `Register-HtmlRoute`   | `HtmlBrowser.RegisterRouteAsync()`   | Intercept requests              |
-| `Unregister-HtmlRoute` | `HtmlBrowser.UnregisterRouteAsync()` | Remove route handler            |
-| `Show-HtmlBrowserHar`  | `HtmlHarViewer.ShowHar()`            | Visualize HAR files             |
-
-### Browser Testing
-| PowerShell Cmdlet        | C# Method                                    | Description                                     |
-| ------------------------ | -------------------------------------------- | ----------------------------------------------- |
-| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestUrlAsync()`           | Comprehensive browser testing                   |
-| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestFileAsync()`          | Test local HTML file (with -Path)               |
-| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestCssResourceAsync()`   | Test specific CSS resource (with -CssResource)  |
-| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestConsoleErrorsAsync()` | Get console errors (with -ErrorsOnly)           |
-| `Test-HtmlBrowser`       | `HtmlBrowserTester.TestPerformanceAsync()`   | Get performance metrics (with -PerformanceOnly) |
-| `Clear-HtmlBrowserCache` | `HtmlBrowserCacheCleaner.CleanAllCache()`    | Clean Playwright browser downloads              |
-
-### Cookies & State
-| PowerShell Cmdlet | C# Method                       | Description              |
-| ----------------- | ------------------------------- | ------------------------ |
-| `Get-HtmlBrowserCookie` | `HtmlBrowser.GetCookiesAsync()` | Retrieve session cookies |
-| `Set-HtmlBrowserCookie` | `HtmlBrowser.SetCookieAsync()`  | Add cookies to session   |
-| `New-HtmlBrowserCookie` | `new HtmlCookie()`              | Create cookie objects    |
-
-### Content & Resources
-| PowerShell Cmdlet          | C# Method                               | Description                   |
-| -------------------------- | --------------------------------------- | ----------------------------- |
-| `Get-HTMLResource`         | `HtmlResourceParser.ExtractResources()` | Extract scripts and CSS       |
-| `Select-HtmlScript`        | `HtmlWorkflowParser.SelectScripts()`    | Select script tags by real JS type rules |
-| `Select-HtmlAsset`         | `HtmlWorkflowParser.SelectAssets()`     | Extract scripts, stylesheets, images, preloads, manifests, and icons |
-| `Measure-HtmlCompatibility` | `HtmlWorkflowParser.MeasureCompatibility()` | Find common HTML compatibility issues |
-| `Invoke-HTMLCrawl`         | `HtmlCrawler.CrawlAsync()`              | Crawl a site offline          |
-| `Save-HtmlBrowserAttachment` | `HtmlBrowser.SaveAttachmentsAsync()`  | Download files from pages     |
-| `Get-HtmlBrowserContent`  | `HtmlBrowser.GetContentAsync()`         | Retrieve page content         |
-| `Export-HTMLOutline`       | `HtmlOutlineBuilder.BuildOutline()`     | Generate document outlines    |
-| `Set-HTMLHttpClientOption` | `HttpClientFactory.ConfigureClient()`   | Configure HTTP client options |
+| Task | PowerShell | C# owner |
+| --- | --- | --- |
+| Parse a document | `ConvertFrom-Html` | `HtmlParser.ParseWithAngleSharp`, `HtmlParser.ParseWithHtmlAgilityPack` |
+| Extract tables | `ConvertFrom-HtmlTable` | `HtmlParser.ParseTablesWithAngleSharpDetailed`, `HtmlParser.ParseTablesWithHtmlAgilityPackDetailed` |
+| Extract lists | `ConvertFrom-HtmlList` | `HtmlParser.ParseListsWithAngleSharpDetailed`, `HtmlParser.ParseListsWithHtmlAgilityPackDetailed` |
+| Extract forms | `ConvertFrom-HtmlForm` | `HtmlParser.ParseFormsWithAngleSharp` |
+| Extract metadata | `ConvertFrom-HtmlMeta` | `HtmlParser.ParseMetaTags` |
+| Extract Open Graph data | `ConvertFrom-HtmlOpenGraph` | `HtmlParser.ParseOpenGraph` |
+| Extract microdata | `ConvertFrom-HtmlMicrodata` | `HtmlParser.ParseMicrodataItems` |
+| Normalize mixed page data | `Select-HtmlData` | `HtmlParsingToolbox.SelectData` |
+| Build a page workbench and audit | `Invoke-HtmlPageWorkbench` | `HtmlPageWorkbench.AnalyzeAsync`, `HtmlDocumentAudit.Analyze` |
+| Find interaction surfaces | `Find-HtmlInteractionSurface` | `HtmlParsingToolbox.FindInteractionSurfaceAsync` |
+| Discover API endpoints | `Find-HtmlApiEndpoint` | `HtmlApiEndpointInventory.Build` |
+| Compare static and rendered HTML | `Compare-HtmlStaticRendered` | `HtmlParsingToolbox.CompareStaticRendered` |
+| Crawl and export a dataset | `Invoke-HtmlCrawl` | `HtmlCrawler.CrawlAsync` |
+| Open or navigate a browser | `Start-HtmlBrowserSession`, `Invoke-HtmlBrowserNavigation` | `HtmlBrowser.OpenSessionAsync`, `HtmlBrowser.NavigateAsync` |
+| Click or fill an element | `Invoke-HtmlBrowserClick`, `Set-HtmlBrowserInput` | `HtmlBrowser.ClickSelectorAsync`, `HtmlBrowser.FillInputAsync` |
+| Capture a screenshot or PDF | `Save-HtmlBrowserScreenshot`, `Save-HtmlBrowserPdf` | `HtmlBrowser.CaptureScreenshotAsync`, `HtmlBrowser.SavePagePdfAsync` |
+| Export HAR or trace data | `Export-HtmlBrowserHar`, `Start-HtmlBrowserTracing`, `Stop-HtmlBrowserTracing` | `HtmlBrowser.ExportHarAsync`, `HtmlBrowser.StartTracingAsync`, `HtmlBrowser.StopTracingAsync` |
+| Test a rendered page | `Test-HtmlBrowser` | `HtmlBrowserTester` |
+| Inline email CSS | `Optimize-Email` | `PreMailerClient.MoveCssInline`, `PreMailerClient.MoveCssInlineAsync` |
+| Format or minify resources | `Format-Html`, `Format-Css`, `Format-JavaScript`, `Optimize-*` | `HtmlFormatter`, `HtmlOptimizer` |
 
 ## 📦 Installation & Packages
 
@@ -163,11 +81,14 @@ dotnet add package HtmlTinkerX
 Install-Module -Name PSParseHTML -AllowClobber -Force
 ```
 
+These commands install the current stable releases. Upstream dependency version
+labels do not change HtmlTinkerX or PSParseHTML release channels.
+
 ### 📋 Package Information
 - **📦 NuGet Package**: `HtmlTinkerX` - Core .NET library
 - **🔧 PowerShell Module**: `PSParseHTML` - PowerShell cmdlets wrapper
-- **🎯 Target Frameworks**: .NET Framework 4.7.2, .NET Standard 2.0, .NET 8.0
-- **💻 PowerShell Compatibility**: Windows PowerShell 5.1+ and PowerShell Core 6.0+
+- **🎯 Target Frameworks**: .NET Framework 4.7.2, .NET 8.0, and .NET 10.0
+- **💻 PowerShell Compatibility**: Windows PowerShell 5.1 and PowerShell 7.4+
 
 ## 🚀 Quick Start
 
@@ -178,14 +99,15 @@ using HtmlTinkerX;
 // Parse HTML and extract tables
 string html = await File.ReadAllTextAsync("page.html");
 var tables = HtmlParser.ParseTablesWithAngleSharp(html);
+HtmlDocumentAuditResult audit = HtmlDocumentAudit.Analyze(html);
 
 // Format and optimize resources
 string formatted = HtmlFormatter.FormatHtml(html);
-string minified = HtmlOptimizer.OptimizeHtml(html);
+string minified = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
 
 // Browser automation
 await using var session = await HtmlBrowser.OpenSessionAsync("https://example.com");
-await HtmlBrowser.SaveScreenshotAsync(session, "screenshot.png");
+await HtmlBrowser.CaptureScreenshotAsync(session.Page, "screenshot.png");
 
 // Offline crawl
 var crawl = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
@@ -1144,7 +1066,7 @@ var tables = HtmlParser.ParseTablesWithAngleSharpDetailed(html);
 var tables2 = HtmlParser.ParseTablesWithHtmlAgilityPack(html);
 
 // Parse from URLs
-var urlDoc = await HtmlParser.ParseFromUrlAsync("https://example.com");
+var urlDoc = await HtmlParser.ParseUrlWithAngleSharpAsync("https://example.com");
 ```
 
 #### HtmlFormatter
@@ -1168,12 +1090,15 @@ string formatted = await HtmlFormatter.FormatHtmlAsync(html);
 #### HtmlOptimizer
 ```csharp
 // Minify resources
-string minifiedHtml = HtmlOptimizer.OptimizeHtml(html);
+string minifiedHtml = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
 string minifiedCss = HtmlOptimizer.OptimizeCss(css);
 string minifiedJs = HtmlOptimizer.OptimizeJavaScript(javascript);
 
 // File operations
-await HtmlOptimizer.OptimizeHtmlFileAsync("input.html", "output.html");
+string optimizedFile = await HtmlOptimizer.OptimizeHtmlFileAsync(
+    "input.html",
+    cssDecodeEscapes: false);
+await File.WriteAllTextAsync("output.html", optimizedFile);
 ```
 
 #### HtmlBrowser (Browser Automation)
@@ -1181,48 +1106,62 @@ await HtmlOptimizer.OptimizeHtmlFileAsync("input.html", "output.html");
 // Create browser sessions
 await using var session = await HtmlBrowser.OpenSessionAsync("https://example.com");
 
-// Authentication
-var credentials = new NetworkCredential("user", "pass");
+// Form-based authentication
+var formLogin = new HtmlFormLogin
+{
+    LoginUrl = "https://example.com/login",
+    UsernameSelector = "#username",
+    PasswordSelector = "#password",
+    SubmitSelector = "button[type='submit']"
+};
 await using var authSession = await HtmlBrowser.OpenSessionAsync(
     "https://example.com/protected",
-    credential: credentials,
-    loginUrl: "https://example.com/login"
+    username: "user",
+    password: "pass",
+    formLogin: formLogin
 );
 
 // Screenshots
-await HtmlBrowser.SaveScreenshotAsync(session, "screenshot.png");
-await HtmlBrowser.SaveScreenshotAsync(session, "full.png", fullPage: true);
+await HtmlBrowser.CaptureScreenshotAsync(session.Page, "screenshot.png");
+await HtmlBrowser.CaptureScreenshotAsync(
+    session.Page,
+    "full.png",
+    new ScreenshotOptions { FullPage = true });
 
 // PDF generation
-await HtmlBrowser.SavePdfAsync(session, "document.pdf");
+await HtmlBrowser.SavePagePdfAsync(session.Page, "document.pdf");
 
 // Navigation
 await HtmlBrowser.NavigateAsync(session, "https://example.com/page2");
 
 // JavaScript execution
-var result = await HtmlBrowser.ExecuteScriptAsync(session, "return document.title;");
+string? title = await HtmlBrowser.EvaluateAsync<string>(session, "document.title");
 
 // Element interaction
-await HtmlBrowser.ClickAsync(session, "#button");
-await HtmlBrowser.SetInputAsync(session, "#username", "user");
-await HtmlBrowser.SubmitFormAsync(session, "#loginForm");
+await HtmlBrowser.ClickSelectorAsync(session, "#button");
+await HtmlBrowser.FillInputAsync(session, "#username", "user");
+await HtmlBrowser.ClickSelectorAsync(session, "#loginForm button[type='submit']");
 ```
 
 #### HtmlUtilities
 ```csharp
 // Convert HTML to plain text
-string plainText = HtmlUtilities.ConvertToText(html);
+string plainText = HtmlParserToText.ConvertToText(html);
 
 // HTTP client operations
-using var httpClient = HttpClientFactory.CreateHttpClient();
+HttpClient httpClient = HtmlHttpClientFactory.Shared;
 string content = await httpClient.GetStringAsync("https://example.com");
 ```
 
 #### PreMailerClient
 ```csharp
 // Email optimization
-string inlinedCss = PreMailerClient.MoveCssInline(emailHtml);
-string optimized = await PreMailerClient.MoveCssInlineAsync(emailHtml, downloadRemoteCss: true);
+PreMailerResult inlineResult = PreMailerClient.MoveCssInline(emailHtml, new PreMailerOptions());
+string inlinedHtml = inlineResult.Html;
+
+var preMailerOptions = new PreMailerOptions { DownloadRemoteCss = true };
+PreMailerResult remoteCssResult = await PreMailerClient.MoveCssInlineAsync(emailHtml, preMailerOptions);
+string optimized = remoteCssResult.Html;
 ```
 
 ### Extension Methods
@@ -1230,9 +1169,9 @@ string optimized = await PreMailerClient.MoveCssInlineAsync(emailHtml, downloadR
 #### HtmlParserExtensions
 ```csharp
 // Quick element queries
-var elements = doc.GetElements("div.class-name");
-var byId = doc.GetElements("#element-id");
-var byTag = doc.GetElements("p");
+var elements = HtmlParserExtensions.GetElements(html, className: "class-name");
+var byId = HtmlParserExtensions.GetElements(html, id: "element-id");
+var byTag = HtmlParserExtensions.GetElements(html, tag: "p");
 ```
 
 ## 📚 Examples
@@ -1299,6 +1238,7 @@ Close-HtmlBrowserSession -Session $session
 
 #### Document Processing
 ```csharp
+using AngleSharp.Dom;
 using HtmlTinkerX;
 
 // Parse and process HTML
@@ -1306,15 +1246,15 @@ string html = await File.ReadAllTextAsync("document.html");
 var document = HtmlParser.ParseWithAngleSharp(html);
 
 // Extract specific elements
-var links = document.GetElements("a[href]");
-var images = document.GetElements("img[src]");
+var links = document.QuerySelectorAll("a[href]");
+var images = document.QuerySelectorAll("img[src]");
 
 // Extract tables with detailed information
 var tables = HtmlParser.ParseTablesWithAngleSharpDetailed(html);
 foreach (var table in tables)
 {
-    Console.WriteLine($"Table has {table.Rows.Count} rows and {table.Headers.Count} columns");
-    foreach (var row in table.Rows)
+    Console.WriteLine($"Table has {table.Metadata.RowCount} rows and {table.Metadata.ColumnCount} columns");
+    foreach (var row in table.Data)
     {
         Console.WriteLine(string.Join(" | ", row.Values));
     }
@@ -1337,13 +1277,15 @@ var jsOptions = new BeautifierOptions
 string formattedJs = HtmlFormatter.FormatJavaScript(javascript, jsOptions);
 
 // Minification
-string minifiedHtml = HtmlOptimizer.OptimizeHtml(html);
+string minifiedHtml = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
 string minifiedCss = HtmlOptimizer.OptimizeCss(css);
 string minifiedJs = HtmlOptimizer.OptimizeJavaScript(javascript);
 
 // Email optimization
 string emailBody = await File.ReadAllTextAsync("newsletter.html");
-string inlined = await PreMailerClient.MoveCssInlineAsync(emailBody, downloadRemoteCss: true);
+var preMailerOptions = new PreMailerOptions { DownloadRemoteCss = true };
+PreMailerResult preMailerResult = await PreMailerClient.MoveCssInlineAsync(emailBody, preMailerOptions);
+string inlined = preMailerResult.Html;
 ```
 
 #### Browser Automation
@@ -1352,23 +1294,27 @@ string inlined = await PreMailerClient.MoveCssInlineAsync(emailBody, downloadRem
 await using var session = await HtmlBrowser.OpenSessionAsync("https://example.com");
 
 // Authenticated session
-var credentials = new NetworkCredential("username", "password");
+var formLogin = new HtmlFormLogin
+{
+    LoginUrl = "https://example.com/login",
+    UsernameSelector = "#username",
+    PasswordSelector = "#password",
+    SubmitSelector = "#login-button"
+};
 await using var authSession = await HtmlBrowser.OpenSessionAsync(
     "https://example.com/protected",
-    credential: credentials,
-    loginUrl: "https://example.com/login",
-    usernameSelector: "#username",
-    passwordSelector: "#password",
-    submitSelector: "#login-button"
+    username: "username",
+    password: "password",
+    formLogin: formLogin
 );
 
 // Interact with the page
-await HtmlBrowser.SetInputAsync(session, "#search", "query");
-await HtmlBrowser.ClickAsync(session, "#search-button");
+await HtmlBrowser.FillInputAsync(session, "#search", "query");
+await HtmlBrowser.ClickSelectorAsync(session, "#search-button");
 await Task.Delay(2000); // Wait for results
 
 // Capture results
-await HtmlBrowser.SaveScreenshotAsync(session, "results.png");
+await HtmlBrowser.CaptureScreenshotAsync(session.Page, "results.png");
 var consoleMessages = HtmlBrowser.GetConsoleLog(session);
 foreach (var message in consoleMessages)
 {
@@ -1376,8 +1322,10 @@ foreach (var message in consoleMessages)
 }
 
 // Download files
-var downloads = await HtmlBrowser.SaveAttachmentsAsync(session, "./downloads", ".pdf");
-Console.WriteLine($"Downloaded {downloads.Count} files");
+await foreach (string download in HtmlBrowser.SavePageDownloadsAsync(session.Page, "./downloads", ".pdf"))
+{
+    Console.WriteLine($"Downloaded {download}");
+}
 ```
 
 ## 🧪 Browser Testing & Network Monitoring
@@ -1855,14 +1803,11 @@ public async Task Page_Performance_Should_Meet_Thresholds()
     Assert.True(metrics.TotalLoadTime < TimeSpan.FromSeconds(5));
     Assert.True(metrics.TotalBytesTransferred < 5 * 1024 * 1024); // 5MB
     Assert.True(metrics.TotalRequests < 50);
-    Assert.All(metrics.RequestsByResourceType, kvp =>
-    {
-        if (kvp.Key == HtmlNetworkResourceType.Image)
-        {
-            Assert.True(kvp.Value.TotalSizeMB < 2,
-                $"Images exceed 2MB limit: {kvp.Value.TotalSizeMB:F2}MB");
-        }
-    });
+    metrics.ResourceBreakdown.TryGetValue(
+        HtmlNetworkResourceType.Image,
+        out int imageRequestCount);
+    Assert.True(imageRequestCount < 20,
+        $"Image request count exceeds limit: {imageRequestCount}");
 }
 ```
 
@@ -1884,14 +1829,14 @@ foreach (var (url, result) in urls.Zip(results))
 {
     Console.WriteLine($"\n{url}:");
     Console.WriteLine($"  Status: {(result.Passed ? "PASS" : "FAIL")}");
-    Console.WriteLine($"  Load Time: {result.PageLoadTime.TotalSeconds:F2}s");
+    Console.WriteLine($"  Load Time: {(result.PageLoadTime?.TotalSeconds ?? 0):F2}s");
     Console.WriteLine($"  Requests: {result.TotalRequests} ({result.FailedRequestCount} failed)");
     Console.WriteLine($"  Console: {result.ErrorCount} errors, {result.WarningCount} warnings");
 }
 
 // Find slowest page
-var slowest = results.OrderByDescending(r => r.PageLoadTime).First();
-Console.WriteLine($"\nSlowest page: {slowest.Url} ({slowest.PageLoadTime.TotalSeconds:F2}s)");
+var slowest = results.OrderByDescending(r => r.PageLoadTime ?? TimeSpan.Zero).First();
+Console.WriteLine($"\nSlowest page: {slowest.Url} ({(slowest.PageLoadTime?.TotalSeconds ?? 0):F2}s)");
 ```
 
 ### Test Result Properties
@@ -1964,7 +1909,7 @@ When you first use browser testing, Playwright automatically downloads required 
    - Shows progress: "Downloading Playwright driver... X% (Y MB/s)"
    - Thread-safe - prevents concurrent downloads
    - Subsequent runs use cached components - no re-download needed
-   - You can manually ensure browsers are installed using `HtmlBrowser.EnsureInstalledAsync()`
+   - You can manually ensure Chromium is installed using `HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium)`
 
 #### Linux: Avoiding sudo prompts
 On Linux, Playwright can also install OS-level dependencies when invoked with `--with-deps` (this typically requires root/sudo).
@@ -2152,7 +2097,7 @@ All dependencies are distributed under permissive licenses. Refer to each projec
 ## 📖 Documentation & Support
 
 - **📚 Examples**: Check the `Examples` folder for comprehensive usage samples
-- **🐛 Issues**: Report bugs and request features on [GitHub Issues](https://github.com/EvotecIT/PSParseHTML/issues)
+- **🐛 Issues**: Report bugs and request features on [GitHub Issues](https://github.com/EvotecIT/HtmlTinkerX/issues)
 - **💬 Discord**: Join our [Discord community](https://evo.yt/discord) for support and discussions
 - **📝 Blog**: Read detailed tutorials on [evotec.xyz](https://evotec.xyz/hub)
 
@@ -2165,7 +2110,7 @@ Update-Module -Name PSParseHTML
 
 ### NuGet Package Updates
 ```bash
-dotnet add package HtmlTinkerX --version latest
+dotnet add package HtmlTinkerX
 ```
 
 **⚠️ Important**: Always test updates in a development environment before deploying to production. Breaking changes may occur between versions.
@@ -2186,41 +2131,10 @@ dotnet add package HtmlTinkerX --version latest
 
 ### Jint and JavaScript Parser Notes
 
-HtmlTinkerX uses Jint for JavaScript execution support. Jint 4.x uses Acornima as its parser; older Jint 3.x builds used Esprima. Use Acornima examples and type names when working with JavaScript AST objects in current HtmlTinkerX builds.
-
-You may see warnings about conflicting Jint versions when building for .NET Framework 4.7.2:
-
-```
-warning MSB3277: Found conflicts between different versions of "Jint" that could not be resolved.
-There was a conflict between "Jint, Version=3.1.6.0" and "Jint, Version=4.1.0.0"
-```
-
-**Why this happens:**
-- HtmlTinkerX references Jint directly
-- AngleSharp.Js 1.0.0-beta.43 (a dependency) was compiled against a different version
-- This is a known issue with prerelease packages
-
-**Impact:**
-- The warning only affects .NET Framework 4.7.2 builds
-- .NET 8.0 and .NET Standard 2.0 builds are not affected
-- The library will still work correctly when binding redirects resolve the runtime version consistently
-
-**Solutions:**
-1. **Ignore the warning** - It doesn't affect functionality
-2. **Target only modern frameworks** - Use .NET 8.0 or .NET Standard 2.0
-3. **Add binding redirect** in your app.config (for .NET Framework apps):
-   ```xml
-   <configuration>
-     <runtime>
-       <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
-         <dependentAssembly>
-           <assemblyIdentity name="Jint" publicKeyToken="2e92ba9c8d81157f" />
-           <bindingRedirect oldVersion="0.0.0.0-4.0.0.0" newVersion="3.1.6.0" />
-         </dependentAssembly>
-       </assemblyBinding>
-     </runtime>
-   </configuration>
-   ```
+Current builds use Jint 4.x and Acornima for JavaScript parsing. Older examples
+that reference Esprima or Jint 3.x types do not match the current API; use the
+Acornima types exposed by `ConvertFrom-JavaScriptAst` and
+`Select-JavaScriptAstNode`.
 
 ### Browser Testing Issues
 
@@ -2258,10 +2172,5 @@ If browser tests fail:
 
 ## 📄 License
 
-Copyright (c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.
-
-This project and its dependencies are distributed under various permissive licenses. See individual dependency repositories for specific license terms.
-
----
-
-*Built with ❤️ by [Evotec](https://evotec.xyz) - Making web content processing simple and powerful.*
+HtmlTinkerX and PSParseHTML are available under the [MIT License](LICENSE).
+Third-party components remain under their own license terms.
