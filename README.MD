@@ -19,9 +19,6 @@ Use the project for work such as:
 
 ## Install
 
-The 2.1 line is prerelease while the required upstream AngleSharp CSS and
-JavaScript extensions remain prerelease packages.
-
 ### PowerShell
 
 ```powershell
@@ -226,22 +223,3 @@ Invoke-Pester .\Tests
 Hand-authored C#, PowerShell, JavaScript, TypeScript, CSS, and build-source files
 are kept at or below 1,000 lines. A contract test enforces the limit; generated
 output and large HTML fixtures are excluded.
-
-## Dependency and release status
-
-The stable AngleSharp core is paired with the upstream AngleSharp.Css and
-AngleSharp.Js 1.0 prerelease lines. Because those extensions are runtime
-dependencies, HtmlTinkerX and PSParseHTML 2.1 artifacts are also prerelease.
-This avoids publishing a nominally stable NuGet package with prerelease
-dependencies and warning NU5104.
-
-See [Docs/Dependencies.md](Docs/Dependencies.md) before changing parser,
-JavaScript engine, screenshot, or packaging dependencies.
-
-## License
-
-Copyright (c) 2011-2026 Przemyslaw Klys, Evotec. All rights reserved. See
-[LICENSE](LICENSE). Third-party components remain subject to their own licenses.
-
-Issues and feature requests belong in the
-[HtmlTinkerX repository](https://github.com/EvotecIT/HtmlTinkerX/issues).
