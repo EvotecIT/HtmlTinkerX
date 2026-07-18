@@ -23,4 +23,10 @@ public sealed class HtmlPageWorkbenchOptions {
 
     /// <summary>Allows linked-script endpoint inspection to download cross-origin scripts.</summary>
     public bool IncludeExternalLinkedScripts { get; set; }
+
+    /// <summary>Runs the shared correctness, safety, and accessibility audit against the primary static or rendered document.</summary>
+    public bool IncludeDocumentAudit { get; set; } = true;
+
+    /// <summary>Optional settings for the shared document audit.</summary>
+    public HtmlDocumentAuditOptions? DocumentAuditOptions { get; set; }
 }

@@ -5,11 +5,11 @@ HtmlTinkerX is a .NET library for parsing and inspecting HTML, CSS, and JavaScri
 ## Install
 
 ```shell
-dotnet add package HtmlTinkerX --prerelease
+dotnet add package HtmlTinkerX --version 2.1.0-beta.2
 ```
 
-The 2.1 line is prerelease while its required upstream AngleSharp CSS and
-JavaScript integrations remain prerelease packages.
+HtmlTinkerX 2.1.0-beta.2 consumes prerelease AngleSharp CSS and JavaScript
+integration packages. Pin the HtmlTinkerX version when reproducible restores matter.
 
 ## Parse HTML
 
@@ -25,6 +25,38 @@ IDocument document = HtmlParser.ParseWithAngleSharp("""
     """);
 
 string title = document.QuerySelector("h1")?.TextContent ?? string.Empty;
+```
+
+## Audit generated or supplied HTML
+
+`HtmlDocumentAudit` provides one reusable contract for static output checks. It reports duplicate IDs, missing document metadata, image alternatives, control names and labels, unsafe URL schemes, and heading-order problems.
+
+```csharp
+HtmlDocumentAuditResult audit = HtmlDocumentAudit.Analyze(html);
+
+foreach (HtmlDocumentAuditIssue issue in audit.Issues) {
+    Console.WriteLine($"{issue.Severity}: {issue.Code} - {issue.Message}");
+}
+```
+
+The audit is diagnostic; it does not rewrite the document or claim full WCAG conformance.
+
+For client-rendered pages, run the same contract after navigation:
+
+```csharp
+await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(url);
+HtmlDocumentAuditResult renderedAudit = await HtmlBrowser.AuditDocumentAsync(session);
+```
+
+Rendered UI tests can inspect styles and attributes without creating another Playwright wrapper:
+
+```csharp
+IReadOnlyDictionary<string, string> values = await HtmlBrowser.GetComputedStylesAsync(
+    session,
+    ".report-panel",
+    new[] { "position", "padding", "overflow" });
+
+string? label = await HtmlBrowser.GetAttributeAsync(session, "#export", "aria-label");
 ```
 
 URL parsers stream responses with a 16 MiB default limit and cooperative

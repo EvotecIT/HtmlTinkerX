@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Text.Json;
@@ -76,6 +77,60 @@ public static partial class HtmlBrowser {
         };
         return JSON.stringify(result);
     }";
+
+    /// <summary>
+    /// Waits until a selector resolves to an exact number of rendered elements.
+    /// </summary>
+    /// <param name="session">Active browser session.</param>
+    /// <param name="selector">CSS selector to count.</param>
+    /// <param name="expectedCount">Expected number of matching elements.</param>
+    /// <param name="timeout">Maximum wait time in milliseconds.</param>
+    /// <param name="pollMilliseconds">Polling interval in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task WaitForElementCountAsync(
+        HtmlBrowserSession session,
+        string selector,
+        int expectedCount,
+        int timeout = 10000,
+        int pollMilliseconds = 50,
+        CancellationToken cancellationToken = default) {
+        if (session == null) {
+            throw new ArgumentNullException(nameof(session));
+        }
+
+        if (string.IsNullOrWhiteSpace(selector)) {
+            throw new ArgumentException("Selector cannot be empty.", nameof(selector));
+        }
+
+        if (expectedCount < 0) {
+            throw new ArgumentOutOfRangeException(nameof(expectedCount), "Expected count cannot be negative.");
+        }
+
+        if (timeout <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be greater than zero.");
+        }
+
+        if (pollMilliseconds <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(pollMilliseconds), "Polling interval must be greater than zero.");
+        }
+
+        ILocator locator = session.Page.Locator(selector);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        int actualCount = -1;
+        while (stopwatch.ElapsedMilliseconds <= timeout) {
+            cancellationToken.ThrowIfCancellationRequested();
+            actualCount = await locator.CountAsync().ConfigureAwait(false);
+            if (actualCount == expectedCount) {
+                return;
+            }
+
+            await session.Page.WaitForTimeoutAsync(pollMilliseconds)
+                .WaitWithCancellationAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Selector '{selector}' resolved to {actualCount} element(s), not {expectedCount}, within {timeout}ms.");
+    }
 
     /// <summary>
     /// Returns browser-observed element information for a CSS selector.

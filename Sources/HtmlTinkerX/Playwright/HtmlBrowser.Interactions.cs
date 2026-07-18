@@ -211,4 +211,9 @@ public static partial class HtmlBrowser {
 
         await task.ConfigureAwait(false);
     }
+
+    private static async Task<T> WaitWithCancellationAsync<T>(this Task<T> task, CancellationToken cancellationToken) {
+        await ((Task)task).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        return await task.ConfigureAwait(false);
+    }
 }

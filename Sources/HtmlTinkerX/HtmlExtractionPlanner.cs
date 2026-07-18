@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace HtmlTinkerX;
 
@@ -26,7 +27,23 @@ public static class HtmlExtractionPlanner {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         HtmlReadableTextResult readable = HtmlParserToText.ExtractReadableText(html);
         IReadOnlyList<HtmlDataItem> dataItems = HtmlParsingToolbox.SelectData(html, baseUri: url);
+        return Analyze(html, document, readable, dataItems, url, CancellationToken.None);
+    }
+
+    internal static HtmlExtractionPlan Analyze(
+        string html,
+        IDocument document,
+        HtmlReadableTextResult readable,
+        IReadOnlyList<HtmlDataItem> dataItems,
+        Uri? url,
+        CancellationToken cancellationToken) {
+        if (html == null) throw new ArgumentNullException(nameof(html));
+        if (document == null) throw new ArgumentNullException(nameof(document));
+        if (readable == null) throw new ArgumentNullException(nameof(readable));
+        if (dataItems == null) throw new ArgumentNullException(nameof(dataItems));
+        cancellationToken.ThrowIfCancellationRequested();
         List<HtmlFormResult> forms = HtmlParser.ParseFormsWithAngleSharp(html);
+        cancellationToken.ThrowIfCancellationRequested();
 
         int wordCount = CountWords(readable.Text);
         int scriptCount = document.QuerySelectorAll("script").Length;
@@ -49,6 +66,7 @@ public static class HtmlExtractionPlanner {
             || item.Kind.Equals("AppState", StringComparison.OrdinalIgnoreCase)
             || item.Kind.Equals("ScriptData", StringComparison.OrdinalIgnoreCase));
         bool looksLikeJavaScriptShell = LooksLikeJavaScriptShell(document, wordCount, executableScriptCount, appStateCount, externalScriptCount);
+        cancellationToken.ThrowIfCancellationRequested();
 
         List<string> reasons = new();
         List<string> warnings = new();
@@ -93,6 +111,7 @@ public static class HtmlExtractionPlanner {
         plan.SuggestedProfileName = profile.Name;
         plan.SuggestedProfileCommand = BuildProfileCommand(profile, url);
         plan.SuggestedProfileReason = BuildProfileReason(profile);
+        cancellationToken.ThrowIfCancellationRequested();
         return plan;
     }
 

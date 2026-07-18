@@ -40,6 +40,9 @@ public sealed class HtmlPageWorkbenchResult {
     /// <summary>Static-vs-rendered comparison when a rendered snapshot is available.</summary>
     public HtmlStaticRenderedComparison? StaticRenderedComparison { get; set; }
 
+    /// <summary>Correctness, safety, and accessibility audit of the primary static or rendered document.</summary>
+    public HtmlDocumentAuditResult? DocumentAudit { get; set; }
+
     /// <summary>PowerShell command that can be used as the next step.</summary>
     public string SuggestedNextCommand { get; set; } = string.Empty;
 

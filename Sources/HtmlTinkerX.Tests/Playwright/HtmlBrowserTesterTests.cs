@@ -25,6 +25,23 @@ public class HtmlBrowserTesterTests {
         Assert.NotNull(result.ConsoleEntries);
         Assert.NotNull(result.PageLoadTime);
     }
+
+    [Fact]
+    public async Task StaticResponseRoute_AndElementCount_ProvideTypedBrowserProof() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        const string url = "https://htmltinkerx.test/fixture";
+
+        await HtmlBrowser.RegisterResponseRouteAsync(
+            session,
+            url,
+            "<main><div class='row'>one</div><div class='row'>two</div></main>",
+            "text/html; charset=utf-8");
+
+        await session.Page.GotoAsync(url);
+        await HtmlBrowser.WaitForElementCountAsync(session, ".row", expectedCount: 2);
+
+        Assert.Equal("one", await session.Page.Locator(".row").First.TextContentAsync());
+    }
     
     [Fact]
     public async Task TestUrlAsync_CapturesNetworkRequests() {

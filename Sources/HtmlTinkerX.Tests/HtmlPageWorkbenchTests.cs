@@ -49,6 +49,8 @@ public class HtmlPageWorkbenchTests {
         Assert.Single(result.JsonLd);
         Assert.Single(result.OpenGraph);
         Assert.NotEmpty(result.JavaScriptConfig);
+        Assert.NotNull(result.DocumentAudit);
+        Assert.Contains(result.DocumentAudit!.Issues, issue => issue.Code == "document-language-missing");
         Assert.Contains(result.Endpoints, item => item.Url == "/api/items");
         Assert.Contains(result.Warnings, warning => warning.Contains("Hidden fields", StringComparison.OrdinalIgnoreCase));
     }
