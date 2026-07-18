@@ -3,16 +3,15 @@
 ## AngleSharp package stability
 
 HtmlTinkerX uses the stable AngleSharp core package. Its CSSOM and DOM JavaScript
-integration still require the upstream `AngleSharp.Css` and `AngleSharp.Js` 1.0
+integration currently use the upstream `AngleSharp.Css` and `AngleSharp.Js` 1.0
 prerelease lines. Both upstream packages declare compatibility with AngleSharp
 1.x; `AngleSharp.Js` also declares compatibility with Jint 4.x.
 
-Because those extensions are runtime dependencies, HtmlTinkerX NuGet and
-PSParseHTML releases must remain prerelease builds while they are present. Do
-not publish a stable HtmlTinkerX package that produces NuGet warning NU5104.
-Before promoting a future stable release, replace these dependencies with stable
-versions and rerun all target-framework tests plus package-only .NET and
-PowerShell smoke tests.
+Upstream dependency labels do not determine the HtmlTinkerX or PSParseHTML
+release channel. Publish normal stable releases after the full target-framework
+tests and package-only .NET and PowerShell smoke tests pass. Treat any NU5104
+warning as a known dependency-metadata warning, not as a reason to mark our
+packages prerelease.
 
 ## Screenshot image processing
 

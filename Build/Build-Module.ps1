@@ -22,7 +22,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
         # ID used to uniquely identify this module
         GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
         # Version number of this module.
-        ModuleVersion        = '2.1.X'
+        ModuleVersion        = '2.0.X'
         # Author of this module
         Author               = 'Przemyslaw Klys'
         # Company or vendor of this module
@@ -39,8 +39,6 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
         LicenseUri           = 'https://github.com/EvotecIT/HtmlTinkerX/blob/v2-speedygonzales/LICENSE'
         # A URL to an icon representing this module.
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
-        # Pre-release tag for this module.
-        PreReleaseTag        = 'beta1'
     }
     New-ConfigurationManifest @Manifest
     # Add external module dependencies, using loop for simplicity

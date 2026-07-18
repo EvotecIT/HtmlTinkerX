@@ -8,14 +8,13 @@
     Description          = 'Module that allows to manipulate, parse, format and optimize HTML, JavaScript and CSS'
     FunctionsToExport    = @()
     GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
-    ModuleVersion        = '2.1.0'
+    ModuleVersion        = '2.0.20'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
             ExternalModuleDependencies = @()
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2018/12/PSWriteHTML.png'
             LicenseUri                 = 'https://github.com/EvotecIT/HtmlTinkerX/blob/v2-speedygonzales/LICENSE'
-            Prerelease                 = 'beta1'
             ProjectUri                 = 'https://github.com/EvotecIT/HtmlTinkerX'
             RequireLicenseAcceptance   = $false
             Tags                       = @('HTML', 'WWW', 'JavaScript', 'CSS', 'Windows', 'MacOS', 'Linux')
