@@ -58,14 +58,38 @@ Get-HtmlBrowserInteractable -Path './report.html'
 Get-HtmlBrowserInteractable -Session $session -Filter 'Media' -Limit 10
 ```
 
-The returned selector can be passed directly to an interaction cmdlet:
+The returned selector is a starting point for interaction. A selector based on
+a shared class, link target, or tag can match more than one element, so inspect
+those matches and pass the selected zero-based index through `-Nth`:
 
 ```powershell
 $pick = Get-HtmlBrowserInteractable -Session $session |
-    Out-GridView -Title 'Pick an element' -PassThru
+    Out-GridView -Title 'Pick an element' -OutputMode Single
 
 if ($pick) {
-    Invoke-HtmlBrowserClick -Session $session -Selector $pick.Selector
+    $selectorMatches = try {
+        @(
+            Get-HtmlBrowserElement -Session $session -Selector $pick.Selector `
+                -IncludeAttributes -ErrorAction Stop
+        )
+    } catch {
+        @()
+    }
+
+    if ($selectorMatches.Count -eq 0) {
+        Write-Warning 'The selected element is no longer present on the page.'
+    } else {
+        $target = if ($selectorMatches.Count -eq 1) {
+            $selectorMatches[0]
+        } else {
+            $selectorMatches |
+                Out-GridView -Title 'Choose the exact matching element' -OutputMode Single
+        }
+
+        if ($target) {
+            Invoke-HtmlBrowserClick -Session $session -Selector $pick.Selector -Nth $target.Index
+        }
+    }
 }
 ```
 
