@@ -46,6 +46,6 @@
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7" />
+        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     </ItemGroup>
 </Project>
