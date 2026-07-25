@@ -26,6 +26,17 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         public override void Post(SendOrPostCallback callback, object? state)
             => ThreadPool.QueueUserWorkItem(_ => callback(state));
     }
+    private sealed class AsyncHookTaskScheduler : TaskScheduler
+    {
+        protected override System.Collections.Generic.IEnumerable<Task>? GetScheduledTasks()
+            => null;
+
+        protected override void QueueTask(Task task)
+            => ThreadPool.QueueUserWorkItem(_ => TryExecuteTask(task));
+
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
+            => TryExecuteTask(task);
+    }
 
     private enum PipelineType
     {
@@ -120,6 +131,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     private readonly CancellationTokenSource _cancelSource = new();
     private readonly object _lifecycleLock = new();
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
+    private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
     private bool _cancelSourceDisposed;
     private bool _disposeRequested;
@@ -272,7 +284,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteObject(sendToPipeline, enumerateCollection);
@@ -290,7 +302,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe error bridge for asynchronous cmdlet code.</summary>
     public new void WriteError(ErrorRecord errorRecord)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteError(errorRecord);
@@ -326,7 +338,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe warning bridge for asynchronous cmdlet code.</summary>
     public new void WriteWarning(string text)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteWarning(text);
@@ -342,7 +354,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe verbose bridge for asynchronous cmdlet code.</summary>
     public new void WriteVerbose(string text)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteVerbose(text);
@@ -358,7 +370,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe debug bridge for asynchronous cmdlet code.</summary>
     public new void WriteDebug(string text)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteDebug(text);
@@ -374,7 +386,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(InformationRecord informationRecord)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteInformation(informationRecord);
@@ -390,7 +402,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(object messageData, string[] tags)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteInformation(messageData, tags);
@@ -406,7 +418,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe progress bridge for asynchronous cmdlet code.</summary>
     public new void WriteProgress(ProgressRecord progressRecord)
     {
-        if (CanAccessPipelineDirectly)
+        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
         {
             ThrowIfStopped();
             base.WriteProgress(progressRecord);
@@ -729,14 +741,19 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         try
         {
             SynchronizationContext.SetSynchronizationContext(HookSynchronizationContext);
-            blockTask = TaskScheduler.Current == TaskScheduler.Default
-                ? task()
-                : Task.Factory.StartNew(
-                        task,
-                        CancellationToken.None,
-                        TaskCreationOptions.DenyChildAttach,
-                        TaskScheduler.Default)
-                    .Unwrap();
+            if (TaskScheduler.Current == TaskScheduler.Default)
+            {
+                blockTask = task();
+            }
+            else
+            {
+                var invocationTask = new Task<Task>(
+                    task,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach);
+                invocationTask.RunSynchronously(HookTaskScheduler);
+                blockTask = invocationTask.GetAwaiter().GetResult();
+            }
         }
         catch (Exception exception)
         {
