@@ -132,6 +132,27 @@ public static class HtmlUtilities {
         string url,
         HtmlHttpFetchOptions? fetchOptions,
         CancellationToken cancellationToken = default) {
+        HtmlHttpTextResult result = await GetTextWithProperEncodingAsync(
+            client,
+            url,
+            fetchOptions,
+            cancellationToken).ConfigureAwait(false);
+        return result.Content;
+    }
+
+    /// <summary>
+    /// Downloads bounded content and returns both decoded text and the final URL after redirects.
+    /// </summary>
+    /// <param name="client">HTTP client to use for the request.</param>
+    /// <param name="url">URL to download from.</param>
+    /// <param name="fetchOptions">Optional response-size policy.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Decoded content and final response URL.</returns>
+    public static async Task<HtmlHttpTextResult> GetTextWithProperEncodingAsync(
+        HttpClient client,
+        string url,
+        HtmlHttpFetchOptions? fetchOptions,
+        CancellationToken cancellationToken = default) {
         if (client == null) {
             throw new ArgumentNullException(nameof(client));
         }
@@ -146,7 +167,11 @@ public static class HtmlUtilities {
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
+        string content = await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
+        return new HtmlHttpTextResult {
+            Content = content,
+            FinalUri = response.RequestMessage?.RequestUri
+        };
     }
 
     /// <summary>

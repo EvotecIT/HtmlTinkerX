@@ -1,4 +1,5 @@
 using HtmlTinkerX;
+using System.Collections;
 using System.Management.Automation;
 using System.Net;
 using System.Net.Http;
@@ -18,6 +19,36 @@ internal static class HttpClientHelper {
     internal static HttpClient Create(string? proxy, PSCredential? credential) {
         ICredentials? creds = credential?.GetNetworkCredential();
         return HtmlHttpClientFactory.Create(proxy, creds);
+    }
+
+    /// <summary>
+    /// Creates a new client and applies request-specific headers over the shared defaults.
+    /// </summary>
+    /// <param name="proxy">Proxy server address.</param>
+    /// <param name="credential">Credentials for the proxy.</param>
+    /// <param name="userAgent">Optional user agent override.</param>
+    /// <param name="headers">Optional request header overrides.</param>
+    /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
+    internal static HttpClient Create(string? proxy, PSCredential? credential, string? userAgent, IDictionary? headers) {
+        HttpClient client = Create(proxy, credential);
+        if (headers != null) {
+            foreach (DictionaryEntry entry in headers) {
+                if (entry.Key == null || entry.Value == null) {
+                    continue;
+                }
+
+                string name = entry.Key.ToString()!;
+                client.DefaultRequestHeaders.Remove(name);
+                client.DefaultRequestHeaders.TryAddWithoutValidation(name, entry.Value.ToString());
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(userAgent)) {
+            client.DefaultRequestHeaders.Remove("User-Agent");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
+        }
+
+        return client;
     }
 
     /// <summary>

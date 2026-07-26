@@ -28,17 +28,17 @@ Set-HtmlBrowserClientOption -ClearHeader
 ## PARAMETERS
 
 ### -ClearHeader
-Clear previously configured headers.
+Clear custom headers and restore the default product user agent.
 
 ```yaml
 Type: SwitchParameter
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: True
 ```
@@ -49,7 +49,7 @@ Headers to apply to created clients.
 ```yaml
 Type: Hashtable
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -65,7 +65,7 @@ Proxy server address.
 ```yaml
 Type: String
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -81,7 +81,7 @@ Credentials for the proxy.
 ```yaml
 Type: PSCredential
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -97,12 +97,12 @@ Timeout in seconds for created clients.
 ```yaml
 Type: Int32
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: -1
 Accept pipeline input: False
 Accept wildcard characters: True
 ```
@@ -116,7 +116,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `System.Object`
+- `None`
 
 ## RELATED LINKS
 

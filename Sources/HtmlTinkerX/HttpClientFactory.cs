@@ -17,7 +17,12 @@ public static class HtmlHttpClientFactory {
     public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(100);
 
     /// <summary>Default headers applied to created clients.</summary>
-    public static IDictionary<string, string> DefaultHeaders { get; } = new Dictionary<string, string>();
+    /// <remarks>
+    /// A descriptive user agent is included because a number of otherwise public sites reject
+    /// requests that omit the header entirely. Consumers can replace or remove it through this
+    /// dictionary before creating a client.
+    /// </remarks>
+    public static IDictionary<string, string> DefaultHeaders { get; } = CreateDefaultHeaders();
 
     /// <summary>Default proxy address.</summary>
     public static string? DefaultProxy { get; set; }
@@ -156,12 +161,31 @@ public static class HtmlHttpClientFactory {
         }
     }
 
+    /// <summary>Clears custom headers and restores the default product user agent.</summary>
+    public static void ResetDefaultHeaders() {
+        DefaultHeaders.Clear();
+        foreach (KeyValuePair<string, string> header in CreateDefaultHeaders()) {
+            DefaultHeaders[header.Key] = header.Value;
+        }
+        ResetShared();
+    }
+
     private static void ApplyDefaults(HttpClient client) {
         client.Timeout = DefaultTimeout;
         client.DefaultRequestHeaders.Clear();
         foreach (var header in DefaultHeaders) {
             client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
         }
+    }
+
+    private static IDictionary<string, string> CreateDefaultHeaders() {
+        Version? version = typeof(HtmlHttpClientFactory).Assembly.GetName().Version;
+        string productVersion = version == null
+            ? "unknown"
+            : $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}";
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["User-Agent"] = $"HtmlTinkerX/{productVersion}"
+        };
     }
 
     private static void ConfigureProxy(HttpClientHandler handler, string? proxy, ICredentials? credential) {

@@ -20,7 +20,7 @@ public sealed class CmdletSetHtmlBrowserClientOption : AsyncPSCmdlet {
     [Parameter]
     public Hashtable? Header { get; set; }
 
-    /// <summary>Clear previously configured headers.</summary>
+    /// <summary>Clear custom headers and restore the default product user agent.</summary>
     [Parameter]
     public SwitchParameter ClearHeader { get; set; }
 
@@ -49,8 +49,7 @@ public sealed class CmdletSetHtmlBrowserClientOption : AsyncPSCmdlet {
         }
 
         if (ClearHeader.IsPresent) {
-            HtmlHttpClientFactory.DefaultHeaders.Clear();
-            HtmlHttpClientFactory.ResetShared();
+            HtmlHttpClientFactory.ResetDefaultHeaders();
         }
 
         if (Header != null) {

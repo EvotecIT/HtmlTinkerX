@@ -1,10 +1,11 @@
+using AngleSharp.Dom;
 using HtmlAgilityPack;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
 
-/// <summary>Returns inner text from HtmlAgilityPack nodes or documents.</summary>
+/// <summary>Returns inner text from AngleSharp or HtmlAgilityPack elements and documents.</summary>
 /// <example>
 ///   <summary>Read decoded paragraph text</summary>
 ///   <code>ConvertFrom-Html -Content $html | Select-HtmlNode -XPath '//p' | Select-HtmlInnerText -DeEntitize</code>
@@ -12,7 +13,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Select, "HtmlInnerText")]
 [OutputType(typeof(string))]
 public sealed class CmdletSelectHtmlInnerText : AsyncPSCmdlet {
-    /// <summary>HtmlAgilityPack node, document, attribute, or raw string content.</summary>
+    /// <summary>AngleSharp or HtmlAgilityPack element, document, attribute, or raw string content.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
     public object InputObject { get; set; } = null!;
 
@@ -33,6 +34,8 @@ public sealed class CmdletSelectHtmlInnerText : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         object value = HtmlPipelineInput.Unwrap(InputObject);
         string text = value switch {
+            IElement element => element.TextContent,
+            IDocument angleDocument => angleDocument.DocumentElement?.TextContent ?? string.Empty,
             HtmlNode node => node.InnerText,
             HtmlDocument document => document.DocumentNode.InnerText,
             HtmlAttribute attribute => attribute.Value,

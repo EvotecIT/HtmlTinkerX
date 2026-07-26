@@ -66,6 +66,11 @@ public sealed class HtmlRedirectTestServer : IDisposable {
             return;
         }
 
+        if (path == "/redirect-selector") {
+            Redirect(context.Response, "/final/catalog/");
+            return;
+        }
+
         if (path == "/final/workbench") {
             await WriteAsync(context.Response, "<html><body><main><h1>Workbench</h1><a href=\"relative-link\">Relative</a><form method=\"post\" action=\"relative-api\"><input name=\"q\" /></form></main></body></html>").ConfigureAwait(false);
             return;
@@ -78,6 +83,11 @@ public sealed class HtmlRedirectTestServer : IDisposable {
 
         if (path == "/final/dataset") {
             await WriteAsync(context.Response, "<html><body><main><h1>Dataset</h1><p>Redirected dataset page.</p><script>fetch(\"relative-api\")</script></main></body></html>").ConfigureAwait(false);
+            return;
+        }
+
+        if (path == "/final/catalog/") {
+            await WriteAsync(context.Response, "<html><body><main><article class=\"product-card sku-one\"><a class=\"product-overlay-link\" href=\"one\">Product one</a></article><article class=\"product-card sku-two\"><a class=\"product-overlay-link\" href=\"two\">Product two</a></article></main></body></html>").ConfigureAwait(false);
             return;
         }
 

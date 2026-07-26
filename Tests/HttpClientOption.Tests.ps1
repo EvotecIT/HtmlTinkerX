@@ -10,6 +10,7 @@ Describe 'Set-HtmlBrowserClientOption' {
         Set-HtmlBrowserClientOption -Header @{ Test = 'Yes' } -ClearHeader
         $client = [HtmlTinkerX.HtmlHttpClientFactory]::Create()
         $client.DefaultRequestHeaders.GetValues('Test') | Should -Contain 'Yes'
+        ($client.DefaultRequestHeaders.GetValues('User-Agent') -join ' ') | Should -Match '^HtmlTinkerX/'
         $client.Dispose()
     }
 

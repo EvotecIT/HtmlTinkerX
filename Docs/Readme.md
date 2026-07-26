@@ -2,7 +2,7 @@
 Module Name: PSParseHTML
 Module Guid: f0387960-7034-4918-a1e1-d5847cbf90df
 Download Help Link: https://github.com/EvotecIT/HtmlTinkerX
-Help Version: 2.2.0
+Help Version: 2.2.1
 Locale: en-US
 ---
 # PSParseHTML Module
@@ -77,7 +77,7 @@ Downloads linked JavaScript files from HTML and discovers likely endpoints.
 Converts HTML lists into PowerShell objects by default.
 
 ### [ConvertFrom-HtmlMeta](ConvertFrom-HtmlMeta.md)
-Parses <meta> tags from HTML content or a URL.
+Parses &lt;meta&gt; tags from HTML content or a URL.
 
 ### [ConvertFrom-HtmlMicrodata](ConvertFrom-HtmlMicrodata.md)
 Extracts microdata items from HTML content or a URL.
@@ -168,6 +168,9 @@ Discovers static, app-state, and endpoint data sources that can be extracted wit
 
 ### [Find-HtmlInteractionSurface](Find-HtmlInteractionSurface.md)
 Finds forms, hidden fields, tokens, inline endpoints, and optional linked-script endpoints in HTML.
+
+### [Find-HtmlSelector](Find-HtmlSelector.md)
+Finds repeated static HTML structures, likely fields, links, and copy-ready extraction commands.
 
 ### [Format-Css](Format-Css.md)
 Cmdlet that formats CSS content using AngleSharp.
@@ -341,13 +344,16 @@ Selects CSS style rules by selector.
 Extracts scripts, stylesheets, images, preloads, manifests, and icons from HTML.
 
 ### [Select-HtmlAttributeValue](Select-HtmlAttributeValue.md)
-Returns an HTML attribute value from HtmlAgilityPack nodes, attributes, or matching object properties.
+Returns an HTML attribute value from AngleSharp or HtmlAgilityPack elements, attributes, and matching object properties.
 
 ### [Select-HtmlData](Select-HtmlData.md)
 Selects normalized structured data, links, assets, tokens, forms, and app state from HTML.
 
+### [Select-HtmlElement](Select-HtmlElement.md)
+Selects elements from static HTML with a CSS selector.
+
 ### [Select-HtmlInnerText](Select-HtmlInnerText.md)
-Returns inner text from HtmlAgilityPack nodes or documents.
+Returns inner text from AngleSharp or HtmlAgilityPack elements and documents.
 
 ### [Select-HtmlJavaScriptConfig](Select-HtmlJavaScriptConfig.md)
 Selects JavaScript application configuration objects and framework state from inline HTML scripts.
@@ -386,7 +392,7 @@ Cmdlet that adds cookies to an active browser session.
 Fills or types text into an input element in a browser session.
 
 ### [Set-HtmlBrowserSelectOption](Set-HtmlBrowserSelectOption.md)
-Cmdlet that selects options from a <select> element.
+Cmdlet that selects options from a &lt;select&gt; element.
 
 ### [Set-HtmlBrowserStorage](Set-HtmlBrowserStorage.md)
 Sets or removes a localStorage or sessionStorage item in an active browser session.

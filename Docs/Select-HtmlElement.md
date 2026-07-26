@@ -4,42 +4,52 @@ Module Name: PSParseHTML
 online version: https://github.com/EvotecIT/HtmlTinkerX
 schema: 2.0.0
 ---
-# ConvertFrom-Html
+# Select-HtmlElement
 ## SYNOPSIS
-Parses HTML content from a string or a remote page.
+Selects elements from static HTML with a CSS selector.
 
 ## SYNTAX
-### Content (Default)
+### Input (Default)
 ```powershell
-ConvertFrom-Html -Content <string> [-Engine <HtmlParserEngine>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Raw] [<CommonParameters>]
+Select-HtmlElement [-Input] <Object> [-Selector] <string> [-First] [-Required] [<CommonParameters>]
+```
+
+### Content
+```powershell
+Select-HtmlElement [-Selector] <string> -Content <string> [-First] [-Required] [<CommonParameters>]
+```
+
+### File
+```powershell
+Select-HtmlElement [-Selector] <string> -Path <string> [-First] [-Required] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-ConvertFrom-Html -Url <uri> [-Engine <HtmlParserEngine>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [-Raw] [<CommonParameters>]
+Select-HtmlElement [-Selector] <string> -Url <uri> [-First] [-Required] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-The cmdlet can read raw HTML or download a web page specified with -Url. When downloading, optional -Proxy and -ProxyCredential parameters control the web request.
+Selects elements from static HTML with a CSS selector.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-ConvertFrom-Html -Url https://example.com
+ConvertFrom-Html -Content $html | Select-HtmlElement -Selector '.product-card'
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-ConvertFrom-Html -Url https://example.com -Proxy http://proxy:8080
+Select-HtmlElement -Url https://example.org -Selector 'h1' -First
 ```
 
 
 ## PARAMETERS
 
 ### -Content
-HTML content to parse.
+HTML content to search.
 
 ```yaml
 Type: String
@@ -50,24 +60,22 @@ Possible values:
 Required: True
 Position: named
 Default value: None
-Accept pipeline input: True (ByValue, ByPropertyName)
+Accept pipeline input: False
 Accept wildcard characters: True
 ```
 
-### -Engine
-Selects parsing engine.
-
-Possible values: AngleSharp, AgilityPack
+### -First
+Return only the first matching element.
 
 ```yaml
-Type: HtmlParserEngine
-Parameter Sets: Content, Url
-Aliases:
-Possible values: AngleSharp, AgilityPack
+Type: SwitchParameter
+Parameter Sets: Input, Content, File, Url
+Aliases: Single
+Possible values:
 
 Required: False
 Position: named
-Default value: AgilityPack
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: True
 ```
@@ -88,12 +96,44 @@ Accept pipeline input: False
 Accept wildcard characters: True
 ```
 
-### -Proxy
-Optional proxy server address used when fetching content from Url. Include the protocol and port number if required.
+### -Input
+Parsed document, element, HtmlAgilityPack node, or raw markup to search.
+
+```yaml
+Type: Object
+Parameter Sets: Input
+Aliases: HtmlDocument, HtmlNode, Node, InputObject
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: True (ByValue)
+Accept wildcard characters: True
+```
+
+### -Path
+Path to an HTML file to search.
 
 ```yaml
 Type: String
-Parameter Sets: Content, Url
+Parameter Sets: File
+Aliases: File
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: True
+```
+
+### -Proxy
+Proxy server address used when downloading by URL.
+
+```yaml
+Type: String
+Parameter Sets: Url
 Aliases:
 Possible values:
 
@@ -105,11 +145,11 @@ Accept wildcard characters: True
 ```
 
 ### -ProxyCredential
-Credentials used to authenticate against the Proxy server.
+Credentials used with the proxy server.
 
 ```yaml
 Type: PSCredential
-Parameter Sets: Content, Url
+Parameter Sets: Url
 Aliases:
 Possible values:
 
@@ -120,12 +160,12 @@ Accept pipeline input: False
 Accept wildcard characters: True
 ```
 
-### -Raw
-Return raw document object.
+### -Required
+Throw when the selector matches no elements.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Content, Url
+Parameter Sets: Input, Content, File, Url
 Aliases:
 Possible values:
 
@@ -136,8 +176,24 @@ Accept pipeline input: False
 Accept wildcard characters: True
 ```
 
+### -Selector
+CSS selector evaluated against the static document or input element.
+
+```yaml
+Type: String
+Parameter Sets: Input, Content, File, Url
+Aliases:
+Possible values:
+
+Required: True
+Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: True
+```
+
 ### -Url
-URL of a HTML page.
+URL of an HTML page to download and search.
 
 ```yaml
 Type: Uri
@@ -173,11 +229,11 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `System.String`
+- `System.Object`
 
 ## OUTPUTS
 
-- `System.Object`
+- `AngleSharp.Dom.IElement`
 
 ## RELATED LINKS
 
