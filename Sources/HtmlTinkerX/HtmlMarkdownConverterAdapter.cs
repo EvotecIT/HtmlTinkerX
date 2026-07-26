@@ -1,4 +1,5 @@
 using System;
+using OfficeIMO.Html;
 using OfficeIMO.Markdown;
 using OfficeIMO.Markdown.Html;
 
@@ -16,7 +17,7 @@ internal static class HtmlMarkdownConverterAdapter {
         }
 
         var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode, markdownProfile);
-        return html.LoadFromHtml(options);
+        return HtmlConversionDocument.Parse(html).ToMarkdownDocument(options);
     }
 
     public static string ConvertToMarkdown(
@@ -30,7 +31,7 @@ internal static class HtmlMarkdownConverterAdapter {
         }
 
         var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode, markdownProfile);
-        return html.LoadFromHtml(options).ToMarkdown(options.MarkdownWriteOptions);
+        return HtmlConversionDocument.Parse(html).ToMarkdown(options);
     }
 
     internal static HtmlToMarkdownOptions CreateOptions(
