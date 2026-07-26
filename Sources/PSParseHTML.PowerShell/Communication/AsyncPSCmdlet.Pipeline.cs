@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 using System.Management.Automation;
 using System.Threading;
 using System.Threading.Tasks;
-
 using HtmlTinkerX;
+
 namespace PSParseHTML.PowerShell;
 
 public abstract partial class AsyncPSCmdlet
@@ -12,9 +12,9 @@ public abstract partial class AsyncPSCmdlet
     /// <summary>Thread-safe progress bridge for asynchronous cmdlet code.</summary>
     public new void WriteProgress(ProgressRecord progressRecord)
     {
-        if (CanAccessPipelineDirectly && Volatile.Read(ref _currentOutPipe) is null)
+        if (CanAccessPipelineDirectly)
         {
-            ThrowIfStopped();
+            PrepareDirectPipelineAccess();
             base.WriteProgress(progressRecord);
             return;
         }
@@ -25,15 +25,11 @@ public abstract partial class AsyncPSCmdlet
         _ = TryQueue(new PipelineItem(progressRecord, PipelineType.Progress));
     }
 
-    /// <summary>
-    /// Validates proxy parameters.
-    /// Throws a terminating error if <paramref name="proxyCredential"/> is provided
-    /// without specifying <paramref name="proxy"/>.
-    /// </summary>
-    /// <param name="proxy">Proxy server address.</param>
-    /// <param name="proxyCredential">Credential for the proxy.</param>
-    protected void ValidateProxy(string? proxy, PSCredential? proxyCredential) {
-        if (proxyCredential != null && string.IsNullOrWhiteSpace(proxy)) {
+    /// <summary>Validates that proxy credentials are accompanied by a proxy address.</summary>
+    protected void ValidateProxy(string? proxy, PSCredential? proxyCredential)
+    {
+        if (proxyCredential != null && string.IsNullOrWhiteSpace(proxy))
+        {
             ThrowTerminatingError(new ErrorRecord(
                 new PSArgumentException("ProxyCredential requires Proxy to be specified."),
                 "ProxyCredentialWithoutProxy",
@@ -42,35 +38,39 @@ public abstract partial class AsyncPSCmdlet
         }
     }
 
-    /// <summary>
-    /// Exports a browser evidence bundle for a failed automation operation and writes a warning with the manifest path.
-    /// </summary>
-    /// <param name="session">Browser session to capture.</param>
-    /// <param name="enabled">Whether failure evidence was requested by the caller.</param>
-    /// <param name="operation">Logical operation name.</param>
-    /// <param name="exception">Failure exception.</param>
-    /// <param name="outFolder">Optional evidence root folder.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <summary>Exports browser evidence for a failed automation operation when requested.</summary>
     protected async Task ExportFailureEvidenceIfRequestedAsync(
         HtmlBrowserSession session,
         bool enabled,
         string operation,
         Exception exception,
         string? outFolder,
-        CancellationToken cancellationToken) {
-        if (!enabled) {
+        CancellationToken cancellationToken)
+    {
+        if (!enabled)
             return;
-        }
 
-        try {
-            HtmlBrowserFailureEvidenceOptions options = new() {
+        try
+        {
+            HtmlBrowserFailureEvidenceOptions options = new()
+            {
                 Operation = operation,
                 BaseFileName = operation,
                 OutFolder = string.IsNullOrWhiteSpace(outFolder) ? "HtmlBrowserFailureEvidence" : outFolder!
             };
-            HtmlBrowserEvidenceResult evidence = await HtmlBrowser.ExportFailureEvidenceAsync(session, exception, options, cancellationToken).ConfigureAwait(false);
+            HtmlBrowserEvidenceResult evidence = await HtmlBrowser.ExportFailureEvidenceAsync(
+                session,
+                exception,
+                options,
+                cancellationToken).ConfigureAwait(false);
             WriteWarning($"Browser failure evidence saved to '{evidence.OutFolder}'. Manifest: '{evidence.ManifestPath}'.");
-        } catch (Exception evidenceException) when (evidenceException is IOException || evidenceException is UnauthorizedAccessException || evidenceException is InvalidOperationException || evidenceException is PlaywrightException) {
+        }
+        catch (Exception evidenceException) when (
+            evidenceException is IOException or
+                UnauthorizedAccessException or
+                InvalidOperationException or
+                PlaywrightException)
+        {
             WriteWarning($"Browser failure evidence could not be saved: {evidenceException.Message}");
         }
     }
@@ -109,6 +109,38 @@ public abstract partial class AsyncPSCmdlet
     private bool CanAccessPipelineDirectly
         => IsPipelineThread || Volatile.Read(ref _asyncLifecycleStarted) == 0;
 
+    private void PrepareDirectPipelineAccess()
+    {
+        ThrowIfStopped();
+        if (IsPipelineThread)
+            Volatile.Read(ref _pumpQueuedItems)?.Invoke();
+    }
+
+    private void PrepareDirectPipelineInteraction()
+    {
+        ThrowIfStopped();
+        ValidateInteractionGeneration();
+        if (IsPipelineThread)
+            Volatile.Read(ref _pumpQueuedItems)?.Invoke();
+    }
+
+    private void ValidateInteractionGeneration()
+    {
+        if (Volatile.Read(ref _asyncLifecycleStarted) == 0)
+            return;
+
+        var activeGeneration = Volatile.Read(ref _activeHookGeneration);
+        var originatingGeneration = _hookGeneration.Value;
+        if (activeGeneration == 0 && originatingGeneration == 0 && IsPipelineThread)
+            return;
+
+        if (originatingGeneration == 0 || originatingGeneration != activeGeneration)
+        {
+            throw new InvalidOperationException(
+                "The asynchronous PowerShell lifecycle that originated this request is no longer active.");
+        }
+    }
+
     private void GetBlockTaskResult(Task blockTask)
     {
         try
@@ -124,8 +156,10 @@ public abstract partial class AsyncPSCmdlet
     private object? RequestPipelineReply(object? value, PipelineType type)
     {
         ThrowIfStopped();
+        ValidateInteractionGeneration();
+        var hookGeneration = _hookGeneration.Value;
         var replyPipe = new PipelineReplyChannel();
-        if (!TryQueue(new PipelineItem(value, type, replyPipe)))
+        if (!TryQueue(new PipelineItem(value, type, replyPipe, hookGeneration)))
         {
             replyPipe.Abandon();
             ThrowIfStopped();
@@ -186,17 +220,24 @@ public abstract partial class AsyncPSCmdlet
         Task blockTask;
         var deferPipeDisposal = 0;
         var pipeDisposed = 0;
+        var hookGeneration = Interlocked.Increment(ref _nextHookGeneration);
 
         void ClearPipes()
         {
+            Volatile.Write(ref _pumpQueuedItems, null);
             _ = Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe);
+            _ = Interlocked.CompareExchange(ref _activeHookGeneration, 0, hookGeneration);
             CompleteAddingIfNeeded(outPipe);
         }
 
         void DisposePipeOnce()
         {
             if (Interlocked.Exchange(ref pipeDisposed, 1) == 0)
+            {
+                while (outPipe.TryTake(out var abandonedItem))
+                    abandonedItem.ReplyPipe?.ReleasePipeline();
                 outPipe.Dispose();
+            }
         }
 
         static void CompleteAddingIfNeeded<T>(BlockingCollection<T> pipe)
@@ -214,6 +255,13 @@ public abstract partial class AsyncPSCmdlet
 
         void PumpItem(PipelineItem item)
         {
+            if (item.ReplyPipe is not null &&
+                item.HookGeneration != Volatile.Read(ref _activeHookGeneration))
+            {
+                item.ReplyPipe.ReleasePipeline();
+                return;
+            }
+
             switch (item.Type)
             {
                 case PipelineType.Output:
@@ -241,8 +289,8 @@ public abstract partial class AsyncPSCmdlet
                     base.WriteInformation((InformationRecord)item.Value!);
                     break;
                 case PipelineType.InformationWithTags:
-                    var information = ((object MessageData, string[] Tags))item.Value!;
-                    base.WriteInformation(information.MessageData, information.Tags);
+                    var information = ((object MessageData, string[]? Tags))item.Value!;
+                    base.WriteInformation(information.MessageData, information.Tags!);
                     break;
                 case PipelineType.Progress:
                     base.WriteProgress((ProgressRecord)item.Value!);
@@ -318,6 +366,23 @@ public abstract partial class AsyncPSCmdlet
                             prompt.UserName,
                             prompt.TargetName));
                     break;
+                case PipelineType.PromptForCredentialOptions:
+                    var promptOptions =
+                        ((string Caption,
+                            string Message,
+                            string UserName,
+                            string TargetName,
+                            PSCredentialTypes AllowedCredentialTypes,
+                            PSCredentialUIOptions Options))item.Value!;
+                    item.ReplyPipe!.Publish(
+                        () => Host.UI.PromptForCredential(
+                            promptOptions.Caption,
+                            promptOptions.Message,
+                            promptOptions.UserName,
+                            promptOptions.TargetName,
+                            promptOptions.AllowedCredentialTypes,
+                            promptOptions.Options));
+                    break;
             }
         }
 
@@ -329,19 +394,23 @@ public abstract partial class AsyncPSCmdlet
 
         Volatile.Write(ref _asyncLifecycleStarted, 1);
         _pipelineThreadId = Environment.CurrentManagedThreadId;
+        Volatile.Write(ref _activeHookGeneration, hookGeneration);
+        Volatile.Write(ref _pumpQueuedItems, PumpQueuedItems);
         Volatile.Write(ref _currentOutPipe, outPipe);
 
         var synchronizationContext = SynchronizationContext.Current;
+        var priorHookGeneration = _hookGeneration.Value;
         try
         {
             SynchronizationContext.SetSynchronizationContext(HookSynchronizationContext);
+            _hookGeneration.Value = hookGeneration;
             if (TaskScheduler.Current == TaskScheduler.Default)
             {
                 blockTask = task();
             }
             else
             {
-                var invocationTask = new Task<Task>(
+                using var invocationTask = new Task<Task>(
                     task,
                     CancellationToken.None,
                     TaskCreationOptions.DenyChildAttach);
@@ -351,8 +420,19 @@ public abstract partial class AsyncPSCmdlet
         }
         catch (Exception exception)
         {
-            ClearPipes();
-            DisposePipeOnce();
+            try
+            {
+                PumpQueuedItems();
+            }
+            catch
+            {
+                // Preserve the hook failure after best-effort delivery of records written before it.
+            }
+            finally
+            {
+                ClearPipes();
+                DisposePipeOnce();
+            }
 
             if (exception is OperationCanceledException && _cancelSource.IsCancellationRequested)
                 throw new PipelineStoppedException();
@@ -361,11 +441,15 @@ public abstract partial class AsyncPSCmdlet
         }
         finally
         {
+            _hookGeneration.Value = priorHookGeneration;
             SynchronizationContext.SetSynchronizationContext(synchronizationContext);
         }
 
         if (blockTask.IsCompleted)
         {
+            if (blockTask.IsFaulted)
+                _ = blockTask.Exception;
+
             CompleteAddingIfNeeded(outPipe);
             try
             {
