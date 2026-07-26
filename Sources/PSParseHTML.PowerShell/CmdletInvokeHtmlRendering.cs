@@ -631,6 +631,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         string? pagePassword = includePageCredentials ? Password : null;
         HttpClient client = HttpClientHelper.CreateWithCookies(Proxy, ProxyCredential, pageCredential, pageUsername, pagePassword, out CookieContainer cookieContainer);
         if (!string.IsNullOrWhiteSpace(userAgent)) {
+            client.DefaultRequestHeaders.Remove("User-Agent");
             client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
         }
 
@@ -663,6 +664,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
     private HttpClient CreateExternalSnapshotHttpClient(string? userAgent) {
         HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
         if (!string.IsNullOrWhiteSpace(userAgent)) {
+            client.DefaultRequestHeaders.Remove("User-Agent");
             client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
         }
 
