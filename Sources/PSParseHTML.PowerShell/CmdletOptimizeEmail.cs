@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -18,6 +19,8 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Optimize, "Email", DefaultParameterSetName = "Body")]
 [OutputType(typeof(string))]
 public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
+    private static readonly SemaphoreSlim LoggerLease = new(1, 1);
+
     /// <summary>
     /// HTML content to process.
     /// </summary>
@@ -101,28 +104,46 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     public string? AnalyticsDomain { get; set; }
 
     private ActionPreference errorAction;
+    private InternalLogger? _logger;
+    private InternalLogger? _previousLogger;
+    private InternalLoggerPowerShell? _loggerBridge;
+    private int _loggerLeaseHeld;
+    private int _processActive;
 
     /// <summary>
     /// Initializes logging and resolves ErrorActionPreference.
     /// </summary>
     protected override void BeginProcessing() {
-        var internalLogger = new InternalLogger();
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(
-            internalLogger,
-            WriteVerbose,
-            WriteWarning,
-            WriteDebug,
-            WriteError,
-            WriteProgress,
-            WriteInformation);
-        LoggingMessages.Logger = internalLogger;
+        try {
+            LoggerLease.Wait(CancelToken);
+        } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
+            throw new PipelineStoppedException();
+        }
+        Volatile.Write(ref _loggerLeaseHeld, 1);
+        try {
+            var internalLogger = new InternalLogger();
+            _loggerBridge = new InternalLoggerPowerShell(
+                internalLogger,
+                WriteVerbose,
+                WriteWarning,
+                WriteDebug,
+                WriteError,
+                WriteProgress,
+                WriteInformation);
+            _logger = internalLogger;
+            _previousLogger = LoggingMessages.Logger;
+            LoggingMessages.Logger = internalLogger;
 
-        errorAction = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
-        if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString() ?? string.Empty;
-            if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
-                errorAction = actionPreference;
+            errorAction = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
+            if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+                string errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString() ?? string.Empty;
+                if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
+                    errorAction = actionPreference;
+                }
             }
+        } catch {
+            DetachLogger();
+            throw;
         }
     }
 
@@ -130,40 +151,81 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     /// Processes the input HTML or file and outputs optimized HTML.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        PreMailerOptions options = new() {
-            BaseUri = BaseUri,
-            RemoveStyleElements = RemoveStyleElements,
-            IgnoreElements = IgnoreElements,
-            Css = Css,
-            CssFilePath = CssFilePath,
-            StripIdAndClassAttributes = StripIdAndClassAttributes,
-            RemoveComments = RemoveComments,
-            PreserveMediaQueries = PreserveMediaQueries,
-            UseEmailFormatter = UseEmailFormatter,
-            DownloadRemoteCss = DownloadRemoteCss,
-            HttpClient = HttpClient,
-            AddAnalyticsTags = AddAnalyticsTags,
-            AnalyticsSource = AnalyticsSource,
-            AnalyticsMedium = AnalyticsMedium,
-            AnalyticsCampaign = AnalyticsCampaign,
-            AnalyticsContent = AnalyticsContent,
-            AnalyticsDomain = AnalyticsDomain
-        };
+        Interlocked.Increment(ref _processActive);
+        try {
+            PreMailerOptions options = new() {
+                BaseUri = BaseUri,
+                RemoveStyleElements = RemoveStyleElements,
+                IgnoreElements = IgnoreElements,
+                Css = Css,
+                CssFilePath = CssFilePath,
+                StripIdAndClassAttributes = StripIdAndClassAttributes,
+                RemoveComments = RemoveComments,
+                PreserveMediaQueries = PreserveMediaQueries,
+                UseEmailFormatter = UseEmailFormatter,
+                DownloadRemoteCss = DownloadRemoteCss,
+                HttpClient = HttpClient,
+                AddAnalyticsTags = AddAnalyticsTags,
+                AnalyticsSource = AnalyticsSource,
+                AnalyticsMedium = AnalyticsMedium,
+                AnalyticsCampaign = AnalyticsCampaign,
+                AnalyticsContent = AnalyticsContent,
+                AnalyticsDomain = AnalyticsDomain
+            };
 
-        PreMailerResult result = ParameterSetName == "File"
-            ? await PreMailerClient
-                .MoveCssInlineFromFileAsync(Path, options, CancelToken)
-                .ConfigureAwait(false)
-            : await PreMailerClient
-                .MoveCssInlineAsync(Body, options, CancelToken)
-                .ConfigureAwait(false);
+            PreMailerResult result = ParameterSetName == "File"
+                ? await PreMailerClient
+                    .MoveCssInlineFromFileAsync(Path, options, CancelToken)
+                    .ConfigureAwait(false)
+                : await PreMailerClient
+                    .MoveCssInlineAsync(Body, options, CancelToken)
+                    .ConfigureAwait(false);
 
-        WriteObject(result.Html);
+            WriteObject(result.Html);
 
-        foreach (var warning in result.Warnings) {
-            LoggingMessages.Logger.WriteWarning(warning.Message);
+            foreach (var warning in result.Warnings) {
+                LoggingMessages.Logger.WriteWarning(warning.Message);
+            }
+        } finally {
+            if (Interlocked.Decrement(ref _processActive) == 0 &&
+                CancelToken.IsCancellationRequested) {
+                DetachLogger();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void EndProcessing() {
+        try {
+            base.EndProcessing();
+        } finally {
+            DetachLogger();
+        }
+    }
+
+    /// <inheritdoc />
+    public override void Dispose() {
+        base.Dispose();
+        if (Volatile.Read(ref _processActive) == 0) {
+            DetachLogger();
+        }
+    }
+
+    private void DetachLogger() {
+        if (Interlocked.Exchange(ref _loggerLeaseHeld, 0) == 0) {
+            return;
         }
 
-        return;
+        try {
+            _loggerBridge?.Dispose();
+            _loggerBridge = null;
+            var logger = Interlocked.Exchange(ref _logger, null);
+            var previous = Interlocked.Exchange(ref _previousLogger, null);
+            if (logger != null && previous != null) {
+                _ = Interlocked.CompareExchange(ref LoggingMessages.Logger, previous, logger);
+            }
+        } finally {
+            LoggerLease.Release();
+        }
     }
 }

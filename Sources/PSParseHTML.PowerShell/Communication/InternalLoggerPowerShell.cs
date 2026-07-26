@@ -1,9 +1,11 @@
 using HtmlTinkerX;
+using System;
+using System.Threading;
 namespace PSParseHTML.PowerShell;
 /// <summary>
 /// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams
 /// </summary>
-public class InternalLoggerPowerShell {
+public class InternalLoggerPowerShell : IDisposable {
     private readonly InternalLogger _logger;
     private readonly Action<string>? _writeVerboseAction;
     private readonly Action<string>? _writeDebugAction;
@@ -11,6 +13,7 @@ public class InternalLoggerPowerShell {
     private readonly Action<string>? _writeWarningAction;
     private readonly Action<ErrorRecord>? _writeErrorAction;
     private readonly Action<ProgressRecord>? _writeProgressAction;
+    private int _disposed;
 
     /// <summary>
     /// Initialize the InternalLoggerPowerShell class
@@ -155,5 +158,19 @@ public class InternalLoggerPowerShell {
     private void WriteProgress(ProgressRecord progressRecord) {
         // Write to PowerShell progress stream
         _writeProgressAction?.Invoke(progressRecord);
+    }
+
+    /// <summary>Detaches all PowerShell stream handlers from the logger.</summary>
+    public void Dispose() {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) {
+            return;
+        }
+
+        _logger.OnVerboseMessage -= Logger_OnVerboseMessage;
+        _logger.OnWarningMessage -= Logger_OnWarningMessage;
+        _logger.OnDebugMessage -= Logger_OnDebugMessage;
+        _logger.OnErrorMessage -= Logger_OnErrorMessage;
+        _logger.OnProgressMessage -= Logger_OnProgressMessage;
+        _logger.OnInformationMessage -= Logger_OnInformationMessage;
     }
 }
