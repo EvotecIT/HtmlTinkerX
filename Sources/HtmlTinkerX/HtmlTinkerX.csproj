@@ -18,7 +18,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoMarkdownHtmlVersion>0.1.13</OfficeImoMarkdownHtmlVersion>
+        <OfficeImoVersion>3.0.2</OfficeImoVersion>
         <ChartForgeXVersion>0.1.6</ChartForgeXVersion>
     </PropertyGroup>
 
@@ -56,7 +56,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="OfficeIMO.Markdown.Html" Version="$(OfficeImoMarkdownHtmlVersion)" />
+        <PackageReference Include="OfficeIMO.Html" Version="$(OfficeImoVersion)" />
+        <PackageReference Include="OfficeIMO.Markdown.Html" Version="$(OfficeImoVersion)" />
     </ItemGroup>
 
     <ItemGroup>

@@ -398,6 +398,39 @@ public static class HtmlImageCandidateParser {
         yield return srcset.Substring(start);
     }
 
+    internal static string GetBestSourceSetSource(string? srcset) {
+        if (string.IsNullOrWhiteSpace(srcset)) return string.Empty;
+        string bestSource = string.Empty;
+        double bestScore = double.MinValue;
+        foreach (string part in SplitSrcSet(srcset!)) {
+            string[] pieces = part.Trim().Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (pieces.Length == 0) continue;
+
+            double score = 0;
+            foreach (string descriptor in pieces.Skip(1)) {
+                string numeric = descriptor.TrimEnd('w', 'W', 'x', 'X');
+                if (double.TryParse(
+                    numeric,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double parsed)) {
+                    score = Math.Max(score, descriptor.EndsWith("x", StringComparison.OrdinalIgnoreCase)
+                        ? parsed * 10000d
+                        : parsed);
+                }
+            }
+
+            if (bestSource.Length == 0 || score >= bestScore) {
+                bestSource = pieces[0];
+                bestScore = score;
+            }
+        }
+
+        return bestSource;
+    }
+
     private static bool IsSeparatorAfterDataUrl(string srcset, int commaIndex) {
         return commaIndex + 1 >= srcset.Length || char.IsWhiteSpace(srcset[commaIndex + 1]);
     }

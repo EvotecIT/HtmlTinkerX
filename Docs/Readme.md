@@ -170,7 +170,7 @@ Discovers static, app-state, and endpoint data sources that can be extracted wit
 Finds forms, hidden fields, tokens, inline endpoints, and optional linked-script endpoints in HTML.
 
 ### [Find-HtmlSelector](Find-HtmlSelector.md)
-Finds repeated static HTML structures, likely fields, links, and copy-ready extraction commands.
+Finds repeated static HTML structures, likely fields, links, and replayable extraction commands or secure templates.
 
 ### [Format-Css](Format-Css.md)
 Cmdlet that formats CSS content using AngleSharp.
@@ -225,6 +225,9 @@ Returns built-in or custom crawl profiles.
 
 ### [Get-HtmlExtractionProfile](Get-HtmlExtractionProfile.md)
 Returns built-in extraction workflow profiles or the profile recommended by an extraction plan.
+
+### [Get-HtmlPage](Get-HtmlPage.md)
+Reads an HTML page as headings, paragraphs, tables, links, resources, and inferred object collections.
 
 ### [Get-HtmlResource](Get-HtmlResource.md)
 Parses external and inline resources and returns their links or downloads them.

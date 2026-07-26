@@ -12,7 +12,17 @@ namespace HtmlTinkerX;
 /// </summary>
 public static partial class HtmlDomExtraction {
     private static readonly string[] CandidateTags = { "article", "div", "li", "section", "tr" };
-    private static readonly string[] UriAttributes = { "href", "src", "action", "poster", "data-src" };
+    private static readonly string[] UriAttributes = {
+        "href", "src", "action", "poster", "data-src", "data-lazy-src", "data-original",
+        "srcset", "data-srcset", "data-lazy-srcset", "data-original-srcset"
+    };
+    private static readonly string[] MediaSourceAttributes = {
+        "data-src", "data-lazy-src", "data-original",
+        "data-srcset", "data-lazy-srcset", "data-original-srcset", "srcset", "src"
+    };
+    private static readonly string[] SourceSetAttributes = {
+        "srcset", "data-srcset", "data-lazy-srcset", "data-original-srcset"
+    };
     private static readonly string[] SemanticAttributes = { "data-type", "itemprop", "name", "role" };
     private static readonly Regex SafeCssIdentifier = new(@"^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$", RegexOptions.Compiled);
     private static readonly Regex PropertyTokenSplit = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
@@ -72,7 +82,18 @@ public static partial class HtmlDomExtraction {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        Uri? effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
+        return Extract(
+            document,
+            itemSelector,
+            properties,
+            GetEffectiveBaseUri(document, baseUri));
+    }
+
+    private static IReadOnlyList<HtmlDomExtractionRecord> Extract(
+        IDocument document,
+        string itemSelector,
+        IReadOnlyDictionary<string, HtmlDomFieldDefinition> properties,
+        Uri? effectiveBaseUri) {
         IHtmlCollection<IElement> items;
         try {
             items = document.QuerySelectorAll(itemSelector);
@@ -252,6 +273,10 @@ public static partial class HtmlDomExtraction {
                 return null;
             }
 
+            if (SourceSetAttributes.Contains(attributeName, StringComparer.OrdinalIgnoreCase)) {
+                value = HtmlImageCandidateParser.GetBestSourceSetSource(value);
+            }
+
             bool shouldResolve = definition.ResolveUrl
                 || UriAttributes.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
             return shouldResolve ? ResolveUrl(value, baseUri) : value;
@@ -350,9 +375,8 @@ public static partial class HtmlDomExtraction {
         Uri? baseUri) {
         bool isLink = element.LocalName.Equals("a", StringComparison.OrdinalIgnoreCase)
             && element.HasAttribute("href");
-        string? mediaAttribute = element.HasAttribute("src")
-            ? "src"
-            : element.HasAttribute("data-src") ? "data-src" : null;
+        string? mediaAttribute = MediaSourceAttributes.FirstOrDefault(attribute =>
+            !string.IsNullOrWhiteSpace(element.GetAttribute(attribute)));
         bool isMedia = mediaAttribute != null
             && (element.LocalName.Equals("img", StringComparison.OrdinalIgnoreCase)
                 || element.LocalName.Equals("source", StringComparison.OrdinalIgnoreCase)
@@ -379,7 +403,12 @@ public static partial class HtmlDomExtraction {
         }
 
         if (isMedia) {
-            string media = ResolveUrl(element.GetAttribute(mediaAttribute!) ?? string.Empty, baseUri);
+            string media = element.GetAttribute(mediaAttribute!) ?? string.Empty;
+            if (SourceSetAttributes.Contains(mediaAttribute!, StringComparer.OrdinalIgnoreCase)) {
+                media = HtmlImageCandidateParser.GetBestSourceSetSource(media);
+            }
+
+            media = ResolveUrl(media, baseUri);
             if (media.Length > 0) {
                 yield return new FieldObservation(selector, mediaAttribute!, media);
             }
@@ -598,8 +627,7 @@ public static partial class HtmlDomExtraction {
             return "LinkText";
         }
 
-        if (field.Attribute.Equals("src", StringComparison.OrdinalIgnoreCase)
-            || field.Attribute.Equals("data-src", StringComparison.OrdinalIgnoreCase)) {
+        if (MediaSourceAttributes.Contains(field.Attribute, StringComparer.OrdinalIgnoreCase)) {
             return "Image";
         }
 
@@ -607,6 +635,14 @@ public static partial class HtmlDomExtraction {
         if (!string.IsNullOrWhiteSpace(dataType)
             && ContainsSemanticToken(field.Selector, "price", "amount", "cost", "value")) {
             return ToPascalCase(dataType!) + "Price";
+        }
+
+        if (Regex.IsMatch(field.Element.LocalName, "^h[1-6]$", RegexOptions.IgnoreCase)) {
+            return "Title";
+        }
+
+        if (ContainsSemanticToken(field.Selector, "price", "amount", "cost")) {
+            return "Price";
         }
 
         string semantic = field.Element.GetAttribute("itemprop")

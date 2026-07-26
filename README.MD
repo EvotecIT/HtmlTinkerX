@@ -30,6 +30,8 @@ Dependency guardrails, including the ChartForgeX-backed screenshot image-process
 ## What it covers
 
 - HTML parsing with AngleSharp and Html Agility Pack
+- object-first page reading with headings, paragraphs, tables, links, resources,
+  and inferred repeated collections
 - tables, lists, forms, metadata, JSON-LD, microdata, Open Graph, application
   state, tokens, image candidates, and API endpoint extraction
 - static and rendered document audits for duplicate IDs, document metadata,
@@ -48,6 +50,7 @@ The PowerShell commands are thin surfaces over HtmlTinkerX. The generated
 
 | Task | PowerShell | C# owner |
 | --- | --- | --- |
+| Read a page as objects without selectors | `Get-HtmlPage` | `HtmlPageReader.Read` |
 | Parse a document | `ConvertFrom-Html` | `HtmlParser.ParseWithAngleSharp`, `HtmlParser.ParseWithHtmlAgilityPack` |
 | Extract tables | `ConvertFrom-HtmlTable` | `HtmlParser.ParseTablesWithAngleSharpDetailed`, `HtmlParser.ParseTablesWithHtmlAgilityPackDetailed` |
 | Extract lists | `ConvertFrom-HtmlList` | `HtmlParser.ParseListsWithAngleSharpDetailed`, `HtmlParser.ParseListsWithHtmlAgilityPackDetailed` |
@@ -92,13 +95,59 @@ labels do not change HtmlTinkerX or PSParseHTML release channels.
 
 ## 🚀 Quick Start
 
+### Read a page as objects
+
+Start here when you want the content rather than the DOM:
+
+```powershell
+$page = Get-HtmlPage -Url 'https://example.org/catalog'
+
+$page.Headings
+$page.Paragraphs
+$page.Tables
+$page.Links
+
+# Repeated cards, rows, or listings are inferred for you.
+$page.Collections | Select-Object Name, Count, Confidence
+$page.Collections[0].Items
+```
+
+Collection items expose inferred fields as ordinary PowerShell properties, such
+as `Title`, `Price`, `ProductLink`, or `Image`. Field names depend on the page.
+Use `$page.Collections[0].Fields` to inspect what was recognized. The retained
+`Selector` property is provenance for troubleshooting and reusable recipes; it
+is not required to read the page.
+
+Markdown remains available as a projection:
+
+```powershell
+$page.Markdown
+```
+
+For client-rendered pages, pass a snapshot captured by `Invoke-HtmlRendering`:
+
+```powershell
+$snapshot = Invoke-HtmlRendering -Url $url -Snapshot
+$page = Get-HtmlPage -RenderedSnapshot $snapshot
+```
+
 ### C# Example
 ```csharp
 using HtmlTinkerX;
 
-// Parse HTML and extract tables
+// Read semantic page objects and inferred collections
 string html = await File.ReadAllTextAsync("page.html");
-var tables = HtmlParser.ParseTablesWithAngleSharp(html);
+HtmlPageDocument page = HtmlPageReader.Read(
+    html,
+    new HtmlPageReaderOptions {
+        BaseUri = new Uri("https://example.org/catalog")
+    });
+
+Console.WriteLine(page.Headings[0].Text);
+Console.WriteLine(page.Tables.Count);
+Console.WriteLine(page.Collections[0].Items[0]["Title"]);
+
+// Audit or use lower-level parsers when you need them
 HtmlDocumentAuditResult audit = HtmlDocumentAudit.Analyze(html);
 
 // Format and optimize resources
