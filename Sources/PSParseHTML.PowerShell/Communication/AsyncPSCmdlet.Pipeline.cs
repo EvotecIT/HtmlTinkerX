@@ -12,9 +12,10 @@ public abstract partial class AsyncPSCmdlet
     /// <summary>Thread-safe progress bridge for asynchronous cmdlet code.</summary>
     public new void WriteProgress(ProgressRecord progressRecord)
     {
+        ThrowIfStopped();
         if (CanAccessPipelineDirectly)
         {
-            PrepareDirectPipelineAccess();
+            using var pipelineContext = EnterDirectPipelineAccess();
             base.WriteProgress(progressRecord);
             return;
         }
@@ -95,17 +96,21 @@ public abstract partial class AsyncPSCmdlet
     /// <inheritdoc />
     public virtual void Dispose()
     {
+        bool cancelActiveBlocks;
         lock (_lifecycleLock)
         {
             if (_disposeRequested)
                 return;
 
             _disposeRequested = true;
+            cancelActiveBlocks = _activeBlocks != 0;
+            Volatile.Write(ref _asyncLifecycleCompleted, 1);
         }
 
         try
         {
-            CancelSource();
+            if (cancelActiveBlocks)
+                CancelSource();
         }
         finally
         {
@@ -123,27 +128,40 @@ public abstract partial class AsyncPSCmdlet
 
     private bool IsConstructionThreadOutsideAsyncHook
         => Volatile.Read(ref _currentOutPipe) is null &&
+           Volatile.Read(ref _asyncLifecycleCompleted) == 0 &&
            Environment.CurrentManagedThreadId == _constructionThreadId &&
            CommandRuntime is not null;
 
     private bool CanAccessPipelineDirectly
         => IsPipelineThread || IsConstructionThreadOutsideAsyncHook;
 
-    private void PrepareDirectPipelineAccess()
-    {
-        ThrowIfStopped();
-        if (IsPipelineThread)
-            Volatile.Read(ref _pumpQueuedItems)?.Invoke();
-    }
-
-    private void PrepareDirectPipelineInteraction()
+    private IDisposable EnterDirectPipelineAccess()
     {
         ThrowIfStopped();
         ValidateInteractionGeneration();
         if (IsPipelineThread)
+        {
             Volatile.Read(ref _pumpQueuedItems)?.Invoke();
+            return new SynchronizationContextScope(
+                Volatile.Read(ref _pipelineSynchronizationContext));
+        }
+
+        return new SynchronizationContextScope(SynchronizationContext.Current);
     }
 
+    private IDisposable EnterDirectPipelineInteraction()
+    {
+        ThrowIfStopped();
+        ValidateInteractionGeneration();
+        if (IsPipelineThread)
+        {
+            Volatile.Read(ref _pumpQueuedItems)?.Invoke();
+            return new SynchronizationContextScope(
+                Volatile.Read(ref _pipelineSynchronizationContext));
+        }
+
+        return new SynchronizationContextScope(SynchronizationContext.Current);
+    }
     private void ValidateInteractionGeneration()
     {
         if (Volatile.Read(ref _asyncLifecycleStarted) == 0)
@@ -228,6 +246,21 @@ public abstract partial class AsyncPSCmdlet
         return value => _ = TryQueue(new PipelineItem(value, pipelineType, hookGeneration: hookGeneration));
     }
 
+    /// <summary>
+    /// Captures lifecycle-bound typed stream writers for callbacks that do not flow execution context.
+    /// </summary>
+    protected CapturedPipelineStreams CapturePipelineStreams()
+    {
+        var hookGeneration = _hookGeneration.Value;
+        if (hookGeneration == 0)
+        {
+            throw new InvalidOperationException(
+                "Lifecycle-bound pipeline streams can only be captured from an asynchronous PowerShell hook.");
+        }
+
+        return new CapturedPipelineStreams(this, hookGeneration);
+    }
+
     private bool TryQueue(PipelineItem item)
     {
         item.BindToHook(_hookGeneration.Value);
@@ -250,6 +283,9 @@ public abstract partial class AsyncPSCmdlet
         }
         catch (OperationCanceledException) when (_cancelSource.IsCancellationRequested)
         {
+            if (item.HookGeneration != 0)
+                throw new PipelineStoppedException();
+
             return false;
         }
     }
@@ -270,7 +306,10 @@ public abstract partial class AsyncPSCmdlet
 
     private void RunBlockInAsyncCore(Func<Task> task)
     {
-        var outPipe = new BlockingCollection<PipelineItem>(boundedCapacity: 1024);
+        // The transport must remain lossless and non-blocking. The pipeline thread can enumerate
+        // user objects or invoke a host that waits for the same background producer that is writing
+        // here; applying bounded backpressure would deadlock both sides.
+        var outPipe = new BlockingCollection<PipelineItem>();
         Task blockTask;
         var deferPipeDisposal = 0;
         var pipeDisposed = 0;
@@ -483,6 +522,7 @@ public abstract partial class AsyncPSCmdlet
         var priorHookGeneration = _hookGeneration.Value;
         try
         {
+            Volatile.Write(ref _pipelineSynchronizationContext, synchronizationContext);
             SynchronizationContext.SetSynchronizationContext(HookSynchronizationContext);
             _hookGeneration.Value = hookGeneration;
             if (TaskScheduler.Current == TaskScheduler.Default)
@@ -525,6 +565,7 @@ public abstract partial class AsyncPSCmdlet
         {
             _hookGeneration.Value = priorHookGeneration;
             SynchronizationContext.SetSynchronizationContext(synchronizationContext);
+            Volatile.Write(ref _pipelineSynchronizationContext, null);
         }
 
         if (blockTask.IsCompleted)
@@ -532,7 +573,6 @@ public abstract partial class AsyncPSCmdlet
             if (blockTask.IsFaulted)
                 _ = blockTask.Exception;
 
-            CompleteAddingIfNeeded(outPipe);
             try
             {
                 PumpQueuedItems();
@@ -559,9 +599,11 @@ public abstract partial class AsyncPSCmdlet
                         if (completed.IsFaulted)
                             _ = completed.Exception;
 
-                        ClearPipes();
                         if (Volatile.Read(ref deferPipeDisposal) != 0)
+                        {
+                            ClearPipes();
                             DisposePipeOnce();
+                        }
                     }
                     finally
                     {
@@ -580,10 +622,13 @@ public abstract partial class AsyncPSCmdlet
 
         try
         {
-            foreach (var item in outPipe.GetConsumingEnumerable(CancelToken))
+            while (!blockTask.IsCompleted || outPipe.Count != 0)
             {
-                PumpItem(item);
+                if (outPipe.TryTake(out var item, millisecondsTimeout: 50, CancelToken))
+                    PumpItem(item);
             }
+
+            ClearPipes();
         }
         catch (Exception pipelineException)
         {
@@ -655,6 +700,11 @@ public abstract partial class AsyncPSCmdlet
         try
         {
             _cancelSource.Cancel();
+        }
+        catch (AggregateException)
+        {
+            // Cancellation callbacks are third-party code. A failing callback must not escape
+            // StopProcessing or mask the pipeline failure that initiated cancellation.
         }
         catch (ObjectDisposedException)
         {
