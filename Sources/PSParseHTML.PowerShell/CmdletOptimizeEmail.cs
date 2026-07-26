@@ -108,12 +108,17 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     private InternalLogger? _previousLogger;
     private InternalLoggerPowerShell? _loggerBridge;
     private int _loggerLeaseHeld;
+    private int _processActive;
 
     /// <summary>
     /// Initializes logging and resolves ErrorActionPreference.
     /// </summary>
     protected override void BeginProcessing() {
-        LoggerLease.Wait();
+        try {
+            LoggerLease.Wait(CancelToken);
+        } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
+            throw new PipelineStoppedException();
+        }
         Volatile.Write(ref _loggerLeaseHeld, 1);
         try {
             var internalLogger = new InternalLogger();
@@ -146,41 +151,47 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     /// Processes the input HTML or file and outputs optimized HTML.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        PreMailerOptions options = new() {
-            BaseUri = BaseUri,
-            RemoveStyleElements = RemoveStyleElements,
-            IgnoreElements = IgnoreElements,
-            Css = Css,
-            CssFilePath = CssFilePath,
-            StripIdAndClassAttributes = StripIdAndClassAttributes,
-            RemoveComments = RemoveComments,
-            PreserveMediaQueries = PreserveMediaQueries,
-            UseEmailFormatter = UseEmailFormatter,
-            DownloadRemoteCss = DownloadRemoteCss,
-            HttpClient = HttpClient,
-            AddAnalyticsTags = AddAnalyticsTags,
-            AnalyticsSource = AnalyticsSource,
-            AnalyticsMedium = AnalyticsMedium,
-            AnalyticsCampaign = AnalyticsCampaign,
-            AnalyticsContent = AnalyticsContent,
-            AnalyticsDomain = AnalyticsDomain
-        };
+        Interlocked.Increment(ref _processActive);
+        try {
+            PreMailerOptions options = new() {
+                BaseUri = BaseUri,
+                RemoveStyleElements = RemoveStyleElements,
+                IgnoreElements = IgnoreElements,
+                Css = Css,
+                CssFilePath = CssFilePath,
+                StripIdAndClassAttributes = StripIdAndClassAttributes,
+                RemoveComments = RemoveComments,
+                PreserveMediaQueries = PreserveMediaQueries,
+                UseEmailFormatter = UseEmailFormatter,
+                DownloadRemoteCss = DownloadRemoteCss,
+                HttpClient = HttpClient,
+                AddAnalyticsTags = AddAnalyticsTags,
+                AnalyticsSource = AnalyticsSource,
+                AnalyticsMedium = AnalyticsMedium,
+                AnalyticsCampaign = AnalyticsCampaign,
+                AnalyticsContent = AnalyticsContent,
+                AnalyticsDomain = AnalyticsDomain
+            };
 
-        PreMailerResult result = ParameterSetName == "File"
-            ? await PreMailerClient
-                .MoveCssInlineFromFileAsync(Path, options, CancelToken)
-                .ConfigureAwait(false)
-            : await PreMailerClient
-                .MoveCssInlineAsync(Body, options, CancelToken)
-                .ConfigureAwait(false);
+            PreMailerResult result = ParameterSetName == "File"
+                ? await PreMailerClient
+                    .MoveCssInlineFromFileAsync(Path, options, CancelToken)
+                    .ConfigureAwait(false)
+                : await PreMailerClient
+                    .MoveCssInlineAsync(Body, options, CancelToken)
+                    .ConfigureAwait(false);
 
-        WriteObject(result.Html);
+            WriteObject(result.Html);
 
-        foreach (var warning in result.Warnings) {
-            LoggingMessages.Logger.WriteWarning(warning.Message);
+            foreach (var warning in result.Warnings) {
+                LoggingMessages.Logger.WriteWarning(warning.Message);
+            }
+        } finally {
+            if (Interlocked.Decrement(ref _processActive) == 0 &&
+                CancelToken.IsCancellationRequested) {
+                DetachLogger();
+            }
         }
-
-        return;
     }
 
     /// <inheritdoc />
@@ -194,8 +205,10 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
 
     /// <inheritdoc />
     public override void Dispose() {
-        DetachLogger();
         base.Dispose();
+        if (Volatile.Read(ref _processActive) == 0) {
+            DetachLogger();
+        }
     }
 
     private void DetachLogger() {
