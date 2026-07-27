@@ -10,6 +10,44 @@ dotnet add package HtmlTinkerX
 
 Pin a stable HtmlTinkerX version when reproducible restores matter.
 
+## Read a page as objects
+
+`HtmlPageReader` uses the canonical `OfficeIMO.Html` semantic document and adds
+web-specific links, resources, and repeated-collection inference. Callers do not
+need CSS selectors to inspect common page content.
+
+```csharp
+using HtmlTinkerX;
+
+string html = await File.ReadAllTextAsync("catalog.html");
+HtmlPageDocument page = HtmlPageReader.Read(
+    html,
+    new HtmlPageReaderOptions {
+        BaseUri = new Uri("https://example.org/catalog")
+    });
+
+foreach (var heading in page.Headings) {
+    Console.WriteLine($"{heading.Level}: {heading.Text}");
+}
+
+foreach (var table in page.Tables) {
+    Console.WriteLine($"{table.Caption}: {table.Rows.Count} rows");
+}
+
+foreach (var item in page.Collections.FirstOrDefault()?.Items
+         ?? Array.Empty<HtmlPageCollectionItem>()) {
+    Console.WriteLine(item["Title"]);
+}
+```
+
+`Sections`, `Blocks`, `Headings`, `Paragraphs`, `Lists`, and `Tables` come from
+the shared OfficeIMO semantic model. `Collections` are inferred by HtmlTinkerX
+from repeated cards, rows, or listings. Each collection retains its selector as
+provenance, but callers do not have to provide one.
+
+Use `page.Markdown` when a text projection is more convenient for display,
+search, or language-model input.
+
 ## Parse HTML
 
 ```csharp

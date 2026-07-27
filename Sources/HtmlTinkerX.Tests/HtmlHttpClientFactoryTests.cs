@@ -2,6 +2,8 @@ using HtmlTinkerX;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
+using System.Threading;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -50,9 +52,44 @@ public class HtmlHttpClientFactoryTests {
     [Fact]
     public void Create_AppliesDefaultHeaders() {
         HtmlHttpClientFactory.DefaultHeaders["X-Test"] = "1";
+        try {
+            using HttpClient client = HtmlHttpClientFactory.Create();
+            Assert.True(client.DefaultRequestHeaders.Contains("X-Test"));
+        } finally {
+            HtmlHttpClientFactory.DefaultHeaders.Remove("X-Test");
+        }
+    }
+
+    [Fact]
+    public void Create_IncludesDescriptiveDefaultUserAgent() {
         using HttpClient client = HtmlHttpClientFactory.Create();
-        Assert.True(client.DefaultRequestHeaders.Contains("X-Test"));
-        HtmlHttpClientFactory.DefaultHeaders.Clear();
+
+        string userAgent = string.Join(" ", client.DefaultRequestHeaders.GetValues("User-Agent"));
+        Assert.StartsWith("HtmlTinkerX/", userAgent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResetDefaultHeaders_RemovesCustomHeadersAndRestoresUserAgent() {
+        HtmlHttpClientFactory.DefaultHeaders["X-Temporary"] = "value";
+
+        HtmlHttpClientFactory.ResetDefaultHeaders();
+
+        Assert.False(HtmlHttpClientFactory.DefaultHeaders.ContainsKey("X-Temporary"));
+        Assert.StartsWith("HtmlTinkerX/", HtmlHttpClientFactory.DefaultHeaders["User-Agent"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetTextWithProperEncodingAsync_ReturnsFinalResponseUri() {
+        Uri finalUri = new("https://example.test/final/catalog/");
+        using HttpClient client = new(new FinalUriHandler(finalUri));
+
+        HtmlHttpTextResult result = await HtmlUtilities.GetTextWithProperEncodingAsync(
+            client,
+            "https://example.test/start",
+            fetchOptions: null);
+
+        Assert.Equal("<p>ok</p>", result.Content);
+        Assert.Equal(finalUri, result.FinalUri);
     }
 
     [Fact]
@@ -138,6 +175,24 @@ public class HtmlHttpClientFactoryTests {
         } finally {
             server.Stop();
             server.Close();
+        }
+    }
+
+    private sealed class FinalUriHandler : HttpMessageHandler {
+        private readonly Uri _finalUri;
+
+        internal FinalUriHandler(Uri finalUri) {
+            _finalUri = finalUri;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) {
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                Content = new StringContent("<p>ok</p>", Encoding.UTF8, "text/html"),
+                RequestMessage = new HttpRequestMessage(HttpMethod.Get, _finalUri)
+            };
+            return Task.FromResult(response);
         }
     }
 }

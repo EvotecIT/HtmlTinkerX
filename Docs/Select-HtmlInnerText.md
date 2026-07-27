@@ -6,7 +6,7 @@ schema: 2.0.0
 ---
 # Select-HtmlInnerText
 ## SYNOPSIS
-Returns inner text from HtmlAgilityPack nodes or documents.
+Returns inner text from AngleSharp or HtmlAgilityPack elements and documents.
 
 ## SYNTAX
 ### __AllParameterSets
@@ -15,7 +15,7 @@ Select-HtmlInnerText [-InputObject] <Object> [-DeEntitize] [-NoTrim] [-DefaultVa
 ```
 
 ## DESCRIPTION
-Returns inner text from HtmlAgilityPack nodes or documents.
+Returns inner text from AngleSharp or HtmlAgilityPack elements and documents.
 
 ## EXAMPLES
 
@@ -38,7 +38,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: True
 ```
@@ -49,7 +49,7 @@ Value returned when the extracted text is empty.
 ```yaml
 Type: String
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -60,12 +60,12 @@ Accept wildcard characters: True
 ```
 
 ### -InputObject
-HtmlAgilityPack node, document, attribute, or raw string content.
+AngleSharp or HtmlAgilityPack element, document, attribute, or raw string content.
 
 ```yaml
 Type: Object
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: True
@@ -81,12 +81,12 @@ Preserves leading and trailing whitespace.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: True
 ```

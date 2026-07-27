@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using HtmlAgilityPack;
 using HtmlTinkerX;
 using System;
+using System.Collections;
 using System.Management.Automation;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -55,6 +56,15 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 
+    /// <summary>User-Agent header used when downloading <see cref="Url"/>.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    public string? UserAgent { get; set; }
+
+    /// <summary>Additional or replacement HTTP headers used when downloading <see cref="Url"/>.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Alias("Headers")]
+    public Hashtable? Header { get; set; }
+
     /// <summary>Return raw document object.</summary>
     [Parameter]
     public SwitchParameter Raw { get; set; }
@@ -63,7 +73,7 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, UserAgent, Header);
             if (Engine == HtmlParserEngine.AngleSharp) {
                 IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);

@@ -6,7 +6,7 @@ schema: 2.0.0
 ---
 # Select-HtmlAttributeValue
 ## SYNOPSIS
-Returns an HTML attribute value from HtmlAgilityPack nodes, attributes, or matching object properties.
+Returns an HTML attribute value from AngleSharp or HtmlAgilityPack elements, attributes, and matching object properties.
 
 ## SYNTAX
 ### __AllParameterSets
@@ -15,7 +15,7 @@ Select-HtmlAttributeValue [-InputObject] <Object> [[-AttributeName] <string>] [-
 ```
 
 ## DESCRIPTION
-Returns an HTML attribute value from HtmlAgilityPack nodes, attributes, or matching object properties.
+Returns an HTML attribute value from AngleSharp or HtmlAgilityPack elements, attributes, and matching object properties.
 
 ## EXAMPLES
 
@@ -33,7 +33,7 @@ Attribute or property name to read.
 ```yaml
 Type: String
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -49,7 +49,7 @@ Value returned when the requested attribute is missing.
 ```yaml
 Type: String
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
@@ -60,12 +60,12 @@ Accept wildcard characters: True
 ```
 
 ### -InputObject
-HtmlAgilityPack node, attribute, document, or an object with a matching property.
+AngleSharp or HtmlAgilityPack element, attribute, document, or an object with a matching property.
 
 ```yaml
 Type: Object
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: True
@@ -81,12 +81,12 @@ Returns DefaultValue when the attribute exists but its value is empty.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: __AllParameterSets
-Aliases: None
+Aliases:
 Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: True
 ```
