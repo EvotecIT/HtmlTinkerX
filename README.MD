@@ -118,6 +118,12 @@ Use `$page.Collections[0].Fields` to inspect what was recognized. The retained
 `Selector` property is provenance for troubleshooting and reusable recipes; it
 is not required to read the page.
 
+The task-oriented
+[object workflow guide](Docs/Examples/07-GetHtmlPageObjectWorkflows/README.MD)
+shows how to inspect the result, work with articles and typed tables, choose a
+repeated collection by its fields, handle rendered pages, and move to explicit
+selectors only when you need a stable extraction recipe.
+
 Markdown remains available as a projection:
 
 ```powershell
