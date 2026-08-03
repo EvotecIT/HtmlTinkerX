@@ -25,12 +25,4 @@ internal static class PlatformExtensions {
         HtmlPlatform.LinuxArm64 => "linux-arm64",
         _ => "linux-x64"
     };
-
-    public static string ToDownloadPlatformId(this HtmlPlatform platform) => platform switch {
-        HtmlPlatform.WindowsX64 => "win32_x64",
-        HtmlPlatform.Mac => "mac",
-        HtmlPlatform.MacArm64 => "mac-arm64",
-        HtmlPlatform.LinuxArm64 => "linux-arm64",
-        _ => "linux"
-    };
 }

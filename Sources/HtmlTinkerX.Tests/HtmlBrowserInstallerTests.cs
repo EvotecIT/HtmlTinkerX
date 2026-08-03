@@ -46,6 +46,30 @@ public class HtmlBrowserInstallerTests
     }
 
     [Fact]
+    public void HasDriverLayout_RejectsDriverWithoutPlaywrightCli()
+    {
+        string driverPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string nodeDir = Path.Combine(driverPath, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId());
+        string packageDir = Path.Combine(driverPath, "package");
+
+        try
+        {
+            Directory.CreateDirectory(nodeDir);
+            Directory.CreateDirectory(packageDir);
+            File.WriteAllText(
+                Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"),
+                "node");
+            File.WriteAllText(Path.Combine(packageDir, "browsers.json"), "{\"browsers\":[]}");
+
+            Assert.False(HtmlBrowser.HasDriverLayout(driverPath));
+        }
+        finally
+        {
+            if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
+        }
+    }
+
+    [Fact]
     public async Task EnsureDriverInstalledAsync_UsesBundledDriverWithoutNetworkDownload()
     {
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
@@ -482,10 +506,7 @@ public class HtmlBrowserInstallerTests
             Directory.CreateDirectory(runtimeDirectory);
             File.WriteAllText(Path.Combine(runtimeDirectory, "marker.txt"), "installed");
         };
-        HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()))
-        {
-            BaseAddress = new Uri("https://playwright.azureedge.net/")
-        };
+        HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
 
         try
         {
@@ -632,6 +653,7 @@ public class HtmlBrowserInstallerTests
         Directory.CreateDirectory(packageDir);
         File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), "node");
         File.WriteAllText(Path.Combine(packageDir, "package.json"), "{}");
+        File.WriteAllText(Path.Combine(packageDir, "cli.js"), "console.log('playwright');");
         File.WriteAllText(Path.Combine(packageDir, "browsers.json"), """
             {
               "browsers": [
@@ -666,22 +688,28 @@ public class HtmlBrowserInstallerTests
         using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
         {
             string nodeFile = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
-            using (var nodeStream = new StreamWriter(archive.CreateEntry(nodeFile).Open()))
+            string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
+            using (var nodeStream = new StreamWriter(archive.CreateEntry($".playwright/node/{platformId}/{nodeFile}").Open()))
             {
                 nodeStream.Write("node");
             }
 
-            using (var licenseStream = new StreamWriter(archive.CreateEntry("LICENSE").Open()))
+            using (var licenseStream = new StreamWriter(archive.CreateEntry(".playwright/node/LICENSE").Open()))
             {
                 licenseStream.Write("license");
             }
 
-            using (var packageStream = new StreamWriter(archive.CreateEntry("package/package.json").Open()))
+            using (var packageStream = new StreamWriter(archive.CreateEntry(".playwright/package/package.json").Open()))
             {
                 packageStream.Write("{}");
             }
 
-            using (var browsersStream = new StreamWriter(archive.CreateEntry("package/browsers.json").Open()))
+            using (var cliStream = new StreamWriter(archive.CreateEntry(".playwright/package/cli.js").Open()))
+            {
+                cliStream.Write("console.log('playwright');");
+            }
+
+            using (var browsersStream = new StreamWriter(archive.CreateEntry(".playwright/package/browsers.json").Open()))
             {
                 browsersStream.Write("""
                     {

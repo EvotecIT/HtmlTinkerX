@@ -18,7 +18,7 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            CleanInstallDir();
+            await CleanInstallationAsync().ConfigureAwait(false);
         }
 
         await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
@@ -69,7 +69,7 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            CleanInstallDir();
+            await CleanInstallationAsync().ConfigureAwait(false);
         }
 
         await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
