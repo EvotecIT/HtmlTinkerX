@@ -155,7 +155,8 @@ public static class HtmlBrowserCacheCleaner {
     /// <returns>Result of the cleaning operation.</returns>
     public static CleanResult CleanCache(IEnumerable<CacheLocation> locations) {
         var result = new CleanResult();
-        
+        using FileStream installationLock = HtmlBrowser.AcquireInstallationFileLockAsync().GetAwaiter().GetResult();
+
         foreach (var location in locations) {
             try {
                 Directory.Delete(location.Path, recursive: true);

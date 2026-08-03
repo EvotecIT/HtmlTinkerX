@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -17,8 +16,6 @@ namespace HtmlTinkerX;
 /// </summary>
 public static partial class HtmlBrowser {
     private const string PlaywrightWithDepsEnvVar = "HTMLTINKERX_PLAYWRIGHT_WITH_DEPS";
-    private const long MaximumDriverArchiveBytes = 512L * 1024 * 1024;
-
     /// <summary>
     /// Semaphore to ensure thread-safe Playwright installation.
     /// Only one installation process can run at a time across all threads.
@@ -50,12 +47,10 @@ public static partial class HtmlBrowser {
     /// </summary>
     private static HtmlPlatform CurrentPlatform => PlatformExtensions.GetCurrentPlatform();
 
-    /// <summary>
-    /// Gets the platform identifier for downloading the Playwright driver.
-    /// </summary>
-    private static string DownloadPlatformId => CurrentPlatform.ToDownloadPlatformId();
-
     private static string NodeExecutable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
+    private static StringComparison FileSystemPathComparison => RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
 
     /// <summary>
     /// Gets the root directory for the Playwright driver installation.
@@ -139,12 +134,16 @@ public static partial class HtmlBrowser {
         string nodePath = Path.Combine(driverPath, "node", PlatformId, NodeExecutable);
         string packagePath = Path.Combine(driverPath, "package");
         string browsersManifestPath = Path.Combine(packagePath, "browsers.json");
-        if (!File.Exists(nodePath) || !Directory.Exists(packagePath) || !File.Exists(browsersManifestPath)) {
+        string cliPath = Path.Combine(packagePath, "cli.js");
+        if (!File.Exists(nodePath) || !Directory.Exists(packagePath) ||
+            !File.Exists(browsersManifestPath) || !File.Exists(cliPath)) {
             return false;
         }
 
         try {
-            return new FileInfo(nodePath).Length > 0 && IsValidBrowserManifest(browsersManifestPath);
+            return new FileInfo(nodePath).Length > 0 &&
+                   new FileInfo(cliPath).Length > 0 &&
+                   IsValidBrowserManifest(browsersManifestPath);
         } catch (IOException) {
             return false;
         } catch (UnauthorizedAccessException) {
@@ -170,7 +169,7 @@ public static partial class HtmlBrowser {
         return string.Equals(
             Path.GetFullPath(driverPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
             Path.GetFullPath(GetBundledDriverPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-            StringComparison.OrdinalIgnoreCase);
+            FileSystemPathComparison);
     }
 
     /// <summary>
@@ -245,8 +244,6 @@ public static partial class HtmlBrowser {
     /// <param name="engine">The browser engine to ensure is installed.</param>
     /// <returns>A task that completes when the installation check/process is finished.</returns>
     public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
-        ValidateExistingInstallation(engine);
-
         // Fast path - check without lock first
         if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
             EnsureDriverSearchPath();
@@ -255,6 +252,7 @@ public static partial class HtmlBrowser {
 
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
+            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
             ValidateExistingInstallation(engine);
 
             if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
@@ -284,6 +282,7 @@ public static partial class HtmlBrowser {
     public static async Task RepairInstallationAsync(HtmlBrowserEngine engine) {
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
+            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
             CleanInstallDir();
             if (!IsDriverPresent()) {
                 await DownloadAndInstallDriverAsync().ConfigureAwait(false);
@@ -562,6 +561,16 @@ public static partial class HtmlBrowser {
         CleanDriver();
     }
 
+    internal static async Task CleanInstallationAsync() {
+        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
+        try {
+            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
+            CleanInstallDir();
+        } finally {
+            InstallationSemaphore.Release();
+        }
+    }
+
     private static void CleanBrowserRuntime(HtmlBrowserEngine engine) {
         string path = GetBrowserInstallPath();
         if (!Directory.Exists(path))
@@ -594,10 +603,6 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <returns>A task that completes when the driver installation check/process is finished.</returns>
     internal static async Task EnsureDriverInstalledAsync() {
-        if (IsDriverCorrupted()) {
-            CleanDriver();
-        }
-
         if (IsDriverPresent()) {
             EnsureDriverSearchPath();
             return;
@@ -605,6 +610,7 @@ public static partial class HtmlBrowser {
 
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
+            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
             if (IsDriverCorrupted()) {
                 CleanDriver();
             }
@@ -644,132 +650,7 @@ public static partial class HtmlBrowser {
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driverRoot);
     }
 
-    private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-
-    private static async Task DownloadAndInstallDriverAsync() {
-        string urlBase = "https://playwright.azureedge.net/builds/driver";
-        if (DriverVersion.Contains("-alpha") || DriverVersion.Contains("-beta") || DriverVersion.Contains("-next"))
-            urlBase += "/next";
-        string url = $"{urlBase}/playwright-{DriverVersion}-{DownloadPlatformId}.zip";
-
-        using var client = HttpClientFactory();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
-
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var total = response.Content.Headers.ContentLength ?? -1L;
-        if (total > MaximumDriverArchiveBytes) {
-            throw new InvalidDataException($"The Playwright driver archive reported {total} bytes, exceeding the {MaximumDriverArchiveBytes}-byte safety limit.");
-        }
-        using var mem = new MemoryStream();
-        var buffer = new byte[81920];
-        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        long read = 0;
-        int lastProgress = 0;
-        var sw = Stopwatch.StartNew();
-        while (true) {
-            int n = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-            if (n == 0)
-                break;
-            if (mem.Length + n > MaximumDriverArchiveBytes) {
-                throw new InvalidDataException($"The Playwright driver archive exceeded the {MaximumDriverArchiveBytes}-byte safety limit while downloading.");
-            }
-            await mem.WriteAsync(buffer, 0, n).ConfigureAwait(false);
-            if (total > 0) {
-                read += n;
-                int progress = (int)(read * 100 / total);
-                if (progress != lastProgress) {
-                    double speed = read / 1024d / 1024d / sw.Elapsed.TotalSeconds;
-                    Console.Write($"\rDownloading Playwright driver... {progress}% ({speed:F1} MB/s)");
-                    lastProgress = progress;
-                }
-            }
-        }
-        Console.WriteLine();
-        mem.Position = 0;
-
-        string baseDir = GetDriverPath();
-        string tempDir = Path.Combine(Path.GetTempPath(), "pwdriver_" + Guid.NewGuid().ToString("N"));
-
-        try {
-            if (Directory.Exists(baseDir))
-                Directory.Delete(baseDir, true);
-
-            Directory.CreateDirectory(tempDir);
-
-            using (var archive = new ZipArchive(mem, ZipArchiveMode.Read, leaveOpen: true)) {
-                archive.ExtractToDirectory(tempDir);
-            }
-
-            Directory.CreateDirectory(Path.Combine(baseDir, "node", PlatformId));
-
-            string nodeDest = Path.Combine(baseDir, "node", PlatformId, NodeExecutable);
-            string nodeSource = Path.Combine(tempDir, NodeExecutable);
-            if (File.Exists(nodeDest))
-                File.Delete(nodeDest);
-            File.Move(nodeSource, nodeDest);
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-                try {
-                    var chmod = Process.Start("chmod", $"+x \"{nodeDest}\"");
-                    chmod?.WaitForExit();
-                } catch {
-                    // ignore
-                }
-            }
-            string licenseDest = Path.Combine(baseDir, "node", "LICENSE");
-            if (File.Exists(licenseDest))
-                File.Delete(licenseDest);
-            File.Move(Path.Combine(tempDir, "LICENSE"), licenseDest);
-
-            string packageSrc = Path.Combine(tempDir, "package");
-            string packageDest = Path.Combine(baseDir, "package");
-            if (Directory.Exists(packageDest))
-                Directory.Delete(packageDest, true);
-            CopyDirectory(packageSrc, packageDest);
-
-#if NETSTANDARD2_0 || NETFRAMEWORK
-            File.WriteAllText(VersionFile, DriverVersion);
-#else
-            await File.WriteAllTextAsync(VersionFile, DriverVersion).ConfigureAwait(false);
-#endif
-        } catch {
-            try {
-                if (Directory.Exists(tempDir)) {
-                    Directory.Delete(tempDir, true);
-                }
-            } catch {
-                // ignore cleanup failure
-            }
-
-            CleanDriver();
-            throw;
-        } finally {
-            try {
-                if (Directory.Exists(tempDir)) {
-                    Directory.Delete(tempDir, true);
-                }
-            } catch {
-                // ignore cleanup failure
-            }
-        }
-
-        EnsureDriverSearchPath();
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory) {
-        Directory.CreateDirectory(destinationDirectory);
-
-        foreach (string file in Directory.GetFiles(sourceDirectory)) {
-            string destinationFile = Path.Combine(destinationDirectory, Path.GetFileName(file));
-            File.Copy(file, destinationFile, overwrite: true);
-        }
-
-        foreach (string directory in Directory.GetDirectories(sourceDirectory)) {
-            string destinationSubdirectory = Path.Combine(destinationDirectory, Path.GetFileName(directory));
-            CopyDirectory(directory, destinationSubdirectory);
-        }
-    }
+    private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
 
     private static void InstallRuntime(HtmlBrowserEngine engine) {
         string runtime = engine.ToString().ToLowerInvariant();
