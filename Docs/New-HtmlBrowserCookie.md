@@ -11,7 +11,7 @@ Cmdlet that creates a new HtmlCookie instance.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-New-HtmlBrowserCookie [-Name] <string> [-Value] <string> [-Domain <string>] [-Path <string>] [-Url <string>] [-Expires <long>] [-HttpOnly] [-Secure] [-SameSite <SameSiteAttribute>] [<CommonParameters>]
+New-HtmlBrowserCookie [-Name] <string> [-Value] <string> [-Domain <string>] [-Path <string>] [-Url <string>] [-Expires <Int64>] [-HttpOnly] [-Secure] [-SameSite <SameSiteAttribute>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -40,14 +40,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Expires
 Cookie expiration time as UNIX timestamp.
 
 ```yaml
-Type: Nullable`1
+Type: Int64
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -56,7 +56,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -HttpOnly
@@ -72,7 +72,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Name
@@ -88,7 +88,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -104,23 +104,23 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SameSite
 SameSite attribute.
 
 ```yaml
-Type: Nullable`1
+Type: SameSiteAttribute
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: Strict, Lax, None
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Secure
@@ -136,7 +136,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -152,7 +152,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Value
@@ -168,7 +168,7 @@ Required: True
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

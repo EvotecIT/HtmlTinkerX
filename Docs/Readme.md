@@ -2,7 +2,7 @@
 Module Name: PSParseHTML
 Module Guid: f0387960-7034-4918-a1e1-d5847cbf90df
 Download Help Link: https://github.com/EvotecIT/HtmlTinkerX
-Help Version: 2.2.1
+Help Version: 2.2.2
 Locale: en-US
 ---
 # PSParseHTML Module
@@ -77,7 +77,7 @@ Downloads linked JavaScript files from HTML and discovers likely endpoints.
 Converts HTML lists into PowerShell objects by default.
 
 ### [ConvertFrom-HtmlMeta](ConvertFrom-HtmlMeta.md)
-Parses &lt;meta&gt; tags from HTML content or a URL.
+Parses <meta> tags from HTML content or a URL.
 
 ### [ConvertFrom-HtmlMicrodata](ConvertFrom-HtmlMicrodata.md)
 Extracts microdata items from HTML content or a URL.
@@ -395,7 +395,7 @@ Cmdlet that adds cookies to an active browser session.
 Fills or types text into an input element in a browser session.
 
 ### [Set-HtmlBrowserSelectOption](Set-HtmlBrowserSelectOption.md)
-Cmdlet that selects options from a &lt;select&gt; element.
+Cmdlet that selects options from a <select> element.
 
 ### [Set-HtmlBrowserStorage](Set-HtmlBrowserStorage.md)
 Sets or removes a localStorage or sessionStorage item in an active browser session.

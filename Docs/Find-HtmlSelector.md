@@ -49,14 +49,14 @@ Base URL used to resolve relative link and image samples.
 ```yaml
 Type: Uri
 Parameter Sets: Content, File
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Content
@@ -65,14 +65,14 @@ HTML content to inspect.
 ```yaml
 Type: String
 Parameter Sets: Content
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Header
@@ -88,7 +88,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Limit
@@ -97,14 +97,14 @@ Maximum number of ranked candidates to return.
 ```yaml
 Type: Int32
 Parameter Sets: Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: 10
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MinimumRepeatCount
@@ -113,14 +113,14 @@ Minimum number of repeated elements a candidate selector must match.
 ```yaml
 Type: Int32
 Parameter Sets: Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: 2
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -136,7 +136,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -145,14 +145,14 @@ Proxy server address used when downloading by URL.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -161,14 +161,14 @@ Credentials used with the proxy server.
 ```yaml
 Type: PSCredential
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Query
@@ -177,14 +177,14 @@ Optional visible text, URL, id, class, or attribute fragment used to focus disco
 ```yaml
 Type: String
 Parameter Sets: Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -200,7 +200,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -209,14 +209,14 @@ User-Agent header used when downloading Url.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

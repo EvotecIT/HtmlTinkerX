@@ -11,17 +11,17 @@ Cmdlet that generates a PDF from a web page using a headless browser.
 ## SYNTAX
 ### Session (Default)
 ```powershell
-Save-HtmlBrowserPdf [[-Session] <HtmlBrowserSession>] [-OutFile] <string> [-SlowMo <int>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <float>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Save-HtmlBrowserPdf [[-Session] <HtmlBrowserSession>] [-OutFile] <string> [-SlowMo <int>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ### Default
 ```powershell
-Save-HtmlBrowserPdf [-Url] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <float>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Save-HtmlBrowserPdf [-Url] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Save-HtmlBrowserPdf [-Path] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <float>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Save-HtmlBrowserPdf [-Path] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -57,7 +57,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BlockResourceType
@@ -73,7 +73,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Browser
@@ -89,7 +89,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BrowserChannel
@@ -105,7 +105,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CancellationToken
@@ -121,7 +121,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Clean
@@ -137,7 +137,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Delay
@@ -153,7 +153,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DisplayHeaderFooter
@@ -169,7 +169,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -FooterTemplate
@@ -185,23 +185,23 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Format
 Paper format (e.g. A4).
 
 ```yaml
-Type: Nullable`1
+Type: PdfPageFormat
 Parameter Sets: Session, Default, File
 Aliases: None
-Possible values:
+Possible values: A0, A1, A2, A3, A4, A5, A6, Letter, Legal, Tabloid, Ledger
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -HeaderTemplate
@@ -217,7 +217,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Height
@@ -233,7 +233,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Landscape
@@ -249,7 +249,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoadState
@@ -265,7 +265,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MarginBottom
@@ -281,7 +281,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MarginLeft
@@ -297,7 +297,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MarginRight
@@ -313,7 +313,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MarginTop
@@ -329,7 +329,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MaskColor
@@ -345,7 +345,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MaskSelector
@@ -361,7 +361,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MaskSensitiveElement
@@ -377,7 +377,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Open
@@ -393,7 +393,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -OutFile
@@ -409,7 +409,7 @@ Required: True
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PageRanges
@@ -425,7 +425,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -441,7 +441,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PreferCssPageSize
@@ -457,7 +457,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PrintBackground
@@ -473,7 +473,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProfilePath
@@ -489,7 +489,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -505,7 +505,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -521,14 +521,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Scale
 Scaling factor.
 
 ```yaml
-Type: Nullable`1
+Type: Single
 Parameter Sets: Session, Default, File
 Aliases: None
 Possible values:
@@ -537,7 +537,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Scenario
@@ -553,7 +553,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Selector
@@ -569,7 +569,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Session
@@ -585,7 +585,7 @@ Required: False
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SlowMo
@@ -601,7 +601,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -StatePath
@@ -617,7 +617,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timeout
@@ -633,7 +633,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -649,7 +649,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserDataDirectory
@@ -665,7 +665,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Visible
@@ -681,7 +681,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Width
@@ -697,7 +697,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters
@@ -709,7 +709,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `System.Object`
+- `None`
 
 ## RELATED LINKS
 

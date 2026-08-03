@@ -70,14 +70,14 @@ Base URL used to resolve relative links and assets. Defaults to Url when downloa
 ```yaml
 Type: Uri
 Parameter Sets: Node, Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Content
@@ -86,14 +86,14 @@ HTML content to inspect.
 ```yaml
 Type: String
 Parameter Sets: Content
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: named
 Default value: None
 Accept pipeline input: True (ByValue, ByPropertyName)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Header
@@ -109,7 +109,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -HtmlNode
@@ -125,7 +125,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ItemSelector
@@ -134,14 +134,14 @@ CSS selector matching each repeated item to convert into a PowerShell object.
 ```yaml
 Type: String
 Parameter Sets: Node, Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Kind
@@ -150,14 +150,14 @@ Data families to include. Supported values include JsonLd, Microdata, OpenGraph,
 ```yaml
 Type: String[]
 Parameter Sets: Node, Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -173,11 +173,13 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Property
-Property-to-selector map used with ItemSelector. String values read trimmed text. Hashtable values can specify Selector, Attribute, ValueKind, All, Required, DefaultValue, or ResolveUrl.
+Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, or ResolveUrl.
 
 ```yaml
 Type: IDictionary
@@ -189,7 +191,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -198,14 +200,14 @@ Proxy server address used when downloading by URL.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -214,14 +216,14 @@ Credentials used with the proxy server.
 ```yaml
 Type: PSCredential
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -237,7 +239,7 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -246,14 +248,14 @@ User-Agent header used when downloading Url.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

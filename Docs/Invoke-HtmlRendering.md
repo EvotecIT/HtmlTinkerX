@@ -11,12 +11,12 @@ Cmdlet that retrieves HTML content after executing JavaScript using a headless b
 ## SYNTAX
 ### Default (Default)
 ```powershell
-Invoke-HtmlRendering [-Url] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
+Invoke-HtmlRendering [-Url] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-DeviceScaleFactor <Double>] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Invoke-HtmlRendering [-Path] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [<CommonParameters>]
+Invoke-HtmlRendering [-Path] <string> [-OutFile <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Session] [-StorageStatePath <string>] [-Selector <string>] [-InnerHtml] [-AsText] [-Snapshot] [-IncludeNetworkLog] [-RenderProfile <HtmlRenderProfile>] [-IncludeStaticRenderedComparison] [-IncludeLinkedScripts] [-IncludeExternalLinkedScripts] [-LinkedScriptMaximumResponseBytes <int>] [-IncludeResponseBody] [-RedactResponseBody] [-ResponseBodyMaxBytes <int>] [-ResponseBodyResourceType <HtmlNetworkResourceType[]>] [-WaitForSelector <string>] [-WaitForFunction <string>] [-LoadState <HtmlBrowserLoadState>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-NoDefault] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-CancellationToken <CancellationToken>] [-UserAgent <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-DeviceScaleFactor <Double>] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -45,7 +45,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -AutoScroll
@@ -61,7 +61,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -AutoScrollDelayMs
@@ -77,7 +77,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -AutoScrollSteps
@@ -93,7 +93,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BlockResourcePattern
@@ -109,7 +109,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BlockResourceType
@@ -125,7 +125,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Browser
@@ -141,7 +141,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CancellationToken
@@ -157,7 +157,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Clean
@@ -173,7 +173,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ClickSelector
@@ -189,7 +189,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ClickText
@@ -205,7 +205,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Credential
@@ -221,14 +221,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DeviceScaleFactor
 Scaling factor for high DPI devices.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Default, File
 Aliases: None
 Possible values:
@@ -237,7 +237,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DismissSelector
@@ -253,7 +253,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DismissText
@@ -269,14 +269,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLatitude
 Latitude used for geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Default, File
 Aliases: None
 Possible values:
@@ -285,14 +285,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLongitude
 Longitude used for geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Default, File
 Aliases: None
 Possible values:
@@ -301,7 +301,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IncludeExternalLinkedScripts
@@ -317,7 +317,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IncludeLinkedScripts
@@ -333,7 +333,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IncludeNetworkLog
@@ -349,7 +349,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IncludeResponseBody
@@ -365,7 +365,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IncludeStaticRenderedComparison
@@ -381,7 +381,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -InnerHtml
@@ -397,7 +397,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -InteractionDelayMs
@@ -413,7 +413,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -InteractionRepeatCount
@@ -429,7 +429,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LinkedScriptMaximumResponseBytes
@@ -445,7 +445,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoadState
@@ -461,7 +461,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoginUrl
@@ -477,7 +477,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -NoDefault
@@ -493,7 +493,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -OutFile
@@ -509,7 +509,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Password
@@ -525,7 +525,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PasswordSelector
@@ -541,7 +541,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -557,7 +557,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -573,7 +573,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -589,7 +589,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -RedactResponseBody
@@ -605,7 +605,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -RenderProfile
@@ -621,7 +621,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ResponseBodyMaxBytes
@@ -637,7 +637,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ResponseBodyResourceType
@@ -653,7 +653,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Selector
@@ -669,7 +669,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Session
@@ -685,7 +685,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SlowMo
@@ -701,7 +701,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Snapshot
@@ -717,7 +717,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -StorageStatePath
@@ -733,7 +733,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SubmitSelector
@@ -749,7 +749,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timeout
@@ -765,7 +765,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timezone
@@ -781,7 +781,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -797,7 +797,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -813,7 +813,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Username
@@ -829,7 +829,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UsernameSelector
@@ -845,14 +845,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportHeight
 Viewport height in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Default, File
 Aliases: None
 Possible values:
@@ -861,14 +861,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportWidth
 Viewport width in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Default, File
 Aliases: None
 Possible values:
@@ -877,7 +877,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Visible
@@ -893,7 +893,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -WaitAfterLoadMs
@@ -909,7 +909,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -WaitForFunction
@@ -925,7 +925,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -WaitForSelector
@@ -941,7 +941,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters
@@ -953,9 +953,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `System.String
-HtmlTinkerX.HtmlBrowserSession
-HtmlTinkerX.HtmlRenderedPageSnapshot`
+- `System.String`
+- `HtmlTinkerX.HtmlBrowserSession`
+- `HtmlTinkerX.HtmlRenderedPageSnapshot`
 
 ## RELATED LINKS
 

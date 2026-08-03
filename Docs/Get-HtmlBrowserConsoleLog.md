@@ -40,23 +40,23 @@ Required: False
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Severity
 Optional severity filter.
 
 ```yaml
-Type: Nullable`1
+Type: HtmlConsoleSeverity
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: Info, Warning, Error
 
 Required: False
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

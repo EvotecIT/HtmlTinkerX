@@ -11,17 +11,17 @@ Cmdlet that starts recording a browser session to a WebM file.
 ## SYNTAX
 ### Session (Default)
 ```powershell
-Start-HtmlBrowserVideoCapture [[-Session] <HtmlBrowserSession>] -OutFile <string> [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
+Start-HtmlBrowserVideoCapture [[-Session] <HtmlBrowserSession>] -OutFile <string> [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-DeviceScaleFactor <Double>] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Start-HtmlBrowserVideoCapture [-Url] <string> -OutFile <string> [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
+Start-HtmlBrowserVideoCapture [-Url] <string> -OutFile <string> [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-DeviceScaleFactor <Double>] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Start-HtmlBrowserVideoCapture [-Path] <string> -OutFile <string> [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-DeviceScaleFactor <double>] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
+Start-HtmlBrowserVideoCapture [-Path] <string> -OutFile <string> [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-Browser <HtmlBrowserEngine>] [-Clean] [-Visible] [-SlowMo <int>] [-Width <int>] [-Height <int>] [-UserAgent <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-DeviceScaleFactor <Double>] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-NoDefault] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -50,7 +50,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Clean
@@ -66,7 +66,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Credential
@@ -82,14 +82,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DeviceScaleFactor
 Device scale factor for emulation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Session, Url, File
 Aliases: None
 Possible values:
@@ -98,14 +98,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLatitude
 Latitude of the emulated geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Session, Url, File
 Aliases: None
 Possible values:
@@ -114,14 +114,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLongitude
 Longitude of the emulated geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Session, Url, File
 Aliases: None
 Possible values:
@@ -130,7 +130,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Height
@@ -146,7 +146,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoginUrl
@@ -162,7 +162,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -NoDefault
@@ -178,7 +178,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -OutFile
@@ -194,7 +194,7 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Password
@@ -210,7 +210,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PasswordSelector
@@ -226,7 +226,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -242,7 +242,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Session
@@ -258,7 +258,7 @@ Required: False
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SlowMo
@@ -274,7 +274,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SubmitSelector
@@ -290,7 +290,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timezone
@@ -306,7 +306,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -322,7 +322,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -338,7 +338,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Username
@@ -354,7 +354,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UsernameSelector
@@ -370,14 +370,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportHeight
 Viewport height override.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Session, Url, File
 Aliases: None
 Possible values:
@@ -386,14 +386,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportWidth
 Viewport width override.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Session, Url, File
 Aliases: None
 Possible values:
@@ -402,7 +402,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Visible
@@ -418,7 +418,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Width
@@ -434,7 +434,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

@@ -54,14 +54,14 @@ Base URL used to resolve relative links and resources.
 ```yaml
 Type: Uri
 Parameter Sets: Content, File
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CollectionHint
@@ -77,7 +77,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CollectionLimit
@@ -86,14 +86,14 @@ Maximum number of distinct inferred collections.
 ```yaml
 Type: Int32
 Parameter Sets: Content, File, Url, Snapshot
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: 5
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Content
@@ -102,14 +102,14 @@ HTML content to read.
 ```yaml
 Type: String
 Parameter Sets: Content
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Header
@@ -125,7 +125,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -MinimumRepeatCount
@@ -134,14 +134,14 @@ Minimum number of repeated elements required for an inferred collection.
 ```yaml
 Type: Int32
 Parameter Sets: Content, File, Url, Snapshot
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: 2
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -NoCollections
@@ -150,14 +150,14 @@ Skips repeated-collection inference.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Content, File, Url, Snapshot
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: False
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -173,7 +173,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -182,14 +182,14 @@ Proxy server address used when downloading by URL.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -198,14 +198,14 @@ Credentials used with the proxy server.
 ```yaml
 Type: PSCredential
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -RenderedSnapshot
@@ -214,14 +214,14 @@ Rendered browser snapshot to read instead of the static source HTML.
 ```yaml
 Type: HtmlRenderedPageSnapshot
 Parameter Sets: Snapshot
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -237,7 +237,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -246,14 +246,14 @@ User-Agent header used when downloading Url.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

@@ -51,7 +51,7 @@ Required: False
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Plan
@@ -67,23 +67,23 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -RecommendedMode
 Optional extraction mode filter.
 
 ```yaml
-Type: Nullable`1
+Type: HtmlExtractionPlanMode
 Parameter Sets: List
 Aliases: None
-Possible values:
+Possible values: Static, RenderedSnapshot, Crawl, BrowserlessRelayCandidate, AuthRequired
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

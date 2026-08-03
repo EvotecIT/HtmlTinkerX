@@ -11,12 +11,12 @@ Clicks a selector or visible text target in a browser session before extraction.
 ## SYNTAX
 ### BySelector (Default)
 ```powershell
-Invoke-HtmlBrowserClick [[-Session] <HtmlBrowserSession>] [-Selector] <string> [-Button <MouseButton>] [-ClickCount <int>] [-Nth <int>] [-Modifier <KeyboardModifier[]>] [-IfVisible] [-Timeout <int>] [-PassThru] [-OnFailureEvidence] [-FailureEvidenceFolder <string>] [<CommonParameters>]
+Invoke-HtmlBrowserClick [[-Session] <HtmlBrowserSession>] [-Selector] <string> [-Button <MouseButton>] [-ClickCount <int>] [-Nth <Int32>] [-Modifier <KeyboardModifier[]>] [-IfVisible] [-Timeout <int>] [-PassThru] [-OnFailureEvidence] [-FailureEvidenceFolder <string>] [<CommonParameters>]
 ```
 
 ### ByText
 ```powershell
-Invoke-HtmlBrowserClick [[-Session] <HtmlBrowserSession>] [-Text] <string> [-Exact] [-Regex <string>] [-Nth <int>] [-IfVisible] [-Timeout <int>] [-PassThru] [-OnFailureEvidence] [-FailureEvidenceFolder <string>] [<CommonParameters>]
+Invoke-HtmlBrowserClick [[-Session] <HtmlBrowserSession>] [-Text] <string> [-Exact] [-Regex <string>] [-Nth <Int32>] [-IfVisible] [-Timeout <int>] [-PassThru] [-OnFailureEvidence] [-FailureEvidenceFolder <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -54,7 +54,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ClickCount
@@ -70,7 +70,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Exact
@@ -86,7 +86,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -FailureEvidenceFolder
@@ -102,7 +102,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -IfVisible
@@ -118,7 +118,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Modifier
@@ -134,14 +134,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Nth
 Zero-based index of the matching selector or text target to click.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: BySelector, ByText
 Aliases: None
 Possible values:
@@ -150,7 +150,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -OnFailureEvidence
@@ -166,7 +166,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PassThru
@@ -182,7 +182,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Regex
@@ -198,7 +198,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Selector
@@ -214,7 +214,7 @@ Required: True
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Session
@@ -230,7 +230,7 @@ Required: False
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Text
@@ -246,7 +246,7 @@ Required: True
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timeout
@@ -262,7 +262,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

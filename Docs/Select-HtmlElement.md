@@ -54,14 +54,14 @@ HTML content to search.
 ```yaml
 Type: String
 Parameter Sets: Content
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -First
@@ -75,9 +75,9 @@ Possible values:
 
 Required: False
 Position: named
-Default value: False
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Header
@@ -93,7 +93,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Input
@@ -109,7 +109,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -125,7 +125,7 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -134,14 +134,14 @@ Proxy server address used when downloading by URL.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -150,14 +150,14 @@ Credentials used with the proxy server.
 ```yaml
 Type: PSCredential
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Required
@@ -166,14 +166,14 @@ Throw when the selector matches no elements.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Input, Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: False
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Selector
@@ -182,14 +182,14 @@ CSS selector evaluated against the static document or input element.
 ```yaml
 Type: String
 Parameter Sets: Input, Content, File, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: 1
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -205,7 +205,7 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -214,14 +214,14 @@ User-Agent header used when downloading Url.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

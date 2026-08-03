@@ -11,12 +11,12 @@ Starts a browser session for rendered web automation, extraction, and evidence w
 ## SYNTAX
 ### Url (Default)
 ```powershell
-Start-HtmlBrowserSession [-Url] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-ScreenWidth <int>] [-ScreenHeight <int>] [-DeviceScaleFactor <double>] [-Mobile] [-Touch] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Start-HtmlBrowserSession [-Url] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Start-HtmlBrowserSession [-Path] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <int>] [-ViewportHeight <int>] [-ScreenWidth <int>] [-ScreenHeight <int>] [-DeviceScaleFactor <double>] [-Mobile] [-Touch] [-GeoLatitude <double>] [-GeoLongitude <double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Start-HtmlBrowserSession [-Path] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -45,7 +45,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BlockResourceType
@@ -61,7 +61,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Browser
@@ -77,7 +77,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BrowserArgument
@@ -93,7 +93,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BrowserChannel
@@ -109,7 +109,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -BrowserExecutablePath
@@ -125,7 +125,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CancellationToken
@@ -141,7 +141,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -CdpEndpointUrl
@@ -157,7 +157,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ChromiumSandbox
@@ -173,7 +173,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Clean
@@ -189,7 +189,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Credential
@@ -205,14 +205,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -DeviceScaleFactor
 Scaling factor for high DPI devices.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -221,14 +221,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLatitude
 Latitude used for geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -237,14 +237,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -GeoLongitude
 Longitude used for geolocation.
 
 ```yaml
-Type: Nullable`1
+Type: Double
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -253,7 +253,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -InitScript
@@ -269,7 +269,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -InitScriptPath
@@ -285,7 +285,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoadState
@@ -301,7 +301,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Locale
@@ -317,7 +317,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoginSuccessSelector
@@ -333,7 +333,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoginTimeout
@@ -349,7 +349,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -LoginUrl
@@ -365,7 +365,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ManualLogin
@@ -381,7 +381,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Mobile
@@ -397,7 +397,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -NoDefault
@@ -413,7 +413,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Password
@@ -429,7 +429,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PasswordSelector
@@ -445,7 +445,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Path
@@ -461,7 +461,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Permission
@@ -477,7 +477,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -PreventSsoAutoSubmit
@@ -493,7 +493,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProfilePath
@@ -509,7 +509,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
@@ -525,7 +525,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -541,7 +541,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Scenario
@@ -557,14 +557,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ScreenHeight
 Screen height in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -573,14 +573,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ScreenWidth
 Screen width in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -589,7 +589,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SlowMo
@@ -605,7 +605,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -StatePath
@@ -621,7 +621,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -SubmitSelector
@@ -637,7 +637,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timeout
@@ -653,7 +653,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Timezone
@@ -669,7 +669,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Touch
@@ -685,7 +685,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -701,7 +701,7 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -717,7 +717,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserDataDirectory
@@ -733,7 +733,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Username
@@ -749,7 +749,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UsernameSelector
@@ -765,14 +765,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportHeight
 Viewport height in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -781,14 +781,14 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ViewportWidth
 Viewport width in pixels.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Url, File
 Aliases: None
 Possible values:
@@ -797,7 +797,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Visible
@@ -813,7 +813,7 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters

@@ -20,7 +20,9 @@ ConvertFrom-Html -Url <uri> [-Engine <HtmlParserEngine>] [-Proxy <string>] [-Pro
 ```
 
 ## DESCRIPTION
-The cmdlet can read raw HTML or download a web page specified with -Url. When downloading, optional -Proxy and -ProxyCredential parameters control the web request.
+The cmdlet can read raw HTML or download a web page specified with
+-Url. When downloading, optional -Proxy and
+-ProxyCredential parameters control the web request.
 
 ## EXAMPLES
 
@@ -44,32 +46,30 @@ HTML content to parse.
 ```yaml
 Type: String
 Parameter Sets: Content
-Aliases:
+Aliases: None
 Possible values:
 
 Required: True
 Position: named
 Default value: None
 Accept pipeline input: True (ByValue, ByPropertyName)
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Engine
 Selects parsing engine.
 
-Possible values: AngleSharp, AgilityPack
-
 ```yaml
 Type: HtmlParserEngine
 Parameter Sets: Content, Url
-Aliases:
+Aliases: None
 Possible values: AngleSharp, AgilityPack
 
 Required: False
 Position: named
-Default value: AgilityPack
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Header
@@ -85,23 +85,24 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Proxy
-Optional proxy server address used when fetching content from Url. Include the protocol and port number if required.
+Optional proxy server address used when fetching content from Url.
+Include the protocol and port number if required.
 
 ```yaml
 Type: String
 Parameter Sets: Content, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
@@ -110,14 +111,14 @@ Credentials used to authenticate against the Proxy server.
 ```yaml
 Type: PSCredential
 Parameter Sets: Content, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Raw
@@ -126,14 +127,14 @@ Return raw document object.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Content, Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
-Default value: False
+Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -Url
@@ -149,7 +150,7 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### -UserAgent
@@ -158,14 +159,14 @@ User-Agent header used when downloading Url.
 ```yaml
 Type: String
 Parameter Sets: Url
-Aliases:
+Aliases: None
 Possible values:
 
 Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: True
+Accept wildcard characters: False
 ```
 
 ### CommonParameters
