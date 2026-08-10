@@ -249,6 +249,7 @@ public sealed class HtmlBrowserLaunchOptions {
         ApplyIfSet(profile.GeoLatitude, value => GeoLatitude = value);
         ApplyIfSet(profile.GeoLongitude, value => GeoLongitude = value);
         ApplyIfSet(profile.ChromiumSandbox, value => ChromiumSandbox = value);
+        ApplyIfSet(profile.IgnoreHttpsErrors, value => IgnoreHTTPSErrors = value);
         ApplyIfSet(profile.PreventSsoAutoSubmit, value => PreventSsoAutoSubmit = value);
 
         AddMissing(BrowserArguments, profile.BrowserArguments);

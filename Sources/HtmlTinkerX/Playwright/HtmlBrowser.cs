@@ -245,10 +245,17 @@ public static partial class HtmlBrowser {
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
 
-        IBrowserContext context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-            () => browserInstance.NewContextAsync(contextOptions),
-            closeBrowserOnCancellation ? () => browserInstance.CloseAsync() : static () => Task.CompletedTask,
-            cancellationToken).ConfigureAwait(false);
+        Task<IBrowserContext> contextCreation = browserInstance.NewContextAsync(contextOptions);
+        IBrowserContext context;
+        try {
+            context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => contextCreation,
+                closeBrowserOnCancellation ? () => browserInstance.CloseAsync() : static () => Task.CompletedTask,
+                cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (!closeBrowserOnCancellation) {
+            CloseContextWhenCreated(contextCreation);
+            throw;
+        }
         try {
             IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 context.NewPageAsync,
@@ -259,6 +266,16 @@ public static partial class HtmlBrowser {
             StartBestEffortClose(() => context.CloseAsync());
             throw;
         }
+    }
+
+    private static void CloseContextWhenCreated(Task<IBrowserContext> contextCreation) {
+        _ = contextCreation.ContinueWith(static completed => {
+            if (completed.Status == TaskStatus.RanToCompletion) {
+                StartBestEffortClose(() => completed.Result.CloseAsync());
+            } else {
+                _ = completed.Exception;
+            }
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {

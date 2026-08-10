@@ -145,6 +145,11 @@ public class HtmlBrowserPdfExportTests {
     [Fact]
     public async Task OpenSessionAsync_CdpCancellationDoesNotCloseExternalBrowser() {
         TaskCompletionSource<IBrowserContext> pendingContext = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> contextClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()))
+            .Callback(() => contextClosed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
         var browser = new Mock<IBrowser>();
         browser.SetupGet(value => value.Contexts).Returns(Array.Empty<IBrowserContext>());
         browser.SetupGet(value => value.IsConnected).Returns(true);
@@ -162,7 +167,11 @@ public class HtmlBrowserPdfExportTests {
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opening);
+            pendingContext.SetResult(context.Object);
+            Task completed = await Task.WhenAny(contextClosed.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+            Assert.Same(contextClosed.Task, completed);
             browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Never);
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Once);
             playwright.Verify(value => value.Dispose(), Times.Once);
         } finally {
             HtmlBrowser.PlaywrightFactory = null;

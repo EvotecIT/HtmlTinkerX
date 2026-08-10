@@ -283,19 +283,20 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
 #if !NETFRAMEWORK
     [Fact]
     public async Task HttpsCertificateErrorsRequireAnExplicitOptIn() {
-        await using LoopbackHttpsServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using (LoopbackHttpsServer strictServer = new())
         await using (HtmlBrowserPdfRenderer strict = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1, networkPolicy: policy))) {
             await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(
-                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url))));
+                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(strictServer.Url))));
         }
 
+        await using LoopbackHttpsServer trustedServer = new();
         await using HtmlBrowserPdfRenderer trusted = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             ignoreHttpsErrors: true,
             networkPolicy: policy));
         HtmlBrowserPdfResult result = await trusted.CaptureAsync(
-            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url)));
+            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(trustedServer.Url)));
 
         AssertPdfContains(result.PdfBytes, "trusted TLS page");
     }

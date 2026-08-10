@@ -180,6 +180,23 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(2, calls);
     }
 
+    [Fact]
+    public async Task SuccessfulDnsLookupExpiresInWarmPolicyEvaluator() {
+        int calls = 0;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => Task.FromResult(new[] { IPAddress.Parse(Interlocked.Increment(ref calls) == 1 ? "8.8.8.8" : "1.1.1.1") }),
+            TimeSpan.FromSeconds(30),
+            () => now);
+
+        Assert.True(await evaluator.IsAllowedAsync("https://refresh.example/report", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("https://refresh.example/report", null, CancellationToken.None));
+        now = now.AddSeconds(31);
+        Assert.True(await evaluator.IsAllowedAsync("https://refresh.example/report", null, CancellationToken.None));
+        Assert.Equal(2, calls);
+    }
+
     [Theory]
     [InlineData("192.0.2.1")]
     [InlineData("198.51.100.1")]
@@ -225,6 +242,27 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         } finally {
             origin.Stop();
         }
+    }
+
+    [Fact]
+    public async Task PolicyProxyBoundsOutboundConnectionAttempts() {
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "render.invalid" });
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { IPAddress.Loopback }));
+        TaskCompletionSource<bool> neverConnects = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using HtmlBrowserPolicyProxy proxy = new(
+            evaluator,
+            TimeSpan.FromMilliseconds(50),
+            (_, _, _) => neverConnects.Task);
+        Uri proxyUri = new(proxy.Server);
+        using TcpClient browser = new();
+        await browser.ConnectAsync(IPAddress.Loopback, proxyUri.Port);
+        using NetworkStream browserStream = browser.GetStream();
+        byte[] payload = Encoding.ASCII.GetBytes("GET http://render.invalid:8080/bound HTTP/1.1\r\nHost: render.invalid:8080\r\n\r\n");
+        await browserStream.WriteAsync(payload, 0, payload.Length);
+        using MemoryStream responseBytes = new();
+        await browserStream.CopyToAsync(responseBytes);
+
+        Assert.Contains("403 Forbidden", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
     }
 
     [Fact]

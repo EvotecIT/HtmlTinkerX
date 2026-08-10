@@ -11,13 +11,22 @@ using System.Threading;
 using System.Threading.Tasks;
 
 internal sealed class HtmlBrowserNetworkPolicyEvaluator {
+    private static readonly TimeSpan DefaultDnsCacheDuration = TimeSpan.FromSeconds(30);
     private readonly HtmlBrowserNetworkPolicy _policy;
     private readonly Func<string, Task<IPAddress[]>> _resolveHost;
-    private readonly ConcurrentDictionary<string, Task<IPAddress[]>> _dns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<DateTimeOffset> _utcNow;
+    private readonly TimeSpan _dnsCacheDuration;
+    private readonly ConcurrentDictionary<string, DnsCacheEntry> _dns = new(StringComparer.OrdinalIgnoreCase);
 
-    internal HtmlBrowserNetworkPolicyEvaluator(HtmlBrowserNetworkPolicy policy, Func<string, Task<IPAddress[]>>? resolveHost = null) {
+    internal HtmlBrowserNetworkPolicyEvaluator(
+        HtmlBrowserNetworkPolicy policy,
+        Func<string, Task<IPAddress[]>>? resolveHost = null,
+        TimeSpan? dnsCacheDuration = null,
+        Func<DateTimeOffset>? utcNow = null) {
         _policy = policy;
         _resolveHost = resolveHost ?? Dns.GetHostAddressesAsync;
+        _dnsCacheDuration = dnsCacheDuration ?? DefaultDnsCacheDuration;
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
     internal async Task<bool> IsAllowedAsync(string url, string? selectedFileDirectory, CancellationToken cancellationToken) {
@@ -53,15 +62,15 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         }
 
         IPAddress[] addresses;
-        Task<IPAddress[]>? lookup = null;
+        DnsCacheEntry? entry = null;
         if (IPAddress.TryParse(host, out IPAddress? literal)) {
             addresses = new[] { literal };
         } else {
             try {
-                lookup = _dns.GetOrAdd(host, _resolveHost);
-                addresses = await WaitAsync(lookup, cancellationToken).ConfigureAwait(false);
+                entry = GetOrRefreshDnsEntry(host);
+                addresses = await WaitAsync(entry.Lookup, cancellationToken).ConfigureAwait(false);
             } catch (SocketException) {
-                if (lookup != null) _dns.TryRemove(host, out _);
+                if (entry != null) RemoveDnsEntry(host, entry);
                 return Array.Empty<IPAddress>();
             }
         }
@@ -70,6 +79,23 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (MatchesHost(host, _policy.AllowedHosts) || _policy.AllowPrivateNetworks) return addresses;
         return addresses.All(IsPublicAddress) ? addresses : Array.Empty<IPAddress>();
     }
+
+    private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
+        while (true) {
+            DateTimeOffset now = _utcNow();
+            if (_dns.TryGetValue(host, out DnsCacheEntry? current) && current.ExpiresAt > now) return current;
+
+            DnsCacheEntry replacement = new(() => _resolveHost(host), now.Add(_dnsCacheDuration));
+            if (current == null) {
+                if (_dns.TryAdd(host, replacement)) return replacement;
+            } else if (_dns.TryUpdate(host, replacement, current)) {
+                return replacement;
+            }
+        }
+    }
+
+    private void RemoveDnsEntry(string host, DnsCacheEntry entry) =>
+        ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(new KeyValuePair<string, DnsCacheEntry>(host, entry));
 
     private bool IsFileAllowed(string path, string? selectedFileDirectory) {
         if (!HtmlBrowserFileSystemPath.TryResolveExistingPath(path, out string fullPath)) return false;
@@ -148,5 +174,17 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancelled);
         if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) cancellationToken.ThrowIfCancellationRequested();
         return await task.ConfigureAwait(false);
+    }
+
+    private sealed class DnsCacheEntry {
+        private readonly Lazy<Task<IPAddress[]>> _lookup;
+
+        internal DnsCacheEntry(Func<Task<IPAddress[]>> lookup, DateTimeOffset expiresAt) {
+            _lookup = new Lazy<Task<IPAddress[]>>(lookup, LazyThreadSafetyMode.ExecutionAndPublication);
+            ExpiresAt = expiresAt;
+        }
+
+        internal Task<IPAddress[]> Lookup => _lookup.Value;
+        internal DateTimeOffset ExpiresAt { get; }
     }
 }

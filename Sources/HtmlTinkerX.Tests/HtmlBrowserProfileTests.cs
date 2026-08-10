@@ -24,6 +24,7 @@ public class HtmlBrowserProfileTests {
             Timezone = "America/New_York",
             ViewportWidth = 1365,
             ViewportHeight = 768,
+            IgnoreHttpsErrors = true,
             PreventSsoAutoSubmit = true
         };
         profile.BrowserArguments.Add("--disable-dev-shm-usage");
@@ -42,6 +43,7 @@ public class HtmlBrowserProfileTests {
             Assert.Equal("America/New_York", options.Timezone);
             Assert.Equal(1365, options.ViewportWidth);
             Assert.Equal(768, options.ViewportHeight);
+            Assert.True(options.IgnoreHTTPSErrors);
             Assert.True(options.PreventSsoAutoSubmit);
             Assert.Contains("--disable-dev-shm-usage", options.BrowserArguments);
             Assert.Contains("geolocation", options.Permissions);

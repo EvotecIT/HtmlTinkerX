@@ -17,24 +17,26 @@ using System.Threading.Tasks;
 /// </summary>
 internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     private const int MaximumHeaderBytes = 64 * 1024;
+    private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(10);
     private readonly HtmlBrowserNetworkPolicyEvaluator _policy;
+    private readonly TimeSpan _connectTimeout;
+    private readonly Func<TcpClient, IPAddress, int, Task> _connect;
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ConcurrentDictionary<long, Task> _clients = new();
     private readonly Task _acceptLoop;
     private long _nextClient;
 
-    internal HtmlBrowserPolicyProxy(HtmlBrowserNetworkPolicy policy) {
-        _policy = new HtmlBrowserNetworkPolicyEvaluator(policy);
-        _listener = new TcpListener(IPAddress.Loopback, 0);
-        _listener.Start();
-        IPEndPoint endpoint = (IPEndPoint)_listener.LocalEndpoint;
-        Server = $"http://127.0.0.1:{endpoint.Port}";
-        _acceptLoop = AcceptLoopAsync();
-    }
+    internal HtmlBrowserPolicyProxy(HtmlBrowserNetworkPolicy policy)
+        : this(new HtmlBrowserNetworkPolicyEvaluator(policy)) { }
 
-    internal HtmlBrowserPolicyProxy(HtmlBrowserNetworkPolicyEvaluator policy) {
+    internal HtmlBrowserPolicyProxy(
+        HtmlBrowserNetworkPolicyEvaluator policy,
+        TimeSpan? connectTimeout = null,
+        Func<TcpClient, IPAddress, int, Task>? connect = null) {
         _policy = policy;
+        _connectTimeout = connectTimeout ?? DefaultConnectTimeout;
+        _connect = connect ?? ((client, address, port) => client.ConnectAsync(address, port));
         _listener = new TcpListener(IPAddress.Loopback, 0);
         _listener.Start();
         IPEndPoint endpoint = (IPEndPoint)_listener.LocalEndpoint;
@@ -185,11 +187,15 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         IPAddress[] addresses = await _policy.ResolveAllowedAddressesAsync(target, cancellationToken).ConfigureAwait(false);
         if (addresses.Length == 0) RequestBlocked?.Invoke(target);
         int port = target.IsDefaultPort ? (target.Scheme == Uri.UriSchemeHttps || target.Scheme == "wss" ? 443 : 80) : target.Port;
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_connectTimeout);
         foreach (IPAddress address in addresses) {
             TcpClient client = new(address.AddressFamily);
             try {
-                await WaitAsync(client.ConnectAsync(address, port), cancellationToken, client).ConfigureAwait(false);
+                await WaitAsync(_connect(client, address, port), deadline.Token, client).ConfigureAwait(false);
                 return client;
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+                client.Dispose();
             } catch (Exception ex) when (ex is SocketException || ex is IOException) {
                 client.Dispose();
             }
@@ -260,7 +266,10 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             values.Item2.Dispose();
             values.Item1.TrySetResult(true);
         }, Tuple.Create(cancelled, client));
-        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) cancellationToken.ThrowIfCancellationRequested();
+        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) {
+            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         await task.ConfigureAwait(false);
     }
 
