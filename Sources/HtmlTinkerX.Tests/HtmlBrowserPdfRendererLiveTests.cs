@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security.Authentication;
 #endif
 
 namespace HtmlTinkerX.Tests;
@@ -116,6 +117,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "cross-origin-clean");
         Assert.Equal("origin-header", declaredOrigin.LastRenderToken);
         Assert.Null(foreignOrigin.LastRenderToken);
+    }
+
+    [Fact]
+    public async Task CrossOriginPageHeadersSurviveCaptureHeaderScoping() {
+        await using LoopbackCorsHeaderServer foreignOrigin = new();
+        await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
+        string html = $"<html><body><img src='/probe'><p id='result'>pending</p><script>fetch('{foreignOrigin.Url}', {{ headers: {{ 'X-Render-Token': 'page-owned' }} }}).then(response => response.text()).then(text => document.querySelector('#result').textContent = text);</script></body></html>";
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'foreign authorized'",
+                timeout: 5000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "capture-owned" }));
+
+        AssertPdfContains(result.PdfBytes, "foreign authorized");
+        Assert.Equal("capture-owned", declaredOrigin.LastRenderToken);
+        Assert.Equal("page-owned", foreignOrigin.LastRenderToken);
     }
 
     [Fact]
@@ -444,20 +468,20 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 #if !NETFRAMEWORK
     [Fact]
     public async Task HttpsCertificateErrorsRequireAnExplicitOptIn() {
+        await using LoopbackHttpsServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowPrivateNetworks: true);
-        await using (LoopbackHttpsServer strictServer = new())
         await using (HtmlBrowserPdfRenderer strict = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1, networkPolicy: policy))) {
-            await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(
-                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(strictServer.Url))));
+            PlaywrightException exception = await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(
+                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url))));
+            Assert.Contains("ERR_CERT", exception.Message, StringComparison.OrdinalIgnoreCase);
         }
 
-        await using LoopbackHttpsServer trustedServer = new();
         await using HtmlBrowserPdfRenderer trusted = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             ignoreHttpsErrors: true,
             networkPolicy: policy));
         HtmlBrowserPdfResult result = await trusted.CaptureAsync(
-            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(trustedServer.Url)));
+            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url)));
 
         AssertPdfContains(result.PdfBytes, "trusted TLS page");
     }
@@ -797,6 +821,62 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
     }
 
+    private sealed class LoopbackCorsHeaderServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _serverTask;
+        private string? _lastRenderToken;
+
+        internal LoopbackCorsHeaderServer() {
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}/foreign";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        internal string? LastRenderToken => Volatile.Read(ref _lastRenderToken);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    using TcpClient client = await _listener.AcceptTcpClientAsync();
+                    using NetworkStream stream = client.GetStream();
+                    byte[] buffer = new byte[8192];
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? origin = LoopbackHtmlServer.ReadHeader(request, "Origin");
+                    bool preflight = request.StartsWith("OPTIONS ", StringComparison.Ordinal);
+                    if (!preflight) {
+                        Volatile.Write(ref _lastRenderToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                    }
+                    byte[] body = preflight ? Array.Empty<byte>() : Encoding.UTF8.GetBytes("foreign authorized");
+                    StringBuilder headers = new();
+                    headers.Append("HTTP/1.1 200 OK\r\n")
+                        .Append("Content-Type: text/plain; charset=utf-8\r\n")
+                        .Append("Access-Control-Allow-Headers: X-Render-Token\r\n")
+                        .Append("Access-Control-Allow-Methods: GET, OPTIONS\r\n");
+                    if (origin != null) headers.Append("Access-Control-Allow-Origin: ").Append(origin).Append("\r\n");
+                    headers.Append("Content-Length: ").Append(body.Length).Append("\r\nConnection: close\r\n\r\n");
+                    byte[] headerBytes = Encoding.ASCII.GetBytes(headers.ToString());
+                    await stream.WriteAsync(headerBytes, 0, headerBytes.Length);
+                    if (body.Length > 0) await stream.WriteAsync(body, 0, body.Length);
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            _cancellation.Dispose();
+        }
+    }
+
 #if !NETFRAMEWORK
     private sealed class LoopbackHttpsServer : IAsyncDisposable {
         private readonly RSA _key = RSA.Create(2048);
@@ -824,7 +904,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 0,
                 listen => {
                     listen.Protocols = HttpProtocols.Http1;
-                    listen.UseHttps(_certificate);
+                    listen.UseHttps(https => {
+                        https.ServerCertificate = _certificate;
+                        https.SslProtocols = SslProtocols.Tls12;
+                    });
                 }));
             _application = builder.Build();
             _application.MapGet("/certificate", () => Results.Content(

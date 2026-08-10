@@ -73,22 +73,21 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try {
             JsonElement request = payload.GetProperty("request");
             string url = request.GetProperty("url").GetString()!;
-            Dictionary<string, string> headers = new(StringComparer.OrdinalIgnoreCase);
-            foreach (JsonProperty header in request.GetProperty("headers").EnumerateObject()) {
-                headers[header.Name] = header.Value.GetString() ?? string.Empty;
-            }
-            foreach (string name in _captureHeaders.Keys) headers.Remove(name);
+            Dictionary<string, object> continueArguments = new() { ["requestId"] = requestId };
             if (IsSameOrigin(_origin, url)) {
+                Dictionary<string, string> headers = new(StringComparer.OrdinalIgnoreCase);
+                foreach (JsonProperty header in request.GetProperty("headers").EnumerateObject()) {
+                    headers[header.Name] = header.Value.GetString() ?? string.Empty;
+                }
                 foreach (KeyValuePair<string, string> header in _captureHeaders) headers[header.Key] = header.Value;
+                continueArguments["headers"] = headers.Select(header => (object)new Dictionary<string, object> {
+                    ["name"] = header.Key,
+                    ["value"] = header.Value
+                }).ToArray();
             }
-            object[] cdpHeaders = headers.Select(header => (object)new Dictionary<string, object> {
-                ["name"] = header.Key,
-                ["value"] = header.Value
-            }).ToArray();
-            await _session.SendAsync("Fetch.continueRequest", new Dictionary<string, object> {
-                ["requestId"] = requestId,
-                ["headers"] = cdpHeaders
-            }).ConfigureAwait(false);
+            // CDP request overrides apply only to this hop and do not extend to redirects.
+            // Continuing other origins without a headers argument preserves page-owned values.
+            await _session.SendAsync("Fetch.continueRequest", continueArguments).ConfigureAwait(false);
         } catch (Exception) {
             try {
                 await _session.SendAsync("Fetch.failRequest", new Dictionary<string, object> {
