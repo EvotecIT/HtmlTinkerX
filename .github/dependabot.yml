@@ -1,13 +1,31 @@
 version: 2
 updates:
-  - package-ecosystem: "nuget"
-    directories:
-      - "/Sources/HtmlTinkerX"
-      - "/Sources/HtmlTinkerX.Tests"
-      - "/Sources/PSParseHTML.PowerShell"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "Europe/Warsaw"
-    open-pull-requests-limit: 10
+- package-ecosystem: nuget
+  directories:
+  - /Sources/HtmlTinkerX
+  - /Sources/HtmlTinkerX.Tests
+  - /Sources/PSParseHTML.PowerShell
+  schedule:
+    interval: daily
+  cooldown:
+    default-days: 7
+    include:
+    - '*'
+  open-pull-requests-limit: 1
+  groups:
+    all-dependencies:
+      patterns:
+      - '*'
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: daily
+  cooldown:
+    default-days: 7
+    include:
+    - '*'
+  open-pull-requests-limit: 1
+  groups:
+    all-dependencies:
+      patterns:
+      - '*'
