@@ -133,7 +133,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }
 
                 if (allowed) {
-                    RouteFetchOptions? fetchOptions = CreateScopedHeaderOptions(request, route.Request);
+                    RouteFetchOptions? fetchOptions = await CreateScopedHeaderOptionsAsync(request, route.Request).ConfigureAwait(false);
                     if (fetchOptions == null) {
                         await route.ContinueAsync().ConfigureAwait(false);
                     } else {
@@ -337,9 +337,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
         await context.AddInitScriptAsync(script).ConfigureAwait(false);
     }
 
-    private static RouteFetchOptions? CreateScopedHeaderOptions(HtmlBrowserPdfRequest request, IRequest networkRequest) {
+    private static async Task<RouteFetchOptions?> CreateScopedHeaderOptionsAsync(HtmlBrowserPdfRequest request, IRequest networkRequest) {
         if (request.Headers.Count == 0 || !IsSameOrigin(request.Source.SecurityOrigin, networkRequest.Url)) return null;
-        Dictionary<string, string> headers = new(networkRequest.Headers, StringComparer.OrdinalIgnoreCase);
+        IReadOnlyDictionary<string, string> browserHeaders = await networkRequest.AllHeadersAsync().ConfigureAwait(false);
+        Dictionary<string, string> headers = new(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> header in browserHeaders) headers[header.Key] = header.Value;
         foreach (KeyValuePair<string, string> header in request.Headers) headers[header.Key] = header.Value;
         return new RouteFetchOptions { Headers = headers, MaxRedirects = 0 };
     }

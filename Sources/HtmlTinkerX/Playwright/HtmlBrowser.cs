@@ -72,7 +72,10 @@ public static partial class HtmlBrowser {
             IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => playwright.Chromium.ConnectOverCDPAsync(
                     options.CdpEndpointUrl!,
-                    new BrowserTypeConnectOverCDPOptions { Timeout = options.Timeout }),
+                    new BrowserTypeConnectOverCDPOptions {
+                        SlowMo = options.SlowMo,
+                        Timeout = options.Timeout
+                    }),
                 DisposeOwnerAsync,
                 cancellationToken).ConfigureAwait(false);
 
@@ -549,17 +552,24 @@ public static partial class HtmlBrowser {
             throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context. Do not combine CdpEndpointUrl with StatePath or StorageStatePath.");
         }
 
-        if (!string.IsNullOrWhiteSpace(options.BrowserChannel) || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath) || options.Clean) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used.");
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)
+            || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath)
+            || options.BrowserArguments.Count > 0
+            || options.ChromiumSandbox.HasValue
+            || options.Clean) {
+            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, BrowserArguments, ChromiumSandbox, and Clean are not used.");
         }
 
         if (HasCdpContextOnlyOptions(options)) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. Launch Chrome with those settings before attaching.");
+            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as IgnoreHTTPSErrors, HTTP credentials, video recording, Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. Launch Chrome with those settings before attaching.");
         }
     }
 
     private static bool HasCdpContextOnlyOptions(HtmlBrowserLaunchOptions options) =>
-        !string.IsNullOrWhiteSpace(options.Proxy)
+        options.IgnoreHTTPSErrors
+        || (!string.IsNullOrWhiteSpace(options.VideoPath))
+        || (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null)
+        || !string.IsNullOrWhiteSpace(options.Proxy)
         || !string.IsNullOrWhiteSpace(options.ProxyUsername)
         || !string.IsNullOrWhiteSpace(options.ProxyPassword)
         || !string.IsNullOrWhiteSpace(options.UserAgent)

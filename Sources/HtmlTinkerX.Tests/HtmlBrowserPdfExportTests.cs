@@ -190,6 +190,19 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task OpenSessionAsync_CdpRejectsIgnoreHttpsErrorsBecauseExistingContextsCannotBeReconfigured() {
+        HtmlBrowserLaunchOptions options = new() {
+            CdpEndpointUrl = "http://127.0.0.1:9222",
+            IgnoreHTTPSErrors = true
+        };
+
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            HtmlBrowser.OpenSessionAsync("https://example.com", options));
+
+        Assert.Contains("IgnoreHTTPSErrors", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OpenSessionAsync_CdpCancellationClosesPageCreatedAfterCancellation() {
         TaskCompletionSource<IPage> pendingPage = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> pageClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);

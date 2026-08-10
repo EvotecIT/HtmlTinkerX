@@ -38,6 +38,23 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ScopedRequestHeadersPreserveContextCookies() {
+        await using LoopbackHtmlServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Correlation-Id"] = "with-cookie" },
+            cookies: new[] { new HtmlBrowserPdfCookie("render-session", "authenticated", url: server.Url) });
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "URL invoice with-cookie render-session=authenticated");
+    }
+
+    [Fact]
     public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
         await using LoopbackContentServer foreignOrigin = new(
             "<html><body><p id='foreign'>foreign-pending</p><script>document.querySelector('#foreign').textContent = localStorage.getItem('token') || 'cross-origin-clean';</script></body></html>");
@@ -343,7 +360,8 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length);
                     string request = Encoding.ASCII.GetString(buffer, 0, read);
                     string correlation = ReadHeader(request, "X-Correlation-Id") ?? "missing";
-                    string body = $"<html><body><h1>URL invoice {System.Net.WebUtility.HtmlEncode(correlation)}</h1></body></html>";
+                    string cookie = ReadHeader(request, "Cookie") ?? "missing";
+                    string body = $"<html><body><h1>URL invoice {System.Net.WebUtility.HtmlEncode(correlation)} {System.Net.WebUtility.HtmlEncode(cookie)}</h1></body></html>";
                     byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
                     string headers = $"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n";
                     byte[] headerBytes = Encoding.ASCII.GetBytes(headers);
@@ -576,6 +594,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
                     await stream.WriteAsync(headers, 0, headers.Length, _cancellation.Token);
                     await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length, _cancellation.Token);
+                    await stream.FlushAsync(_cancellation.Token);
                 } catch (Exception ex) when (_cancellation.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
                     return;
                 } catch (AuthenticationException) {

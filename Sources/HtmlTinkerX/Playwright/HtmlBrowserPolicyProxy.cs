@@ -90,11 +90,11 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 }
 
                 if (string.Equals(requestParts[0], "CONNECT", StringComparison.OrdinalIgnoreCase)) {
-                    await HandleConnectAsync(browser, requestParts[1], cancellationToken).ConfigureAwait(false);
+                    await HandleConnectAsync(browserClient, browser, requestParts[1], cancellationToken).ConfigureAwait(false);
                     return;
                 }
 
-                await HandleHttpAsync(browser, requestParts, lines, headerAndRemainder, headerEnd + 4, cancellationToken).ConfigureAwait(false);
+                await HandleHttpAsync(browserClient, browser, requestParts, lines, headerAndRemainder, headerEnd + 4, cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 // Renderer disposal closes active proxy connections.
             } catch (IOException) {
@@ -105,7 +105,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         }
     }
 
-    private async Task HandleConnectAsync(NetworkStream browser, string authority, CancellationToken cancellationToken) {
+    private async Task HandleConnectAsync(TcpClient browserClient, NetworkStream browser, string authority, CancellationToken cancellationToken) {
         if (!TryParseAuthority(authority, 443, out string host, out int port)) {
             await WriteStatusAsync(browser, 400, "Bad CONNECT Target", cancellationToken).ConfigureAwait(false);
             return;
@@ -120,10 +120,11 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
 
         byte[] established = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
         await browser.WriteAsync(established, 0, established.Length, cancellationToken).ConfigureAwait(false);
-        await RelayAsync(browser, remoteClient.GetStream(), cancellationToken).ConfigureAwait(false);
+        await RelayAsync(browserClient, remoteClient, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task HandleHttpAsync(
+        TcpClient browserClient,
         NetworkStream browser,
         string[] requestParts,
         string[] lines,
@@ -180,7 +181,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         if (bodyOffset < received.Length) {
             await remote.WriteAsync(received, bodyOffset, received.Length - bodyOffset, cancellationToken).ConfigureAwait(false);
         }
-        await RelayAsync(browser, remote, cancellationToken).ConfigureAwait(false);
+        await RelayAsync(browserClient, remoteClient, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<TcpClient?> ConnectAllowedAsync(Uri target, CancellationToken cancellationToken) {
@@ -203,13 +204,30 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         return null;
     }
 
-    private static async Task RelayAsync(Stream first, Stream second, CancellationToken cancellationToken) {
+    private static async Task RelayAsync(TcpClient firstClient, TcpClient secondClient, CancellationToken cancellationToken) {
+        Stream first = firstClient.GetStream();
+        Stream second = secondClient.GetStream();
         Task firstToSecond = CopyAsync(first, second, cancellationToken);
         Task secondToFirst = CopyAsync(second, first, cancellationToken);
-        await Task.WhenAny(firstToSecond, secondToFirst).ConfigureAwait(false);
-        try { first.Dispose(); } catch (ObjectDisposedException) { }
-        try { second.Dispose(); } catch (ObjectDisposedException) { }
-        try { await Task.WhenAll(firstToSecond, secondToFirst).ConfigureAwait(false); } catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is OperationCanceledException) { }
+        Task completed = await Task.WhenAny(firstToSecond, secondToFirst).ConfigureAwait(false);
+        if (completed.Status == TaskStatus.RanToCompletion) {
+            TryShutdownSend(ReferenceEquals(completed, firstToSecond) ? secondClient : firstClient);
+        } else {
+            try { first.Dispose(); } catch (ObjectDisposedException) { }
+            try { second.Dispose(); } catch (ObjectDisposedException) { }
+        }
+        try {
+            await Task.WhenAll(firstToSecond, secondToFirst).ConfigureAwait(false);
+        } catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is OperationCanceledException) {
+        }
+    }
+
+    private static void TryShutdownSend(TcpClient client) {
+        try {
+            client.Client.Shutdown(SocketShutdown.Send);
+        } catch (Exception ex) when (ex is ObjectDisposedException || ex is SocketException) {
+            // The peer already completed the full close.
+        }
     }
 
     private static async Task CopyAsync(Stream source, Stream destination, CancellationToken cancellationToken) {
