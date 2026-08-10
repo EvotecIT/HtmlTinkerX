@@ -234,7 +234,7 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
                     token).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
-                await SaveOneShotAsync(new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri, outPath, token).ConfigureAwait(false);
+                await SaveOneShotAsync(HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri, outPath, token).ConfigureAwait(false);
                 break;
             default:
                 await SaveOneShotAsync(Url, outPath, token).ConfigureAwait(false);

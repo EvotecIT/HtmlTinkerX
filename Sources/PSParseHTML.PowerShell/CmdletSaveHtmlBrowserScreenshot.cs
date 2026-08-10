@@ -306,7 +306,7 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
                 await CaptureOneShotAsync(Url, options, token).ConfigureAwait(false);
                 break;
             case ParameterSetFileClip:
-                await CaptureOneShotAsync(new System.Uri(Path!.ToFullPath()).AbsoluteUri, options, token).ConfigureAwait(false);
+                await CaptureOneShotAsync(HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri, options, token).ConfigureAwait(false);
                 break;
             case ParameterSetSessionClip:
                 await HtmlBrowser.CaptureScreenshotAsync(
@@ -324,7 +324,7 @@ public sealed class CmdletSaveHtmlBrowserScreenshot : AsyncPSCmdlet {
                 break;
             default:
                 string target = ParameterSetName == ParameterSetFileDefault
-                    ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
+                    ? HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri
                     : Url;
                 await CaptureOneShotAsync(target, options, token).ConfigureAwait(false);
                 break;

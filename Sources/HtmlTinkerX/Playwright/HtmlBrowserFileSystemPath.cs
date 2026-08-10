@@ -18,6 +18,16 @@ internal static class HtmlBrowserFileSystemPath {
     private const uint DriveRemote = 4;
     private const int ErrorInsufficientBuffer = 122;
 
+    internal static string GetValidatedLocalPath(string path) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            throw new ArgumentException("File path cannot be empty.", nameof(path));
+        }
+        if (!IsSafeLocalPath(path)) {
+            throw new ArgumentException("Only direct local paths are supported as browser file sources; network, device, mapped, substituted, and reparse paths are rejected.", nameof(path));
+        }
+        return Path.GetFullPath(path);
+    }
+
     internal static bool TryResolveExistingPath(string path, out string resolved) {
         resolved = string.Empty;
         try {

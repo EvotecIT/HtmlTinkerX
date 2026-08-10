@@ -164,7 +164,7 @@ public sealed class CmdletSaveHtmlBrowserContent : AsyncPSCmdlet {
             await HtmlBrowser.SaveContentAsync(session, fullPath, Selector, InnerHtml.IsPresent, AsText.IsPresent, Timeout, token).ConfigureAwait(false);
         } else {
             string target = ParameterSetName == ParameterSetFile
-                ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
+                ? HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri
                 : Url!;
             HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
             ValidateProxy(launchOptions.Proxy, ProxyCredential);

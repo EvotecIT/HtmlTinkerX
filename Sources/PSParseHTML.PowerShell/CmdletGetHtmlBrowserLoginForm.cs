@@ -123,7 +123,7 @@ public sealed class CmdletGetHtmlBrowserLoginForm : AsyncPSCmdlet {
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new System.Uri(Path!.ToFullPath()).AbsoluteUri;
+                string fileUrl = HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri;
                 HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
                 await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(fileUrl, fileOptions, token).ConfigureAwait(false)) {
                     result = await HtmlBrowser.DetectLoginFormAsync(sess.Page, token).ConfigureAwait(false);

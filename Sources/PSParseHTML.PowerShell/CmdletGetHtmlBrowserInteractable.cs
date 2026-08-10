@@ -170,7 +170,7 @@ public sealed class CmdletGetHtmlBrowserInteractable : AsyncPSCmdlet {
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new Uri(Path!.ToFullPath()).AbsoluteUri;
+                string fileUrl = HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri;
                 HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
                 await using (HtmlBrowserSession sess = await HtmlBrowser.OpenSessionAsync(fileUrl, fileOptions, token).ConfigureAwait(false)) {
                     list = await HtmlBrowser.GetInteractablesAsync(sess.Page, token).ConfigureAwait(false);

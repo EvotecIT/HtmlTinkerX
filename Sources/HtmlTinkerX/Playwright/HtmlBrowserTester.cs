@@ -180,17 +180,14 @@ public static class HtmlBrowserTester {
         int timeout = 30000,
         bool ignoreHttpsErrors = false) {
         
-        // Resolve the file path
-        var resolvedPath = filePath.ToFullPath();
+        Uri fileUri = HtmlBrowser.CreateLocalFileUri(filePath);
+        string resolvedPath = fileUri.LocalPath;
         if (!System.IO.File.Exists(resolvedPath)) {
             throw new System.IO.FileNotFoundException($"HTML file not found: {resolvedPath}");
         }
-        
-        // Convert to file:// URL
-        var fileUrl = new System.Uri(resolvedPath).AbsoluteUri;
-        
+
         // Test the file URL
-        return await TestUrlAsync(fileUrl, engine, headless, timeout, ignoreHttpsErrors: ignoreHttpsErrors);
+        return await TestUrlAsync(fileUri.AbsoluteUri, engine, headless, timeout, ignoreHttpsErrors: ignoreHttpsErrors);
     }
 
     /// <summary>

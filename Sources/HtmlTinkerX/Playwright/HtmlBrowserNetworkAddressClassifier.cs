@@ -28,26 +28,30 @@ internal static class HtmlBrowserNetworkAddressClassifier {
         return false;
     }
 
-    private static bool IsGloballyReachableIpv4(byte[] bytes) {
-        byte first = bytes[0];
-        byte second = bytes[1];
+    private static bool IsGloballyReachableIpv4(byte[] bytes, int offset = 0) {
+        byte first = bytes[offset];
+        byte second = bytes[offset + 1];
         if (first == 0 || first == 10 || first == 127 || first >= 224) return false;
         if (first == 100 && second >= 64 && second <= 127) return false;
         if (first == 169 && second == 254) return false;
         if (first == 172 && second >= 16 && second <= 31) return false;
         if (first == 192 && second == 168) return false;
-        if (first == 192 && second == 0 && bytes[2] == 0) return false;
-        if (first == 192 && second == 0 && bytes[2] == 2) return false;
-        if (first == 192 && second == 88 && bytes[2] == 99) return false;
+        if (first == 192 && second == 0 && bytes[offset + 2] == 0) {
+            return bytes[offset + 3] == 9 || bytes[offset + 3] == 10;
+        }
+        if (first == 192 && second == 0 && bytes[offset + 2] == 2) return false;
+        if (first == 192 && second == 88 && bytes[offset + 2] == 99) return false;
         if (first == 198 && (second == 18 || second == 19)) return false;
-        if (first == 198 && second == 51 && bytes[2] == 100) return false;
-        if (first == 203 && second == 0 && bytes[2] == 113) return false;
+        if (first == 198 && second == 51 && bytes[offset + 2] == 100) return false;
+        if (first == 203 && second == 0 && bytes[offset + 2] == 113) return false;
         return true;
     }
 
     private static bool IsGloballyReachableIpv6(IPAddress address, byte[] bytes) {
         if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal) return false;
-        if (IsWellKnownIpv4Ipv6Translation(bytes)) return true; // 64:ff9b::/96
+        if (IsWellKnownIpv4Ipv6Translation(bytes)) {
+            return IsGloballyReachableIpv4(bytes, 12); // 64:ff9b::/96 embeds IPv4 in the final 32 bits.
+        }
         if ((bytes[0] & 0xE0) != 0x20) return false; // Global unicast allocation is 2000::/3.
 
         // IANA special-purpose ranges whose destination is not globally reachable.

@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http;
 #endif
 
 namespace HtmlTinkerX.Tests;
@@ -666,10 +667,32 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _application.StartAsync().GetAwaiter().GetResult();
             IServer server = _application.Services.GetRequiredService<IServer>();
             string address = Assert.Single(server.Features.Get<IServerAddressesFeature>()!.Addresses);
-            Url = address.TrimEnd('/') + "/certificate";
+            Uri endpoint = new(address);
+            // Use the certificate's DNS identity so Windows Chromium sends SNI. An IP-literal
+            // connection can be closed during the TLS handshake before certificate policy runs.
+            Url = $"https://localhost:{endpoint.Port}/certificate";
+            WaitUntilReachable(Url);
         }
 
         internal string Url { get; }
+
+        private static void WaitUntilReachable(string url) {
+            using HttpClientHandler handler = new() {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+            using HttpClient client = new(handler) { Timeout = TimeSpan.FromSeconds(1) };
+            Exception? lastError = null;
+            for (int attempt = 0; attempt < 10; attempt++) {
+                try {
+                    string body = client.GetStringAsync(url).GetAwaiter().GetResult();
+                    if (body.Contains("trusted TLS page", StringComparison.Ordinal)) return;
+                } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException) {
+                    lastError = ex;
+                }
+                Thread.Sleep(50);
+            }
+            throw new InvalidOperationException("The loopback HTTPS fixture did not become reachable.", lastError);
+        }
 
         public async ValueTask DisposeAsync() {
             await _application.DisposeAsync();

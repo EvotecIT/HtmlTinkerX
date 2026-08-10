@@ -1,7 +1,6 @@
 namespace HtmlTinkerX;
 
 using System;
-using System.IO;
 
 /// <summary>Immutable input for a browser-backed PDF capture.</summary>
 public sealed class HtmlBrowserPdfSource {
@@ -94,13 +93,11 @@ public sealed class HtmlBrowserPdfSource {
 
     /// <summary>Creates a local HTML-file source.</summary>
     public static HtmlBrowserPdfSource FromFile(string path) {
-        if (string.IsNullOrWhiteSpace(path)) {
-            throw new ArgumentException("File path cannot be empty.", nameof(path));
-        }
-        if (HtmlBrowserFileSystemPath.IsNetworkOrDevicePath(path)) {
-            throw new ArgumentException("UNC, network, and device paths are not supported as browser PDF file sources.", nameof(path));
-        }
-
-        return new HtmlBrowserPdfSource(HtmlBrowserPdfSourceKind.File, null, null, Path.GetFullPath(path), null);
+        return new HtmlBrowserPdfSource(
+            HtmlBrowserPdfSourceKind.File,
+            null,
+            null,
+            HtmlBrowserFileSystemPath.GetValidatedLocalPath(path),
+            null);
     }
 }

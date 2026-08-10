@@ -190,7 +190,7 @@ public sealed class CmdletGetHtmlBrowserSsoHandoff : AsyncPSCmdlet {
                 }
                 break;
             case ParameterSetFile:
-                string fileUrl = new Uri(Path!.ToFullPath()).AbsoluteUri;
+                string fileUrl = HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri;
                 HtmlBrowserLaunchOptions fileOptions = await CreateLaunchOptionsAsync(token).ConfigureAwait(false);
                 ValidateProxy(fileOptions.Proxy, ProxyCredential);
                 fileOptions.PreventSsoAutoSubmit = true;

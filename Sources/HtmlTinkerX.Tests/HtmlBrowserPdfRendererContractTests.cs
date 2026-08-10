@@ -214,6 +214,11 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(2, probes);
     }
 
+    [Fact]
+    public async Task BrowserTesterRejectsNetworkFilesBeforeExistenceChecks() {
+        await Assert.ThrowsAsync<ArgumentException>(() => HtmlBrowserTester.TestFileAsync(@"\\server\share\report.html"));
+    }
+
 #if !NETFRAMEWORK
     [Fact]
     public void WindowsSubstitutedDriveIsRejectedFromLiveDosDeviceMetadata() {
@@ -231,6 +236,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             Assert.True(File.Exists(mappedFile));
             Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(mappedFile));
             Assert.False(HtmlBrowserFileSystemPath.TryResolveExistingPath(mappedFile, out _));
+            Assert.Throws<ArgumentException>(() => HtmlBrowser.CreateLocalFileUri(mappedFile));
         } finally {
             if (!string.IsNullOrWhiteSpace(drive)) RunSubst($"{drive} /D");
             Directory.Delete(root, recursive: true);
@@ -420,6 +426,10 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [InlineData("3fff:fff::1")]
     [InlineData("4000::1")]
     [InlineData("5f00::1")]
+    [InlineData("64:ff9b::1")]
+    [InlineData("64:ff9b::a00:1")]
+    [InlineData("64:ff9b::7f00:1")]
+    [InlineData("64:ff9b::c000:201")]
     public async Task PublicNetworkPolicyRejectsNonGloballyReachableSpecialAddresses(string address) {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
@@ -429,7 +439,9 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Theory]
-    [InlineData("64:ff9b::1")]
+    [InlineData("64:ff9b::808:808")]
+    [InlineData("192.0.0.9")]
+    [InlineData("192.0.0.10")]
     [InlineData("2001:1::1")]
     [InlineData("2001:1::2")]
     [InlineData("2001:1::3")]
@@ -438,7 +450,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [InlineData("2001:20::1")]
     [InlineData("2001:30::1")]
     [InlineData("3fff:1000::1")]
-    public async Task PublicNetworkPolicyAllowsGloballyReachableIpv6SpecialAssignments(string address) {
+    public async Task PublicNetworkPolicyAllowsGloballyReachableSpecialAssignments(string address) {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
             _ => Task.FromResult(new[] { IPAddress.Parse(address) }));
