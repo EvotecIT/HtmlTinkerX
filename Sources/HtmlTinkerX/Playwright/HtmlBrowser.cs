@@ -557,11 +557,11 @@ public static partial class HtmlBrowser {
             || options.BrowserArguments.Count > 0
             || options.ChromiumSandbox.HasValue
             || options.Clean) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, BrowserArguments, ChromiumSandbox, and Clean are not used.");
+            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used. BrowserArguments and ChromiumSandbox are not used either.");
         }
 
         if (HasCdpContextOnlyOptions(options)) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as IgnoreHTTPSErrors, HTTP credentials, video recording, Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. Launch Chrome with those settings before attaching.");
+            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. IgnoreHTTPSErrors, HTTP credentials, and video recording are not applied either. Launch Chrome with those settings before attaching.");
         }
     }
 

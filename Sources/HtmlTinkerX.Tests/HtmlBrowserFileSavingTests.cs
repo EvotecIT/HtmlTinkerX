@@ -132,4 +132,38 @@ public class HtmlBrowserFileSavingTests {
         Directory.Delete(Path.GetDirectoryName(file)!, true);
     }
 
+    [Fact]
+    public async Task SavePagePdfAsync_MasksAndRestoresChildFrames() {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "frames.pdf");
+        var operations = new List<string>();
+        var mainFrame = new Mock<IFrame>();
+        var childFrame = new Mock<IFrame>();
+        childFrame.SetupGet(frame => frame.IsDetached).Returns(false);
+        childFrame.Setup(frame => frame.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
+            .Callback<string, object?>((script, _) => operations.Add(
+                script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "child-restore" : "child-mask"))
+            .ReturnsAsync((JsonElement?)default);
+        var page = new Mock<IPage>();
+        page.SetupGet(value => value.MainFrame).Returns(mainFrame.Object);
+        page.SetupGet(value => value.Frames).Returns(new[] { mainFrame.Object, childFrame.Object });
+        page.Setup(value => value.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
+            .Callback<string, object?>((script, _) => operations.Add(
+                script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "main-restore" : "main-mask"))
+            .ReturnsAsync((JsonElement?)default);
+        page.Setup(value => value.PdfAsync(It.IsAny<PagePdfOptions>()))
+            .Callback<PagePdfOptions>(options => {
+                operations.Add("pdf");
+                File.WriteAllText(options.Path!, "pdf");
+            })
+            .ReturnsAsync(Array.Empty<byte>());
+
+        await HtmlBrowser.SavePagePdfAsync(
+            page.Object,
+            file,
+            new HtmlBrowserPdfOptions(maskSelectors: new[] { ".secret" }));
+
+        Assert.Equal(new[] { "main-mask", "child-mask", "pdf", "main-restore", "child-restore" }, operations);
+        Directory.Delete(Path.GetDirectoryName(file)!, true);
+    }
+
 }

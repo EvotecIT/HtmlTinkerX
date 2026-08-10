@@ -48,6 +48,34 @@ public static partial class HtmlBrowser {
         "textarea[name*='pin' i]",
         "textarea[id*='pin' i]"
     };
+    private const string ApplyVisualMaskScript =
+        @"({ selectors, color }) => {
+            const marker = 'data-htmltinkerx-visual-mask';
+            const previousStyle = 'data-htmltinkerx-visual-mask-style';
+            const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
+            for (const selector of selectors || []) {
+                if (!selector || !selector.trim()) continue;
+                let elements = [];
+                try { elements = Array.from(document.querySelectorAll(selector)); } catch { continue; }
+                for (const element of elements) {
+                    if (!(element instanceof HTMLElement)) continue;
+                    if (!element.hasAttribute(marker)) {
+                        const currentStyle = element.getAttribute('style');
+                        element.setAttribute(previousStyle, currentStyle || '');
+                        element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
+                        element.setAttribute(marker, 'true');
+                    }
+                    element.style.setProperty('background-color', color, 'important');
+                    element.style.setProperty('border-color', color, 'important');
+                    element.style.setProperty('box-shadow', 'none', 'important');
+                    element.style.setProperty('caret-color', 'transparent', 'important');
+                    element.style.setProperty('color', 'transparent', 'important');
+                    element.style.setProperty('filter', 'none', 'important');
+                    element.style.setProperty('outline-color', color, 'important');
+                    element.style.setProperty('text-shadow', 'none', 'important');
+                }
+            }
+        }";
 
     internal static async Task<T> ExecuteWithTemporaryVisualMaskAsync<T>(
         IPage page,
@@ -62,13 +90,13 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<IFrame> maskedChildFrames = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
         try {
             cancellationToken.ThrowIfCancellationRequested();
             return await action().ConfigureAwait(false);
         } finally {
             try {
-                await RemoveTemporaryVisualMaskAsync(page).ConfigureAwait(false);
+                await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames).ConfigureAwait(false);
             } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
                 // Cancellation closes the page to interrupt Playwright. Preserve the original
                 // cancellation instead of replacing it with cleanup failure from the closed page.
@@ -93,57 +121,38 @@ public static partial class HtmlBrowser {
         return selectors.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static Task ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
+    private static async Task<IReadOnlyList<IFrame>> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         string color = string.IsNullOrWhiteSpace(maskColor) ? "#000000" : maskColor!;
-        return page.EvaluateAsync(
-            @"({ selectors, color }) => {
-                const marker = 'data-htmltinkerx-visual-mask';
-                const previousStyle = 'data-htmltinkerx-visual-mask-style';
-                const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
-                for (const selector of selectors || []) {
-                    if (!selector || !selector.trim()) {
-                        continue;
-                    }
+        object arguments = new {
+            selectors,
+            color
+        };
+        await page.EvaluateAsync(ApplyVisualMaskScript, arguments).ConfigureAwait(false);
 
-                    let elements = [];
-                    try {
-                        elements = Array.from(document.querySelectorAll(selector));
-                    } catch {
-                        continue;
-                    }
-
-                    for (const element of elements) {
-                        if (!(element instanceof HTMLElement)) {
-                            continue;
-                        }
-
-                        if (!element.hasAttribute(marker)) {
-                            const currentStyle = element.getAttribute('style');
-                            element.setAttribute(previousStyle, currentStyle || '');
-                            element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
-                            element.setAttribute(marker, 'true');
-                        }
-
-                        element.style.setProperty('background-color', color, 'important');
-                        element.style.setProperty('border-color', color, 'important');
-                        element.style.setProperty('box-shadow', 'none', 'important');
-                        element.style.setProperty('caret-color', 'transparent', 'important');
-                        element.style.setProperty('color', 'transparent', 'important');
-                        element.style.setProperty('filter', 'none', 'important');
-                        element.style.setProperty('outline-color', color, 'important');
-                        element.style.setProperty('text-shadow', 'none', 'important');
-                    }
+        List<IFrame> maskedChildFrames = new();
+        IReadOnlyList<IFrame>? frames = page.Frames;
+        if (frames == null) return maskedChildFrames;
+        try {
+            foreach (IFrame frame in frames) {
+                if (ReferenceEquals(frame, page.MainFrame)) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                try {
+                    await frame.EvaluateAsync(ApplyVisualMaskScript, arguments).ConfigureAwait(false);
+                    maskedChildFrames.Add(frame);
+                } catch (PlaywrightException) when (frame.IsDetached) {
+                    // Detached frames are no longer part of the artifact.
                 }
-            }",
-            new {
-                selectors,
-                color
-            });
+            }
+        } catch {
+            try { await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames).ConfigureAwait(false); } catch (PlaywrightException) { }
+            throw;
+        }
+        return maskedChildFrames;
     }
 
-    private static Task RemoveTemporaryVisualMaskAsync(IPage page) =>
-        page.EvaluateAsync(
+    private static async Task RemoveTemporaryVisualMaskAsync(IPage page, IReadOnlyList<IFrame> maskedChildFrames) {
+        const string restoreScript =
             @"() => {
                 const marker = 'data-htmltinkerx-visual-mask';
                 const previousStyle = 'data-htmltinkerx-visual-mask-style';
@@ -165,5 +174,14 @@ public static partial class HtmlBrowser {
                     element.removeAttribute(previousStyle);
                     element.removeAttribute(hadStyle);
                 }
-            }");
+            }";
+        await page.EvaluateAsync(restoreScript).ConfigureAwait(false);
+        foreach (IFrame frame in maskedChildFrames) {
+            try {
+                await frame.EvaluateAsync(restoreScript).ConfigureAwait(false);
+            } catch (PlaywrightException) when (frame.IsDetached) {
+                // Detached frames no longer require restoration.
+            }
+        }
+    }
 }

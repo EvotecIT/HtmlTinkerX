@@ -20,6 +20,9 @@ public sealed class HtmlBrowserPdfCookie {
         if (string.IsNullOrWhiteSpace(url) && string.IsNullOrWhiteSpace(domain)) {
             throw new ArgumentException("A cookie requires either a URL or a domain.", nameof(url));
         }
+        if (!string.IsNullOrWhiteSpace(url) && (!string.IsNullOrWhiteSpace(domain) || !string.IsNullOrWhiteSpace(path))) {
+            throw new ArgumentException("A cookie URL cannot be combined with domain or path scope. Use either URL or a domain/path pair.", nameof(url));
+        }
 
         Name = name;
         Value = value;

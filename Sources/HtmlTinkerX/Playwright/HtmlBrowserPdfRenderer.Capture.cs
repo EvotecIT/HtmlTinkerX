@@ -1,5 +1,9 @@
 namespace HtmlTinkerX;
 
+using AngleSharp;
+using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
+using AngleSharpHtmlParser = AngleSharp.Html.Parser.HtmlParser;
 using Microsoft.Playwright;
 using System;
 using System.Collections.Concurrent;
@@ -8,7 +12,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -266,18 +269,34 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     }), cancellationToken).ConfigureAwait(false);
                 } else {
                     string documentUrl = source.HtmlDocumentUri.AbsoluteUri;
+                    int initialDocumentFulfilled = 0;
+                    Func<IRoute, Task> initialDocumentRoute = route => {
+                        if (string.Equals(route.Request.ResourceType, "document", StringComparison.OrdinalIgnoreCase)
+                            && Interlocked.CompareExchange(ref initialDocumentFulfilled, 1, 0) == 0) {
+                            return route.FulfillAsync(new RouteFulfillOptions {
+                                Body = html,
+                                ContentType = "text/html; charset=utf-8",
+                                Status = 200
+                            });
+                        }
+                        return route.ContinueAsync();
+                    };
                     await ExecuteCancellablePageOperationAsync(
                         page,
-                        () => page.RouteAsync(documentUrl, route => route.FulfillAsync(new RouteFulfillOptions {
-                            Body = html,
-                            ContentType = "text/html; charset=utf-8",
-                            Status = 200
-                        })),
+                        () => page.RouteAsync(documentUrl, initialDocumentRoute),
                         cancellationToken).ConfigureAwait(false);
-                    await ExecuteCancellablePageOperationAsync(page, () => page.GotoAsync(documentUrl, new PageGotoOptions {
-                        Timeout = timeout,
-                        WaitUntil = WaitUntilState.DOMContentLoaded
-                    }), cancellationToken).ConfigureAwait(false);
+                    try {
+                        await ExecuteCancellablePageOperationAsync(page, () => page.GotoAsync(documentUrl, new PageGotoOptions {
+                            Timeout = timeout,
+                            WaitUntil = WaitUntilState.DOMContentLoaded
+                        }), cancellationToken).ConfigureAwait(false);
+                    } finally {
+                        try {
+                            await page.UnrouteAsync(documentUrl, initialDocumentRoute).ConfigureAwait(false);
+                        } catch (PlaywrightException) when (page.IsClosed) {
+                            // Cancellation closes the page and removes its routes.
+                        }
+                    }
                 }
                 break;
             default:
@@ -355,15 +374,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
     private static string AddBaseElement(string html, Uri? baseUri) {
         if (baseUri == null) return html;
-        string baseElement = "<base href=\"" + System.Net.WebUtility.HtmlEncode(baseUri.AbsoluteUri) + "\">";
-        Match head = Regex.Match(html, "<head(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (head.Success) return html.Insert(head.Index + head.Length, baseElement);
-        Match htmlElement = Regex.Match(html, "<html(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (htmlElement.Success) return html.Insert(htmlElement.Index + htmlElement.Length, "<head>" + baseElement + "</head>");
-        Match doctype = Regex.Match(html, "<!doctype(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        return doctype.Success
-            ? html.Insert(doctype.Index + doctype.Length, "<head>" + baseElement + "</head>")
-            : "<head>" + baseElement + "</head>" + html;
+        AngleSharpHtmlParser parser = new();
+        using IHtmlDocument document = parser.ParseDocument(html);
+        IElement baseElement = document.CreateElement("base");
+        baseElement.SetAttribute("href", baseUri.AbsoluteUri);
+        document.Head!.Prepend(baseElement);
+        return document.ToHtml();
     }
 
     private static async Task ExecuteCancellablePageOperationAsync(IPage page, Func<Task> operation, CancellationToken cancellationToken) {

@@ -95,6 +95,51 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task HtmlBaseInjectionIgnoresHeadTextInsideCommentsAndScripts() {
+        string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-PdfBase-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try {
+            string assets = Path.Combine(root, "assets");
+            Directory.CreateDirectory(assets);
+            Uri baseUri = new Uri(assets + Path.DirectorySeparatorChar);
+            string html = "<!-- <head>comment-only</head> --><script>const sample = '<head>script-only</head>';</script><p id='base'>pending</p>";
+            HtmlBrowserNetworkPolicy policy = new(
+                allowFileAccess: true,
+                allowedFileDirectories: new[] { root });
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                maximumBrowserInstances: 1,
+                networkPolicy: policy));
+
+            HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+                HtmlBrowserPdfSource.FromHtml(html, baseUri),
+                beforeCaptureScript: "document.querySelector('#base').textContent = document.baseURI.endsWith('/assets/') ? 'base-resolved' : document.baseURI;"));
+
+            AssertPdfContains(result.PdfBytes, "base-resolved");
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task HtmlDocumentRouteOnlyFulfillsTheInitialNavigation() {
+        await using LoopbackContentServer origin = new("server-location-response");
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        string html = "<p id='result'>pending</p><script>fetch(location.href).then(r => r.text()).then(value => document.querySelector('#result').textContent = value);</script>";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html, new Uri(origin.Url)),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent.includes('server-location-response')",
+                timeout: 10000)));
+
+        AssertPdfContains(result.PdfBytes, "server-location-response");
+    }
+
+    [Fact]
     public async Task BlockedRequestSamplesNeverExceedTheConfiguredLimit() {
         string resources = string.Join(string.Empty, Enumerable.Range(0, 24).Select(index => $"<img src='http://127.0.0.1:{20000 + index}/blocked'>"));
         HtmlBrowserNetworkPolicy policy = new(blockedRequestDiagnosticLimit: 2);
@@ -551,6 +596,14 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
             names.AddDnsName("localhost");
             names.AddIpAddress(IPAddress.Loopback);
             request.CertificateExtensions.Add(names.Build());
+            request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
+            request.CertificateExtensions.Add(new X509KeyUsageExtension(
+                X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment,
+                false));
+            OidCollection usages = new();
+            usages.Add(new Oid("1.3.6.1.5.5.7.3.1"));
+            request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, false));
+            request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
             _certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1));
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -584,7 +637,8 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                 try {
                     await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions {
                         ServerCertificate = _certificate,
-                        EnabledSslProtocols = SslProtocols.Tls12
+                        EnabledSslProtocols = SslProtocols.None,
+                        ApplicationProtocols = new System.Collections.Generic.List<SslApplicationProtocol> { SslApplicationProtocol.Http11 }
                     }, _cancellation.Token);
                     byte[] request = new byte[4096];
                     int read = await stream.ReadAsync(request, 0, request.Length, _cancellation.Token);

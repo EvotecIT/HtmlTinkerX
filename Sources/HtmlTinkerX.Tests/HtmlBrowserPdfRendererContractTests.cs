@@ -292,8 +292,33 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void PdfCookieRejectsMixedUrlAndDomainPathScope() {
+        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfCookie(
+            "session",
+            "value",
+            url: "https://example.com",
+            domain: "example.com"));
+        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfCookie(
+            "session",
+            "value",
+            url: "https://example.com",
+            path: "/reports"));
+    }
+
+    [Fact]
     public void PublicNetworkEnforcementRejectsCallerProxyWhoseDnsCannotBeBound() {
         Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(new HtmlBrowserPdfRendererOptions(proxy: "http://proxy.example:8080")));
+    }
+
+    [Fact]
+    public void HostRulesRejectCallerProxyBecauseWebSocketTunnelsCannotBeEnforced() {
+        HtmlBrowserNetworkPolicy policy = new(
+            allowPrivateNetworks: true,
+            deniedHosts: new[] { "internal.example" });
+
+        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(new HtmlBrowserPdfRendererOptions(
+            proxy: "http://proxy.example:8080",
+            networkPolicy: policy)));
     }
 
     [Fact]

@@ -41,6 +41,10 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         if (!_options.NetworkPolicy.AllowPrivateNetworks && !string.IsNullOrWhiteSpace(_options.Proxy)) {
             throw new ArgumentException("A caller-supplied proxy cannot be combined with public-network-only enforcement because HtmlTinkerX cannot bind the proxy's DNS decision to the remote socket. Enable private-network access explicitly when the trusted proxy owns that boundary.", nameof(options));
         }
+        if (!string.IsNullOrWhiteSpace(_options.Proxy)
+            && (_options.NetworkPolicy.AllowedHosts.Count > 0 || _options.NetworkPolicy.DeniedHosts.Count > 0)) {
+            throw new ArgumentException("A caller-supplied proxy cannot be combined with allowed or denied host rules because HtmlTinkerX cannot enforce those rules for WebSocket tunnels through that proxy.", nameof(options));
+        }
         _admissionGate = new SemaphoreSlim(
             _options.MaximumBrowserInstances + _options.MaximumQueuedCaptures,
             _options.MaximumBrowserInstances + _options.MaximumQueuedCaptures);
