@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 #endif
 
@@ -654,7 +655,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             builder.WebHost.ConfigureKestrel(options => options.Listen(
                 IPAddress.Loopback,
                 0,
-                listen => listen.UseHttps(_certificate)));
+                listen => {
+                    listen.Protocols = HttpProtocols.Http1;
+                    listen.UseHttps(_certificate);
+                }));
             _application = builder.Build();
             _application.MapGet("/certificate", () => Results.Content(
                 "<html><body><p>trusted TLS page</p></body></html>",

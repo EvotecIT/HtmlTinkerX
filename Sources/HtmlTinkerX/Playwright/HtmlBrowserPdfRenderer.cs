@@ -116,10 +116,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         cancellationToken.ThrowIfCancellationRequested();
         HtmlBrowserPolicyProxy? policyProxy = null;
         HtmlBrowserLaunchOptions launchOptions = _options.CreateLaunchOptions();
-        if (string.IsNullOrWhiteSpace(_options.Proxy)
-            && (!_options.NetworkPolicy.AllowPrivateNetworks
-                || _options.NetworkPolicy.AllowedHosts.Count > 0
-                || _options.NetworkPolicy.DeniedHosts.Count > 0)) {
+        if (_options.RequiresManagedPolicyProxy) {
             policyProxy = new HtmlBrowserPolicyProxy(_options.NetworkPolicy);
             launchOptions.Proxy = policyProxy.Server;
         }

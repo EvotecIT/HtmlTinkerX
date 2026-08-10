@@ -111,6 +111,12 @@ public sealed class HtmlBrowserPdfRendererOptions {
     /// <summary>Gets the resource access policy enforced for every capture.</summary>
     public HtmlBrowserNetworkPolicy NetworkPolicy { get; }
 
+    internal bool RequiresManagedPolicyProxy =>
+        string.IsNullOrWhiteSpace(Proxy)
+        && (!NetworkPolicy.AllowPrivateNetworks
+            || NetworkPolicy.AllowedHosts.Count > 0
+            || NetworkPolicy.DeniedHosts.Count > 0);
+
     internal HtmlBrowserLaunchOptions CreateLaunchOptions() {
         HtmlBrowserLaunchOptions options = new() {
             Browser = Browser,
@@ -124,10 +130,13 @@ public sealed class HtmlBrowserPdfRendererOptions {
             ProxyPassword = ProxyPassword
         };
         foreach (string argument in BrowserArguments) options.BrowserArguments.Add(argument);
-        if (string.IsNullOrWhiteSpace(Proxy)) {
+        if (RequiresManagedPolicyProxy) {
             // Chromium implicitly bypasses proxies for loopback unless this subtraction rule
             // is present. The capture-scoped policy proxy must observe loopback WS/WSS too.
             options.BrowserArguments.Add("--proxy-bypass-list=<-loopback>");
+            // WebRTC ICE/STUN and QUIC use UDP paths that HTTP/CONNECT proxies cannot inspect.
+            options.BrowserArguments.Add("--force-webrtc-ip-handling-policy=disable_non_proxied_udp");
+            options.BrowserArguments.Add("--disable-quic");
         }
         if (IgnoreHttpsErrors) options.BrowserArguments.Add("--ignore-certificate-errors");
         return options;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -117,6 +118,19 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void ManagedPolicyProxyDisablesTrafficThatCanBypassHttpConnect() {
+        HtmlBrowserLaunchOptions protectedLaunch = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
+        HtmlBrowserLaunchOptions unrestrictedLaunch = new HtmlBrowserPdfRendererOptions(
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()).CreateLaunchOptions();
+
+        Assert.Contains("--force-webrtc-ip-handling-policy=disable_non_proxied_udp", protectedLaunch.BrowserArguments);
+        Assert.Contains("--disable-quic", protectedLaunch.BrowserArguments);
+        Assert.DoesNotContain("--force-webrtc-ip-handling-policy=disable_non_proxied_udp", unrestrictedLaunch.BrowserArguments);
+        Assert.DoesNotContain("--disable-quic", unrestrictedLaunch.BrowserArguments);
+        Assert.DoesNotContain("--proxy-bypass-list=<-loopback>", unrestrictedLaunch.BrowserArguments);
+    }
+
+    [Fact]
     public void BrowserTestConvenienceMethodsExposeTheHttpsOptIn() {
         string[] names = {
             nameof(HtmlBrowserTester.TestCssResourceAsync),
@@ -173,6 +187,57 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.False(HtmlBrowserFileSystemPath.TryResolveExistingPath(path, out _));
     }
 
+    [Theory]
+    [InlineData(4, null, true)]
+    [InlineData(1, @"\Device\Mup\server\share", true)]
+    [InlineData(3, @"\??\C:\local-substitution", true)]
+    [InlineData(3, @"\Device\HarddiskVolume3", false)]
+    public void WindowsDriveClassificationUsesLocalMappingsBeforePathProbes(uint driveType, string? deviceTarget, bool expected) {
+        bool classified = HtmlBrowserFileSystemPath.IsWindowsUnsafeDriveRoot(
+            @"Z:\",
+            _ => driveType,
+            _ => deviceTarget);
+
+        Assert.Equal(expected, classified);
+    }
+
+    [Fact]
+    public void WindowsReparseClassificationStopsBeforeTheTargetPathIsProbed() {
+        string[] components = { @"C:\root", @"C:\root\link", @"C:\root\link\asset.css" };
+        int probes = 0;
+
+        bool classified = HtmlBrowserFileSystemPath.ContainsReparsePointBeforeTargetProbe(
+            components,
+            _ => ++probes == 2 ? FileAttributes.ReparsePoint : FileAttributes.Directory);
+
+        Assert.True(classified);
+        Assert.Equal(2, probes);
+    }
+
+#if !NETFRAMEWORK
+    [Fact]
+    public void WindowsSubstitutedDriveIsRejectedFromLiveDosDeviceMetadata() {
+        if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
+        string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-Subst-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "asset.css"), "body{}");
+        string? drive = Enumerable.Range('D', 'Z' - 'D' + 1)
+            .Select(value => ((char)value) + ":")
+            .FirstOrDefault(candidate => !Directory.Exists(candidate + Path.DirectorySeparatorChar));
+        Assert.False(string.IsNullOrWhiteSpace(drive));
+        try {
+            Assert.Equal(0, RunSubst($"{drive} \"{root}\""));
+            string mappedFile = drive + Path.DirectorySeparatorChar + "asset.css";
+            Assert.True(File.Exists(mappedFile));
+            Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(mappedFile));
+            Assert.False(HtmlBrowserFileSystemPath.TryResolveExistingPath(mappedFile, out _));
+        } finally {
+            if (!string.IsNullOrWhiteSpace(drive)) RunSubst($"{drive} /D");
+            Directory.Delete(root, recursive: true);
+        }
+    }
+#endif
+
     [Fact]
     public async Task FilePolicyRejectsRemoteFileUrisBeforePathResolution() {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(new HtmlBrowserNetworkPolicy(
@@ -196,12 +261,26 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             Directory.CreateSymbolicLink(link, outside);
             HtmlBrowserNetworkPolicyEvaluator evaluator = new(HtmlBrowserNetworkPolicy.PublicNetworkOnly);
 
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
+                Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(Path.Combine(link, "secret.css")));
+            }
             Assert.False(await evaluator.IsAllowedAsync(new Uri(Path.Combine(link, "secret.css")).AbsoluteUri, root, CancellationToken.None));
         } finally {
             if (Directory.Exists(link)) Directory.Delete(link);
             Directory.Delete(root, recursive: true);
             Directory.Delete(outside, recursive: true);
         }
+    }
+#endif
+
+#if !NETFRAMEWORK
+    private static int RunSubst(string arguments) {
+        using Process process = Process.Start(new ProcessStartInfo("subst.exe", arguments) {
+            UseShellExecute = false,
+            CreateNoWindow = true
+        })!;
+        process.WaitForExit();
+        return process.ExitCode;
     }
 #endif
 

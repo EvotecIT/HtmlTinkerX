@@ -250,8 +250,13 @@ public sealed partial class HtmlBrowserPdfRenderer {
             HtmlBrowserPdfSourceKind.File => new Uri(source.FilePath!).AbsoluteUri,
             _ => source.BaseUri?.AbsoluteUri
         };
-        if (source.Kind == HtmlBrowserPdfSourceKind.File && !File.Exists(source.FilePath)) {
-            throw new FileNotFoundException("HTML input file was not found.", source.FilePath);
+        if (source.Kind == HtmlBrowserPdfSourceKind.File) {
+            if (!HtmlBrowserFileSystemPath.IsSafeLocalPath(source.FilePath!)) {
+                throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target!)}'.");
+            }
+            if (!File.Exists(source.FilePath)) {
+                throw new FileNotFoundException("HTML input file was not found.", source.FilePath);
+            }
         }
         if (target != null && !await policy.IsAllowedAsync(target, fileDirectory, cancellationToken).ConfigureAwait(false)) {
             throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target)}'.");

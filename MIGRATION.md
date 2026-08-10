@@ -29,6 +29,8 @@ Per-render headers and local/session storage are limited to the source origin. H
 
 Per-render headers apply to same-origin HTTP(S) document and subresource requests. Browser WebSocket handshakes do not support arbitrary request headers; use scoped cookies or page authentication state when a WS/WSS endpoint requires credentials.
 
+Browser file inputs now require local paths. UNC/device paths are rejected on every platform. Windows mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are rejected before file content is probed, while Unix paths retain canonical containment checks. Public-network and host-filtered renderer policies also disable non-proxied WebRTC UDP and QUIC; opt into private-network access only when the page is trusted to use those transports.
+
 ## Already-loaded pages
 
 The long `GetPagePdfAsync` and `SavePagePdfAsync` overloads were removed. Pass immutable print and readiness objects instead:

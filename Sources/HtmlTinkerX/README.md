@@ -139,11 +139,15 @@ Console.WriteLine(
 
 Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. Per-render headers and local/session storage are restricted to the URL source origin; HTML-string capture requires an absolute HTTP/HTTPS `baseUri` when using them. Cookies retain their own URL/domain scope. CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in the same immutable request snapshot. For a page already loaded in an authenticated `HtmlBrowserSession`, pass its `IPage` to `GetPagePdfAsync` or `SavePagePdfAsync` with `HtmlBrowserPdfOptions`.
 
+File capture accepts local paths only. UNC/device paths are rejected on every platform. On Windows, mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are also rejected before file content is probed; Unix paths retain canonical containment checks.
+
 Per-render headers cover same-origin HTTP(S) documents and subresources. JavaScript WebSocket handshakes cannot carry arbitrary headers; use a scoped cookie or authenticated page state for WS/WSS endpoints.
 
 `navigationTimeout` limits initial source loading. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation.
 
 Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
+
+When HtmlTinkerX owns the public-network or host-policy proxy, Chromium also disables non-proxied WebRTC UDP and QUIC so page traffic cannot bypass that policy boundary. An explicit private-network policy leaves those browser transports available.
 
 The pooled renderer validates HTTPS certificates and permits only public HTTP(S) and WS(S) targets by default. Its browser-slot proxy connects to the same DNS address that passed policy evaluation, preventing a second browser-side lookup from changing the destination. `HtmlBrowserNetworkPolicy` can allow specific private hosts and canonical file roots for trusted internal workloads; symlink escapes are rejected. A caller-supplied proxy requires explicit private-network mode because that trusted proxy owns DNS and outbound enforcement. These controls are defense in depth, not a process sandbox: services that accept untrusted URLs or markup should also enforce outbound policy at the container, host, firewall, or proxy boundary and should not expose arbitrary local-file paths.
 
