@@ -94,7 +94,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
 
         if (addresses.Length == 0) return Array.Empty<IPAddress>();
         if (MatchesHost(host, _policy.AllowedHosts) || _policy.AllowPrivateNetworks) return addresses;
-        return addresses.All(IsPublicAddress) ? addresses : Array.Empty<IPAddress>();
+        return addresses.All(HtmlBrowserNetworkAddressClassifier.IsGloballyReachable) ? addresses : Array.Empty<IPAddress>();
     }
 
     private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
@@ -153,47 +153,6 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (HtmlBrowserNetworkPolicy.PathComparer.Equals(fullPath, fullDirectory)) return true;
         string prefix = fullDirectory + Path.DirectorySeparatorChar;
         return fullPath.StartsWith(prefix, HtmlBrowserNetworkPolicy.PathComparer == StringComparer.OrdinalIgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-    }
-
-    private static bool IsPublicAddress(IPAddress address) {
-        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
-        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.None) || address.Equals(IPAddress.IPv6None)) return false;
-
-        byte[] bytes = address.GetAddressBytes();
-        if (address.AddressFamily == AddressFamily.InterNetwork) {
-            byte first = bytes[0];
-            byte second = bytes[1];
-            if (first == 0 || first == 10 || first == 127 || first >= 224) return false;
-            if (first == 100 && second >= 64 && second <= 127) return false;
-            if (first == 169 && second == 254) return false;
-            if (first == 172 && second >= 16 && second <= 31) return false;
-            if (first == 192 && second == 168) return false;
-            if (first == 192 && second == 0 && bytes[2] == 0) return false;
-            if (first == 192 && second == 0 && bytes[2] == 2) return false;
-            if (first == 192 && second == 88 && bytes[2] == 99) return false;
-            if (first == 198 && (second == 18 || second == 19)) return false;
-            if (first == 198 && second == 51 && bytes[2] == 100) return false;
-            if (first == 203 && second == 0 && bytes[2] == 113) return false;
-            return true;
-        }
-
-        if (address.AddressFamily == AddressFamily.InterNetworkV6) {
-            if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal) return false;
-            if ((bytes[0] & 0xFE) == 0xFC) return false;
-            if (bytes[0] == 0x5F && bytes[1] == 0x00) return false;
-            if (bytes[0] == 0x01 && bytes.Take(8).Skip(1).All(value => value == 0)) return false;
-            if (bytes[0] == 0x20 && bytes[1] == 0x01) {
-                if (bytes[2] == 0x00 && bytes[3] == 0x00) return false;
-                if (bytes[2] == 0x00 && bytes[3] == 0x02) return false;
-                if (bytes[2] == 0x0D && bytes[3] == 0xB8) return false;
-                if (bytes[2] == 0 && ((bytes[3] & 0xF0) == 0x10 || (bytes[3] & 0xF0) == 0x20)) return false;
-            }
-            if (bytes[0] == 0x20 && bytes[1] == 0x02) return false;
-            if (bytes[0] == 0x00 && bytes[1] == 0x64 && bytes[2] == 0xFF && bytes[3] == 0x9B && bytes[4] == 0 && bytes[5] == 1) return false;
-            return true;
-        }
-
-        return false;
     }
 
     private static async Task<T> WaitAsync<T>(Task<T> task, CancellationToken cancellationToken) {

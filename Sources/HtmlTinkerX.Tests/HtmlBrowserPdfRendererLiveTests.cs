@@ -24,7 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HtmlTinkerX.Tests;
 
 [Collection("Playwright collection")]
-public sealed class HtmlBrowserPdfRendererLiveTests {
+public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task UrlCaptureUsesExplicitPrivateHostPolicyAndRequestHeaders() {
         await using LoopbackHtmlServer server = new();
@@ -488,6 +488,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         private readonly string _body;
         private readonly TimeSpan _responseDelay;
         private string? _lastRenderToken;
+        private int _requestCount;
 
         internal LoopbackContentServer(string body, TimeSpan? responseDelay = null) {
             _body = body;
@@ -500,6 +501,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
 
         internal string Url { get; }
         internal string? LastRenderToken => Volatile.Read(ref _lastRenderToken);
+        internal int RequestCount => Volatile.Read(ref _requestCount);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -508,6 +510,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     using NetworkStream stream = client.GetStream();
                     byte[] buffer = new byte[8192];
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    Interlocked.Increment(ref _requestCount);
                     string request = Encoding.ASCII.GetString(buffer, 0, read);
                     string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                     if (token != null) Volatile.Write(ref _lastRenderToken, token);

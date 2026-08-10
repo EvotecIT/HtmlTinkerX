@@ -329,13 +329,42 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [InlineData("198.51.100.1")]
     [InlineData("203.0.113.1")]
     [InlineData("2001:db8::1")]
+    [InlineData("64:ff9b:1::1")]
+    [InlineData("100::1")]
+    [InlineData("100:0:0:1::1")]
+    [InlineData("2001::1")]
+    [InlineData("2001:1::4")]
+    [InlineData("2001:2::1")]
+    [InlineData("2001:10::1")]
+    [InlineData("2001:100::1")]
+    [InlineData("3fff::1")]
+    [InlineData("3fff:fff::1")]
+    [InlineData("4000::1")]
     [InlineData("5f00::1")]
-    public async Task PublicNetworkPolicyRejectsNonRoutableDocumentationAddresses(string address) {
+    public async Task PublicNetworkPolicyRejectsNonGloballyReachableSpecialAddresses(string address) {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
             _ => Task.FromResult(new[] { IPAddress.Parse(address) }));
 
         Assert.False(await evaluator.IsAllowedAsync("https://reserved.example/report", null, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("64:ff9b::1")]
+    [InlineData("2001:1::1")]
+    [InlineData("2001:1::2")]
+    [InlineData("2001:1::3")]
+    [InlineData("2001:3::1")]
+    [InlineData("2001:4:112::1")]
+    [InlineData("2001:20::1")]
+    [InlineData("2001:30::1")]
+    [InlineData("3fff:1000::1")]
+    public async Task PublicNetworkPolicyAllowsGloballyReachableIpv6SpecialAssignments(string address) {
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => Task.FromResult(new[] { IPAddress.Parse(address) }));
+
+        Assert.True(await evaluator.IsAllowedAsync("https://public.example/report", null, CancellationToken.None));
     }
 
     [Fact]

@@ -66,7 +66,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             queueDuration,
                             retried,
                             operationToken).ConfigureAwait(false);
-                    } catch (Exception ex) when (attempt == 0 && !operationToken.IsCancellationRequested && IsBrowserProcessFailure(ex, slot)) {
+                    } catch (Exception) when (attempt == 0 && !operationToken.IsCancellationRequested && IsBrowserProcessFailure(slot)) {
                         retried = true;
                         returnSlot = false;
                         slot.MarkBroken();
@@ -443,16 +443,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
     }
 
-    private static bool IsBrowserProcessFailure(Exception exception, BrowserSlot slot) {
-        if (!slot.Browser.IsConnected || slot.IsBroken) return true;
-        if (exception is not PlaywrightException playwright) return false;
-        string message = playwright.Message ?? string.Empty;
-        return message.IndexOf("browser has been closed", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("browser closed", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("target page, context or browser has been closed", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("connection closed", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("crash", StringComparison.OrdinalIgnoreCase) >= 0;
-    }
+    private static bool IsBrowserProcessFailure(BrowserSlot slot) =>
+        !slot.Browser.IsConnected || slot.IsBroken;
 
     private static string SanitizeUri(string url) {
         if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)) return url;
