@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -123,6 +124,28 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         }
     }
 
+    [Theory]
+    [InlineData(@"\\server\share\asset.css")]
+    [InlineData("//server/share/asset.css")]
+    [InlineData(@"\\?\UNC\server\share\asset.css")]
+    [InlineData(@"\\.\PhysicalDrive0")]
+    [InlineData(@"\??\C:\asset.css")]
+    [InlineData(@"\Device\HarddiskVolume1\asset.css")]
+    [InlineData("file://server/share/asset.css")]
+    public void FilePathResolutionRejectsNetworkAndDevicePathsBeforeNormalization(string path) {
+        Assert.True(HtmlBrowserFileSystemPath.IsNetworkOrDevicePath(path));
+        Assert.False(HtmlBrowserFileSystemPath.TryResolveExistingPath(path, out _));
+    }
+
+    [Fact]
+    public async Task FilePolicyRejectsRemoteFileUrisBeforePathResolution() {
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(new HtmlBrowserNetworkPolicy(
+            allowFileAccess: true,
+            allowedFileDirectories: new[] { Path.GetPathRoot(Path.GetFullPath("."))! }));
+
+        Assert.False(await evaluator.IsAllowedAsync("file://server/share/asset.css", null, CancellationToken.None));
+    }
+
 #if !NETFRAMEWORK
     [Fact]
     public async Task SelectedFileDirectoryRejectsSymlinkEscape() {
@@ -213,13 +236,15 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
-    public async Task TimedOutDnsLookupsAreGloballyBounded() {
+    public async Task TimedOutDnsLookupsAreGloballyBoundedWithoutCachingGateSaturation() {
         TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int calls = 0;
+        ConcurrentDictionary<string, byte> startedHosts = new(StringComparer.OrdinalIgnoreCase);
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
-            _ => {
+            host => {
                 Interlocked.Increment(ref calls);
+                startedHosts.TryAdd(host, 0);
                 return pendingLookup.Task;
             },
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
@@ -231,7 +256,18 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
         Assert.All(results, Assert.False);
         Assert.InRange(Volatile.Read(ref calls), 1, 32);
+        string saturatedHost = Enumerable.Range(0, 64)
+            .Select(index => $"bounded-{index}.example")
+            .First(host => !startedHosts.ContainsKey(host));
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
+
+        bool recovered = false;
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+        while (!recovered && DateTime.UtcNow < deadline) {
+            recovered = await evaluator.IsAllowedAsync($"https://{saturatedHost}/report", null, CancellationToken.None);
+            if (!recovered) await Task.Delay(10);
+        }
+        Assert.True(recovered);
     }
 
     [Theory]
@@ -321,6 +357,48 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             await originTask;
         } finally {
             origin.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task PolicyProxyBoundsAReversePumpAfterTheBrowserHalfCloses() {
+        TcpListener origin = new(IPAddress.Loopback, 0);
+        origin.Start();
+        using CancellationTokenSource originLifetime = new();
+        Task originTask = Task.CompletedTask;
+        try {
+            int originPort = ((IPEndPoint)origin.LocalEndpoint).Port;
+            originTask = Task.Run(async () => {
+                try {
+                    using TcpClient accepted = await origin.AcceptTcpClientAsync();
+                    using NetworkStream stream = accepted.GetStream();
+                    byte[] payload = new byte[1];
+                    Assert.Equal(1, await stream.ReadAsync(payload, 0, payload.Length));
+                    try { await Task.Delay(Timeout.Infinite, originLifetime.Token); } catch (OperationCanceledException) { }
+                } catch (SocketException) when (originLifetime.IsCancellationRequested) {
+                } catch (ObjectDisposedException) when (originLifetime.IsCancellationRequested) {
+                }
+            });
+            HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "render.invalid" });
+            HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { IPAddress.Loopback }));
+            await using HtmlBrowserPolicyProxy proxy = new(evaluator, relayDrainTimeout: TimeSpan.FromMilliseconds(50));
+            Uri proxyUri = new(proxy.Server);
+            using TcpClient browser = new();
+            await browser.ConnectAsync(IPAddress.Loopback, proxyUri.Port);
+            using NetworkStream browserStream = browser.GetStream();
+            byte[] connect = Encoding.ASCII.GetBytes($"CONNECT render.invalid:{originPort} HTTP/1.1\r\nHost: render.invalid:{originPort}\r\n\r\nx");
+            await browserStream.WriteAsync(connect, 0, connect.Length);
+            browser.Client.Shutdown(SocketShutdown.Send);
+
+            using MemoryStream responseBytes = new();
+            Task readResponse = browserStream.CopyToAsync(responseBytes);
+            Assert.Same(readResponse, await Task.WhenAny(readResponse, Task.Delay(TimeSpan.FromSeconds(2))));
+            await readResponse;
+            Assert.Contains("200 Connection Established", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+        } finally {
+            originLifetime.Cancel();
+            origin.Stop();
+            await originTask;
         }
     }
 

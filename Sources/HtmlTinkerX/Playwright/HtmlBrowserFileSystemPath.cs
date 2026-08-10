@@ -17,6 +17,7 @@ internal static class HtmlBrowserFileSystemPath {
 
     internal static bool TryResolveExistingPath(string path, out string resolved) {
         resolved = string.Empty;
+        if (IsNetworkOrDevicePath(path)) return false;
         try {
             string fullPath = Path.GetFullPath(path);
             if (!File.Exists(fullPath) && !Directory.Exists(fullPath)) return false;
@@ -32,6 +33,22 @@ internal static class HtmlBrowserFileSystemPath {
                                      || ex is Win32Exception) {
             return false;
         }
+    }
+
+    internal static bool IsNetworkOrDevicePath(string path) {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string candidate = path.TrimStart();
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri)
+            && uri.IsFile
+            && !string.IsNullOrWhiteSpace(uri.Host)) return true;
+        return candidate.StartsWith(@"\\", StringComparison.Ordinal)
+               || candidate.StartsWith("//", StringComparison.Ordinal)
+               || candidate.StartsWith(@"\??\", StringComparison.OrdinalIgnoreCase)
+               || candidate.StartsWith(@"\Device\", StringComparison.OrdinalIgnoreCase)
+               || candidate.StartsWith(@"\GLOBAL??\", StringComparison.OrdinalIgnoreCase)
+               || candidate.StartsWith(@"\DosDevices\", StringComparison.OrdinalIgnoreCase)
+               || candidate.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)
+               || candidate.StartsWith(@"\\.\", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveWindowsPath(string path) {

@@ -44,6 +44,9 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
             case "blob":
                 return true;
             case "file":
+                if (uri.IsUnc
+                    || (!string.IsNullOrEmpty(uri.Host)
+                        && !string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase))) return false;
                 return IsFileAllowed(uri.LocalPath, selectedFileDirectory);
             case "http":
             case "https":
@@ -82,6 +85,9 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
             } catch (SocketException) {
                 if (entry != null) RemoveDnsEntry(host, entry);
                 return Array.Empty<IPAddress>();
+            } catch (DnsLookupCapacityException) {
+                if (entry != null) RemoveDnsEntry(host, entry);
+                return Array.Empty<IPAddress>();
             }
         }
 
@@ -109,7 +115,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(new KeyValuePair<string, DnsCacheEntry>(host, entry));
 
     private async Task<IPAddress[]> ResolveHostBoundedAsync(string host) {
-        if (!DnsLookupGate.Wait(0)) return Array.Empty<IPAddress>();
+        if (!DnsLookupGate.Wait(0)) throw new DnsLookupCapacityException();
         try {
             return await _resolveHost(host).ConfigureAwait(false);
         } finally {
@@ -210,4 +216,6 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         internal Task<IPAddress[]> Lookup => _lookup.Value;
         internal DateTimeOffset ExpiresAt { get; }
     }
+
+    private sealed class DnsLookupCapacityException : Exception { }
 }

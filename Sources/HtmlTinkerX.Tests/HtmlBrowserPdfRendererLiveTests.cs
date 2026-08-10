@@ -670,6 +670,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     await stream.WriteAsync(headers, 0, headers.Length, _cancellation.Token);
                     await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length, _cancellation.Token);
                     await stream.FlushAsync(_cancellation.Token);
+                    await stream.ShutdownAsync();
                 } catch (Exception ex) when (_cancellation.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
                     return;
                 } catch (AuthenticationException) {

@@ -18,8 +18,10 @@ using System.Threading.Tasks;
 internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     private const int MaximumHeaderBytes = 64 * 1024;
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan DefaultRelayDrainTimeout = TimeSpan.FromSeconds(5);
     private readonly HtmlBrowserNetworkPolicyEvaluator _policy;
     private readonly TimeSpan _connectTimeout;
+    private readonly TimeSpan _relayDrainTimeout;
     private readonly Func<TcpClient, IPAddress, int, Task> _connect;
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _lifetime = new();
@@ -33,9 +35,11 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     internal HtmlBrowserPolicyProxy(
         HtmlBrowserNetworkPolicyEvaluator policy,
         TimeSpan? connectTimeout = null,
-        Func<TcpClient, IPAddress, int, Task>? connect = null) {
+        Func<TcpClient, IPAddress, int, Task>? connect = null,
+        TimeSpan? relayDrainTimeout = null) {
         _policy = policy;
         _connectTimeout = connectTimeout ?? DefaultConnectTimeout;
+        _relayDrainTimeout = relayDrainTimeout ?? DefaultRelayDrainTimeout;
         _connect = connect ?? ((client, address, port) => client.ConnectAsync(address, port));
         _listener = new TcpListener(IPAddress.Loopback, 0);
         _listener.Start();
@@ -136,7 +140,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         if (tunnelOffset < received.Length) {
             await remote.WriteAsync(received, tunnelOffset, received.Length - tunnelOffset, cancellationToken).ConfigureAwait(false);
         }
-        await RelayAsync(browserClient, remoteClient, cancellationToken).ConfigureAwait(false);
+        await RelayAsync(browserClient, remoteClient, _relayDrainTimeout, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task HandleHttpAsync(
@@ -197,7 +201,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         if (bodyOffset < received.Length) {
             await remote.WriteAsync(received, bodyOffset, received.Length - bodyOffset, cancellationToken).ConfigureAwait(false);
         }
-        await RelayAsync(browserClient, remoteClient, cancellationToken).ConfigureAwait(false);
+        await RelayAsync(browserClient, remoteClient, _relayDrainTimeout, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<TcpClient?> ConnectAllowedAsync(Uri target, CancellationToken cancellationToken) {
@@ -220,7 +224,11 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         return null;
     }
 
-    private static async Task RelayAsync(TcpClient firstClient, TcpClient secondClient, CancellationToken cancellationToken) {
+    private static async Task RelayAsync(
+        TcpClient firstClient,
+        TcpClient secondClient,
+        TimeSpan drainTimeout,
+        CancellationToken cancellationToken) {
         Stream first = firstClient.GetStream();
         Stream second = secondClient.GetStream();
         Task firstToSecond = CopyAsync(first, second, cancellationToken);
@@ -228,6 +236,12 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         Task completed = await Task.WhenAny(firstToSecond, secondToFirst).ConfigureAwait(false);
         if (completed.Status == TaskStatus.RanToCompletion) {
             TryShutdownSend(ReferenceEquals(completed, firstToSecond) ? secondClient : firstClient);
+            Task remaining = ReferenceEquals(completed, firstToSecond) ? secondToFirst : firstToSecond;
+            Task drainDeadline = Task.Delay(drainTimeout, cancellationToken);
+            if (await Task.WhenAny(remaining, drainDeadline).ConfigureAwait(false) != remaining) {
+                try { first.Dispose(); } catch (ObjectDisposedException) { }
+                try { second.Dispose(); } catch (ObjectDisposedException) { }
+            }
         } else {
             try { first.Dispose(); } catch (ObjectDisposedException) { }
             try { second.Dispose(); } catch (ObjectDisposedException) { }
