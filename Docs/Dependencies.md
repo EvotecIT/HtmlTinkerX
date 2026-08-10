@@ -2,16 +2,41 @@
 
 ## AngleSharp package stability
 
-HtmlTinkerX uses the stable AngleSharp core package. Its CSSOM and DOM JavaScript
-integration currently use the upstream `AngleSharp.Css` and `AngleSharp.Js` 1.0
-prerelease lines. Both upstream packages declare compatibility with AngleSharp
-1.x; `AngleSharp.Js` also declares compatibility with Jint 4.x.
+HtmlTinkerX uses stable releases of AngleSharp, AngleSharp.Css, AngleSharp.Js,
+and AngleSharp.Diffing. AngleSharp.Js requires Jint 4.x; keep the direct Jint
+reference at or above the minimum declared by AngleSharp.Js so NuGet cannot
+resolve an older runtime beneath the DOM integration.
 
-Upstream dependency labels do not determine the HtmlTinkerX or PSParseHTML
-release channel. Publish normal stable releases after the full target-framework
-tests and package-only .NET and PowerShell smoke tests pass. Treat any NU5104
-warning as a known dependency-metadata warning, not as a reason to mark our
-packages prerelease.
+Validate AngleSharp updates across `net472`, `net8.0`, and `net10.0`, including
+package-only .NET and PowerShell smoke tests. The stable CSS and JavaScript
+packages no longer produce prerelease dependency warnings.
+
+AngleSharp.Js 1.0 moved `XMLHttpRequest` to AngleSharp.Io. Earlier prerelease
+builds exposed that constructor through `HtmlScriptRunner`, although the runner
+did not register a loader capable of sending the request. The stable runner
+intentionally keeps network-capable APIs such as `XMLHttpRequest`, `fetch`, and
+`WebSocket` unavailable. Use the existing controlled HTTP workflows or
+Playwright when a task needs network or browser behavior.
+
+### Optional AngleSharp packages
+
+Do not add companion packages only to broaden the dependency graph:
+
+- `AngleSharp.Io` can add requesters, cookies, storage, `fetch`, and related web
+  platform services. Add it only with an explicit browserless-network contract,
+  including opt-in network access, URI policy, caller-provided HTTP configuration,
+  cancellation, size limits, and deterministic tests. Enabling it implicitly in
+  `HtmlScriptRunner` would also expose network-capable constructors such as
+  `WebSocket` to previously local DOM scripts.
+- `AngleSharp.XPath` overlaps with the established HtmlAgilityPack XPath cmdlets.
+  Add it only as part of an intentional AngleSharp-native XPath surface rather
+  than maintaining two interchangeable implementations.
+- `AngleSharp.Xml` overlaps with the hardened `System.Xml` paths used for feeds,
+  discovery documents, and SAML. Keep security-sensitive XML parsing on those
+  explicit readers unless a browser-style XML DOM becomes a real requirement.
+- `AngleSharp.Renderer` and `AngleSharp.Wasm` serve specialized rendering and
+  WebAssembly scenarios. They are not replacements for browser layout, painting,
+  authentication, downloads, or interaction automation.
 
 ## Screenshot image processing
 

@@ -9,6 +9,10 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Provides helpers for executing JavaScript against HTML using AngleSharp.Js.
 /// </summary>
+/// <remarks>
+/// The runner operates on the supplied markup only. It does not register document loaders,
+/// requesters, WebSockets, or other network-capable browser services.
+/// </remarks>
 public static class HtmlScriptRunner {
     /// <summary>
     /// Loads the provided HTML markup and executes JavaScript in its context.
