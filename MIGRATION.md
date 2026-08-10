@@ -27,6 +27,8 @@ Initial navigation uses `HtmlBrowserPdfRequest.NavigationTimeout`. `HtmlBrowserP
 
 Per-render headers and local/session storage are limited to the source origin. HTML-string capture must provide an absolute HTTP or HTTPS `baseUri` when using those values; HtmlTinkerX navigates the supplied markup at that origin while still resolving relative resources from the base URI. This prevents credentials from being broadcast to cross-origin frames and resources.
 
+Per-render headers apply to same-origin HTTP(S) document and subresource requests. Browser WebSocket handshakes do not support arbitrary request headers; use scoped cookies or page authentication state when a WS/WSS endpoint requires credentials.
+
 ## Already-loaded pages
 
 The long `GetPagePdfAsync` and `SavePagePdfAsync` overloads were removed. Pass immutable print and readiness objects instead:

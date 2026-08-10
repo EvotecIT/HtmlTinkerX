@@ -47,7 +47,7 @@ public sealed class HtmlBrowserPdfRequest {
     public HtmlBrowserPdfOptions PdfOptions { get; }
     /// <summary>Gets the readiness conditions.</summary>
     public HtmlBrowserPdfReadiness Readiness { get; }
-    /// <summary>Gets extra HTTP headers applied only to requests matching the source origin.</summary>
+    /// <summary>Gets extra headers applied only to HTTP(S) document and subresource requests matching the source origin.</summary>
     public IReadOnlyDictionary<string, string> Headers { get; }
     /// <summary>Gets cookies applied before navigation.</summary>
     public IReadOnlyList<HtmlBrowserPdfCookie> Cookies { get; }

@@ -117,6 +117,22 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void BrowserTestConvenienceMethodsExposeTheHttpsOptIn() {
+        string[] names = {
+            nameof(HtmlBrowserTester.TestCssResourceAsync),
+            nameof(HtmlBrowserTester.TestConsoleErrorsAsync),
+            nameof(HtmlBrowserTester.TestPerformanceAsync)
+        };
+
+        foreach (string name in names) {
+            System.Reflection.MethodInfo method = Assert.Single(typeof(HtmlBrowserTester).GetMethods(), candidate => candidate.Name == name);
+            System.Reflection.ParameterInfo parameter = Assert.Single(method.GetParameters(), candidate => candidate.Name == "ignoreHttpsErrors");
+            Assert.Equal(typeof(bool), parameter.ParameterType);
+            Assert.Equal(false, parameter.DefaultValue);
+        }
+    }
+
+    [Fact]
     public async Task PublicNetworkPolicyBlocksPrivateTargetsUnlessExplicitlyAllowed() {
         HtmlBrowserNetworkPolicyEvaluator publicOnly = new(HtmlBrowserNetworkPolicy.PublicNetworkOnly);
         HtmlBrowserNetworkPolicyEvaluator allowListed = new(new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" }));

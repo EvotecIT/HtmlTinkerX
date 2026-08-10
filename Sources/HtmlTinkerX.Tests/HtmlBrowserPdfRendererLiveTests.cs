@@ -167,14 +167,14 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
 
     [Fact]
     public async Task ReadinessTimeoutDoesNotLimitInitialNavigation() {
-        await using LoopbackContentServer origin = new("<p>navigation completed</p>", TimeSpan.FromMilliseconds(250));
+        await using LoopbackContentServer origin = new("<p>navigation completed</p>", TimeSpan.FromMilliseconds(1500));
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
         HtmlBrowserPdfRequest request = new(
             HtmlBrowserPdfSource.FromUrl(origin.Url),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 100),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 1000),
             navigationTimeout: 5000);
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
@@ -389,7 +389,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
 #if !NETFRAMEWORK
     [Fact]
     public async Task HttpsCertificateErrorsRequireAnExplicitOptIn() {
-        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        HtmlBrowserNetworkPolicy policy = new(allowPrivateNetworks: true);
         await using (LoopbackHttpsServer strictServer = new())
         await using (HtmlBrowserPdfRenderer strict = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1, networkPolicy: policy))) {
             await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(

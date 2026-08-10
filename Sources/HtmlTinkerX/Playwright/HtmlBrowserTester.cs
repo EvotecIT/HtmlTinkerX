@@ -120,34 +120,47 @@ public static class HtmlBrowserTester {
     /// <summary>
     /// Tests if a specific CSS resource is loaded.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="cssUrl">CSS resource URL fragment to find.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<HtmlNetworkEntryDetailed?> TestCssResourceAsync(
         string url,
         string cssUrl,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.CssResources.FirstOrDefault(r => r.Url.Contains(cssUrl));
     }
     
     /// <summary>
     /// Tests for console errors on a page.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<IList<HtmlConsoleEntryDetailed>> TestConsoleErrorsAsync(
         string url,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.ConsoleErrors.ToList();
     }
     
     /// <summary>
     /// Tests page performance metrics.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<HtmlPerformanceMetrics> TestPerformanceAsync(
         string url,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.GetPerformanceMetrics();
     }
     
