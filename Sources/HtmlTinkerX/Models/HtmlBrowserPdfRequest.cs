@@ -20,8 +20,10 @@ public sealed class HtmlBrowserPdfRequest {
         string? beforeCaptureScript = null,
         bool bypassContentSecurityPolicy = false,
         HtmlBrowserPdfMediaType mediaType = HtmlBrowserPdfMediaType.Print,
-        int navigationTimeout = 30000) {
+        int navigationTimeout = 30000,
+        int beforeCaptureScriptTimeout = 30000) {
         if (navigationTimeout < 0) throw new ArgumentOutOfRangeException(nameof(navigationTimeout));
+        if (beforeCaptureScriptTimeout < 0) throw new ArgumentOutOfRangeException(nameof(beforeCaptureScriptTimeout));
         Source = source ?? throw new ArgumentNullException(nameof(source));
         PdfOptions = pdfOptions ?? new HtmlBrowserPdfOptions();
         Readiness = readiness ?? new HtmlBrowserPdfReadiness();
@@ -39,6 +41,7 @@ public sealed class HtmlBrowserPdfRequest {
         BypassContentSecurityPolicy = bypassContentSecurityPolicy;
         MediaType = mediaType;
         NavigationTimeout = navigationTimeout;
+        BeforeCaptureScriptTimeout = beforeCaptureScriptTimeout;
     }
 
     /// <summary>Gets the capture source.</summary>
@@ -65,6 +68,8 @@ public sealed class HtmlBrowserPdfRequest {
     public HtmlBrowserPdfMediaType MediaType { get; }
     /// <summary>Gets the timeout in milliseconds for initial source navigation or content loading. Zero disables the timeout.</summary>
     public int NavigationTimeout { get; }
+    /// <summary>Gets the timeout in milliseconds for the optional pre-capture script. Zero disables the timeout.</summary>
+    public int BeforeCaptureScriptTimeout { get; }
 
     private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values, StringComparer comparer) {
         Dictionary<string, string> copy = new(comparer);

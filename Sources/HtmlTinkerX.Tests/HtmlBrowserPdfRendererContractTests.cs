@@ -102,10 +102,12 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         HtmlBrowserPdfRequest request = new(
             HtmlBrowserPdfSource.FromHtml("<p>timeouts</p>"),
             readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 50),
-            navigationTimeout: 2000);
+            navigationTimeout: 2000,
+            beforeCaptureScriptTimeout: 75);
 
         Assert.Equal(50, request.Readiness.Timeout);
         Assert.Equal(2000, request.NavigationTimeout);
+        Assert.Equal(75, request.BeforeCaptureScriptTimeout);
     }
 
     [Fact]
@@ -115,6 +117,12 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
         Assert.DoesNotContain("--ignore-certificate-errors", strict.BrowserArguments);
         Assert.Contains("--ignore-certificate-errors", trusted.BrowserArguments);
+    }
+
+    [Fact]
+    public void RendererOptionsRejectProxyCredentialsWithoutAProxyServer() {
+        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRendererOptions(proxyUsername: "user"));
+        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRendererOptions(proxyPassword: "secret"));
     }
 
     [Fact]
@@ -493,6 +501,43 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task PolicyProxyDoesNotForwardProxyAuthorizationToTheOrigin() {
+        TcpListener origin = new(IPAddress.Loopback, 0);
+        origin.Start();
+        try {
+            int originPort = ((IPEndPoint)origin.LocalEndpoint).Port;
+            Task<string> originTask = Task.Run(async () => {
+                using TcpClient accepted = await origin.AcceptTcpClientAsync();
+                using NetworkStream stream = accepted.GetStream();
+                byte[] request = new byte[4096];
+                int read = await stream.ReadAsync(request, 0, request.Length);
+                string received = Encoding.ASCII.GetString(request, 0, read);
+                byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+                await stream.WriteAsync(response, 0, response.Length);
+                return received;
+            });
+            HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+                new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "render.invalid" }),
+                _ => Task.FromResult(new[] { IPAddress.Loopback }));
+            await using HtmlBrowserPolicyProxy proxy = new(evaluator);
+            Uri proxyUri = new(proxy.Server);
+            using TcpClient browser = new();
+            await browser.ConnectAsync(IPAddress.Loopback, proxyUri.Port);
+            using NetworkStream browserStream = browser.GetStream();
+            byte[] payload = Encoding.ASCII.GetBytes($"GET http://render.invalid:{originPort}/ HTTP/1.1\r\nHost: render.invalid:{originPort}\r\nProxy-Authorization: Basic c2VjcmV0\r\n\r\n");
+            await browserStream.WriteAsync(payload, 0, payload.Length);
+            using MemoryStream responseBytes = new();
+            await browserStream.CopyToAsync(responseBytes);
+
+            string originRequest = await originTask;
+            Assert.DoesNotContain("Proxy-Authorization:", originRequest, StringComparison.OrdinalIgnoreCase);
+            Assert.EndsWith("ok", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+        } finally {
+            origin.Stop();
+        }
+    }
+
+    [Fact]
     public async Task PolicyProxyPreservesTunnelBytesCoalescedWithConnectHeaders() {
         TcpListener origin = new(IPAddress.Loopback, 0);
         origin.Start();
@@ -673,6 +718,13 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile("file://server/share/report.html"));
         Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\\?\C:\reports\report.html"));
         Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\??\C:\reports\report.html"));
+    }
+
+    [Fact]
+    public void PdfHtmlSourceRejectsNetworkFileBasesBeforeNormalization() {
+        Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromHtml(
+            "<p>unsafe base</p>",
+            new Uri("file://server/share/report.html")));
     }
 
     [Fact]

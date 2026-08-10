@@ -190,7 +190,8 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         foreach (string line in lines.Skip(1)) {
             if (line.Length == 0
                 || line.StartsWith("Connection:", StringComparison.OrdinalIgnoreCase)
-                || line.StartsWith("Proxy-Connection:", StringComparison.OrdinalIgnoreCase)) continue;
+                || line.StartsWith("Proxy-Connection:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase)) continue;
             if (line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)) hasHost = true;
             forwarded.Append(line).Append("\r\n");
         }

@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -39,7 +38,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 HtmlBrowserNetworkPolicyEvaluator policy = new(_options.NetworkPolicy);
                 string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
                     ? Path.GetDirectoryName(request.Source.FilePath!)
-                    : null;
+                    : request.Source.FileBaseDirectory;
                 await ValidateInitialSourceAsync(
                     request.Source,
                     policy,
@@ -163,11 +162,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 cancellationToken).ConfigureAwait(false);
             await ExecuteCancellableSlotOperationAsync(
                 slot,
-                () => AddStorageInitScriptAsync(context, request),
+                () => AddCookiesAsync(context, request.Cookies),
                 cancellationToken).ConfigureAwait(false);
             await ExecuteCancellableSlotOperationAsync(
                 slot,
-                () => AddCookiesAsync(context, request.Cookies),
+                () => HtmlBrowserStorageInitializer.AddAsync(context, request),
                 cancellationToken).ConfigureAwait(false);
 
             IPage page = await ExecuteCancellableSlotOperationAsync(
@@ -186,7 +185,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         request.Headers,
                         cancellationToken),
                     cancellationToken).ConfigureAwait(false);
-
             long navigationStarted = Stopwatch.GetTimestamp();
             await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
@@ -357,7 +355,18 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 cancellationToken).ConfigureAwait(false);
         }
         if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
-            await ExecuteCancellablePageOperationAsync(page, () => page.EvaluateAsync(request.BeforeCaptureScript!), cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource? deadline = request.BeforeCaptureScriptTimeout == 0
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline?.CancelAfter(request.BeforeCaptureScriptTimeout);
+            try {
+                await ExecuteCancellablePageOperationAsync(
+                    page,
+                    () => page.EvaluateAsync(request.BeforeCaptureScript!),
+                    deadline?.Token ?? cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
+                throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
+            }
         }
 
         await HtmlBrowserPdfCapture.WaitForReadinessAsync(page, request.Readiness, cancellationToken).ConfigureAwait(false);
@@ -382,15 +391,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
             }
         }).ToArray();
         await context.AddCookiesAsync(values).ConfigureAwait(false);
-    }
-
-    private static async Task AddStorageInitScriptAsync(IBrowserContext context, HtmlBrowserPdfRequest request) {
-        if (request.LocalStorage.Count == 0 && request.SessionStorage.Count == 0) return;
-        string expectedOrigin = JsonSerializer.Serialize(request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority));
-        string local = JsonSerializer.Serialize(request.LocalStorage);
-        string session = JsonSerializer.Serialize(request.SessionStorage);
-        string script = $"(() => {{ const expectedOrigin = {expectedOrigin}; if (window !== window.top || location.origin !== expectedOrigin) return; const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
-        await context.AddInitScriptAsync(script).ConfigureAwait(false);
     }
 
     private static string AddBaseElement(string html, Uri? baseUri) {

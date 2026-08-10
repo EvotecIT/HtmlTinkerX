@@ -137,13 +137,13 @@ Console.WriteLine(
     $"rendered {result.Diagnostics.TotalDuration.TotalMilliseconds:N0} ms");
 ```
 
-Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. Per-render headers and local/session storage are restricted to the URL source origin; HTML-string capture requires an absolute HTTP/HTTPS `baseUri` when using them. Cookies retain their own URL/domain scope. CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in the same immutable request snapshot. For a page already loaded in an authenticated `HtmlBrowserSession`, pass its `IPage` to `GetPagePdfAsync` or `SavePagePdfAsync` with `HtmlBrowserPdfOptions`.
+Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. An HTTP/HTTPS base gives an HTML string that origin; a direct local `file:` base loads relative styles, scripts, and images under the same local-directory boundary as file capture. Per-render headers and local/session storage are restricted to the URL source origin, so HTML-string capture requires an absolute HTTP/HTTPS `baseUri` when using them. Cookies retain their own URL/domain scope. CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in the same immutable request snapshot. For a page already loaded in an authenticated `HtmlBrowserSession`, pass its `IPage` to `GetPagePdfAsync` or `SavePagePdfAsync` with `HtmlBrowserPdfOptions`.
 
 File capture accepts local paths only. UNC/device paths are rejected on every platform. On Windows, mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are also rejected before file content is probed; Unix paths retain canonical containment checks.
 
-Per-render headers cover same-origin HTTP(S) documents and subresources. JavaScript WebSocket handshakes cannot carry arbitrary headers; use a scoped cookie or authenticated page state for WS/WSS endpoints.
+Per-render headers cover same-origin HTTP(S) documents, subresources, and dedicated-worker requests. JavaScript WebSocket handshakes cannot carry arbitrary headers; use a scoped cookie or authenticated page state for WS/WSS endpoints.
 
-`navigationTimeout` limits initial source loading. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation.
+`navigationTimeout` limits initial source loading. `beforeCaptureScriptTimeout` limits an optional pre-capture script and defaults to 30 seconds. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation. Set an individual timeout to zero only when that stage may intentionally run without a deadline.
 
 Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
 

@@ -15,7 +15,12 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly Uri? _origin;
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
     private readonly ConcurrentDictionary<Task, byte> _pending = new();
+    private readonly ConcurrentDictionary<string, byte> _workerSessions = new(StringComparer.Ordinal);
     private readonly EventHandler<JsonElement?> _handler;
+    private readonly EventHandler<JsonElement?> _targetAttachedHandler;
+    private readonly EventHandler<JsonElement?> _targetMessageHandler;
+    private readonly EventHandler<JsonElement?> _targetDetachedHandler;
+    private long _nextWorkerCommandId;
     private int _disposed;
 
     private HtmlBrowserScopedHeaderInterceptor(
@@ -26,6 +31,9 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         _origin = origin;
         _captureHeaders = captureHeaders;
         _handler = OnRequestPaused;
+        _targetAttachedHandler = OnTargetAttached;
+        _targetMessageHandler = OnTargetMessage;
+        _targetDetachedHandler = OnTargetDetached;
     }
 
     internal static async Task<HtmlBrowserScopedHeaderInterceptor> CreateAsync(
@@ -38,6 +46,9 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         ICDPSession session = await context.NewCDPSessionAsync(page).ConfigureAwait(false);
         HtmlBrowserScopedHeaderInterceptor interceptor = new(session, origin, captureHeaders);
         session.Event("Fetch.requestPaused").OnEvent += interceptor._handler;
+        session.Event("Target.attachedToTarget").OnEvent += interceptor._targetAttachedHandler;
+        session.Event("Target.receivedMessageFromTarget").OnEvent += interceptor._targetMessageHandler;
+        session.Event("Target.detachedFromTarget").OnEvent += interceptor._targetDetachedHandler;
         try {
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
                 ["patterns"] = new[] {
@@ -45,10 +56,22 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                     new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
                 }
             }).ConfigureAwait(false);
+            await session.SendAsync("Target.setAutoAttach", new Dictionary<string, object> {
+                ["autoAttach"] = true,
+                ["waitForDebuggerOnStart"] = true,
+                ["flatten"] = false,
+                ["filter"] = new object[] {
+                    new Dictionary<string, object> { ["type"] = "worker", ["exclude"] = false },
+                    new Dictionary<string, object> { ["exclude"] = true }
+                }
+            }).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             return interceptor;
         } catch {
             session.Event("Fetch.requestPaused").OnEvent -= interceptor._handler;
+            session.Event("Target.attachedToTarget").OnEvent -= interceptor._targetAttachedHandler;
+            session.Event("Target.receivedMessageFromTarget").OnEvent -= interceptor._targetMessageHandler;
+            session.Event("Target.detachedFromTarget").OnEvent -= interceptor._targetDetachedHandler;
             try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
             throw;
         }
@@ -56,7 +79,36 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private void OnRequestPaused(object? sender, JsonElement? payload) {
         if (payload == null || Volatile.Read(ref _disposed) != 0) return;
-        Task pending = ContinueRequestAsync(payload.Value);
+        Track(ContinueRequestAsync(payload.Value, workerSessionId: null));
+    }
+
+    private void OnTargetAttached(object? sender, JsonElement? payload) {
+        if (payload == null || Volatile.Read(ref _disposed) != 0) return;
+        JsonElement targetInfo = payload.Value.GetProperty("targetInfo");
+        if (!string.Equals(targetInfo.GetProperty("type").GetString(), "worker", StringComparison.Ordinal)) return;
+        string sessionId = payload.Value.GetProperty("sessionId").GetString()!;
+        _workerSessions[sessionId] = 0;
+        Track(ConfigureWorkerAsync(sessionId));
+    }
+
+    private void OnTargetMessage(object? sender, JsonElement? payload) {
+        if (payload == null || Volatile.Read(ref _disposed) != 0) return;
+        string sessionId = payload.Value.GetProperty("sessionId").GetString()!;
+        if (!_workerSessions.ContainsKey(sessionId)) return;
+        using JsonDocument message = JsonDocument.Parse(payload.Value.GetProperty("message").GetString()!);
+        if (!message.RootElement.TryGetProperty("method", out JsonElement method)
+            || !string.Equals(method.GetString(), "Fetch.requestPaused", StringComparison.Ordinal)
+            || !message.RootElement.TryGetProperty("params", out JsonElement parameters)) return;
+        Track(ContinueRequestAsync(parameters.Clone(), sessionId));
+    }
+
+    private void OnTargetDetached(object? sender, JsonElement? payload) {
+        if (payload == null || !payload.Value.TryGetProperty("sessionId", out JsonElement session)) return;
+        string? sessionId = session.GetString();
+        if (sessionId != null) _workerSessions.TryRemove(sessionId, out _);
+    }
+
+    private void Track(Task pending) {
         _pending[pending] = 0;
         _ = pending.ContinueWith(
             completed => {
@@ -68,7 +120,20 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             TaskScheduler.Default);
     }
 
-    private async Task ContinueRequestAsync(JsonElement payload) {
+    private async Task ConfigureWorkerAsync(string sessionId) {
+        try {
+            await SendWorkerCommandAsync(sessionId, "Fetch.enable", new Dictionary<string, object> {
+                ["patterns"] = new[] {
+                    new Dictionary<string, object> { ["urlPattern"] = "http://*/*", ["requestStage"] = "Request" },
+                    new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
+                }
+            }).ConfigureAwait(false);
+        } finally {
+            await SendWorkerCommandAsync(sessionId, "Runtime.runIfWaitingForDebugger", new Dictionary<string, object>()).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ContinueRequestAsync(JsonElement payload, string? workerSessionId) {
         string requestId = payload.GetProperty("requestId").GetString()!;
         try {
             JsonElement request = payload.GetProperty("request");
@@ -87,10 +152,10 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             }
             // CDP request overrides apply only to this hop and do not extend to redirects.
             // Continuing other origins without a headers argument preserves page-owned values.
-            await _session.SendAsync("Fetch.continueRequest", continueArguments).ConfigureAwait(false);
+            await SendCommandAsync(workerSessionId, "Fetch.continueRequest", continueArguments).ConfigureAwait(false);
         } catch (Exception) {
             try {
-                await _session.SendAsync("Fetch.failRequest", new Dictionary<string, object> {
+                await SendCommandAsync(workerSessionId, "Fetch.failRequest", new Dictionary<string, object> {
                     ["requestId"] = requestId,
                     ["errorReason"] = "Failed"
                 }).ConfigureAwait(false);
@@ -99,6 +164,23 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             }
             throw;
         }
+    }
+
+    private Task SendCommandAsync(string? workerSessionId, string method, Dictionary<string, object> arguments) =>
+        workerSessionId == null
+            ? _session.SendAsync(method, arguments)
+            : SendWorkerCommandAsync(workerSessionId, method, arguments);
+
+    private Task SendWorkerCommandAsync(string sessionId, string method, Dictionary<string, object> arguments) {
+        string message = JsonSerializer.Serialize(new Dictionary<string, object> {
+            ["id"] = Interlocked.Increment(ref _nextWorkerCommandId),
+            ["method"] = method,
+            ["params"] = arguments
+        });
+        return _session.SendAsync("Target.sendMessageToTarget", new Dictionary<string, object> {
+            ["sessionId"] = sessionId,
+            ["message"] = message
+        });
     }
 
     private static bool IsSameOrigin(Uri? expectedOrigin, string requestUrl) {
@@ -111,7 +193,26 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _session.Event("Fetch.requestPaused").OnEvent -= _handler;
+        _session.Event("Target.attachedToTarget").OnEvent -= _targetAttachedHandler;
+        _session.Event("Target.receivedMessageFromTarget").OnEvent -= _targetMessageHandler;
+        _session.Event("Target.detachedFromTarget").OnEvent -= _targetDetachedHandler;
+        try {
+            await _session.SendAsync("Target.setAutoAttach", new Dictionary<string, object> {
+                ["autoAttach"] = false,
+                ["waitForDebuggerOnStart"] = false,
+                ["flatten"] = false
+            }).ConfigureAwait(false);
+        } catch (PlaywrightException) { }
         try { await _session.SendAsync("Fetch.disable").ConfigureAwait(false); } catch (PlaywrightException) { }
+        foreach (string workerSession in _workerSessions.Keys) {
+            try { await SendWorkerCommandAsync(workerSession, "Fetch.disable", new Dictionary<string, object>()).ConfigureAwait(false); } catch (PlaywrightException) { }
+            try {
+                await _session.SendAsync("Target.detachFromTarget", new Dictionary<string, object> {
+                    ["sessionId"] = workerSession
+                }).ConfigureAwait(false);
+            } catch (PlaywrightException) { }
+        }
+        _workerSessions.Clear();
         Task[] pending = _pending.Keys.ToArray();
         if (pending.Length > 0) {
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (PlaywrightException) { }

@@ -41,6 +41,10 @@ public sealed class HtmlBrowserPdfRendererOptions {
         if (maximumBrowserAge.HasValue && maximumBrowserAge.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumBrowserAge));
         if (viewportWidth.HasValue != viewportHeight.HasValue) throw new ArgumentException("Viewport width and height must be provided together.");
         if (viewportWidth <= 0 || viewportHeight <= 0) throw new ArgumentOutOfRangeException(nameof(viewportWidth));
+        if (string.IsNullOrWhiteSpace(proxy)
+            && (!string.IsNullOrWhiteSpace(proxyUsername) || !string.IsNullOrWhiteSpace(proxyPassword))) {
+            throw new ArgumentException("Proxy credentials require a caller-supplied proxy server.", nameof(proxy));
+        }
 
         Browser = browser;
         MinimumBrowserInstances = minimumBrowserInstances;

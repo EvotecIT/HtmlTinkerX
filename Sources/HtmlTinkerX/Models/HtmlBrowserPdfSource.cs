@@ -1,6 +1,7 @@
 namespace HtmlTinkerX;
 
 using System;
+using System.IO;
 
 /// <summary>Immutable input for a browser-backed PDF capture.</summary>
 public sealed class HtmlBrowserPdfSource {
@@ -46,9 +47,22 @@ public sealed class HtmlBrowserPdfSource {
     /// <summary>Gets the navigation URI used to give an HTML string its declared HTTP origin.</summary>
     internal Uri? HtmlDocumentUri {
         get {
-            if (Kind != HtmlBrowserPdfSourceKind.Html || SecurityOrigin == null) return null;
-            UriBuilder builder = new(BaseUri!) { Fragment = string.Empty };
-            return builder.Uri;
+            if (Kind != HtmlBrowserPdfSourceKind.Html || BaseUri == null) return null;
+            if (SecurityOrigin != null) {
+                UriBuilder builder = new(BaseUri) { Fragment = string.Empty };
+                return builder.Uri;
+            }
+            if (!BaseUri.IsFile || FileBaseDirectory == null) return null;
+            return new Uri(Path.Combine(FileBaseDirectory, ".htmltinkerx-document.html"));
+        }
+    }
+
+    /// <summary>Gets the trusted local directory used by an HTML-string file base.</summary>
+    internal string? FileBaseDirectory {
+        get {
+            if (Kind != HtmlBrowserPdfSourceKind.Html || BaseUri?.IsFile != true) return null;
+            string path = HtmlBrowserFileSystemPath.GetValidatedLocalPath(BaseUri.LocalPath);
+            return Directory.Exists(path) ? path : Path.GetDirectoryName(path);
         }
     }
 
@@ -86,6 +100,12 @@ public sealed class HtmlBrowserPdfSource {
 
         if (baseUri != null && !baseUri.IsAbsoluteUri) {
             throw new ArgumentException("Base URI must be absolute.", nameof(baseUri));
+        }
+        if (baseUri?.IsFile == true) {
+            if (HtmlBrowserFileSystemPath.IsNetworkOrDevicePath(baseUri.AbsoluteUri)) {
+                throw new ArgumentException("File base URI must use a direct local path.", nameof(baseUri));
+            }
+            _ = HtmlBrowserFileSystemPath.GetValidatedLocalPath(baseUri.LocalPath);
         }
 
         return new HtmlBrowserPdfSource(HtmlBrowserPdfSourceKind.Html, null, html, null, baseUri);
