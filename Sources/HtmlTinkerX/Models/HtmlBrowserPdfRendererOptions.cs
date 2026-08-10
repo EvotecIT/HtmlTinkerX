@@ -129,6 +129,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
             // is present. The capture-scoped policy proxy must observe loopback WS/WSS too.
             options.BrowserArguments.Add("--proxy-bypass-list=<-loopback>");
         }
+        if (IgnoreHttpsErrors) options.BrowserArguments.Add("--ignore-certificate-errors");
         return options;
     }
 }

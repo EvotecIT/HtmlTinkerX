@@ -14,13 +14,16 @@ var request = new HtmlBrowserPdfRequest(
     HtmlBrowserPdfSource.FromUrl("https://example.com"),
     pdfOptions: new HtmlBrowserPdfOptions(
         format: PdfPageFormat.A4,
-        printBackground: true));
+        printBackground: true),
+    navigationTimeout: 30_000);
 
 HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
 await File.WriteAllBytesAsync("page.pdf", result.PdfBytes);
 ```
 
 `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` and `HtmlBrowserPdfSource.FromFile(path)` use the same request contract.
+
+Initial navigation uses `HtmlBrowserPdfRequest.NavigationTimeout`. `HtmlBrowserPdfReadiness.Timeout` now applies only to each configured load-state, selector, function, or stability check, so a short readiness deadline no longer shortens source loading.
 
 Per-render headers and local/session storage are limited to the source origin. HTML-string capture must provide an absolute HTTP or HTTPS `baseUri` when using those values; HtmlTinkerX navigates the supplied markup at that origin while still resolving relative resources from the base URI. This prevents credentials from being broadcast to cross-origin frames and resources.
 
@@ -49,6 +52,6 @@ Omit readiness when the caller has already prepared the page. Cancelling an acti
 
 ## HTTPS certificates
 
-Browser sessions and browser tests now validate HTTPS certificates by default. Set `HtmlBrowserLaunchOptions.IgnoreHTTPSErrors = true`, `HtmlBrowserPdfRendererOptions(ignoreHttpsErrors: true)`, or the PowerShell `-IgnoreHttpsErrors` switch only for a source whose certificate you intentionally trust.
+Browser sessions and browser tests now validate HTTPS certificates by default. Set `HtmlBrowserLaunchOptions.IgnoreHTTPSErrors = true`, `HtmlBrowserPdfRendererOptions(ignoreHttpsErrors: true)`, or the PowerShell `-IgnoreHttpsErrors` switch only for a source whose certificate you intentionally trust. The pooled renderer applies this opt-in to its dedicated Chromium processes and isolated contexts.
 
 Browser PDF output remains Chromium-only. Firefox and WebKit cannot service a PDF request.

@@ -33,11 +33,18 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
             Interlocked.Increment(ref _accepted);
             long totalStarted = Stopwatch.GetTimestamp();
-            long queueStarted = totalStarted;
             bool leaseAcquired = false;
-            bool countedAsQueued = true;
-            Interlocked.Increment(ref _queued);
+            bool countedAsQueued = false;
             try {
+                HtmlBrowserNetworkPolicyEvaluator policy = new(_options.NetworkPolicy);
+                string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
+                    ? Path.GetDirectoryName(request.Source.FilePath!)
+                    : null;
+                await ValidateInitialSourceAsync(request.Source, policy, selectedFileDirectory, operationToken).ConfigureAwait(false);
+
+                long queueStarted = Stopwatch.GetTimestamp();
+                countedAsQueued = true;
+                Interlocked.Increment(ref _queued);
                 await _leaseGate.WaitAsync(operationToken).ConfigureAwait(false);
                 leaseAcquired = true;
                 Interlocked.Decrement(ref _queued);
@@ -54,6 +61,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         completedResult = await CaptureWithSlotAsync(
                             slot,
                             request,
+                            policy,
+                            selectedFileDirectory,
                             queueDuration,
                             retried,
                             operationToken).ConfigureAwait(false);
@@ -95,10 +104,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
     private async Task<HtmlBrowserPdfResult> CaptureWithSlotAsync(
         BrowserSlot slot,
         HtmlBrowserPdfRequest request,
+        HtmlBrowserNetworkPolicyEvaluator policy,
+        string? selectedFileDirectory,
         TimeSpan queueDuration,
         bool retried,
         CancellationToken cancellationToken) {
-        HtmlBrowserNetworkPolicyEvaluator policy = new(_options.NetworkPolicy);
         ConcurrentQueue<string> blockedRequests = new();
         int blockedRequestCount = 0;
         int blockedRequestSamples = 0;
@@ -114,14 +124,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
             blockedByProxy = uri => RecordBlockedRequest(uri.AbsoluteUri);
             slot.PolicyProxy.RequestBlocked += blockedByProxy;
         }
-        string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
-            ? Path.GetDirectoryName(request.Source.FilePath!)
-            : null;
-
         BrowserNewContextOptions contextOptions = CreateContextOptions(request);
         IBrowserContext? context = null;
         try {
-            await ValidateInitialSourceAsync(request.Source, policy, selectedFileDirectory, cancellationToken).ConfigureAwait(false);
             context = await ExecuteCancellableSlotOperationAsync(
                 slot,
                 () => slot.Browser.NewContextAsync(contextOptions),
@@ -169,7 +174,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             page.SetDefaultTimeout(request.Readiness.Timeout);
 
             long navigationStarted = Stopwatch.GetTimestamp();
-            await LoadSourceAsync(page, request.Source, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
+            await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
             long readinessStarted = Stopwatch.GetTimestamp();

@@ -81,6 +81,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
                 entry = GetOrRefreshDnsEntry(host);
                 addresses = await WaitAsync(entry.Lookup, deadline.Token).ConfigureAwait(false);
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+                if (entry != null) RemoveDnsEntry(host, entry);
                 return Array.Empty<IPAddress>();
             } catch (SocketException) {
                 if (entry != null) RemoveDnsEntry(host, entry);

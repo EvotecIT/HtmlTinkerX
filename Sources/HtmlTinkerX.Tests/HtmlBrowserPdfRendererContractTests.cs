@@ -97,6 +97,26 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void RequestKeepsNavigationAndReadinessTimeoutsIndependent() {
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml("<p>timeouts</p>"),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 50),
+            navigationTimeout: 2000);
+
+        Assert.Equal(50, request.Readiness.Timeout);
+        Assert.Equal(2000, request.NavigationTimeout);
+    }
+
+    [Fact]
+    public void HttpsErrorOptInAlsoConfiguresTheDedicatedChromiumProcess() {
+        HtmlBrowserLaunchOptions strict = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
+        HtmlBrowserLaunchOptions trusted = new HtmlBrowserPdfRendererOptions(ignoreHttpsErrors: true).CreateLaunchOptions();
+
+        Assert.DoesNotContain("--ignore-certificate-errors", strict.BrowserArguments);
+        Assert.Contains("--ignore-certificate-errors", trusted.BrowserArguments);
+    }
+
+    [Fact]
     public async Task PublicNetworkPolicyBlocksPrivateTargetsUnlessExplicitlyAllowed() {
         HtmlBrowserNetworkPolicyEvaluator publicOnly = new(HtmlBrowserNetworkPolicy.PublicNetworkOnly);
         HtmlBrowserNetworkPolicyEvaluator allowListed = new(new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" }));
@@ -223,16 +243,34 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public async Task DnsLookupHasAnInternalDeadlineWithoutCallerCancellation() {
         TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
-            _ => pendingLookup.Task,
+            _ => Interlocked.Increment(ref calls) == 1
+                ? pendingLookup.Task
+                : Task.FromResult(new[] { IPAddress.Parse("8.8.8.8") }),
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
         Assert.Same(allowed, await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(2))));
         Assert.False(await allowed);
+        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
+        Assert.Equal(2, calls);
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
+    }
+
+    [Fact]
+    public async Task RejectedInitialSourceDoesNotLaunchOrChargeABrowserSlot() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => renderer.CaptureAsync(
+            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl("http://127.0.0.1/rejected"))));
+
+        HtmlBrowserPdfRendererMetrics metrics = renderer.GetMetricsSnapshot();
+        Assert.Equal(0, metrics.BrowsersCreated);
+        Assert.Equal(0, metrics.BrowsersRecycled);
+        Assert.Equal(1, metrics.FailedCaptures);
     }
 
     [Fact]
@@ -447,7 +485,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             TaskCompletionSource<bool> neverConnects = new(TaskCreationOptions.RunContinuationsAsynchronously);
             await using HtmlBrowserPolicyProxy proxy = new(
                 evaluator,
-                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromSeconds(5),
                 (client, address, port) => address.Equals(stalledAddress)
                     ? neverConnects.Task
                     : client.ConnectAsync(address, port));

@@ -166,6 +166,23 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ReadinessTimeoutDoesNotLimitInitialNavigation() {
+        await using LoopbackContentServer origin = new("<p>navigation completed</p>", TimeSpan.FromMilliseconds(250));
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromUrl(origin.Url),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 100),
+            navigationTimeout: 5000);
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "navigation completed");
+    }
+
+    [Fact]
     public async Task BlockedRequestSamplesNeverExceedTheConfiguredLimit() {
         string resources = string.Join(string.Empty, Enumerable.Range(0, 24).Select(index => $"<img src='http://127.0.0.1:{20000 + index}/blocked'>"));
         HtmlBrowserNetworkPolicy policy = new(blockedRequestDiagnosticLimit: 2);
@@ -469,10 +486,12 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         private readonly CancellationTokenSource _cancellation = new();
         private readonly Task _serverTask;
         private readonly string _body;
+        private readonly TimeSpan _responseDelay;
         private string? _lastRenderToken;
 
-        internal LoopbackContentServer(string body) {
+        internal LoopbackContentServer(string body, TimeSpan? responseDelay = null) {
             _body = body;
+            _responseDelay = responseDelay ?? TimeSpan.Zero;
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             Url = $"http://127.0.0.1:{port}/origin";
@@ -492,6 +511,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     string request = Encoding.ASCII.GetString(buffer, 0, read);
                     string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                     if (token != null) Volatile.Write(ref _lastRenderToken, token);
+                    if (_responseDelay > TimeSpan.Zero) await Task.Delay(_responseDelay, _cancellation.Token);
                     byte[] bodyBytes = Encoding.UTF8.GetBytes(_body);
                     byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
                     await stream.WriteAsync(headers, 0, headers.Length);
