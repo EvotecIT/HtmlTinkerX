@@ -228,7 +228,8 @@ public static partial class HtmlBrowser {
     private static async Task<(IBrowserContext Context, IPage Page)> CreateBrowserContextAsync(
         IBrowser browserInstance,
         HtmlBrowserLaunchOptions options,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool closeBrowserOnCancellation = true) {
         BrowserNewContextOptions? contextOptions = null;
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -246,7 +247,7 @@ public static partial class HtmlBrowser {
 
         IBrowserContext context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
             () => browserInstance.NewContextAsync(contextOptions),
-            () => browserInstance.CloseAsync(),
+            closeBrowserOnCancellation ? () => browserInstance.CloseAsync() : static () => Task.CompletedTask,
             cancellationToken).ConfigureAwait(false);
         try {
             IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -427,7 +428,11 @@ public static partial class HtmlBrowser {
                 } else {
                     closeContextOnDispose = true;
                     closePageOnDispose = false;
-                    (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
+                    (context, page) = await CreateBrowserContextAsync(
+                        browserInstance,
+                        options,
+                        cancellationToken,
+                        closeBrowserOnCancellation: false).ConfigureAwait(false);
                 }
             } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
                 resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);

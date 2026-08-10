@@ -39,7 +39,7 @@ public sealed class HtmlBrowserPdfSource {
             if (value == null || (value.Scheme != System.Uri.UriSchemeHttp && value.Scheme != System.Uri.UriSchemeHttps)) {
                 return null;
             }
-            UriBuilder origin = new(value.Scheme, value.Host, value.Port);
+            UriBuilder origin = new(value.Scheme, value.IdnHost, value.Port);
             return origin.Uri;
         }
     }

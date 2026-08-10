@@ -61,6 +61,39 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task HtmlBaseInjectionPreservesStandardsModeWithoutAnExplicitHead() {
+        await using LoopbackContentServer origin = new("unused");
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml("<!doctype html><html><body><p id='mode'>pending</p></body></html>", new Uri(origin.Url)),
+            beforeCaptureScript: "document.querySelector('#mode').textContent = document.compatMode;");
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "CSS1Compat");
+    }
+
+    [Fact]
+    public async Task BlockedRequestSamplesNeverExceedTheConfiguredLimit() {
+        string resources = string.Join(string.Empty, Enumerable.Range(0, 24).Select(index => $"<img src='http://127.0.0.1:{20000 + index}/blocked'>"));
+        HtmlBrowserNetworkPolicy policy = new(blockedRequestDiagnosticLimit: 2);
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml("<html><body><p>bounded samples</p>" + resources + "</body></html>"),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 500));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        Assert.True(result.Diagnostics.BlockedRequestCount > 2);
+        Assert.Equal(2, result.Diagnostics.BlockedRequests.Count);
+    }
+
+    [Fact]
     public async Task HtmlCaptureProducesReadablePdfAndReusesWarmBrowserWithIsolatedContexts() {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             minimumBrowserInstances: 1,

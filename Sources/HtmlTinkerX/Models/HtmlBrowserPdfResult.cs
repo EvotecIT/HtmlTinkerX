@@ -17,4 +17,7 @@ public sealed class HtmlBrowserPdfResult {
     public int Length => _pdfBytes.Length;
     /// <summary>Gets diagnostics for the browser stage.</summary>
     public HtmlBrowserPdfDiagnostics Diagnostics { get; }
+
+    internal HtmlBrowserPdfResult WithTotalDuration(TimeSpan totalDuration) =>
+        new(_pdfBytes, Diagnostics.WithTotalDuration(totalDuration));
 }

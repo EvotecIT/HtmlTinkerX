@@ -69,6 +69,24 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void WebStorageSnapshotsPreserveCaseSensitiveKeys() {
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml("<p>storage</p>", new Uri("https://example.com/report")),
+            localStorage: new Dictionary<string, string> { ["token"] = "lower", ["Token"] = "upper" });
+
+        Assert.Equal(2, request.LocalStorage.Count);
+        Assert.Equal("lower", request.LocalStorage["token"]);
+        Assert.Equal("upper", request.LocalStorage["Token"]);
+    }
+
+    [Fact]
+    public void IdnSourceOriginUsesTheBrowserCanonicalHost() {
+        HtmlBrowserPdfSource source = HtmlBrowserPdfSource.FromUrl("https://bücher.example/report");
+
+        Assert.Equal("xn--bcher-kva.example", source.SecurityOrigin!.IdnHost);
+    }
+
+    [Fact]
     public void RequestRejectsCredentialsWithoutAnHttpOrigin() {
         ArgumentException exception = Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromHtml("<h1>No origin</h1>"),
@@ -146,6 +164,20 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
         Assert.Equal("xn--bcher-kva.example", Assert.Single(policy.DeniedHosts));
         Assert.False(await evaluator.IsAllowedAsync("https://bücher.example/report", null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task FailedDnsLookupIsEvictedSoTheWarmPolicyCanRecover() {
+        int calls = 0;
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => Interlocked.Increment(ref calls) == 1
+                ? Task.FromException<IPAddress[]>(new SocketException())
+                : Task.FromResult(new[] { IPAddress.Parse("8.8.8.8") }));
+
+        Assert.False(await evaluator.IsAllowedAsync("https://recover.example/report", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("https://recover.example/report", null, CancellationToken.None));
+        Assert.Equal(2, calls);
     }
 
     [Theory]

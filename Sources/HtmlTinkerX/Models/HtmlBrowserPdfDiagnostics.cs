@@ -64,4 +64,20 @@ public sealed class HtmlBrowserPdfDiagnostics {
     public IReadOnlyList<string> BlockedRequests { get; }
     /// <summary>Gets non-fatal capture warnings.</summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    internal HtmlBrowserPdfDiagnostics WithTotalDuration(TimeSpan totalDuration) => new(
+        SourceKind,
+        BrowserInstanceId,
+        BrowserReused,
+        RetriedAfterBrowserFailure,
+        FinalUrl,
+        BrowserVersion,
+        QueueDuration,
+        NavigationDuration,
+        ReadinessDuration,
+        PdfDuration,
+        totalDuration,
+        BlockedRequestCount,
+        BlockedRequests,
+        Warnings);
 }

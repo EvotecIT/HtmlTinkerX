@@ -53,13 +53,15 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         }
 
         IPAddress[] addresses;
+        Task<IPAddress[]>? lookup = null;
         if (IPAddress.TryParse(host, out IPAddress? literal)) {
             addresses = new[] { literal };
         } else {
             try {
-                Task<IPAddress[]> lookup = _dns.GetOrAdd(host, _resolveHost);
+                lookup = _dns.GetOrAdd(host, _resolveHost);
                 addresses = await WaitAsync(lookup, cancellationToken).ConfigureAwait(false);
             } catch (SocketException) {
+                if (lookup != null) _dns.TryRemove(host, out _);
                 return Array.Empty<IPAddress>();
             }
         }

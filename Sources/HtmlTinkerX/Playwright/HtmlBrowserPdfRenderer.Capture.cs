@@ -46,16 +46,14 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 for (int attempt = 0; attempt < 2; attempt++) {
                     BrowserSlot slot = await RentSlotAsync(operationToken).ConfigureAwait(false);
                     bool returnSlot = true;
+                    HtmlBrowserPdfResult? completedResult = null;
                     try {
-                        HtmlBrowserPdfResult result = await CaptureWithSlotAsync(
+                        completedResult = await CaptureWithSlotAsync(
                             slot,
                             request,
                             queueDuration,
-                            totalStarted,
                             retried,
                             operationToken).ConfigureAwait(false);
-                        Interlocked.Increment(ref _succeeded);
-                        return result;
                     } catch (Exception ex) when (attempt == 0 && !operationToken.IsCancellationRequested && IsBrowserProcessFailure(ex, slot)) {
                         retried = true;
                         returnSlot = false;
@@ -64,6 +62,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         await RecycleSlotAsync(slot).ConfigureAwait(false);
                     } finally {
                         if (returnSlot) await ReturnSlotAsync(slot).ConfigureAwait(false);
+                    }
+                    if (completedResult != null) {
+                        Interlocked.Increment(ref _succeeded);
+                        return completedResult.WithTotalDuration(StopwatchElapsed(totalStarted));
                     }
                 }
 
@@ -91,21 +93,22 @@ public sealed partial class HtmlBrowserPdfRenderer {
         BrowserSlot slot,
         HtmlBrowserPdfRequest request,
         TimeSpan queueDuration,
-        long totalStarted,
         bool retried,
         CancellationToken cancellationToken) {
         HtmlBrowserNetworkPolicyEvaluator policy = new(_options.NetworkPolicy);
         ConcurrentQueue<string> blockedRequests = new();
         int blockedRequestCount = 0;
+        int blockedRequestSamples = 0;
         List<string> warnings = new();
+        void RecordBlockedRequest(string url) {
+            Interlocked.Increment(ref blockedRequestCount);
+            if (Interlocked.Increment(ref blockedRequestSamples) <= _options.NetworkPolicy.BlockedRequestDiagnosticLimit) {
+                blockedRequests.Enqueue(SanitizeUri(url));
+            }
+        }
         Action<Uri>? blockedByProxy = null;
         if (slot.PolicyProxy != null) {
-            blockedByProxy = uri => {
-                Interlocked.Increment(ref blockedRequestCount);
-                if (blockedRequests.Count < _options.NetworkPolicy.BlockedRequestDiagnosticLimit) {
-                    blockedRequests.Enqueue(SanitizeUri(uri.AbsoluteUri));
-                }
-            };
+            blockedByProxy = uri => RecordBlockedRequest(uri.AbsoluteUri);
             slot.PolicyProxy.RequestBlocked += blockedByProxy;
         }
         string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
@@ -140,10 +143,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     return;
                 }
 
-                Interlocked.Increment(ref blockedRequestCount);
-                if (blockedRequests.Count < _options.NetworkPolicy.BlockedRequestDiagnosticLimit) {
-                    blockedRequests.Enqueue(SanitizeUri(route.Request.Url));
-                }
+                RecordBlockedRequest(route.Request.Url);
                 await route.AbortAsync("blockedbyclient").ConfigureAwait(false);
             };
             await ExecuteCancellableSlotOperationAsync(
@@ -199,7 +199,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 navigationDuration,
                 readinessDuration,
                 pdfDuration,
-                StopwatchElapsed(totalStarted),
+                TimeSpan.Zero,
                 Volatile.Read(ref blockedRequestCount),
                 blockedRequests.ToArray(),
                 warnings.ToArray());
@@ -355,7 +355,13 @@ public sealed partial class HtmlBrowserPdfRenderer {
         if (baseUri == null) return html;
         string baseElement = "<base href=\"" + System.Net.WebUtility.HtmlEncode(baseUri.AbsoluteUri) + "\">";
         Match head = Regex.Match(html, "<head(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        return head.Success ? html.Insert(head.Index + head.Length, baseElement) : "<head>" + baseElement + "</head>" + html;
+        if (head.Success) return html.Insert(head.Index + head.Length, baseElement);
+        Match htmlElement = Regex.Match(html, "<html(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (htmlElement.Success) return html.Insert(htmlElement.Index + htmlElement.Length, "<head>" + baseElement + "</head>");
+        Match doctype = Regex.Match(html, "<!doctype(?:\\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return doctype.Success
+            ? html.Insert(doctype.Index + doctype.Length, "<head>" + baseElement + "</head>")
+            : "<head>" + baseElement + "</head>" + html;
     }
 
     private static async Task ExecuteCancellablePageOperationAsync(IPage page, Func<Task> operation, CancellationToken cancellationToken) {

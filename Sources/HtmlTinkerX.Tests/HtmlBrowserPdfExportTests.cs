@@ -143,6 +143,33 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task OpenSessionAsync_CdpCancellationDoesNotCloseExternalBrowser() {
+        TaskCompletionSource<IBrowserContext> pendingContext = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(value => value.Contexts).Returns(Array.Empty<IBrowserContext>());
+        browser.SetupGet(value => value.IsConnected).Returns(true);
+        browser.Setup(value => value.NewContextAsync(It.IsAny<BrowserNewContextOptions>())).Returns(pendingContext.Task);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.ConnectOverCDPAsync(It.IsAny<string>(), It.IsAny<BrowserTypeConnectOverCDPOptions>()))
+            .ReturnsAsync(browser.Object);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        using CancellationTokenSource cancellation = new();
+        HtmlBrowserLaunchOptions options = new() { CdpEndpointUrl = "http://127.0.0.1:9222" };
+        try {
+            Task<HtmlBrowserSession> opening = HtmlBrowser.OpenSessionAsync("https://example.com", options, cancellation.Token);
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opening);
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Never);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task MaskCleanupDoesNotReplaceActivePdfCancellation() {
         TaskCompletionSource<byte[]> pendingPdf = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool closed = false;

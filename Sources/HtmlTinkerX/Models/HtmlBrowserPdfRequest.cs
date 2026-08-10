@@ -23,10 +23,10 @@ public sealed class HtmlBrowserPdfRequest {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         PdfOptions = pdfOptions ?? new HtmlBrowserPdfOptions();
         Readiness = readiness ?? new HtmlBrowserPdfReadiness();
-        Headers = Snapshot(headers);
+        Headers = Snapshot(headers, StringComparer.OrdinalIgnoreCase);
         Cookies = Array.AsReadOnly((cookies ?? Array.Empty<HtmlBrowserPdfCookie>()).ToArray());
-        LocalStorage = Snapshot(localStorage);
-        SessionStorage = Snapshot(sessionStorage);
+        LocalStorage = Snapshot(localStorage, StringComparer.Ordinal);
+        SessionStorage = Snapshot(sessionStorage, StringComparer.Ordinal);
         if ((Headers.Count != 0 || LocalStorage.Count != 0 || SessionStorage.Count != 0) && Source.SecurityOrigin == null) {
             throw new ArgumentException(
                 "Per-render headers and web storage require a URL source or an HTML source with an absolute HTTP/HTTPS base URI so credentials can be limited to one origin.",
@@ -61,8 +61,8 @@ public sealed class HtmlBrowserPdfRequest {
     /// <summary>Gets the CSS media type emulated before printing.</summary>
     public HtmlBrowserPdfMediaType MediaType { get; }
 
-    private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values) {
-        Dictionary<string, string> copy = new(StringComparer.OrdinalIgnoreCase);
+    private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values, StringComparer comparer) {
+        Dictionary<string, string> copy = new(comparer);
         if (values != null) {
             foreach (KeyValuePair<string, string> item in values) {
                 if (string.IsNullOrWhiteSpace(item.Key)) {
