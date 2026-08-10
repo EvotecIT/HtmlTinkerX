@@ -21,6 +21,7 @@ public static class HtmlBrowserTester {
     /// <param name="proxy">Proxy server URL.</param>
     /// <param name="proxyUsername">Proxy username.</param>
     /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     /// <returns>Detailed test results.</returns>
     public static async Task<HtmlBrowserTestResult> TestUrlAsync(
         string url,
@@ -29,7 +30,8 @@ public static class HtmlBrowserTester {
         int timeout = 30000,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null) {
+        string? proxyPassword = null,
+        bool ignoreHttpsErrors = false) {
         
         var result = new HtmlBrowserTestResult { Url = url };
         var startTime = DateTimeOffset.UtcNow;
@@ -59,7 +61,7 @@ public static class HtmlBrowserTester {
 
                 var browser = await browserType.LaunchAsync(launchOptions);
                 try {
-                    var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = true };
+                    var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = ignoreHttpsErrors };
                     var context = await browser.NewContextAsync(contextOptions);
                     try {
                         var page = await context.NewPageAsync();
@@ -156,12 +158,14 @@ public static class HtmlBrowserTester {
     /// <param name="engine">Browser engine to use.</param>
     /// <param name="headless">Run in headless mode.</param>
     /// <param name="timeout">Timeout in milliseconds.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     /// <returns>Detailed test results.</returns>
     public static async Task<HtmlBrowserTestResult> TestFileAsync(
         string filePath,
         HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
         bool headless = true,
-        int timeout = 30000) {
+        int timeout = 30000,
+        bool ignoreHttpsErrors = false) {
         
         // Resolve the file path
         var resolvedPath = filePath.ToFullPath();
@@ -173,7 +177,7 @@ public static class HtmlBrowserTester {
         var fileUrl = new System.Uri(resolvedPath).AbsoluteUri;
         
         // Test the file URL
-        return await TestUrlAsync(fileUrl, engine, headless, timeout);
+        return await TestUrlAsync(fileUrl, engine, headless, timeout, ignoreHttpsErrors: ignoreHttpsErrors);
     }
 
     /// <summary>

@@ -236,6 +236,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         private int _broken;
         private int _renderCount;
         private int _disposed;
+        private int _playwrightDisposed;
 
         internal BrowserSlot(long id, IPlaywright playwright, IBrowser browser, HtmlBrowserPolicyProxy? policyProxy) {
             Id = id;
@@ -254,15 +255,25 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         internal bool IsBroken => Volatile.Read(ref _broken) != 0;
         internal void MarkBroken() => Interlocked.Exchange(ref _broken, 1);
         internal void RecordRender() => Interlocked.Increment(ref _renderCount);
+        internal void DisposePlaywright() {
+            if (Interlocked.Exchange(ref _playwrightDisposed, 1) == 0) Playwright.Dispose();
+        }
 
         public async ValueTask DisposeAsync() {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             try {
-                if (Browser.IsConnected) await Browser.CloseAsync().ConfigureAwait(false);
-            } catch (PlaywrightException) {
+                if (Browser.IsConnected) {
+                    Task close = Browser.CloseAsync();
+                    if (await Task.WhenAny(close, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) == close) {
+                        await close.ConfigureAwait(false);
+                    } else {
+                        _ = close.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                    }
+                }
+            } catch (Exception) {
                 // A crashed browser is already closed from the renderer's perspective.
             } finally {
-                Playwright.Dispose();
+                DisposePlaywright();
                 if (PolicyProxy != null) await PolicyProxy.DisposeAsync().ConfigureAwait(false);
             }
         }

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -21,21 +22,44 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
-    public async Task LegacyPdfOverloadRejectsNonChromiumBeforeLaunch() {
-        await Assert.ThrowsAsync<NotSupportedException>(
-            () => HtmlBrowser.GetPagePdfAsync("about:blank", browser: HtmlBrowserEngine.WebKit));
+    public void DirectPagePdfApiUsesTheOptionsContractOnly() {
+        System.Reflection.MethodInfo[] methods = typeof(HtmlBrowser).GetMethods()
+            .Where(method => method.Name == nameof(HtmlBrowser.GetPagePdfAsync) || method.Name == nameof(HtmlBrowser.SavePagePdfAsync))
+            .ToArray();
+
+        Assert.Equal(2, methods.Length);
+        Assert.All(methods, method => {
+            System.Reflection.ParameterInfo[] parameters = method.GetParameters();
+            Assert.Equal(typeof(IPage), parameters[0].ParameterType);
+            Assert.Contains(parameters, parameter => parameter.ParameterType == typeof(HtmlBrowserPdfOptions));
+            Assert.True(parameters.Length <= 5);
+        });
+    }
+
+    [Fact]
+    public void PdfReadinessRejectsNegativeDelay() {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfReadiness(delayMilliseconds: -1));
     }
 
     [Fact]
     public void RequestSnapshotsMutableCollections() {
         Dictionary<string, string> headers = new() { ["X-Correlation-Id"] = "first" };
         HtmlBrowserPdfRequest request = new(
-            HtmlBrowserPdfSource.FromHtml("<h1>Snapshot</h1>"),
+            HtmlBrowserPdfSource.FromHtml("<h1>Snapshot</h1>", new Uri("https://reports.example/invoice")),
             headers: headers);
 
         headers["X-Correlation-Id"] = "changed";
 
         Assert.Equal("first", request.Headers["X-Correlation-Id"]);
+    }
+
+    [Fact]
+    public void RequestRejectsCredentialsWithoutAnHttpOrigin() {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<h1>No origin</h1>"),
+            localStorage: new Dictionary<string, string> { ["token"] = "secret" }));
+
+        Assert.Contains("HTTP/HTTPS base URI", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -163,8 +187,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
-    public void LegacyLaunchOptionsKeepHttpsCompatibilityWhilePooledRendererIsStrict() {
-        Assert.True(new HtmlBrowserLaunchOptions().IgnoreHTTPSErrors);
+    public void BrowserSessionsAndPooledRendererValidateHttpsByDefault() {
+        Assert.False(new HtmlBrowserLaunchOptions().IgnoreHTTPSErrors);
         Assert.False(new HtmlBrowserPdfRendererOptions().IgnoreHttpsErrors);
     }
 }

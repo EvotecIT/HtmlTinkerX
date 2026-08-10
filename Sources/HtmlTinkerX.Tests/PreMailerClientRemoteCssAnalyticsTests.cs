@@ -1,5 +1,6 @@
 using HtmlTinkerX;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -62,6 +63,7 @@ public class PreMailerClientRemoteCssAnalyticsTests {
         string localCssPath = new Uri(localCssFile).AbsoluteUri;
 
         HttpListener server = StartCssServer("a{color:red}", out string remoteUrl);
+        using HttpClient httpClient = new();
 
         string html = $"<html><head><link rel='stylesheet' href='{localCssPath}'><link rel='stylesheet' href='{remoteUrl}'></head><body><h1>Header</h1><a href='https://example.com/page'>Link</a></body></html>";
         var options = new PreMailerOptions {
@@ -70,7 +72,8 @@ public class PreMailerClientRemoteCssAnalyticsTests {
             AnalyticsSource = "newsletter",
             AnalyticsMedium = "email",
             AnalyticsCampaign = "campaign",
-            AnalyticsContent = "content"
+            AnalyticsContent = "content",
+            HttpClient = httpClient
         };
 
         try {

@@ -12,6 +12,7 @@ namespace HtmlTinkerX.Tests;
 /// <summary>
 /// Tests video recording capabilities of <see cref="HtmlBrowser"/>.
 /// </summary>
+[Collection("Playwright collection")]
 public class HtmlBrowserVideoRecordingTests {
     [Theory]
     [InlineData(false)]

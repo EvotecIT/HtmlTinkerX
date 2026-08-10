@@ -70,10 +70,11 @@ public static partial class HtmlBrowser {
             await SavePagePdfAsync(
                 session.Page,
                 path,
-                printBackground: true,
-                maskSensitiveElements: options.MaskSensitiveScreenshotElements,
-                maskSelectors: options.ScreenshotMaskSelectors,
-                maskColor: options.ScreenshotMaskColor,
+                new HtmlBrowserPdfOptions(
+                    printBackground: true,
+                    maskSensitiveElements: options.MaskSensitiveScreenshotElements,
+                    maskSelectors: options.ScreenshotMaskSelectors,
+                    maskColor: options.ScreenshotMaskColor),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             AddArtifact(result, fullFolder, "Pdf", path, "application/pdf");
         }

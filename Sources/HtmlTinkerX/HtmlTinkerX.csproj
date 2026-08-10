@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.2.2</VersionPrefix>
+        <VersionPrefix>3.0.0</VersionPrefix>
         <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <AssemblyName>HtmlTinkerX</AssemblyName>
         <AssemblyTitle>HtmlTinkerX</AssemblyTitle>
@@ -62,6 +62,7 @@
 
     <ItemGroup>
         <None Include="README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\MIGRATION.md" Pack="true" PackagePath="\" />
         <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
     </ItemGroup>
 

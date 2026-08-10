@@ -27,6 +27,11 @@ public sealed class HtmlBrowserPdfRequest {
         Cookies = Array.AsReadOnly((cookies ?? Array.Empty<HtmlBrowserPdfCookie>()).ToArray());
         LocalStorage = Snapshot(localStorage);
         SessionStorage = Snapshot(sessionStorage);
+        if ((Headers.Count != 0 || LocalStorage.Count != 0 || SessionStorage.Count != 0) && Source.SecurityOrigin == null) {
+            throw new ArgumentException(
+                "Per-render headers and web storage require a URL source or an HTML source with an absolute HTTP/HTTPS base URI so credentials can be limited to one origin.",
+                nameof(source));
+        }
         StyleSheetContent = styleSheetContent;
         BeforeCaptureScript = beforeCaptureScript;
         BypassContentSecurityPolicy = bypassContentSecurityPolicy;
@@ -39,13 +44,13 @@ public sealed class HtmlBrowserPdfRequest {
     public HtmlBrowserPdfOptions PdfOptions { get; }
     /// <summary>Gets the readiness conditions.</summary>
     public HtmlBrowserPdfReadiness Readiness { get; }
-    /// <summary>Gets extra HTTP headers applied to the isolated context.</summary>
+    /// <summary>Gets extra HTTP headers applied only to requests matching the source origin.</summary>
     public IReadOnlyDictionary<string, string> Headers { get; }
     /// <summary>Gets cookies applied before navigation.</summary>
     public IReadOnlyList<HtmlBrowserPdfCookie> Cookies { get; }
-    /// <summary>Gets local-storage values applied before page scripts run.</summary>
+    /// <summary>Gets local-storage values applied before page scripts run, only for the source origin.</summary>
     public IReadOnlyDictionary<string, string> LocalStorage { get; }
-    /// <summary>Gets session-storage values applied before page scripts run.</summary>
+    /// <summary>Gets session-storage values applied before page scripts run, only for the source origin.</summary>
     public IReadOnlyDictionary<string, string> SessionStorage { get; }
     /// <summary>Gets optional CSS injected after navigation.</summary>
     public string? StyleSheetContent { get; }

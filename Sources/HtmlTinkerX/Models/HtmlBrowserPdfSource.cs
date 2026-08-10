@@ -28,6 +28,31 @@ public sealed class HtmlBrowserPdfSource {
     /// <summary>Gets the optional base URI used to resolve HTML-string resources.</summary>
     public Uri? BaseUri { get; }
 
+    /// <summary>Gets the HTTP origin to which per-render headers and web storage may be scoped.</summary>
+    internal Uri? SecurityOrigin {
+        get {
+            Uri? value = Kind switch {
+                HtmlBrowserPdfSourceKind.Url => Uri,
+                HtmlBrowserPdfSourceKind.Html => BaseUri,
+                _ => null
+            };
+            if (value == null || (value.Scheme != System.Uri.UriSchemeHttp && value.Scheme != System.Uri.UriSchemeHttps)) {
+                return null;
+            }
+            UriBuilder origin = new(value.Scheme, value.Host, value.Port);
+            return origin.Uri;
+        }
+    }
+
+    /// <summary>Gets the navigation URI used to give an HTML string its declared HTTP origin.</summary>
+    internal Uri? HtmlDocumentUri {
+        get {
+            if (Kind != HtmlBrowserPdfSourceKind.Html || SecurityOrigin == null) return null;
+            UriBuilder builder = new(BaseUri!) { Fragment = string.Empty };
+            return builder.Uri;
+        }
+    }
+
     /// <summary>Creates a URL source.</summary>
     public static HtmlBrowserPdfSource FromUrl(string url) {
         if (string.IsNullOrWhiteSpace(url)) {

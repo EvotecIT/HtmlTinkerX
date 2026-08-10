@@ -136,7 +136,7 @@ Console.WriteLine(
     $"rendered {result.Diagnostics.TotalDuration.TotalMilliseconds:N0} ms");
 ```
 
-Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. Per-render headers, cookies, local/session storage, CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in an immutable request snapshot. Existing `GetPagePdfAsync` and `SavePagePdfAsync` overloads remain available for one-shot and already-open-page workflows.
+Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. Per-render headers and local/session storage are restricted to the URL source origin; HTML-string capture requires an absolute HTTP/HTTPS `baseUri` when using them. Cookies retain their own URL/domain scope. CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in the same immutable request snapshot. For a page already loaded in an authenticated `HtmlBrowserSession`, pass its `IPage` to `GetPagePdfAsync` or `SavePagePdfAsync` with `HtmlBrowserPdfOptions`.
 
 Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
 

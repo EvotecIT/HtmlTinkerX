@@ -1183,8 +1183,13 @@ await HtmlBrowser.CaptureScreenshotAsync(
     "full.png",
     new ScreenshotOptions { FullPage = true });
 
-// PDF generation
-await HtmlBrowser.SavePagePdfAsync(session.Page, "document.pdf");
+// PDF generation from an already-loaded page
+await HtmlBrowser.SavePagePdfAsync(
+    session.Page,
+    "document.pdf",
+    new HtmlBrowserPdfOptions(
+        format: PdfPageFormat.A4,
+        printBackground: true));
 
 // High-throughput PDF generation with warm Chromium reuse and isolated contexts
 await using var pdfRenderer = new HtmlBrowserPdfRenderer(
@@ -1219,7 +1224,7 @@ await HtmlBrowser.FillInputAsync(session, "#username", "user");
 await HtmlBrowser.ClickSelectorAsync(session, "#loginForm button[type='submit']");
 ```
 
-`HtmlBrowserPdfRenderer` accepts URL, HTML-string, and file sources. Each capture gets a fresh context while the bounded pool reuses Chromium processes, applies request-scoped headers/cookies/storage/readiness and print options, and returns lifecycle diagnostics with the PDF bytes. PDF capture is Chromium-only; Firefox and WebKit requests fail before launch.
+`HtmlBrowserPdfRenderer` accepts URL, HTML-string, and file sources. Each capture gets a fresh context while the bounded pool reuses Chromium processes, applies origin-scoped headers/storage, cookie-scoped authentication, readiness and print options, and returns lifecycle diagnostics with the PDF bytes. HTML-string requests need an HTTP/HTTPS base URI when using headers or web storage. PDF capture is Chromium-only; Firefox and WebKit requests fail before launch.
 
 The renderer validates HTTPS and blocks private-network HTTP(S)/WS(S) and arbitrary file requests by default. Its browser-slot proxy connects to the exact DNS address accepted by policy, while canonical path checks reject file symlink escapes. Configure `HtmlBrowserNetworkPolicy` with explicit internal hosts or file roots when the caller and resources are trusted. A caller-supplied proxy requires explicit private-network mode because that proxy owns DNS and outbound enforcement. These controls do not replace container or host egress policy for services that accept untrusted input.
 

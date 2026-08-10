@@ -116,7 +116,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
         IBrowserContext? context = null;
         try {
             await ValidateInitialSourceAsync(request.Source, policy, selectedFileDirectory, cancellationToken).ConfigureAwait(false);
-            context = await slot.Browser.NewContextAsync(contextOptions).ConfigureAwait(false);
+            context = await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => slot.Browser.NewContextAsync(contextOptions),
+                cancellationToken).ConfigureAwait(false);
             Func<IRoute, Task> policyRoute = async route => {
                 bool allowed;
                 try {
@@ -127,7 +130,13 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }
 
                 if (allowed) {
-                    await route.ContinueAsync().ConfigureAwait(false);
+                    RouteFetchOptions? fetchOptions = CreateScopedHeaderOptions(request, route.Request);
+                    if (fetchOptions == null) {
+                        await route.ContinueAsync().ConfigureAwait(false);
+                    } else {
+                        IAPIResponse response = await route.FetchAsync(fetchOptions).ConfigureAwait(false);
+                        await route.FulfillAsync(new RouteFulfillOptions { Response = response }).ConfigureAwait(false);
+                    }
                     return;
                 }
 
@@ -137,11 +146,23 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }
                 await route.AbortAsync("blockedbyclient").ConfigureAwait(false);
             };
-            await context.RouteAsync("**/*", policyRoute).ConfigureAwait(false);
-            await AddStorageInitScriptAsync(context, request, cancellationToken).ConfigureAwait(false);
-            await AddCookiesAsync(context, request.Cookies, cancellationToken).ConfigureAwait(false);
+            await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => context.RouteAsync("**/*", policyRoute),
+                cancellationToken).ConfigureAwait(false);
+            await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => AddStorageInitScriptAsync(context, request),
+                cancellationToken).ConfigureAwait(false);
+            await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => AddCookiesAsync(context, request.Cookies),
+                cancellationToken).ConfigureAwait(false);
 
-            IPage page = await context.NewPageAsync().ConfigureAwait(false);
+            IPage page = await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => context.NewPageAsync(),
+                cancellationToken).ConfigureAwait(false);
             page.SetDefaultTimeout(request.Readiness.Timeout);
 
             long navigationStarted = Stopwatch.GetTimestamp();
@@ -152,10 +173,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
             await PreparePageAsync(page, request, cancellationToken).ConfigureAwait(false);
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
 
-            PagePdfOptions pdfOptions = CreatePagePdfOptions(request.PdfOptions);
+            PagePdfOptions pdfOptions = HtmlBrowserPdfCapture.CreatePageOptions(request.PdfOptions);
             long pdfStarted = Stopwatch.GetTimestamp();
-            byte[] bytes = await ExecuteCancellableContextOperationAsync(
-                context,
+            byte[] bytes = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
                     page,
                     request.PdfOptions.MaskSensitiveElements,
@@ -163,6 +183,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     request.PdfOptions.MaskColor,
                     () => page.PdfAsync(pdfOptions),
                     cancellationToken),
+                () => AbortSlotAsync(slot),
                 cancellationToken).ConfigureAwait(false);
             TimeSpan pdfDuration = StopwatchElapsed(pdfStarted);
 
@@ -185,11 +206,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             return new HtmlBrowserPdfResult(bytes, diagnostics);
         } finally {
             if (context != null) {
-                try {
-                    await context.CloseAsync().ConfigureAwait(false);
-                } catch (PlaywrightException) {
-                    slot.MarkBroken();
-                }
+                await CloseContextAsync(context, slot).ConfigureAwait(false);
             }
             if (slot.PolicyProxy != null && blockedByProxy != null) slot.PolicyProxy.RequestBlocked -= blockedByProxy;
         }
@@ -203,10 +220,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             StorageStatePath = _options.StorageStatePath,
             UserAgent = _options.UserAgent,
             Locale = _options.Locale,
-            TimezoneId = _options.Timezone,
-            ExtraHTTPHeaders = request.Headers.Count == 0
-                ? null
-                : request.Headers.ToDictionary(static item => item.Key, static item => item.Value, StringComparer.OrdinalIgnoreCase)
+            TimezoneId = _options.Timezone
         };
         if (_options.ViewportWidth.HasValue && _options.ViewportHeight.HasValue) {
             options.ViewportSize = new ViewportSize { Width = _options.ViewportWidth.Value, Height = _options.ViewportHeight.Value };
@@ -245,10 +259,26 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 break;
             case HtmlBrowserPdfSourceKind.Html:
                 string html = AddBaseElement(source.Html!, source.BaseUri);
-                await ExecuteCancellablePageOperationAsync(page, () => page.SetContentAsync(html, new PageSetContentOptions {
-                    Timeout = timeout,
-                    WaitUntil = WaitUntilState.DOMContentLoaded
-                }), cancellationToken).ConfigureAwait(false);
+                if (source.HtmlDocumentUri == null) {
+                    await ExecuteCancellablePageOperationAsync(page, () => page.SetContentAsync(html, new PageSetContentOptions {
+                        Timeout = timeout,
+                        WaitUntil = WaitUntilState.DOMContentLoaded
+                    }), cancellationToken).ConfigureAwait(false);
+                } else {
+                    string documentUrl = source.HtmlDocumentUri.AbsoluteUri;
+                    await ExecuteCancellablePageOperationAsync(
+                        page,
+                        () => page.RouteAsync(documentUrl, route => route.FulfillAsync(new RouteFulfillOptions {
+                            Body = html,
+                            ContentType = "text/html; charset=utf-8",
+                            Status = 200
+                        })),
+                        cancellationToken).ConfigureAwait(false);
+                    await ExecuteCancellablePageOperationAsync(page, () => page.GotoAsync(documentUrl, new PageGotoOptions {
+                        Timeout = timeout,
+                        WaitUntil = WaitUntilState.DOMContentLoaded
+                    }), cancellationToken).ConfigureAwait(false);
+                }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(source));
@@ -257,60 +287,28 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
     private static async Task PreparePageAsync(IPage page, HtmlBrowserPdfRequest request, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        await page.EmulateMediaAsync(new PageEmulateMediaOptions {
-            Media = request.MediaType == HtmlBrowserPdfMediaType.Screen ? Media.Screen : Media.Print
-        }).ConfigureAwait(false);
+        await ExecuteCancellablePageOperationAsync(
+            page,
+            () => page.EmulateMediaAsync(new PageEmulateMediaOptions {
+                Media = request.MediaType == HtmlBrowserPdfMediaType.Screen ? Media.Screen : Media.Print
+            }),
+            cancellationToken).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(request.StyleSheetContent)) {
-            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = request.StyleSheetContent }).ConfigureAwait(false);
+            await ExecuteCancellablePageOperationAsync(
+                page,
+                () => page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = request.StyleSheetContent }),
+                cancellationToken).ConfigureAwait(false);
         }
         if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
             await ExecuteCancellablePageOperationAsync(page, () => page.EvaluateAsync(request.BeforeCaptureScript!), cancellationToken).ConfigureAwait(false);
         }
 
-        HtmlBrowserPdfReadiness readiness = request.Readiness;
-        if (!readiness.SkipLoadState) {
-            await ExecuteCancellablePageOperationAsync(
-                page,
-                () => HtmlBrowser.WaitForLoadStateAsync(page, readiness.LoadState, readiness.Timeout, cancellationToken),
-                cancellationToken).ConfigureAwait(false);
-        }
-        if (!string.IsNullOrWhiteSpace(readiness.Selector)) {
-            await ExecuteCancellablePageOperationAsync(page, () => page.WaitForSelectorAsync(readiness.Selector!, new PageWaitForSelectorOptions { Timeout = readiness.Timeout }), cancellationToken).ConfigureAwait(false);
-        }
-        if (!string.IsNullOrWhiteSpace(readiness.Function)) {
-            await ExecuteCancellablePageOperationAsync(page, () => page.WaitForFunctionAsync(readiness.Function!, null, new PageWaitForFunctionOptions { Timeout = readiness.Timeout }), cancellationToken).ConfigureAwait(false);
-        }
-        if (readiness.Stable) {
-            await WaitForStableMarkupAsync(page, readiness, cancellationToken).ConfigureAwait(false);
-        }
-        if (readiness.DelayMilliseconds > 0) {
-            await Task.Delay(readiness.DelayMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
+        await HtmlBrowserPdfCapture.WaitForReadinessAsync(page, request.Readiness, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task WaitForStableMarkupAsync(IPage page, HtmlBrowserPdfReadiness readiness, CancellationToken cancellationToken) {
-        long started = Stopwatch.GetTimestamp();
-        long? stableSince = null;
-        string? previous = null;
-        while (StopwatchElapsed(started).TotalMilliseconds <= readiness.Timeout) {
-            cancellationToken.ThrowIfCancellationRequested();
-            string current = await page.ContentAsync().ConfigureAwait(false);
-            if (string.Equals(previous, current, StringComparison.Ordinal)) {
-                stableSince ??= Stopwatch.GetTimestamp();
-                if (StopwatchElapsed(stableSince.Value).TotalMilliseconds >= readiness.StableMilliseconds) return;
-            } else {
-                previous = current;
-                stableSince = null;
-            }
-            await Task.Delay(readiness.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        throw new TimeoutException("Page markup did not remain stable within the configured readiness timeout.");
-    }
-
-    private static async Task AddCookiesAsync(IBrowserContext context, IReadOnlyList<HtmlBrowserPdfCookie> cookies, CancellationToken cancellationToken) {
+    private static async Task AddCookiesAsync(IBrowserContext context, IReadOnlyList<HtmlBrowserPdfCookie> cookies) {
         if (cookies.Count == 0) return;
-        cancellationToken.ThrowIfCancellationRequested();
         Cookie[] values = cookies.Select(cookie => new Cookie {
             Name = cookie.Name,
             Value = cookie.Value,
@@ -330,56 +328,28 @@ public sealed partial class HtmlBrowserPdfRenderer {
         await context.AddCookiesAsync(values).ConfigureAwait(false);
     }
 
-    private static async Task AddStorageInitScriptAsync(IBrowserContext context, HtmlBrowserPdfRequest request, CancellationToken cancellationToken) {
+    private static async Task AddStorageInitScriptAsync(IBrowserContext context, HtmlBrowserPdfRequest request) {
         if (request.LocalStorage.Count == 0 && request.SessionStorage.Count == 0) return;
-        cancellationToken.ThrowIfCancellationRequested();
+        string expectedOrigin = JsonSerializer.Serialize(request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority));
         string local = JsonSerializer.Serialize(request.LocalStorage);
         string session = JsonSerializer.Serialize(request.SessionStorage);
-        string script = $"(() => {{ const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
+        string script = $"(() => {{ const expectedOrigin = {expectedOrigin}; if (location.origin !== expectedOrigin) return; const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
         await context.AddInitScriptAsync(script).ConfigureAwait(false);
     }
 
-    private static PagePdfOptions CreatePagePdfOptions(HtmlBrowserPdfOptions options) {
-        PagePdfOptions result = new() {
-            Landscape = options.Landscape,
-            PrintBackground = options.PrintBackground,
-            Format = ToPageFormat(options.Format),
-            Width = options.Width,
-            Height = options.Height,
-            PageRanges = options.PageRanges,
-            Scale = options.Scale,
-            DisplayHeaderFooter = options.DisplayHeaderFooter,
-            HeaderTemplate = options.HeaderTemplate,
-            FooterTemplate = options.FooterTemplate,
-            PreferCSSPageSize = options.PreferCssPageSize,
-            Outline = options.Outline,
-            Tagged = options.Tagged
-        };
-        if (options.MarginTop != null || options.MarginRight != null || options.MarginBottom != null || options.MarginLeft != null) {
-            result.Margin = new Margin {
-                Top = options.MarginTop,
-                Right = options.MarginRight,
-                Bottom = options.MarginBottom,
-                Left = options.MarginLeft
-            };
-        }
-        return result;
+    private static RouteFetchOptions? CreateScopedHeaderOptions(HtmlBrowserPdfRequest request, IRequest networkRequest) {
+        if (request.Headers.Count == 0 || !IsSameOrigin(request.Source.SecurityOrigin, networkRequest.Url)) return null;
+        Dictionary<string, string> headers = new(networkRequest.Headers, StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> header in request.Headers) headers[header.Key] = header.Value;
+        return new RouteFetchOptions { Headers = headers, MaxRedirects = 0 };
     }
 
-    private static string? ToPageFormat(PdfPageFormat? format) => format switch {
-        PdfPageFormat.A0 => "A0",
-        PdfPageFormat.A1 => "A1",
-        PdfPageFormat.A2 => "A2",
-        PdfPageFormat.A3 => "A3",
-        PdfPageFormat.A4 => "A4",
-        PdfPageFormat.A5 => "A5",
-        PdfPageFormat.A6 => "A6",
-        PdfPageFormat.Letter => "Letter",
-        PdfPageFormat.Legal => "Legal",
-        PdfPageFormat.Tabloid => "Tabloid",
-        PdfPageFormat.Ledger => "Ledger",
-        _ => null
-    };
+    private static bool IsSameOrigin(Uri? expectedOrigin, string requestUrl) {
+        if (expectedOrigin == null || !Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? requestUri)) return false;
+        return string.Equals(expectedOrigin.Scheme, requestUri.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(expectedOrigin.Host, requestUri.Host, StringComparison.OrdinalIgnoreCase)
+            && expectedOrigin.Port == requestUri.Port;
+    }
 
     private static string AddBaseElement(string html, Uri? baseUri) {
         if (baseUri == null) return html;
@@ -388,33 +358,52 @@ public sealed partial class HtmlBrowserPdfRenderer {
         return head.Success ? html.Insert(head.Index + head.Length, baseElement) : "<head>" + baseElement + "</head>" + html;
     }
 
-    private static async Task<T> ExecuteCancellableContextOperationAsync<T>(IBrowserContext context, Func<Task<T>> operation, CancellationToken cancellationToken) {
-        Task<T> task = operation();
-        if (!cancellationToken.CanBeCanceled || task.IsCompleted) return await task.ConfigureAwait(false);
-        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancelled);
-        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) {
-            try { await context.CloseAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
-            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-        return await task.ConfigureAwait(false);
+    private static async Task ExecuteCancellablePageOperationAsync(IPage page, Func<Task> operation, CancellationToken cancellationToken) {
+        await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => page.CloseAsync(), cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task ExecuteCancellablePageOperationAsync(IPage page, Func<Task> operation, CancellationToken cancellationToken) {
-        Task task = operation();
-        if (!cancellationToken.CanBeCanceled || task.IsCompleted) {
-            await task.ConfigureAwait(false);
+    private static async Task<T> ExecuteCancellableSlotOperationAsync<T>(BrowserSlot slot, Func<Task<T>> operation, CancellationToken cancellationToken) {
+        return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => AbortSlotAsync(slot), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task ExecuteCancellableSlotOperationAsync(BrowserSlot slot, Func<Task> operation, CancellationToken cancellationToken) {
+        await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => AbortSlotAsync(slot), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static Task AbortSlotAsync(BrowserSlot slot) {
+        slot.MarkBroken();
+        try {
+            if (slot.Browser.IsConnected) {
+                Task close = slot.Browser.CloseAsync();
+                _ = close.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
+        } catch (Exception) {
+            // Closing the transport is best-effort; the broken slot will be recycled.
+        }
+        slot.DisposePlaywright();
+        return Task.CompletedTask;
+    }
+
+    private static async Task CloseContextAsync(IBrowserContext context, BrowserSlot slot) {
+        Task close;
+        try {
+            close = context.CloseAsync();
+        } catch (Exception) {
+            slot.MarkBroken();
             return;
         }
-        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancelled);
-        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) {
-            try { await page.CloseAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
-            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
-            cancellationToken.ThrowIfCancellationRequested();
+
+        Task completed = await Task.WhenAny(close, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false);
+        if (completed != close) {
+            await AbortSlotAsync(slot).ConfigureAwait(false);
+            _ = close.ContinueWith(static finished => _ = finished.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return;
         }
-        await task.ConfigureAwait(false);
+        try {
+            await close.ConfigureAwait(false);
+        } catch (Exception) {
+            slot.MarkBroken();
+        }
     }
 
     private static bool IsBrowserProcessFailure(Exception exception, BrowserSlot slot) {

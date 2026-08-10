@@ -40,6 +40,10 @@ internal static class HtmlBrowserLaunchOptionFactory {
             options.Headless = false;
         }
 
+        if (IsBound(request.BoundParameters, nameof(request.IgnoreHttpsErrors))) {
+            options.IgnoreHTTPSErrors = request.IgnoreHttpsErrors.IsPresent;
+        }
+
         if (IsBound(request.BoundParameters, nameof(request.SlowMo))) {
             options.SlowMo = request.SlowMo;
         }

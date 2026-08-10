@@ -37,6 +37,30 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
+        await using LoopbackContentServer foreignOrigin = new(
+            "<html><body><p id='foreign'>foreign-pending</p><script>document.querySelector('#foreign').textContent = localStorage.getItem('token') || 'cross-origin-clean';</script></body></html>");
+        await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
+        string html = $"<html><body><p id='main'>main-pending</p><img src='/probe'><iframe style='width:600px;height:100px' src='{foreignOrigin.Url}'></iframe><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing';</script></body></html>";
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 750),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
+            localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "origin-storage");
+        AssertPdfContains(result.PdfBytes, "cross-origin-clean");
+        Assert.Equal("origin-header", declaredOrigin.LastRenderToken);
+        Assert.Null(foreignOrigin.LastRenderToken);
+    }
+
+    [Fact]
     public async Task HtmlCaptureProducesReadablePdfAndReusesWarmBrowserWithIsolatedContexts() {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             minimumBrowserInstances: 1,
@@ -188,11 +212,28 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         Assert.Contains(result.Diagnostics.BlockedRequests, value => value.Contains("127.0.0.1", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task OriginScopedHeadersAreRemovedFromCrossOriginRedirects() {
+        await using LoopbackRedirectServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "localhost", "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Secret"] = "must-not-leak" }));
+
+        AssertPdfContains(result.PdfBytes, "private");
+        Assert.Equal(1, server.PrivateRequests);
+        Assert.Null(server.PrivateRenderSecret);
+    }
+
 #if !NETFRAMEWORK
     [Fact]
     public async Task HttpsCertificateErrorsRequireAnExplicitOptIn() {
         await using LoopbackHttpsServer server = new();
-        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "localhost" });
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using (HtmlBrowserPdfRenderer strict = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1, networkPolicy: policy))) {
             await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(
                 new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url))));
@@ -281,6 +322,54 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         }
     }
 
+    private sealed class LoopbackContentServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _serverTask;
+        private readonly string _body;
+        private string? _lastRenderToken;
+
+        internal LoopbackContentServer(string body) {
+            _body = body;
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}/origin";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        internal string? LastRenderToken => Volatile.Read(ref _lastRenderToken);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    using TcpClient client = await _listener.AcceptTcpClientAsync();
+                    using NetworkStream stream = client.GetStream();
+                    byte[] buffer = new byte[8192];
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
+                    if (token != null) Volatile.Write(ref _lastRenderToken, token);
+                    byte[] bodyBytes = Encoding.UTF8.GetBytes(_body);
+                    byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(headers, 0, headers.Length);
+                    await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length);
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            _cancellation.Dispose();
+        }
+    }
+
     private sealed class LoopbackWebSocketServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
@@ -327,6 +416,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         private readonly CancellationTokenSource _cancellation = new();
         private readonly Task _serverTask;
         private int _privateRequests;
+        private string? _privateRenderSecret;
 
         internal LoopbackRedirectServer() {
             _listener.Start();
@@ -339,6 +429,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         internal string Url { get; }
         private string RedirectTarget { get; }
         internal int PrivateRequests => Volatile.Read(ref _privateRequests);
+        internal string? PrivateRenderSecret => Volatile.Read(ref _privateRenderSecret);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -351,6 +442,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                     byte[] response;
                     if (request.StartsWith("GET /private", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _privateRequests);
+                        Volatile.Write(ref _privateRenderSecret, LoopbackHtmlServer.ReadHeader(request, "X-Render-Secret"));
                         response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nprivate");
                     } else {
                         response = Encoding.ASCII.GetBytes($"HTTP/1.1 302 Found\r\nLocation: {RedirectTarget}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
@@ -389,7 +481,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
             _certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1));
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            Url = $"https://localhost:{port}/certificate";
+            Url = $"https://127.0.0.1:{port}/certificate";
             _serverTask = ServeAsync();
         }
 

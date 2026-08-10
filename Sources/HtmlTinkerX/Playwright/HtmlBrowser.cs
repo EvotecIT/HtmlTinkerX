@@ -24,17 +24,27 @@ public static partial class HtmlBrowser {
         await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
+        IPlaywright playwright = PlaywrightFactory != null
             ? await PlaywrightFactory().ConfigureAwait(false)
             : await Playwright.CreateAsync();
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        try {
+            IBrowserType type = ResolveBrowserType(playwright, options.Browser);
+            BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
 
-        IBrowserType type = ResolveBrowserType(playwright, options.Browser);
-
-        BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var browserInstance = await type.LaunchAsync(launchOptions);
-        return (playwright, browserInstance);
+            IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => type.LaunchAsync(launchOptions),
+                DisposeOwnerAsync,
+                cancellationToken).ConfigureAwait(false);
+            return (playwright, browserInstance);
+        } catch {
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task<(IPlaywright Playwright, IBrowser Browser)> ConnectOverCdpAsync(
@@ -50,18 +60,27 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
+        IPlaywright playwright = PlaywrightFactory != null
             ? await PlaywrightFactory().ConfigureAwait(false)
             : await Playwright.CreateAsync();
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        try {
+            IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => playwright.Chromium.ConnectOverCDPAsync(
+                    options.CdpEndpointUrl!,
+                    new BrowserTypeConnectOverCDPOptions { Timeout = options.Timeout }),
+                DisposeOwnerAsync,
+                cancellationToken).ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IBrowser browserInstance = await playwright.Chromium.ConnectOverCDPAsync(
-            options.CdpEndpointUrl!,
-            new BrowserTypeConnectOverCDPOptions {
-                Timeout = options.Timeout
-            }).ConfigureAwait(false);
-
-        return (playwright, browserInstance);
+            return (playwright, browserInstance);
+        } catch {
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task<(IPlaywright Playwright, IBrowserContext Context, IPage Page)> LaunchPersistentContextAsync(
@@ -77,20 +96,38 @@ public static partial class HtmlBrowser {
         string userDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
+        IPlaywright playwright = PlaywrightFactory != null
             ? await PlaywrightFactory().ConfigureAwait(false)
             : await Playwright.CreateAsync();
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        IBrowserContext? context = null;
+        try {
+            IBrowserType type = ResolveBrowserType(playwright, options.Browser);
+            BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
 
-        IBrowserType type = ResolveBrowserType(playwright, options.Browser);
-        BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
+            context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => type.LaunchPersistentContextAsync(userDataDirectory, contextOptions),
+                DisposeOwnerAsync,
+                cancellationToken).ConfigureAwait(false);
+            IPage page = context.Pages.Count > 0
+                ? context.Pages[0]
+                : await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    context.NewPageAsync,
+                    () => context.CloseAsync(),
+                    cancellationToken).ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IBrowserContext context = await type.LaunchPersistentContextAsync(userDataDirectory, contextOptions).ConfigureAwait(false);
-        IPage page = context.Pages.Count > 0
-            ? context.Pages[0]
-            : await context.NewPageAsync().ConfigureAwait(false);
-
-        return (playwright, context, page);
+            return (playwright, context, page);
+        } catch {
+            if (context != null) {
+                StartBestEffortClose(() => context.CloseAsync());
+            }
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static IBrowserType ResolveBrowserType(IPlaywright playwright, HtmlBrowserEngine browser) =>
@@ -207,10 +244,20 @@ public static partial class HtmlBrowser {
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var context = await browserInstance.NewContextAsync(contextOptions);
-        var page = await context.NewPageAsync();
-        return (context, page);
+        IBrowserContext context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => browserInstance.NewContextAsync(contextOptions),
+            () => browserInstance.CloseAsync(),
+            cancellationToken).ConfigureAwait(false);
+        try {
+            IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                context.NewPageAsync,
+                () => context.CloseAsync(),
+                cancellationToken).ConfigureAwait(false);
+            return (context, page);
+        } catch {
+            StartBestEffortClose(() => context.CloseAsync());
+            throw;
+        }
     }
 
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
@@ -346,60 +393,101 @@ public static partial class HtmlBrowser {
             options.Headless = false;
         }
 
-        IPlaywright playwright;
-        IBrowser? browserInstance;
-        IBrowserContext context;
-        IPage page;
+        IPlaywright? playwright = null;
+        IBrowser? browserInstance = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
         string? resolvedUserDataDirectory = null;
         bool closeContextOnDispose = true;
         bool closeBrowserOnDispose = true;
         bool closePageOnDispose = false;
+        int ownershipAborted = 0;
 
-        if (!string.IsNullOrWhiteSpace(options.CdpEndpointUrl)) {
-            (playwright, browserInstance) = await ConnectOverCdpAsync(options, cancellationToken).ConfigureAwait(false);
-            if (browserInstance.Contexts.Count > 0) {
-                context = browserInstance.Contexts[0];
-                page = await context.NewPageAsync().ConfigureAwait(false);
+        Task AbortOwnershipAsync() {
+            if (Interlocked.Exchange(ref ownershipAborted, 1) != 0) return Task.CompletedTask;
+            if (closePageOnDispose && page != null && !page.IsClosed) StartBestEffortClose(() => page.CloseAsync());
+            if (closeContextOnDispose && context != null) StartBestEffortClose(() => context.CloseAsync());
+            if (closeBrowserOnDispose && browserInstance != null && browserInstance.IsConnected) StartBestEffortClose(() => browserInstance.CloseAsync());
+            try { playwright?.Dispose(); } catch (Exception) { }
+            return Task.CompletedTask;
+        }
+
+        try {
+            if (!string.IsNullOrWhiteSpace(options.CdpEndpointUrl)) {
+                (playwright, browserInstance) = await ConnectOverCdpAsync(options, cancellationToken).ConfigureAwait(false);
+                closeContextOnDispose = false;
+                closeBrowserOnDispose = false;
+                closePageOnDispose = true;
+                if (browserInstance.Contexts.Count > 0) {
+                    context = browserInstance.Contexts[0];
+                    page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                        context.NewPageAsync,
+                        AbortOwnershipAsync,
+                        cancellationToken).ConfigureAwait(false);
+                } else {
+                    closeContextOnDispose = true;
+                    closePageOnDispose = false;
+                    (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
+                }
+            } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
+                resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
+                (playwright, context, page) = await LaunchPersistentContextAsync(options, cancellationToken).ConfigureAwait(false);
+                browserInstance = context.Browser;
+                closeBrowserOnDispose = false;
             } else {
+                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);
                 (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
             }
-            closeContextOnDispose = false;
-            closeBrowserOnDispose = false;
-            closePageOnDispose = true;
-        } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
-            resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
-            (playwright, context, page) = await LaunchPersistentContextAsync(options, cancellationToken).ConfigureAwait(false);
-            browserInstance = context.Browser;
-            closeBrowserOnDispose = false;
-        } else {
-            (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);
-            (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
+
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => ApplyInitScriptsAsync(context!, options, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+
+            var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
+            HtmlBrowserSession session = new(
+                playwright!,
+                browserInstance,
+                context!,
+                page!,
+                !string.IsNullOrEmpty(options.VideoPath) ? page!.Video : null,
+                options.VideoPath,
+                network,
+                resolvedUserDataDirectory,
+                options.CdpEndpointUrl,
+                closeContextOnDispose,
+                closeBrowserOnDispose,
+                closePageOnDispose);
+
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => ApplyResourceBlockingAsync(page!, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => NavigateAsync(page!, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+            if (options.ManualLogin) {
+                await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    () => WaitForManualLoginAsync(session, options.LoginSuccessSelector, options.LoginTimeout, cancellationToken),
+                    AbortOwnershipAsync,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return session;
+        } catch {
+            await AbortOwnershipAsync().ConfigureAwait(false);
+            throw;
         }
+    }
 
-        await ApplyInitScriptsAsync(context, options, cancellationToken).ConfigureAwait(false);
-
-        var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
-        HtmlBrowserSession session = new(
-            playwright,
-            browserInstance,
-            context,
-            page,
-            !string.IsNullOrEmpty(options.VideoPath) ? page.Video : null,
-            options.VideoPath,
-            network,
-            resolvedUserDataDirectory,
-            options.CdpEndpointUrl,
-            closeContextOnDispose,
-            closeBrowserOnDispose,
-            closePageOnDispose);
-
-        await ApplyResourceBlockingAsync(page, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken).ConfigureAwait(false);
-        await NavigateAsync(page, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken);
-        if (options.ManualLogin) {
-            await WaitForManualLoginAsync(session, options.LoginSuccessSelector, options.LoginTimeout, cancellationToken).ConfigureAwait(false);
+    private static void StartBestEffortClose(Func<Task> close) {
+        try {
+            Task task = close();
+            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        } catch (Exception) {
+            // The transport is already gone; disposing Playwright below completes ownership cleanup.
         }
-
-        return session;
     }
 
     private static void ValidateCdpAttachOptions(HtmlBrowserLaunchOptions options) {

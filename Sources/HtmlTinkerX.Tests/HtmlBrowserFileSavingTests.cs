@@ -65,11 +65,12 @@ public class HtmlBrowserFileSavingTests {
         await HtmlBrowser.SavePagePdfAsync(
             page.Object,
             file,
-            landscape: true,
-            marginTop: "1cm",
-            marginRight: "2cm",
-            marginBottom: "3cm",
-            marginLeft: "4cm");
+            new HtmlBrowserPdfOptions(
+                landscape: true,
+                marginTop: "1cm",
+                marginRight: "2cm",
+                marginBottom: "3cm",
+                marginLeft: "4cm"));
 
         Assert.NotNull(options);
         Assert.Equal(file, options!.Path);
@@ -90,7 +91,7 @@ public class HtmlBrowserFileSavingTests {
             .Callback<PagePdfOptions>(o => options = o)
             .ReturnsAsync(Array.Empty<byte>());
 
-        await HtmlBrowser.SavePagePdfAsync(page.Object, file, format: PdfPageFormat.A4);
+        await HtmlBrowser.SavePagePdfAsync(page.Object, file, new HtmlBrowserPdfOptions(format: PdfPageFormat.A4));
 
         Assert.NotNull(options);
         Assert.Equal("A4", options!.Format);
@@ -118,9 +119,10 @@ public class HtmlBrowserFileSavingTests {
         await HtmlBrowser.SavePagePdfAsync(
             page.Object,
             file,
-            maskSensitiveElements: true,
-            maskSelectors: new[] { "#token" },
-            maskColor: "#00ff00");
+            new HtmlBrowserPdfOptions(
+                maskSensitiveElements: true,
+                maskSelectors: new[] { "#token" },
+                maskColor: "#00ff00"));
 
         Assert.Equal(new[] { "mask", "pdf", "restore" }, operations);
         string maskArgumentJson = JsonSerializer.Serialize(evaluateArguments[0]);
@@ -130,11 +132,4 @@ public class HtmlBrowserFileSavingTests {
         Directory.Delete(Path.GetDirectoryName(file)!, true);
     }
 
-    [Fact]
-    public async Task SavePagePdfAsync_NegativeDelayThrows() {
-        var page = new Mock<IPage>();
-
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
-            await HtmlBrowser.SavePagePdfAsync(page.Object, "file.pdf", delayMs: -1));
-    }
 }
