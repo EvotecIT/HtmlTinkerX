@@ -26,6 +26,7 @@
         <PackageReference Include="AngleSharp" Version="1.7.1" />
         <PackageReference Include="AngleSharp.Css" Version="1.0.1" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
+        <PackageReference Include="AngleSharp.Io" Version="1.1.0" />
         <PackageReference Include="AngleSharp.Js" Version="1.0.1" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="Jint" Version="4.15.3" />
