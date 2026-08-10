@@ -17,7 +17,7 @@ internal static class HttpClientHelper {
     /// <param name="credential">Credentials for the proxy.</param>
     /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
     internal static HttpClient Create(string? proxy, PSCredential? credential) {
-        ICredentials? creds = credential?.GetNetworkCredential();
+        System.Net.ICredentials? creds = credential?.GetNetworkCredential();
         return HtmlHttpClientFactory.Create(proxy, creds);
     }
 

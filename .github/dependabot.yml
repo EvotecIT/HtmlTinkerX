@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directories:
+      - "/Sources/HtmlTinkerX"
+      - "/Sources/HtmlTinkerX.Tests"
+      - "/Sources/PSParseHTML.PowerShell"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Warsaw"
+    open-pull-requests-limit: 10

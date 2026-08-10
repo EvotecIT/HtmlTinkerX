@@ -110,7 +110,7 @@
         $content = '<a hx-boost=true><!--c--></a>'
         $result = Optimize-HTML -Content $content -HtmlSettings $settings
 
-        $result | Should -Be '<a hx-boost></a>'
+        $result | Should -Be '<a hx-boost=true></a>'
     }
 
     It 'Removes optional tags when requested' {

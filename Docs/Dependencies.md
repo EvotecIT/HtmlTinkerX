@@ -2,16 +2,57 @@
 
 ## AngleSharp package stability
 
-HtmlTinkerX uses the stable AngleSharp core package. Its CSSOM and DOM JavaScript
-integration currently use the upstream `AngleSharp.Css` and `AngleSharp.Js` 1.0
-prerelease lines. Both upstream packages declare compatibility with AngleSharp
-1.x; `AngleSharp.Js` also declares compatibility with Jint 4.x.
+HtmlTinkerX uses stable releases of AngleSharp, AngleSharp.Css, AngleSharp.Io,
+AngleSharp.Js, and AngleSharp.Diffing. AngleSharp.Js requires Jint 4.x; keep the
+direct Jint reference at or above the minimum declared by AngleSharp.Js so NuGet
+cannot resolve an older runtime beneath the DOM integration.
 
-Upstream dependency labels do not determine the HtmlTinkerX or PSParseHTML
-release channel. Publish normal stable releases after the full target-framework
-tests and package-only .NET and PowerShell smoke tests pass. Treat any NU5104
-warning as a known dependency-metadata warning, not as a reason to mark our
-packages prerelease.
+Validate AngleSharp updates across `net472`, `net8.0`, and `net10.0`, including
+package-only .NET and PowerShell smoke tests. The stable CSS and JavaScript
+packages no longer produce prerelease dependency warnings.
+
+AngleSharp.Js 1.0 moved `XMLHttpRequest` to AngleSharp.Io. HtmlTinkerX includes
+the stable I/O package so callers do not need to add a second package before
+using that integration. The default `HtmlScriptRunner.RunAsync` overload still
+registers only AngleSharp.Js, keeping network-capable APIs such as
+`XMLHttpRequest`, `fetch`, and `WebSocket` unavailable.
+
+Use the browsing-context overload when a script should deliberately receive I/O
+services. Its configuration is the security boundary: registering AngleSharp.Io
+requesters and a document loader exposes network-capable browser APIs to the
+script. Register requesters individually: `WithRequesters` enables HTTP, FTP,
+file, data, and about protocols together, so it is inappropriate when an HTTP
+URI policy is the intended boundary. Prefer a caller-owned HTTP client wrapped
+in one `HttpClientRequester`, with the required URI policy, authentication,
+proxy, timeouts, and response limits. The caller also owns the context and its
+document lifetime.
+
+```csharp
+var configuration = Configuration.Default
+    .With(new HttpClientRequester(httpClient))
+    .WithDefaultLoader()
+    .WithJs();
+using var context = BrowsingContext.New(configuration);
+
+var result = await HtmlScriptRunner.RunAsync<string>(html, script, context);
+```
+
+This is a browserless HTTP/DOM workflow. Use Playwright when a task depends on
+layout, painting, browser authentication, downloads, or interaction automation.
+
+### Optional AngleSharp packages
+
+Do not add companion packages only to broaden the dependency graph:
+
+- `AngleSharp.XPath` overlaps with the established HtmlAgilityPack XPath cmdlets.
+  Add it only as part of an intentional AngleSharp-native XPath surface rather
+  than maintaining two interchangeable implementations.
+- `AngleSharp.Xml` overlaps with the hardened `System.Xml` paths used for feeds,
+  discovery documents, and SAML. Keep security-sensitive XML parsing on those
+  explicit readers unless a browser-style XML DOM becomes a real requirement.
+- `AngleSharp.Renderer` and `AngleSharp.Wasm` serve specialized rendering and
+  WebAssembly scenarios. They are not replacements for browser layout, painting,
+  authentication, downloads, or interaction automation.
 
 ## Screenshot image processing
 
