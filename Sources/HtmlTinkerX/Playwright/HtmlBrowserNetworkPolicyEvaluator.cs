@@ -35,7 +35,14 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
-    internal async Task<bool> IsAllowedAsync(string url, string? selectedFileDirectory, CancellationToken cancellationToken) {
+    internal Task<bool> IsAllowedAsync(string url, string? selectedFileDirectory, CancellationToken cancellationToken) =>
+        IsAllowedAsync(url, selectedFileDirectory, deferNetworkResolutionToProxy: false, cancellationToken);
+
+    internal async Task<bool> IsAllowedAsync(
+        string url,
+        string? selectedFileDirectory,
+        bool deferNetworkResolutionToProxy,
+        CancellationToken cancellationToken) {
         if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)) return false;
 
         switch (uri.Scheme.ToLowerInvariant()) {
@@ -52,10 +59,18 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
             case "https":
             case "ws":
             case "wss":
+                if (deferNetworkResolutionToProxy) return IsNetworkUriAllowedByTrustedProxy(uri);
                 return await IsNetworkUriAllowedAsync(uri, cancellationToken).ConfigureAwait(false);
             default:
                 return false;
         }
+    }
+
+    private bool IsNetworkUriAllowedByTrustedProxy(Uri uri) {
+        if (!_policy.AllowPrivateNetworks
+            || _policy.AllowedHosts.Count > 0
+            || _policy.DeniedHosts.Count > 0) return false;
+        return _policy.AllowUriCredentials || string.IsNullOrEmpty(uri.UserInfo);
     }
 
     private async Task<bool> IsNetworkUriAllowedAsync(Uri uri, CancellationToken cancellationToken) =>

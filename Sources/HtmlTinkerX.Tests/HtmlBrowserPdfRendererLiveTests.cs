@@ -20,7 +20,6 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http;
 #endif
 
 namespace HtmlTinkerX.Tests;
@@ -59,6 +58,40 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
 
         AssertPdfContains(result.PdfBytes, "URL invoice with-cookie render-session=authenticated");
+    }
+
+    [Fact]
+    public async Task TrustedCallerProxyOwnsDnsForProxyOnlyHosts() {
+        await using ProxyOnlyHostServer proxy = new();
+        HtmlBrowserNetworkPolicy policy = new(allowPrivateNetworks: true);
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            proxy: proxy.Url,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl("http://renderer.proxy-only.invalid/invoice")));
+
+        AssertPdfContains(result.PdfBytes, "proxy resolved page");
+        Assert.Contains("renderer.proxy-only.invalid", proxy.LastRequestTarget, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task StableReadinessIncludesAttachedChildFrames() {
+        const string html = "<html><body><iframe style='width:600px;height:100px' srcdoc=\"<p id='state'>child starts</p><script>setTimeout(() => document.querySelector('#state').textContent = 'child done', 300)</script>\"></iframe></body></html>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            readiness: new HtmlBrowserPdfReadiness(
+                stable: true,
+                stableMilliseconds: 200,
+                pollMilliseconds: 25,
+                timeout: 5000)));
+
+        AssertPdfContains(result.PdfBytes, "child done");
     }
 
     [Fact]
@@ -388,6 +421,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Null(server.PrivateRenderSecret);
     }
 
+    [Fact]
+    public async Task ScopedRequestHeadersDoNotBufferEventStreams() {
+        await using LoopbackStreamingServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#state').textContent === 'streaming-ready'",
+                timeout: 5000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "stream-token" }));
+
+        AssertPdfContains(result.PdfBytes, "streaming-ready");
+        Assert.Equal("stream-token", server.EventStreamToken);
+    }
+
 #if !NETFRAMEWORK
     [Fact]
     public async Task HttpsCertificateErrorsRequireAnExplicitOptIn() {
@@ -631,6 +684,119 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
     }
 
+    private sealed class ProxyOnlyHostServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _serverTask;
+        private string? _lastRequestTarget;
+
+        internal ProxyOnlyHostServer() {
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        internal string? LastRequestTarget => Volatile.Read(ref _lastRequestTarget);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    using TcpClient client = await _listener.AcceptTcpClientAsync();
+                    using NetworkStream stream = client.GetStream();
+                    byte[] buffer = new byte[8192];
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string firstLine = request.Split(new[] { "\r\n" }, StringSplitOptions.None)[0];
+                    Volatile.Write(ref _lastRequestTarget, firstLine);
+                    byte[] body = Encoding.UTF8.GetBytes("<html><body><p>proxy resolved page</p></body></html>");
+                    byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(headers, 0, headers.Length);
+                    await stream.WriteAsync(body, 0, body.Length);
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            _cancellation.Dispose();
+        }
+    }
+
+    private sealed class LoopbackStreamingServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _serverTask;
+        private string? _eventStreamToken;
+
+        internal LoopbackStreamingServer() {
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}/";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        internal string? EventStreamToken => Volatile.Read(ref _eventStreamToken);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
+                    _ = HandleAsync(client);
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        private async Task HandleAsync(TcpClient client) {
+            using (client)
+            using (NetworkStream stream = client.GetStream()) {
+                try {
+                    byte[] buffer = new byte[8192];
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    if (request.StartsWith("GET /events", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _eventStreamToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        byte[] headers = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n");
+                        byte[] message = Encoding.UTF8.GetBytes("data: streaming-ready\n\n");
+                        await stream.WriteAsync(headers, 0, headers.Length);
+                        await stream.WriteAsync(message, 0, message.Length);
+                        await stream.FlushAsync();
+                        await Task.Delay(Timeout.Infinite, _cancellation.Token);
+                        return;
+                    }
+                    const string html = "<html><body><p id='state'>pending</p><script>const source = new EventSource('/events'); source.onmessage = event => { document.querySelector('#state').textContent = event.data; source.close(); };</script></body></html>";
+                    byte[] body = Encoding.UTF8.GetBytes(html);
+                    byte[] responseHeaders = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(responseHeaders, 0, responseHeaders.Length);
+                    await stream.WriteAsync(body, 0, body.Length);
+                } catch (OperationCanceledException) when (_cancellation.IsCancellationRequested) {
+                } catch (ObjectDisposedException) {
+                } catch (IOException) {
+                } catch (SocketException) {
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            _cancellation.Dispose();
+        }
+    }
+
 #if !NETFRAMEWORK
     private sealed class LoopbackHttpsServer : IAsyncDisposable {
         private readonly RSA _key = RSA.Create(2048);
@@ -671,27 +837,24 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             // Use the certificate's DNS identity so Windows Chromium sends SNI. An IP-literal
             // connection can be closed during the TLS handshake before certificate policy runs.
             Url = $"https://localhost:{endpoint.Port}/certificate";
-            WaitUntilReachable(Url);
+            WaitUntilListening(endpoint.Port);
         }
 
         internal string Url { get; }
 
-        private static void WaitUntilReachable(string url) {
-            using HttpClientHandler handler = new() {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-            using HttpClient client = new(handler) { Timeout = TimeSpan.FromSeconds(1) };
+        private static void WaitUntilListening(int port) {
             Exception? lastError = null;
             for (int attempt = 0; attempt < 10; attempt++) {
                 try {
-                    string body = client.GetStringAsync(url).GetAwaiter().GetResult();
-                    if (body.Contains("trusted TLS page", StringComparison.Ordinal)) return;
-                } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException) {
+                    using TcpClient client = new();
+                    client.Connect(IPAddress.Loopback, port);
+                    return;
+                } catch (SocketException ex) {
                     lastError = ex;
                 }
                 Thread.Sleep(50);
             }
-            throw new InvalidOperationException("The loopback HTTPS fixture did not become reachable.", lastError);
+            throw new InvalidOperationException("The loopback HTTPS fixture did not start listening.", lastError);
         }
 
         public async ValueTask DisposeAsync() {

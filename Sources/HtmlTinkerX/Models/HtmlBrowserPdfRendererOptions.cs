@@ -117,6 +117,12 @@ public sealed class HtmlBrowserPdfRendererOptions {
             || NetworkPolicy.AllowedHosts.Count > 0
             || NetworkPolicy.DeniedHosts.Count > 0);
 
+    internal bool ProxyOwnsNetworkResolution =>
+        !string.IsNullOrWhiteSpace(Proxy)
+        && NetworkPolicy.AllowPrivateNetworks
+        && NetworkPolicy.AllowedHosts.Count == 0
+        && NetworkPolicy.DeniedHosts.Count == 0;
+
     internal HtmlBrowserLaunchOptions CreateLaunchOptions() {
         HtmlBrowserLaunchOptions options = new() {
             Browser = Browser,

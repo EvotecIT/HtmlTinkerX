@@ -86,8 +86,12 @@ public class HtmlBrowserPdfExportTests {
     public async Task StableMarkupReadHonorsItsReadinessDeadline() {
         TaskCompletionSource<string> pendingContent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var frame = new Mock<IFrame>();
+        frame.SetupGet(value => value.IsDetached).Returns(false);
+        frame.SetupGet(value => value.Url).Returns("about:blank");
+        frame.Setup(value => value.ContentAsync()).Returns(pendingContent.Task);
         var page = new Mock<IPage>();
-        page.Setup(value => value.ContentAsync()).Returns(pendingContent.Task);
+        page.SetupGet(value => value.Frames).Returns(new[] { frame.Object });
         page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(pendingClose.Task);
         HtmlBrowserPdfReadiness readiness = new(skipLoadState: true, stable: true, timeout: 100);
 
@@ -99,13 +103,17 @@ public class HtmlBrowserPdfExportTests {
 
     [Fact]
     public async Task ZeroStabilityTimeoutWaitsWithoutAnInternalDeadline() {
+        var frame = new Mock<IFrame>();
+        frame.SetupGet(value => value.IsDetached).Returns(false);
+        frame.SetupGet(value => value.Url).Returns("about:blank");
+        frame.Setup(value => value.ContentAsync()).ReturnsAsync("<main>stable</main>");
         var page = new Mock<IPage>();
-        page.Setup(value => value.ContentAsync()).ReturnsAsync("<main>stable</main>");
+        page.SetupGet(value => value.Frames).Returns(new[] { frame.Object });
         HtmlBrowserPdfReadiness readiness = new(skipLoadState: true, stable: true, stableMilliseconds: 0, pollMilliseconds: 1, timeout: 0);
 
         await HtmlBrowserPdfCapture.WaitForReadinessAsync(page.Object, readiness, CancellationToken.None);
 
-        page.Verify(value => value.ContentAsync(), Times.AtLeast(2));
+        frame.Verify(value => value.ContentAsync(), Times.AtLeast(2));
     }
 
     [Fact]

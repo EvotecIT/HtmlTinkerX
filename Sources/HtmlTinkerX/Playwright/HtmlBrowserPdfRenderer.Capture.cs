@@ -40,7 +40,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
                     ? Path.GetDirectoryName(request.Source.FilePath!)
                     : null;
-                await ValidateInitialSourceAsync(request.Source, policy, selectedFileDirectory, operationToken).ConfigureAwait(false);
+                await ValidateInitialSourceAsync(
+                    request.Source,
+                    policy,
+                    selectedFileDirectory,
+                    _options.ProxyOwnsNetworkResolution,
+                    operationToken).ConfigureAwait(false);
 
                 long queueStarted = Stopwatch.GetTimestamp();
                 countedAsQueued = true;
@@ -134,20 +139,18 @@ public sealed partial class HtmlBrowserPdfRenderer {
             Func<IRoute, Task> policyRoute = async route => {
                 bool allowed;
                 try {
-                    allowed = await policy.IsAllowedAsync(route.Request.Url, selectedFileDirectory, cancellationToken).ConfigureAwait(false);
+                    allowed = await policy.IsAllowedAsync(
+                        route.Request.Url,
+                        selectedFileDirectory,
+                        _options.ProxyOwnsNetworkResolution,
+                        cancellationToken).ConfigureAwait(false);
                 } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                     await route.AbortAsync("aborted").ConfigureAwait(false);
                     return;
                 }
 
                 if (allowed) {
-                    RouteFetchOptions? fetchOptions = await CreateScopedHeaderOptionsAsync(request, route.Request).ConfigureAwait(false);
-                    if (fetchOptions == null) {
-                        await route.ContinueAsync().ConfigureAwait(false);
-                    } else {
-                        await using IAPIResponse response = await route.FetchAsync(fetchOptions).ConfigureAwait(false);
-                        await route.FulfillAsync(new RouteFulfillOptions { Response = response }).ConfigureAwait(false);
-                    }
+                    await route.ContinueAsync().ConfigureAwait(false);
                     return;
                 }
 
@@ -172,6 +175,17 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 () => context.NewPageAsync(),
                 cancellationToken).ConfigureAwait(false);
             page.SetDefaultTimeout(request.Readiness.Timeout);
+            await using HtmlBrowserScopedHeaderInterceptor? scopedHeaders = request.Headers.Count == 0
+                ? null
+                : await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+                        context,
+                        page,
+                        request.Source.SecurityOrigin,
+                        request.Headers,
+                        cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
 
             long navigationStarted = Stopwatch.GetTimestamp();
             await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
@@ -244,7 +258,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
         return options;
     }
 
-    private static async Task ValidateInitialSourceAsync(HtmlBrowserPdfSource source, HtmlBrowserNetworkPolicyEvaluator policy, string? fileDirectory, CancellationToken cancellationToken) {
+    private static async Task ValidateInitialSourceAsync(
+        HtmlBrowserPdfSource source,
+        HtmlBrowserNetworkPolicyEvaluator policy,
+        string? fileDirectory,
+        bool deferNetworkResolutionToProxy,
+        CancellationToken cancellationToken) {
         string? target = source.Kind switch {
             HtmlBrowserPdfSourceKind.Url => source.Uri!.AbsoluteUri,
             HtmlBrowserPdfSourceKind.File => new Uri(source.FilePath!).AbsoluteUri,
@@ -258,7 +277,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new FileNotFoundException("HTML input file was not found.", source.FilePath);
             }
         }
-        if (target != null && !await policy.IsAllowedAsync(target, fileDirectory, cancellationToken).ConfigureAwait(false)) {
+        if (target != null && !await policy.IsAllowedAsync(target, fileDirectory, deferNetworkResolutionToProxy, cancellationToken).ConfigureAwait(false)) {
             throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target)}'.");
         }
     }
@@ -372,22 +391,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
         string session = JsonSerializer.Serialize(request.SessionStorage);
         string script = $"(() => {{ const expectedOrigin = {expectedOrigin}; if (window !== window.top || location.origin !== expectedOrigin) return; const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
         await context.AddInitScriptAsync(script).ConfigureAwait(false);
-    }
-
-    private static async Task<RouteFetchOptions?> CreateScopedHeaderOptionsAsync(HtmlBrowserPdfRequest request, IRequest networkRequest) {
-        if (request.Headers.Count == 0 || !IsSameOrigin(request.Source.SecurityOrigin, networkRequest.Url)) return null;
-        IReadOnlyDictionary<string, string> browserHeaders = await networkRequest.AllHeadersAsync().ConfigureAwait(false);
-        Dictionary<string, string> headers = new(StringComparer.OrdinalIgnoreCase);
-        foreach (KeyValuePair<string, string> header in browserHeaders) headers[header.Key] = header.Value;
-        foreach (KeyValuePair<string, string> header in request.Headers) headers[header.Key] = header.Value;
-        return new RouteFetchOptions { Headers = headers, MaxRedirects = 0 };
-    }
-
-    private static bool IsSameOrigin(Uri? expectedOrigin, string requestUrl) {
-        if (expectedOrigin == null || !Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? requestUri)) return false;
-        return string.Equals(expectedOrigin.Scheme, requestUri.Scheme, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(expectedOrigin.Host, requestUri.Host, StringComparison.OrdinalIgnoreCase)
-            && expectedOrigin.Port == requestUri.Port;
     }
 
     private static string AddBaseElement(string html, Uri? baseUri) {

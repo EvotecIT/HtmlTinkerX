@@ -3,6 +3,7 @@ namespace HtmlTinkerX;
 using Microsoft.Playwright;
 using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -136,9 +137,8 @@ internal static class HtmlBrowserPdfCapture {
             deadline?.CancelAfter(remainingMilliseconds);
             string current;
             try {
-                current = await ExecuteWithCancellationAsync(
-                    page.ContentAsync,
-                    () => page.CloseAsync(),
+                current = await GetFrameMarkupSnapshotAsync(
+                    page,
                     deadline?.Token ?? cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
                 throw new TimeoutException("Page markup serialization exceeded the configured readiness timeout.");
@@ -157,5 +157,24 @@ internal static class HtmlBrowserPdfCapture {
             await Task.Delay(unlimited ? readiness.PollMilliseconds : Math.Min(readiness.PollMilliseconds, remainingMilliseconds), cancellationToken).ConfigureAwait(false);
         }
         throw new TimeoutException("Page markup did not remain stable within the configured readiness timeout.");
+    }
+
+    private static async Task<string> GetFrameMarkupSnapshotAsync(IPage page, CancellationToken cancellationToken) {
+        StringBuilder snapshot = new();
+        foreach (IFrame frame in page.Frames) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (frame.IsDetached) continue;
+            try {
+                string markup = await ExecuteWithCancellationAsync(
+                    frame.ContentAsync,
+                    () => page.CloseAsync(),
+                    cancellationToken).ConfigureAwait(false);
+                snapshot.Append(frame.Url).Append('\0').Append(markup).Append('\0');
+            } catch (PlaywrightException) when (frame.IsDetached) {
+                // A frame can detach between the snapshot and ContentAsync. Its disappearance
+                // changes the next snapshot, so it cannot create a false stable interval.
+            }
+        }
+        return snapshot.ToString();
     }
 }

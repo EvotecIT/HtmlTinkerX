@@ -681,6 +681,26 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task TrustedCallerProxyCanResolveHostsUnavailableToTheRenderer() {
+        int resolverCalls = 0;
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            new HtmlBrowserNetworkPolicy(allowPrivateNetworks: true),
+            _ => {
+                Interlocked.Increment(ref resolverCalls);
+                throw new SocketException((int)SocketError.HostNotFound);
+            });
+
+        bool allowed = await evaluator.IsAllowedAsync(
+            "http://renderer.proxy-only.invalid/report",
+            selectedFileDirectory: null,
+            deferNetworkResolutionToProxy: true,
+            CancellationToken.None);
+
+        Assert.True(allowed);
+        Assert.Equal(0, resolverCalls);
+    }
+
+    [Fact]
     public void HostRulesRejectCallerProxyBecauseWebSocketTunnelsCannotBeEnforced() {
         HtmlBrowserNetworkPolicy policy = new(
             allowPrivateNetworks: true,
