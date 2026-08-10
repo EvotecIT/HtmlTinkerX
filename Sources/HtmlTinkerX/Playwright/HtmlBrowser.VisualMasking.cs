@@ -49,7 +49,7 @@ public static partial class HtmlBrowser {
         "textarea[id*='pin' i]"
     };
 
-    private static async Task<T> ExecuteWithTemporaryVisualMaskAsync<T>(
+    internal static async Task<T> ExecuteWithTemporaryVisualMaskAsync<T>(
         IPage page,
         bool maskSensitiveElements,
         IEnumerable<string>? maskSelectors,
@@ -67,7 +67,12 @@ public static partial class HtmlBrowser {
             cancellationToken.ThrowIfCancellationRequested();
             return await action().ConfigureAwait(false);
         } finally {
-            await RemoveTemporaryVisualMaskAsync(page).ConfigureAwait(false);
+            try {
+                await RemoveTemporaryVisualMaskAsync(page).ConfigureAwait(false);
+            } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
+                // Cancellation closes the page to interrupt Playwright. Preserve the original
+                // cancellation instead of replacing it with cleanup failure from the closed page.
+            }
         }
     }
 

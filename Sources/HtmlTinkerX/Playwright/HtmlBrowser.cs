@@ -13,7 +13,7 @@ namespace HtmlTinkerX;
 public static partial class HtmlBrowser {
     internal static Func<Task<IPlaywright>>? PlaywrightFactory { get; set; }
 
-    private static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
+    internal static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
@@ -146,7 +146,7 @@ public static partial class HtmlBrowser {
         BrowserTypeLaunchPersistentContextOptions contextOptions = new() {
             Headless = options.Headless,
             SlowMo = options.SlowMo,
-            IgnoreHTTPSErrors = true
+            IgnoreHTTPSErrors = options.IgnoreHTTPSErrors
         };
 
         ApplySharedContextOptions(
@@ -203,7 +203,7 @@ public static partial class HtmlBrowser {
         }
 
         contextOptions ??= new BrowserNewContextOptions();
-        contextOptions.IgnoreHTTPSErrors = true;
+        contextOptions.IgnoreHTTPSErrors = options.IgnoreHTTPSErrors;
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
 

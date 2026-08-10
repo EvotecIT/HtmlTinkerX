@@ -53,6 +53,13 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Run the browser without a visible window.</summary>
     public bool Headless { get; set; } = true;
 
+    /// <summary>
+    /// Ignore HTTPS certificate errors in browser contexts. This defaults to <see langword="true"/>
+    /// for compatibility with historical HtmlTinkerX sessions; service-grade callers should set it
+    /// explicitly according to their trust policy.
+    /// </summary>
+    public bool IgnoreHTTPSErrors { get; set; } = true;
+
     /// <summary>Delay Playwright actions by this number of milliseconds.</summary>
     public int SlowMo { get; set; }
 

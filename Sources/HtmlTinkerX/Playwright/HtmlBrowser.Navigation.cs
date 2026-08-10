@@ -224,14 +224,14 @@ public static partial class HtmlBrowser {
         });
     }
 
-    private static WaitUntilState ToWaitUntilState(HtmlBrowserLoadState loadState) => loadState switch {
+    internal static WaitUntilState ToWaitUntilState(HtmlBrowserLoadState loadState) => loadState switch {
         HtmlBrowserLoadState.Commit => WaitUntilState.Commit,
         HtmlBrowserLoadState.DomContentLoaded => WaitUntilState.DOMContentLoaded,
         HtmlBrowserLoadState.Load => WaitUntilState.Load,
         _ => WaitUntilState.NetworkIdle
     };
 
-    private static async Task WaitForLoadStateAsync(IPage page, HtmlBrowserLoadState loadState, int timeout, CancellationToken cancellationToken) {
+    internal static async Task WaitForLoadStateAsync(IPage page, HtmlBrowserLoadState loadState, int timeout, CancellationToken cancellationToken) {
         if (loadState == HtmlBrowserLoadState.Commit) {
             return;
         }

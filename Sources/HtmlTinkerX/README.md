@@ -96,6 +96,52 @@ IReadOnlyDictionary<string, string> values = await HtmlBrowser.GetComputedStyles
 string? label = await HtmlBrowser.GetAttributeAsync(session, "#export", "aria-label");
 ```
 
+## Render HTML to PDF with a warm Chromium pool
+
+`HtmlBrowserPdfRenderer` keeps Chromium processes warm while creating a fresh browser context for every render. The renderer bounds active and queued work, recycles browsers by age or render count, retries once after a browser-process failure, and reports queue and render timings.
+
+```csharp
+using HtmlTinkerX;
+
+await using var renderer = new HtmlBrowserPdfRenderer(
+    new HtmlBrowserPdfRendererOptions(
+        minimumBrowserInstances: 1,
+        maximumBrowserInstances: 4,
+        maximumQueuedCaptures: 32));
+
+await renderer.PreWarmAsync();
+
+var request = new HtmlBrowserPdfRequest(
+    HtmlBrowserPdfSource.FromUrl("https://reports.example.org/quarterly"),
+    pdfOptions: new HtmlBrowserPdfOptions(
+        format: PdfPageFormat.A4,
+        printBackground: true,
+        marginTop: "12mm",
+        marginBottom: "12mm",
+        tagged: true,
+        outline: true),
+    readiness: new HtmlBrowserPdfReadiness(
+        selector: "[data-report-ready]",
+        timeout: 30_000),
+    headers: new Dictionary<string, string> {
+        ["X-Correlation-Id"] = correlationId
+    });
+
+HtmlBrowserPdfResult result = await renderer.CaptureAsync(request, cancellationToken);
+await File.WriteAllBytesAsync("quarterly.pdf", result.PdfBytes, cancellationToken);
+
+Console.WriteLine(
+    $"Browser {result.Diagnostics.BrowserInstanceId}: " +
+    $"queued {result.Diagnostics.QueueDuration.TotalMilliseconds:N0} ms, " +
+    $"rendered {result.Diagnostics.TotalDuration.TotalMilliseconds:N0} ms");
+```
+
+Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. Per-render headers, cookies, local/session storage, CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in an immutable request snapshot. Existing `GetPagePdfAsync` and `SavePagePdfAsync` overloads remain available for one-shot and already-open-page workflows.
+
+Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
+
+The pooled renderer validates HTTPS certificates and permits only public HTTP(S) and WS(S) targets by default. Its browser-slot proxy connects to the same DNS address that passed policy evaluation, preventing a second browser-side lookup from changing the destination. `HtmlBrowserNetworkPolicy` can allow specific private hosts and canonical file roots for trusted internal workloads; symlink escapes are rejected. A caller-supplied proxy requires explicit private-network mode because that trusted proxy owns DNS and outbound enforcement. These controls are defense in depth, not a process sandbox: services that accept untrusted URLs or markup should also enforce outbound policy at the container, host, firewall, or proxy boundary and should not expose arbitrary local-file paths.
+
 URL parsers stream responses with a 16 MiB default limit and cooperative
 cancellation. Override the bound for a specific operation when needed:
 

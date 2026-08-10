@@ -50,6 +50,7 @@ public static partial class HtmlBrowser {
         bool maskSensitiveElements = false,
         IEnumerable<string>? maskSelectors = null,
         string? maskColor = null) {
+        EnsurePdfBrowserSupported(browser);
         HtmlBrowserLaunchOptions launchOptions = HtmlBrowserLaunchOptions.FromLegacyParameters(
             browser,
             clean,
@@ -124,6 +125,7 @@ public static partial class HtmlBrowser {
         if (launchOptions == null) {
             throw new ArgumentNullException(nameof(launchOptions));
         }
+        EnsurePdfBrowserSupported(launchOptions.Browser);
 
         if (delayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
@@ -246,7 +248,7 @@ public static partial class HtmlBrowser {
             maskSelectors,
             maskColor,
             async () => {
-                await page.PdfAsync(options).ConfigureAwait(false);
+                await ExecutePdfOperationWithCancellationAsync(page, () => page.PdfAsync(options), cancellationToken).ConfigureAwait(false);
                 return true;
             },
             cancellationToken).ConfigureAwait(false);
@@ -360,7 +362,7 @@ public static partial class HtmlBrowser {
             maskSensitiveElements,
             maskSelectors,
             maskColor,
-            () => page.PdfAsync(options),
+            () => ExecutePdfOperationWithCancellationAsync(page, () => page.PdfAsync(options), cancellationToken),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -402,6 +404,7 @@ public static partial class HtmlBrowser {
         bool maskSensitiveElements = false,
         IEnumerable<string>? maskSelectors = null,
         string? maskColor = null) {
+        EnsurePdfBrowserSupported(browser);
         if (delayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(delayMs), "Delay must be zero or positive.");
         }
@@ -445,6 +448,32 @@ public static partial class HtmlBrowser {
             maskSensitiveElements,
             maskSelectors,
             maskColor).ConfigureAwait(false);
+    }
+
+    private static void EnsurePdfBrowserSupported(HtmlBrowserEngine browser) {
+        if (browser != HtmlBrowserEngine.Chromium) {
+            throw new NotSupportedException("Playwright PDF capture is supported only by Chromium. Firefox and WebKit cannot service a PDF request.");
+        }
+    }
+
+    private static async Task<T> ExecutePdfOperationWithCancellationAsync<T>(IPage page, Func<Task<T>> operation, CancellationToken cancellationToken) {
+        Task<T> task = operation();
+        if (!cancellationToken.CanBeCanceled || task.IsCompleted) {
+            return await task.ConfigureAwait(false);
+        }
+
+        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancelled);
+        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) {
+            try {
+                if (!page.IsClosed) await page.CloseAsync().ConfigureAwait(false);
+            } catch (PlaywrightException) {
+                // Closing the page is a best-effort transport abort.
+            }
+            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        return await task.ConfigureAwait(false);
     }
 
 }
