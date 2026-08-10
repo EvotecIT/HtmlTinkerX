@@ -71,8 +71,11 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     private readonly ConcurrentDictionary<IRequest, IResponse> _responses = new();
     private ConcurrentQueue<IRequest>? _order;
     private object? _networkSync;
+    private Task? _disposeTask;
+    private object? _disposeSync;
     private ConcurrentQueue<IRequest> RequestOrder => LazyInitializer.EnsureInitialized(ref _order, () => new ConcurrentQueue<IRequest>())!;
     private object NetworkSync => LazyInitializer.EnsureInitialized(ref _networkSync, () => new object())!;
+    private object DisposeSync => LazyInitializer.EnsureInitialized(ref _disposeSync, () => new object())!;
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
     private int? _networkLogLimit;
     /// <summary>
@@ -320,7 +323,13 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// <summary>
     /// Asynchronously disposes of the browser session, closing the page, context, and browser.
     /// </summary>
-    public async ValueTask DisposeAsync() {
+    public ValueTask DisposeAsync() {
+        lock (DisposeSync) {
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync() {
         if (_closePageOnDispose && Page != null && !Page.IsClosed) {
             try {
                 await Page.CloseAsync().ConfigureAwait(false);
