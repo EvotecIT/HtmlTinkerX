@@ -1,6 +1,7 @@
 using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
@@ -62,6 +63,28 @@ public class HtmlBrowserSessionDisposeTests {
         playwright.Verify(p => p.Dispose(), Times.Once);
         browser.Verify(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Once);
         context.Verify(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_RetriesCleanupAfterFailure() {
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(p => p.Dispose()).Verifiable();
+        var browser = new Mock<IBrowser>();
+        browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>())).Returns(Task.CompletedTask).Verifiable();
+        var context = new Mock<IBrowserContext>();
+        context.SetupSequence(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()))
+            .ThrowsAsync(new InvalidOperationException("cleanup failed"))
+            .Returns(Task.CompletedTask);
+        var page = new Mock<IPage>();
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.DisposeAsync().AsTask());
+        await session.DisposeAsync();
+
+        playwright.Verify(p => p.Dispose(), Times.Once);
+        browser.Verify(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Once);
+        context.Verify(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()), Times.Exactly(2));
     }
 
     [Fact]

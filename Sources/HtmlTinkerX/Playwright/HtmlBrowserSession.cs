@@ -325,7 +325,10 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     /// </summary>
     public ValueTask DisposeAsync() {
         lock (DisposeSync) {
-            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+            if (_disposeTask == null || _disposeTask.IsFaulted || _disposeTask.IsCanceled) {
+                _disposeTask = DisposeCoreAsync();
+            }
+            return new ValueTask(_disposeTask);
         }
     }
 
