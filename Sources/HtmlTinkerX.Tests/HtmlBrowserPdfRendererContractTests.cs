@@ -209,6 +209,29 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
         Assert.Same(allowed, await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(2))));
         Assert.False(await allowed);
+        pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
+    }
+
+    [Fact]
+    public async Task TimedOutDnsLookupsAreGloballyBounded() {
+        TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => {
+                Interlocked.Increment(ref calls);
+                return pendingLookup.Task;
+            },
+            dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
+        Task<bool>[] lookups = Enumerable.Range(0, 64)
+            .Select(index => evaluator.IsAllowedAsync($"https://bounded-{index}.example/report", null, CancellationToken.None))
+            .ToArray();
+
+        bool[] results = await Task.WhenAll(lookups);
+
+        Assert.All(results, Assert.False);
+        Assert.InRange(Volatile.Read(ref calls), 1, 32);
+        pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
     }
 
     [Theory]
@@ -252,6 +275,49 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             await browserStream.CopyToAsync(responseBytes);
 
             Assert.EndsWith("bound", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+            await originTask;
+        } finally {
+            origin.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task PolicyProxyPreservesTunnelBytesCoalescedWithConnectHeaders() {
+        TcpListener origin = new(IPAddress.Loopback, 0);
+        origin.Start();
+        try {
+            int originPort = ((IPEndPoint)origin.LocalEndpoint).Port;
+            byte[] tunnelPayload = Encoding.ASCII.GetBytes("coalesced-client-hello");
+            Task originTask = Task.Run(async () => {
+                using TcpClient accepted = await origin.AcceptTcpClientAsync();
+                using NetworkStream stream = accepted.GetStream();
+                byte[] received = new byte[tunnelPayload.Length];
+                int offset = 0;
+                while (offset < received.Length) {
+                    int read = await stream.ReadAsync(received, offset, received.Length - offset);
+                    if (read == 0) break;
+                    offset += read;
+                }
+                Assert.Equal(tunnelPayload, received);
+                byte[] response = Encoding.ASCII.GetBytes("tunnel-response");
+                await stream.WriteAsync(response, 0, response.Length);
+            });
+            HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "render.invalid" });
+            HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { IPAddress.Loopback }));
+            await using HtmlBrowserPolicyProxy proxy = new(evaluator);
+            Uri proxyUri = new(proxy.Server);
+            using TcpClient browser = new();
+            await browser.ConnectAsync(IPAddress.Loopback, proxyUri.Port);
+            using NetworkStream browserStream = browser.GetStream();
+            byte[] connect = Encoding.ASCII.GetBytes($"CONNECT render.invalid:{originPort} HTTP/1.1\r\nHost: render.invalid:{originPort}\r\n\r\n");
+            byte[] request = connect.Concat(tunnelPayload).ToArray();
+            await browserStream.WriteAsync(request, 0, request.Length);
+            using MemoryStream responseBytes = new();
+            await browserStream.CopyToAsync(responseBytes);
+
+            string responseText = Encoding.ASCII.GetString(responseBytes.ToArray());
+            Assert.Contains("200 Connection Established", responseText, StringComparison.Ordinal);
+            Assert.EndsWith("tunnel-response", responseText, StringComparison.Ordinal);
             await originTask;
         } finally {
             origin.Stop();
@@ -303,6 +369,14 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             "value",
             url: "https://example.com",
             path: "/reports"));
+    }
+
+    [Fact]
+    public void PdfFileSourceRejectsNetworkAndDevicePathsBeforeNormalization() {
+        Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\\server\share\report.html"));
+        Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile("file://server/share/report.html"));
+        Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\\?\C:\reports\report.html"));
+        Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\??\C:\reports\report.html"));
     }
 
     [Fact]

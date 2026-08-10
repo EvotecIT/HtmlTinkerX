@@ -11,8 +11,10 @@ using System.Threading;
 using System.Threading.Tasks;
 
 internal sealed class HtmlBrowserNetworkPolicyEvaluator {
+    private const int MaximumConcurrentDnsLookups = 32;
     private static readonly TimeSpan DefaultDnsCacheDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan DefaultDnsLookupTimeout = TimeSpan.FromSeconds(5);
+    private static readonly SemaphoreSlim DnsLookupGate = new(MaximumConcurrentDnsLookups, MaximumConcurrentDnsLookups);
     private readonly HtmlBrowserNetworkPolicy _policy;
     private readonly Func<string, Task<IPAddress[]>> _resolveHost;
     private readonly Func<DateTimeOffset> _utcNow;
@@ -76,7 +78,6 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
                 entry = GetOrRefreshDnsEntry(host);
                 addresses = await WaitAsync(entry.Lookup, deadline.Token).ConfigureAwait(false);
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
-                if (entry != null) RemoveDnsEntry(host, entry);
                 return Array.Empty<IPAddress>();
             } catch (SocketException) {
                 if (entry != null) RemoveDnsEntry(host, entry);
@@ -92,9 +93,10 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
         while (true) {
             DateTimeOffset now = _utcNow();
-            if (_dns.TryGetValue(host, out DnsCacheEntry? current) && current.ExpiresAt > now) return current;
+            if (_dns.TryGetValue(host, out DnsCacheEntry? current)
+                && (!current.Lookup.IsCompleted || current.ExpiresAt > now)) return current;
 
-            DnsCacheEntry replacement = new(() => _resolveHost(host), now.Add(_dnsCacheDuration));
+            DnsCacheEntry replacement = new(() => ResolveHostBoundedAsync(host), now.Add(_dnsCacheDuration));
             if (current == null) {
                 if (_dns.TryAdd(host, replacement)) return replacement;
             } else if (_dns.TryUpdate(host, replacement, current)) {
@@ -105,6 +107,15 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
 
     private void RemoveDnsEntry(string host, DnsCacheEntry entry) =>
         ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(new KeyValuePair<string, DnsCacheEntry>(host, entry));
+
+    private async Task<IPAddress[]> ResolveHostBoundedAsync(string host) {
+        if (!DnsLookupGate.Wait(0)) return Array.Empty<IPAddress>();
+        try {
+            return await _resolveHost(host).ConfigureAwait(false);
+        } finally {
+            DnsLookupGate.Release();
+        }
+    }
 
     private bool IsFileAllowed(string path, string? selectedFileDirectory) {
         if (!HtmlBrowserFileSystemPath.TryResolveExistingPath(path, out string fullPath)) return false;

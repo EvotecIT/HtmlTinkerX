@@ -97,7 +97,18 @@ public sealed class HtmlBrowserPdfSource {
         if (string.IsNullOrWhiteSpace(path)) {
             throw new ArgumentException("File path cannot be empty.", nameof(path));
         }
+        if (IsNetworkOrDevicePath(path)) {
+            throw new ArgumentException("UNC, network, and device paths are not supported as browser PDF file sources.", nameof(path));
+        }
 
         return new HtmlBrowserPdfSource(HtmlBrowserPdfSourceKind.File, null, null, Path.GetFullPath(path), null);
+    }
+
+    private static bool IsNetworkOrDevicePath(string path) {
+        string value = path.Trim();
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) && uri.IsFile && !string.IsNullOrWhiteSpace(uri.Host)) return true;
+        return value.StartsWith(@"\\", StringComparison.Ordinal)
+            || value.StartsWith("//", StringComparison.Ordinal)
+            || value.StartsWith(@"\??\", StringComparison.OrdinalIgnoreCase);
     }
 }

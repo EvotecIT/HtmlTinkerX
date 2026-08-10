@@ -90,7 +90,13 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 }
 
                 if (string.Equals(requestParts[0], "CONNECT", StringComparison.OrdinalIgnoreCase)) {
-                    await HandleConnectAsync(browserClient, browser, requestParts[1], cancellationToken).ConfigureAwait(false);
+                    await HandleConnectAsync(
+                        browserClient,
+                        browser,
+                        requestParts[1],
+                        headerAndRemainder,
+                        headerEnd + 4,
+                        cancellationToken).ConfigureAwait(false);
                     return;
                 }
 
@@ -105,7 +111,13 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         }
     }
 
-    private async Task HandleConnectAsync(TcpClient browserClient, NetworkStream browser, string authority, CancellationToken cancellationToken) {
+    private async Task HandleConnectAsync(
+        TcpClient browserClient,
+        NetworkStream browser,
+        string authority,
+        byte[] received,
+        int tunnelOffset,
+        CancellationToken cancellationToken) {
         if (!TryParseAuthority(authority, 443, out string host, out int port)) {
             await WriteStatusAsync(browser, 400, "Bad CONNECT Target", cancellationToken).ConfigureAwait(false);
             return;
@@ -120,6 +132,10 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
 
         byte[] established = Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection Established\r\n\r\n");
         await browser.WriteAsync(established, 0, established.Length, cancellationToken).ConfigureAwait(false);
+        NetworkStream remote = remoteClient.GetStream();
+        if (tunnelOffset < received.Length) {
+            await remote.WriteAsync(received, tunnelOffset, received.Length - tunnelOffset, cancellationToken).ConfigureAwait(false);
+        }
         await RelayAsync(browserClient, remoteClient, cancellationToken).ConfigureAwait(false);
     }
 

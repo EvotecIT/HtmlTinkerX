@@ -191,13 +191,21 @@ public sealed partial class HtmlBrowserPdfRenderer {
             TimeSpan pdfDuration = StopwatchElapsed(pdfStarted);
 
             if (bytes.Length == 0) warnings.Add("Chromium returned an empty PDF payload.");
+            string finalUrl = SanitizeUri(page.Url);
+            string browserVersion = slot.Browser.Version;
+            await CloseContextAsync(context, slot).ConfigureAwait(false);
+            context = null;
+            if (slot.PolicyProxy != null && blockedByProxy != null) {
+                slot.PolicyProxy.RequestBlocked -= blockedByProxy;
+                blockedByProxy = null;
+            }
             HtmlBrowserPdfDiagnostics diagnostics = new(
                 request.Source.Kind,
                 slot.Id,
                 slot.RenderCount > 0,
                 retried,
-                SanitizeUri(page.Url),
-                slot.Browser.Version,
+                finalUrl,
+                browserVersion,
                 queueDuration,
                 navigationDuration,
                 readinessDuration,
@@ -352,7 +360,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         string expectedOrigin = JsonSerializer.Serialize(request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority));
         string local = JsonSerializer.Serialize(request.LocalStorage);
         string session = JsonSerializer.Serialize(request.SessionStorage);
-        string script = $"(() => {{ const expectedOrigin = {expectedOrigin}; if (location.origin !== expectedOrigin) return; const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
+        string script = $"(() => {{ const expectedOrigin = {expectedOrigin}; if (window !== window.top || location.origin !== expectedOrigin) return; const local = {local}; const session = {session}; try {{ for (const key of Object.keys(local)) localStorage.setItem(key, local[key]); }} catch {{ }} try {{ for (const key of Object.keys(session)) sessionStorage.setItem(key, session[key]); }} catch {{ }} }})();";
         await context.AddInitScriptAsync(script).ConfigureAwait(false);
     }
 

@@ -79,6 +79,27 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task StorageSeedRunsOnlyInTheTopLevelDocument() {
+        await using LoopbackContentServer origin = new("<html><body>child frame</body></html>");
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        string html = "<p id='result'>pending</p><script>localStorage.removeItem('token'); const frame = document.createElement('iframe'); frame.src = '/child'; frame.onload = () => document.querySelector('#result').textContent = localStorage.getItem('token') || 'not-restored'; document.body.appendChild(frame);</script>";
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml(html, new Uri(origin.Url)),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "initial-token" });
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "not-restored");
+    }
+
+    [Fact]
     public async Task HtmlBaseInjectionPreservesStandardsModeWithoutAnExplicitHead() {
         await using LoopbackContentServer origin = new("unused");
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
