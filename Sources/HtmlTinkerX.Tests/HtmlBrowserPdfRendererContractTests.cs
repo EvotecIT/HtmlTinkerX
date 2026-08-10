@@ -197,6 +197,20 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(2, calls);
     }
 
+    [Fact]
+    public async Task DnsLookupHasAnInternalDeadlineWithoutCallerCancellation() {
+        TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => pendingLookup.Task,
+            dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
+
+        Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
+
+        Assert.Same(allowed, await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(2))));
+        Assert.False(await allowed);
+    }
+
     [Theory]
     [InlineData("192.0.2.1")]
     [InlineData("198.51.100.1")]

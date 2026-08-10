@@ -98,6 +98,17 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task ZeroStabilityTimeoutWaitsWithoutAnInternalDeadline() {
+        var page = new Mock<IPage>();
+        page.Setup(value => value.ContentAsync()).ReturnsAsync("<main>stable</main>");
+        HtmlBrowserPdfReadiness readiness = new(skipLoadState: true, stable: true, stableMilliseconds: 0, pollMilliseconds: 1, timeout: 0);
+
+        await HtmlBrowserPdfCapture.WaitForReadinessAsync(page.Object, readiness, CancellationToken.None);
+
+        page.Verify(value => value.ContentAsync(), Times.AtLeast(2));
+    }
+
+    [Fact]
     public async Task LaunchBrowserAsync_DisposesPlaywrightWhenLaunchFails() {
         var browserType = new Mock<IBrowserType>();
         browserType.Setup(type => type.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
@@ -179,6 +190,46 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task OpenSessionAsync_CdpCancellationClosesPageCreatedAfterCancellation() {
+        TaskCompletionSource<IPage> pendingPage = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> pageClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var page = new Mock<IPage>();
+        page.SetupGet(value => value.IsClosed).Returns(false);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>()))
+            .Callback(() => pageClosed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewPageAsync()).Returns(pendingPage.Task);
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(value => value.Contexts).Returns(new[] { context.Object });
+        browser.SetupGet(value => value.IsConnected).Returns(true);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.ConnectOverCDPAsync(It.IsAny<string>(), It.IsAny<BrowserTypeConnectOverCDPOptions>())).ReturnsAsync(browser.Object);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        using CancellationTokenSource cancellation = new();
+        try {
+            Task<HtmlBrowserSession> opening = HtmlBrowser.OpenSessionAsync(
+                "https://example.com",
+                new HtmlBrowserLaunchOptions { CdpEndpointUrl = "http://127.0.0.1:9222" },
+                cancellation.Token);
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opening);
+            pendingPage.SetResult(page.Object);
+            Task completed = await Task.WhenAny(pageClosed.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+            Assert.Same(pageClosed.Task, completed);
+            page.Verify(value => value.CloseAsync(It.IsAny<PageCloseOptions>()), Times.Once);
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Never);
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Never);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task MaskCleanupDoesNotReplaceActivePdfCancellation() {
         TaskCompletionSource<byte[]> pendingPdf = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool closed = false;
@@ -201,5 +252,25 @@ public class HtmlBrowserPdfExportTests {
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => capture);
+    }
+
+    [Fact]
+    public async Task MaskApplicationHonorsDirectPdfCancellation() {
+        TaskCompletionSource<JsonElement?> pendingMask = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var page = new Mock<IPage>();
+        page.SetupGet(value => value.IsClosed).Returns(false);
+        page.Setup(value => value.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>())).Returns(pendingMask.Task);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(Task.CompletedTask);
+        using CancellationTokenSource cancellation = new();
+
+        Task<byte[]> capture = HtmlBrowser.GetPagePdfAsync(
+            page.Object,
+            new HtmlBrowserPdfOptions(maskSelectors: new[] { "#secret" }),
+            cancellationToken: cancellation.Token);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => capture);
+        page.Verify(value => value.CloseAsync(It.IsAny<PageCloseOptions>()), Times.Once);
+        page.Verify(value => value.PdfAsync(It.IsAny<PagePdfOptions>()), Times.Never);
     }
 }

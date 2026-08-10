@@ -123,19 +123,24 @@ internal static class HtmlBrowserPdfCapture {
         Stopwatch stopwatch = Stopwatch.StartNew();
         TimeSpan? stableSince = null;
         string? previous = null;
-        while (stopwatch.ElapsedMilliseconds <= readiness.Timeout) {
+        bool unlimited = readiness.Timeout == 0;
+        while (unlimited || stopwatch.ElapsedMilliseconds <= readiness.Timeout) {
             cancellationToken.ThrowIfCancellationRequested();
-            int remainingMilliseconds = readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
-            if (remainingMilliseconds <= 0) break;
-            using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(remainingMilliseconds);
+            int remainingMilliseconds = unlimited
+                ? int.MaxValue
+                : readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
+            if (!unlimited && remainingMilliseconds <= 0) break;
+            using CancellationTokenSource? deadline = unlimited
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline?.CancelAfter(remainingMilliseconds);
             string current;
             try {
                 current = await ExecuteWithCancellationAsync(
                     page.ContentAsync,
                     () => page.CloseAsync(),
-                    deadline.Token).ConfigureAwait(false);
-            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+                    deadline?.Token ?? cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
                 throw new TimeoutException("Page markup serialization exceeded the configured readiness timeout.");
             }
             if (string.Equals(previous, current, StringComparison.Ordinal)) {
@@ -145,9 +150,11 @@ internal static class HtmlBrowserPdfCapture {
                 previous = current;
                 stableSince = null;
             }
-            remainingMilliseconds = readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
-            if (remainingMilliseconds <= 0) break;
-            await Task.Delay(Math.Min(readiness.PollMilliseconds, remainingMilliseconds), cancellationToken).ConfigureAwait(false);
+            if (!unlimited) {
+                remainingMilliseconds = readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
+                if (remainingMilliseconds <= 0) break;
+            }
+            await Task.Delay(unlimited ? readiness.PollMilliseconds : Math.Min(readiness.PollMilliseconds, remainingMilliseconds), cancellationToken).ConfigureAwait(false);
         }
         throw new TimeoutException("Page markup did not remain stable within the configured readiness timeout.");
     }

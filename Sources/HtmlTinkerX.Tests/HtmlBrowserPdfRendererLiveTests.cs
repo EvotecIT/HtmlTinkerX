@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using System.Collections.Concurrent;
 using Microsoft.Playwright;
 using System.Threading;
 using System.Threading.Tasks;
@@ -522,7 +523,9 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         private readonly CancellationTokenSource _cancellation = new();
         private readonly RSA _key = RSA.Create(2048);
         private readonly X509Certificate2 _certificate;
+        private readonly ConcurrentDictionary<long, Task> _clients = new();
         private readonly Task _serverTask;
+        private long _nextClient;
 
         internal LoopbackHttpsServer() {
             CertificateRequest request = new("CN=localhost", _key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -542,15 +545,32 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
                 try {
-                    using TcpClient client = await _listener.AcceptTcpClientAsync();
-                    using SslStream stream = new(client.GetStream(), leaveInnerStreamOpen: false);
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
+                    long id = Interlocked.Increment(ref _nextClient);
+                    Task handling = HandleClientAsync(client);
+                    _clients[id] = handling;
+                    _ = handling.ContinueWith(
+                        completed => _clients.TryRemove(id, out _),
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                } catch (Exception ex) when (_cancellation.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
+                    return;
+                }
+            }
+        }
+
+        private async Task HandleClientAsync(TcpClient client) {
+            using (client)
+            using (SslStream stream = new(client.GetStream(), leaveInnerStreamOpen: false)) {
+                try {
                     await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions {
                         ServerCertificate = _certificate,
                         EnabledSslProtocols = SslProtocols.Tls12
                     }, _cancellation.Token);
                     byte[] request = new byte[4096];
                     int read = await stream.ReadAsync(request, 0, request.Length, _cancellation.Token);
-                    if (read == 0) continue;
+                    if (read == 0) return;
                     string body = "<html><body><p>trusted TLS page</p></body></html>";
                     byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
                     byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
@@ -561,7 +581,7 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
                 } catch (AuthenticationException) {
                     // The strict browser intentionally rejects this development certificate.
                 } catch (IOException) {
-                    // The strict browser can close immediately after certificate validation.
+                    // The browser can close immediately after certificate validation.
                 }
             }
         }
@@ -570,6 +590,8 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
             _cancellation.Cancel();
             _listener.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            Task[] clients = _clients.Values.ToArray();
+            if (clients.Length > 0) await Task.WhenAll(clients);
             _certificate.Dispose();
             _key.Dispose();
             _cancellation.Dispose();

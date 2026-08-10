@@ -229,7 +229,8 @@ public static partial class HtmlBrowser {
         IBrowser browserInstance,
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken,
-        bool closeBrowserOnCancellation = true) {
+        bool closeBrowserOnCancellation = true,
+        Action<Task<IBrowserContext>>? contextCreationCanceled = null) {
         BrowserNewContextOptions? contextOptions = null;
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -253,7 +254,11 @@ public static partial class HtmlBrowser {
                 closeBrowserOnCancellation ? () => browserInstance.CloseAsync() : static () => Task.CompletedTask,
                 cancellationToken).ConfigureAwait(false);
         } catch (OperationCanceledException) when (!closeBrowserOnCancellation) {
-            CloseContextWhenCreated(contextCreation);
+            if (contextCreationCanceled != null) {
+                contextCreationCanceled(contextCreation);
+            } else {
+                CloseContextWhenCreated(contextCreation);
+            }
             throw;
         }
         try {
@@ -268,15 +273,25 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static void CloseContextWhenCreated(Task<IBrowserContext> contextCreation) {
-        _ = contextCreation.ContinueWith(static completed => {
-            if (completed.Status == TaskStatus.RanToCompletion) {
-                StartBestEffortClose(() => completed.Result.CloseAsync());
-            } else {
-                _ = completed.Exception;
+    private static void CloseContextWhenCreated(Task<IBrowserContext> contextCreation, IPlaywright? playwrightOwner = null) =>
+        StartBestEffortClose(async () => {
+            try {
+                IBrowserContext context = await contextCreation.ConfigureAwait(false);
+                await context.CloseAsync().ConfigureAwait(false);
+            } finally {
+                playwrightOwner?.Dispose();
             }
-        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-    }
+        });
+
+    private static void ClosePageWhenCreated(Task<IPage> pageCreation, IPlaywright playwrightOwner) =>
+        StartBestEffortClose(async () => {
+            try {
+                IPage page = await pageCreation.ConfigureAwait(false);
+                await page.CloseAsync().ConfigureAwait(false);
+            } finally {
+                playwrightOwner.Dispose();
+            }
+        });
 
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
         if (setStorageState && !string.IsNullOrEmpty(options.StorageStatePath)) {
@@ -438,10 +453,18 @@ public static partial class HtmlBrowser {
                 closePageOnDispose = true;
                 if (browserInstance.Contexts.Count > 0) {
                     context = browserInstance.Contexts[0];
-                    page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                        context.NewPageAsync,
-                        AbortOwnershipAsync,
-                        cancellationToken).ConfigureAwait(false);
+                    Task<IPage> pageCreation = context.NewPageAsync();
+                    try {
+                        page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                            () => pageCreation,
+                            static () => Task.CompletedTask,
+                            cancellationToken).ConfigureAwait(false);
+                    } catch (OperationCanceledException) {
+                        IPlaywright playwrightOwner = playwright!;
+                        playwright = null;
+                        ClosePageWhenCreated(pageCreation, playwrightOwner);
+                        throw;
+                    }
                 } else {
                     closeContextOnDispose = true;
                     closePageOnDispose = false;
@@ -449,7 +472,12 @@ public static partial class HtmlBrowser {
                         browserInstance,
                         options,
                         cancellationToken,
-                        closeBrowserOnCancellation: false).ConfigureAwait(false);
+                        closeBrowserOnCancellation: false,
+                        contextCreationCanceled: contextCreation => {
+                            IPlaywright playwrightOwner = playwright!;
+                            playwright = null;
+                            CloseContextWhenCreated(contextCreation, playwrightOwner);
+                        }).ConfigureAwait(false);
                 }
             } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
                 resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);

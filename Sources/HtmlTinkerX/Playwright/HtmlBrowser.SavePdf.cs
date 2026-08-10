@@ -29,18 +29,18 @@ public static partial class HtmlBrowser {
 
         string fullPath = HtmlUtilities.EnsureDirectoryExists(path);
         PagePdfOptions pageOptions = HtmlBrowserPdfCapture.CreatePageOptions(options, fullPath);
-        await ExecuteWithTemporaryVisualMaskAsync(
-            page,
-            options.MaskSensitiveElements,
-            options.MaskSelectors,
-            options.MaskColor,
-            async () => {
-                await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                    () => page.PdfAsync(pageOptions),
-                    () => page.CloseAsync(),
-                    cancellationToken).ConfigureAwait(false);
-                return true;
-            },
+        await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => ExecuteWithTemporaryVisualMaskAsync(
+                page,
+                options.MaskSensitiveElements,
+                options.MaskSelectors,
+                options.MaskColor,
+                async () => {
+                    await page.PdfAsync(pageOptions).ConfigureAwait(false);
+                    return true;
+                },
+                cancellationToken),
+            () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -63,15 +63,15 @@ public static partial class HtmlBrowser {
         }
 
         PagePdfOptions pageOptions = HtmlBrowserPdfCapture.CreatePageOptions(options);
-        return await ExecuteWithTemporaryVisualMaskAsync(
-            page,
-            options.MaskSensitiveElements,
-            options.MaskSelectors,
-            options.MaskColor,
-            () => HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+        return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => ExecuteWithTemporaryVisualMaskAsync(
+                page,
+                options.MaskSensitiveElements,
+                options.MaskSelectors,
+                options.MaskColor,
                 () => page.PdfAsync(pageOptions),
-                () => page.CloseAsync(),
                 cancellationToken),
+            () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }
 }

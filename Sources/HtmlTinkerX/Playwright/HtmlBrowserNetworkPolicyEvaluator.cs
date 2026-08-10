@@ -12,20 +12,24 @@ using System.Threading.Tasks;
 
 internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     private static readonly TimeSpan DefaultDnsCacheDuration = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultDnsLookupTimeout = TimeSpan.FromSeconds(5);
     private readonly HtmlBrowserNetworkPolicy _policy;
     private readonly Func<string, Task<IPAddress[]>> _resolveHost;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly TimeSpan _dnsCacheDuration;
+    private readonly TimeSpan _dnsLookupTimeout;
     private readonly ConcurrentDictionary<string, DnsCacheEntry> _dns = new(StringComparer.OrdinalIgnoreCase);
 
     internal HtmlBrowserNetworkPolicyEvaluator(
         HtmlBrowserNetworkPolicy policy,
         Func<string, Task<IPAddress[]>>? resolveHost = null,
         TimeSpan? dnsCacheDuration = null,
-        Func<DateTimeOffset>? utcNow = null) {
+        Func<DateTimeOffset>? utcNow = null,
+        TimeSpan? dnsLookupTimeout = null) {
         _policy = policy;
         _resolveHost = resolveHost ?? Dns.GetHostAddressesAsync;
         _dnsCacheDuration = dnsCacheDuration ?? DefaultDnsCacheDuration;
+        _dnsLookupTimeout = dnsLookupTimeout ?? DefaultDnsLookupTimeout;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -66,9 +70,14 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (IPAddress.TryParse(host, out IPAddress? literal)) {
             addresses = new[] { literal };
         } else {
+            using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(_dnsLookupTimeout);
             try {
                 entry = GetOrRefreshDnsEntry(host);
-                addresses = await WaitAsync(entry.Lookup, cancellationToken).ConfigureAwait(false);
+                addresses = await WaitAsync(entry.Lookup, deadline.Token).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+                if (entry != null) RemoveDnsEntry(host, entry);
+                return Array.Empty<IPAddress>();
             } catch (SocketException) {
                 if (entry != null) RemoveDnsEntry(host, entry);
                 return Array.Empty<IPAddress>();
@@ -172,7 +181,10 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (!cancellationToken.CanBeCanceled || task.IsCompleted) return await task.ConfigureAwait(false);
         TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true), cancelled);
-        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) cancellationToken.ThrowIfCancellationRequested();
+        if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task) {
+            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         return await task.ConfigureAwait(false);
     }
 
