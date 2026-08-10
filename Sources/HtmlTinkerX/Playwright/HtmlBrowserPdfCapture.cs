@@ -125,10 +125,19 @@ internal static class HtmlBrowserPdfCapture {
         string? previous = null;
         while (stopwatch.ElapsedMilliseconds <= readiness.Timeout) {
             cancellationToken.ThrowIfCancellationRequested();
-            string current = await ExecuteWithCancellationAsync(
-                page.ContentAsync,
-                () => page.CloseAsync(),
-                cancellationToken).ConfigureAwait(false);
+            int remainingMilliseconds = readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
+            if (remainingMilliseconds <= 0) break;
+            using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(remainingMilliseconds);
+            string current;
+            try {
+                current = await ExecuteWithCancellationAsync(
+                    page.ContentAsync,
+                    () => page.CloseAsync(),
+                    deadline.Token).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+                throw new TimeoutException("Page markup serialization exceeded the configured readiness timeout.");
+            }
             if (string.Equals(previous, current, StringComparison.Ordinal)) {
                 stableSince ??= stopwatch.Elapsed;
                 if ((stopwatch.Elapsed - stableSince.Value).TotalMilliseconds >= readiness.StableMilliseconds) return;
@@ -136,7 +145,9 @@ internal static class HtmlBrowserPdfCapture {
                 previous = current;
                 stableSince = null;
             }
-            await Task.Delay(readiness.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+            remainingMilliseconds = readiness.Timeout - (int)Math.Min(int.MaxValue, stopwatch.ElapsedMilliseconds);
+            if (remainingMilliseconds <= 0) break;
+            await Task.Delay(Math.Min(readiness.PollMilliseconds, remainingMilliseconds), cancellationToken).ConfigureAwait(false);
         }
         throw new TimeoutException("Page markup did not remain stable within the configured readiness timeout.");
     }

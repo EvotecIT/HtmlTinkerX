@@ -2,6 +2,7 @@ namespace HtmlTinkerX;
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -62,7 +63,25 @@ public sealed class HtmlBrowserNetworkPolicy {
     private static IReadOnlyList<string> SnapshotHosts(IEnumerable<string>? hosts) =>
         Array.AsReadOnly((hosts ?? Array.Empty<string>())
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim().TrimEnd('.').ToLowerInvariant())
+            .Select(NormalizeHostPattern)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray());
+
+    private static string NormalizeHostPattern(string value) {
+        string pattern = value.Trim().TrimEnd('.');
+        bool wildcard = pattern.StartsWith("*.", StringComparison.Ordinal);
+        string host = wildcard ? pattern.Substring(2) : pattern;
+        if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("Host patterns cannot be empty.", nameof(value));
+        string normalized;
+        if (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address)) {
+            normalized = address.ToString();
+        } else {
+            try {
+                normalized = new IdnMapping().GetAscii(host).ToLowerInvariant();
+            } catch (ArgumentException exception) {
+                throw new ArgumentException($"Host pattern '{value}' is not a valid DNS name.", nameof(value), exception);
+            }
+        }
+        return wildcard ? "*." + normalized : normalized;
+    }
 }

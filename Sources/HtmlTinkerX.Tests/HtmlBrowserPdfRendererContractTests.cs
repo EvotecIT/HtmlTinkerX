@@ -42,6 +42,21 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void CustomPageDimensionsOverrideTheDefaultNamedFormat() {
+        HtmlBrowserPdfOptions options = new(width: "210mm", height: "297mm");
+
+        Assert.Null(options.Format);
+        Assert.Null(HtmlBrowserPdfCapture.CreatePageOptions(options).Format);
+    }
+
+    [Fact]
+    public void DomainCookieDefaultsToTheRootPath() {
+        HtmlBrowserPdfCookie cookie = new("session", "value", domain: "example.com");
+
+        Assert.Equal("/", cookie.Path);
+    }
+
+    [Fact]
     public void RequestSnapshotsMutableCollections() {
         Dictionary<string, string> headers = new() { ["X-Correlation-Id"] = "first" };
         HtmlBrowserPdfRequest request = new(
@@ -120,6 +135,17 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             _ => Task.FromResult(new[] { IPAddress.Parse("8.8.8.8"), IPAddress.Loopback }));
 
         Assert.False(await evaluator.IsAllowedAsync("https://mixed.example/report", null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UnicodeDeniedHostIsCanonicalizedLikeTheRequestUri() {
+        HtmlBrowserNetworkPolicy policy = new(deniedHosts: new[] { "bücher.example" });
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            policy,
+            _ => Task.FromResult(new[] { IPAddress.Parse("8.8.8.8") }));
+
+        Assert.Equal("xn--bcher-kva.example", Assert.Single(policy.DeniedHosts));
+        Assert.False(await evaluator.IsAllowedAsync("https://bücher.example/report", null, CancellationToken.None));
     }
 
     [Theory]

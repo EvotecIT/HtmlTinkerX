@@ -25,7 +25,9 @@ public sealed class HtmlBrowserPdfCookie {
         Value = value;
         Url = url;
         Domain = domain;
-        Path = path;
+        Path = string.IsNullOrWhiteSpace(url) && !string.IsNullOrWhiteSpace(domain) && string.IsNullOrWhiteSpace(path)
+            ? "/"
+            : path;
         Expires = expires;
         HttpOnly = httpOnly;
         Secure = secure;

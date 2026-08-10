@@ -164,6 +164,24 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task AllowedWebSocketUpgradeIsRelayedByThePolicyProxy() {
+        await using LoopbackWebSocketServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+        string html = $"<html><body data-ws='waiting'><p id='status'>websocket waiting</p><script>const done=s=>{{document.body.dataset.ws=s;document.querySelector('#status').textContent='websocket '+s;}}; const ws=new WebSocket('{server.Url}'); ws.onopen=()=>done('opened'); ws.onerror=()=>done('failed');</script></body></html>";
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml(html),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, function: "() => document.body.dataset.ws !== 'waiting'", timeout: 10000));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "websocket opened");
+        Assert.Equal(0, result.Diagnostics.BlockedRequestCount);
+    }
+
+    [Fact]
     public async Task DisposeCancelsPendingCallerScriptAndDrainsTheLease() {
         HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1, maximumQueuedCaptures: 1));
         HtmlBrowserPdfRequest request = new(

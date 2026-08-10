@@ -83,6 +83,21 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task StableMarkupReadHonorsItsReadinessDeadline() {
+        TaskCompletionSource<string> pendingContent = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var page = new Mock<IPage>();
+        page.Setup(value => value.ContentAsync()).Returns(pendingContent.Task);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(pendingClose.Task);
+        HtmlBrowserPdfReadiness readiness = new(skipLoadState: true, stable: true, timeout: 100);
+
+        Task wait = HtmlBrowserPdfCapture.WaitForReadinessAsync(page.Object, readiness, CancellationToken.None);
+
+        Assert.Same(wait, await Task.WhenAny(wait, Task.Delay(TimeSpan.FromSeconds(2))));
+        await Assert.ThrowsAsync<TimeoutException>(() => wait);
+    }
+
+    [Fact]
     public async Task LaunchBrowserAsync_DisposesPlaywrightWhenLaunchFails() {
         var browserType = new Mock<IBrowserType>();
         browserType.Setup(type => type.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))

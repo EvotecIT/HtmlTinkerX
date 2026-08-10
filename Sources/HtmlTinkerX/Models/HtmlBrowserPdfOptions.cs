@@ -34,7 +34,7 @@ public sealed class HtmlBrowserPdfOptions {
 
         Landscape = landscape;
         PrintBackground = printBackground;
-        Format = format;
+        Format = !string.IsNullOrWhiteSpace(width) || !string.IsNullOrWhiteSpace(height) ? null : format;
         Width = width;
         Height = height;
         MarginTop = marginTop;
@@ -58,7 +58,7 @@ public sealed class HtmlBrowserPdfOptions {
     public bool Landscape { get; }
     /// <summary>Gets whether background graphics are printed.</summary>
     public bool PrintBackground { get; }
-    /// <summary>Gets the standard paper format.</summary>
+    /// <summary>Gets the standard paper format, or <see langword="null"/> when a custom width or height is supplied.</summary>
     public PdfPageFormat? Format { get; }
     /// <summary>Gets the custom paper width.</summary>
     public string? Width { get; }

@@ -157,6 +157,12 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         StringBuilder forwarded = new();
         forwarded.Append(requestParts[0]).Append(' ').Append(pathAndQuery).Append(' ').Append(requestParts[2]).Append("\r\n");
         bool hasHost = false;
+        bool isUpgrade = lines.Skip(1).Any(line =>
+            line.StartsWith("Connection:", StringComparison.OrdinalIgnoreCase)
+            && line.Substring(line.IndexOf(':') + 1)
+                .Split(',')
+                .Any(token => string.Equals(token.Trim(), "upgrade", StringComparison.OrdinalIgnoreCase)))
+            && lines.Skip(1).Any(line => line.StartsWith("Upgrade:", StringComparison.OrdinalIgnoreCase));
         foreach (string line in lines.Skip(1)) {
             if (line.Length == 0
                 || line.StartsWith("Connection:", StringComparison.OrdinalIgnoreCase)
@@ -165,7 +171,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             forwarded.Append(line).Append("\r\n");
         }
         if (!hasHost) forwarded.Append("Host: ").Append(target.IsDefaultPort ? target.IdnHost : target.Authority).Append("\r\n");
-        forwarded.Append("Connection: close\r\n\r\n");
+        forwarded.Append(isUpgrade ? "Connection: Upgrade\r\n\r\n" : "Connection: close\r\n\r\n");
 
         byte[] forwardedHeader = Encoding.ASCII.GetBytes(forwarded.ToString());
         await remote.WriteAsync(forwardedHeader, 0, forwardedHeader.Length, cancellationToken).ConfigureAwait(false);
