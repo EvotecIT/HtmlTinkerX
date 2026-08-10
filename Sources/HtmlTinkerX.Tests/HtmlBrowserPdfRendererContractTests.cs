@@ -275,6 +275,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [InlineData("198.51.100.1")]
     [InlineData("203.0.113.1")]
     [InlineData("2001:db8::1")]
+    [InlineData("5f00::1")]
     public async Task PublicNetworkPolicyRejectsNonRoutableDocumentationAddresses(string address) {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
@@ -421,6 +422,49 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         await browserStream.CopyToAsync(responseBytes);
 
         Assert.Contains("403 Forbidden", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolicyProxyFallsBackAfterAnAddressAttemptTimesOut() {
+        TcpListener origin = new(IPAddress.Loopback, 0);
+        origin.Start();
+        try {
+            int originPort = ((IPEndPoint)origin.LocalEndpoint).Port;
+            Task originTask = Task.Run(async () => {
+                using TcpClient accepted = await origin.AcceptTcpClientAsync();
+                using NetworkStream stream = accepted.GetStream();
+                byte[] request = new byte[4096];
+                int read = await stream.ReadAsync(request, 0, request.Length);
+                Assert.Contains("GET /fallback HTTP/1.1", Encoding.ASCII.GetString(request, 0, read), StringComparison.Ordinal);
+                byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nfallback");
+                await stream.WriteAsync(response, 0, response.Length);
+            });
+            IPAddress stalledAddress = IPAddress.Parse("127.0.0.2");
+            HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "render.invalid" });
+            HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+                policy,
+                _ => Task.FromResult(new[] { stalledAddress, IPAddress.Loopback }));
+            TaskCompletionSource<bool> neverConnects = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            await using HtmlBrowserPolicyProxy proxy = new(
+                evaluator,
+                TimeSpan.FromMilliseconds(500),
+                (client, address, port) => address.Equals(stalledAddress)
+                    ? neverConnects.Task
+                    : client.ConnectAsync(address, port));
+            Uri proxyUri = new(proxy.Server);
+            using TcpClient browser = new();
+            await browser.ConnectAsync(IPAddress.Loopback, proxyUri.Port);
+            using NetworkStream browserStream = browser.GetStream();
+            byte[] payload = Encoding.ASCII.GetBytes($"GET http://render.invalid:{originPort}/fallback HTTP/1.1\r\nHost: render.invalid:{originPort}\r\n\r\n");
+            await browserStream.WriteAsync(payload, 0, payload.Length);
+            using MemoryStream responseBytes = new();
+            await browserStream.CopyToAsync(responseBytes);
+
+            Assert.EndsWith("fallback", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+            await originTask;
+        } finally {
+            origin.Stop();
+        }
     }
 
     [Fact]

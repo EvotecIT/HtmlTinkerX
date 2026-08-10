@@ -140,7 +140,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     if (fetchOptions == null) {
                         await route.ContinueAsync().ConfigureAwait(false);
                     } else {
-                        IAPIResponse response = await route.FetchAsync(fetchOptions).ConfigureAwait(false);
+                        await using IAPIResponse response = await route.FetchAsync(fetchOptions).ConfigureAwait(false);
                         await route.FulfillAsync(new RouteFulfillOptions { Response = response }).ConfigureAwait(false);
                     }
                     return;

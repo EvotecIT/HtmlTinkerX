@@ -6,15 +6,20 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Security.Cryptography;
-using System.Net.Security;
-using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Collections.Concurrent;
 using Microsoft.Playwright;
 using System.Threading;
 using System.Threading.Tasks;
 using UglyToad.PdfPig;
 using Xunit;
+#if !NETFRAMEWORK
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+#endif
 
 namespace HtmlTinkerX.Tests;
 
@@ -603,13 +608,9 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
 
 #if !NETFRAMEWORK
     private sealed class LoopbackHttpsServer : IAsyncDisposable {
-        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-        private readonly CancellationTokenSource _cancellation = new();
         private readonly RSA _key = RSA.Create(2048);
         private readonly X509Certificate2 _certificate;
-        private readonly ConcurrentDictionary<long, Task> _clients = new();
-        private readonly Task _serverTask;
-        private long _nextClient;
+        private readonly WebApplication _application;
 
         internal LoopbackHttpsServer() {
             CertificateRequest request = new("CN=localhost", _key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -626,70 +627,27 @@ public sealed class HtmlBrowserPdfRendererLiveTests {
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, false));
             request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
             _certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1));
-            _listener.Start();
-            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            Url = $"https://127.0.0.1:{port}/certificate";
-            _serverTask = ServeAsync();
+            WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+            builder.WebHost.ConfigureKestrel(options => options.Listen(
+                IPAddress.Loopback,
+                0,
+                listen => listen.UseHttps(_certificate)));
+            _application = builder.Build();
+            _application.MapGet("/certificate", () => Results.Content(
+                "<html><body><p>trusted TLS page</p></body></html>",
+                "text/html; charset=utf-8"));
+            _application.StartAsync().GetAwaiter().GetResult();
+            IServer server = _application.Services.GetRequiredService<IServer>();
+            string address = Assert.Single(server.Features.Get<IServerAddressesFeature>()!.Addresses);
+            Url = address.TrimEnd('/') + "/certificate";
         }
 
         internal string Url { get; }
 
-        private async Task ServeAsync() {
-            while (!_cancellation.IsCancellationRequested) {
-                try {
-                    TcpClient client = await _listener.AcceptTcpClientAsync();
-                    long id = Interlocked.Increment(ref _nextClient);
-                    Task handling = HandleClientAsync(client);
-                    _clients[id] = handling;
-                    _ = handling.ContinueWith(
-                        completed => _clients.TryRemove(id, out _),
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
-                } catch (Exception ex) when (_cancellation.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
-                    return;
-                }
-            }
-        }
-
-        private async Task HandleClientAsync(TcpClient client) {
-            using (client)
-            using (SslStream stream = new(client.GetStream(), leaveInnerStreamOpen: false)) {
-                try {
-                    await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions {
-                        ServerCertificate = _certificate,
-                        EnabledSslProtocols = SslProtocols.None,
-                        ApplicationProtocols = new System.Collections.Generic.List<SslApplicationProtocol> { SslApplicationProtocol.Http11 }
-                    }, _cancellation.Token);
-                    byte[] request = new byte[4096];
-                    int read = await stream.ReadAsync(request, 0, request.Length, _cancellation.Token);
-                    if (read == 0) return;
-                    string body = "<html><body><p>trusted TLS page</p></body></html>";
-                    byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
-                    byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
-                    await stream.WriteAsync(headers, 0, headers.Length, _cancellation.Token);
-                    await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length, _cancellation.Token);
-                    await stream.FlushAsync(_cancellation.Token);
-                    await stream.ShutdownAsync();
-                } catch (Exception ex) when (_cancellation.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
-                    return;
-                } catch (AuthenticationException) {
-                    // The strict browser intentionally rejects this development certificate.
-                } catch (IOException) {
-                    // The browser can close immediately after certificate validation.
-                }
-            }
-        }
-
         public async ValueTask DisposeAsync() {
-            _cancellation.Cancel();
-            _listener.Stop();
-            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
-            Task[] clients = _clients.Values.ToArray();
-            if (clients.Length > 0) await Task.WhenAll(clients);
+            await _application.DisposeAsync();
             _certificate.Dispose();
             _key.Dispose();
-            _cancellation.Dispose();
         }
     }
 #endif

@@ -179,6 +179,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (address.AddressFamily == AddressFamily.InterNetworkV6) {
             if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal) return false;
             if ((bytes[0] & 0xFE) == 0xFC) return false;
+            if (bytes[0] == 0x5F && bytes[1] == 0x00) return false;
             if (bytes[0] == 0x01 && bytes.Take(8).Skip(1).All(value => value == 0)) return false;
             if (bytes[0] == 0x20 && bytes[1] == 0x01) {
                 if (bytes[2] == 0x00 && bytes[3] == 0x00) return false;

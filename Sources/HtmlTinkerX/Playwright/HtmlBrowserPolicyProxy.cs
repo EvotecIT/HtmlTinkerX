@@ -3,6 +3,7 @@ namespace HtmlTinkerX;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -208,14 +209,20 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         IPAddress[] addresses = await _policy.ResolveAllowedAddressesAsync(target, cancellationToken).ConfigureAwait(false);
         if (addresses.Length == 0) RequestBlocked?.Invoke(target);
         int port = target.IsDefaultPort ? (target.Scheme == Uri.UriSchemeHttps || target.Scheme == "wss" ? 443 : 80) : target.Port;
-        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(_connectTimeout);
-        foreach (IPAddress address in addresses) {
+        long started = Stopwatch.GetTimestamp();
+        for (int index = 0; index < addresses.Length; index++) {
+            double elapsedSeconds = (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency;
+            TimeSpan remaining = _connectTimeout - TimeSpan.FromSeconds(elapsedSeconds);
+            if (remaining <= TimeSpan.Zero) return null;
+            TimeSpan attemptTimeout = TimeSpan.FromTicks(Math.Max(1, remaining.Ticks / (addresses.Length - index)));
+            using CancellationTokenSource attemptDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            attemptDeadline.CancelAfter(attemptTimeout);
+            IPAddress address = addresses[index];
             TcpClient client = new(address.AddressFamily);
             try {
-                await WaitAsync(_connect(client, address, port), deadline.Token, client).ConfigureAwait(false);
+                await WaitAsync(_connect(client, address, port), attemptDeadline.Token, client).ConfigureAwait(false);
                 return client;
-            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attemptDeadline.IsCancellationRequested) {
                 client.Dispose();
             } catch (Exception ex) when (ex is SocketException || ex is IOException) {
                 client.Dispose();

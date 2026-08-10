@@ -31,6 +31,10 @@
         <ProjectReference Include="..\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj" />
     </ItemGroup>
 
+    <ItemGroup Condition=" '$(TargetFramework)' != 'net472' ">
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="System.Management.Automation" Version="7.4.15" Condition=" '$(TargetFramework)' != 'net472' " />
     </ItemGroup>
