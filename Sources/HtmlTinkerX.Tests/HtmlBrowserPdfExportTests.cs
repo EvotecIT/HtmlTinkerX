@@ -33,6 +33,31 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task PopupCoordinatorPropagatesBackgroundHeaderAttachmentFailure() {
+        TaskCompletionSource<bool> attachmentFailed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var primaryPage = new Mock<IPage>();
+        var popupPage = new Mock<IPage>();
+        popupPage.SetupGet(value => value.IsClosed).Returns(false);
+        popupPage.SetupGet(value => value.Url).Returns("about:blank");
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewCDPSessionAsync(popupPage.Object))
+            .ThrowsAsync(new PlaywrightException("attachment failed"));
+        await using HtmlBrowserPopupHeaderCoordinator coordinator = new(
+            context.Object,
+            primaryPage.Object,
+            new Uri("https://example.test"),
+            new Dictionary<string, string> { ["X-Test"] = "value" },
+            CancellationToken.None,
+            () => attachmentFailed.TrySetResult(true));
+
+        context.Raise(value => value.Page += null, context.Object, popupPage.Object);
+        Assert.Same(attachmentFailed.Task, await Task.WhenAny(attachmentFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(coordinator.ThrowIfFaulted);
+        Assert.Contains("attachment failed", exception.InnerException?.Message);
+    }
+
+    [Fact]
     public async Task GetPagePdfAsync_ReturnsBytes() {
         var page = new Mock<IPage>();
         page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>()))
@@ -147,6 +172,43 @@ public class HtmlBrowserPdfExportTests {
         HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
         try {
             await Assert.ThrowsAsync<PlaywrightException>(() => HtmlBrowser.LaunchBrowserAsync(new HtmlBrowserLaunchOptions(), CancellationToken.None));
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
+    public async Task LaunchBrowserAsync_CancellationClosesBrowserThatFinishesLaunchingLate() {
+        TaskCompletionSource<IBrowser> pendingLaunch = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> launchStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> browserClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> ownerDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browser = new Mock<IBrowser>();
+        browser.Setup(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()))
+            .Callback(() => browserClosed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(type => type.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .Callback(() => launchStarted.TrySetResult(true))
+            .Returns(pendingLaunch.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        playwright.Setup(value => value.Dispose()).Callback(() => ownerDisposed.TrySetResult(true));
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        using CancellationTokenSource cancellation = new();
+        try {
+            Task<(IPlaywright Playwright, IBrowser Browser)> launching =
+                HtmlBrowser.LaunchBrowserAsync(new HtmlBrowserLaunchOptions(), cancellation.Token);
+            await launchStarted.Task;
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => launching);
+            pendingLaunch.SetResult(browser.Object);
+
+            Assert.Same(browserClosed.Task, await Task.WhenAny(browserClosed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            Assert.Same(ownerDisposed.Task, await Task.WhenAny(ownerDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Once);
             playwright.Verify(value => value.Dispose(), Times.Once);
         } finally {
             HtmlBrowser.PlaywrightFactory = null;

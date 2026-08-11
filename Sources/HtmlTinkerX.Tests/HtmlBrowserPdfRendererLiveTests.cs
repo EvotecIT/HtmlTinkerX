@@ -357,10 +357,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             minimumBrowserInstances: 1,
             maximumBrowserInstances: 1,
-            maximumBrowserAge: TimeSpan.FromMilliseconds(1)));
+            maximumBrowserAge: TimeSpan.FromMilliseconds(100)));
 
         await renderer.PreWarmAsync();
-        await Task.Delay(20);
+        await Task.Delay(150);
         Assert.Equal(0, renderer.GetMetricsSnapshot().IdleBrowsers);
         await renderer.PreWarmAsync();
 

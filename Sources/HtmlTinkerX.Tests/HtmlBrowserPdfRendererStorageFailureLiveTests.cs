@@ -15,7 +15,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() => renderer.CaptureAsync(
             new HtmlBrowserPdfRequest(
-                HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+                HtmlBrowserPdfSource.FromUrl(server.StorageForgeryUrl),
                 localStorage: new Dictionary<string, string> {
                     ["oversized"] = new string('x', 20 * 1024 * 1024)
                 })));

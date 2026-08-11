@@ -30,6 +30,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private readonly EventHandler<IPage> _pageHandler;
     private readonly Action _cleanupTimedOut;
     private readonly TimeSpan _cleanupTimeout;
+    private Exception? _failure;
     private int _disposed;
 
     internal HtmlBrowserPopupHeaderCoordinator(
@@ -68,7 +69,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _ = pending.ContinueWith(
             completed => {
                 _pending.TryRemove(completed, out _);
-                _ = completed.Exception;
+                if (!completed.IsFaulted || Volatile.Read(ref _disposed) != 0) return;
+                Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
+                _cleanupTimedOut();
             },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -93,8 +96,15 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             // before releasing this page so nested navigation cannot outrun interception.
             await AddNavigationShimAsync(page).ConfigureAwait(false);
             await page.EvaluateAsync(ReleaseNavigationScript).ConfigureAwait(false);
-        } catch (PlaywrightException) {
-            // A caller can close or replace the blank popup while interception is attached.
+        } catch (PlaywrightException) when (page.IsClosed || !string.Equals(page.Url, "about:blank", StringComparison.OrdinalIgnoreCase)) {
+            // A caller can close the popup or navigate it before the release handshake finishes.
+        }
+    }
+
+    internal void ThrowIfFaulted() {
+        Exception? failure = Volatile.Read(ref _failure);
+        if (failure != null) {
+            throw new InvalidOperationException("Popup header interception failed before capture completed.", failure);
         }
     }
 

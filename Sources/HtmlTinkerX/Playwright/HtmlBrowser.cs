@@ -33,17 +33,25 @@ public static partial class HtmlBrowser {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
             return Task.CompletedTask;
         }
+        int lateLaunchCleanupOwnsPlaywright = 0;
         try {
             IBrowserType type = ResolveBrowserType(playwright, options.Browser);
             BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
-
+            Task<IBrowser> launch = type.LaunchAsync(launchOptions);
             IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                () => type.LaunchAsync(launchOptions),
-                DisposeOwnerAsync,
+                () => launch,
+                () => {
+                    if (Interlocked.Exchange(ref lateLaunchCleanupOwnsPlaywright, 1) == 0) {
+                        CloseBrowserWhenLaunchCompletes(launch, playwright);
+                    }
+                    return Task.CompletedTask;
+                },
                 cancellationToken).ConfigureAwait(false);
             return (playwright, browserInstance);
         } catch {
-            await DisposeOwnerAsync().ConfigureAwait(false);
+            if (Volatile.Read(ref lateLaunchCleanupOwnsPlaywright) == 0) {
+                await DisposeOwnerAsync().ConfigureAwait(false);
+            }
             throw;
         }
     }
@@ -109,13 +117,19 @@ public static partial class HtmlBrowser {
             return Task.CompletedTask;
         }
         IBrowserContext? context = null;
+        int lateLaunchCleanupOwnsPlaywright = 0;
         try {
             IBrowserType type = ResolveBrowserType(playwright, options.Browser);
             BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
-
+            Task<IBrowserContext> launch = type.LaunchPersistentContextAsync(userDataDirectory, contextOptions);
             context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                () => type.LaunchPersistentContextAsync(userDataDirectory, contextOptions),
-                DisposeOwnerAsync,
+                () => launch,
+                () => {
+                    if (Interlocked.Exchange(ref lateLaunchCleanupOwnsPlaywright, 1) == 0) {
+                        ClosePersistentContextWhenLaunchCompletes(launch, playwright);
+                    }
+                    return Task.CompletedTask;
+                },
                 cancellationToken).ConfigureAwait(false);
             IPage page = context.Pages.Count > 0
                 ? context.Pages[0]
@@ -129,7 +143,9 @@ public static partial class HtmlBrowser {
             if (context != null) {
                 StartBestEffortClose(() => context.CloseAsync());
             }
-            await DisposeOwnerAsync().ConfigureAwait(false);
+            if (Volatile.Read(ref lateLaunchCleanupOwnsPlaywright) == 0) {
+                await DisposeOwnerAsync().ConfigureAwait(false);
+            }
             throw;
         }
     }

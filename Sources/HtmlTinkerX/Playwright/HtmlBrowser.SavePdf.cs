@@ -39,7 +39,8 @@ public static partial class HtmlBrowser {
                     await page.PdfAsync(pageOptions).ConfigureAwait(false);
                     return true;
                 },
-                cancellationToken),
+                cancellationToken,
+                freezePageScriptsDuringAction: true),
             () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }
@@ -70,7 +71,8 @@ public static partial class HtmlBrowser {
                 options.MaskSelectors,
                 options.MaskColor,
                 () => page.PdfAsync(pageOptions),
-                cancellationToken),
+                cancellationToken,
+                freezePageScriptsDuringAction: true),
             () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }

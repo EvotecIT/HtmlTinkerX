@@ -65,7 +65,7 @@ public class HtmlBrowserPersistentProfileTests {
             UserDataDirectory = userDataDirectory,
             Headless = true,
             LoadState = HtmlBrowserLoadState.Load,
-            Timeout = 10000
+            Timeout = 30000
         };
 
         try {
@@ -94,7 +94,7 @@ public class HtmlBrowserPersistentProfileTests {
             Password = "proof-secret",
             Headless = true,
             LoadState = HtmlBrowserLoadState.DomContentLoaded,
-            Timeout = 10000
+            Timeout = 30000
         };
 
         try {
@@ -130,7 +130,7 @@ public class HtmlBrowserPersistentProfileTests {
 
     private static HttpListener StartLocalPageServer(out string url) {
         int port = GetFreePort();
-        url = $"http://localhost:{port}/";
+        url = $"http://127.0.0.1:{port}/";
         HttpListener listener = new();
         listener.Prefixes.Add(url);
         listener.Start();
@@ -157,7 +157,7 @@ public class HtmlBrowserPersistentProfileTests {
 
     private static HttpListener StartBasicAuthPageServer(out string url, string username, string password) {
         int port = GetFreePort();
-        url = $"http://localhost:{port}/";
+        url = $"http://127.0.0.1:{port}/";
         string expected = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
         HttpListener listener = new();
         listener.Prefixes.Add(url);

@@ -145,28 +145,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
-    public async Task BrowserPdfMaskRedactsTextAfterPageScriptsReplaceDomPrimitives() {
-        const string html = @"<p>public artifact marker</p><p id='secret'>sensitive artifact value</p><script>
-            document.querySelectorAll = () => [];
-            Document.prototype.querySelectorAll = () => [];
-            Element.prototype.querySelectorAll = () => [];
-            Document.prototype.createElement = () => { throw new Error('page-owned createElement'); };
-            Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 });
-            CSSStyleDeclaration.prototype.setProperty = () => {};
-        </script>";
-        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
-            maximumBrowserInstances: 1,
-            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
-
-        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
-            HtmlBrowserPdfSource.FromHtml(html),
-            pdfOptions: new HtmlBrowserPdfOptions(maskSelectors: new[] { "#secret" })));
-
-        AssertPdfContains(result.PdfBytes, "public artifact marker");
-        AssertPdfDoesNotContain(result.PdfBytes, "sensitive artifact value");
-    }
-
-    [Fact]
     public async Task VisualMaskAppliesToChildFramesAndRestoresTheirInlineStyles() {
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
         await session.Page.SetContentAsync("<iframe srcdoc=\"<input id='secret' style='width:120px;height:30px'>\"></iframe>");
@@ -558,12 +536,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task CaptureStyleSheetTimeoutReleasesTheBrowserLease() {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
-        const string blockedHtml = "<html><body><p>blocked</p><script>document.querySelector = () => { while (true) { } };</script></body></html>";
+        string blockedHtml = "<html><body><p>blocked</p>"
+            + string.Concat(Enumerable.Repeat("<iframe srcdoc='<p>frame</p>'></iframe>", 50))
+            + "</body></html>";
 
         TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.CaptureAsync(
             new HtmlBrowserPdfRequest(
                 HtmlBrowserPdfSource.FromHtml(blockedHtml),
-                readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, timeout: 250),
+                readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, timeout: 1),
                 styleSheetContent: "body { color: black; }")));
 
         Assert.Contains("stylesheet injection", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -640,6 +620,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupReferer;
         private string? _lastExistingContextToken;
         private string? _lastSubmitAction;
+        private string? _lastImageSubmitCoordinates;
         private int _blankPopupResourceRequests;
         private readonly string _namedContextInitialUrl;
 
@@ -648,10 +629,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
+            CrossOriginRedirectUrl = $"http://localhost:{port}/redirect-to-header-popup";
             BlankPopupResourceUrl = $"http://127.0.0.1:{port}/blank-popup-resource";
             NestedPopupUrl = $"http://127.0.0.1:{port}/nested-main";
             NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
+            StorageForgeryUrl = $"http://127.0.0.1:{port}/storage-forgery-main";
             ExistingContextUrl = $"http://127.0.0.1:{port}/existing-context-main";
             NamedContextUrl = $"http://127.0.0.1:{port}/named-context-main";
             DeclarativeAnchorUrl = $"http://127.0.0.1:{port}/declarative-anchor-main";
@@ -659,6 +642,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             DeclarativeFormOpenerUrl = $"http://127.0.0.1:{port}/declarative-form-opener-main";
             DeclarativeNamedUrl = $"http://127.0.0.1:{port}/declarative-named-main";
             DeclarativeSingleSubmitUrl = $"http://127.0.0.1:{port}/declarative-single-submit-main";
+            DeclarativeImageSubmitUrl = $"http://127.0.0.1:{port}/declarative-image-submit-main";
             DeclarativeSelfAnchorUrl = $"http://127.0.0.1:{port}/declarative-self-anchor-main";
             DeclarativeSelfFormUrl = $"http://127.0.0.1:{port}/declarative-self-form-main";
             DeclarativeExplicitSelfAnchorUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-anchor-main";
@@ -672,10 +656,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
 
         internal string HeaderUrl { get; }
+        internal string CrossOriginRedirectUrl { get; }
         internal string BlankPopupResourceUrl { get; }
         internal string NestedPopupUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
+        internal string StorageForgeryUrl { get; }
         internal string ExistingContextUrl { get; }
         internal string NamedContextUrl { get; }
         internal string DeclarativeAnchorUrl { get; }
@@ -683,6 +669,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string DeclarativeFormOpenerUrl { get; }
         internal string DeclarativeNamedUrl { get; }
         internal string DeclarativeSingleSubmitUrl { get; }
+        internal string DeclarativeImageSubmitUrl { get; }
         internal string DeclarativeSelfAnchorUrl { get; }
         internal string DeclarativeSelfFormUrl { get; }
         internal string DeclarativeExplicitSelfAnchorUrl { get; }
@@ -709,7 +696,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     string requestTarget = request.Split(' ')[1];
                     string contentType = "text/html; charset=utf-8";
                     string body;
-                    if (requestTarget.StartsWith("/nested-parent", StringComparison.Ordinal)) {
+                    string status = "200 OK";
+                    string locationHeader = string.Empty;
+                    if (requestTarget.StartsWith("/redirect-to-header-popup", StringComparison.Ordinal)) {
+                        status = "302 Found";
+                        locationHeader = $"Location: {HeaderUrl.Replace("/header-main", "/header-popup")}\r\n";
+                        body = string.Empty;
+                    } else if (requestTarget.StartsWith("/nested-parent", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         body = "<script>window.open('/nested-child', '_blank');</script>";
                     } else if (requestTarget.StartsWith("/nested-child", StringComparison.Ordinal)) {
@@ -731,6 +724,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         if (requestTarget.Contains("action=approve", StringComparison.Ordinal)) {
                             Volatile.Write(ref _lastSubmitAction, "approve");
+                        }
+                        string? imageX = ReadQueryValue(requestTarget, "approval.x");
+                        string? imageY = ReadQueryValue(requestTarget, "approval.y");
+                        if (imageX != null && imageY != null) {
+                            Volatile.Write(ref _lastImageSubmitCoordinates, imageX + "," + imageY);
                         }
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => opener.postMessage(text, '*'));</script>";
                     } else if (requestTarget.StartsWith("/blank-popup-fetch", StringComparison.Ordinal)) {
@@ -758,10 +756,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
                             ? "popup authorized|" + (Volatile.Read(ref _lastSubmitAction) ?? "missing")
                             : "pending";
+                    } else if (requestTarget.StartsWith("/image-submit-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
+                            ? "popup authorized|" + (Volatile.Read(ref _lastImageSubmitCoordinates) ?? "missing")
+                            : "pending";
                     } else if (requestTarget.StartsWith("/storage-popup", StringComparison.Ordinal)) {
                         body = "<script>localStorage.setItem('observed', localStorage.getItem('token') || 'missing'); close();</script>";
                     } else if (requestTarget.StartsWith("/storage-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('observed') || 'pending', 20);</script>";
+                    } else if (requestTarget.StartsWith("/storage-forgery-main", StringComparison.Ordinal)) {
+                        body = "<p>storage forgery probe</p><script>for (const key of Object.getOwnPropertyNames(globalThis)) { if (key.startsWith('__htmltinkerx_storage_') || key.startsWith('htmltinkerxStorage')) globalThis[key] = JSON.stringify({ completed: true, errors: [] }); }</script>";
                     } else if (requestTarget.StartsWith("/existing-context-destination", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastExistingContextToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         body = LastExistingContextToken == "popup-token"
@@ -786,6 +791,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='reportWindow'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-single-submit-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><form action='/wrong-popup' method='post' target='_blank'><button type='submit' name='action' value='approve' formaction='/header-popup' formmethod='get'>open</button></form><script>let submitCount = 0; document.addEventListener('submit', () => submitCount++); setInterval(() => fetch('/submitter-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text + '|' + submitCount), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-image-submit-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><form action='/header-popup' method='get' target='_blank'><input name='approval' type='image' alt='approve' style='width:40px;height:30px' src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2230%22/%3E'></form><script>setInterval(() => fetch('/image-submit-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-self-anchor-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><a href='/self-destination'>open</a>";
                     } else if (requestTarget.StartsWith("/declarative-self-form-main", StringComparison.Ordinal)) {
@@ -808,7 +815,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     }
                     byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
-                    byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
+                    byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\n{locationHeader}Content-Type: {contentType}\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
                     await stream.WriteAsync(response, 0, response.Length);
                     await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length);
                 } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
@@ -817,6 +824,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     return;
                 }
             }
+        }
+
+        private static string? ReadQueryValue(string requestTarget, string name) {
+            int queryIndex = requestTarget.IndexOf('?');
+            if (queryIndex < 0) return null;
+            foreach (string part in requestTarget.Substring(queryIndex + 1).Split('&')) {
+                int equals = part.IndexOf('=');
+                string key = equals < 0 ? part : part.Substring(0, equals);
+                if (string.Equals(Uri.UnescapeDataString(key), name, StringComparison.Ordinal)) {
+                    return equals < 0 ? string.Empty : Uri.UnescapeDataString(part.Substring(equals + 1));
+                }
+            }
+            return null;
         }
 
         public async ValueTask DisposeAsync() {

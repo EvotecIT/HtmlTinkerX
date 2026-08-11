@@ -93,7 +93,13 @@
         let documentMutationQueued = false;
         let documentWriteQueued = false;
         let documentCloseQueued = false;
+        let documentWrittenSynchronously = false;
         const queued = [];
+        const guardedResources = [];
+        const requestAttributes = new Map([
+            ['src', 'src'], ['srcset', 'srcset'], ['href', 'href'], ['action', 'action'],
+            ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction']
+        ]);
         const runWhenReady = action => {
             if (ready) action();
             else queued.push(action);
@@ -118,6 +124,91 @@
             }
         });
         const nativeObjects = new WeakMap();
+        const guardResourceAttributes = (element, initialValues) => {
+            const values = new Map(initialValues);
+            const guardedProperties = [];
+            for (const [attribute, property] of requestAttributes) {
+                if (!(property in element)) continue;
+                let descriptor = null;
+                let prototype = element;
+                while (prototype && descriptor == null) {
+                    descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+                    prototype = Object.getPrototypeOf(prototype);
+                }
+                if (descriptor == null || descriptor.configurable === false && Object.prototype.hasOwnProperty.call(element, property)) continue;
+                Object.defineProperty(element, property, {
+                    configurable: true,
+                    enumerable: descriptor.enumerable,
+                    get() {
+                        if (values.has(attribute)) return values.get(attribute);
+                        return descriptor.get ? descriptor.get.call(element) : '';
+                    },
+                    set(value) { values.set(attribute, String(value)); }
+                });
+                guardedProperties.push([attribute, property]);
+            }
+            const nativeSetAttribute = element.setAttribute;
+            const nativeRemoveAttribute = element.removeAttribute;
+            Object.defineProperty(element, 'setAttribute', {
+                configurable: true,
+                value(name, value) {
+                    const attribute = String(name).toLowerCase();
+                    if (requestAttributes.has(attribute)) {
+                        values.set(attribute, String(value));
+                        return;
+                    }
+                    return nativeSetAttribute.call(this, name, value);
+                }
+            });
+            Object.defineProperty(element, 'removeAttribute', {
+                configurable: true,
+                value(name) {
+                    const attribute = String(name).toLowerCase();
+                    if (requestAttributes.has(attribute)) {
+                        values.delete(attribute);
+                        return;
+                    }
+                    return nativeRemoveAttribute.call(this, name);
+                }
+            });
+            guardedResources.push(() => {
+                for (const [, property] of guardedProperties) delete element[property];
+                delete element.setAttribute;
+                delete element.removeAttribute;
+                for (const [attribute, value] of values) nativeSetAttribute.call(element, attribute, value);
+            });
+        };
+        const writeStagedMarkup = (method, args) => {
+            const nativeDocument = popup.document;
+            const template = nativeDocument.createElement('template');
+            template.innerHTML = args.map(value => String(value)).join('');
+            const descriptors = [];
+            let markerIndex = 0;
+            for (const element of template.content.querySelectorAll('*')) {
+                const values = [];
+                for (const attribute of requestAttributes.keys()) {
+                    if (!element.hasAttribute(attribute)) continue;
+                    values.push([attribute, element.getAttribute(attribute)]);
+                    element.removeAttribute(attribute);
+                }
+                const marker = `htmltinkerx-${Date.now()}-${markerIndex++}-${Math.random().toString(36).slice(2)}`;
+                element.setAttribute('data-htmltinkerx-staged-resource', marker);
+                descriptors.push([marker, values]);
+            }
+            const nativeWrite = method === 'writeln'
+                ? nativeDocument.writeln
+                : nativeDocument.write;
+            Reflect.apply(nativeWrite, nativeDocument, [template.innerHTML]);
+            for (const [marker, values] of descriptors) {
+                const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
+                if (!element) continue;
+                element.removeAttribute('data-htmltinkerx-staged-resource');
+                guardResourceAttributes(element, values);
+            }
+            documentMutationQueued = true;
+            documentWriteQueued = true;
+            documentWrittenSynchronously = true;
+        };
         const mutationMethods = new Set([
             'append', 'appendChild', 'after', 'before', 'click', 'close', 'insertAdjacentElement',
             'insertAdjacentHTML', 'insertAdjacentText', 'insertBefore', 'open', 'prepend',
@@ -151,6 +242,10 @@
                             : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
                     }
                     return (...args) => {
+                        if (!ready && (property === 'write' || property === 'writeln') && resolve() === popup.document) {
+                            writeStagedMarkup(property, args);
+                            return undefined;
+                        }
                         if (!mutationMethods.has(property) || ready) {
                             const invoke = () => {
                                 const current = resolve();
@@ -159,7 +254,7 @@
                             };
                             const initialResult = invoke();
                             if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
-                            return stagedObject(() => initialResult);
+                            return initialResult;
                         }
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;
@@ -206,12 +301,13 @@
             // in the popup's release evaluation destroys that evaluation context before
             // queued mutations can be replayed.
             globalThis.setTimeout(() => {
-                if (documentMutationQueued) {
+                if (documentMutationQueued && !documentWrittenSynchronously) {
                     popup.document.open();
                     popup.document.write('<!doctype html><html><head></head><body></body></html>');
                     popup.document.close();
                 }
                 ready = true;
+                while (guardedResources.length > 0) guardedResources.shift()();
                 while (queued.length > 0) queued.shift()();
                 if (documentWriteQueued && !documentCloseQueued) popup.document.close();
             }, 0);
@@ -273,9 +369,19 @@
         return suppressOpener ? null : popup;
     };
 
-    window.open = function(url, target, features) {
+    const stagedWindowOpen = function(url, target, features) {
         return openWithReferrerPolicy.call(this, url, target, features, '');
     };
+    Object.defineProperty(Window.prototype, 'open', {
+        value: stagedWindowOpen,
+        writable: false,
+        configurable: false
+    });
+    Object.defineProperty(window, 'open', {
+        value: stagedWindowOpen,
+        writable: false,
+        configurable: false
+    });
 
     const effectiveTarget = (element, submitter) => {
         if (submitter != null && submitter.hasAttribute('formtarget')) {
@@ -363,8 +469,7 @@
         const normalized = normalizedDeclarativeTarget(target);
         if (specialTargets.includes(normalized) || targetsExistingFrame(target)) return false;
         const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
-        return action.origin === location.origin
-            && String(submitter?.formMethod || form.method).toLowerCase() !== 'dialog';
+        return String(submitter?.formMethod || form.method).toLowerCase() !== 'dialog';
     };
 
     const submitWithoutRedispatch = (form, submitter) => {
@@ -434,33 +539,17 @@
         }
     };
 
-    const afterPagePropagationHandlers = (type, shouldStage, handler) => {
+    const afterPagePropagationHandlers = (type, shouldStage, handler, observe) => {
         originalAddEventListener.call(window, type, event => {
-            const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target, document, window];
-            let staged = false;
-            const observer = current => {
-                if (current !== event || staged || !shouldStage(current)) return;
-                staged = true;
-                internallyCancelledEvents.add(current);
-                originalPreventDefault.call(current);
-                globalThis.queueMicrotask(() => {
-                    try { handler(current); }
-                    finally {
-                        internallyCancelledEvents.delete(current);
-                        pageCancelledEvents.delete(current);
-                    }
-                });
-            };
-            for (const target of path) {
-                if (target && typeof target.addEventListener === 'function') {
-                    originalAddEventListener.call(target, type, observer, { capture: false, once: true });
-                }
-            }
+            if (typeof observe === 'function') observe(event);
+            if (!shouldStage(event)) return;
+            internallyCancelledEvents.add(event);
+            originalPreventDefault.call(event);
             globalThis.queueMicrotask(() => {
-                for (const target of path) {
-                    if (target && typeof target.removeEventListener === 'function') {
-                        originalRemoveEventListener.call(target, type, observer, false);
-                    }
+                try { handler(event); }
+                finally {
+                    internallyCancelledEvents.delete(event);
+                    pageCancelledEvents.delete(event);
                 }
             });
         }, true);
@@ -476,22 +565,26 @@
         const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
         const destination = new URL(anchor.href, document.baseURI);
         if (!explicitlyCurrent
-            && (specialTargets.includes(normalizedDeclarativeTarget(target)) || destination.origin !== location.origin)) return null;
+            && specialTargets.includes(normalizedDeclarativeTarget(target))) return null;
         return { anchor, target, explicitlyCurrent, destination, path };
+    };
+
+    const recordImageSubmitCoordinates = event => {
+        if (event.button !== 0) return;
+        const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+        const submitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
+        if (!(submitter instanceof HTMLInputElement)) return;
+        imageSubmitCoordinates.set(submitter, {
+            x: Math.max(0, Math.floor(event.offsetX || 0)),
+            y: Math.max(0, Math.floor(event.offsetY || 0))
+        });
     };
 
     afterPagePropagationHandlers('click', event => stagedClickAnchor(event) !== null, event => {
         if (event.defaultPrevented) return;
         const staged = stagedClickAnchor(event);
         if (staged === null) return;
-        const { anchor, target, explicitlyCurrent, destination, path } = staged;
-        const imageSubmitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
-        if (imageSubmitter instanceof HTMLInputElement) {
-            imageSubmitCoordinates.set(imageSubmitter, {
-                x: Math.max(0, Math.floor(event.offsetX || 0)),
-                y: Math.max(0, Math.floor(event.offsetY || 0))
-            });
-        }
+        const { anchor, target, explicitlyCurrent, destination } = staged;
         if (explicitlyCurrent) {
             originalOpen.call(window, destination.href, '_self');
             return;
@@ -502,7 +595,7 @@
             ? 'noreferrer'
             : rel.contains('noopener') || !rel.contains('opener') ? 'noopener' : undefined;
         openWithReferrerPolicy.call(window, destination.href, target, features, anchor.referrerPolicy || '');
-    });
+    }, recordImageSubmitCoordinates);
 
     afterPagePropagationHandlers('submit', event => {
         const form = event.target;

@@ -240,13 +240,14 @@ public sealed partial class HtmlBrowserPdfRenderer {
             if (storageInitialization != null) {
                 await ExecuteCancellablePageOperationAsync(
                     page,
-                    () => storageInitialization.ValidateAsync(page),
+                    () => storageInitialization.ValidateAsync(),
                     cancellationToken).ConfigureAwait(false);
             }
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
             long readinessStarted = Stopwatch.GetTimestamp();
             await PreparePageAsync(page, request, cancellationToken).ConfigureAwait(false);
+            popupCoordinator?.ThrowIfFaulted();
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
 
             long pdfStarted = Stopwatch.GetTimestamp();
@@ -270,10 +271,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
                                 request.PdfOptions,
                                 request.MaximumPdfBytes,
                                 pdfToken),
-                        pdfToken),
+                        pdfToken,
+                        freezePageScriptsDuringAction: true),
                     () => AbortSlotAsync(slot),
                     pdfToken).ConfigureAwait(false);
                 bytes = HtmlBrowserPdfCapture.ValidateOutputSize(bytes, request.MaximumPdfBytes);
+                popupCoordinator?.ThrowIfFaulted();
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && pdfDeadline?.IsCancellationRequested == true) {
                 throw new TimeoutException($"Chromium PDF generation did not complete within {request.PdfTimeout} ms.");
             }
@@ -307,6 +310,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         } finally {
             if (popupCoordinator != null) await popupCoordinator.DisposeAsync().ConfigureAwait(false);
             if (scopedHeaders != null) await scopedHeaders.DisposeAsync().ConfigureAwait(false);
+            if (storageInitialization != null) await storageInitialization.DisposeAsync().ConfigureAwait(false);
             if (context != null) {
                 await CloseContextAsync(context, slot).ConfigureAwait(false);
             }
@@ -519,27 +523,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
         deadline?.CancelAfter(timeout);
         CancellationToken operationToken = deadline?.Token ?? cancellationToken;
         try {
-            foreach (IFrame frame in page.Frames) {
-                operationToken.ThrowIfCancellationRequested();
-                if (frame.IsDetached) continue;
-                try {
-                    await ExecuteCancellablePageOperationAsync(
-                        page,
-                        () => frame.EvaluateAsync(@"css => {
-                            const attribute = 'data-htmltinkerx-pdf-capture-style';
-                            let style = document.querySelector(`style[${attribute}]`);
-                            if (!style) {
-                                style = document.createElement('style');
-                                style.setAttribute(attribute, '');
-                                (document.head || document.documentElement).prepend(style);
-                            }
-                            style.textContent = css;
-                        }", styleSheetContent),
-                        operationToken).ConfigureAwait(false);
-                } catch (PlaywrightException) when (frame.IsDetached) {
-                    // A frame can detach between the snapshot and style injection.
-                }
-            }
+            await ExecuteCancellablePageOperationAsync(
+                page,
+                () => HtmlBrowser.ApplyCaptureStyleSheetAsync(page, styleSheetContent, operationToken),
+                operationToken).ConfigureAwait(false);
         } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
             throw new TimeoutException($"Capture stylesheet injection did not complete within {timeout} ms.");
         }

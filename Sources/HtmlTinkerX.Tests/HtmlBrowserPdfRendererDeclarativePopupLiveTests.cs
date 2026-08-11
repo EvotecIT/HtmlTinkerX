@@ -95,6 +95,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "popup authorized|approve|1");
     }
 
+    [Fact]
+    public async Task ImageSubmitPopupPreservesTheClickCoordinates() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string clickImage = "const input = document.querySelector('input[type=image]'); const rect = input.getBoundingClientRect(); input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, clientX: rect.left + 7, clientY: rect.top + 9 })); true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeImageSubmitUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized|7,9'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: clickImage));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized|7,9");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -197,8 +217,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = form
-            ? "const form = document.querySelector('form'); form.addEventListener('submit', event => event.stopPropagation()); form.requestSubmit(); true"
-            : "const anchor = document.querySelector('a'); anchor.addEventListener('click', event => event.stopPropagation()); anchor.click(); true";
+            ? "const form = document.querySelector('form'); form.addEventListener('submit', event => event.stopImmediatePropagation()); form.requestSubmit(); true"
+            : "const anchor = document.querySelector('a'); anchor.addEventListener('click', event => event.stopImmediatePropagation()); anchor.click(); true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(form ? server.DeclarativeFormUrl : server.DeclarativeAnchorUrl),
@@ -252,5 +272,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
         Assert.Null(server.LastPopupReferer);
+    }
+
+    [Fact]
+    public async Task CrossOriginPopupRedirectBackToCaptureOriginReceivesScopedHeaders() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1", "localhost" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: $"window.open('{server.CrossOriginRedirectUrl}', '_blank'); true"));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
     }
 }

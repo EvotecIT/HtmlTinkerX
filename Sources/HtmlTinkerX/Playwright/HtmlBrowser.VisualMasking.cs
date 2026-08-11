@@ -114,7 +114,8 @@ public static partial class HtmlBrowser {
         IEnumerable<string>? maskSelectors,
         string? maskColor,
         Func<Task<T>> action,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool freezePageScriptsDuringAction = false) {
         string[] selectors = CreateVisualMaskSelectors(maskSensitiveElements, maskSelectors);
         if (selectors.Length == 0) {
             return await action().ConfigureAwait(false);
@@ -124,8 +125,18 @@ public static partial class HtmlBrowser {
         TemporaryVisualMask mask = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
         try {
             cancellationToken.ThrowIfCancellationRequested();
+            if (freezePageScriptsDuringAction) {
+                await mask.SetPageScriptExecutionDisabledAsync(disabled: true).ConfigureAwait(false);
+            }
             return await action().ConfigureAwait(false);
         } finally {
+            if (freezePageScriptsDuringAction) {
+                try {
+                    await mask.SetPageScriptExecutionDisabledAsync(disabled: false).ConfigureAwait(false);
+                } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
+                    // Cancellation closes the page to interrupt printing; there is no live realm to restore.
+                }
+            }
             try {
                 await mask.DisposeAsync().ConfigureAwait(false);
             } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
@@ -194,7 +205,7 @@ public static partial class HtmlBrowser {
                 JsonElement? worldResult = await session.SendAsync("Page.createIsolatedWorld", new Dictionary<string, object> {
                     ["frameId"] = frameId,
                     ["worldName"] = "HtmlTinkerX.VisualMask",
-                    ["grantUniveralAccess"] = false
+                    ["grantUniversalAccess"] = false
                 }).ConfigureAwait(false);
                 if (!worldResult.HasValue
                     || !worldResult.Value.TryGetProperty("executionContextId", out JsonElement contextIdElement)
@@ -315,6 +326,11 @@ public static partial class HtmlBrowser {
             _executionContexts = executionContexts;
             _token = token;
         }
+
+        internal Task SetPageScriptExecutionDisabledAsync(bool disabled) =>
+            _session.SendAsync("Emulation.setScriptExecutionDisabled", new Dictionary<string, object> {
+                ["value"] = disabled
+            });
 
         public async ValueTask DisposeAsync() {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

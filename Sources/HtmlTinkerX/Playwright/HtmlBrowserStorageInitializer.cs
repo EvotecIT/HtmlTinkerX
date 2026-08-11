@@ -18,7 +18,8 @@ internal static class HtmlBrowserStorageInitializer {
     internal static async Task<HtmlBrowserStorageInitialization?> AddAsync(IPage page, HtmlBrowserPdfRequest request) {
         if (request.LocalStorage.Count == 0 && request.SessionStorage.Count == 0) return null;
 
-        string statusKeyValue = "__htmltinkerx_storage_" + Guid.NewGuid().ToString("N");
+        string statusKeyValue = "htmltinkerxStorage" + Guid.NewGuid().ToString("N");
+        string worldName = "HtmlTinkerX.Storage." + Guid.NewGuid().ToString("N");
         string configuration = JsonSerializer.Serialize(new {
             expectedOrigin = request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority),
             marker = "__htmltinkerx_seed_" + Guid.NewGuid().ToString("N"),
@@ -27,8 +28,39 @@ internal static class HtmlBrowserStorageInitializer {
             session = request.SessionStorage
         });
         string script = $"({Script.Value})({configuration})";
-        await page.AddInitScriptAsync(script).ConfigureAwait(false);
-        return new HtmlBrowserStorageInitialization(statusKeyValue);
+        ICDPSession session = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
+        HtmlBrowserStorageInitialization? initialization = null;
+        try {
+            await session.SendAsync("Page.enable").ConfigureAwait(false);
+            await session.SendAsync("Runtime.enable").ConfigureAwait(false);
+            string mainFrameId = await GetMainFrameIdAsync(session).ConfigureAwait(false);
+            initialization = new HtmlBrowserStorageInitialization(session, worldName, statusKeyValue, mainFrameId);
+            await session.SendAsync("Page.addScriptToEvaluateOnNewDocument", new Dictionary<string, object> {
+                ["source"] = script,
+                ["worldName"] = worldName,
+                ["runImmediately"] = true
+            }).ConfigureAwait(false);
+            return initialization;
+        } catch {
+            if (initialization != null) {
+                await initialization.DisposeAsync().ConfigureAwait(false);
+            } else {
+                try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
+            }
+            throw;
+        }
+    }
+
+    private static async Task<string> GetMainFrameIdAsync(ICDPSession session) {
+        JsonElement? tree = await session.SendAsync("Page.getFrameTree").ConfigureAwait(false);
+        if (!tree.HasValue
+            || !tree.Value.TryGetProperty("frameTree", out JsonElement frameTree)
+            || !frameTree.TryGetProperty("frame", out JsonElement frame)
+            || !frame.TryGetProperty("id", out JsonElement id)
+            || string.IsNullOrEmpty(id.GetString())) {
+            throw new PlaywrightException("Chromium did not report the main frame for web-storage initialization.");
+        }
+        return id.GetString()!;
     }
 
     private static string LoadScript() {
@@ -40,16 +72,43 @@ internal static class HtmlBrowserStorageInitializer {
     }
 }
 
-internal sealed class HtmlBrowserStorageInitialization {
+internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
+    private readonly ICDPSession _session;
+    private readonly string _worldName;
     private readonly string _statusKey;
+    private readonly string _mainFrameId;
+    private readonly ICDPSessionEvent _contextCreatedEvent;
+    private int _executionContextId;
+    private int _disposed;
 
-    internal HtmlBrowserStorageInitialization(string statusKey) {
+    internal HtmlBrowserStorageInitialization(ICDPSession session, string worldName, string statusKey, string mainFrameId) {
+        _session = session;
+        _worldName = worldName;
         _statusKey = statusKey;
+        _mainFrameId = mainFrameId;
+        _contextCreatedEvent = session.Event("Runtime.executionContextCreated");
+        _contextCreatedEvent.OnEvent += HandleExecutionContextCreated;
     }
 
-    internal async Task ValidateAsync(IPage page) {
+    internal async Task ValidateAsync() {
+        if (Volatile.Read(ref _disposed) != 0) throw new ObjectDisposedException(nameof(HtmlBrowserStorageInitialization));
+        int contextId = Volatile.Read(ref _executionContextId);
+        if (contextId == 0) throw new InvalidOperationException("Requested web storage was not initialized for the capture origin.");
         string statusKey = JsonSerializer.Serialize(_statusKey);
-        string? json = await page.EvaluateAsync<string?>($"() => globalThis[{statusKey}] || null").ConfigureAwait(false);
+        JsonElement? evaluation = await _session.SendAsync("Runtime.evaluate", new Dictionary<string, object> {
+            ["expression"] = $"globalThis[{statusKey}] || null",
+            ["contextId"] = contextId,
+            ["returnByValue"] = true
+        }).ConfigureAwait(false);
+        if (evaluation.HasValue && evaluation.Value.TryGetProperty("exceptionDetails", out JsonElement exception)) {
+            throw new PlaywrightException("Web-storage validation failed in Chromium's isolated world: " + exception.ToString());
+        }
+        string? json = evaluation.HasValue
+            && evaluation.Value.TryGetProperty("result", out JsonElement result)
+            && result.TryGetProperty("value", out JsonElement value)
+            && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
         HtmlBrowserStorageSeedStatus? status = json == null
             ? null
             : JsonSerializer.Deserialize<HtmlBrowserStorageSeedStatus>(json);
@@ -59,6 +118,25 @@ internal sealed class HtmlBrowserStorageInitialization {
         if (status.Errors.Count > 0) {
             throw new InvalidOperationException("Requested web storage could not be initialized: " + string.Join("; ", status.Errors));
         }
+    }
+
+    private void HandleExecutionContextCreated(object? sender, JsonElement? payload) {
+        if (!payload.HasValue
+            || !payload.Value.TryGetProperty("context", out JsonElement context)
+            || !context.TryGetProperty("name", out JsonElement name)
+            || !string.Equals(name.GetString(), _worldName, StringComparison.Ordinal)
+            || !context.TryGetProperty("auxData", out JsonElement auxiliaryData)
+            || !auxiliaryData.TryGetProperty("frameId", out JsonElement frameId)
+            || !string.Equals(frameId.GetString(), _mainFrameId, StringComparison.Ordinal)
+            || !context.TryGetProperty("id", out JsonElement id)
+            || !id.TryGetInt32(out int contextId)) return;
+        Volatile.Write(ref _executionContextId, contextId);
+    }
+
+    public async ValueTask DisposeAsync() {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _contextCreatedEvent.OnEvent -= HandleExecutionContextCreated;
+        try { await _session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
     }
 
     private sealed class HtmlBrowserStorageSeedStatus {
