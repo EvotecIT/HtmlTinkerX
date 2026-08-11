@@ -98,7 +98,7 @@ string? label = await HtmlBrowser.GetAttributeAsync(session, "#export", "aria-la
 
 ## Render HTML to PDF with a warm Chromium pool
 
-`HtmlBrowserPdfRenderer` keeps Chromium processes warm while creating a fresh browser context for every render. The renderer bounds active and queued work, recycles browsers by age or render count, retries once after a browser-process failure, and reports queue and render timings.
+`HtmlBrowserPdfRenderer` keeps Chromium processes warm while creating a fresh browser context for every render. The renderer bounds active and queued work, recycles browsers by age, render count, or failure, and reports queue and render timings. Failed captures are not replayed by default because navigation or caller scripts may have external side effects. Set `retryOnBrowserFailure: true` only for an idempotent request to permit one retry after an actual browser-process failure.
 
 ```csharp
 using HtmlTinkerX;

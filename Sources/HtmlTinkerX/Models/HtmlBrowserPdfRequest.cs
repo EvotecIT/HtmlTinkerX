@@ -22,7 +22,8 @@ public sealed class HtmlBrowserPdfRequest {
         HtmlBrowserPdfMediaType mediaType = HtmlBrowserPdfMediaType.Print,
         int navigationTimeout = 30000,
         int beforeCaptureScriptTimeout = 30000,
-        int pdfTimeout = 30000) {
+        int pdfTimeout = 30000,
+        bool retryOnBrowserFailure = false) {
         if (navigationTimeout < 0) throw new ArgumentOutOfRangeException(nameof(navigationTimeout));
         if (beforeCaptureScriptTimeout < 0) throw new ArgumentOutOfRangeException(nameof(beforeCaptureScriptTimeout));
         if (pdfTimeout < 0) throw new ArgumentOutOfRangeException(nameof(pdfTimeout));
@@ -45,6 +46,7 @@ public sealed class HtmlBrowserPdfRequest {
         NavigationTimeout = navigationTimeout;
         BeforeCaptureScriptTimeout = beforeCaptureScriptTimeout;
         PdfTimeout = pdfTimeout;
+        RetryOnBrowserFailure = retryOnBrowserFailure;
     }
 
     /// <summary>Gets the capture source.</summary>
@@ -75,6 +77,8 @@ public sealed class HtmlBrowserPdfRequest {
     public int BeforeCaptureScriptTimeout { get; }
     /// <summary>Gets the timeout in milliseconds for Chromium PDF generation. Zero disables the timeout.</summary>
     public int PdfTimeout { get; }
+    /// <summary>Gets whether a browser-process failure may replay the full capture once. Enable only for idempotent sources and scripts.</summary>
+    public bool RetryOnBrowserFailure { get; }
 
     private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values, StringComparer comparer) {
         Dictionary<string, string> copy = new(comparer);

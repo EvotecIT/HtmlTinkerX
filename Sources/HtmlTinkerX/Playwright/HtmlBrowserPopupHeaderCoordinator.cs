@@ -59,7 +59,10 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                 // existing _self/_parent/_top or named context before deferred navigation runs.
                 const popup = originalOpen.call(this, '', target, initialFeatures);
                 if (popup) {
-                    popup.setTimeout(() => {
+                    if (suppressOpener) {
+                        try { popup.opener = null; } catch { }
+                    }
+                    globalThis.setTimeout(() => {
                         try {
                             if (suppressReferrer) {
                                 const link = popup.document.createElement('a');
@@ -71,11 +74,13 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                             } else {
                                 popup.location.href = destination;
                             }
-                        } catch { }
+                        } catch {
+                            // Existing named contexts can still be cross-origin. Their Location
+                            // is normally writable, but native navigation is the standards-safe
+                            // fallback when the WindowProxy does not expose the required surface.
+                            originalOpen.call(window, destination, target, features);
+                        }
                     }, 0);
-                    if (suppressOpener) {
-                        try { popup.opener = null; } catch { }
-                    }
                 }
                 return suppressOpener ? null : popup;
             };

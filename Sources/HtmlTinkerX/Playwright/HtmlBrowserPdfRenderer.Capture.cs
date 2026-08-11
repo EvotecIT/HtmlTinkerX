@@ -72,7 +72,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             operationToken).ConfigureAwait(false);
                     } catch (TimeoutException) {
                         throw;
-                    } catch (Exception) when (attempt == 0 && !operationToken.IsCancellationRequested && IsBrowserProcessFailure(slot)) {
+                    } catch (Exception) when (CanRetryBrowserFailure(
+                        request,
+                        attempt,
+                        operationToken.IsCancellationRequested,
+                        IsBrowserProcessFailure(slot))) {
                         retried = true;
                         returnSlot = false;
                         slot.MarkBroken();
@@ -106,6 +110,16 @@ public sealed partial class HtmlBrowserPdfRenderer {
             EndOperation();
         }
     }
+
+    internal static bool CanRetryBrowserFailure(
+        HtmlBrowserPdfRequest request,
+        int attempt,
+        bool cancellationRequested,
+        bool browserProcessFailure) =>
+        request.RetryOnBrowserFailure
+        && attempt == 0
+        && !cancellationRequested
+        && browserProcessFailure;
 
     private async Task<HtmlBrowserPdfResult> CaptureWithSlotAsync(
         BrowserSlot slot,
