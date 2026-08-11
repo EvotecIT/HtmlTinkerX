@@ -33,4 +33,25 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastPopupToken);
         Assert.Equal("popup-token", server.LastProtectedToken);
     }
+
+    [Fact]
+    public async Task DeclarativeFormRelOpenerPreservesTheExplicitOpenerRelationship() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeFormOpenerUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "document.querySelector('form').submit(); true"));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+    }
 }

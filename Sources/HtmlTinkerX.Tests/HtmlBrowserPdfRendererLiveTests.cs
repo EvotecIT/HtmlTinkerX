@@ -17,6 +17,24 @@ namespace HtmlTinkerX.Tests;
 [Collection("Playwright collection")]
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task PdfStreamingRejectsOversizedOutputAndKeepsTheWarmSlotReusable() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() => renderer.CaptureAsync(
+            new HtmlBrowserPdfRequest(
+                HtmlBrowserPdfSource.FromHtml("<p>too large</p>"),
+                maximumPdfBytes: 8)));
+        HtmlBrowserPdfResult recovered = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<p>stream recovered</p>")));
+
+        Assert.Contains("configured limit", exception.Message, StringComparison.OrdinalIgnoreCase);
+        AssertPdfContains(recovered.PdfBytes, "stream recovered");
+        Assert.Equal(1, renderer.GetMetricsSnapshot().BrowsersCreated);
+    }
+
+    [Fact]
     public async Task UrlCaptureUsesExplicitPrivateHostPolicyAndRequestHeaders() {
         await using LoopbackHtmlServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });

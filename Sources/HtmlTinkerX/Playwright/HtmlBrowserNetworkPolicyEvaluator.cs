@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 
 internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     private const int MaximumConcurrentDnsLookups = 32;
+    private const int DefaultMaximumDnsCacheEntries = 1024;
     private static readonly TimeSpan DefaultDnsCacheDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan DefaultDnsLookupTimeout = TimeSpan.FromSeconds(5);
     private static readonly SemaphoreSlim DnsLookupGate = new(MaximumConcurrentDnsLookups, MaximumConcurrentDnsLookups);
@@ -20,20 +21,27 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly TimeSpan _dnsCacheDuration;
     private readonly TimeSpan _dnsLookupTimeout;
+    private readonly int _maximumDnsCacheEntries;
     private readonly ConcurrentDictionary<string, DnsCacheEntry> _dns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _dnsSync = new();
 
     internal HtmlBrowserNetworkPolicyEvaluator(
         HtmlBrowserNetworkPolicy policy,
         Func<string, Task<IPAddress[]>>? resolveHost = null,
         TimeSpan? dnsCacheDuration = null,
         Func<DateTimeOffset>? utcNow = null,
-        TimeSpan? dnsLookupTimeout = null) {
+        TimeSpan? dnsLookupTimeout = null,
+        int maximumDnsCacheEntries = DefaultMaximumDnsCacheEntries) {
+        if (maximumDnsCacheEntries <= 0) throw new ArgumentOutOfRangeException(nameof(maximumDnsCacheEntries));
         _policy = policy;
         _resolveHost = resolveHost ?? Dns.GetHostAddressesAsync;
         _dnsCacheDuration = dnsCacheDuration ?? DefaultDnsCacheDuration;
         _dnsLookupTimeout = dnsLookupTimeout ?? DefaultDnsLookupTimeout;
+        _maximumDnsCacheEntries = maximumDnsCacheEntries;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
+
+    internal int DnsCacheEntryCount => _dns.Count;
 
     internal Task<bool> IsAllowedAsync(string url, string? selectedFileDirectory, CancellationToken cancellationToken) =>
         IsAllowedAsync(url, selectedFileDirectory, deferNetworkResolutionToProxy: false, cancellationToken);
@@ -116,22 +124,41 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     }
 
     private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
-        while (true) {
+        lock (_dnsSync) {
             DateTimeOffset now = _utcNow();
             if (_dns.TryGetValue(host, out DnsCacheEntry? current)
-                && (!current.Lookup.IsCompleted || current.ExpiresAt > now)) return current;
+                && (!current.IsCompleted || current.ExpiresAt > now)) return current;
 
             DnsCacheEntry replacement = new(() => ResolveHostBoundedAsync(host), now.Add(_dnsCacheDuration));
-            if (current == null) {
-                if (_dns.TryAdd(host, replacement)) return replacement;
-            } else if (_dns.TryUpdate(host, replacement, current)) {
+            if (current != null) {
+                _dns[host] = replacement;
                 return replacement;
             }
+
+            EvictCompletedDnsEntries(now, onlyExpired: true);
+            if (_dns.Count >= _maximumDnsCacheEntries) EvictCompletedDnsEntries(now, onlyExpired: false, maximumToRemove: 1);
+            if (_dns.Count >= _maximumDnsCacheEntries) throw new DnsLookupCapacityException();
+            _dns[host] = replacement;
+            return replacement;
         }
     }
 
-    private void RemoveDnsEntry(string host, DnsCacheEntry entry) =>
-        ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(new KeyValuePair<string, DnsCacheEntry>(host, entry));
+    private void EvictCompletedDnsEntries(DateTimeOffset now, bool onlyExpired, int maximumToRemove = int.MaxValue) {
+        IEnumerable<KeyValuePair<string, DnsCacheEntry>> candidates = _dns
+            .Where(pair => pair.Value.IsCompleted && (!onlyExpired || pair.Value.ExpiresAt <= now))
+            .OrderBy(pair => pair.Value.ExpiresAt)
+            .Take(maximumToRemove)
+            .ToArray();
+        foreach (KeyValuePair<string, DnsCacheEntry> candidate in candidates) {
+            ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(candidate);
+        }
+    }
+
+    private void RemoveDnsEntry(string host, DnsCacheEntry entry) {
+        lock (_dnsSync) {
+            ((ICollection<KeyValuePair<string, DnsCacheEntry>>)_dns).Remove(new KeyValuePair<string, DnsCacheEntry>(host, entry));
+        }
+    }
 
     private async Task<IPAddress[]> ResolveHostBoundedAsync(string host) {
         if (!DnsLookupGate.Wait(0)) throw new DnsLookupCapacityException();
@@ -193,6 +220,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         }
 
         internal Task<IPAddress[]> Lookup => _lookup.Value;
+        internal bool IsCompleted => _lookup.IsValueCreated && _lookup.Value.IsCompleted;
         internal DateTimeOffset ExpiresAt { get; }
     }
 

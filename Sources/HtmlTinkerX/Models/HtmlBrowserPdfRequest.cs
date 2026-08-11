@@ -7,6 +7,9 @@ using System.Linq;
 
 /// <summary>Immutable, per-render browser PDF request.</summary>
 public sealed class HtmlBrowserPdfRequest {
+    /// <summary>Default maximum browser-generated PDF payload: 128 MiB.</summary>
+    public const long DefaultMaximumPdfBytes = 128L * 1024 * 1024;
+
     /// <summary>Initializes a browser PDF request.</summary>
     public HtmlBrowserPdfRequest(
         HtmlBrowserPdfSource source,
@@ -23,10 +26,12 @@ public sealed class HtmlBrowserPdfRequest {
         int navigationTimeout = 30000,
         int beforeCaptureScriptTimeout = 30000,
         int pdfTimeout = 30000,
-        bool retryOnBrowserFailure = false) {
+        bool retryOnBrowserFailure = false,
+        long maximumPdfBytes = DefaultMaximumPdfBytes) {
         if (navigationTimeout < 0) throw new ArgumentOutOfRangeException(nameof(navigationTimeout));
         if (beforeCaptureScriptTimeout < 0) throw new ArgumentOutOfRangeException(nameof(beforeCaptureScriptTimeout));
         if (pdfTimeout < 0) throw new ArgumentOutOfRangeException(nameof(pdfTimeout));
+        if (maximumPdfBytes < 0 || maximumPdfBytes > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(maximumPdfBytes));
         Source = source ?? throw new ArgumentNullException(nameof(source));
         PdfOptions = pdfOptions ?? new HtmlBrowserPdfOptions();
         Readiness = readiness ?? new HtmlBrowserPdfReadiness();
@@ -47,6 +52,7 @@ public sealed class HtmlBrowserPdfRequest {
         BeforeCaptureScriptTimeout = beforeCaptureScriptTimeout;
         PdfTimeout = pdfTimeout;
         RetryOnBrowserFailure = retryOnBrowserFailure;
+        MaximumPdfBytes = maximumPdfBytes;
     }
 
     /// <summary>Gets the capture source.</summary>
@@ -79,6 +85,8 @@ public sealed class HtmlBrowserPdfRequest {
     public int PdfTimeout { get; }
     /// <summary>Gets whether a browser-process failure may replay the full capture once. Enable only for idempotent sources and scripts.</summary>
     public bool RetryOnBrowserFailure { get; }
+    /// <summary>Gets the maximum accepted Chromium PDF payload in bytes. Zero disables the limit.</summary>
+    public long MaximumPdfBytes { get; }
 
     private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values, StringComparer comparer) {
         Dictionary<string, string> copy = new(comparer);

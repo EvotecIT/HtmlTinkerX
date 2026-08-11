@@ -124,6 +124,7 @@ var request = new HtmlBrowserPdfRequest(
         selector: "[data-report-ready]",
         timeout: 30_000),
     navigationTimeout: 60_000,
+    maximumPdfBytes: 64L * 1024 * 1024,
     headers: new Dictionary<string, string> {
         ["X-Correlation-Id"] = correlationId
     });
@@ -139,11 +140,11 @@ Console.WriteLine(
 
 Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `HtmlBrowserPdfSource.FromFile(path)` for a local document. An HTTP/HTTPS base gives an HTML string that origin; a direct local `file:` base loads relative styles, scripts, and images under the same local-directory boundary as file capture. Per-render headers and local/session storage are restricted to the URL source origin, so HTML-string capture requires an absolute HTTP/HTTPS `baseUri` when using them. Cookies retain their own URL/domain scope. CSS, JavaScript, media type, readiness conditions, sensitive-element masking, and Chromium print options are captured in the same immutable request snapshot. For a page already loaded in an authenticated `HtmlBrowserSession`, pass its `IPage` to `GetPagePdfAsync` or `SavePagePdfAsync` with `HtmlBrowserPdfOptions`.
 
-File capture accepts local paths only. UNC/device paths are rejected on every platform. On Windows, mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are also rejected before file content is probed; Unix paths retain canonical containment checks.
+File capture accepts local paths only. UNC/device paths are rejected on every platform. On Windows, mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are also rejected before file content is probed; user-controlled Unix symbolic-link components are rejected as well.
 
 Per-render headers cover same-origin HTTP(S) pages and popups, subresources, and dedicated worker requests. Shared worker requests and JavaScript WebSocket handshakes cannot carry securely origin-scoped arbitrary headers through Playwright's public APIs; use a scoped cookie or authenticated page state for those endpoints.
 
-`navigationTimeout` limits initial source loading. `beforeCaptureScriptTimeout` limits an optional pre-capture script, and `pdfTimeout` limits Chromium PDF generation; both default to 30 seconds. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation. Set an individual timeout to zero only when that stage may intentionally run without a deadline.
+`navigationTimeout` limits initial source loading. `beforeCaptureScriptTimeout` limits an optional pre-capture script, and `pdfTimeout` limits Chromium PDF generation; both default to 30 seconds. `maximumPdfBytes` streams Chromium output through a bounded 128 MiB default; set a smaller service-specific limit, or zero only for a trusted document that intentionally needs unbounded Playwright output. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation. Set an individual timeout to zero only when that stage may intentionally run without a deadline.
 
 Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
 

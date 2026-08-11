@@ -92,7 +92,13 @@
 
         const popup = originalOpen.call(window, '', '_blank');
         if (!popup) return false;
-        try { popup.opener = null; } catch { }
+        const rel = form.relList;
+        const suppressOpener = rel.contains('noreferrer')
+            || rel.contains('noopener')
+            || !rel.contains('opener');
+        if (suppressOpener) {
+            try { popup.opener = null; } catch { }
+        }
         const popupName = `htmltinkerx-popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         try { popup.name = popupName; } catch { }
 

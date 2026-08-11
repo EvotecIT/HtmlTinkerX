@@ -423,6 +423,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             NamedContextUrl = $"http://127.0.0.1:{port}/named-context-main";
             DeclarativeAnchorUrl = $"http://127.0.0.1:{port}/declarative-anchor-main";
             DeclarativeFormUrl = $"http://127.0.0.1:{port}/declarative-form-main";
+            DeclarativeFormOpenerUrl = $"http://127.0.0.1:{port}/declarative-form-opener-main";
             _serverTask = ServeAsync();
         }
 
@@ -433,6 +434,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string NamedContextUrl { get; }
         internal string DeclarativeAnchorUrl { get; }
         internal string DeclarativeFormUrl { get; }
+        internal string DeclarativeFormOpenerUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
@@ -483,6 +485,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-form-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><form action='/header-popup' method='post' target='_blank'><button type='submit'>open</button></form><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-form-opener-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><form action='/header-popup' method='post' target='_blank' rel='opener'><button type='submit'>open</button></form><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     } else {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     }

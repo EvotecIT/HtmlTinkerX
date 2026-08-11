@@ -136,6 +136,40 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void RequestBoundsPdfPayloadBeforeResultRetention() {
+        HtmlBrowserPdfRequest request = new(HtmlBrowserPdfSource.FromHtml("<p>bounded</p>"));
+        byte[] bytes = new byte[4];
+
+        Assert.Equal(HtmlBrowserPdfRequest.DefaultMaximumPdfBytes, request.MaximumPdfBytes);
+        Assert.Same(bytes, HtmlBrowserPdfCapture.ValidateOutputSize(bytes, 4));
+        Assert.Same(bytes, HtmlBrowserPdfCapture.ValidateOutputSize(bytes, 0));
+        Assert.Throws<InvalidOperationException>(() => HtmlBrowserPdfCapture.ValidateOutputSize(bytes, 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<p>invalid limit</p>"),
+            maximumPdfBytes: -1));
+    }
+
+    [Fact]
+    public void BoundedCdpPrintMapsCssLengthsAndPrintFlags() {
+        HtmlBrowserPdfOptions options = new(
+            landscape: true,
+            width: "210mm",
+            height: "29.7cm",
+            marginTop: "96px",
+            outline: true,
+            tagged: true);
+
+        Dictionary<string, object> parameters = HtmlBrowserPdfCapture.CreateCdpPrintParameters(options);
+
+        Assert.Equal(8.2677165354, Assert.IsType<double>(parameters["paperWidth"]), 8);
+        Assert.Equal(11.6929133858, Assert.IsType<double>(parameters["paperHeight"]), 8);
+        Assert.Equal(1d, Assert.IsType<double>(parameters["marginTop"]));
+        Assert.True(Assert.IsType<bool>(parameters["landscape"]));
+        Assert.True(Assert.IsType<bool>(parameters["generateDocumentOutline"]));
+        Assert.True(Assert.IsType<bool>(parameters["generateTaggedPDF"]));
+    }
+
+    [Fact]
     public void HttpsErrorOptInAlsoConfiguresTheDedicatedChromiumProcess() {
         HtmlBrowserLaunchOptions strict = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
         HtmlBrowserLaunchOptions trusted = new HtmlBrowserPdfRendererOptions(ignoreHttpsErrors: true).CreateLaunchOptions();
@@ -321,14 +355,46 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             Directory.CreateSymbolicLink(link, outside);
             HtmlBrowserNetworkPolicyEvaluator evaluator = new(HtmlBrowserNetworkPolicy.PublicNetworkOnly);
 
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
-                Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(Path.Combine(link, "secret.css")));
-            }
+            Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(Path.Combine(link, "secret.css")));
             Assert.False(await evaluator.IsAllowedAsync(new Uri(Path.Combine(link, "secret.css")).AbsoluteUri, root, CancellationToken.None));
         } finally {
             if (Directory.Exists(link)) Directory.Delete(link);
             Directory.Delete(root, recursive: true);
             Directory.Delete(outside, recursive: true);
+        }
+    }
+#endif
+
+#if !NETFRAMEWORK
+    [Fact]
+    public void UnixFilePolicyRejectsSymlinksEvenWithinTheSelectedTree() {
+        if (Environment.OSVersion.Platform == PlatformID.Win32NT) return;
+        string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-DirectPath-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string target = Path.Combine(root, "target.html");
+        string link = Path.Combine(root, "link.html");
+        File.WriteAllText(target, "<p>safe</p>");
+        try {
+            File.CreateSymbolicLink(link, target);
+
+            Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(link));
+            Assert.False(HtmlBrowserFileSystemPath.TryResolveExistingPath(link, out _));
+        } finally {
+            File.Delete(link);
+            File.Delete(target);
+            Directory.Delete(root);
+        }
+    }
+
+    [Fact]
+    public void LinuxStatFallbackClassifiesAnOrdinaryFile() {
+        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux)) return;
+        string path = Path.GetTempFileName();
+        try {
+            Assert.True(HtmlBrowserUnixFileSystemPath.TryGetLinuxStatMode(path, out uint mode));
+            Assert.True(HtmlBrowserUnixFileSystemPath.IsRegularFileOrDirectoryMode(mode));
+        } finally {
+            File.Delete(path);
         }
     }
 #endif
@@ -393,6 +459,41 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         now = now.AddSeconds(31);
         Assert.True(await evaluator.IsAllowedAsync("https://refresh.example/report", null, CancellationToken.None));
         Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task CompletedDnsEntriesAreEvictedAtTheRendererCacheBound() {
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => Task.FromResult(new[] { IPAddress.Parse("8.8.8.8") }),
+            maximumDnsCacheEntries: 2);
+
+        Assert.True(await evaluator.IsAllowedAsync("https://one.example/report", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("https://two.example/report", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("https://three.example/report", null, CancellationToken.None));
+
+        Assert.Equal(2, evaluator.DnsCacheEntryCount);
+    }
+
+    [Fact]
+    public async Task DnsCacheBoundNeverEvictsSharedInFlightLookups() {
+        TaskCompletionSource<IPAddress[]> first = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<IPAddress[]> second = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.PublicNetworkOnly,
+            _ => Interlocked.Increment(ref calls) == 1 ? first.Task : second.Task,
+            dnsLookupTimeout: TimeSpan.FromMilliseconds(25),
+            maximumDnsCacheEntries: 2);
+
+        Assert.False(await evaluator.IsAllowedAsync("https://one.example/report", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("https://two.example/report", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("https://three.example/report", null, CancellationToken.None));
+
+        Assert.Equal(2, evaluator.DnsCacheEntryCount);
+        Assert.Equal(2, calls);
+        first.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
+        second.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
     }
 
     [Fact]

@@ -222,7 +222,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
             await PreparePageAsync(page, request, cancellationToken).ConfigureAwait(false);
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
 
-            PagePdfOptions pdfOptions = HtmlBrowserPdfCapture.CreatePageOptions(request.PdfOptions);
             long pdfStarted = Stopwatch.GetTimestamp();
             using CancellationTokenSource? pdfDeadline = request.PdfTimeout == 0
                 ? null
@@ -237,10 +236,17 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         request.PdfOptions.MaskSensitiveElements,
                         request.PdfOptions.MaskSelectors,
                         request.PdfOptions.MaskColor,
-                        () => page.PdfAsync(pdfOptions),
+                        () => request.MaximumPdfBytes == 0
+                            ? page.PdfAsync(HtmlBrowserPdfCapture.CreatePageOptions(request.PdfOptions))
+                            : HtmlBrowserPdfCapture.PrintToPdfBoundedAsync(
+                                page,
+                                request.PdfOptions,
+                                request.MaximumPdfBytes,
+                                pdfToken),
                         pdfToken),
                     () => AbortSlotAsync(slot),
                     pdfToken).ConfigureAwait(false);
+                bytes = HtmlBrowserPdfCapture.ValidateOutputSize(bytes, request.MaximumPdfBytes);
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && pdfDeadline?.IsCancellationRequested == true) {
                 throw new TimeoutException($"Chromium PDF generation did not complete within {request.PdfTimeout} ms.");
             }

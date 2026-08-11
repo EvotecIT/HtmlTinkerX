@@ -63,14 +63,46 @@ internal static class HtmlBrowserFileSystemPath {
             try {
                 resolved = ResolveUnixPath(fullPath);
             } catch (Win32Exception ex) when (ex.NativeErrorCode == 2) {
-                // Preserve validation of not-yet-created ordinary local paths.
-                return true;
+                // Preserve validation of not-yet-created ordinary local paths, but
+                // reject an existing parent whose canonical path reveals a symlink.
+                return HasOnlyDirectUnixAncestors(fullPath);
             }
-            return HtmlBrowserUnixFileSystemPath.IsRegularFileOrDirectory(resolved);
+            return AreEquivalentDirectUnixPaths(fullPath, resolved)
+                && HtmlBrowserUnixFileSystemPath.IsRegularFileOrDirectory(resolved);
         } catch {
             // Path safety checks fail closed before existence or content probes.
             return false;
         }
+    }
+
+    private static bool HasOnlyDirectUnixAncestors(string fullPath) {
+        string? ancestor = Path.GetDirectoryName(fullPath);
+        while (!string.IsNullOrEmpty(ancestor)) {
+            try {
+                string resolved = ResolveUnixPath(ancestor);
+                return AreEquivalentDirectUnixPaths(ancestor, resolved)
+                    && HtmlBrowserUnixFileSystemPath.IsRegularFileOrDirectory(resolved);
+            } catch (Win32Exception ex) when (ex.NativeErrorCode == 2) {
+                ancestor = Path.GetDirectoryName(ancestor);
+            }
+        }
+        return false;
+    }
+
+    private static bool AreEquivalentDirectUnixPaths(string requested, string resolved) {
+        if (requested.Length > 1) requested = requested.TrimEnd(Path.DirectorySeparatorChar);
+        if (resolved.Length > 1) resolved = resolved.TrimEnd(Path.DirectorySeparatorChar);
+        if (string.Equals(requested, resolved, StringComparison.Ordinal)) return true;
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return false;
+        // Darwin exposes these operating-system-owned compatibility roots through
+        // /private. Preserve ordinary temporary/configuration paths while rejecting
+        // mutable symlink components below them.
+        foreach (string root in new[] { "/etc", "/tmp", "/var" }) {
+            if ((string.Equals(requested, root, StringComparison.Ordinal)
+                 || requested.StartsWith(root + "/", StringComparison.Ordinal))
+                && string.Equals(resolved, "/private" + requested, StringComparison.Ordinal)) return true;
+        }
+        return false;
     }
 
     internal static bool IsNetworkOrDevicePath(string path) {

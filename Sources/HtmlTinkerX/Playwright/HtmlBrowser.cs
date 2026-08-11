@@ -286,13 +286,14 @@ public static partial class HtmlBrowser {
                 Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
                 if (await Task.WhenAny(contextCreation, deadline).ConfigureAwait(false) == contextCreation) {
                     IBrowserContext context = await contextCreation.ConfigureAwait(false);
-                    await context.CloseAsync().ConfigureAwait(false);
+                    Task close = context.CloseAsync();
+                    if (await Task.WhenAny(close, deadline).ConfigureAwait(false) == close) {
+                        await close.ConfigureAwait(false);
+                    } else {
+                        ObserveLateFault(close);
+                    }
                 } else {
-                    _ = contextCreation.ContinueWith(
-                        static completed => _ = completed.Exception,
-                        CancellationToken.None,
-                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
+                    ObserveLateFault(contextCreation);
                 }
             } finally {
                 // Disposing this local owner disconnects only the CDP client and guarantees
@@ -310,13 +311,14 @@ public static partial class HtmlBrowser {
                 Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
                 if (await Task.WhenAny(pageCreation, deadline).ConfigureAwait(false) == pageCreation) {
                     IPage page = await pageCreation.ConfigureAwait(false);
-                    await page.CloseAsync().ConfigureAwait(false);
+                    Task close = page.CloseAsync();
+                    if (await Task.WhenAny(close, deadline).ConfigureAwait(false) == close) {
+                        await close.ConfigureAwait(false);
+                    } else {
+                        ObserveLateFault(close);
+                    }
                 } else {
-                    _ = pageCreation.ContinueWith(
-                        static completed => _ = completed.Exception,
-                        CancellationToken.None,
-                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
+                    ObserveLateFault(pageCreation);
                 }
             } finally {
                 // Disposing the local Playwright owner only disconnects this CDP client. It
@@ -324,6 +326,13 @@ public static partial class HtmlBrowser {
                 playwrightOwner.Dispose();
             }
         });
+
+    private static void ObserveLateFault(Task task) =>
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
         if (setStorageState && !string.IsNullOrWhiteSpace(options.StorageStatePath)) {

@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 
 /// <summary>Classifies existing Unix browser sources without opening or reading their contents.</summary>
 internal static class HtmlBrowserUnixFileSystemPath {
+    private const int LinuxStatBufferSize = 256;
     private const int CurrentWorkingDirectory = -100;
     private const uint StatxType = 0x00000001;
     private const uint FileTypeMask = 0xF000;
@@ -38,9 +39,36 @@ internal static class HtmlBrowserUnixFileSystemPath {
             return true;
         }
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return false;
-        if (StatLinux(CurrentWorkingDirectory, path, 0, StatxType, out LinuxStat statx) != 0) return false;
-        mode = statx.Mode;
-        return true;
+        try {
+            if (StatLinux(CurrentWorkingDirectory, path, 0, StatxType, out LinuxStat statx) == 0) {
+                mode = statx.Mode;
+                return true;
+            }
+        } catch (EntryPointNotFoundException) {
+            // Older kernels/libcs and some Mono runtimes do not expose statx.
+        }
+        return TryGetLinuxStatMode(path, out mode);
+    }
+
+    internal static bool TryGetLinuxStatMode(string path, out uint mode) {
+        mode = 0;
+        IntPtr buffer = Marshal.AllocHGlobal(LinuxStatBufferSize);
+        try {
+            for (int offset = 0; offset < LinuxStatBufferSize; offset += sizeof(long)) {
+                Marshal.WriteInt64(buffer, offset, 0);
+            }
+            if (StatLinuxFallback(path, buffer) != 0) return false;
+            // Linux/glibc places st_mode at byte 24 on x86-64 and byte 16 on
+            // x86, ARM, and ARM64. Reading from an oversized native buffer avoids
+            // coupling the fallback to each architecture's complete struct stat.
+            int modeOffset = RuntimeInformation.ProcessArchitecture == Architecture.X64 ? 24 : 16;
+            mode = unchecked((uint)Marshal.ReadInt32(buffer, modeOffset));
+            return true;
+        } catch (EntryPointNotFoundException) {
+            return false;
+        } finally {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private static bool IsWithin(string path, string root) =>
@@ -63,4 +91,7 @@ internal static class HtmlBrowserUnixFileSystemPath {
 
     [DllImport("libc", EntryPoint = "statx", SetLastError = true)]
     private static extern int StatLinux(int directoryFileDescriptor, string path, int flags, uint mask, out LinuxStat stat);
+
+    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
+    private static extern int StatLinuxFallback(string path, IntPtr stat);
 }

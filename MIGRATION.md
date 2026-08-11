@@ -29,11 +29,13 @@ Initial navigation uses `HtmlBrowserPdfRequest.NavigationTimeout`. `HtmlBrowserP
 
 `HtmlBrowserPdfRequest.PdfTimeout` independently bounds Chromium PDF generation and also defaults to 30 seconds. A PDF timeout aborts and recycles the affected browser without replaying the capture.
 
+`HtmlBrowserPdfRequest.MaximumPdfBytes` defaults to 128 MiB. The pooled renderer uses Chromium's streaming PDF transport and stops reading once the configured limit is reached. Set the value to zero only when a trusted workload intentionally needs the legacy unbounded `PdfAsync` behavior.
+
 Per-render headers and local/session storage are limited to the source origin. HTML-string capture must provide an absolute HTTP or HTTPS `baseUri` when using those values; HtmlTinkerX navigates the supplied markup at that origin while still resolving relative resources from the base URI. This prevents credentials from being broadcast to cross-origin frames and resources.
 
 Per-render headers apply to same-origin HTTP(S) page and popup, subresource, and dedicated-worker requests. Browser WebSocket handshakes do not support arbitrary request headers; use scoped cookies or page authentication state when a WS/WSS endpoint requires credentials.
 
-Browser file inputs now require local paths. UNC/device paths are rejected on every platform. Windows mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are rejected before file content is probed, while Unix paths retain canonical containment checks. Public-network and host-filtered renderer policies also disable non-proxied WebRTC UDP and QUIC; opt into private-network access only when the page is trusted to use those transports.
+Browser file inputs now require local paths. UNC/device paths are rejected on every platform. Windows mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are rejected before file content is probed. User-controlled Unix symbolic-link components are rejected too. Public-network and host-filtered renderer policies also disable non-proxied WebRTC UDP and QUIC; opt into private-network access only when the page is trusted to use those transports.
 
 ## Already-loaded pages
 

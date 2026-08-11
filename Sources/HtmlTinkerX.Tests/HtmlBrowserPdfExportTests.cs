@@ -216,6 +216,46 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task CdpContextCleanupBoundsTheClosePhase() {
+        TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> ownerDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(pendingClose.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(value => value.Dispose()).Callback(() => ownerDisposed.TrySetResult(true));
+
+        HtmlBrowser.CloseContextWhenCreated(
+            Task.FromResult(context.Object),
+            playwright.Object,
+            TimeSpan.FromMilliseconds(25));
+
+        Assert.Same(ownerDisposed.Task, await Task.WhenAny(ownerDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+        Assert.False(pendingClose.Task.IsCompleted);
+        context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Once);
+        playwright.Verify(value => value.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CdpPageCleanupBoundsTheClosePhase() {
+        TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> ownerDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var page = new Mock<IPage>();
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(pendingClose.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(value => value.Dispose()).Callback(() => ownerDisposed.TrySetResult(true));
+
+        HtmlBrowser.ClosePageWhenCreated(
+            Task.FromResult(page.Object),
+            playwright.Object,
+            TimeSpan.FromMilliseconds(25));
+
+        Assert.Same(ownerDisposed.Task, await Task.WhenAny(ownerDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+        Assert.False(pendingClose.Task.IsCompleted);
+        page.Verify(value => value.CloseAsync(It.IsAny<PageCloseOptions>()), Times.Once);
+        playwright.Verify(value => value.Dispose(), Times.Once);
+    }
+
+    [Fact]
     public async Task OpenSessionAsync_CdpRejectsIgnoreHttpsErrorsBecauseExistingContextsCannotBeReconfigured() {
         HtmlBrowserLaunchOptions options = new() {
             CdpEndpointUrl = "http://127.0.0.1:9222",
