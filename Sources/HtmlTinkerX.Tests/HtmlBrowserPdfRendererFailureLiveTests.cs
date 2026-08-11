@@ -35,6 +35,42 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task LateBrowserProvisioningBoundsCloseAndAlwaysDisposesPlaywright() {
+        TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> playwrightDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(value => value.IsConnected).Returns(true);
+        browser.Setup(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>())).Returns(pendingClose.Task);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>())).Returns(pendingBrowser.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        playwright.Setup(value => value.Dispose()).Callback(() => playwrightDisposed.TrySetResult(true));
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        try {
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                minimumBrowserInstances: 1,
+                maximumBrowserInstances: 1,
+                setupTimeout: TimeSpan.FromMilliseconds(25),
+                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+            await Assert.ThrowsAsync<TimeoutException>(() => renderer.PreWarmAsync());
+            pendingBrowser.SetResult(browser.Object);
+
+            Assert.Same(
+                playwrightDisposed.Task,
+                await Task.WhenAny(playwrightDisposed.Task, Task.Delay(TimeSpan.FromSeconds(4))));
+            Assert.False(pendingClose.Task.IsCompleted);
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Once);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            pendingClose.TrySetResult(true);
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task SetupDeadlineIncludesBrowserProvisioningBeforeASlotExists() {
         TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var browserType = new Mock<IBrowserType>();

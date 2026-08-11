@@ -158,6 +158,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         IBrowserContext? context = null;
         HtmlBrowserScopedHeaderInterceptor? scopedHeaders = null;
         HtmlBrowserPopupHeaderCoordinator? popupCoordinator = null;
+        HtmlBrowserStorageInitialization? storageInitialization = null;
         try {
             Func<IRoute, Task> policyRoute = async route => {
                 bool allowed;
@@ -199,7 +200,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     () => AddCookiesAsync(context, page, request.Cookies),
                     setupCancellationToken).ConfigureAwait(false);
                 page.SetDefaultTimeout(request.Readiness.Timeout);
-                await ExecuteCancellablePageOperationAsync(
+                storageInitialization = await ExecuteCancellablePageOperationAsync(
                     page,
                     () => HtmlBrowserStorageInitializer.AddAsync(page, request),
                     setupCancellationToken).ConfigureAwait(false);
@@ -236,6 +237,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
             }
             long navigationStarted = Stopwatch.GetTimestamp();
             await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
+            if (storageInitialization != null) {
+                await ExecuteCancellablePageOperationAsync(
+                    page,
+                    () => storageInitialization.ValidateAsync(page),
+                    cancellationToken).ConfigureAwait(false);
+            }
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
             long readinessStarted = Stopwatch.GetTimestamp();
@@ -550,6 +557,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
     private static async Task ExecuteCancellablePageOperationAsync(IPage page, Func<Task> operation, CancellationToken cancellationToken) {
         await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => page.CloseAsync(), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<T> ExecuteCancellablePageOperationAsync<T>(IPage page, Func<Task<T>> operation, CancellationToken cancellationToken) {
+        return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => page.CloseAsync(), cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<T> ExecuteCancellableSlotOperationAsync<T>(BrowserSlot slot, Func<Task<T>> operation, CancellationToken cancellationToken) {

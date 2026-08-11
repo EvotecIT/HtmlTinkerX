@@ -162,16 +162,35 @@ public static partial class HtmlBrowser {
             token
         });
         ICDPSession session = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
-        List<int> executionContexts = new();
+        List<VisualMaskExecutionContext> executionContexts = new();
         try {
-            JsonElement? treeResult = await session.SendAsync("Page.getFrameTree").ConfigureAwait(false);
-            if (!treeResult.HasValue || !treeResult.Value.TryGetProperty("frameTree", out JsonElement frameTree)) {
-                throw new PlaywrightException("Chromium did not return a frame tree for visual masking.");
-            }
-            List<string> frameIds = new();
-            AddFrameIds(frameTree, frameIds);
+            IReadOnlyList<string> frameIds = await GetFrameIdsAsync(session).ConfigureAwait(false);
             foreach (string frameId in frameIds) {
                 cancellationToken.ThrowIfCancellationRequested();
+                VisualMaskExecutionContext? executionContext = await ApplyVisualMaskToFrameAsync(
+                    session,
+                    frameId,
+                    arguments).ConfigureAwait(false);
+                if (executionContext.HasValue) executionContexts.Add(executionContext.Value);
+            }
+        } catch (Exception setupError) {
+            Exception? cleanupError = null;
+            try { await RemoveTemporaryVisualMaskAsync(session, executionContexts, token).ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = error; }
+            try { await session.DetachAsync().ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            if (cleanupError != null) throw new AggregateException(setupError, cleanupError);
+            throw;
+        }
+        return new TemporaryVisualMask(session, executionContexts, token);
+    }
+
+    private static async Task<VisualMaskExecutionContext?> ApplyVisualMaskToFrameAsync(
+        ICDPSession session,
+        string frameId,
+        string arguments) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
                 JsonElement? worldResult = await session.SendAsync("Page.createIsolatedWorld", new Dictionary<string, object> {
                     ["frameId"] = frameId,
                     ["worldName"] = "HtmlTinkerX.VisualMask",
@@ -183,15 +202,27 @@ public static partial class HtmlBrowser {
                     throw new PlaywrightException("Chromium did not create an isolated execution world for visual masking.");
                 }
                 await EvaluateInIsolatedWorldAsync(session, contextId, $"({ApplyVisualMaskScript})({arguments})").ConfigureAwait(false);
-                executionContexts.Add(contextId);
+                return new VisualMaskExecutionContext(frameId, contextId);
+            } catch (PlaywrightException) {
+                if (!await IsFramePresentAsync(session, frameId).ConfigureAwait(false)) return null;
+                if (attempt != 0) throw;
             }
-        } catch {
-            try { await RemoveTemporaryVisualMaskAsync(session, executionContexts, token).ConfigureAwait(false); } catch (PlaywrightException) { }
-            try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
-            throw;
         }
-        return new TemporaryVisualMask(session, executionContexts, token);
+        return null;
     }
+
+    private static async Task<IReadOnlyList<string>> GetFrameIdsAsync(ICDPSession session) {
+        JsonElement? treeResult = await session.SendAsync("Page.getFrameTree").ConfigureAwait(false);
+        if (!treeResult.HasValue || !treeResult.Value.TryGetProperty("frameTree", out JsonElement frameTree)) {
+            throw new PlaywrightException("Chromium did not return a frame tree for visual masking.");
+        }
+        List<string> frameIds = new();
+        AddFrameIds(frameTree, frameIds);
+        return frameIds;
+    }
+
+    private static async Task<bool> IsFramePresentAsync(ICDPSession session, string frameId) =>
+        (await GetFrameIdsAsync(session).ConfigureAwait(false)).Contains(frameId, StringComparer.Ordinal);
 
     private static void AddFrameIds(JsonElement frameTree, List<string> frameIds) {
         if (frameTree.TryGetProperty("frame", out JsonElement frame)
@@ -220,7 +251,10 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static async Task RemoveTemporaryVisualMaskAsync(ICDPSession session, IReadOnlyList<int> executionContexts, string token) {
+    private static async Task RemoveTemporaryVisualMaskAsync(
+        ICDPSession session,
+        IReadOnlyList<VisualMaskExecutionContext> executionContexts,
+        string token) {
         const string restoreScript =
             @"({ token }) => {
                 const stateKey = 'htmltinkerxVisualMask' + token;
@@ -238,22 +272,45 @@ public static partial class HtmlBrowser {
                 delete globalThis[stateKey];
             }";
         string arguments = JsonSerializer.Serialize(new { token });
-        foreach (int executionContext in executionContexts) {
+        foreach (VisualMaskExecutionContext executionContext in executionContexts) {
             try {
-                await EvaluateInIsolatedWorldAsync(session, executionContext, $"({restoreScript})({arguments})").ConfigureAwait(false);
-            } catch (PlaywrightException) {
-                // Detached or navigated frames no longer contain the masked document.
+                await EvaluateInIsolatedWorldAsync(
+                    session,
+                    executionContext.ExecutionContextId,
+                    $"({restoreScript})({arguments})").ConfigureAwait(false);
+            } catch (PlaywrightException error) {
+                if (!await IsFramePresentAsync(session, executionContext.FrameId).ConfigureAwait(false)
+                    || IsMissingExecutionContext(error)) continue;
+                throw;
             }
         }
     }
 
+    private static bool IsMissingExecutionContext(PlaywrightException error) =>
+        error.Message.IndexOf("Cannot find context with specified id", StringComparison.OrdinalIgnoreCase) >= 0
+        || error.Message.IndexOf("Execution context was destroyed", StringComparison.OrdinalIgnoreCase) >= 0
+        || error.Message.IndexOf("Cannot find execution context", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private readonly struct VisualMaskExecutionContext {
+        internal VisualMaskExecutionContext(string frameId, int executionContextId) {
+            FrameId = frameId;
+            ExecutionContextId = executionContextId;
+        }
+
+        internal string FrameId { get; }
+        internal int ExecutionContextId { get; }
+    }
+
     private sealed class TemporaryVisualMask : IAsyncDisposable {
         private readonly ICDPSession _session;
-        private readonly IReadOnlyList<int> _executionContexts;
+        private readonly IReadOnlyList<VisualMaskExecutionContext> _executionContexts;
         private readonly string _token;
         private int _disposed;
 
-        internal TemporaryVisualMask(ICDPSession session, IReadOnlyList<int> executionContexts, string token) {
+        internal TemporaryVisualMask(
+            ICDPSession session,
+            IReadOnlyList<VisualMaskExecutionContext> executionContexts,
+            string token) {
             _session = session;
             _executionContexts = executionContexts;
             _token = token;
@@ -261,11 +318,12 @@ public static partial class HtmlBrowser {
 
         public async ValueTask DisposeAsync() {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-            try {
-                await RemoveTemporaryVisualMaskAsync(_session, _executionContexts, _token).ConfigureAwait(false);
-            } finally {
-                await _session.DetachAsync().ConfigureAwait(false);
-            }
+            Exception? cleanupError = null;
+            try { await RemoveTemporaryVisualMaskAsync(_session, _executionContexts, _token).ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = error; }
+            try { await _session.DetachAsync().ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            if (cleanupError != null) throw cleanupError;
         }
     }
 }

@@ -7,8 +7,26 @@
     const originalOpen = window.open;
     const originalSubmit = HTMLFormElement.prototype.submit;
     const originalAddEventListener = EventTarget.prototype.addEventListener;
+    const originalRemoveEventListener = EventTarget.prototype.removeEventListener;
+    const originalPreventDefault = Event.prototype.preventDefault;
+    const defaultPreventedDescriptor = Object.getOwnPropertyDescriptor(Event.prototype, 'defaultPrevented');
+    const internallyCancelledEvents = new WeakSet();
+    const pageCancelledEvents = new WeakSet();
     const specialTargets = ['_self', '_parent', '_top'];
     const imageSubmitCoordinates = new WeakMap();
+
+    Event.prototype.preventDefault = function() {
+        pageCancelledEvents.add(this);
+        return originalPreventDefault.call(this);
+    };
+    Object.defineProperty(Event.prototype, 'defaultPrevented', {
+        ...defaultPreventedDescriptor,
+        get() {
+            return internallyCancelledEvents.has(this)
+                ? pageCancelledEvents.has(this)
+                : defaultPreventedDescriptor.get.call(this);
+        }
+    });
 
     const normalizedTarget = target => target == null || String(target).length === 0
         ? '_blank'
@@ -141,9 +159,7 @@
                             };
                             const initialResult = invoke();
                             if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
-                            let currentResult = initialResult;
-                            if (!ready) queued.push(() => { currentResult = invoke(); });
-                            return stagedObject(() => currentResult);
+                            return stagedObject(() => initialResult);
                         }
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;
@@ -174,7 +190,8 @@
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
                 if (property === 'document') return documentFacade;
-                return Reflect.get(targetWindow, property, targetWindow);
+                const value = Reflect.get(targetWindow, property, targetWindow);
+                return typeof value === 'function' ? value.bind(targetWindow) : value;
             },
             set(targetWindow, property, value) {
                 if (property === 'location') {
@@ -300,12 +317,9 @@
     };
 
     const deferPopupFormSubmission = (form, submitter, submit) => {
+        if (!canDeferPopupFormSubmission(form, submitter)) return false;
         const target = effectiveTarget(form, submitter);
         const normalized = normalizedDeclarativeTarget(target);
-        if (specialTargets.includes(normalized)) return false;
-        if (targetsExistingFrame(target)) return false;
-        const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
-        if (action.origin !== location.origin || String(submitter?.formMethod || form.method).toLowerCase() === 'dialog') return false;
 
         const popup = originalOpen.call(window, '', target);
         if (!popup) return false;
@@ -342,6 +356,15 @@
             }
         });
         return true;
+    };
+
+    const canDeferPopupFormSubmission = (form, submitter) => {
+        const target = effectiveTarget(form, submitter);
+        const normalized = normalizedDeclarativeTarget(target);
+        if (specialTargets.includes(normalized) || targetsExistingFrame(target)) return false;
+        const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
+        return action.origin === location.origin
+            && String(submitter?.formMethod || form.method).toLowerCase() !== 'dialog';
     };
 
     const submitWithoutRedispatch = (form, submitter) => {
@@ -411,17 +434,57 @@
         }
     };
 
-    const afterPageWindowHandlers = (type, handler) => {
+    const afterPagePropagationHandlers = (type, shouldStage, handler) => {
         originalAddEventListener.call(window, type, event => {
-            originalAddEventListener.call(window, type, current => {
-                if (current === event) handler(current);
-            }, { capture: false, once: true });
+            const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target, document, window];
+            let staged = false;
+            const observer = current => {
+                if (current !== event || staged || !shouldStage(current)) return;
+                staged = true;
+                internallyCancelledEvents.add(current);
+                originalPreventDefault.call(current);
+                globalThis.queueMicrotask(() => {
+                    try { handler(current); }
+                    finally {
+                        internallyCancelledEvents.delete(current);
+                        pageCancelledEvents.delete(current);
+                    }
+                });
+            };
+            for (const target of path) {
+                if (target && typeof target.addEventListener === 'function') {
+                    originalAddEventListener.call(target, type, observer, { capture: false, once: true });
+                }
+            }
+            globalThis.queueMicrotask(() => {
+                for (const target of path) {
+                    if (target && typeof target.removeEventListener === 'function') {
+                        originalRemoveEventListener.call(target, type, observer, false);
+                    }
+                }
+            });
         }, true);
     };
 
-    afterPageWindowHandlers('click', event => {
-        if (event.defaultPrevented || event.button !== 0) return;
+    const stagedClickAnchor = event => {
+        if (event.button !== 0) return null;
         const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+        const anchor = path.find(node => node instanceof HTMLAnchorElement)
+            || (event.target instanceof Element ? event.target.closest('a[href]') : null);
+        if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download')) return null;
+        const target = effectiveTarget(anchor, null);
+        const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
+        const destination = new URL(anchor.href, document.baseURI);
+        if (!explicitlyCurrent
+            && (specialTargets.includes(normalizedDeclarativeTarget(target)) || destination.origin !== location.origin)) return null;
+        return { anchor, target, explicitlyCurrent, destination, path };
+    };
+
+    afterPagePropagationHandlers('click', event => stagedClickAnchor(event) !== null, event => {
+        if (event.defaultPrevented) return;
+        const staged = stagedClickAnchor(event);
+        if (staged === null) return;
+        const { anchor, target, explicitlyCurrent, destination, path } = staged;
         const imageSubmitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
         if (imageSubmitter instanceof HTMLInputElement) {
             imageSubmitCoordinates.set(imageSubmitter, {
@@ -429,21 +492,11 @@
                 y: Math.max(0, Math.floor(event.offsetY || 0))
             });
         }
-        const anchor = path.find(node => node instanceof HTMLAnchorElement)
-            || (event.target instanceof Element ? event.target.closest('a[href]') : null);
-        if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download')) return;
-        const target = effectiveTarget(anchor, null);
-        const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
-        const destination = new URL(anchor.href, document.baseURI);
         if (explicitlyCurrent) {
-            event.preventDefault();
             originalOpen.call(window, destination.href, '_self');
             return;
         }
-        if (specialTargets.includes(normalizedDeclarativeTarget(target))) return;
-        if (destination.origin !== location.origin) return;
 
-        event.preventDefault();
         const rel = anchor.relList;
         const features = rel.contains('noreferrer')
             ? 'noreferrer'
@@ -451,16 +504,21 @@
         openWithReferrerPolicy.call(window, destination.href, target, features, anchor.referrerPolicy || '');
     });
 
-    afterPageWindowHandlers('submit', event => {
+    afterPagePropagationHandlers('submit', event => {
         const form = event.target;
-        if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
+        if (!(form instanceof HTMLFormElement)) return false;
+        const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+        return hasExplicitEmptyTarget(form, submitter) || canDeferPopupFormSubmission(form, submitter);
+    }, event => {
+        if (event.defaultPrevented) return;
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
         if (hasExplicitEmptyTarget(form, submitter)) {
-            event.preventDefault();
             submitInCurrentContext(form, () => submitWithoutRedispatch(form, submitter));
             return;
         }
-        if (deferPopupFormSubmission(form, submitter, () => submitWithoutRedispatch(form, submitter))) event.preventDefault();
+        deferPopupFormSubmission(form, submitter, () => submitWithoutRedispatch(form, submitter));
     });
 
     HTMLFormElement.prototype.submit = function() {

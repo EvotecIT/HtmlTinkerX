@@ -31,7 +31,7 @@ Initial navigation uses `HtmlBrowserPdfRequest.NavigationTimeout`. `HtmlBrowserP
 
 `HtmlBrowserPdfRequest.MaximumPdfBytes` defaults to 128 MiB. The pooled renderer uses Chromium's streaming PDF transport and stops reading once the configured limit is reached. Set the value to zero only when a trusted workload intentionally needs the legacy unbounded `PdfAsync` behavior.
 
-Per-render headers and local/session storage are limited to the source origin. HTML-string capture must provide an absolute HTTP or HTTPS `baseUri` when using those values; HtmlTinkerX navigates the supplied markup at that origin while still resolving relative resources from the base URI. This prevents credentials from being broadcast to cross-origin frames and resources.
+Per-render headers and local/session storage are limited to the source origin. HTML-string capture must provide an absolute HTTP or HTTPS `baseUri` when using those values; HtmlTinkerX navigates the supplied markup at that origin while still resolving relative resources from the base URI. This prevents credentials from being broadcast to cross-origin frames and resources. Capture now fails when Chromium rejects a requested storage entry because of origin policy or quota, rather than continuing with partially initialized application state.
 
 Per-render headers apply to same-origin HTTP(S) page and popup, subresource, and dedicated-worker requests. Browser WebSocket handshakes do not support arbitrary request headers; use scoped cookies or page authentication state when a WS/WSS endpoint requires credentials.
 

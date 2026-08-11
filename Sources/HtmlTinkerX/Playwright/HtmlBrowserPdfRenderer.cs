@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 /// isolated per-render contexts, recycling, cancellation, and lifecycle metrics.
 /// </summary>
 public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
+    private static readonly TimeSpan BrowserCloseDeadline = TimeSpan.FromSeconds(2);
     private readonly HtmlBrowserPdfRendererOptions _options;
     private readonly HtmlBrowserNetworkPolicyEvaluator _networkPolicy;
     private readonly SemaphoreSlim _admissionGate;
@@ -168,7 +169,11 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     private static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserWithCancellationAsync(
         HtmlBrowserLaunchOptions launchOptions,
         CancellationToken cancellationToken) {
-        Task<(IPlaywright Playwright, IBrowser Browser)> launch = HtmlBrowser.LaunchBrowserAsync(launchOptions, cancellationToken);
+        // The renderer owns setup cancellation. Let the underlying launch settle so a browser
+        // that appears after the deadline can still be closed before its Playwright owner is disposed.
+        Task<(IPlaywright Playwright, IBrowser Browser)> launch = HtmlBrowser.LaunchBrowserAsync(
+            launchOptions,
+            CancellationToken.None);
         if (!cancellationToken.CanBeCanceled || launch.IsCompleted) return await launch.ConfigureAwait(false);
 
         TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -180,8 +185,14 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
                 static async completed => {
                     if (completed.Status == TaskStatus.RanToCompletion) {
                         (IPlaywright playwright, IBrowser browser) = completed.Result;
-                        try { if (browser.IsConnected) await browser.CloseAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
-                        playwright.Dispose();
+                        try {
+                            await CloseBrowserWithinDeadlineAsync(browser).ConfigureAwait(false);
+                        } catch (Exception) {
+                            // The cancelled operation has already returned. Late browser cleanup
+                            // is best-effort, but the Playwright transport must always be released.
+                        } finally {
+                            playwright.Dispose();
+                        }
                     } else if (completed.IsFaulted) {
                         _ = completed.Exception;
                     }
@@ -192,6 +203,16 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
             cancellationToken.ThrowIfCancellationRequested();
         }
         return await launch.ConfigureAwait(false);
+    }
+
+    private static async Task CloseBrowserWithinDeadlineAsync(IBrowser browser) {
+        if (!browser.IsConnected) return;
+        Task close = browser.CloseAsync();
+        if (await Task.WhenAny(close, Task.Delay(BrowserCloseDeadline)).ConfigureAwait(false) == close) {
+            await close.ConfigureAwait(false);
+        } else {
+            _ = close.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        }
     }
 
     private async Task ReturnSlotAsync(BrowserSlot slot) {
@@ -295,14 +316,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         public async ValueTask DisposeAsync() {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             try {
-                if (Browser.IsConnected) {
-                    Task close = Browser.CloseAsync();
-                    if (await Task.WhenAny(close, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) == close) {
-                        await close.ConfigureAwait(false);
-                    } else {
-                        _ = close.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
-                    }
-                }
+                await CloseBrowserWithinDeadlineAsync(Browser).ConfigureAwait(false);
             } catch (Exception) {
                 // A crashed browser is already closed from the renderer's perspective.
             } finally {

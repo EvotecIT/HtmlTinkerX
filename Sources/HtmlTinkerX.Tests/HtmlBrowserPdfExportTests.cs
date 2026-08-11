@@ -396,6 +396,78 @@ public class HtmlBrowserPdfExportTests {
         page.Verify(value => value.PdfAsync(It.IsAny<PagePdfOptions>()), Times.Never);
     }
 
+    [Fact]
+    public async Task MaskApplicationSkipsAFrameThatDetachesAfterTheFrameSnapshot() {
+        int frameTreeReads = 0;
+        var cdp = new Mock<ICDPSession>();
+        cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+                "Page.getFrameTree" when Interlocked.Increment(ref frameTreeReads) == 1 =>
+                    Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""},""childFrames"":[{""frame"":{""id"":""detached""}}]}}")),
+                "Page.getFrameTree" =>
+                    Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
+                "Page.createIsolatedWorld" when arguments != null && (string)arguments["frameId"] == "detached" =>
+                    Task.FromException<JsonElement?>(new PlaywrightException("No frame with given id found")),
+                "Page.createIsolatedWorld" =>
+                    Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
+                _ => Task.FromResult<JsonElement?>(null)
+            });
+        cdp.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(cdp.Object);
+        page.SetupGet(value => value.Context).Returns(context.Object);
+
+        string result = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            page.Object,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#000000",
+            action: () => Task.FromResult("captured"),
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal("captured", result);
+        Assert.Equal(2, frameTreeReads);
+    }
+
+    [Fact]
+    public async Task MaskCleanupPropagatesRestorationFailureForALiveFrame() {
+        int frameTreeReads = 0;
+        var cdp = new Mock<ICDPSession>();
+        cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+                "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
+                "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
+                "Runtime.evaluate" when arguments != null
+                    && arguments.TryGetValue("expression", out object? expression)
+                    && expression.ToString()!.Contains("delete globalThis[stateKey]", StringComparison.Ordinal) =>
+                        Task.FromException<JsonElement?>(new PlaywrightException("Transient CDP restore failure")),
+                _ => Task.FromResult<JsonElement?>(null)
+            })
+            .Callback<string, Dictionary<string, object>?>((method, _) => {
+                if (method == "Page.getFrameTree") Interlocked.Increment(ref frameTreeReads);
+            });
+        cdp.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(cdp.Object);
+        page.SetupGet(value => value.Context).Returns(context.Object);
+        page.SetupGet(value => value.IsClosed).Returns(false);
+
+        PlaywrightException exception = await Assert.ThrowsAsync<PlaywrightException>(() =>
+            HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+                page.Object,
+                maskSensitiveElements: false,
+                maskSelectors: new[] { "#secret" },
+                maskColor: "#000000",
+                action: () => Task.FromResult(true),
+                cancellationToken: CancellationToken.None));
+
+        Assert.Contains("restore failure", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, frameTreeReads);
+        cdp.Verify(value => value.DetachAsync(), Times.Once);
+    }
+
     private static JsonElement ParseJson(string json) {
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
