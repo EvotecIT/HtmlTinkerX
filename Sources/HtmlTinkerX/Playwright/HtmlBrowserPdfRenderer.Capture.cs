@@ -70,6 +70,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             queueDuration,
                             retried,
                             operationToken).ConfigureAwait(false);
+                    } catch (TimeoutException) {
+                        throw;
                     } catch (Exception) when (attempt == 0 && !operationToken.IsCancellationRequested && IsBrowserProcessFailure(slot)) {
                         retried = true;
                         returnSlot = false;
@@ -130,6 +132,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
         BrowserNewContextOptions contextOptions = CreateContextOptions(request);
         IBrowserContext? context = null;
+        HtmlBrowserPopupHeaderCoordinator? popupHeaders = null;
         try {
             context = await ExecuteCancellableSlotOperationAsync(
                 slot,
@@ -149,7 +152,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }
 
                 if (allowed) {
-                    await route.ContinueAsync().ConfigureAwait(false);
+                    if (popupHeaders?.RequiresDocumentBridge(route.Request) == true) {
+                        await popupHeaders.ContinueInitialDocumentAsync(route).ConfigureAwait(false);
+                    } else {
+                        await route.ContinueAsync().ConfigureAwait(false);
+                    }
                     return;
                 }
 
@@ -164,16 +171,15 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 slot,
                 () => AddCookiesAsync(context, request.Cookies),
                 cancellationToken).ConfigureAwait(false);
-            await ExecuteCancellableSlotOperationAsync(
-                slot,
-                () => HtmlBrowserStorageInitializer.AddAsync(context, request),
-                cancellationToken).ConfigureAwait(false);
-
             IPage page = await ExecuteCancellableSlotOperationAsync(
                 slot,
                 () => context.NewPageAsync(),
                 cancellationToken).ConfigureAwait(false);
             page.SetDefaultTimeout(request.Readiness.Timeout);
+            await ExecuteCancellablePageOperationAsync(
+                page,
+                () => HtmlBrowserStorageInitializer.AddAsync(page, request),
+                cancellationToken).ConfigureAwait(false);
             await using HtmlBrowserScopedHeaderInterceptor? scopedHeaders = request.Headers.Count == 0
                 ? null
                 : await ExecuteCancellableSlotOperationAsync(
@@ -185,6 +191,21 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         request.Headers,
                         cancellationToken),
                     cancellationToken).ConfigureAwait(false);
+            await using HtmlBrowserPopupHeaderCoordinator? popupCoordinator = request.Headers.Count == 0
+                ? null
+                : new HtmlBrowserPopupHeaderCoordinator(
+                    context,
+                    page,
+                    request.Source.SecurityOrigin,
+                    request.Headers,
+                    cancellationToken);
+            popupHeaders = popupCoordinator;
+            if (popupCoordinator != null) {
+                await ExecuteCancellablePageOperationAsync(
+                    page,
+                    () => HtmlBrowserPopupHeaderCoordinator.AddNavigationShimAsync(page),
+                    cancellationToken).ConfigureAwait(false);
+            }
             long navigationStarted = Stopwatch.GetTimestamp();
             await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
@@ -195,16 +216,26 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
             PagePdfOptions pdfOptions = HtmlBrowserPdfCapture.CreatePageOptions(request.PdfOptions);
             long pdfStarted = Stopwatch.GetTimestamp();
-            byte[] bytes = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                () => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
-                    page,
-                    request.PdfOptions.MaskSensitiveElements,
-                    request.PdfOptions.MaskSelectors,
-                    request.PdfOptions.MaskColor,
-                    () => page.PdfAsync(pdfOptions),
-                    cancellationToken),
-                () => AbortSlotAsync(slot),
-                cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource? pdfDeadline = request.PdfTimeout == 0
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pdfDeadline?.CancelAfter(request.PdfTimeout);
+            byte[] bytes;
+            try {
+                CancellationToken pdfToken = pdfDeadline?.Token ?? cancellationToken;
+                bytes = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    () => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+                        page,
+                        request.PdfOptions.MaskSensitiveElements,
+                        request.PdfOptions.MaskSelectors,
+                        request.PdfOptions.MaskColor,
+                        () => page.PdfAsync(pdfOptions),
+                        pdfToken),
+                    () => AbortSlotAsync(slot),
+                    pdfToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && pdfDeadline?.IsCancellationRequested == true) {
+                throw new TimeoutException($"Chromium PDF generation did not complete within {request.PdfTimeout} ms.");
+            }
             TimeSpan pdfDuration = StopwatchElapsed(pdfStarted);
 
             if (bytes.Length == 0) warnings.Add("Chromium returned an empty PDF payload.");
@@ -265,6 +296,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
         string? target = source.Kind switch {
             HtmlBrowserPdfSourceKind.Url => source.Uri!.AbsoluteUri,
             HtmlBrowserPdfSourceKind.File => new Uri(source.FilePath!).AbsoluteUri,
+            HtmlBrowserPdfSourceKind.Html when source.BaseUri?.IsFile == true && fileDirectory != null =>
+                new Uri(Path.GetFullPath(fileDirectory) + Path.DirectorySeparatorChar).AbsoluteUri,
             _ => source.BaseUri?.AbsoluteUri
         };
         if (source.Kind == HtmlBrowserPdfSourceKind.File) {

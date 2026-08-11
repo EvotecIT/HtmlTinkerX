@@ -51,10 +51,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         session.Event("Target.detachedFromTarget").OnEvent += interceptor._targetDetachedHandler;
         try {
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
-                ["patterns"] = new[] {
-                    new Dictionary<string, object> { ["urlPattern"] = "http://*/*", ["requestStage"] = "Request" },
-                    new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
-                }
+                ["patterns"] = CreateFetchPatterns()
             }).ConfigureAwait(false);
             await session.SendAsync("Target.setAutoAttach", new Dictionary<string, object> {
                 ["autoAttach"] = true,
@@ -68,10 +65,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             cancellationToken.ThrowIfCancellationRequested();
             return interceptor;
         } catch {
-            session.Event("Fetch.requestPaused").OnEvent -= interceptor._handler;
-            session.Event("Target.attachedToTarget").OnEvent -= interceptor._targetAttachedHandler;
-            session.Event("Target.receivedMessageFromTarget").OnEvent -= interceptor._targetMessageHandler;
-            session.Event("Target.detachedFromTarget").OnEvent -= interceptor._targetDetachedHandler;
+            interceptor.Unsubscribe();
             try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
             throw;
         }
@@ -123,15 +117,17 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private async Task ConfigureWorkerAsync(string sessionId) {
         try {
             await SendWorkerCommandAsync(sessionId, "Fetch.enable", new Dictionary<string, object> {
-                ["patterns"] = new[] {
-                    new Dictionary<string, object> { ["urlPattern"] = "http://*/*", ["requestStage"] = "Request" },
-                    new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
-                }
+                ["patterns"] = CreateFetchPatterns()
             }).ConfigureAwait(false);
         } finally {
             await SendWorkerCommandAsync(sessionId, "Runtime.runIfWaitingForDebugger", new Dictionary<string, object>()).ConfigureAwait(false);
         }
     }
+
+    private static object[] CreateFetchPatterns() => new object[] {
+        new Dictionary<string, object> { ["urlPattern"] = "http://*/*", ["requestStage"] = "Request" },
+        new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
+    };
 
     private async Task ContinueRequestAsync(JsonElement payload, string? workerSessionId) {
         string requestId = payload.GetProperty("requestId").GetString()!;
@@ -150,8 +146,6 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                     ["value"] = header.Value
                 }).ToArray();
             }
-            // CDP request overrides apply only to this hop and do not extend to redirects.
-            // Continuing other origins without a headers argument preserves page-owned values.
             await SendCommandAsync(workerSessionId, "Fetch.continueRequest", continueArguments).ConfigureAwait(false);
         } catch (Exception) {
             try {
@@ -159,9 +153,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                     ["requestId"] = requestId,
                     ["errorReason"] = "Failed"
                 }).ConfigureAwait(false);
-            } catch (PlaywrightException) {
-                // The target can close while a paused request is being failed.
-            }
+            } catch (PlaywrightException) { }
             throw;
         }
     }
@@ -192,10 +184,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _session.Event("Fetch.requestPaused").OnEvent -= _handler;
-        _session.Event("Target.attachedToTarget").OnEvent -= _targetAttachedHandler;
-        _session.Event("Target.receivedMessageFromTarget").OnEvent -= _targetMessageHandler;
-        _session.Event("Target.detachedFromTarget").OnEvent -= _targetDetachedHandler;
+        Unsubscribe();
         try {
             await _session.SendAsync("Target.setAutoAttach", new Dictionary<string, object> {
                 ["autoAttach"] = false,
@@ -218,5 +207,12 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (PlaywrightException) { }
         }
         try { await _session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
+    }
+
+    private void Unsubscribe() {
+        _session.Event("Fetch.requestPaused").OnEvent -= _handler;
+        _session.Event("Target.attachedToTarget").OnEvent -= _targetAttachedHandler;
+        _session.Event("Target.receivedMessageFromTarget").OnEvent -= _targetMessageHandler;
+        _session.Event("Target.detachedFromTarget").OnEvent -= _targetDetachedHandler;
     }
 }

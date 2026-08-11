@@ -103,11 +103,16 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             HtmlBrowserPdfSource.FromHtml("<p>timeouts</p>"),
             readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 50),
             navigationTimeout: 2000,
-            beforeCaptureScriptTimeout: 75);
+            beforeCaptureScriptTimeout: 75,
+            pdfTimeout: 125);
 
         Assert.Equal(50, request.Readiness.Timeout);
         Assert.Equal(2000, request.NavigationTimeout);
         Assert.Equal(75, request.BeforeCaptureScriptTimeout);
+        Assert.Equal(125, request.PdfTimeout);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<p>invalid PDF timeout</p>"),
+            pdfTimeout: -1));
     }
 
     [Fact]

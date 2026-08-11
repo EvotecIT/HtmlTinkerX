@@ -21,9 +21,11 @@ public sealed class HtmlBrowserPdfRequest {
         bool bypassContentSecurityPolicy = false,
         HtmlBrowserPdfMediaType mediaType = HtmlBrowserPdfMediaType.Print,
         int navigationTimeout = 30000,
-        int beforeCaptureScriptTimeout = 30000) {
+        int beforeCaptureScriptTimeout = 30000,
+        int pdfTimeout = 30000) {
         if (navigationTimeout < 0) throw new ArgumentOutOfRangeException(nameof(navigationTimeout));
         if (beforeCaptureScriptTimeout < 0) throw new ArgumentOutOfRangeException(nameof(beforeCaptureScriptTimeout));
+        if (pdfTimeout < 0) throw new ArgumentOutOfRangeException(nameof(pdfTimeout));
         Source = source ?? throw new ArgumentNullException(nameof(source));
         PdfOptions = pdfOptions ?? new HtmlBrowserPdfOptions();
         Readiness = readiness ?? new HtmlBrowserPdfReadiness();
@@ -42,6 +44,7 @@ public sealed class HtmlBrowserPdfRequest {
         MediaType = mediaType;
         NavigationTimeout = navigationTimeout;
         BeforeCaptureScriptTimeout = beforeCaptureScriptTimeout;
+        PdfTimeout = pdfTimeout;
     }
 
     /// <summary>Gets the capture source.</summary>
@@ -50,7 +53,7 @@ public sealed class HtmlBrowserPdfRequest {
     public HtmlBrowserPdfOptions PdfOptions { get; }
     /// <summary>Gets the readiness conditions.</summary>
     public HtmlBrowserPdfReadiness Readiness { get; }
-    /// <summary>Gets extra headers applied only to HTTP(S) document and subresource requests matching the source origin.</summary>
+    /// <summary>Gets extra headers applied only to HTTP(S) page, popup, worker, and subresource requests matching the source origin.</summary>
     public IReadOnlyDictionary<string, string> Headers { get; }
     /// <summary>Gets cookies applied before navigation.</summary>
     public IReadOnlyList<HtmlBrowserPdfCookie> Cookies { get; }
@@ -70,6 +73,8 @@ public sealed class HtmlBrowserPdfRequest {
     public int NavigationTimeout { get; }
     /// <summary>Gets the timeout in milliseconds for the optional pre-capture script. Zero disables the timeout.</summary>
     public int BeforeCaptureScriptTimeout { get; }
+    /// <summary>Gets the timeout in milliseconds for Chromium PDF generation. Zero disables the timeout.</summary>
+    public int PdfTimeout { get; }
 
     private static IReadOnlyDictionary<string, string> Snapshot(IReadOnlyDictionary<string, string>? values, StringComparer comparer) {
         Dictionary<string, string> copy = new(comparer);

@@ -141,9 +141,9 @@ Use `HtmlBrowserPdfSource.FromHtml(markup, baseUri)` for an HTML string or `Html
 
 File capture accepts local paths only. UNC/device paths are rejected on every platform. On Windows, mapped or substituted drives and symbolic-link, junction, or reparse-point indirection are also rejected before file content is probed; Unix paths retain canonical containment checks.
 
-Per-render headers cover same-origin HTTP(S) documents, subresources, and dedicated-worker requests. JavaScript WebSocket handshakes cannot carry arbitrary headers; use a scoped cookie or authenticated page state for WS/WSS endpoints.
+Per-render headers cover same-origin HTTP(S) pages and popups, subresources, and dedicated-worker requests. JavaScript WebSocket handshakes cannot carry arbitrary headers; use a scoped cookie or authenticated page state for WS/WSS endpoints.
 
-`navigationTimeout` limits initial source loading. `beforeCaptureScriptTimeout` limits an optional pre-capture script and defaults to 30 seconds. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation. Set an individual timeout to zero only when that stage may intentionally run without a deadline.
+`navigationTimeout` limits initial source loading. `beforeCaptureScriptTimeout` limits an optional pre-capture script, and `pdfTimeout` limits Chromium PDF generation; both default to 30 seconds. `HtmlBrowserPdfReadiness.Timeout` independently limits each readiness condition after navigation. Set an individual timeout to zero only when that stage may intentionally run without a deadline.
 
 Browser PDF output is a Chromium capability. Selecting Firefox or WebKit for a PDF request throws before a browser is launched.
 
