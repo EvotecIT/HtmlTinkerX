@@ -46,13 +46,17 @@ public class HtmlBrowserPdfExportTests {
         var session = new Mock<ICDPSession>();
         session.Setup(value => value.Event(It.IsAny<string>()))
             .Returns<string>(name => Event(name).Object);
+        string? autoAttachMessage = null;
+        string? resumeMessage = null;
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) =>
-                method == "Target.sendMessageToTarget"
-                && arguments != null
-                && arguments["message"].ToString()!.Contains("\"method\":\"Fetch.enable\"", StringComparison.Ordinal)
-                    ? Task.FromException<JsonElement?>(new PlaywrightException("worker interception failed"))
-                    : Task.FromResult<JsonElement?>(null));
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+                if (method == "Target.sendMessageToTarget" && arguments != null) {
+                    string sentMessage = arguments["message"].ToString()!;
+                    if (sentMessage.Contains("\"method\":\"Target.setAutoAttach\"", StringComparison.Ordinal)) autoAttachMessage = sentMessage;
+                    if (sentMessage.Contains("\"method\":\"Runtime.runIfWaitingForDebugger\"", StringComparison.Ordinal)) resumeMessage = sentMessage;
+                }
+                return Task.FromResult<JsonElement?>(null);
+            });
         session.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
         var page = new Mock<IPage>();
         var context = new Mock<IBrowserContext>();
@@ -67,6 +71,27 @@ public class HtmlBrowserPdfExportTests {
         JsonElement attachedWorker = ParseJson(@"{""sessionId"":""worker-1"",""targetInfo"":{""type"":""worker""}}");
 
         Event("Target.attachedToTarget").Raise(value => value.OnEvent += null, session.Object, attachedWorker);
+        Assert.True(SpinWait.SpinUntil(() => autoAttachMessage != null, TimeSpan.FromSeconds(2)));
+        using JsonDocument sent = JsonDocument.Parse(autoAttachMessage!);
+        long commandId = sent.RootElement.GetProperty("id").GetInt64();
+        string failedResponse = JsonSerializer.Serialize(new Dictionary<string, object> {
+            ["sessionId"] = "worker-1",
+            ["message"] = JsonSerializer.Serialize(new Dictionary<string, object> {
+                ["id"] = commandId,
+                ["error"] = new Dictionary<string, object> { ["message"] = "worker interception failed" }
+            })
+        });
+        Event("Target.receivedMessageFromTarget").Raise(value => value.OnEvent += null, session.Object, ParseJson(failedResponse));
+        Assert.True(SpinWait.SpinUntil(() => resumeMessage != null, TimeSpan.FromSeconds(2)));
+        using JsonDocument resume = JsonDocument.Parse(resumeMessage!);
+        string resumedResponse = JsonSerializer.Serialize(new Dictionary<string, object> {
+            ["sessionId"] = "worker-1",
+            ["message"] = JsonSerializer.Serialize(new Dictionary<string, object> {
+                ["id"] = resume.RootElement.GetProperty("id").GetInt64(),
+                ["result"] = new Dictionary<string, object>()
+            })
+        });
+        Event("Target.receivedMessageFromTarget").Raise(value => value.OnEvent += null, session.Object, ParseJson(resumedResponse));
         Assert.Same(interceptionFailed.Task, await Task.WhenAny(interceptionFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted);

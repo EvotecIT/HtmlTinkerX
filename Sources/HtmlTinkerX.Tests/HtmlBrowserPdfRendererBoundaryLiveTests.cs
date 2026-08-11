@@ -568,6 +568,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupCssToken;
         private string? _lastPopupScriptToken;
         private int _blankPopupResourceRequests;
+        private int _unauthorizedBlankPopupResourceRequests;
         private readonly string _namedContextInitialUrl;
 
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
@@ -630,6 +631,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
+        internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
         internal string? LastPopupCssToken => Volatile.Read(ref _lastPopupCssToken);
         internal string? LastPopupScriptToken => Volatile.Read(ref _lastPopupScriptToken);
@@ -729,7 +731,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
                     } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _blankPopupResourceRequests);
-                        Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
+                        if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);
+                        Volatile.Write(ref _lastPopupToken, token);
                         contentType = "application/javascript; charset=utf-8";
                         body = "void 0;";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {

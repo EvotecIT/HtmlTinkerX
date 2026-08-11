@@ -94,8 +94,10 @@
         let documentWriteQueued = false;
         let documentCloseQueued = false;
         let documentWrittenSynchronously = false;
+        const documentWriteParts = [];
         const queued = [];
         const guardedResources = [];
+        const guardedElements = new WeakSet();
         const requestAttributes = new Map([
             ['src', 'src'], ['srcset', 'srcset'], ['href', 'href'], ['action', 'action'],
             ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction']
@@ -114,7 +116,16 @@
                 }
             });
         });
-        popup.fetch = stagedFetch;
+        Object.defineProperty(popup.Window.prototype, 'fetch', {
+            value: stagedFetch,
+            writable: false,
+            configurable: false
+        });
+        Object.defineProperty(popup, 'fetch', {
+            value: stagedFetch,
+            writable: false,
+            configurable: false
+        });
         const nativeLocation = popup.location;
         let popupFacade;
         const locationFacade = new Proxy({}, {
@@ -139,8 +150,10 @@
                 && attribute === 'content'
                 && String(element.getAttribute('http-equiv')).toLowerCase() === 'refresh');
         const guardDeferredAttributes = (element, initialValues) => {
+            if (guardedElements.has(element)) return;
+            guardedElements.add(element);
             const values = new Map(initialValues);
-            const guardedProperties = [];
+            let released = false;
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -151,23 +164,26 @@
                 }
                 if (descriptor == null || descriptor.configurable === false && Object.prototype.hasOwnProperty.call(element, property)) continue;
                 Object.defineProperty(element, property, {
-                    configurable: true,
+                    configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
-                        if (values.has(attribute)) return values.get(attribute);
+                        if (!released && values.has(attribute)) return values.get(attribute);
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
-                    set(value) { values.set(attribute, String(value)); }
+                    set(value) {
+                        if (!released) values.set(attribute, String(value));
+                        else if (descriptor.set) descriptor.set.call(element, value);
+                        else nativeSetAttribute.call(element, attribute, String(value));
+                    }
                 });
-                guardedProperties.push([attribute, property]);
             }
             const nativeSetAttribute = element.setAttribute;
             const nativeRemoveAttribute = element.removeAttribute;
             Object.defineProperty(element, 'setAttribute', {
-                configurable: true,
+                configurable: false,
                 value(name, value) {
                     const attribute = String(name).toLowerCase();
-                    if (shouldDeferAttribute(element, attribute)) {
+                    if (!released && shouldDeferAttribute(element, attribute)) {
                         values.set(attribute, String(value));
                         return;
                     }
@@ -175,10 +191,10 @@
                 }
             });
             Object.defineProperty(element, 'removeAttribute', {
-                configurable: true,
+                configurable: false,
                 value(name) {
                     const attribute = String(name).toLowerCase();
-                    if (shouldDeferAttribute(element, attribute)) {
+                    if (!released && shouldDeferAttribute(element, attribute)) {
                         values.delete(attribute);
                         return;
                     }
@@ -186,16 +202,32 @@
                 }
             });
             guardedResources.push(() => {
-                for (const [, property] of guardedProperties) delete element[property];
-                delete element.setAttribute;
-                delete element.removeAttribute;
+                released = true;
                 for (const [attribute, value] of values) nativeSetAttribute.call(element, attribute, value);
             });
         };
+        const guardCreatedElement = element => {
+            if (!(element instanceof popup.Element) || guardedElements.has(element)) return element;
+            const values = [];
+            for (const attribute of Array.from(element.attributes)) {
+                const name = attribute.name.toLowerCase();
+                if (!shouldDeferAttribute(element, name)) continue;
+                values.push([name, attribute.value]);
+                element.removeAttribute(attribute.name);
+            }
+            guardDeferredAttributes(element, values);
+            return element;
+        };
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
+            documentWriteParts.push(args.map(value => String(value)).join('') + (method === 'writeln' ? '\n' : ''));
+            if (documentWriteParts.length > 1) {
+                nativeDocument.open();
+                guardedResources.length = 0;
+                documentCloseQueued = false;
+            }
             const template = nativeDocument.createElement('template');
-            template.innerHTML = args.map(value => String(value)).join('');
+            template.innerHTML = documentWriteParts.join('');
             const descriptors = [];
             let markerIndex = 0;
             for (const element of template.content.querySelectorAll('*')) {
@@ -224,10 +256,7 @@
                 element.setAttribute('data-htmltinkerx-staged-resource', marker);
                 descriptors.push({ marker, values, styleText, script });
             }
-            const nativeWrite = method === 'writeln'
-                ? nativeDocument.writeln
-                : nativeDocument.write;
-            Reflect.apply(nativeWrite, nativeDocument, [template.innerHTML]);
+            Reflect.apply(nativeDocument.write, nativeDocument, [template.innerHTML]);
             for (const { marker, values, styleText, script } of descriptors) {
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
@@ -273,6 +302,7 @@
             'replaceChildren', 'replaceWith', 'requestSubmit', 'setAttribute', 'setAttributeNS',
             'submit', 'toggleAttribute', 'write', 'writeln'
         ]);
+        const createdNodeMethods = new Set(['adoptNode', 'cloneNode', 'createElement', 'createElementNS', 'importNode']);
         const unwrap = value => {
             const resolve = nativeObjects.get(value);
             return resolve ? resolve() : value;
@@ -311,6 +341,7 @@
                             };
                             const initialResult = invoke();
                             if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
+                            if (!ready && createdNodeMethods.has(property)) guardCreatedElement(initialResult);
                             return initialResult;
                         }
                         const result = stagedMutationResult(resolve, property, args);
@@ -344,6 +375,7 @@
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 const value = Reflect.get(targetWindow, property, targetWindow);
+                if (value === stagedFetch) return stagedFetch;
                 if (value === targetWindow) return popupFacade;
                 return typeof value === 'function' ? value.bind(targetWindow) : value;
             },

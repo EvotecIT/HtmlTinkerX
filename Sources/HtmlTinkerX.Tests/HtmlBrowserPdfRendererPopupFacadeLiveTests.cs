@@ -88,6 +88,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastPopupToken);
     }
 
+    [Fact]
+    public async Task DetachedPopupResourceCreatedThroughTheFacadeWaitsForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const image = popup.document.createElement('img');
+            delete image.src;
+            image.src = '{server.BlankPopupResourceUrl}';
+            true";
+
+        await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 750),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.True(server.BlankPopupResourceRequests > 0);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+        Assert.Equal("popup-token", server.LastPopupToken);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -140,6 +163,62 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "popup fetch completed");
         Assert.Equal("popup-token", server.LastPopupFetchToken);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BlankPopupFetchCannotBypassStagingThroughThePrototype(bool deleteOwnOverride) {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string fetch = deleteOwnOverride
+            ? "delete popup.fetch; popup.fetch('/popup/fetch-result')"
+            : "Object.getPrototypeOf(popup).fetch.call(popup, '/popup/fetch-result')";
+        string script = $@"const popup = window.open('', '_blank');
+            {fetch}.then(response => response.text()).then(text => document.querySelector('#result').textContent = text);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup fetch completed'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup fetch completed");
+        Assert.Equal("popup-token", server.LastPopupFetchToken);
+    }
+
+    [Fact]
+    public async Task RepeatedPopupWritesShareOneParserStream() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.document.write('<div id=""outer"">');
+            popup.document.write('<span id=""inner"">nested popup write</span>');
+            popup.document.write('</div>');
+            const outer = popup.document.querySelector('#outer');
+            const inner = popup.document.querySelector('#inner');
+            document.querySelector('#result').textContent = outer?.contains(inner) ? inner.textContent : 'parser state lost';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "nested popup write");
+        AssertPdfDoesNotContain(result.PdfBytes, "parser state lost");
     }
 
     [Fact]

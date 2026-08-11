@@ -16,6 +16,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly Uri? _origin;
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
     private readonly ConcurrentDictionary<Task, byte> _pending = new();
+    private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> _workerCommandResponses = new();
     private readonly ConcurrentDictionary<string, string[]> _workerSessions = new(StringComparer.Ordinal);
     private readonly EventHandler<JsonElement?> _handler;
     private readonly EventHandler<JsonElement?> _targetAttachedHandler;
@@ -161,6 +162,19 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     }
 
     private void ProcessWorkerMessage(string[] workerPath, JsonElement message) {
+        if (message.TryGetProperty("id", out JsonElement responseId)
+            && responseId.TryGetInt64(out long commandId)
+            && _workerCommandResponses.TryRemove(commandId, out TaskCompletionSource<bool>? response)) {
+            if (message.TryGetProperty("error", out JsonElement error)) {
+                string detail = error.TryGetProperty("message", out JsonElement errorMessage)
+                    ? errorMessage.GetString() ?? error.GetRawText()
+                    : error.GetRawText();
+                response.TrySetException(new PlaywrightException(detail));
+            } else {
+                response.TrySetResult(true);
+            }
+            return;
+        }
         if (!message.TryGetProperty("method", out JsonElement methodElement)
             || !message.TryGetProperty("params", out JsonElement parameters)) return;
         string? method = methodElement.GetString();
@@ -209,9 +223,8 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private async Task ConfigureWorkerAsync(string[] workerPath) {
         try {
-            await SendWorkerCommandAsync(workerPath, "Fetch.enable", new Dictionary<string, object> {
-                ["patterns"] = CreateFetchPatterns()
-            }).ConfigureAwait(false);
+            // The page CDP session owns Fetch interception for document and dedicated-worker
+            // requests. Worker targets do not consistently expose the Fetch domain themselves.
             await SendWorkerCommandAsync(workerPath, "Target.setAutoAttach", CreateAutoAttachArguments(enabled: true)).ConfigureAwait(false);
         } finally {
             await SendWorkerCommandAsync(workerPath, "Runtime.runIfWaitingForDebugger", new Dictionary<string, object>()).ConfigureAwait(false);
@@ -288,9 +301,18 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             ? _session.SendAsync(method, arguments)
             : SendWorkerCommandAsync(workerSessionPath, method, arguments);
 
-    private Task SendWorkerCommandAsync(IReadOnlyList<string> workerPath, string method, Dictionary<string, object> arguments) {
+    private async Task SendWorkerCommandAsync(
+        IReadOnlyList<string> workerPath,
+        string method,
+        Dictionary<string, object> arguments,
+        bool waitForResponse = true) {
+        long commandId = Interlocked.Increment(ref _nextWorkerCommandId);
+        TaskCompletionSource<bool>? response = waitForResponse
+            ? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+            : null;
+        if (response != null) _workerCommandResponses[commandId] = response;
         string message = JsonSerializer.Serialize(new Dictionary<string, object> {
-            ["id"] = Interlocked.Increment(ref _nextWorkerCommandId),
+            ["id"] = commandId,
             ["method"] = method,
             ["params"] = arguments
         });
@@ -304,10 +326,16 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                 }
             });
         }
-        return _session.SendAsync("Target.sendMessageToTarget", new Dictionary<string, object> {
-            ["sessionId"] = workerPath[0],
-            ["message"] = message
-        });
+        try {
+            await _session.SendAsync("Target.sendMessageToTarget", new Dictionary<string, object> {
+                ["sessionId"] = workerPath[0],
+                ["message"] = message
+            }).ConfigureAwait(false);
+            if (response != null) await response.Task.ConfigureAwait(false);
+        } catch {
+            if (response != null) _workerCommandResponses.TryRemove(commandId, out _);
+            throw;
+        }
     }
 
     private static string WorkerPathKey(IEnumerable<string> workerPath) => string.Join("/", workerPath);
@@ -337,8 +365,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         } catch (PlaywrightException) { }
         try { await _session.SendAsync("Fetch.disable").ConfigureAwait(false); } catch (PlaywrightException) { }
         foreach (string[] workerPath in _workerSessions.Values.OrderByDescending(path => path.Length)) {
-            try { await SendWorkerCommandAsync(workerPath, "Target.setAutoAttach", CreateAutoAttachArguments(enabled: false)).ConfigureAwait(false); } catch (PlaywrightException) { }
-            try { await SendWorkerCommandAsync(workerPath, "Fetch.disable", new Dictionary<string, object>()).ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await SendWorkerCommandAsync(workerPath, "Target.setAutoAttach", CreateAutoAttachArguments(enabled: false), waitForResponse: false).ConfigureAwait(false); } catch (PlaywrightException) { }
             try {
                 if (workerPath.Length == 1) {
                     await _session.SendAsync("Target.detachFromTarget", new Dictionary<string, object> {
@@ -347,11 +374,15 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                 } else {
                     await SendWorkerCommandAsync(workerPath.Take(workerPath.Length - 1).ToArray(), "Target.detachFromTarget", new Dictionary<string, object> {
                         ["sessionId"] = workerPath[workerPath.Length - 1]
-                    }).ConfigureAwait(false);
+                    }, waitForResponse: false).ConfigureAwait(false);
                 }
             } catch (PlaywrightException) { }
         }
         _workerSessions.Clear();
+        foreach (TaskCompletionSource<bool> response in _workerCommandResponses.Values) {
+            response.TrySetException(new PlaywrightException("Worker target detached before the CDP command completed."));
+        }
+        _workerCommandResponses.Clear();
         Task[] pending = _pending.Keys.ToArray();
         if (pending.Length > 0) {
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (PlaywrightException) { }

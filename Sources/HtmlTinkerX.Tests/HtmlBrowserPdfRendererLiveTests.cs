@@ -107,14 +107,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackContentServer foreignOrigin = new(
             "<html><body><p id='foreign'>foreign-pending</p><script>document.querySelector('#foreign').textContent = localStorage.getItem('token') || 'cross-origin-clean';</script></body></html>");
         await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><p id='main'>main-pending</p><img src='/probe'><iframe style='width:600px;height:100px' src='{foreignOrigin.Url}'></iframe><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing';</script></body></html>";
+        string html = $"<html><body><p id='main'>main-pending</p><script>const frame = document.createElement('iframe'); frame.style.cssText = 'width:600px;height:100px'; const loaded = new Promise(resolve => frame.addEventListener('load', resolve, {{ once: true }})); frame.src = '{foreignOrigin.Url}'; document.body.appendChild(frame); Promise.all([fetch('/probe'), loaded]).then(() => document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing');</script></body></html>";
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
         HtmlBrowserPdfRequest request = new(
             HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 750),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#main').textContent === 'origin-storage'",
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
 
@@ -130,7 +133,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     public async Task CrossOriginPageHeadersSurviveCaptureHeaderScoping() {
         await using LoopbackCorsHeaderServer foreignOrigin = new();
         await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><img src='/probe'><p id='result'>pending</p><script>fetch('{foreignOrigin.Url}', {{ headers: {{ 'X-Render-Token': 'page-owned' }} }}).then(response => response.text()).then(text => document.querySelector('#result').textContent = text);</script></body></html>";
+        string html = $"<html><body><p id='result'>pending</p><script>Promise.all([fetch('/probe'), fetch('{foreignOrigin.Url}', {{ headers: {{ 'X-Render-Token': 'page-owned' }} }}).then(response => response.text())]).then(([, text]) => document.querySelector('#result').textContent = text);</script></body></html>";
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -141,7 +144,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'foreign authorized'",
-                timeout: 5000),
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "capture-owned" }));
 
         AssertPdfContains(result.PdfBytes, "foreign authorized");
