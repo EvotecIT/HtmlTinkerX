@@ -19,6 +19,7 @@ using System.Threading.Tasks;
 internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     private const int MaximumHeaderBytes = 64 * 1024;
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan MaximumAddressAttemptTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan DefaultRelayDrainTimeout = TimeSpan.FromSeconds(5);
     private readonly HtmlBrowserNetworkPolicyEvaluator _policy;
     private readonly TimeSpan _connectTimeout;
@@ -215,7 +216,8 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             double elapsedSeconds = (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency;
             TimeSpan remaining = _connectTimeout - TimeSpan.FromSeconds(elapsedSeconds);
             if (remaining <= TimeSpan.Zero) return null;
-            TimeSpan attemptTimeout = TimeSpan.FromTicks(Math.Max(1, remaining.Ticks / (addresses.Length - index)));
+            TimeSpan fairShare = TimeSpan.FromTicks(Math.Max(1, remaining.Ticks / (addresses.Length - index)));
+            TimeSpan attemptTimeout = fairShare <= MaximumAddressAttemptTimeout ? fairShare : MaximumAddressAttemptTimeout;
             using CancellationTokenSource attemptDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             attemptDeadline.CancelAfter(attemptTimeout);
             IPAddress address = addresses[index];

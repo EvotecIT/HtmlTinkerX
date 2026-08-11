@@ -11,6 +11,7 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private static readonly TimeSpan LateCdpPageCleanupTimeout = TimeSpan.FromSeconds(2);
     internal static Func<Task<IPlaywright>>? PlaywrightFactory { get; set; }
 
     internal static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
@@ -286,12 +287,26 @@ public static partial class HtmlBrowser {
             }
         });
 
-    private static void ClosePageWhenCreated(Task<IPage> pageCreation, IPlaywright playwrightOwner) =>
+    internal static void ClosePageWhenCreated(
+        Task<IPage> pageCreation,
+        IPlaywright playwrightOwner,
+        TimeSpan? cleanupTimeout = null) =>
         StartBestEffortClose(async () => {
             try {
-                IPage page = await pageCreation.ConfigureAwait(false);
-                await page.CloseAsync().ConfigureAwait(false);
+                Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
+                if (await Task.WhenAny(pageCreation, deadline).ConfigureAwait(false) == pageCreation) {
+                    IPage page = await pageCreation.ConfigureAwait(false);
+                    await page.CloseAsync().ConfigureAwait(false);
+                } else {
+                    _ = pageCreation.ContinueWith(
+                        static completed => _ = completed.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                }
             } finally {
+                // Disposing the local Playwright owner only disconnects this CDP client. It
+                // bounds cleanup even when the externally owned browser never answers NewPage.
                 playwrightOwner.Dispose();
             }
         });

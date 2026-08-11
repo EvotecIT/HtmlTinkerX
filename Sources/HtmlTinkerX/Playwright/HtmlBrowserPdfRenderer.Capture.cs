@@ -146,7 +146,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
         BrowserNewContextOptions contextOptions = CreateContextOptions(request);
         IBrowserContext? context = null;
-        HtmlBrowserPopupHeaderCoordinator? popupHeaders = null;
         try {
             context = await ExecuteCancellableSlotOperationAsync(
                 slot,
@@ -166,11 +165,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }
 
                 if (allowed) {
-                    if (popupHeaders?.RequiresDocumentBridge(route.Request) == true) {
-                        await popupHeaders.ContinueInitialDocumentAsync(route).ConfigureAwait(false);
-                    } else {
-                        await route.ContinueAsync().ConfigureAwait(false);
-                    }
+                    await route.ContinueAsync().ConfigureAwait(false);
                     return;
                 }
 
@@ -213,7 +208,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     request.Source.SecurityOrigin,
                     request.Headers,
                     cancellationToken);
-            popupHeaders = popupCoordinator;
             if (popupCoordinator != null) {
                 await ExecuteCancellablePageOperationAsync(
                     page,

@@ -124,6 +124,28 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastProtectedToken);
     }
 
+    [Fact]
+    public async Task PopupDocumentsStreamWhileTheFirstSubresourceReceivesOriginScopedHeaders() {
+        await using LoopbackStreamingPopupServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'streaming popup authorized'",
+                timeout: 5000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "window.open('/streaming-popup', '_blank'); true"));
+
+        AssertPdfContains(result.PdfBytes, "streaming popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+    }
+
     [Theory]
     [InlineData("noopener")]
     [InlineData("noreferrer")]
@@ -469,6 +491,110 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _cancellation.Cancel();
             _listener.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            _cancellation.Dispose();
+        }
+    }
+
+    private sealed class LoopbackStreamingPopupServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<long, Task> _clients = new();
+        private readonly TaskCompletionSource<bool> _protectedObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Task _serverTask;
+        private string? _lastPopupToken;
+        private string? _lastProtectedToken;
+        private long _nextClient;
+
+        internal LoopbackStreamingPopupServer() {
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}/streaming-main";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
+        internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
+                    long id = Interlocked.Increment(ref _nextClient);
+                    Task handling = HandleClientAsync(client);
+                    _clients[id] = handling;
+                    _ = handling.ContinueWith(
+                        completed => {
+                            _clients.TryRemove(id, out _);
+                            _ = completed.Exception;
+                        },
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                } catch (Exception ex) when (_cancellation.IsCancellationRequested
+                    && (ex is ObjectDisposedException || ex is SocketException)) {
+                    return;
+                }
+            }
+        }
+
+        private async Task HandleClientAsync(TcpClient client) {
+            using (client)
+            using (NetworkStream stream = client.GetStream()) {
+                try {
+                    byte[] buffer = new byte[8192];
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
+                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string requestTarget = request.Split(' ')[1];
+                    if (requestTarget.StartsWith("/streaming-popup", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        const string streamingBody = "<script>fetch('/streaming-protected').then(response => response.text()).then(text => opener.postMessage(text, '*'));</script>";
+                        byte[] bodyBytes = Encoding.UTF8.GetBytes(streamingBody);
+                        byte[] headers = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+                        byte[] chunkHeader = Encoding.ASCII.GetBytes(bodyBytes.Length.ToString("X") + "\r\n");
+                        await stream.WriteAsync(headers, 0, headers.Length, _cancellation.Token);
+                        await stream.WriteAsync(chunkHeader, 0, chunkHeader.Length, _cancellation.Token);
+                        await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length, _cancellation.Token);
+                        await stream.WriteAsync(new byte[] { 13, 10 }, 0, 2, _cancellation.Token);
+                        await stream.FlushAsync(_cancellation.Token);
+                        await _protectedObserved.Task;
+                        byte[] completed = Encoding.ASCII.GetBytes("0\r\n\r\n");
+                        await stream.WriteAsync(completed, 0, completed.Length, _cancellation.Token);
+                        return;
+                    }
+
+                    string body;
+                    string contentType = "text/html; charset=utf-8";
+                    if (requestTarget.StartsWith("/streaming-protected", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
+                            ? "streaming popup authorized"
+                            : "streaming popup denied";
+                        contentType = "text/plain; charset=utf-8";
+                        _protectedObserved.TrySetResult(true);
+                    } else {
+                        body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
+                    }
+                    byte[] bodyResponse = Encoding.UTF8.GetBytes(body);
+                    byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {bodyResponse.Length}\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(response, 0, response.Length, _cancellation.Token);
+                    await stream.WriteAsync(bodyResponse, 0, bodyResponse.Length, _cancellation.Token);
+                } catch (Exception ex) when (_cancellation.IsCancellationRequested
+                    && (ex is OperationCanceledException || ex is ObjectDisposedException || ex is SocketException || ex is IOException)) {
+                    return;
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _protectedObserved.TrySetCanceled();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            Task[] clients = _clients.Values.ToArray();
+            if (clients.Length > 0) {
+                try { await Task.WhenAll(clients); } catch (OperationCanceledException) { }
+            }
             _cancellation.Dispose();
         }
     }

@@ -8,8 +8,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-/// <summary>Attaches streaming header interception to popups and bridges only their initial document request.</summary>
+/// <summary>Attaches streaming header interception before newly opened popups navigate.</summary>
 internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
+    private const string ReleaseNavigationScript = @"() => {
+        globalThis.__htmlTinkerXPopupHeadersReady = true;
+        const release = globalThis.__htmlTinkerXReleasePopupNavigation;
+        if (typeof release === 'function') release();
+    }";
     private readonly IBrowserContext _context;
     private readonly IPage _primaryPage;
     private readonly Uri? _origin;
@@ -62,7 +67,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                     if (suppressOpener) {
                         try { popup.opener = null; } catch { }
                     }
-                    globalThis.setTimeout(() => {
+                    const navigate = () => {
                         try {
                             if (suppressReferrer) {
                                 const link = popup.document.createElement('a');
@@ -80,31 +85,36 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                             // fallback when the WindowProxy does not expose the required surface.
                             originalOpen.call(window, destination, target, features);
                         }
-                    }, 0);
+                    };
+                    let currentUrl;
+                    try { currentUrl = popup.location.href; } catch { currentUrl = null; }
+                    const normalizedTarget = target == null || String(target).length === 0
+                        ? '_blank'
+                        : String(target).toLowerCase();
+                    const isNewBlankContext = currentUrl === 'about:blank'
+                        && !['_self', '_parent', '_top'].includes(normalizedTarget);
+                    if (isNewBlankContext) {
+                        let fallback;
+                        const release = () => {
+                            if (fallback != null) globalThis.clearTimeout(fallback);
+                            try { delete popup.__htmlTinkerXReleasePopupNavigation; } catch { }
+                            navigate();
+                        };
+                        popup.__htmlTinkerXReleasePopupNavigation = release;
+                        if (popup.__htmlTinkerXPopupHeadersReady === true) {
+                            release();
+                        } else if (normalizedTarget !== '_blank') {
+                            // An existing named about:blank context does not raise a new-page
+                            // event. Preserve its navigation after a short compatibility delay.
+                            fallback = globalThis.setTimeout(release, 1000);
+                        }
+                    } else {
+                        globalThis.setTimeout(navigate, 0);
+                    }
                 }
                 return suppressOpener ? null : popup;
             };
         })();");
-
-    internal bool RequiresDocumentBridge(IRequest request) {
-        if (Volatile.Read(ref _disposed) != 0
-            || !string.Equals(request.ResourceType, "document", StringComparison.OrdinalIgnoreCase)) return false;
-        return IsSameOrigin(_origin, request.Url);
-    }
-
-    internal async Task ContinueInitialDocumentAsync(IRoute route) {
-        Dictionary<string, string> headers = new(route.Request.Headers, StringComparer.OrdinalIgnoreCase);
-        foreach (KeyValuePair<string, string> header in _captureHeaders) headers[header.Key] = header.Value;
-        IAPIResponse response = await route.FetchAsync(new RouteFetchOptions {
-            Headers = headers,
-            MaxRedirects = 0
-        }).ConfigureAwait(false);
-        try {
-            await route.FulfillAsync(new RouteFulfillOptions { Response = response }).ConfigureAwait(false);
-        } finally {
-            await response.DisposeAsync().ConfigureAwait(false);
-        }
-    }
 
     private void OnPage(object? sender, IPage page) {
         if (page == _primaryPage || Volatile.Read(ref _disposed) != 0) return;
@@ -127,7 +137,15 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             _origin,
             _captureHeaders,
             _cancellationToken).ConfigureAwait(false);
-        if (!_interceptors.TryAdd(page, interceptor)) await interceptor.DisposeAsync().ConfigureAwait(false);
+        if (!_interceptors.TryAdd(page, interceptor)) {
+            await interceptor.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
+        try {
+            await page.EvaluateAsync(ReleaseNavigationScript).ConfigureAwait(false);
+        } catch (PlaywrightException) {
+            // A caller can close or replace the blank popup while interception is attached.
+        }
     }
 
     public async ValueTask DisposeAsync() {
@@ -141,12 +159,5 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             await interceptor.DisposeAsync().ConfigureAwait(false);
         }
         _interceptors.Clear();
-    }
-
-    private static bool IsSameOrigin(Uri? expectedOrigin, string requestUrl) {
-        if (expectedOrigin == null || !Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? requestUri)) return false;
-        return string.Equals(expectedOrigin.Scheme, requestUri.Scheme, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(expectedOrigin.Host, requestUri.Host, StringComparison.OrdinalIgnoreCase)
-            && expectedOrigin.Port == requestUri.Port;
     }
 }

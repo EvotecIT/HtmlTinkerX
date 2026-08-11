@@ -150,7 +150,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         ReadTimeout = 2000,
                         WriteTimeout = 2000
                     };
-                    stream.AuthenticateAsClient("localhost", null, SslProtocols.Tls12, false);
+                    stream.AuthenticateAsClient(new SslClientAuthenticationOptions {
+                        TargetHost = "localhost",
+                        EnabledSslProtocols = SslProtocols.Tls12,
+                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+                        ApplicationProtocols = new System.Collections.Generic.List<SslApplicationProtocol> { SslApplicationProtocol.Http11 }
+                    });
                     byte[] request = Encoding.ASCII.GetBytes("GET /certificate HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
                     stream.Write(request, 0, request.Length);
                     stream.Flush();
