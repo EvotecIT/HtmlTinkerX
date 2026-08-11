@@ -167,13 +167,13 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 slot,
                 () => context.RouteAsync("**/*", policyRoute),
                 cancellationToken).ConfigureAwait(false);
-            await ExecuteCancellableSlotOperationAsync(
-                slot,
-                () => AddCookiesAsync(context, request.Cookies),
-                cancellationToken).ConfigureAwait(false);
             IPage page = await ExecuteCancellableSlotOperationAsync(
                 slot,
                 () => context.NewPageAsync(),
+                cancellationToken).ConfigureAwait(false);
+            await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => AddCookiesAsync(context, page, request.Cookies),
                 cancellationToken).ConfigureAwait(false);
             page.SetDefaultTimeout(request.Readiness.Timeout);
             await ExecuteCancellablePageOperationAsync(
@@ -329,7 +329,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 }), cancellationToken).ConfigureAwait(false);
                 break;
             case HtmlBrowserPdfSourceKind.Html:
-                string html = AddBaseElement(source.Html!, source.BaseUri);
+                string html = AddBaseElement(source.Html!, source.ResourceBaseUri);
                 if (source.HtmlDocumentUri == null) {
                     await ExecuteCancellablePageOperationAsync(page, () => page.SetContentAsync(html, new PageSetContentOptions {
                         Timeout = timeout,
@@ -381,11 +381,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
             }),
             cancellationToken).ConfigureAwait(false);
 
-        if (!string.IsNullOrWhiteSpace(request.StyleSheetContent)) {
-            await ExecuteCancellablePageOperationAsync(
-                page,
-                () => page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = request.StyleSheetContent }),
-                cancellationToken).ConfigureAwait(false);
+        bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
+        if (hasCaptureStyle) {
+            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
         }
         if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
             using CancellationTokenSource? deadline = request.BeforeCaptureScriptTimeout == 0
@@ -400,30 +398,98 @@ public sealed partial class HtmlBrowserPdfRenderer {
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
                 throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
             }
+            if (hasCaptureStyle) {
+                await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         await HtmlBrowserPdfCapture.WaitForReadinessAsync(page, request.Readiness, cancellationToken).ConfigureAwait(false);
+        if (hasCaptureStyle) {
+            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
+        }
     }
 
-    private static async Task AddCookiesAsync(IBrowserContext context, IReadOnlyList<HtmlBrowserPdfCookie> cookies) {
+    private static async Task AddCookiesAsync(
+        IBrowserContext context,
+        IPage page,
+        IReadOnlyList<HtmlBrowserPdfCookie> cookies) {
         if (cookies.Count == 0) return;
-        Cookie[] values = cookies.Select(cookie => new Cookie {
-            Name = cookie.Name,
-            Value = cookie.Value,
-            Url = cookie.Url,
-            Domain = cookie.Domain,
-            Path = cookie.Path,
-            Expires = cookie.Expires.HasValue ? (float)cookie.Expires.Value : null,
-            HttpOnly = cookie.HttpOnly,
-            Secure = cookie.Secure,
-            SameSite = cookie.SameSite switch {
-                HtmlBrowserCookieSameSite.Lax => SameSiteAttribute.Lax,
-                HtmlBrowserCookieSameSite.Strict => SameSiteAttribute.Strict,
-                HtmlBrowserCookieSameSite.None => SameSiteAttribute.None,
-                _ => null
+        if (cookies.All(cookie => !cookie.Expires.HasValue)) {
+            await context.AddCookiesAsync(cookies.Select(CreatePlaywrightCookie)).ConfigureAwait(false);
+            return;
+        }
+
+        ICDPSession? session = null;
+        try {
+            session = await context.NewCDPSessionAsync(page).ConfigureAwait(false);
+            await session.SendAsync("Network.setCookies", new Dictionary<string, object> {
+                ["cookies"] = cookies.Select(CreateCdpCookie).ToArray()
+            }).ConfigureAwait(false);
+        } finally {
+            if (session != null) await session.DetachAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static Cookie CreatePlaywrightCookie(HtmlBrowserPdfCookie cookie) => new() {
+        Name = cookie.Name,
+        Value = cookie.Value,
+        Url = cookie.Url,
+        Domain = cookie.Domain,
+        Path = cookie.Path,
+        HttpOnly = cookie.HttpOnly,
+        Secure = cookie.Secure,
+        SameSite = CreatePlaywrightSameSite(cookie.SameSite)
+    };
+
+    internal static Dictionary<string, object> CreateCdpCookie(HtmlBrowserPdfCookie cookie) {
+        Dictionary<string, object> value = new() {
+            ["name"] = cookie.Name,
+            ["value"] = cookie.Value
+        };
+        if (cookie.Url != null) value["url"] = cookie.Url;
+        if (cookie.Domain != null) value["domain"] = cookie.Domain;
+        if (cookie.Path != null) value["path"] = cookie.Path;
+        if (cookie.Expires.HasValue) value["expires"] = (double)cookie.Expires.Value;
+        if (cookie.HttpOnly.HasValue) value["httpOnly"] = cookie.HttpOnly.Value;
+        if (cookie.Secure.HasValue) value["secure"] = cookie.Secure.Value;
+        if (cookie.SameSite.HasValue) value["sameSite"] = cookie.SameSite.Value switch {
+            HtmlBrowserCookieSameSite.Lax => "Lax",
+            HtmlBrowserCookieSameSite.Strict => "Strict",
+            HtmlBrowserCookieSameSite.None => "None",
+            _ => throw new ArgumentOutOfRangeException(nameof(cookie))
+        };
+        return value;
+    }
+
+    private static SameSiteAttribute? CreatePlaywrightSameSite(HtmlBrowserCookieSameSite? sameSite) => sameSite switch {
+        HtmlBrowserCookieSameSite.Lax => SameSiteAttribute.Lax,
+        HtmlBrowserCookieSameSite.Strict => SameSiteAttribute.Strict,
+        HtmlBrowserCookieSameSite.None => SameSiteAttribute.None,
+        _ => null
+    };
+
+    private static async Task ApplyStyleSheetAsync(IPage page, string styleSheetContent, CancellationToken cancellationToken) {
+        foreach (IFrame frame in page.Frames) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (frame.IsDetached) continue;
+            try {
+                await ExecuteCancellablePageOperationAsync(
+                    page,
+                    () => frame.EvaluateAsync(@"css => {
+                        const attribute = 'data-htmltinkerx-pdf-capture-style';
+                        let style = document.querySelector(`style[${attribute}]`);
+                        if (!style) {
+                            style = document.createElement('style');
+                            style.setAttribute(attribute, '');
+                            (document.head || document.documentElement).prepend(style);
+                        }
+                        style.textContent = css;
+                    }", styleSheetContent),
+                    cancellationToken).ConfigureAwait(false);
+            } catch (PlaywrightException) when (frame.IsDetached) {
+                // A frame can detach between the snapshot and style injection.
             }
-        }).ToArray();
-        await context.AddCookiesAsync(values).ConfigureAwait(false);
+        }
     }
 
     private static string AddBaseElement(string html, Uri? baseUri) {

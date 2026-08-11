@@ -15,6 +15,17 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public sealed class HtmlBrowserPdfRendererContractTests {
+    [Fact]
+    public void ChromiumCookieExpirationRetainsUnixSecondPrecision() {
+        const long expiration = 4102444801;
+        HtmlBrowserPdfCookie cookie = new("session", "value", url: "https://example.test", expires: expiration);
+
+        System.Collections.Generic.Dictionary<string, object> value = HtmlBrowserPdfRenderer.CreateCdpCookie(cookie);
+
+        Assert.IsType<double>(value["expires"]);
+        Assert.Equal((double)expiration, value["expires"]);
+    }
+
     [Theory]
     [InlineData("ws://user:secret@example.test:8080/private?token=hidden#fragment", "ws://example.test:8080/private")]
     [InlineData("wss://user:secret@example.test/private?token=hidden#fragment", "wss://example.test/private")]

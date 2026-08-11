@@ -945,31 +945,21 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             // The test browser maps this name to IPv4 so the fixture is independent of host
             // resolver ordering while the TLS handshake still carries the localhost SNI value.
             Url = $"https://localhost:{endpoint.Port}/certificate";
-            WaitUntilReady(Url, endpoint.Port);
+            WaitUntilReady(Url);
         }
 
         internal string Url { get; }
 
-        private static void WaitUntilReady(string url, int port) {
+        private static void WaitUntilReady(string url) {
             Exception? lastError = null;
             Stopwatch deadline = Stopwatch.StartNew();
             while (deadline.Elapsed < TimeSpan.FromSeconds(15)) {
                 try {
-                    using SocketsHttpHandler handler = new() {
+                    using HttpClientHandler handler = new() {
                         UseProxy = false,
-                        ConnectCallback = async (_, cancellationToken) => {
-                            Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                            try {
-                                await socket.ConnectAsync(IPAddress.Loopback, port, cancellationToken);
-                                return new NetworkStream(socket, ownsSocket: true);
-                            } catch {
-                                socket.Dispose();
-                                throw;
-                            }
-                        }
+                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+                        SslProtocols = SslProtocols.Tls12
                     };
-                    handler.SslOptions.EnabledSslProtocols = SslProtocols.Tls12;
-                    handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
                     using HttpClient client = new(handler) {
                         DefaultRequestVersion = HttpVersion.Version11,
                         DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact,

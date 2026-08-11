@@ -28,6 +28,21 @@ public sealed class HtmlBrowserPdfSource {
     /// <summary>Gets the optional base URI used to resolve HTML-string resources.</summary>
     public Uri? BaseUri { get; }
 
+    /// <summary>Gets the base URI normalized for browser resource resolution.</summary>
+    internal Uri? ResourceBaseUri {
+        get {
+            if (BaseUri?.IsFile != true) return BaseUri;
+            string path = HtmlBrowserFileSystemPath.GetValidatedLocalPath(BaseUri.LocalPath);
+            if (!Directory.Exists(path)) return BaseUri;
+            string fullPath = Path.GetFullPath(path);
+            if (!fullPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                && !fullPath.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal)) {
+                fullPath += Path.DirectorySeparatorChar;
+            }
+            return new Uri(fullPath);
+        }
+    }
+
     /// <summary>Gets the HTTP origin to which per-render headers and web storage may be scoped.</summary>
     internal Uri? SecurityOrigin {
         get {

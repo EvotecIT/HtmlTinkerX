@@ -11,6 +11,65 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task NearFuturePersistentCookieRemainsAvailableDuringCapture() {
+        await using LoopbackHtmlServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            cookies: new[] {
+                new HtmlBrowserPdfCookie(
+                    "render-session",
+                    "short-lived",
+                    url: server.Url,
+                    expires: DateTimeOffset.UtcNow.AddSeconds(30).ToUnixTimeSeconds())
+            }));
+
+        AssertPdfContains(result.PdfBytes, "render-session=short-lived");
+    }
+
+    [Fact]
+    public async Task CaptureStyleSheetAppliesToAttachedChildFrames() {
+        const string html = "<p id='result'>pending</p><iframe srcdoc=\"<p id='framed'>framed</p>\"></iframe>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            styleSheetContent: "#framed { display: none; }",
+            beforeCaptureScript: "document.querySelector('#result').textContent = getComputedStyle(frames[0].document.querySelector('#framed')).display === 'none' ? 'child style applied' : 'child style missing';"));
+
+        AssertPdfContains(result.PdfBytes, "child style applied");
+    }
+
+    [Fact]
+    public async Task ExistingDirectoryFileBaseResolvesResourcesInsideThatDirectory() {
+        string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-DirectoryBase-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "message.js"), "document.querySelector('#result').textContent = 'directory resource loaded';");
+        try {
+            Uri baseUri = new(Path.GetFullPath(root));
+            const string html = "<p id='result'>pending</p><script src='message.js'></script>";
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
+
+            HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+                HtmlBrowserPdfSource.FromHtml(html, baseUri),
+                readiness: new HtmlBrowserPdfReadiness(
+                    skipLoadState: true,
+                    function: "() => document.querySelector('#result').textContent === 'directory resource loaded'",
+                    timeout: 5000)));
+
+            AssertPdfContains(result.PdfBytes, "directory resource loaded");
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task SameOriginPopupRequestsReceiveOriginScopedHeaders() {
         await using LoopbackPopupServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
