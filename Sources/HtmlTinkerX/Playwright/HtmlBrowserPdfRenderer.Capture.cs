@@ -147,10 +147,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         BrowserNewContextOptions contextOptions = CreateContextOptions(request);
         IBrowserContext? context = null;
         try {
-            context = await ExecuteCancellableSlotOperationAsync(
-                slot,
-                () => slot.Browser.NewContextAsync(contextOptions),
-                cancellationToken).ConfigureAwait(false);
+            context = await CreateContextWithDeadlineAsync(slot, contextOptions, cancellationToken).ConfigureAwait(false);
             Func<IRoute, Task> policyRoute = async route => {
                 bool allowed;
                 try {
@@ -534,6 +531,22 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
     private static async Task<T> ExecuteCancellableSlotOperationAsync<T>(BrowserSlot slot, Func<Task<T>> operation, CancellationToken cancellationToken) {
         return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(operation, () => AbortSlotAsync(slot), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IBrowserContext> CreateContextWithDeadlineAsync(
+        BrowserSlot slot,
+        BrowserNewContextOptions contextOptions,
+        CancellationToken cancellationToken) {
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_options.ContextCreationTimeout);
+        try {
+            return await ExecuteCancellableSlotOperationAsync(
+                slot,
+                () => slot.Browser.NewContextAsync(contextOptions),
+                deadline.Token).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
+            throw new TimeoutException($"Browser context creation did not complete within {_options.ContextCreationTimeout.TotalMilliseconds:0} ms.");
+        }
     }
 
     private static async Task ExecuteCancellableSlotOperationAsync(BrowserSlot slot, Func<Task> operation, CancellationToken cancellationToken) {

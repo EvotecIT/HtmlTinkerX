@@ -65,7 +65,7 @@ public static partial class HtmlBrowser {
                         .filter(element => !element.hasAttribute(overlayMarker));
                 } catch { continue; }
                 for (const element of elements) {
-                    if (!(element instanceof HTMLElement)) continue;
+                    if (!(element instanceof Element) || !element.style) continue;
                     if (state.seen.has(element)) continue;
                     state.seen.add(element);
                     state.masked.push({ element, style: element.getAttribute('style') });
@@ -183,7 +183,7 @@ public static partial class HtmlBrowser {
                 if (!state) return;
                 for (const overlay of state.overlays) overlay.remove();
                 for (const item of state.masked) {
-                    if (!(item.element instanceof HTMLElement)) continue;
+                    if (!(item.element instanceof Element) || !item.element.style) continue;
                     if (item.style === null) {
                         item.element.removeAttribute('style');
                     } else {

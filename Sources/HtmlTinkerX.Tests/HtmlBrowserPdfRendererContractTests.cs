@@ -44,6 +44,15 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void RendererOwnsAFiniteContextCreationDeadline() {
+        HtmlBrowserPdfRendererOptions options = new();
+
+        Assert.Equal(TimeSpan.FromSeconds(30), options.ContextCreationTimeout);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(
+            contextCreationTimeout: TimeSpan.Zero));
+    }
+
+    [Fact]
     public void DirectPagePdfApiUsesTheOptionsContractOnly() {
         System.Reflection.MethodInfo[] methods = typeof(HtmlBrowser).GetMethods()
             .Where(method => method.Name == nameof(HtmlBrowser.GetPagePdfAsync) || method.Name == nameof(HtmlBrowser.SavePagePdfAsync))

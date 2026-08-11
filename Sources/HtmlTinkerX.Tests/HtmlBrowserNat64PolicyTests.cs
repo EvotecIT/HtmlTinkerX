@@ -35,6 +35,20 @@ public sealed class HtmlBrowserNat64PolicyTests {
         Assert.Throws<ArgumentException>(() => new HtmlBrowserNetworkPolicy(nat64Prefixes: new[] { prefix }));
     }
 
+    [Fact]
+    public async Task MostSpecificConfiguredPrefixOwnsOverlappingNat64Address() {
+        const string broadPrefix = "2001:4860::/32";
+        // The broad /32 decodes 8.8.8.8 from this address, while the overlapping
+        // /96 decodes the actual private destination supplied below.
+        const string specificPrefix = "2001:4860:808:808::/96";
+        IPAddress destination = CreateNat64Address(specificPrefix, IPAddress.Parse("10.0.0.1"));
+        HtmlBrowserNetworkPolicy policy = new(nat64Prefixes: new[] { broadPrefix, specificPrefix });
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { destination }));
+
+        Assert.False(await evaluator.IsAllowedAsync("https://translated.example/report", null, CancellationToken.None));
+        Assert.Equal(new[] { specificPrefix, broadPrefix }, policy.Nat64Prefixes);
+    }
+
     private static IPAddress CreateNat64Address(string prefix, IPAddress ipv4) {
         string[] parts = prefix.Split('/');
         byte[] bytes = IPAddress.Parse(parts[0]).GetAddressBytes();

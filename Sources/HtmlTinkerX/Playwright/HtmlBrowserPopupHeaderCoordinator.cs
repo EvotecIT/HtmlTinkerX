@@ -89,6 +89,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             return;
         }
         try {
+            // Every attached popup can open another popup. Install the same staging shim
+            // before releasing this page so nested navigation cannot outrun interception.
+            await AddNavigationShimAsync(page).ConfigureAwait(false);
             await page.EvaluateAsync(ReleaseNavigationScript).ConfigureAwait(false);
         } catch (PlaywrightException) {
             // A caller can close or replace the blank popup while interception is attached.

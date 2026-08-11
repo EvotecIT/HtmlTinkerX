@@ -38,6 +38,7 @@ public sealed class HtmlBrowserNetworkPolicy {
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(HtmlBrowserNat64Prefix.Parse)
             .Distinct()
+            .OrderByDescending(prefix => prefix.PrefixLength)
             .ToArray();
         Nat64Prefixes = Array.AsReadOnly(parsedNat64Prefixes.Select(prefix => prefix.ToString()).ToArray());
         ParsedNat64Prefixes = Array.AsReadOnly(parsedNat64Prefixes);

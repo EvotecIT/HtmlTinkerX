@@ -44,6 +44,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task VisualMaskCoversSvgElementsAndRestoresTheirInlineStyle() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync("<svg width='160' height='90'><rect id='secret' width='120' height='70' fill='red' style='opacity:0.75'></rect></svg>");
+
+        string masked = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#000000",
+            action: () => session.Page.EvaluateAsync<string>(@"() => {
+                const secret = document.querySelector('#secret');
+                const overlay = document.querySelector('[data-htmltinkerx-visual-mask-overlay]');
+                return getComputedStyle(secret).visibility + '|' + (overlay !== null) + '|' + overlay.getBoundingClientRect().width;
+            }"),
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal("hidden|true|120", masked);
+        Assert.Equal(
+            "visible|opacity:0.75|0",
+            await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + secret.getAttribute('style') + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length; }"));
+    }
+
+    [Fact]
     public async Task NearFuturePersistentCookieRemainsAvailableDuringCapture() {
         await using LoopbackHtmlServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
@@ -120,6 +143,28 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             beforeCaptureScript: "window.open('/header-popup', '_blank'); true"));
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+    }
+
+    [Fact]
+    public async Task NestedPopupNavigationWaitsForOriginScopedHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.NestedPopupUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'nested popup authorized'",
+                timeout: 10000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "window.open('/nested-parent', '_blank'); true"));
+
+        AssertPdfContains(result.PdfBytes, "nested popup authorized");
         Assert.Equal("popup-token", server.LastPopupToken);
         Assert.Equal("popup-token", server.LastProtectedToken);
     }
@@ -436,6 +481,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
+            NestedPopupUrl = $"http://127.0.0.1:{port}/nested-main";
             NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
             ExistingContextUrl = $"http://127.0.0.1:{port}/existing-context-main";
@@ -455,6 +501,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
 
         internal string HeaderUrl { get; }
+        internal string NestedPopupUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
         internal string ExistingContextUrl { get; }
@@ -486,7 +533,20 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     string requestTarget = request.Split(' ')[1];
                     string contentType = "text/html; charset=utf-8";
                     string body;
-                    if (requestTarget.StartsWith("/header-popup-noopener", StringComparison.Ordinal)) {
+                    if (requestTarget.StartsWith("/nested-parent", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        body = "<script>window.open('/nested-child', '_blank');</script>";
+                    } else if (requestTarget.StartsWith("/nested-child", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        body = "<p>nested child</p>";
+                    } else if (requestTarget.StartsWith("/nested-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
+                            ? "nested popup authorized"
+                            : "pending";
+                    } else if (requestTarget.StartsWith("/nested-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><script>setInterval(() => fetch('/nested-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
+                    } else if (requestTarget.StartsWith("/header-popup-noopener", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";

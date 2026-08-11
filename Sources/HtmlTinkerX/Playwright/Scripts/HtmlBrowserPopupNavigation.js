@@ -1,4 +1,9 @@
 (() => {
+    if (globalThis.__htmlTinkerXPopupNavigationShimInstalled === true) return;
+    Object.defineProperty(globalThis, '__htmlTinkerXPopupNavigationShimInstalled', {
+        value: true,
+        configurable: false
+    });
     const originalOpen = window.open;
     const originalSubmit = HTMLFormElement.prototype.submit;
     const specialTargets = ['_self', '_parent', '_top'];
