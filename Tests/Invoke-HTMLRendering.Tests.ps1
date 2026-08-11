@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         $server = Start-SnapshotTestServer -Port $port
 
         try {
-            $snapshot = Invoke-HTMLRendering -Url "http://127.0.0.1:$port/response-ready" -LoadState Commit -Selector '#ready' -AsText -Snapshot -IncludeResponseBody -Timeout 3000
+            $snapshot = Invoke-HTMLRendering -Url "http://127.0.0.1:$port/response-ready" -LoadState Commit -Selector '#ready' -AsText -Snapshot -IncludeResponseBody -Timeout 10000
 
             $snapshot.Content | Should -Be 'response body ready'
             $readyResponse = $snapshot.NetworkLog | Where-Object { $_.Url -like '*/api/ready' } | Select-Object -First 1

@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -63,6 +64,24 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("hidden|true|120", masked);
         Assert.Equal(
             "visible|opacity:0.75|0",
+            await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + secret.getAttribute('style') + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length; }"));
+    }
+
+    [Fact]
+    public async Task InvalidVisualMaskSelectorFailsClosedBeforeChangingThePage() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync("<p id='secret' style='color:red'>sensitive</p>");
+
+        await Assert.ThrowsAsync<PlaywrightException>(() => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret", ":not(" },
+            maskColor: "#000000",
+            action: () => Task.FromResult(true),
+            cancellationToken: CancellationToken.None));
+
+        Assert.Equal(
+            "visible|color:red|0",
             await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + secret.getAttribute('style') + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length; }"));
     }
 
@@ -497,6 +516,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             DeclarativeExplicitSelfFormUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-form-main";
             DeclarativeExplicitSelfNativeFormUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-native-form-main";
             DeclarativeCancelledAnchorUrl = $"http://127.0.0.1:{port}/declarative-cancelled-anchor-main";
+            DeclarativeWindowCancelledAnchorUrl = $"http://127.0.0.1:{port}/declarative-window-cancelled-anchor-main";
+            DeclarativeReferrerPolicyUrl = $"http://127.0.0.1:{port}/declarative-referrer-policy-main";
+            SiblingNamedContextUrl = $"http://127.0.0.1:{port}/sibling-named-context-main";
             _serverTask = ServeAsync();
         }
 
@@ -517,6 +539,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string DeclarativeExplicitSelfFormUrl { get; }
         internal string DeclarativeExplicitSelfNativeFormUrl { get; }
         internal string DeclarativeCancelledAnchorUrl { get; }
+        internal string DeclarativeWindowCancelledAnchorUrl { get; }
+        internal string DeclarativeReferrerPolicyUrl { get; }
+        internal string SiblingNamedContextUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
@@ -552,6 +577,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";
                     } else if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         if (requestTarget.Contains("action=approve", StringComparison.Ordinal)) {
                             Volatile.Write(ref _lastSubmitAction, "approve");
                         }
@@ -579,6 +605,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                             : "<p id='result'>existing context denied</p>";
                     } else if (requestTarget.StartsWith("/named-context-main", StringComparison.Ordinal)) {
                         body = $"<p id='result'>pending</p><iframe name='reportFrame' src='{System.Net.WebUtility.HtmlEncode(_namedContextInitialUrl)}'></iframe><script>setInterval(() => {{ try {{ document.querySelector('#result').textContent = frames.reportFrame.document.querySelector('#result').textContent; }} catch {{ }} }}, 20);</script>";
+                    } else if (requestTarget.StartsWith("/sibling-named-context-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><iframe name='sourceFrame' srcdoc=\"<a href='/existing-context-destination' target='reportFrame'>open</a>\"></iframe><iframe name='reportFrame' src='about:blank'></iframe><script>setInterval(() => { try { const text = frames.reportFrame.document.querySelector('#result')?.textContent; if (text) document.querySelector('#result').textContent = text; } catch { } }, 20);</script>";
                     } else if (requestTarget.StartsWith("/existing-context-initial", StringComparison.Ordinal)
                         || requestTarget.StartsWith("/existing-context-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p>";
@@ -606,6 +634,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<base target='_blank'><p id='result'>pending</p><form action='/self-destination' method='post' target=''><button type='submit'>open</button></form>";
                     } else if (requestTarget.StartsWith("/declarative-cancelled-anchor-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>document.addEventListener('click', event => { event.preventDefault(); document.querySelector('#result').textContent = 'navigation cancelled'; });</script>";
+                    } else if (requestTarget.StartsWith("/declarative-window-cancelled-anchor-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>window.addEventListener('click', event => { event.preventDefault(); document.querySelector('#result').textContent = 'window navigation cancelled'; });</script>";
+                    } else if (requestTarget.StartsWith("/declarative-referrer-policy-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/header-popup' target='_blank' rel='opener' referrerpolicy='no-referrer'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/self-destination", StringComparison.Ordinal)) {
                         body = "<p id='self-result'>self navigated</p>";
                     } else {

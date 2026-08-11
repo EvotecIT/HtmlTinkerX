@@ -12,6 +12,7 @@ internal static class HtmlBrowserUnixFileSystemPath {
     private const uint FileTypeMask = 0xF000;
     private const uint DirectoryType = 0x4000;
     private const uint RegularFileType = 0x8000;
+    private const uint MacMountLocal = 0x00001000;
 
     internal static bool IsPseudoFileSystemPath(string path) {
         string fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
@@ -21,7 +22,7 @@ internal static class HtmlBrowserUnixFileSystemPath {
     }
 
     internal static bool IsRegularFileOrDirectory(string path) {
-        if (IsPseudoFileSystemPath(path) || !TryGetMode(path, out uint mode)) return false;
+        if (IsPseudoFileSystemPath(path) || IsRemoteFileSystemPath(path) || !TryGetMode(path, out uint mode)) return false;
         uint fileType = mode & FileTypeMask;
         return fileType == RegularFileType || fileType == DirectoryType;
     }
@@ -29,6 +30,47 @@ internal static class HtmlBrowserUnixFileSystemPath {
     internal static bool IsRegularFileOrDirectoryMode(uint mode) {
         uint fileType = mode & FileTypeMask;
         return fileType == RegularFileType || fileType == DirectoryType;
+    }
+
+    internal static bool IsRemoteFileSystemType(long fileSystemType) => fileSystemType switch {
+        0x00006969 => true, // NFS
+        0x0000517B => true, // SMB
+        0xFF534D42 => true, // CIFS
+        0xFE534D42 => true, // SMB2/SMB3
+        0x5346414F => true, // AFS
+        0x73757245 => true, // Coda
+        0x0000564C => true, // NCP
+        0x01021997 => true, // 9P
+        0x00C36400 => true, // Ceph
+        0x65735546 => true, // FUSE, including sshfs/rclone/s3fs
+        0x0BD00BD0 => true, // Lustre
+        0x20030528 => true, // OrangeFS/PVFS2
+        0x19830326 => true, // BeeGFS
+        0x01161970 => true, // GFS2
+        0x7461636F => true, // OCFS2
+        _ => false
+    };
+
+    private static bool IsRemoteFileSystemPath(string path) {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            return StatFsMac(path, out MacStatFs stat) != 0 || (stat.Flags & MacMountLocal) == 0;
+        }
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return false;
+        IntPtr buffer = Marshal.AllocHGlobal(LinuxStatBufferSize);
+        try {
+            for (int offset = 0; offset < LinuxStatBufferSize; offset += sizeof(long)) {
+                Marshal.WriteInt64(buffer, offset, 0);
+            }
+            if (StatFsLinux(path, buffer) != 0) return true;
+            long fileSystemType = IntPtr.Size == 8
+                ? Marshal.ReadInt64(buffer, 0)
+                : unchecked((uint)Marshal.ReadInt32(buffer, 0));
+            return IsRemoteFileSystemType(fileSystemType);
+        } catch (EntryPointNotFoundException) {
+            return true;
+        } finally {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private static bool TryGetMode(string path, out uint mode) {
@@ -80,6 +122,11 @@ internal static class HtmlBrowserUnixFileSystemPath {
         [FieldOffset(4)] internal ushort Mode;
     }
 
+    [StructLayout(LayoutKind.Explicit, Size = 2168)]
+    private struct MacStatFs {
+        [FieldOffset(64)] internal uint Flags;
+    }
+
     // Linux statx has one fixed userspace ABI across 32-bit and 64-bit architectures.
     [StructLayout(LayoutKind.Explicit, Size = 256)]
     private struct LinuxStat {
@@ -89,9 +136,15 @@ internal static class HtmlBrowserUnixFileSystemPath {
     [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
     private static extern int StatMac(string path, out MacStat stat);
 
+    [DllImport("libc", EntryPoint = "statfs", SetLastError = true)]
+    private static extern int StatFsMac(string path, out MacStatFs stat);
+
     [DllImport("libc", EntryPoint = "statx", SetLastError = true)]
     private static extern int StatLinux(int directoryFileDescriptor, string path, int flags, uint mask, out LinuxStat stat);
 
     [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
     private static extern int StatLinuxFallback(string path, IntPtr stat);
+
+    [DllImport("libc", EntryPoint = "statfs", SetLastError = true)]
+    private static extern int StatFsLinux(string path, IntPtr stat);
 }

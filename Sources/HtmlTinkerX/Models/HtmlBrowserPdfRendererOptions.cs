@@ -30,7 +30,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
         int? viewportWidth = 1440,
         int? viewportHeight = 900,
         HtmlBrowserNetworkPolicy? networkPolicy = null,
-        TimeSpan? contextCreationTimeout = null) {
+        TimeSpan? setupTimeout = null) {
         if (browser != HtmlBrowserEngine.Chromium) {
             throw new NotSupportedException("Browser PDF capture is supported only by Chromium. Firefox and WebKit requests must use a non-PDF browser capability.");
         }
@@ -40,7 +40,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
         if (maximumQueuedCaptures < 0) throw new ArgumentOutOfRangeException(nameof(maximumQueuedCaptures));
         if (maximumRendersPerBrowser <= 0) throw new ArgumentOutOfRangeException(nameof(maximumRendersPerBrowser));
         if (maximumBrowserAge.HasValue && maximumBrowserAge.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumBrowserAge));
-        if (contextCreationTimeout.HasValue && contextCreationTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(contextCreationTimeout));
+        if (setupTimeout.HasValue && setupTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(setupTimeout));
         if (viewportWidth.HasValue != viewportHeight.HasValue) throw new ArgumentException("Viewport width and height must be provided together.");
         if (viewportWidth <= 0 || viewportHeight <= 0) throw new ArgumentOutOfRangeException(nameof(viewportWidth));
         if (string.IsNullOrWhiteSpace(proxy)
@@ -54,7 +54,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
         MaximumQueuedCaptures = maximumQueuedCaptures;
         MaximumRendersPerBrowser = maximumRendersPerBrowser;
         MaximumBrowserAge = maximumBrowserAge ?? TimeSpan.FromMinutes(30);
-        ContextCreationTimeout = contextCreationTimeout ?? TimeSpan.FromSeconds(30);
+        SetupTimeout = setupTimeout ?? TimeSpan.FromSeconds(30);
         Headless = headless;
         IgnoreHttpsErrors = ignoreHttpsErrors;
         BrowserChannel = NormalizeOptional(browserChannel);
@@ -85,8 +85,8 @@ public sealed class HtmlBrowserPdfRendererOptions {
     public int MaximumRendersPerBrowser { get; }
     /// <summary>Gets the maximum browser lifetime.</summary>
     public TimeSpan MaximumBrowserAge { get; }
-    /// <summary>Gets the renderer-owned deadline for creating each isolated browser context.</summary>
-    public TimeSpan ContextCreationTimeout { get; }
+    /// <summary>Gets the renderer-owned deadline for isolated context and page setup before navigation.</summary>
+    public TimeSpan SetupTimeout { get; }
     /// <summary>Gets whether browser processes are headless.</summary>
     public bool Headless { get; }
     /// <summary>Gets whether HTTPS certificate errors are ignored.</summary>

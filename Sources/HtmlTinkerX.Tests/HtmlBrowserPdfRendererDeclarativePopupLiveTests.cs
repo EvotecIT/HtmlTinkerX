@@ -167,4 +167,64 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "navigation cancelled");
         Assert.Null(server.LastPopupToken);
     }
+
+    [Fact]
+    public async Task LaterWindowClickHandlerCanCancelDeclarativePopup() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeWindowCancelledAnchorUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'window navigation cancelled'",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "document.querySelector('a').click(); true"));
+
+        AssertPdfContains(result.PdfBytes, "window navigation cancelled");
+        Assert.Null(server.LastPopupToken);
+    }
+
+    [Fact]
+    public async Task BlankNamedSiblingFrameUsesNativeTargetedNavigation() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.SiblingNamedContextUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'existing context authorized'",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "frames.sourceFrame.document.querySelector('a').click(); true"));
+
+        AssertPdfContains(result.PdfBytes, "existing context authorized");
+        Assert.Equal("popup-token", server.LastExistingContextToken);
+    }
+
+    [Fact]
+    public async Task DeclarativeAnchorPreservesItsNoReferrerPolicy() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeReferrerPolicyUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "document.querySelector('a').click(); true"));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Null(server.LastPopupReferer);
+    }
 }

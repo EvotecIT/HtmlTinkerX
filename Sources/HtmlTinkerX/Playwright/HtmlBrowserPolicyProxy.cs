@@ -28,6 +28,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ConcurrentDictionary<long, Task> _clients = new();
+    private readonly ConcurrentDictionary<long, TcpClient> _activeClients = new();
     private readonly Task _acceptLoop;
     private long _nextClient;
 
@@ -51,6 +52,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     }
 
     internal string Server { get; }
+    internal int ActiveClientCount => _activeClients.Count;
     internal event Action<Uri>? RequestBlocked;
 
     private async Task AcceptLoopAsync() {
@@ -65,10 +67,15 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             }
 
             long id = Interlocked.Increment(ref _nextClient);
+            _activeClients[id] = client;
             Task handling = HandleClientAsync(client, _lifetime.Token);
             _clients[id] = handling;
             _ = handling.ContinueWith(
-                completed => _clients.TryRemove(id, out _),
+                completed => {
+                    _clients.TryRemove(id, out _);
+                    _activeClients.TryRemove(id, out _);
+                    _ = completed.Exception;
+                },
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
@@ -113,6 +120,8 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 // Either endpoint closed the connection.
             } catch (SocketException) {
                 // Either endpoint closed the connection.
+            } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
+                // Renderer disposal closes active proxy connections.
             }
         }
     }
@@ -258,8 +267,13 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             try { first.Dispose(); } catch (ObjectDisposedException) { }
             try { second.Dispose(); } catch (ObjectDisposedException) { }
         }
+        Task both = Task.WhenAll(firstToSecond, secondToFirst);
+        if (await Task.WhenAny(both, Task.Delay(drainTimeout)).ConfigureAwait(false) != both) {
+            _ = both.ContinueWith(static finished => _ = finished.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return;
+        }
         try {
-            await Task.WhenAll(firstToSecond, secondToFirst).ConfigureAwait(false);
+            await both.ConfigureAwait(false);
         } catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is OperationCanceledException) {
         }
     }
@@ -338,10 +352,19 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         _lifetime.Cancel();
         _listener.Stop();
         try { await _acceptLoop.ConfigureAwait(false); } catch (OperationCanceledException) { }
+        foreach (TcpClient client in _activeClients.Values) {
+            try { client.Dispose(); } catch (ObjectDisposedException) { }
+        }
         Task[] clients = _clients.Values.ToArray();
         if (clients.Length > 0) {
-            try { await Task.WhenAll(clients).ConfigureAwait(false); } catch (Exception ex) when (ex is IOException || ex is SocketException || ex is OperationCanceledException) { }
+            Task drain = Task.WhenAll(clients);
+            if (await Task.WhenAny(drain, Task.Delay(_relayDrainTimeout)).ConfigureAwait(false) == drain) {
+                try { await drain.ConfigureAwait(false); } catch (Exception ex) when (ex is IOException || ex is SocketException || ex is OperationCanceledException || ex is ObjectDisposedException) { }
+            } else {
+                _ = drain.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
         }
+        _activeClients.Clear();
         _lifetime.Dispose();
     }
 }

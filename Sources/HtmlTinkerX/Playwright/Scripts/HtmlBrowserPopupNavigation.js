@@ -6,6 +6,7 @@
     });
     const originalOpen = window.open;
     const originalSubmit = HTMLFormElement.prototype.submit;
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
     const specialTargets = ['_self', '_parent', '_top'];
     const imageSubmitCoordinates = new WeakMap();
 
@@ -19,8 +20,27 @@
 
     const targetsExistingFrame = target => {
         if (target == null || String(target).length === 0) return false;
-        return Array.from(document.querySelectorAll('iframe[name], frame[name]'))
-            .some(frame => frame.getAttribute('name') === String(target));
+        const expected = String(target);
+        const visited = new WeakSet();
+        const containsNamedFrame = currentDocument => {
+            if (visited.has(currentDocument)) return false;
+            visited.add(currentDocument);
+            for (const frame of currentDocument.querySelectorAll('iframe, frame')) {
+                if (frame.getAttribute('name') === expected) return true;
+                try {
+                    if (frame.contentDocument && containsNamedFrame(frame.contentDocument)) return true;
+                } catch { }
+            }
+            return false;
+        };
+        let root = window;
+        while (root !== root.parent) {
+            try {
+                void root.parent.document;
+                root = root.parent;
+            } catch { break; }
+        }
+        try { return containsNamedFrame(root.document); } catch { return false; }
     };
 
     const armBlankPopup = (popup, target, navigate) => {
@@ -42,7 +62,7 @@
         }
     };
 
-    window.open = function(url, target, features) {
+    const openWithReferrerPolicy = function(url, target, features, referrerPolicy) {
         if (url == null || String(url).length === 0 || String(url).toLowerCase() === 'about:blank') {
             return originalOpen.call(this, url, target, features);
         }
@@ -68,16 +88,17 @@
             if (suppressOpener) {
                 try { popup.opener = null; } catch { }
             }
-        const navigate = useNativeTargeting => {
-            if (useNativeTargeting) {
-                originalOpen.call(window, destination, target, features);
-                return;
-            }
-            try {
-                if (suppressReferrer) {
+            const navigate = useNativeTargeting => {
+                if (useNativeTargeting) {
+                    originalOpen.call(window, destination, target, features);
+                    return;
+                }
+                try {
+                    if (suppressReferrer || referrerPolicy) {
                         const link = popup.document.createElement('a');
                         link.href = destination;
-                        link.rel = 'noreferrer';
+                        if (suppressReferrer) link.rel = 'noreferrer';
+                        if (referrerPolicy) link.referrerPolicy = referrerPolicy;
                         link.target = '_self';
                         (popup.document.body || popup.document.documentElement).appendChild(link);
                         link.click();
@@ -93,6 +114,10 @@
             armBlankPopup(popup, initialTarget, navigate);
         }
         return suppressOpener ? null : popup;
+    };
+
+    window.open = function(url, target, features) {
+        return openWithReferrerPolicy.call(this, url, target, features, '');
     };
 
     const effectiveTarget = (element, submitter) => {
@@ -246,7 +271,15 @@
         }
     };
 
-    window.addEventListener('click', event => {
+    const afterPageWindowHandlers = (type, handler) => {
+        originalAddEventListener.call(window, type, event => {
+            originalAddEventListener.call(window, type, current => {
+                if (current === event) handler(current);
+            }, { capture: false, once: true });
+        }, true);
+    };
+
+    afterPageWindowHandlers('click', event => {
         if (event.defaultPrevented || event.button !== 0) return;
         const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
         const imageSubmitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
@@ -275,10 +308,10 @@
         const features = rel.contains('noreferrer')
             ? 'noreferrer'
             : rel.contains('noopener') || !rel.contains('opener') ? 'noopener' : undefined;
-        window.open(destination.href, target, features);
-    }, false);
+        openWithReferrerPolicy.call(window, destination.href, target, features, anchor.referrerPolicy || '');
+    });
 
-    window.addEventListener('submit', event => {
+    afterPageWindowHandlers('submit', event => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
@@ -288,7 +321,7 @@
             return;
         }
         if (deferPopupFormSubmission(form, submitter, () => submitWithoutRedispatch(form, submitter))) event.preventDefault();
-    }, false);
+    });
 
     HTMLFormElement.prototype.submit = function() {
         const form = this;

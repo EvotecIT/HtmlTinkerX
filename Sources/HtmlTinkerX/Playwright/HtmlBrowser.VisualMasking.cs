@@ -57,13 +57,14 @@ public static partial class HtmlBrowser {
                 state = { masked: [], overlays: [], seen: new WeakSet() };
                 Object.defineProperty(document, stateKey, { value: state, configurable: true });
             }
+            const selections = [];
             for (const selector of selectors || []) {
                 if (!selector || !selector.trim()) continue;
-                let elements = [];
-                try {
-                    elements = Array.from(document.querySelectorAll(selector))
-                        .filter(element => !element.hasAttribute(overlayMarker));
-                } catch { continue; }
+                const elements = Array.from(document.querySelectorAll(selector))
+                    .filter(element => !element.hasAttribute(overlayMarker));
+                selections.push(elements);
+            }
+            for (const elements of selections) {
                 for (const element of elements) {
                     if (!(element instanceof Element) || !element.style) continue;
                     if (state.seen.has(element)) continue;

@@ -44,12 +44,25 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
-    public void RendererOwnsAFiniteContextCreationDeadline() {
+    public void RendererOwnsAFinitePreNavigationSetupDeadline() {
         HtmlBrowserPdfRendererOptions options = new();
 
-        Assert.Equal(TimeSpan.FromSeconds(30), options.ContextCreationTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(30), options.SetupTimeout);
         Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(
-            contextCreationTimeout: TimeSpan.Zero));
+            setupTimeout: TimeSpan.Zero));
+    }
+
+    [Theory]
+    [InlineData(0x00006969L)]
+    [InlineData(0xFF534D42L)]
+    [InlineData(0xFE534D42L)]
+    [InlineData(0x01021997L)]
+    [InlineData(0x65735546L)]
+    [InlineData(0x0BD00BD0L)]
+    [InlineData(0x19830326L)]
+    public void UnixPathBoundaryRecognizesRemoteAndUserSpaceFileSystems(long fileSystemType) {
+        Assert.True(HtmlBrowserUnixFileSystemPath.IsRemoteFileSystemType(fileSystemType));
+        Assert.False(HtmlBrowserUnixFileSystemPath.IsRemoteFileSystemType(0xEF53));
     }
 
     [Fact]
@@ -804,6 +817,22 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         await browserStream.CopyToAsync(responseBytes);
 
         Assert.Contains("403 Forbidden", Encoding.ASCII.GetString(responseBytes.ToArray()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolicyProxyDisposalClosesClientsBlockedBeforeHeaders() {
+        HtmlBrowserPolicyProxy proxy = new(HtmlBrowserNetworkPolicy.PublicNetworkOnly);
+        using TcpClient client = new();
+        Uri endpoint = new(proxy.Server);
+        await client.ConnectAsync(IPAddress.Loopback, endpoint.Port);
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+        while (proxy.ActiveClientCount == 0 && DateTime.UtcNow < deadline) await Task.Delay(10);
+        Assert.Equal(1, proxy.ActiveClientCount);
+
+        Task disposal = proxy.DisposeAsync().AsTask();
+
+        Assert.Same(disposal, await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromSeconds(2))));
+        await disposal;
     }
 
     [Fact]
