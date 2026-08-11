@@ -142,7 +142,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         ConcurrentQueue<string> blockedRequests = new();
         int blockedRequestCount = 0;
         int blockedRequestSamples = 0;
-        int blockedDocumentRequests = 0;
+        int blockedTopLevelNavigations = 0;
         List<string> warnings = new();
         void RecordBlockedRequest(string url) {
             Interlocked.Increment(ref blockedRequestCount);
@@ -150,9 +150,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 blockedRequests.Enqueue(SanitizeUri(url));
             }
         }
-        void RecordHeaderPolicyBlocked(string url, bool documentRequest) {
+        void RecordHeaderPolicyBlocked(string url, bool topLevelDocument) {
             RecordBlockedRequest(url);
-            if (documentRequest) Interlocked.Increment(ref blockedDocumentRequests);
+            if (topLevelDocument) Interlocked.Increment(ref blockedTopLevelNavigations);
         }
         Action<Uri>? blockedByProxy = null;
         if (slot.PolicyProxy != null) {
@@ -240,11 +240,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         cancellationToken,
                         slot.MarkBroken,
                         requestAllowed: headerPolicy,
-                        requestBlocked: RecordHeaderPolicyBlocked);
+                        requestBlocked: (url, _) => RecordBlockedRequest(url));
                 if (popupCoordinator != null) {
                     await ExecuteCancellablePageOperationAsync(
                         page,
-                        () => HtmlBrowserPopupHeaderCoordinator.AddNavigationShimAsync(page),
+                        () => popupCoordinator.AddNavigationShimAsync(page),
                         setupCancellationToken).ConfigureAwait(false);
                 }
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && setupCancellationToken.IsCancellationRequested) {
@@ -254,7 +254,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             long navigationStarted = Stopwatch.GetTimestamp();
             try {
                 await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
-            } catch (PlaywrightException) when (Volatile.Read(ref blockedDocumentRequests) > 0 && !page.IsClosed) {
+            } catch (PlaywrightException) when (Volatile.Read(ref blockedTopLevelNavigations) > 0 && !page.IsClosed) {
                 // A policy-blocked redirect terminates Chromium's awaited navigation. The
                 // blocked destination has already been replaced with an empty response.
             }
@@ -294,7 +294,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
                                 request.MaximumPdfBytes,
                                 pdfToken),
                         pdfToken,
-                        freezePageScriptsDuringAction: true),
+                        freezePageScriptsDuringAction: request.PdfOptions.MaskSensitiveElements
+                            || request.PdfOptions.MaskSelectors.Count > 0
+                            || !string.IsNullOrWhiteSpace(request.StyleSheetContent)),
                     () => AbortSlotAsync(slot),
                     pdfToken).ConfigureAwait(false);
                 bytes = HtmlBrowserPdfCapture.ValidateOutputSize(bytes, request.MaximumPdfBytes);

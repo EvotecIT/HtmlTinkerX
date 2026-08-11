@@ -1,7 +1,5 @@
 using System;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -14,16 +12,13 @@ public sealed class HtmlBrowserNat64PolicyTests {
     [InlineData("2001:4860:abcd:ef00::/56")]
     [InlineData("2001:4860:abcd:ef01::/64")]
     [InlineData("2001:4860:abcd:ef01:2345:6789::/96")]
-    public async Task ConfiguredPrefixesClassifyEmbeddedIpv4Destinations(string prefix) {
+    public void ConfiguredPrefixesClassifyEmbeddedIpv4Destinations(string prefix) {
         IPAddress privateDestination = CreateNat64Address(prefix, IPAddress.Parse("10.0.0.1"));
         IPAddress publicDestination = CreateNat64Address(prefix, IPAddress.Parse("8.8.8.8"));
         HtmlBrowserNetworkPolicy policy = new(nat64Prefixes: new[] { prefix });
 
-        HtmlBrowserNetworkPolicyEvaluator privateEvaluator = new(policy, _ => Task.FromResult(new[] { privateDestination }));
-        HtmlBrowserNetworkPolicyEvaluator publicEvaluator = new(policy, _ => Task.FromResult(new[] { publicDestination }));
-
-        Assert.False(await privateEvaluator.IsAllowedAsync("https://translated.example/report", null, CancellationToken.None));
-        Assert.True(await publicEvaluator.IsAllowedAsync("https://translated.example/report", null, CancellationToken.None));
+        Assert.False(HtmlBrowserNetworkAddressClassifier.IsGloballyReachable(privateDestination, policy.ParsedNat64Prefixes));
+        Assert.True(HtmlBrowserNetworkAddressClassifier.IsGloballyReachable(publicDestination, policy.ParsedNat64Prefixes));
         Assert.Equal(prefix, Assert.Single(policy.Nat64Prefixes));
     }
 
@@ -36,16 +31,15 @@ public sealed class HtmlBrowserNat64PolicyTests {
     }
 
     [Fact]
-    public async Task MostSpecificConfiguredPrefixOwnsOverlappingNat64Address() {
+    public void MostSpecificConfiguredPrefixOwnsOverlappingNat64Address() {
         const string broadPrefix = "2001:4860::/32";
         // The broad /32 decodes 8.8.8.8 from this address, while the overlapping
         // /96 decodes the actual private destination supplied below.
         const string specificPrefix = "2001:4860:808:808::/96";
         IPAddress destination = CreateNat64Address(specificPrefix, IPAddress.Parse("10.0.0.1"));
         HtmlBrowserNetworkPolicy policy = new(nat64Prefixes: new[] { broadPrefix, specificPrefix });
-        HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { destination }));
 
-        Assert.False(await evaluator.IsAllowedAsync("https://translated.example/report", null, CancellationToken.None));
+        Assert.False(HtmlBrowserNetworkAddressClassifier.IsGloballyReachable(destination, policy.ParsedNat64Prefixes));
         Assert.Equal(new[] { specificPrefix, broadPrefix }, policy.Nat64Prefixes);
     }
 

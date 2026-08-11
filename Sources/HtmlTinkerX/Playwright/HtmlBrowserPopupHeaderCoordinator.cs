@@ -14,11 +14,7 @@ using System.Threading.Tasks;
 internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
     private const string NavigationShimResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js";
-    private const string ReleaseNavigationScript = @"() => {
-        globalThis.__htmlTinkerXPopupHeadersReady = true;
-        const release = globalThis.__htmlTinkerXReleasePopupNavigation;
-        if (typeof release === 'function') release();
-    }";
+    private const string ReleasePropertyPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_PROPERTY__";
     private static readonly Lazy<string> NavigationShim = new(LoadNavigationShim, LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IBrowserContext _context;
     private readonly IPage _primaryPage;
@@ -32,6 +28,8 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private readonly TimeSpan _cleanupTimeout;
     private readonly Func<string, Task<bool>>? _requestAllowed;
     private readonly Action<string, bool>? _requestBlocked;
+    private readonly string _releasePropertyName;
+    private readonly string _navigationShim;
     private Exception? _failure;
     private int _disposed;
 
@@ -54,11 +52,13 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _cleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
         _requestAllowed = requestAllowed;
         _requestBlocked = requestBlocked;
+        _releasePropertyName = Guid.NewGuid().ToString("N");
+        _navigationShim = NavigationShim.Value.Replace(ReleasePropertyPlaceholder, _releasePropertyName);
         _pageHandler = OnPage;
         context.Page += _pageHandler;
     }
 
-    internal static Task AddNavigationShimAsync(IPage page) => page.AddInitScriptAsync(NavigationShim.Value);
+    internal Task AddNavigationShimAsync(IPage page) => page.AddInitScriptAsync(_navigationShim);
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
@@ -103,7 +103,12 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             // Every attached popup can open another popup. Install the same staging shim
             // before releasing this page so nested navigation cannot outrun interception.
             await AddNavigationShimAsync(page).ConfigureAwait(false);
-            await page.EvaluateAsync(ReleaseNavigationScript).ConfigureAwait(false);
+            await page.EvaluateAsync(@"propertyName => {
+                const release = globalThis[propertyName];
+                if (typeof release !== 'function') return;
+                delete globalThis[propertyName];
+                release();
+            }", _releasePropertyName).ConfigureAwait(false);
         } catch (PlaywrightException) when (page.IsClosed || !string.Equals(page.Url, "about:blank", StringComparison.OrdinalIgnoreCase)) {
             // A caller can close the popup or navigate it before the release handshake finishes.
         }

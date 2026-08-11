@@ -14,6 +14,7 @@
     const pageCancelledEvents = new WeakSet();
     const specialTargets = ['_self', '_parent', '_top'];
     const imageSubmitCoordinates = new WeakMap();
+    const popupReleaseProperty = '__HTMLTINKERX_POPUP_RELEASE_PROPERTY__';
 
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
@@ -71,13 +72,12 @@
         }
 
         const release = () => {
-            try { delete popup.__htmlTinkerXReleasePopupNavigation; } catch { }
             navigate();
         };
-        popup.__htmlTinkerXReleasePopupNavigation = release;
-        if (popup.__htmlTinkerXPopupHeadersReady === true) {
-            release();
-        }
+        Object.defineProperty(popup, popupReleaseProperty, {
+            value: release,
+            configurable: true
+        });
     };
 
     const openStagedBlankPopup = function(url, target, features) {
@@ -239,9 +239,26 @@
                 if (script !== null) {
                     guardedResources.push(() => {
                         const replacement = nativeDocument.createElement('script');
+                        const attributes = new Map(script.attributes.map(([name, value]) => [name.toLowerCase(), value]));
+                        const blockingExternal = attributes.has('src')
+                            && !attributes.has('async')
+                            && !attributes.has('defer')
+                            && String(attributes.get('type') || '').toLowerCase() !== 'module';
+                        let completed = null;
+                        if (blockingExternal) {
+                            completed = new Promise(resolve => {
+                                replacement.addEventListener('load', resolve, { once: true });
+                                replacement.addEventListener('error', resolve, { once: true });
+                            });
+                        }
                         for (const [name, value] of script.attributes) replacement.setAttribute(name, value);
                         replacement.textContent = script.text;
                         element.replaceWith(replacement);
+                        if (blockingExternal && documentWriteQueued && !documentCloseQueued) {
+                            nativeDocument.close();
+                            documentCloseQueued = true;
+                        }
+                        return completed;
                     });
                 }
             }
@@ -325,7 +342,9 @@
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
                 if (property === 'document') return documentFacade;
+                if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 const value = Reflect.get(targetWindow, property, targetWindow);
+                if (value === targetWindow) return popupFacade;
                 return typeof value === 'function' ? value.bind(targetWindow) : value;
             },
             set(targetWindow, property, value) {
@@ -340,14 +359,14 @@
             // Run document replacement from the opener realm. Performing document.open()
             // in the popup's release evaluation destroys that evaluation context before
             // queued mutations can be replayed.
-            globalThis.setTimeout(() => {
+            globalThis.setTimeout(async () => {
                 if (documentMutationQueued && !documentWrittenSynchronously) {
                     popup.document.open();
                     popup.document.write('<!doctype html><html><head></head><body></body></html>');
                     popup.document.close();
                 }
                 ready = true;
-                while (guardedResources.length > 0) guardedResources.shift()();
+                while (guardedResources.length > 0) await guardedResources.shift()();
                 while (queued.length > 0) queued.shift()();
                 if (documentWriteQueued && !documentCloseQueued) popup.document.close();
             }, 0);

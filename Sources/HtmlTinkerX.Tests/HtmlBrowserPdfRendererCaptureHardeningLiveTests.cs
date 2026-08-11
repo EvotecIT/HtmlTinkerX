@@ -5,6 +5,21 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task OrdinaryCapturePreservesBeforePrintHandlers() {
+        const string html = @"<p id='result'>beforeprint pending</p><script>
+            addEventListener('beforeprint', () => document.querySelector('#result').textContent = 'ordinary beforeprint ran');
+        </script>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html)));
+
+        AssertPdfContains(result.PdfBytes, "ordinary beforeprint ran");
+    }
+
+    [Fact]
     public async Task BrowserPdfMaskRedactsTextAfterPageScriptsReplaceDomPrimitives() {
         const string html = @"<p>public artifact marker</p><p id='secret'>sensitive artifact value</p><script>
             document.querySelectorAll = () => [];

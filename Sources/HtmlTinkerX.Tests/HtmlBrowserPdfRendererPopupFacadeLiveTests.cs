@@ -6,6 +6,54 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task BlankPopupSelfAliasesRemainStagedBehindThePrivateReleaseHandshake() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = @"const popup = window.open('', '_blank');
+            for (const name of Object.getOwnPropertyNames(popup)) {
+                if (name.toLowerCase().includes('htmltinkerx') && typeof popup[name] === 'function') popup[name]();
+            }
+            popup.window.location.href = '/header-popup';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+    }
+
+    [Fact]
+    public async Task SynchronousPopupWritePreservesBlockingExternalScriptOrder() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.document.write('<script src=""/popup/blocking.js""></script><script>opener.document.querySelector(""#result"").textContent=globalThis.externalReady?""script order preserved"":""script order broken"";</script>');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'script order preserved' || document.querySelector('#result').textContent === 'script order broken'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "script order preserved");
+    }
+
+    [Fact]
     public async Task ExplicitBlankPopupPreservesCreatedNodeIdentityAndBindsWindowMethods() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

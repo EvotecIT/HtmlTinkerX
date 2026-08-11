@@ -74,6 +74,51 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task ScopedHeaderInterceptorIdentifiesOnlyThePrimaryFrameDocumentAsTopLevel() {
+        Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
+        Mock<ICDPSessionEvent> Event(string name) {
+            if (!events.TryGetValue(name, out Mock<ICDPSessionEvent>? value)) {
+                value = new Mock<ICDPSessionEvent>();
+                events[name] = value;
+            }
+            return value;
+        }
+        List<bool> blockedDocuments = new();
+        TaskCompletionSource<bool> callbacksCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new Mock<ICDPSession>();
+        session.Setup(value => value.Event(It.IsAny<string>()))
+            .Returns<string>(name => Event(name).Object);
+        session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) =>
+                Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
+                    ? ParseJson(@"{""frameTree"":{""frame"":{""id"":""main-frame""}}}")
+                    : null));
+        session.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var page = new Mock<IPage>();
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(session.Object);
+        await using HtmlBrowserScopedHeaderInterceptor interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+            context.Object,
+            page.Object,
+            new Uri("https://example.test"),
+            new Dictionary<string, string>(),
+            CancellationToken.None,
+            requestAllowed: _ => Task.FromResult(false),
+            requestBlocked: (_, topLevel) => {
+                blockedDocuments.Add(topLevel);
+                if (blockedDocuments.Count == 2) callbacksCompleted.TrySetResult(true);
+            });
+
+        Event("Fetch.requestPaused").Raise(value => value.OnEvent += null, session.Object,
+            ParseJson(@"{""requestId"":""child"",""frameId"":""child-frame"",""resourceType"":""Document"",""request"":{""url"":""https://blocked.test/child"",""headers"":{}}}"));
+        Event("Fetch.requestPaused").Raise(value => value.OnEvent += null, session.Object,
+            ParseJson(@"{""requestId"":""main"",""frameId"":""main-frame"",""resourceType"":""Document"",""request"":{""url"":""https://blocked.test/main"",""headers"":{}}}"));
+        Assert.Same(callbacksCompleted.Task, await Task.WhenAny(callbacksCompleted.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+
+        Assert.Equal(new[] { false, true }, blockedDocuments);
+    }
+
+    [Fact]
     public async Task StorageInitializationBoundsSessionDetach() {
         TaskCompletionSource<bool> pendingDetach = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> cleanupTimedOut = new(TaskCreationOptions.RunContinuationsAsynchronously);
