@@ -32,6 +32,31 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastProtectedToken);
     }
 
+    [Theory]
+    [InlineData("noopener")]
+    [InlineData("noreferrer")]
+    public async Task OpenerSuppressingPopupsNavigateWithOriginScopedHeaders(string features) {
+        await using LoopbackPopupServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.NoOpenerHeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => window.popupReturnedNull && document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 5000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: $"window.popupReturnedNull = window.open('/header-popup-noopener', '_blank', '{features}') === null; true"));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+        if (features == "noreferrer") Assert.Null(server.LastPopupReferer);
+    }
+
     [Fact]
     public async Task WebStorageDoesNotReseedAnIndependentPopup() {
         await using LoopbackPopupServer server = new();
@@ -222,19 +247,23 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private readonly Task _serverTask;
         private string? _lastPopupToken;
         private string? _lastProtectedToken;
+        private string? _lastPopupReferer;
 
         internal LoopbackPopupServer() {
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
+            NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
             _serverTask = ServeAsync();
         }
 
         internal string HeaderUrl { get; }
+        internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
+        internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -247,7 +276,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     string requestTarget = request.Split(' ')[1];
                     string contentType = "text/html; charset=utf-8";
                     string body;
-                    if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
+                    if (requestTarget.StartsWith("/header-popup-noopener", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
+                        body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";
+                    } else if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => opener.postMessage(text, '*'));</script>";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {
@@ -258,6 +291,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<script>localStorage.setItem('observed', localStorage.getItem('token') || 'missing'); close();</script>";
                     } else if (requestTarget.StartsWith("/storage-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('observed') || 'pending', 20);</script>";
+                    } else if (requestTarget.StartsWith("/header-noopener-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('popup-result') || 'pending', 20);</script>";
                     } else {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     }

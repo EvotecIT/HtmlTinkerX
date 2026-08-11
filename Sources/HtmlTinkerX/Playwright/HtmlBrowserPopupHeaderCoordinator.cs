@@ -43,9 +43,39 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                     return originalOpen.call(this, url, target, features);
                 }
                 const destination = new URL(String(url), document.baseURI).href;
-                const popup = originalOpen.call(this, 'about:blank', target, features);
-                if (popup) setTimeout(() => { try { popup.location.href = destination; } catch { } }, 0);
-                return popup;
+                const featureTokens = features == null
+                    ? []
+                    : String(features).split(',').map(token => token.trim()).filter(Boolean);
+                const isEnabled = name => featureTokens.some(token => {
+                    const parts = token.toLowerCase().split('=', 2);
+                    return parts[0] === name && (parts.length === 1 || !['0', 'no', 'false'].includes(parts[1]));
+                });
+                const suppressReferrer = isEnabled('noreferrer');
+                const suppressOpener = suppressReferrer || isEnabled('noopener');
+                const initialFeatures = suppressOpener
+                    ? featureTokens.filter(token => !['noopener', 'noreferrer'].includes(token.toLowerCase().split('=', 1)[0])).join(',')
+                    : features;
+                const popup = originalOpen.call(this, 'about:blank', target, initialFeatures);
+                if (popup) {
+                    popup.setTimeout(() => {
+                        try {
+                            if (suppressReferrer) {
+                                const link = popup.document.createElement('a');
+                                link.href = destination;
+                                link.rel = 'noreferrer';
+                                link.target = '_self';
+                                (popup.document.body || popup.document.documentElement).appendChild(link);
+                                link.click();
+                            } else {
+                                popup.location.href = destination;
+                            }
+                        } catch { }
+                    }, 0);
+                    if (suppressOpener) {
+                        try { popup.opener = null; } catch { }
+                    }
+                }
+                return suppressOpener ? null : popup;
             };
         })();");
 

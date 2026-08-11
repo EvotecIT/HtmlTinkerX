@@ -424,6 +424,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
     [Theory]
     [InlineData("192.0.2.1")]
+    [InlineData("192.88.99.1")]
+    [InlineData("192.88.99.2")]
     [InlineData("198.51.100.1")]
     [InlineData("203.0.113.1")]
     [InlineData("2001:db8::1")]
@@ -443,6 +445,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     [InlineData("64:ff9b::a00:1")]
     [InlineData("64:ff9b::7f00:1")]
     [InlineData("64:ff9b::c000:201")]
+    [InlineData("64:ff9b::c058:6301")]
+    [InlineData("64:ff9b::c058:6302")]
     public async Task PublicNetworkPolicyRejectsNonGloballyReachableSpecialAddresses(string address) {
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
