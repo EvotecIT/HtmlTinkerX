@@ -487,11 +487,16 @@ public sealed partial class HtmlBrowserPdfRenderer {
     private static bool IsBrowserProcessFailure(BrowserSlot slot) =>
         !slot.Browser.IsConnected || slot.IsBroken;
 
-    private static string SanitizeUri(string url) {
+    internal static string SanitizeUri(string url) {
         if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)) return url;
         if (uri.Scheme == Uri.UriSchemeFile) return uri.GetLeftPart(UriPartial.Path);
-        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return uri.Scheme + ":";
+        bool hasNetworkAuthority = uri.Scheme == Uri.UriSchemeHttp
+            || uri.Scheme == Uri.UriSchemeHttps
+            || string.Equals(uri.Scheme, "ws", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Scheme, "wss", StringComparison.OrdinalIgnoreCase);
+        if (!hasNetworkAuthority) return uri.Scheme + ":";
         UriBuilder builder = new(uri) { UserName = string.Empty, Password = string.Empty, Query = string.Empty, Fragment = string.Empty };
         return builder.Uri.AbsoluteUri;
     }
+
 }

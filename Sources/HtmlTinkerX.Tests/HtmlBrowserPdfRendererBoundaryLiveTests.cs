@@ -97,6 +97,31 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("worker-token", server.LastProtectedToken);
     }
 
+    [Theory]
+    [InlineData("_self", false)]
+    [InlineData("_parent", false)]
+    [InlineData("_top", false)]
+    [InlineData("reportFrame", true)]
+    public async Task ExistingBrowsingContextsNavigateWithoutLosingTheDestination(string target, bool namedFrame) {
+        await using LoopbackPopupServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(namedFrame ? server.NamedContextUrl : server.ExistingContextUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'existing context authorized'",
+                timeout: 5000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: $"window.open('/existing-context-destination', '{target}'); true"));
+
+        AssertPdfContains(result.PdfBytes, "existing context authorized");
+        Assert.Equal("popup-token", server.LastExistingContextToken);
+    }
+
     [Fact]
     public async Task WebStorageSeedsOnlyTheInitialTopLevelDocument() {
         const string html = "<html><body><p id='result'>pending</p><script>document.querySelector('#result').textContent = localStorage.getItem('token') || 'not-restored';</script></body></html>";
@@ -248,6 +273,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupToken;
         private string? _lastProtectedToken;
         private string? _lastPopupReferer;
+        private string? _lastExistingContextToken;
 
         internal LoopbackPopupServer() {
             _listener.Start();
@@ -255,15 +281,20 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
             NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
+            ExistingContextUrl = $"http://127.0.0.1:{port}/existing-context-main";
+            NamedContextUrl = $"http://127.0.0.1:{port}/named-context-main";
             _serverTask = ServeAsync();
         }
 
         internal string HeaderUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
+        internal string ExistingContextUrl { get; }
+        internal string NamedContextUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
+        internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -291,6 +322,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<script>localStorage.setItem('observed', localStorage.getItem('token') || 'missing'); close();</script>";
                     } else if (requestTarget.StartsWith("/storage-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('observed') || 'pending', 20);</script>";
+                    } else if (requestTarget.StartsWith("/existing-context-destination", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastExistingContextToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        body = LastExistingContextToken == "popup-token"
+                            ? "<p id='result'>existing context authorized</p>"
+                            : "<p id='result'>existing context denied</p>";
+                    } else if (requestTarget.StartsWith("/named-context-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><iframe name='reportFrame' src='/existing-context-initial'></iframe><script>setInterval(() => { try { document.querySelector('#result').textContent = frames.reportFrame.document.querySelector('#result').textContent; } catch { } }, 20);</script>";
+                    } else if (requestTarget.StartsWith("/existing-context-initial", StringComparison.Ordinal)
+                        || requestTarget.StartsWith("/existing-context-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p>";
                     } else if (requestTarget.StartsWith("/header-noopener-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('popup-result') || 'pending', 20);</script>";
                     } else {

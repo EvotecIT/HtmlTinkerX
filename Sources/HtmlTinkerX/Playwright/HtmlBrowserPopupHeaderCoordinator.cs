@@ -55,7 +55,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                 const initialFeatures = suppressOpener
                     ? featureTokens.filter(token => !['noopener', 'noreferrer'].includes(token.toLowerCase().split('=', 1)[0])).join(',')
                     : features;
-                const popup = originalOpen.call(this, 'about:blank', target, initialFeatures);
+                // An empty URL creates an interceptable about:blank popup without navigating an
+                // existing _self/_parent/_top or named context before deferred navigation runs.
+                const popup = originalOpen.call(this, '', target, initialFeatures);
                 if (popup) {
                     popup.setTimeout(() => {
                         try {

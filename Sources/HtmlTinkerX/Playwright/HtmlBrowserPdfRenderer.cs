@@ -62,6 +62,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
             CancellationToken operationToken = operationCancellation.Token;
             await _poolMutation.WaitAsync(operationToken).ConfigureAwait(false);
             try {
+                await RecycleUnavailableIdleSlotsAsync().ConfigureAwait(false);
                 while (_slots.Count < _options.MinimumBrowserInstances) {
                     operationToken.ThrowIfCancellationRequested();
                     BrowserSlot slot = await CreateSlotAsync(operationToken).ConfigureAwait(false);
@@ -72,6 +73,17 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
             }
         } finally {
             EndOperation();
+        }
+    }
+
+    private async Task RecycleUnavailableIdleSlotsAsync() {
+        int candidates = _available.Count;
+        for (int index = 0; index < candidates && _available.TryDequeue(out BrowserSlot? slot); index++) {
+            if (ShouldRecycle(slot)) {
+                await RecycleSlotAsync(slot).ConfigureAwait(false);
+            } else {
+                _available.Enqueue(slot);
+            }
         }
     }
 

@@ -15,6 +15,15 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public sealed class HtmlBrowserPdfRendererContractTests {
+    [Theory]
+    [InlineData("ws://user:secret@example.test:8080/private?token=hidden#fragment", "ws://example.test:8080/private")]
+    [InlineData("wss://user:secret@example.test/private?token=hidden#fragment", "wss://example.test/private")]
+    public void BlockedWebSocketDiagnosticsRetainAuthorityAndPathWithoutSecrets(string value, string expected) {
+        string sanitized = HtmlBrowserPdfRenderer.SanitizeUri(value);
+
+        Assert.Equal(expected, sanitized);
+    }
+
     [Fact]
     public void RendererOptionsRejectNonChromiumBeforeLaunch() {
         NotSupportedException exception = Assert.Throws<NotSupportedException>(

@@ -347,6 +347,23 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task PreWarmReplacesExpiredIdleBrowsersBeforeCountingTheMinimum() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            minimumBrowserInstances: 1,
+            maximumBrowserInstances: 1,
+            maximumBrowserAge: TimeSpan.FromMilliseconds(1)));
+
+        await renderer.PreWarmAsync();
+        await Task.Delay(20);
+        await renderer.PreWarmAsync();
+
+        HtmlBrowserPdfRendererMetrics metrics = renderer.GetMetricsSnapshot();
+        Assert.Equal(2, metrics.BrowsersCreated);
+        Assert.Equal(1, metrics.BrowsersRecycled);
+        Assert.Equal(1, metrics.IdleBrowsers);
+    }
+
+    [Fact]
     public async Task WebSocketRequestsUseTheSamePrivateNetworkPolicy() {
         await using LoopbackWebSocketServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
@@ -928,22 +945,36 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             // The test browser maps this name to IPv4 so the fixture is independent of host
             // resolver ordering while the TLS handshake still carries the localhost SNI value.
             Url = $"https://localhost:{endpoint.Port}/certificate";
-            WaitUntilReady($"https://127.0.0.1:{endpoint.Port}/certificate");
+            WaitUntilReady(Url, endpoint.Port);
         }
 
         internal string Url { get; }
 
-        private static void WaitUntilReady(string url) {
+        private static void WaitUntilReady(string url, int port) {
             Exception? lastError = null;
             Stopwatch deadline = Stopwatch.StartNew();
             while (deadline.Elapsed < TimeSpan.FromSeconds(15)) {
                 try {
-                    using HttpClientHandler handler = new() {
-                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-                        SslProtocols = SslProtocols.Tls12,
-                        UseProxy = false
+                    using SocketsHttpHandler handler = new() {
+                        UseProxy = false,
+                        ConnectCallback = async (_, cancellationToken) => {
+                            Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                            try {
+                                await socket.ConnectAsync(IPAddress.Loopback, port, cancellationToken);
+                                return new NetworkStream(socket, ownsSocket: true);
+                            } catch {
+                                socket.Dispose();
+                                throw;
+                            }
+                        }
                     };
-                    using HttpClient client = new(handler) { Timeout = TimeSpan.FromSeconds(2) };
+                    handler.SslOptions.EnabledSslProtocols = SslProtocols.Tls12;
+                    handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+                    using HttpClient client = new(handler) {
+                        DefaultRequestVersion = HttpVersion.Version11,
+                        DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact,
+                        Timeout = TimeSpan.FromSeconds(2)
+                    };
                     string body = client.GetStringAsync(url).GetAwaiter().GetResult();
                     if (body.Contains("trusted TLS page", StringComparison.Ordinal)) return;
                     lastError = new InvalidOperationException("The loopback HTTPS fixture returned unexpected content.");
