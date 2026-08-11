@@ -85,7 +85,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
     public int MaximumRendersPerBrowser { get; }
     /// <summary>Gets the maximum browser lifetime.</summary>
     public TimeSpan MaximumBrowserAge { get; }
-    /// <summary>Gets the renderer-owned deadline for isolated context and page setup before navigation.</summary>
+    /// <summary>Gets the renderer-owned deadline for browser provisioning, isolated context, and page setup before navigation.</summary>
     public TimeSpan SetupTimeout { get; }
     /// <summary>Gets whether browser processes are headless.</summary>
     public bool Headless { get; }

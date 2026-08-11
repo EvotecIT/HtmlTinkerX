@@ -62,9 +62,62 @@
         }
     };
 
+    const openStagedBlankPopup = function(url, target, features) {
+        const popup = originalOpen.call(this, url, target, features);
+        if (!popup || specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) return popup;
+        try {
+            if (popup.location.href !== 'about:blank') return popup;
+        } catch {
+            return popup;
+        }
+
+        let ready = false;
+        const queued = [];
+        const runWhenReady = action => {
+            if (ready) action();
+            else queued.push(action);
+        };
+        const openerFetch = globalThis.fetch.bind(globalThis);
+        popup.fetch = (...args) => new Promise((resolve, reject) => {
+            runWhenReady(() => openerFetch(...args).then(resolve, reject));
+        });
+        const nativeLocation = popup.location;
+        const locationFacade = new Proxy({}, {
+            get(_, property) {
+                const value = Reflect.get(nativeLocation, property, nativeLocation);
+                if (['assign', 'replace', 'reload'].includes(property)) {
+                    return (...args) => runWhenReady(() => Reflect.apply(value, nativeLocation, args));
+                }
+                return typeof value === 'function' ? value.bind(nativeLocation) : value;
+            },
+            set(_, property, value) {
+                runWhenReady(() => Reflect.set(nativeLocation, property, value, nativeLocation));
+                return true;
+            }
+        });
+        const popupFacade = new Proxy(popup, {
+            get(targetWindow, property) {
+                if (property === 'location') return locationFacade;
+                return Reflect.get(targetWindow, property, targetWindow);
+            },
+            set(targetWindow, property, value) {
+                if (property === 'location') {
+                    runWhenReady(() => { targetWindow.location = value; });
+                    return true;
+                }
+                return Reflect.set(targetWindow, property, value, targetWindow);
+            }
+        });
+        armBlankPopup(popup, target, () => {
+            ready = true;
+            while (queued.length > 0) queued.shift()();
+        });
+        return popupFacade;
+    };
+
     const openWithReferrerPolicy = function(url, target, features, referrerPolicy) {
         if (url == null || String(url).length === 0 || String(url).toLowerCase() === 'about:blank') {
-            return originalOpen.call(this, url, target, features);
+            return openStagedBlankPopup.call(this, url, target, features);
         }
         const destination = new URL(String(url), document.baseURI).href;
         const featureTokens = features == null

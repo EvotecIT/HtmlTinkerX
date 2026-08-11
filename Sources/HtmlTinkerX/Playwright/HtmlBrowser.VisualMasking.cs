@@ -57,10 +57,17 @@ public static partial class HtmlBrowser {
                 state = { masked: [], overlays: [], seen: new WeakSet() };
                 Object.defineProperty(document, stateKey, { value: state, configurable: true });
             }
+            const roots = [document];
+            for (let index = 0; index < roots.length; index++) {
+                for (const element of roots[index].querySelectorAll('*')) {
+                    if (element.shadowRoot && !roots.includes(element.shadowRoot)) roots.push(element.shadowRoot);
+                }
+            }
             const selections = [];
             for (const selector of selectors || []) {
                 if (!selector || !selector.trim()) continue;
-                const elements = Array.from(document.querySelectorAll(selector))
+                const elements = roots
+                    .flatMap(root => Array.from(root.querySelectorAll(selector)))
                     .filter(element => !element.hasAttribute(overlayMarker));
                 selections.push(elements);
             }

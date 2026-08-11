@@ -58,7 +58,15 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
                 bool retried = false;
                 for (int attempt = 0; attempt < 2; attempt++) {
-                    BrowserSlot slot = await RentSlotAsync(operationToken).ConfigureAwait(false);
+                    using CancellationTokenSource setupDeadline = CancellationTokenSource.CreateLinkedTokenSource(operationToken);
+                    setupDeadline.CancelAfter(_options.SetupTimeout);
+                    CancellationToken setupToken = setupDeadline.Token;
+                    BrowserSlot slot;
+                    try {
+                        slot = await RentSlotAsync(setupToken).ConfigureAwait(false);
+                    } catch (OperationCanceledException) when (!operationToken.IsCancellationRequested && setupDeadline.IsCancellationRequested) {
+                        throw new TimeoutException($"Browser capture setup did not complete within {_options.SetupTimeout.TotalMilliseconds:0} ms.");
+                    }
                     bool returnSlot = true;
                     HtmlBrowserPdfResult? completedResult = null;
                     try {
@@ -69,6 +77,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             selectedFileDirectory,
                             queueDuration,
                             retried,
+                            setupToken,
                             operationToken).ConfigureAwait(false);
                     } catch (TimeoutException) {
                         throw;
@@ -128,6 +137,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
         string? selectedFileDirectory,
         TimeSpan queueDuration,
         bool retried,
+        CancellationToken setupCancellationToken,
         CancellationToken cancellationToken) {
         ConcurrentQueue<string> blockedRequests = new();
         int blockedRequestCount = 0;
@@ -171,62 +181,58 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 await route.AbortAsync("blockedbyclient").ConfigureAwait(false);
             };
             IPage page;
-            using (CancellationTokenSource setupDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)) {
-                setupDeadline.CancelAfter(_options.SetupTimeout);
-                CancellationToken setupToken = setupDeadline.Token;
-                try {
-                    context = await ExecuteCancellableSlotOperationAsync(
+            try {
+                context = await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => slot.Browser.NewContextAsync(contextOptions),
+                    setupCancellationToken).ConfigureAwait(false);
+                await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => context.RouteAsync("**/*", policyRoute),
+                    setupCancellationToken).ConfigureAwait(false);
+                page = await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => context.NewPageAsync(),
+                    setupCancellationToken).ConfigureAwait(false);
+                await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => AddCookiesAsync(context, page, request.Cookies),
+                    setupCancellationToken).ConfigureAwait(false);
+                page.SetDefaultTimeout(request.Readiness.Timeout);
+                await ExecuteCancellablePageOperationAsync(
+                    page,
+                    () => HtmlBrowserStorageInitializer.AddAsync(page, request),
+                    setupCancellationToken).ConfigureAwait(false);
+                scopedHeaders = request.Headers.Count == 0
+                    ? null
+                    : await ExecuteCancellableSlotOperationAsync(
                         slot,
-                        () => slot.Browser.NewContextAsync(contextOptions),
-                        setupToken).ConfigureAwait(false);
-                    await ExecuteCancellableSlotOperationAsync(
-                        slot,
-                        () => context.RouteAsync("**/*", policyRoute),
-                        setupToken).ConfigureAwait(false);
-                    page = await ExecuteCancellableSlotOperationAsync(
-                        slot,
-                        () => context.NewPageAsync(),
-                        setupToken).ConfigureAwait(false);
-                    await ExecuteCancellableSlotOperationAsync(
-                        slot,
-                        () => AddCookiesAsync(context, page, request.Cookies),
-                        setupToken).ConfigureAwait(false);
-                    page.SetDefaultTimeout(request.Readiness.Timeout);
-                    await ExecuteCancellablePageOperationAsync(
-                        page,
-                        () => HtmlBrowserStorageInitializer.AddAsync(page, request),
-                        setupToken).ConfigureAwait(false);
-                    scopedHeaders = request.Headers.Count == 0
-                        ? null
-                        : await ExecuteCancellableSlotOperationAsync(
-                            slot,
-                            () => HtmlBrowserScopedHeaderInterceptor.CreateAsync(
-                                context,
-                                page,
-                                request.Source.SecurityOrigin,
-                                request.Headers,
-                                cancellationToken,
-                                slot.MarkBroken),
-                            setupToken).ConfigureAwait(false);
-                    popupCoordinator = request.Headers.Count == 0
-                        ? null
-                        : new HtmlBrowserPopupHeaderCoordinator(
+                        () => HtmlBrowserScopedHeaderInterceptor.CreateAsync(
                             context,
                             page,
                             request.Source.SecurityOrigin,
                             request.Headers,
                             cancellationToken,
-                            slot.MarkBroken);
-                    if (popupCoordinator != null) {
-                        await ExecuteCancellablePageOperationAsync(
-                            page,
-                            () => HtmlBrowserPopupHeaderCoordinator.AddNavigationShimAsync(page),
-                            setupToken).ConfigureAwait(false);
-                    }
-                } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && setupDeadline.IsCancellationRequested) {
-                    await AbortSlotAsync(slot).ConfigureAwait(false);
-                    throw new TimeoutException($"Browser capture setup did not complete within {_options.SetupTimeout.TotalMilliseconds:0} ms.");
+                            slot.MarkBroken),
+                        setupCancellationToken).ConfigureAwait(false);
+                popupCoordinator = request.Headers.Count == 0
+                    ? null
+                    : new HtmlBrowserPopupHeaderCoordinator(
+                        context,
+                        page,
+                        request.Source.SecurityOrigin,
+                        request.Headers,
+                        cancellationToken,
+                        slot.MarkBroken);
+                if (popupCoordinator != null) {
+                    await ExecuteCancellablePageOperationAsync(
+                        page,
+                        () => HtmlBrowserPopupHeaderCoordinator.AddNavigationShimAsync(page),
+                        setupCancellationToken).ConfigureAwait(false);
                 }
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && setupCancellationToken.IsCancellationRequested) {
+                await AbortSlotAsync(slot).ConfigureAwait(false);
+                throw new TimeoutException($"Browser capture setup did not complete within {_options.SetupTimeout.TotalMilliseconds:0} ms.");
             }
             long navigationStarted = Stopwatch.GetTimestamp();
             await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);

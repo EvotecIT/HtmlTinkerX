@@ -9,6 +9,36 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task SetupDeadlineIncludesBrowserProvisioningBeforeASlotExists() {
+        TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>())).Returns(pendingBrowser.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        try {
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                maximumBrowserInstances: 1,
+                setupTimeout: TimeSpan.FromMilliseconds(25),
+                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+            TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.CaptureAsync(
+                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromHtml("<p>launch deadline</p>"))));
+
+            Assert.Contains("capture setup", exception.Message, StringComparison.OrdinalIgnoreCase);
+            HtmlBrowserPdfRendererMetrics metrics = renderer.GetMetricsSnapshot();
+            Assert.Equal(1, metrics.FailedCaptures);
+            Assert.Equal(0, metrics.BrowsersCreated);
+            Assert.Equal(0, metrics.BrowsersRecycled);
+            Assert.Equal(0, metrics.ActiveCaptures);
+        } finally {
+            pendingBrowser.TrySetResult(Mock.Of<IBrowser>());
+            await Task.Yield();
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task SetupDeadlineAbortsAndRecyclesTheBrowserSlotWhenPageCreationStalls() {
         TaskCompletionSource<IPage> pendingPage = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var context = new Mock<IBrowserContext>();
@@ -28,7 +58,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         try {
             await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
                 maximumBrowserInstances: 1,
-                setupTimeout: TimeSpan.FromMilliseconds(25),
+                setupTimeout: TimeSpan.FromMilliseconds(500),
                 networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
 
             TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.CaptureAsync(
