@@ -2,6 +2,7 @@
     const originalOpen = window.open;
     const originalSubmit = HTMLFormElement.prototype.submit;
     const specialTargets = ['_self', '_parent', '_top'];
+    const imageSubmitCoordinates = new WeakMap();
 
     const normalizedTarget = target => target == null || String(target).length === 0
         ? '_blank'
@@ -89,11 +90,22 @@
         return suppressOpener ? null : popup;
     };
 
-    const effectiveTarget = (elementTarget, submitterTarget) => {
-        const explicit = submitterTarget || elementTarget;
-        if (explicit) return explicit;
+    const effectiveTarget = (element, submitter) => {
+        if (submitter != null && submitter.hasAttribute('formtarget')) {
+            return submitter.getAttribute('formtarget') || '';
+        }
+        if (element.hasAttribute('target')) {
+            return element.getAttribute('target') || '';
+        }
         const base = document.querySelector('base[target]');
-        return base == null ? '' : base.target;
+        return base == null ? '' : base.getAttribute('target') || '';
+    };
+
+    const hasExplicitEmptyTarget = (element, submitter) => {
+        if (submitter != null && submitter.hasAttribute('formtarget')) {
+            return (submitter.getAttribute('formtarget') || '') === '';
+        }
+        return element.hasAttribute('target') && (element.getAttribute('target') || '') === '';
     };
 
     const restoreAfterPopupNavigation = (popup, restore) => {
@@ -118,7 +130,7 @@
     };
 
     const deferPopupFormSubmission = (form, submitter, submit) => {
-        const target = effectiveTarget(form.target, submitter == null ? '' : submitter.formTarget);
+        const target = effectiveTarget(form, submitter);
         const normalized = normalizedDeclarativeTarget(target);
         if (specialTargets.includes(normalized)) return false;
         if (targetsExistingFrame(target)) return false;
@@ -169,39 +181,88 @@
             ['enctype', 'formenctype']
         ];
         const previous = [];
+        const successfulControls = [];
         if (submitter != null) {
             for (const [formAttribute, submitterAttribute] of overrides) {
                 if (!submitter.hasAttribute(submitterAttribute)) continue;
                 previous.push([formAttribute, form.getAttribute(formAttribute)]);
                 form.setAttribute(formAttribute, submitter.getAttribute(submitterAttribute));
             }
-        }
-        try {
-            originalSubmit.call(form);
-            return () => {
-                for (const [attribute, value] of previous) {
-                    if (value === null) form.removeAttribute(attribute);
-                    else form.setAttribute(attribute, value);
-                }
+            const appendSuccessfulControl = (name, value) => {
+                const control = document.createElement('input');
+                control.type = 'hidden';
+                control.name = name;
+                control.value = value;
+                form.appendChild(control);
+                successfulControls.push(control);
             };
-        } catch (error) {
+            if (!submitter.disabled && submitter instanceof HTMLInputElement && submitter.type.toLowerCase() === 'image') {
+                const coordinates = imageSubmitCoordinates.get(submitter) || { x: 0, y: 0 };
+                const prefix = submitter.name ? `${submitter.name}.` : '';
+                appendSuccessfulControl(`${prefix}x`, String(coordinates.x));
+                appendSuccessfulControl(`${prefix}y`, String(coordinates.y));
+            } else if (!submitter.disabled && submitter.getAttribute('name')) {
+                appendSuccessfulControl(submitter.getAttribute('name'), submitter.value || '');
+            }
+        }
+        const restore = () => {
+            for (const control of successfulControls) control.remove();
             for (const [attribute, value] of previous) {
                 if (value === null) form.removeAttribute(attribute);
                 else form.setAttribute(attribute, value);
             }
+        };
+        try {
+            originalSubmit.call(form);
+            return restore;
+        } catch (error) {
+            restore();
             throw error;
         }
     };
 
-    document.addEventListener('click', event => {
+    const submitInCurrentContext = (form, submit) => {
+        const previousTarget = form.target;
+        form.target = '_self';
+        try {
+            const restoreSubmission = submit();
+            let restored = false;
+            const restore = () => {
+                if (restored) return;
+                restored = true;
+                if (typeof restoreSubmission === 'function') restoreSubmission();
+                form.target = previousTarget;
+            };
+            globalThis.addEventListener('pagehide', restore, { once: true });
+            globalThis.setTimeout(restore, 5000);
+        } catch (error) {
+            form.target = previousTarget;
+            throw error;
+        }
+    };
+
+    window.addEventListener('click', event => {
         if (event.defaultPrevented || event.button !== 0) return;
         const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+        const imageSubmitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
+        if (imageSubmitter instanceof HTMLInputElement) {
+            imageSubmitCoordinates.set(imageSubmitter, {
+                x: Math.max(0, Math.floor(event.offsetX || 0)),
+                y: Math.max(0, Math.floor(event.offsetY || 0))
+            });
+        }
         const anchor = path.find(node => node instanceof HTMLAnchorElement)
             || (event.target instanceof Element ? event.target.closest('a[href]') : null);
         if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download')) return;
-        const target = effectiveTarget(anchor.target, '');
-        if (specialTargets.includes(normalizedDeclarativeTarget(target))) return;
+        const target = effectiveTarget(anchor, null);
+        const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
         const destination = new URL(anchor.href, document.baseURI);
+        if (explicitlyCurrent) {
+            event.preventDefault();
+            originalOpen.call(window, destination.href, '_self');
+            return;
+        }
+        if (specialTargets.includes(normalizedDeclarativeTarget(target))) return;
         if (destination.origin !== location.origin) return;
 
         event.preventDefault();
@@ -216,11 +277,19 @@
         const form = event.target;
         if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+        if (hasExplicitEmptyTarget(form, submitter)) {
+            event.preventDefault();
+            submitInCurrentContext(form, () => submitWithoutRedispatch(form, submitter));
+            return;
+        }
         if (deferPopupFormSubmission(form, submitter, () => submitWithoutRedispatch(form, submitter))) event.preventDefault();
     }, false);
 
     HTMLFormElement.prototype.submit = function() {
         const form = this;
+        if (hasExplicitEmptyTarget(form, null)) {
+            return submitInCurrentContext(form, () => originalSubmit.call(form));
+        }
         if (!deferPopupFormSubmission(form, null, () => originalSubmit.call(form))) {
             return originalSubmit.call(form);
         }

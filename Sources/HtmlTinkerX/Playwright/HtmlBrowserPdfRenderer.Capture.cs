@@ -400,7 +400,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
         bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
         if (hasCaptureStyle) {
-            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
+            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
         }
         if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
             using CancellationTokenSource? deadline = request.BeforeCaptureScriptTimeout == 0
@@ -416,13 +416,13 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
             }
             if (hasCaptureStyle) {
-                await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
+                await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
             }
         }
 
         await HtmlBrowserPdfCapture.WaitForReadinessAsync(page, request.Readiness, cancellationToken).ConfigureAwait(false);
         if (hasCaptureStyle) {
-            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, cancellationToken).ConfigureAwait(false);
+            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -485,27 +485,36 @@ public sealed partial class HtmlBrowserPdfRenderer {
         _ => null
     };
 
-    private static async Task ApplyStyleSheetAsync(IPage page, string styleSheetContent, CancellationToken cancellationToken) {
-        foreach (IFrame frame in page.Frames) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (frame.IsDetached) continue;
-            try {
-                await ExecuteCancellablePageOperationAsync(
-                    page,
-                    () => frame.EvaluateAsync(@"css => {
-                        const attribute = 'data-htmltinkerx-pdf-capture-style';
-                        let style = document.querySelector(`style[${attribute}]`);
-                        if (!style) {
-                            style = document.createElement('style');
-                            style.setAttribute(attribute, '');
-                            (document.head || document.documentElement).prepend(style);
-                        }
-                        style.textContent = css;
-                    }", styleSheetContent),
-                    cancellationToken).ConfigureAwait(false);
-            } catch (PlaywrightException) when (frame.IsDetached) {
-                // A frame can detach between the snapshot and style injection.
+    private static async Task ApplyStyleSheetAsync(IPage page, string styleSheetContent, int timeout, CancellationToken cancellationToken) {
+        using CancellationTokenSource? deadline = timeout == 0
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline?.CancelAfter(timeout);
+        CancellationToken operationToken = deadline?.Token ?? cancellationToken;
+        try {
+            foreach (IFrame frame in page.Frames) {
+                operationToken.ThrowIfCancellationRequested();
+                if (frame.IsDetached) continue;
+                try {
+                    await ExecuteCancellablePageOperationAsync(
+                        page,
+                        () => frame.EvaluateAsync(@"css => {
+                            const attribute = 'data-htmltinkerx-pdf-capture-style';
+                            let style = document.querySelector(`style[${attribute}]`);
+                            if (!style) {
+                                style = document.createElement('style');
+                                style.setAttribute(attribute, '');
+                                (document.head || document.documentElement).prepend(style);
+                            }
+                            style.textContent = css;
+                        }", styleSheetContent),
+                        operationToken).ConfigureAwait(false);
+                } catch (PlaywrightException) when (frame.IsDetached) {
+                    // A frame can detach between the snapshot and style injection.
+                }
             }
+        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
+            throw new TimeoutException($"Capture stylesheet injection did not complete within {timeout} ms.");
         }
     }
 

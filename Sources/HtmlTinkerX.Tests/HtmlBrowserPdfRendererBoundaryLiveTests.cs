@@ -344,6 +344,24 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(recovered.PdfBytes, "PDF lease recovered");
     }
 
+    [Fact]
+    public async Task CaptureStyleSheetTimeoutReleasesTheBrowserLease() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
+        const string blockedHtml = "<html><body><p>blocked</p><script>document.querySelector = () => { while (true) { } };</script></body></html>";
+
+        TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.CaptureAsync(
+            new HtmlBrowserPdfRequest(
+                HtmlBrowserPdfSource.FromHtml(blockedHtml),
+                readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, timeout: 250),
+                styleSheetContent: "body { color: black; }")));
+
+        Assert.Contains("stylesheet injection", exception.Message, StringComparison.OrdinalIgnoreCase);
+        HtmlBrowserPdfResult recovered = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<html><body><p>style timeout recovered</p></body></html>"),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, timeout: 5000)));
+        AssertPdfContains(recovered.PdfBytes, "style timeout recovered");
+    }
+
     private sealed class LoopbackWorkerHeaderServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
@@ -410,6 +428,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastProtectedToken;
         private string? _lastPopupReferer;
         private string? _lastExistingContextToken;
+        private string? _lastSubmitAction;
         private readonly string _namedContextInitialUrl;
 
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
@@ -428,6 +447,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             DeclarativeSingleSubmitUrl = $"http://127.0.0.1:{port}/declarative-single-submit-main";
             DeclarativeSelfAnchorUrl = $"http://127.0.0.1:{port}/declarative-self-anchor-main";
             DeclarativeSelfFormUrl = $"http://127.0.0.1:{port}/declarative-self-form-main";
+            DeclarativeExplicitSelfAnchorUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-anchor-main";
+            DeclarativeExplicitSelfFormUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-form-main";
+            DeclarativeExplicitSelfNativeFormUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-native-form-main";
+            DeclarativeCancelledAnchorUrl = $"http://127.0.0.1:{port}/declarative-cancelled-anchor-main";
             _serverTask = ServeAsync();
         }
 
@@ -443,6 +466,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string DeclarativeSingleSubmitUrl { get; }
         internal string DeclarativeSelfAnchorUrl { get; }
         internal string DeclarativeSelfFormUrl { get; }
+        internal string DeclarativeExplicitSelfAnchorUrl { get; }
+        internal string DeclarativeExplicitSelfFormUrl { get; }
+        internal string DeclarativeExplicitSelfNativeFormUrl { get; }
+        internal string DeclarativeCancelledAnchorUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
@@ -465,6 +492,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";
                     } else if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        if (requestTarget.Contains("action=approve", StringComparison.Ordinal)) {
+                            Volatile.Write(ref _lastSubmitAction, "approve");
+                        }
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => opener.postMessage(text, '*'));</script>";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
@@ -473,6 +503,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     } else if (requestTarget.StartsWith("/popup-status", StringComparison.Ordinal)) {
                         contentType = "text/plain; charset=utf-8";
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token" ? "popup authorized" : "pending";
+                    } else if (requestTarget.StartsWith("/submitter-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
+                            ? "popup authorized|" + (Volatile.Read(ref _lastSubmitAction) ?? "missing")
+                            : "pending";
                     } else if (requestTarget.StartsWith("/storage-popup", StringComparison.Ordinal)) {
                         body = "<script>localStorage.setItem('observed', localStorage.getItem('token') || 'missing'); close();</script>";
                     } else if (requestTarget.StartsWith("/storage-main", StringComparison.Ordinal)) {
@@ -498,11 +533,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     } else if (requestTarget.StartsWith("/declarative-named-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='reportWindow'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-single-submit-main", StringComparison.Ordinal)) {
-                        body = "<p id='result'>pending</p><form action='/wrong-popup' method='get' target='_blank'><button type='submit' formaction='/header-popup' formmethod='post'>open</button></form><script>let submitCount = 0; document.addEventListener('submit', () => submitCount++); setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text + '|' + submitCount), 20);</script>";
+                        body = "<p id='result'>pending</p><form action='/wrong-popup' method='post' target='_blank'><button type='submit' name='action' value='approve' formaction='/header-popup' formmethod='get'>open</button></form><script>let submitCount = 0; document.addEventListener('submit', () => submitCount++); setInterval(() => fetch('/submitter-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text + '|' + submitCount), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-self-anchor-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><a href='/self-destination'>open</a>";
                     } else if (requestTarget.StartsWith("/declarative-self-form-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><form action='/self-destination' method='post'><button type='submit'>open</button></form>";
+                    } else if (requestTarget.StartsWith("/declarative-explicit-self-anchor-main", StringComparison.Ordinal)) {
+                        body = "<base target='_blank'><p id='result'>pending</p><a href='/self-destination' target=''>open</a>";
+                    } else if (requestTarget.StartsWith("/declarative-explicit-self-form-main", StringComparison.Ordinal)) {
+                        body = "<base target='_blank'><p id='result'>pending</p><form action='/self-destination' method='post' target='_blank'><button type='submit' formtarget=''>open</button></form>";
+                    } else if (requestTarget.StartsWith("/declarative-explicit-self-native-form-main", StringComparison.Ordinal)) {
+                        body = "<base target='_blank'><p id='result'>pending</p><form action='/self-destination' method='post' target=''><button type='submit'>open</button></form>";
+                    } else if (requestTarget.StartsWith("/declarative-cancelled-anchor-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>document.addEventListener('click', event => { event.preventDefault(); document.querySelector('#result').textContent = 'navigation cancelled'; });</script>";
                     } else if (requestTarget.StartsWith("/self-destination", StringComparison.Ordinal)) {
                         body = "<p id='self-result'>self navigated</p>";
                     } else {
