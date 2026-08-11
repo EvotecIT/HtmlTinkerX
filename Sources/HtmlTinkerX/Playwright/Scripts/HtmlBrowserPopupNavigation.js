@@ -104,10 +104,17 @@
             if (ready) action();
             else queued.push(action);
         };
-        const openerFetch = globalThis.fetch.bind(globalThis);
-        popup.fetch = (...args) => new Promise((resolve, reject) => {
-            runWhenReady(() => openerFetch(...args).then(resolve, reject));
+        const popupFetch = popup.fetch.bind(popup);
+        const stagedFetch = (...args) => new Promise((resolve, reject) => {
+            runWhenReady(() => {
+                try {
+                    popupFetch(...args).then(resolve, reject);
+                } catch (error) {
+                    reject(error);
+                }
+            });
         });
+        popup.fetch = stagedFetch;
         const nativeLocation = popup.location;
         let popupFacade;
         const locationFacade = new Proxy({}, {
@@ -124,7 +131,14 @@
             }
         });
         const nativeObjects = new WeakMap();
-        const guardResourceAttributes = (element, initialValues) => {
+        const shouldDeferAttribute = (element, attribute) => requestAttributes.has(attribute)
+            || attribute === 'style'
+            || attribute.startsWith('on')
+            || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
+            || (element.localName === 'meta'
+                && attribute === 'content'
+                && String(element.getAttribute('http-equiv')).toLowerCase() === 'refresh');
+        const guardDeferredAttributes = (element, initialValues) => {
             const values = new Map(initialValues);
             const guardedProperties = [];
             for (const [attribute, property] of requestAttributes) {
@@ -153,7 +167,7 @@
                 configurable: true,
                 value(name, value) {
                     const attribute = String(name).toLowerCase();
-                    if (requestAttributes.has(attribute)) {
+                    if (shouldDeferAttribute(element, attribute)) {
                         values.set(attribute, String(value));
                         return;
                     }
@@ -164,7 +178,7 @@
                 configurable: true,
                 value(name) {
                     const attribute = String(name).toLowerCase();
-                    if (requestAttributes.has(attribute)) {
+                    if (shouldDeferAttribute(element, attribute)) {
                         values.delete(attribute);
                         return;
                     }
@@ -185,25 +199,51 @@
             const descriptors = [];
             let markerIndex = 0;
             for (const element of template.content.querySelectorAll('*')) {
+                const script = element.localName === 'script'
+                    ? {
+                        attributes: Array.from(element.attributes, attribute => [attribute.name, attribute.value]),
+                        text: element.textContent
+                    }
+                    : null;
                 const values = [];
-                for (const attribute of requestAttributes.keys()) {
-                    if (!element.hasAttribute(attribute)) continue;
-                    values.push([attribute, element.getAttribute(attribute)]);
-                    element.removeAttribute(attribute);
+                if (script !== null) {
+                    for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
+                    element.setAttribute('type', 'application/x-htmltinkerx-staged');
+                    element.textContent = '';
+                } else {
+                    for (const attribute of Array.from(element.attributes)) {
+                        const name = attribute.name.toLowerCase();
+                        if (!shouldDeferAttribute(element, name)) continue;
+                        values.push([name, attribute.value]);
+                        element.removeAttribute(attribute.name);
+                    }
                 }
+                const styleText = element.localName === 'style' ? element.textContent : null;
+                if (styleText !== null) element.textContent = '';
                 const marker = `htmltinkerx-${Date.now()}-${markerIndex++}-${Math.random().toString(36).slice(2)}`;
                 element.setAttribute('data-htmltinkerx-staged-resource', marker);
-                descriptors.push([marker, values]);
+                descriptors.push({ marker, values, styleText, script });
             }
             const nativeWrite = method === 'writeln'
                 ? nativeDocument.writeln
                 : nativeDocument.write;
             Reflect.apply(nativeWrite, nativeDocument, [template.innerHTML]);
-            for (const [marker, values] of descriptors) {
+            for (const { marker, values, styleText, script } of descriptors) {
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
                 element.removeAttribute('data-htmltinkerx-staged-resource');
-                guardResourceAttributes(element, values);
+                guardDeferredAttributes(element, values);
+                if (styleText !== null) {
+                    guardedResources.push(() => { element.textContent = styleText; });
+                }
+                if (script !== null) {
+                    guardedResources.push(() => {
+                        const replacement = nativeDocument.createElement('script');
+                        for (const [name, value] of script.attributes) replacement.setAttribute(name, value);
+                        replacement.textContent = script.text;
+                        element.replaceWith(replacement);
+                    });
+                }
             }
             documentMutationQueued = true;
             documentWriteQueued = true;

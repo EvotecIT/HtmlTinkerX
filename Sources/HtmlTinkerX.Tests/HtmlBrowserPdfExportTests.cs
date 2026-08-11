@@ -33,6 +33,69 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task ScopedHeaderInterceptorPropagatesWorkerConfigurationFailure() {
+        Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
+        Mock<ICDPSessionEvent> Event(string name) {
+            if (!events.TryGetValue(name, out Mock<ICDPSessionEvent>? value)) {
+                value = new Mock<ICDPSessionEvent>();
+                events[name] = value;
+            }
+            return value;
+        }
+        TaskCompletionSource<bool> interceptionFailed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new Mock<ICDPSession>();
+        session.Setup(value => value.Event(It.IsAny<string>()))
+            .Returns<string>(name => Event(name).Object);
+        session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) =>
+                method == "Target.sendMessageToTarget"
+                && arguments != null
+                && arguments["message"].ToString()!.Contains("\"method\":\"Fetch.enable\"", StringComparison.Ordinal)
+                    ? Task.FromException<JsonElement?>(new PlaywrightException("worker interception failed"))
+                    : Task.FromResult<JsonElement?>(null));
+        session.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var page = new Mock<IPage>();
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(session.Object);
+        await using HtmlBrowserScopedHeaderInterceptor interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+            context.Object,
+            page.Object,
+            new Uri("https://example.test"),
+            new Dictionary<string, string> { ["X-Test"] = "value" },
+            CancellationToken.None,
+            () => interceptionFailed.TrySetResult(true));
+        JsonElement attachedWorker = ParseJson(@"{""sessionId"":""worker-1"",""targetInfo"":{""type"":""worker""}}");
+
+        Event("Target.attachedToTarget").Raise(value => value.OnEvent += null, session.Object, attachedWorker);
+        Assert.Same(interceptionFailed.Task, await Task.WhenAny(interceptionFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted);
+        Assert.Contains("worker interception failed", exception.InnerException?.Message);
+    }
+
+    [Fact]
+    public async Task StorageInitializationBoundsSessionDetach() {
+        TaskCompletionSource<bool> pendingDetach = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> cleanupTimedOut = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var contextCreated = new Mock<ICDPSessionEvent>();
+        var session = new Mock<ICDPSession>();
+        session.Setup(value => value.Event("Runtime.executionContextCreated")).Returns(contextCreated.Object);
+        session.Setup(value => value.DetachAsync()).Returns(pendingDetach.Task);
+        HtmlBrowserStorageInitialization initialization = new(
+            session.Object,
+            "storage-world",
+            "storage-status",
+            "main-frame",
+            () => cleanupTimedOut.TrySetResult(true),
+            TimeSpan.FromMilliseconds(25));
+
+        await initialization.DisposeAsync();
+
+        Assert.Equal(TaskStatus.RanToCompletion, cleanupTimedOut.Task.Status);
+        Assert.False(pendingDetach.Task.IsCompleted);
+    }
+
+    [Fact]
     public async Task PopupCoordinatorPropagatesBackgroundHeaderAttachmentFailure() {
         TaskCompletionSource<bool> attachmentFailed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var primaryPage = new Mock<IPage>();

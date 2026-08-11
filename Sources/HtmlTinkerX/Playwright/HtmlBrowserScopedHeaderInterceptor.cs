@@ -23,6 +23,9 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly EventHandler<JsonElement?> _targetDetachedHandler;
     private readonly TimeSpan _cleanupTimeout;
     private readonly Action _cleanupTimedOut;
+    private readonly Func<string, Task<bool>>? _requestAllowed;
+    private readonly Action<string, bool>? _requestBlocked;
+    private Exception? _failure;
     private long _nextWorkerCommandId;
     private int _disposed;
     private int _subscribed;
@@ -32,12 +35,16 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         Uri? origin,
         IReadOnlyDictionary<string, string> captureHeaders,
         TimeSpan? cleanupTimeout = null,
-        Action? cleanupTimedOut = null) {
+        Action? cleanupTimedOut = null,
+        Func<string, Task<bool>>? requestAllowed = null,
+        Action<string, bool>? requestBlocked = null) {
         _session = session;
         _origin = origin;
         _captureHeaders = captureHeaders;
         _cleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
         _cleanupTimedOut = cleanupTimedOut ?? NoOp;
+        _requestAllowed = requestAllowed;
+        _requestBlocked = requestBlocked;
         _handler = OnRequestPaused;
         _targetAttachedHandler = OnTargetAttached;
         _targetMessageHandler = OnTargetMessage;
@@ -51,10 +58,19 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         IReadOnlyDictionary<string, string> captureHeaders,
         CancellationToken cancellationToken,
         Action? cleanupTimedOut = null,
-        TimeSpan? cleanupTimeout = null) {
+        TimeSpan? cleanupTimeout = null,
+        Func<string, Task<bool>>? requestAllowed = null,
+        Action<string, bool>? requestBlocked = null) {
         cancellationToken.ThrowIfCancellationRequested();
         ICDPSession session = await context.NewCDPSessionAsync(page).ConfigureAwait(false);
-        HtmlBrowserScopedHeaderInterceptor interceptor = new(session, origin, captureHeaders, cleanupTimeout, cleanupTimedOut);
+        HtmlBrowserScopedHeaderInterceptor interceptor = new(
+            session,
+            origin,
+            captureHeaders,
+            cleanupTimeout,
+            cleanupTimedOut,
+            requestAllowed,
+            requestBlocked);
         interceptor.Subscribe();
         try {
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
@@ -114,11 +130,20 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         _ = pending.ContinueWith(
             completed => {
                 _pending.TryRemove(completed, out _);
-                _ = completed.Exception;
+                if (!completed.IsFaulted || Volatile.Read(ref _disposed) != 0) return;
+                Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
+                _cleanupTimedOut();
             },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+    }
+
+    internal void ThrowIfFaulted() {
+        Exception? failure = Volatile.Read(ref _failure);
+        if (failure != null) {
+            throw new InvalidOperationException("Scoped header interception failed before capture completed.", failure);
+        }
     }
 
     private async Task ConfigureWorkerAsync(string sessionId) {
@@ -141,6 +166,24 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try {
             JsonElement request = payload.GetProperty("request");
             string url = request.GetProperty("url").GetString()!;
+            if (_requestAllowed != null && !await _requestAllowed(url).ConfigureAwait(false)) {
+                bool documentRequest = payload.TryGetProperty("resourceType", out JsonElement resourceType)
+                    && string.Equals(resourceType.GetString(), "Document", StringComparison.OrdinalIgnoreCase);
+                _requestBlocked?.Invoke(url, documentRequest);
+                if (documentRequest) {
+                    await SendCommandAsync(workerSessionId, "Fetch.fulfillRequest", new Dictionary<string, object> {
+                        ["requestId"] = requestId,
+                        ["responseCode"] = 204,
+                        ["responseHeaders"] = Array.Empty<object>()
+                    }).ConfigureAwait(false);
+                } else {
+                    await SendCommandAsync(workerSessionId, "Fetch.failRequest", new Dictionary<string, object> {
+                        ["requestId"] = requestId,
+                        ["errorReason"] = "BlockedByClient"
+                    }).ConfigureAwait(false);
+                }
+                return;
+            }
             Dictionary<string, object> continueArguments = new() { ["requestId"] = requestId };
             if (IsSameOrigin(_origin, url)) {
                 Dictionary<string, string> headers = new(StringComparer.OrdinalIgnoreCase);

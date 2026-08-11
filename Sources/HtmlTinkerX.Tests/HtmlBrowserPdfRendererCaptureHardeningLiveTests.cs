@@ -47,6 +47,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task BrowserPdfMaskCannotBeRemovedByMutationObservers() {
+        const string html = @"<p>public observer marker</p><p id='secret'>observer sensitive value</p><script>
+            new MutationObserver(() => {
+                document.querySelector('#secret').style.setProperty('visibility', 'visible', 'important');
+                document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').forEach(element => element.remove());
+            }).observe(document.documentElement, { subtree: true, childList: true, attributes: true });
+        </script>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            pdfOptions: new HtmlBrowserPdfOptions(maskSelectors: new[] { "#secret" })));
+
+        AssertPdfContains(result.PdfBytes, "public observer marker");
+        AssertPdfDoesNotContain(result.PdfBytes, "observer sensitive value");
+    }
+
+    [Fact]
     public async Task CaptureStyleSheetIgnoresPageOwnedDomMethodOverrides() {
         const string html = @"<p>public stylesheet marker</p><p id='secret'>stylesheet sensitive value</p><script>
             document.querySelector = () => ({ textContent: '' });
@@ -64,5 +84,24 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "public stylesheet marker");
         AssertPdfDoesNotContain(result.PdfBytes, "stylesheet sensitive value");
+    }
+
+    [Fact]
+    public async Task CaptureStyleSheetCannotBeRemovedByBeforePrintHandlers() {
+        const string html = @"<p>public beforeprint style marker</p><p id='secret'>beforeprint style sensitive value</p><script>
+            addEventListener('beforeprint', () => {
+                document.querySelector('style[data-htmltinkerx-pdf-capture-style]')?.remove();
+            });
+        </script>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            styleSheetContent: "#secret { display: none !important; }"));
+
+        AssertPdfContains(result.PdfBytes, "public beforeprint style marker");
+        AssertPdfDoesNotContain(result.PdfBytes, "beforeprint style sensitive value");
     }
 }

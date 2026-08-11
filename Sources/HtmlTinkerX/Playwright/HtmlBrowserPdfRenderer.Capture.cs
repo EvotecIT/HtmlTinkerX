@@ -142,12 +142,17 @@ public sealed partial class HtmlBrowserPdfRenderer {
         ConcurrentQueue<string> blockedRequests = new();
         int blockedRequestCount = 0;
         int blockedRequestSamples = 0;
+        int blockedDocumentRequests = 0;
         List<string> warnings = new();
         void RecordBlockedRequest(string url) {
             Interlocked.Increment(ref blockedRequestCount);
             if (Interlocked.Increment(ref blockedRequestSamples) <= _options.NetworkPolicy.BlockedRequestDiagnosticLimit) {
                 blockedRequests.Enqueue(SanitizeUri(url));
             }
+        }
+        void RecordHeaderPolicyBlocked(string url, bool documentRequest) {
+            RecordBlockedRequest(url);
+            if (documentRequest) Interlocked.Increment(ref blockedDocumentRequests);
         }
         Action<Uri>? blockedByProxy = null;
         if (slot.PolicyProxy != null) {
@@ -181,16 +186,23 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 RecordBlockedRequest(route.Request.Url);
                 await route.AbortAsync("blockedbyclient").ConfigureAwait(false);
             };
+            Func<string, Task<bool>> headerPolicy = url => policy.IsAllowedAsync(
+                url,
+                selectedFileDirectory,
+                _options.ProxyOwnsNetworkResolution,
+                cancellationToken);
             IPage page;
             try {
                 context = await ExecuteCancellableSlotOperationAsync(
                     slot,
                     () => slot.Browser.NewContextAsync(contextOptions),
                     setupCancellationToken).ConfigureAwait(false);
-                await ExecuteCancellableSlotOperationAsync(
-                    slot,
-                    () => context.RouteAsync("**/*", policyRoute),
-                    setupCancellationToken).ConfigureAwait(false);
+                if (request.Headers.Count == 0) {
+                    await ExecuteCancellableSlotOperationAsync(
+                        slot,
+                        () => context.RouteAsync("**/*", policyRoute),
+                        setupCancellationToken).ConfigureAwait(false);
+                }
                 page = await ExecuteCancellableSlotOperationAsync(
                     slot,
                     () => context.NewPageAsync(),
@@ -202,7 +214,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 page.SetDefaultTimeout(request.Readiness.Timeout);
                 storageInitialization = await ExecuteCancellablePageOperationAsync(
                     page,
-                    () => HtmlBrowserStorageInitializer.AddAsync(page, request),
+                    () => HtmlBrowserStorageInitializer.AddAsync(page, request, slot.MarkBroken),
                     setupCancellationToken).ConfigureAwait(false);
                 scopedHeaders = request.Headers.Count == 0
                     ? null
@@ -214,7 +226,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             request.Source.SecurityOrigin,
                             request.Headers,
                             cancellationToken,
-                            slot.MarkBroken),
+                            slot.MarkBroken,
+                            requestAllowed: headerPolicy,
+                            requestBlocked: RecordHeaderPolicyBlocked),
                         setupCancellationToken).ConfigureAwait(false);
                 popupCoordinator = request.Headers.Count == 0
                     ? null
@@ -224,7 +238,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         request.Source.SecurityOrigin,
                         request.Headers,
                         cancellationToken,
-                        slot.MarkBroken);
+                        slot.MarkBroken,
+                        requestAllowed: headerPolicy,
+                        requestBlocked: RecordHeaderPolicyBlocked);
                 if (popupCoordinator != null) {
                     await ExecuteCancellablePageOperationAsync(
                         page,
@@ -236,7 +252,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new TimeoutException($"Browser capture setup did not complete within {_options.SetupTimeout.TotalMilliseconds:0} ms.");
             }
             long navigationStarted = Stopwatch.GetTimestamp();
-            await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
+            try {
+                await LoadSourceAsync(page, request.Source, request.NavigationTimeout, cancellationToken).ConfigureAwait(false);
+            } catch (PlaywrightException) when (Volatile.Read(ref blockedDocumentRequests) > 0 && !page.IsClosed) {
+                // A policy-blocked redirect terminates Chromium's awaited navigation. The
+                // blocked destination has already been replaced with an empty response.
+            }
             if (storageInitialization != null) {
                 await ExecuteCancellablePageOperationAsync(
                     page,
@@ -247,6 +268,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
             long readinessStarted = Stopwatch.GetTimestamp();
             await PreparePageAsync(page, request, cancellationToken).ConfigureAwait(false);
+            scopedHeaders?.ThrowIfFaulted();
             popupCoordinator?.ThrowIfFaulted();
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
 
@@ -276,6 +298,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     () => AbortSlotAsync(slot),
                     pdfToken).ConfigureAwait(false);
                 bytes = HtmlBrowserPdfCapture.ValidateOutputSize(bytes, request.MaximumPdfBytes);
+                scopedHeaders?.ThrowIfFaulted();
                 popupCoordinator?.ThrowIfFaulted();
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && pdfDeadline?.IsCancellationRequested == true) {
                 throw new TimeoutException($"Chromium PDF generation did not complete within {request.PdfTimeout} ms.");

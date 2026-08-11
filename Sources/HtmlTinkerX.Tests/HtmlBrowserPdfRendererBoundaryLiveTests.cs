@@ -614,6 +614,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     private sealed class LoopbackPopupServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
+        private readonly System.Collections.Concurrent.ConcurrentBag<Task> _clients = new();
         private readonly Task _serverTask;
         private string? _lastPopupToken;
         private string? _lastProtectedToken;
@@ -621,6 +622,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastExistingContextToken;
         private string? _lastSubmitAction;
         private string? _lastImageSubmitCoordinates;
+        private string? _lastPopupFetchToken;
+        private string? _lastPopupCssToken;
+        private string? _lastPopupScriptToken;
         private int _blankPopupResourceRequests;
         private readonly string _namedContextInitialUrl;
 
@@ -684,12 +688,28 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
+        internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
+        internal string? LastPopupCssToken => Volatile.Read(ref _lastPopupCssToken);
+        internal string? LastPopupScriptToken => Volatile.Read(ref _lastPopupScriptToken);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
                 try {
-                    using TcpClient client = await _listener.AcceptTcpClientAsync();
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
+                    _clients.Add(HandleClientAsync(client));
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        private async Task HandleClientAsync(TcpClient client) {
+            try {
+                using (client) {
                     using NetworkStream stream = client.GetStream();
+                    using CancellationTokenRegistration registration = _cancellation.Token.Register(client.Dispose);
                     byte[] buffer = new byte[8192];
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length);
                     string request = Encoding.ASCII.GetString(buffer, 0, read);
@@ -735,6 +755,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";
                         body = LastPopupToken == "popup-token" ? "popup authorized" : "popup denied";
+                    } else if (requestTarget.StartsWith("/popup/fetch-result", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupFetchToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "text/plain; charset=utf-8";
+                        body = "popup fetch completed";
+                    } else if (requestTarget.StartsWith("/popup/protected.css", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupCssToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "text/css; charset=utf-8";
+                        body = "body { color: black; }";
+                    } else if (requestTarget.StartsWith("/popup/script-result", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupScriptToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "text/plain; charset=utf-8";
+                        body = "popup script completed";
+                    } else if (requestTarget.StartsWith("/popup-fetch-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = Volatile.Read(ref _lastPopupFetchToken) == "popup-token"
+                            ? "popup fetch authorized"
+                            : "pending";
+                    } else if (requestTarget.StartsWith("/popup-resource-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = Volatile.Read(ref _lastPopupCssToken) == "popup-token"
+                            && Volatile.Read(ref _lastPopupScriptToken) == "popup-token"
+                                ? "popup resources authorized"
+                                : "pending";
                     } else if (requestTarget.StartsWith("/blank-popup-location", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         string result = LastPopupToken == "popup-token" ? "popup authorized" : "popup denied";
@@ -818,11 +861,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\n{locationHeader}Content-Type: {contentType}\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
                     await stream.WriteAsync(response, 0, response.Length);
                     await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length);
-                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
-                    return;
-                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
-                    return;
                 }
+            } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+            } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+            } catch (IOException) when (_cancellation.IsCancellationRequested) {
             }
         }
 
@@ -843,6 +885,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _cancellation.Cancel();
             _listener.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            await Task.WhenAll(_clients.ToArray());
             _cancellation.Dispose();
         }
     }

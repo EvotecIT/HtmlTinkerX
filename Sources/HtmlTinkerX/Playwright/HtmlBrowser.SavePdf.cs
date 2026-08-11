@@ -40,7 +40,7 @@ public static partial class HtmlBrowser {
                     return true;
                 },
                 cancellationToken,
-                freezePageScriptsDuringAction: true),
+                freezePageScriptsDuringAction: options.MaskSensitiveElements || options.MaskSelectors.Count > 0),
             () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }
@@ -72,7 +72,7 @@ public static partial class HtmlBrowser {
                 options.MaskColor,
                 () => page.PdfAsync(pageOptions),
                 cancellationToken,
-                freezePageScriptsDuringAction: true),
+                freezePageScriptsDuringAction: options.MaskSensitiveElements || options.MaskSelectors.Count > 0),
             () => page.CloseAsync(),
             cancellationToken).ConfigureAwait(false);
     }

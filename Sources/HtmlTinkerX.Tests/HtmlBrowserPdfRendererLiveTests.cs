@@ -454,6 +454,23 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ScopedHeadersPreserveTheAllowedHostPolicyAcrossRedirects() {
+        await using LoopbackRedirectServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "localhost" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "scoped" }));
+
+        Assert.Equal(0, server.PrivateRequests);
+        Assert.True(result.Diagnostics.BlockedRequestCount >= 1);
+        Assert.Contains(result.Diagnostics.BlockedRequests, value => value.Contains("127.0.0.1", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task OriginScopedHeadersAreRemovedFromCrossOriginRedirects() {
         await using LoopbackRedirectServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "localhost", "127.0.0.1" });

@@ -12,10 +12,15 @@ using System.Threading.Tasks;
 
 /// <summary>Seeds origin-scoped web storage once per capture before source scripts run.</summary>
 internal static class HtmlBrowserStorageInitializer {
+    private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
     private const string ScriptResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserStorageInitialization.js";
     private static readonly Lazy<string> Script = new(LoadScript, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    internal static async Task<HtmlBrowserStorageInitialization?> AddAsync(IPage page, HtmlBrowserPdfRequest request) {
+    internal static async Task<HtmlBrowserStorageInitialization?> AddAsync(
+        IPage page,
+        HtmlBrowserPdfRequest request,
+        Action? cleanupTimedOut = null,
+        TimeSpan? cleanupTimeout = null) {
         if (request.LocalStorage.Count == 0 && request.SessionStorage.Count == 0) return null;
 
         string statusKeyValue = "htmltinkerxStorage" + Guid.NewGuid().ToString("N");
@@ -34,7 +39,13 @@ internal static class HtmlBrowserStorageInitializer {
             await session.SendAsync("Page.enable").ConfigureAwait(false);
             await session.SendAsync("Runtime.enable").ConfigureAwait(false);
             string mainFrameId = await GetMainFrameIdAsync(session).ConfigureAwait(false);
-            initialization = new HtmlBrowserStorageInitialization(session, worldName, statusKeyValue, mainFrameId);
+            initialization = new HtmlBrowserStorageInitialization(
+                session,
+                worldName,
+                statusKeyValue,
+                mainFrameId,
+                cleanupTimedOut,
+                cleanupTimeout ?? DefaultCleanupTimeout);
             await session.SendAsync("Page.addScriptToEvaluateOnNewDocument", new Dictionary<string, object> {
                 ["source"] = script,
                 ["worldName"] = worldName,
@@ -78,14 +89,24 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
     private readonly string _statusKey;
     private readonly string _mainFrameId;
     private readonly ICDPSessionEvent _contextCreatedEvent;
+    private readonly Action _cleanupTimedOut;
+    private readonly TimeSpan _cleanupTimeout;
     private int _executionContextId;
     private int _disposed;
 
-    internal HtmlBrowserStorageInitialization(ICDPSession session, string worldName, string statusKey, string mainFrameId) {
+    internal HtmlBrowserStorageInitialization(
+        ICDPSession session,
+        string worldName,
+        string statusKey,
+        string mainFrameId,
+        Action? cleanupTimedOut = null,
+        TimeSpan? cleanupTimeout = null) {
         _session = session;
         _worldName = worldName;
         _statusKey = statusKey;
         _mainFrameId = mainFrameId;
+        _cleanupTimedOut = cleanupTimedOut ?? NoOp;
+        _cleanupTimeout = cleanupTimeout ?? TimeSpan.FromSeconds(2);
         _contextCreatedEvent = session.Event("Runtime.executionContextCreated");
         _contextCreatedEvent.OnEvent += HandleExecutionContextCreated;
     }
@@ -136,8 +157,23 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _contextCreatedEvent.OnEvent -= HandleExecutionContextCreated;
-        try { await _session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
+        Task cleanup = _session.DetachAsync();
+        if (await Task.WhenAny(cleanup, Task.Delay(_cleanupTimeout)).ConfigureAwait(false) == cleanup) {
+            try { await cleanup.ConfigureAwait(false); } catch (PlaywrightException) { }
+            return;
+        }
+        _cleanupTimedOut();
+        ObserveLateFault(cleanup);
     }
+
+    private static void ObserveLateFault(Task task) =>
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+    private static void NoOp() { }
 
     private sealed class HtmlBrowserStorageSeedStatus {
         [JsonPropertyName("completed")]

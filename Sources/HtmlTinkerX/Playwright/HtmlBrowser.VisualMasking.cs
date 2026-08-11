@@ -117,26 +117,21 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken,
         bool freezePageScriptsDuringAction = false) {
         string[] selectors = CreateVisualMaskSelectors(maskSensitiveElements, maskSelectors);
-        if (selectors.Length == 0) {
+        if (selectors.Length == 0 && !freezePageScriptsDuringAction) {
             return await action().ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        TemporaryVisualMask mask = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
+        TemporaryVisualMask mask = await ApplyTemporaryVisualMaskAsync(
+            page,
+            selectors,
+            maskColor,
+            cancellationToken,
+            disablePageScripts: freezePageScriptsDuringAction).ConfigureAwait(false);
         try {
             cancellationToken.ThrowIfCancellationRequested();
-            if (freezePageScriptsDuringAction) {
-                await mask.SetPageScriptExecutionDisabledAsync(disabled: true).ConfigureAwait(false);
-            }
             return await action().ConfigureAwait(false);
         } finally {
-            if (freezePageScriptsDuringAction) {
-                try {
-                    await mask.SetPageScriptExecutionDisabledAsync(disabled: false).ConfigureAwait(false);
-                } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
-                    // Cancellation closes the page to interrupt printing; there is no live realm to restore.
-                }
-            }
             try {
                 await mask.DisposeAsync().ConfigureAwait(false);
             } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
@@ -163,7 +158,12 @@ public static partial class HtmlBrowser {
         return selectors.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static async Task<TemporaryVisualMask> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
+    private static async Task<TemporaryVisualMask> ApplyTemporaryVisualMaskAsync(
+        IPage page,
+        string[] selectors,
+        string? maskColor,
+        CancellationToken cancellationToken,
+        bool disablePageScripts = false) {
         cancellationToken.ThrowIfCancellationRequested();
         string color = string.IsNullOrWhiteSpace(maskColor) ? "#000000" : maskColor!;
         string token = Guid.NewGuid().ToString("N");
@@ -174,27 +174,43 @@ public static partial class HtmlBrowser {
         });
         ICDPSession session = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
         List<VisualMaskExecutionContext> executionContexts = new();
+        bool scriptsDisabled = false;
         try {
-            IReadOnlyList<string> frameIds = await GetFrameIdsAsync(session).ConfigureAwait(false);
-            foreach (string frameId in frameIds) {
-                cancellationToken.ThrowIfCancellationRequested();
-                VisualMaskExecutionContext? executionContext = await ApplyVisualMaskToFrameAsync(
-                    session,
-                    frameId,
-                    arguments).ConfigureAwait(false);
-                if (executionContext.HasValue) executionContexts.Add(executionContext.Value);
+            if (disablePageScripts) {
+                await SetPageScriptExecutionDisabledAsync(session, disabled: true).ConfigureAwait(false);
+                scriptsDisabled = true;
+            }
+            if (selectors.Length > 0) {
+                IReadOnlyList<string> frameIds = await GetFrameIdsAsync(session).ConfigureAwait(false);
+                foreach (string frameId in frameIds) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    VisualMaskExecutionContext? executionContext = await ApplyVisualMaskToFrameAsync(
+                        session,
+                        frameId,
+                        arguments).ConfigureAwait(false);
+                    if (executionContext.HasValue) executionContexts.Add(executionContext.Value);
+                }
             }
         } catch (Exception setupError) {
             Exception? cleanupError = null;
             try { await RemoveTemporaryVisualMaskAsync(session, executionContexts, token).ConfigureAwait(false); }
             catch (Exception error) { cleanupError = error; }
+            if (scriptsDisabled) {
+                try { await SetPageScriptExecutionDisabledAsync(session, disabled: false).ConfigureAwait(false); }
+                catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            }
             try { await session.DetachAsync().ConfigureAwait(false); }
             catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
             if (cleanupError != null) throw new AggregateException(setupError, cleanupError);
             throw;
         }
-        return new TemporaryVisualMask(session, executionContexts, token);
+        return new TemporaryVisualMask(session, executionContexts, token, scriptsDisabled);
     }
+
+    private static Task SetPageScriptExecutionDisabledAsync(ICDPSession session, bool disabled) =>
+        session.SendAsync("Emulation.setScriptExecutionDisabled", new Dictionary<string, object> {
+            ["value"] = disabled
+        });
 
     private static async Task<VisualMaskExecutionContext?> ApplyVisualMaskToFrameAsync(
         ICDPSession session,
@@ -316,27 +332,29 @@ public static partial class HtmlBrowser {
         private readonly ICDPSession _session;
         private readonly IReadOnlyList<VisualMaskExecutionContext> _executionContexts;
         private readonly string _token;
+        private readonly bool _scriptsDisabled;
         private int _disposed;
 
         internal TemporaryVisualMask(
             ICDPSession session,
             IReadOnlyList<VisualMaskExecutionContext> executionContexts,
-            string token) {
+            string token,
+            bool scriptsDisabled) {
             _session = session;
             _executionContexts = executionContexts;
             _token = token;
+            _scriptsDisabled = scriptsDisabled;
         }
-
-        internal Task SetPageScriptExecutionDisabledAsync(bool disabled) =>
-            _session.SendAsync("Emulation.setScriptExecutionDisabled", new Dictionary<string, object> {
-                ["value"] = disabled
-            });
 
         public async ValueTask DisposeAsync() {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             Exception? cleanupError = null;
             try { await RemoveTemporaryVisualMaskAsync(_session, _executionContexts, _token).ConfigureAwait(false); }
             catch (Exception error) { cleanupError = error; }
+            if (_scriptsDisabled) {
+                try { await SetPageScriptExecutionDisabledAsync(_session, disabled: false).ConfigureAwait(false); }
+                catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            }
             try { await _session.DetachAsync().ConfigureAwait(false); }
             catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
             if (cleanupError != null) throw cleanupError;

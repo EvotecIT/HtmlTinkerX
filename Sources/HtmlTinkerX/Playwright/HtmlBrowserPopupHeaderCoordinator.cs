@@ -30,6 +30,8 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private readonly EventHandler<IPage> _pageHandler;
     private readonly Action _cleanupTimedOut;
     private readonly TimeSpan _cleanupTimeout;
+    private readonly Func<string, Task<bool>>? _requestAllowed;
+    private readonly Action<string, bool>? _requestBlocked;
     private Exception? _failure;
     private int _disposed;
 
@@ -40,7 +42,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         IReadOnlyDictionary<string, string> captureHeaders,
         CancellationToken cancellationToken,
         Action cleanupTimedOut,
-        TimeSpan? cleanupTimeout = null) {
+        TimeSpan? cleanupTimeout = null,
+        Func<string, Task<bool>>? requestAllowed = null,
+        Action<string, bool>? requestBlocked = null) {
         _context = context;
         _primaryPage = primaryPage;
         _origin = origin;
@@ -48,6 +52,8 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _cancellationToken = cancellationToken;
         _cleanupTimedOut = cleanupTimedOut;
         _cleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
+        _requestAllowed = requestAllowed;
+        _requestBlocked = requestBlocked;
         _pageHandler = OnPage;
         context.Page += _pageHandler;
     }
@@ -86,7 +92,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             _captureHeaders,
             _cancellationToken,
             _cleanupTimedOut,
-            _cleanupTimeout).ConfigureAwait(false);
+            _cleanupTimeout,
+            _requestAllowed,
+            _requestBlocked).ConfigureAwait(false);
         if (!_interceptors.TryAdd(page, interceptor)) {
             await interceptor.DisposeAsync().ConfigureAwait(false);
             return;
