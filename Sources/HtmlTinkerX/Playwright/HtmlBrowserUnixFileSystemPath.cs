@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 
 /// <summary>Classifies existing Unix browser sources without opening or reading their contents.</summary>
 internal static class HtmlBrowserUnixFileSystemPath {
+    private const int CurrentWorkingDirectory = -100;
+    private const uint StatxType = 0x00000001;
     private const uint FileTypeMask = 0xF000;
     private const uint DirectoryType = 0x4000;
     private const uint RegularFileType = 0x8000;
@@ -36,19 +38,9 @@ internal static class HtmlBrowserUnixFileSystemPath {
             return true;
         }
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return false;
-
-        switch (RuntimeInformation.ProcessArchitecture) {
-            case Architecture.X64:
-                if (StatLinuxX64(path, out LinuxX64Stat x64) != 0) return false;
-                mode = x64.Mode;
-                return true;
-            case Architecture.Arm64:
-                if (StatLinuxArm64(path, out LinuxArm64Stat arm64) != 0) return false;
-                mode = arm64.Mode;
-                return true;
-            default:
-                return false;
-        }
+        if (StatLinux(CurrentWorkingDirectory, path, 0, StatxType, out LinuxStat statx) != 0) return false;
+        mode = statx.Mode;
+        return true;
     }
 
     private static bool IsWithin(string path, string root) =>
@@ -60,22 +52,15 @@ internal static class HtmlBrowserUnixFileSystemPath {
         [FieldOffset(4)] internal ushort Mode;
     }
 
-    [StructLayout(LayoutKind.Explicit, Size = 144)]
-    private struct LinuxX64Stat {
-        [FieldOffset(24)] internal uint Mode;
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size = 128)]
-    private struct LinuxArm64Stat {
-        [FieldOffset(16)] internal uint Mode;
+    // Linux statx has one fixed userspace ABI across 32-bit and 64-bit architectures.
+    [StructLayout(LayoutKind.Explicit, Size = 256)]
+    private struct LinuxStat {
+        [FieldOffset(28)] internal ushort Mode;
     }
 
     [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
     private static extern int StatMac(string path, out MacStat stat);
 
-    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
-    private static extern int StatLinuxX64(string path, out LinuxX64Stat stat);
-
-    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
-    private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
+    [DllImport("libc", EntryPoint = "statx", SetLastError = true)]
+    private static extern int StatLinux(int directoryFileDescriptor, string path, int flags, uint mask, out LinuxStat stat);
 }

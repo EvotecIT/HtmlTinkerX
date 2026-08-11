@@ -84,6 +84,33 @@
         return base == null ? '' : base.target;
     };
 
+    const deferBlankFormSubmission = (form, submitter, submit) => {
+        const target = effectiveTarget(form.target, submitter == null ? '' : submitter.formTarget);
+        if (normalizedTarget(target) !== '_blank') return false;
+        const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
+        if (action.origin !== location.origin || String(submitter?.formMethod || form.method).toLowerCase() === 'dialog') return false;
+
+        const popup = originalOpen.call(window, '', '_blank');
+        if (!popup) return false;
+        try { popup.opener = null; } catch { }
+        const popupName = `htmltinkerx-popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        try { popup.name = popupName; } catch { }
+
+        armBlankPopup(popup, '_blank', () => {
+            const previousFormTarget = form.target;
+            const previousSubmitterTarget = submitter == null ? null : submitter.formTarget;
+            form.target = popupName;
+            if (submitter != null) submitter.formTarget = popupName;
+            try {
+                submit();
+            } finally {
+                form.target = previousFormTarget;
+                if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
+            }
+        });
+        return true;
+    };
+
     document.addEventListener('click', event => {
         if (event.defaultPrevented || event.button !== 0) return;
         const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
@@ -106,23 +133,7 @@
         const form = event.target;
         if (!(form instanceof HTMLFormElement) || releasedForms.delete(form) || event.defaultPrevented) return;
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
-        const target = effectiveTarget(form.target, submitter == null ? '' : submitter.formTarget);
-        if (normalizedTarget(target) !== '_blank') return;
-        const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
-        if (action.origin !== location.origin || String(submitter?.formMethod || form.method).toLowerCase() === 'dialog') return;
-
-        event.preventDefault();
-        const popup = originalOpen.call(window, '', '_blank');
-        if (!popup) return;
-        try { popup.opener = null; } catch { }
-        const popupName = `htmltinkerx-popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        try { popup.name = popupName; } catch { }
-
-        armBlankPopup(popup, '_blank', () => {
-            const previousFormTarget = form.target;
-            const previousSubmitterTarget = submitter == null ? null : submitter.formTarget;
-            form.target = popupName;
-            if (submitter != null) submitter.formTarget = popupName;
+        if (deferBlankFormSubmission(form, submitter, () => {
             releasedForms.add(form);
             try {
                 if (typeof form.requestSubmit === 'function') {
@@ -132,9 +143,14 @@
                 }
             } finally {
                 releasedForms.delete(form);
-                form.target = previousFormTarget;
-                if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
             }
-        });
+        })) event.preventDefault();
     }, false);
+
+    HTMLFormElement.prototype.submit = function() {
+        const form = this;
+        if (!deferBlankFormSubmission(form, null, () => originalSubmit.call(form))) {
+            return originalSubmit.call(form);
+        }
+    };
 })();

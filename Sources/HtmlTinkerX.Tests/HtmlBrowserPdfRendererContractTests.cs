@@ -151,6 +151,27 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void RendererOptionsNormalizeBlankOptionalLaunchSettings() {
+        HtmlBrowserPdfRendererOptions options = new(
+            browserChannel: " ",
+            browserExecutablePath: "\t",
+            proxy: "  ",
+            storageStatePath: " ",
+            userAgent: "\t",
+            locale: " ",
+            timezone: "\r\n",
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowPrivateNetworks: true));
+
+        Assert.Null(options.BrowserChannel);
+        Assert.Null(options.BrowserExecutablePath);
+        Assert.Null(options.Proxy);
+        Assert.Null(options.StorageStatePath);
+        Assert.Null(options.UserAgent);
+        Assert.Null(options.Locale);
+        Assert.Null(options.Timezone);
+    }
+
+    [Fact]
     public void ManagedPolicyProxyDisablesTrafficThatCanBypassHttpConnect() {
         HtmlBrowserLaunchOptions protectedLaunch = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
         HtmlBrowserLaunchOptions unrestrictedLaunch = new HtmlBrowserPdfRendererOptions(

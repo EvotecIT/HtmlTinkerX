@@ -198,6 +198,24 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task CdpContextCleanupDisposesItsOwnerWhenCreationNeverCompletes() {
+        TaskCompletionSource<IBrowserContext> pendingContext = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> ownerDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(value => value.Dispose()).Callback(() => ownerDisposed.TrySetResult(true));
+
+        HtmlBrowser.CloseContextWhenCreated(
+            pendingContext.Task,
+            playwright.Object,
+            TimeSpan.FromMilliseconds(25));
+
+        Task completed = await Task.WhenAny(ownerDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+        Assert.Same(ownerDisposed.Task, completed);
+        playwright.Verify(value => value.Dispose(), Times.Once);
+        Assert.False(pendingContext.Task.IsCompleted);
+    }
+
+    [Fact]
     public async Task OpenSessionAsync_CdpRejectsIgnoreHttpsErrorsBecauseExistingContextsCannotBeReconfigured() {
         HtmlBrowserLaunchOptions options = new() {
             CdpEndpointUrl = "http://127.0.0.1:9222",

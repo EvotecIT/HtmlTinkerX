@@ -6,9 +6,10 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DeclarativeSameOriginPopupsWaitForOriginScopedHeaderInterception(bool useForm) {
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task DeclarativeSameOriginPopupsWaitForOriginScopedHeaderInterception(int submissionMode) {
         await using LoopbackPopupServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
@@ -16,15 +17,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: policy));
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
-            HtmlBrowserPdfSource.FromUrl(useForm ? server.DeclarativeFormUrl : server.DeclarativeAnchorUrl),
+            HtmlBrowserPdfSource.FromUrl(submissionMode == 0 ? server.DeclarativeAnchorUrl : server.DeclarativeFormUrl),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'popup authorized'",
                 timeout: 5000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
-            beforeCaptureScript: useForm
-                ? "document.querySelector('form').requestSubmit(); true"
-                : "document.querySelector('a').click(); true"));
+            beforeCaptureScript: submissionMode switch {
+                1 => "document.querySelector('form').requestSubmit(); true",
+                2 => "document.querySelector('form').submit(); true",
+                _ => "document.querySelector('a').click(); true"
+            }));
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
         Assert.Equal("popup-token", server.LastPopupToken);

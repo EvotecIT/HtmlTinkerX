@@ -54,17 +54,17 @@ public sealed class HtmlBrowserPdfRendererOptions {
         MaximumBrowserAge = maximumBrowserAge ?? TimeSpan.FromMinutes(30);
         Headless = headless;
         IgnoreHttpsErrors = ignoreHttpsErrors;
-        BrowserChannel = browserChannel;
-        BrowserExecutablePath = browserExecutablePath;
+        BrowserChannel = NormalizeOptional(browserChannel);
+        BrowserExecutablePath = NormalizeOptional(browserExecutablePath);
         BrowserArguments = Array.AsReadOnly((browserArguments ?? Array.Empty<string>()).Where(value => !string.IsNullOrWhiteSpace(value)).ToArray());
         ChromiumSandbox = chromiumSandbox;
-        Proxy = proxy;
+        Proxy = NormalizeOptional(proxy);
         ProxyUsername = proxyUsername;
         ProxyPassword = proxyPassword;
-        StorageStatePath = storageStatePath;
-        UserAgent = userAgent;
-        Locale = locale;
-        Timezone = timezone;
+        StorageStatePath = NormalizeOptional(storageStatePath);
+        UserAgent = NormalizeOptional(userAgent);
+        Locale = NormalizeOptional(locale);
+        Timezone = NormalizeOptional(timezone);
         ViewportWidth = viewportWidth;
         ViewportHeight = viewportHeight;
         NetworkPolicy = networkPolicy ?? HtmlBrowserNetworkPolicy.PublicNetworkOnly;
@@ -151,4 +151,7 @@ public sealed class HtmlBrowserPdfRendererOptions {
         if (IgnoreHttpsErrors) options.BrowserArguments.Add("--ignore-certificate-errors");
         return options;
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
 }

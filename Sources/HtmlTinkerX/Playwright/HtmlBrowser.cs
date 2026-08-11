@@ -150,17 +150,17 @@ public static partial class HtmlBrowser {
             ? EnsureInstalledAsync(options.Browser)
             : EnsureDriverInstalledAsync();
 
-    private static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
+    internal static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
         var launchOptions = new BrowserTypeLaunchOptions {
             Headless = options.Headless,
             SlowMo = options.SlowMo
         };
 
-        if (!string.IsNullOrEmpty(options.BrowserChannel)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)) {
             launchOptions.Channel = options.BrowserChannel;
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserExecutablePath)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserExecutablePath)) {
             launchOptions.ExecutablePath = options.BrowserExecutablePath!.ToFullPath();
         }
 
@@ -172,7 +172,7 @@ public static partial class HtmlBrowser {
             launchOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
         }
 
-        if (!string.IsNullOrEmpty(options.Proxy)) {
+        if (!string.IsNullOrWhiteSpace(options.Proxy)) {
             launchOptions.Proxy = new Proxy {
                 Server = options.Proxy!,
                 Username = options.ProxyUsername,
@@ -183,7 +183,7 @@ public static partial class HtmlBrowser {
         return launchOptions;
     }
 
-    private static BrowserTypeLaunchPersistentContextOptions CreatePersistentContextOptions(HtmlBrowserLaunchOptions options) {
+    internal static BrowserTypeLaunchPersistentContextOptions CreatePersistentContextOptions(HtmlBrowserLaunchOptions options) {
         BrowserTypeLaunchPersistentContextOptions contextOptions = new() {
             Headless = options.Headless,
             SlowMo = options.SlowMo,
@@ -202,11 +202,11 @@ public static partial class HtmlBrowser {
             };
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserChannel)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)) {
             contextOptions.Channel = options.BrowserChannel;
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserExecutablePath)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserExecutablePath)) {
             contextOptions.ExecutablePath = options.BrowserExecutablePath!.ToFullPath();
         }
 
@@ -218,7 +218,7 @@ public static partial class HtmlBrowser {
             contextOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
         }
 
-        if (!string.IsNullOrEmpty(options.Proxy)) {
+        if (!string.IsNullOrWhiteSpace(options.Proxy)) {
             contextOptions.Proxy = new Proxy {
                 Server = options.Proxy!,
                 Username = options.ProxyUsername,
@@ -277,12 +277,26 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static void CloseContextWhenCreated(Task<IBrowserContext> contextCreation, IPlaywright? playwrightOwner = null) =>
+    internal static void CloseContextWhenCreated(
+        Task<IBrowserContext> contextCreation,
+        IPlaywright? playwrightOwner = null,
+        TimeSpan? cleanupTimeout = null) =>
         StartBestEffortClose(async () => {
             try {
-                IBrowserContext context = await contextCreation.ConfigureAwait(false);
-                await context.CloseAsync().ConfigureAwait(false);
+                Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
+                if (await Task.WhenAny(contextCreation, deadline).ConfigureAwait(false) == contextCreation) {
+                    IBrowserContext context = await contextCreation.ConfigureAwait(false);
+                    await context.CloseAsync().ConfigureAwait(false);
+                } else {
+                    _ = contextCreation.ContinueWith(
+                        static completed => _ = completed.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                }
             } finally {
+                // Disposing this local owner disconnects only the CDP client and guarantees
+                // cleanup even when the externally owned browser never answers NewContext.
                 playwrightOwner?.Dispose();
             }
         });
@@ -312,22 +326,22 @@ public static partial class HtmlBrowser {
         });
 
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
-        if (setStorageState && !string.IsNullOrEmpty(options.StorageStatePath)) {
+        if (setStorageState && !string.IsNullOrWhiteSpace(options.StorageStatePath)) {
             contextOptions.StorageStatePath = options.StorageStatePath;
         }
 
-        if (!string.IsNullOrEmpty(options.VideoPath)) {
+        if (!string.IsNullOrWhiteSpace(options.VideoPath)) {
             string resolved = HtmlUtilities.EnsureDirectoryExists(options.VideoPath!);
             string dir = Path.GetDirectoryName(resolved) ?? resolved;
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = options.VideoWidth, Height = options.VideoHeight };
         }
 
-        if (!string.IsNullOrEmpty(options.UserAgent)) {
+        if (!string.IsNullOrWhiteSpace(options.UserAgent)) {
             contextOptions.UserAgent = options.UserAgent;
         }
 
-        if (!string.IsNullOrEmpty(options.Locale)) {
+        if (!string.IsNullOrWhiteSpace(options.Locale)) {
             contextOptions.Locale = options.Locale;
         }
 
@@ -365,24 +379,24 @@ public static partial class HtmlBrowser {
             contextOptions.Permissions = new[] { "geolocation" };
         }
 
-        if (!string.IsNullOrEmpty(options.Timezone)) {
+        if (!string.IsNullOrWhiteSpace(options.Timezone)) {
             contextOptions.TimezoneId = options.Timezone;
         }
     }
 
     private static void ApplySharedContextOptions(BrowserTypeLaunchPersistentContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
-        if (!string.IsNullOrEmpty(options.VideoPath)) {
+        if (!string.IsNullOrWhiteSpace(options.VideoPath)) {
             string resolved = HtmlUtilities.EnsureDirectoryExists(options.VideoPath!);
             string dir = Path.GetDirectoryName(resolved) ?? resolved;
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = options.VideoWidth, Height = options.VideoHeight };
         }
 
-        if (!string.IsNullOrEmpty(options.UserAgent)) {
+        if (!string.IsNullOrWhiteSpace(options.UserAgent)) {
             contextOptions.UserAgent = options.UserAgent;
         }
 
-        if (!string.IsNullOrEmpty(options.Locale)) {
+        if (!string.IsNullOrWhiteSpace(options.Locale)) {
             contextOptions.Locale = options.Locale;
         }
 
@@ -420,7 +434,7 @@ public static partial class HtmlBrowser {
             contextOptions.Permissions = new[] { "geolocation" };
         }
 
-        if (!string.IsNullOrEmpty(options.Timezone)) {
+        if (!string.IsNullOrWhiteSpace(options.Timezone)) {
             contextOptions.TimezoneId = options.Timezone;
         }
     }
@@ -518,7 +532,7 @@ public static partial class HtmlBrowser {
                 browserInstance,
                 context!,
                 page!,
-                !string.IsNullOrEmpty(options.VideoPath) ? page!.Video : null,
+                !string.IsNullOrWhiteSpace(options.VideoPath) ? page!.Video : null,
                 options.VideoPath,
                 network,
                 resolvedUserDataDirectory,
