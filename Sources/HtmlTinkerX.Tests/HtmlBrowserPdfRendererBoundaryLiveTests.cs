@@ -11,6 +11,39 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task VisualMaskUsesAnOpaqueOverlayForReplacedContentAndRestoresThePage() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync("<img id='secret' alt='sensitive image' style='width:120px;height:80px' src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='>");
+
+        string masked = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#00ff00",
+            action: () => session.Page.EvaluateAsync<string>(@"() => {
+                const secret = document.querySelector('#secret');
+                const overlay = document.querySelector('[data-htmltinkerx-visual-mask-overlay]');
+                const rect = secret.getBoundingClientRect();
+                const overlayRect = overlay.getBoundingClientRect();
+                return [
+                    getComputedStyle(secret).visibility,
+                    document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length,
+                    getComputedStyle(overlay).backgroundColor,
+                    getComputedStyle(overlay).backgroundImage,
+                    overlayRect.width >= rect.width && overlayRect.height >= rect.height
+                ].join('|');
+            }"),
+            cancellationToken: CancellationToken.None);
+
+        Assert.StartsWith("hidden|1|rgb(0, 0, 0)|", masked, StringComparison.Ordinal);
+        Assert.Contains("rgb(0, 255, 0)", masked, StringComparison.Ordinal);
+        Assert.EndsWith("|true", masked, StringComparison.Ordinal);
+        Assert.Equal(
+            "visible|0|width:120px;height:80px",
+            await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length + '|' + secret.getAttribute('style'); }"));
+    }
+
+    [Fact]
     public async Task NearFuturePersistentCookieRemainsAvailableDuringCapture() {
         await using LoopbackHtmlServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });

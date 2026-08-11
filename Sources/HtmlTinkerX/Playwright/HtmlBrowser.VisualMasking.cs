@@ -51,28 +51,48 @@ public static partial class HtmlBrowser {
     private const string ApplyVisualMaskScript =
         @"({ selectors, color }) => {
             const marker = 'data-htmltinkerx-visual-mask';
+            const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
             const previousStyle = 'data-htmltinkerx-visual-mask-style';
             const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
             for (const selector of selectors || []) {
                 if (!selector || !selector.trim()) continue;
                 let elements = [];
-                try { elements = Array.from(document.querySelectorAll(selector)); } catch { continue; }
+                try {
+                    elements = Array.from(document.querySelectorAll(selector))
+                        .filter(element => !element.hasAttribute(overlayMarker));
+                } catch { continue; }
                 for (const element of elements) {
                     if (!(element instanceof HTMLElement)) continue;
-                    if (!element.hasAttribute(marker)) {
-                        const currentStyle = element.getAttribute('style');
-                        element.setAttribute(previousStyle, currentStyle || '');
-                        element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
-                        element.setAttribute(marker, 'true');
-                    }
-                    element.style.setProperty('background-color', color, 'important');
-                    element.style.setProperty('border-color', color, 'important');
-                    element.style.setProperty('box-shadow', 'none', 'important');
-                    element.style.setProperty('caret-color', 'transparent', 'important');
-                    element.style.setProperty('color', 'transparent', 'important');
-                    element.style.setProperty('filter', 'none', 'important');
-                    element.style.setProperty('outline-color', color, 'important');
-                    element.style.setProperty('text-shadow', 'none', 'important');
+                    if (element.hasAttribute(marker)) continue;
+                    const currentStyle = element.getAttribute('style');
+                    element.setAttribute(previousStyle, currentStyle || '');
+                    element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
+                    element.setAttribute(marker, 'true');
+                    const rect = element.getBoundingClientRect();
+                    const computed = getComputedStyle(element);
+                    element.style.setProperty('visibility', 'hidden', 'important');
+
+                    const overlay = document.createElement('div');
+                    overlay.setAttribute(overlayMarker, 'true');
+                    overlay.style.setProperty('position', computed.position === 'fixed' ? 'fixed' : 'absolute', 'important');
+                    overlay.style.setProperty('left', `${rect.left + (computed.position === 'fixed' ? 0 : window.scrollX)}px`, 'important');
+                    overlay.style.setProperty('top', `${rect.top + (computed.position === 'fixed' ? 0 : window.scrollY)}px`, 'important');
+                    overlay.style.setProperty('width', `${rect.width}px`, 'important');
+                    overlay.style.setProperty('height', `${rect.height}px`, 'important');
+                    overlay.style.setProperty('margin', '0', 'important');
+                    overlay.style.setProperty('padding', '0', 'important');
+                    overlay.style.setProperty('border', '0', 'important');
+                    overlay.style.setProperty('background-color', '#000000', 'important');
+                    overlay.style.setProperty('background-image', `linear-gradient(${color}, ${color})`, 'important');
+                    overlay.style.setProperty('box-shadow', 'none', 'important');
+                    overlay.style.setProperty('filter', 'none', 'important');
+                    overlay.style.setProperty('opacity', '1', 'important');
+                    overlay.style.setProperty('visibility', 'visible', 'important');
+                    overlay.style.setProperty('pointer-events', 'none', 'important');
+                    overlay.style.setProperty('z-index', '2147483647', 'important');
+                    overlay.style.setProperty('print-color-adjust', 'exact', 'important');
+                    overlay.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+                    document.documentElement.appendChild(overlay);
                 }
             }
         }";
@@ -155,8 +175,12 @@ public static partial class HtmlBrowser {
         const string restoreScript =
             @"() => {
                 const marker = 'data-htmltinkerx-visual-mask';
+                const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
                 const previousStyle = 'data-htmltinkerx-visual-mask-style';
                 const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
+                for (const overlay of Array.from(document.querySelectorAll('[' + overlayMarker + ']'))) {
+                    overlay.remove();
+                }
                 for (const element of Array.from(document.querySelectorAll('[' + marker + ']'))) {
                     if (!(element instanceof HTMLElement)) {
                         continue;

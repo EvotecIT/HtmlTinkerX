@@ -18,7 +18,8 @@ public sealed class HtmlBrowserNetworkPolicy {
         IEnumerable<string>? allowedHosts = null,
         IEnumerable<string>? deniedHosts = null,
         IEnumerable<string>? allowedFileDirectories = null,
-        int blockedRequestDiagnosticLimit = 32) {
+        int blockedRequestDiagnosticLimit = 32,
+        IEnumerable<string>? nat64Prefixes = null) {
         if (blockedRequestDiagnosticLimit < 0) {
             throw new ArgumentOutOfRangeException(nameof(blockedRequestDiagnosticLimit));
         }
@@ -33,6 +34,13 @@ public sealed class HtmlBrowserNetworkPolicy {
             .Select(Path.GetFullPath)
             .Distinct(PathComparer)
             .ToArray());
+        HtmlBrowserNat64Prefix[] parsedNat64Prefixes = (nat64Prefixes ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(HtmlBrowserNat64Prefix.Parse)
+            .Distinct()
+            .ToArray();
+        Nat64Prefixes = Array.AsReadOnly(parsedNat64Prefixes.Select(prefix => prefix.ToString()).ToArray());
+        ParsedNat64Prefixes = Array.AsReadOnly(parsedNat64Prefixes);
         BlockedRequestDiagnosticLimit = blockedRequestDiagnosticLimit;
     }
 
@@ -54,8 +62,12 @@ public sealed class HtmlBrowserNetworkPolicy {
     public IReadOnlyList<string> DeniedHosts { get; }
     /// <summary>Gets local directories from which file resources may be loaded.</summary>
     public IReadOnlyList<string> AllowedFileDirectories { get; }
+    /// <summary>Gets configured RFC 6052 network-specific NAT64 prefixes used to classify embedded IPv4 destinations.</summary>
+    public IReadOnlyList<string> Nat64Prefixes { get; }
     /// <summary>Gets the maximum number of blocked resource URLs retained in diagnostics.</summary>
     public int BlockedRequestDiagnosticLimit { get; }
+
+    internal IReadOnlyList<HtmlBrowserNat64Prefix> ParsedNat64Prefixes { get; }
 
     internal static StringComparer PathComparer =>
         Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;

@@ -99,7 +99,15 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         Interlocked.Read(ref _recycled),
         Volatile.Read(ref _active),
         Volatile.Read(ref _queued),
-        _available.Count);
+        CountUsableIdleSlots());
+
+    private int CountUsableIdleSlots() {
+        int count = 0;
+        foreach (BrowserSlot slot in _available) {
+            if (!ShouldRecycle(slot)) count++;
+        }
+        return count;
+    }
 
     private async Task<BrowserSlot> RentSlotAsync(CancellationToken cancellationToken) {
         while (_available.TryDequeue(out BrowserSlot? available)) {

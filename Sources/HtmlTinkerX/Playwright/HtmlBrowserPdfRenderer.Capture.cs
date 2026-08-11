@@ -271,8 +271,9 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
     }
 
-    private BrowserNewContextOptions CreateContextOptions(HtmlBrowserPdfRequest request) {
+    internal BrowserNewContextOptions CreateContextOptions(HtmlBrowserPdfRequest request) {
         BrowserNewContextOptions options = new() {
+            AcceptDownloads = false,
             IgnoreHTTPSErrors = _options.IgnoreHttpsErrors,
             BypassCSP = request.BypassContentSecurityPolicy,
             ServiceWorkers = ServiceWorkerPolicy.Block,

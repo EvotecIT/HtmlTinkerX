@@ -20,7 +20,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.Http;
+using System.Net.Security;
 using System.Security.Authentication;
 #endif
 
@@ -355,6 +355,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         await renderer.PreWarmAsync();
         await Task.Delay(20);
+        Assert.Equal(0, renderer.GetMetricsSnapshot().IdleBrowsers);
         await renderer.PreWarmAsync();
 
         HtmlBrowserPdfRendererMetrics metrics = renderer.GetMetricsSnapshot();
@@ -945,30 +946,42 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             // The test browser maps this name to IPv4 so the fixture is independent of host
             // resolver ordering while the TLS handshake still carries the localhost SNI value.
             Url = $"https://localhost:{endpoint.Port}/certificate";
-            WaitUntilReady(Url);
+            WaitUntilReady(endpoint.Port);
         }
 
         internal string Url { get; }
 
-        private static void WaitUntilReady(string url) {
+        private static void WaitUntilReady(int port) {
             Exception? lastError = null;
             Stopwatch deadline = Stopwatch.StartNew();
             while (deadline.Elapsed < TimeSpan.FromSeconds(15)) {
                 try {
-                    using HttpClientHandler handler = new() {
-                        UseProxy = false,
-                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-                        SslProtocols = SslProtocols.Tls12
+                    using TcpClient client = new(AddressFamily.InterNetwork) {
+                        ReceiveTimeout = 2000,
+                        SendTimeout = 2000
                     };
-                    using HttpClient client = new(handler) {
-                        DefaultRequestVersion = HttpVersion.Version11,
-                        DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact,
-                        Timeout = TimeSpan.FromSeconds(2)
-                    };
-                    string body = client.GetStringAsync(url).GetAwaiter().GetResult();
-                    if (body.Contains("trusted TLS page", StringComparison.Ordinal)) return;
+                    client.Connect(IPAddress.Loopback, port);
+                    using SslStream stream = new(
+                        client.GetStream(),
+                        leaveInnerStreamOpen: false,
+                        (_, _, _, _) => true);
+                    stream.ReadTimeout = 2000;
+                    stream.WriteTimeout = 2000;
+                    stream.AuthenticateAsClient("localhost", null, SslProtocols.Tls12, checkCertificateRevocation: false);
+                    byte[] request = Encoding.ASCII.GetBytes("GET /certificate HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+                    stream.Write(request, 0, request.Length);
+                    stream.Flush();
+                    byte[] response = new byte[8192];
+                    StringBuilder body = new();
+                    while (body.Length < 65536) {
+                        int read = stream.Read(response, 0, response.Length);
+                        if (read == 0) break;
+                        body.Append(Encoding.UTF8.GetString(response, 0, read));
+                        if (body.ToString().Contains("200 OK", StringComparison.Ordinal)
+                            && body.ToString().Contains("trusted TLS page", StringComparison.Ordinal)) return;
+                    }
                     lastError = new InvalidOperationException("The loopback HTTPS fixture returned unexpected content.");
-                } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException) {
+                } catch (Exception ex) when (ex is IOException || ex is SocketException || ex is AuthenticationException) {
                     lastError = ex;
                 }
                 Thread.Sleep(100);

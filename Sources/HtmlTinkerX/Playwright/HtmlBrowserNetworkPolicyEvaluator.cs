@@ -109,7 +109,9 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
 
         if (addresses.Length == 0) return Array.Empty<IPAddress>();
         if (MatchesHost(host, _policy.AllowedHosts) || _policy.AllowPrivateNetworks) return addresses;
-        return addresses.All(HtmlBrowserNetworkAddressClassifier.IsGloballyReachable) ? addresses : Array.Empty<IPAddress>();
+        return addresses.All(address => HtmlBrowserNetworkAddressClassifier.IsGloballyReachable(address, _policy.ParsedNat64Prefixes))
+            ? addresses
+            : Array.Empty<IPAddress>();
     }
 
     private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
