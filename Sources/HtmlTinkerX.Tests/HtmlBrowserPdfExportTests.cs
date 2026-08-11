@@ -333,12 +333,23 @@ public class HtmlBrowserPdfExportTests {
     public async Task MaskCleanupDoesNotReplaceActivePdfCancellation() {
         TaskCompletionSource<byte[]> pendingPdf = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool closed = false;
+        var cdp = new Mock<ICDPSession>();
+        cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+                "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
+                "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
+                "Runtime.evaluate" when arguments != null
+                    && arguments.TryGetValue("expression", out object? expression)
+                    && expression.ToString()!.Contains("delete globalThis[stateKey]", StringComparison.Ordinal) =>
+                        Task.FromException<JsonElement?>(new PlaywrightException("Target page has been closed")),
+                _ => Task.FromResult<JsonElement?>(null)
+            });
+        cdp.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
         var page = new Mock<IPage>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(cdp.Object);
+        page.SetupGet(value => value.Context).Returns(context.Object);
         page.SetupGet(p => p.IsClosed).Returns(() => closed);
-        page.Setup(p => p.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
-            .Returns<string, object?>((script, _) => script.Contains("delete document[stateKey]", StringComparison.Ordinal)
-                ? Task.FromException<JsonElement?>(new PlaywrightException("Target page has been closed"))
-                : Task.FromResult<JsonElement?>(null));
         page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>())).Returns(pendingPdf.Task);
         page.Setup(p => p.CloseAsync(It.IsAny<PageCloseOptions>()))
             .Callback(() => closed = true)
@@ -357,9 +368,20 @@ public class HtmlBrowserPdfExportTests {
     [Fact]
     public async Task MaskApplicationHonorsDirectPdfCancellation() {
         TaskCompletionSource<JsonElement?> pendingMask = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cdp = new Mock<ICDPSession>();
+        cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, _) => method switch {
+                "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
+                "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
+                "Runtime.evaluate" => pendingMask.Task,
+                _ => Task.FromResult<JsonElement?>(null)
+            });
+        cdp.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
         var page = new Mock<IPage>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(cdp.Object);
+        page.SetupGet(value => value.Context).Returns(context.Object);
         page.SetupGet(value => value.IsClosed).Returns(false);
-        page.Setup(value => value.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>())).Returns(pendingMask.Task);
         page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(Task.CompletedTask);
         using CancellationTokenSource cancellation = new();
 
@@ -372,5 +394,10 @@ public class HtmlBrowserPdfExportTests {
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => capture);
         page.Verify(value => value.CloseAsync(It.IsAny<PageCloseOptions>()), Times.Once);
         page.Verify(value => value.PdfAsync(It.IsAny<PagePdfOptions>()), Times.Never);
+    }
+
+    private static JsonElement ParseJson(string json) {
+        using JsonDocument document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 }

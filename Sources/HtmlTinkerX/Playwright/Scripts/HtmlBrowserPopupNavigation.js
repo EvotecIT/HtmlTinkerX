@@ -72,6 +72,9 @@
         }
 
         let ready = false;
+        let documentMutationQueued = false;
+        let documentWriteQueued = false;
+        let documentCloseQueued = false;
         const queued = [];
         const runWhenReady = action => {
             if (ready) action();
@@ -82,6 +85,7 @@
             runWhenReady(() => openerFetch(...args).then(resolve, reject));
         });
         const nativeLocation = popup.location;
+        let popupFacade;
         const locationFacade = new Proxy({}, {
             get(_, property) {
                 const value = Reflect.get(nativeLocation, property, nativeLocation);
@@ -95,9 +99,81 @@
                 return true;
             }
         });
-        const popupFacade = new Proxy(popup, {
+        const nativeObjects = new WeakMap();
+        const mutationMethods = new Set([
+            'append', 'appendChild', 'after', 'before', 'click', 'close', 'insertAdjacentElement',
+            'insertAdjacentHTML', 'insertAdjacentText', 'insertBefore', 'open', 'prepend',
+            'remove', 'removeAttribute', 'removeAttributeNS', 'removeChild', 'replaceChild',
+            'replaceChildren', 'replaceWith', 'requestSubmit', 'setAttribute', 'setAttributeNS',
+            'submit', 'toggleAttribute', 'write', 'writeln'
+        ]);
+        const unwrap = value => {
+            const resolve = nativeObjects.get(value);
+            return resolve ? resolve() : value;
+        };
+        const stagedMutationResult = (resolve, property, args) => {
+            if (property === 'open') return stagedObject(resolve);
+            if (['appendChild', 'insertBefore', 'replaceChild', 'removeChild'].includes(property)) {
+                return args.length === 0 ? undefined : args[0];
+            }
+            return undefined;
+        };
+        const stagedObject = resolve => {
+            const value = resolve();
+            if (value === nativeLocation) return locationFacade;
+            if (value === popup) return popupFacade;
+            if (!value || !(value instanceof popup.Node)) return value;
+            const facade = new Proxy({}, {
+                get(_, property) {
+                    const target = resolve();
+                    const member = Reflect.get(target, property, target);
+                    if (typeof member !== 'function') {
+                        return member instanceof popup.Node
+                            ? stagedObject(() => Reflect.get(resolve(), property, resolve()))
+                            : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
+                    }
+                    return (...args) => {
+                        if (!mutationMethods.has(property) || ready) {
+                            const invoke = () => {
+                                const current = resolve();
+                                const currentMember = Reflect.get(current, property, current);
+                                return Reflect.apply(currentMember, current, args.map(unwrap));
+                            };
+                            const initialResult = invoke();
+                            if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
+                            let currentResult = initialResult;
+                            if (!ready) queued.push(() => { currentResult = invoke(); });
+                            return stagedObject(() => currentResult);
+                        }
+                        const result = stagedMutationResult(resolve, property, args);
+                        documentMutationQueued = true;
+                        if (property === 'write' || property === 'writeln') documentWriteQueued = true;
+                        if (property === 'close') documentCloseQueued = true;
+                        queued.push(() => {
+                            const current = resolve();
+                            const currentMember = Reflect.get(current, property, current);
+                            Reflect.apply(currentMember, current, args.map(unwrap));
+                        });
+                        return result;
+                    };
+                },
+                set(_, property, valueToSet) {
+                    if (!ready) documentMutationQueued = true;
+                    runWhenReady(() => {
+                        const current = resolve();
+                        Reflect.set(current, property, unwrap(valueToSet), current);
+                    });
+                    return true;
+                }
+            });
+            nativeObjects.set(facade, resolve);
+            return facade;
+        };
+        const documentFacade = stagedObject(() => popup.document);
+        popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
+                if (property === 'document') return documentFacade;
                 return Reflect.get(targetWindow, property, targetWindow);
             },
             set(targetWindow, property, value) {
@@ -109,8 +185,19 @@
             }
         });
         armBlankPopup(popup, target, () => {
-            ready = true;
-            while (queued.length > 0) queued.shift()();
+            // Run document replacement from the opener realm. Performing document.open()
+            // in the popup's release evaluation destroys that evaluation context before
+            // queued mutations can be replayed.
+            globalThis.setTimeout(() => {
+                if (documentMutationQueued) {
+                    popup.document.open();
+                    popup.document.write('<!doctype html><html><head></head><body></body></html>');
+                    popup.document.close();
+                }
+                ready = true;
+                while (queued.length > 0) queued.shift()();
+                if (documentWriteQueued && !documentCloseQueued) popup.document.close();
+            }, 0);
         });
         return popupFacade;
     };

@@ -1,11 +1,13 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Playwright;
+using UglyToad.PdfPig;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -115,6 +117,82 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task VisualMaskIgnoresPageOwnedSelectorOverrides() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync("<input id='secret' type='password' style='width:140px;height:40px'>");
+        IElementHandle secret = (await session.Page.QuerySelectorAsync("#secret"))!;
+        await session.Page.EvaluateAsync(@"() => {
+            document.querySelectorAll = () => [];
+            Document.prototype.querySelectorAll = () => [];
+            Element.prototype.querySelectorAll = () => [];
+            ShadowRoot.prototype.querySelectorAll = () => [];
+            Document.prototype.createElement = () => { throw new Error('page-owned createElement'); };
+            Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 });
+            CSSStyleDeclaration.prototype.setProperty = () => {};
+        }");
+
+        string masked = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: true,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#000000",
+            action: () => secret.EvaluateAsync<string>("element => getComputedStyle(element).visibility"),
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal("hidden", masked);
+        Assert.Equal("visible|width:140px;height:40px", await secret.EvaluateAsync<string>(
+            "element => getComputedStyle(element).visibility + '|' + element.getAttribute('style')"));
+    }
+
+    [Fact]
+    public async Task BrowserPdfMaskRedactsTextAfterPageScriptsReplaceDomPrimitives() {
+        const string html = @"<p>public artifact marker</p><p id='secret'>sensitive artifact value</p><script>
+            document.querySelectorAll = () => [];
+            Document.prototype.querySelectorAll = () => [];
+            Element.prototype.querySelectorAll = () => [];
+            Document.prototype.createElement = () => { throw new Error('page-owned createElement'); };
+            Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 });
+            CSSStyleDeclaration.prototype.setProperty = () => {};
+        </script>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            pdfOptions: new HtmlBrowserPdfOptions(maskSelectors: new[] { "#secret" })));
+
+        AssertPdfContains(result.PdfBytes, "public artifact marker");
+        AssertPdfDoesNotContain(result.PdfBytes, "sensitive artifact value");
+    }
+
+    [Fact]
+    public async Task VisualMaskAppliesToChildFramesAndRestoresTheirInlineStyles() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync("<iframe srcdoc=\"<input id='secret' style='width:120px;height:30px'>\"></iframe>");
+        IFrame child = session.Page.Frames.Single(frame => !ReferenceEquals(frame, session.Page.MainFrame));
+
+        string masked = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#000000",
+            action: () => child.EvaluateAsync<string>("() => getComputedStyle(document.querySelector('#secret')).visibility"),
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal("hidden", masked);
+        Assert.Equal("visible|width:120px;height:30px", await child.EvaluateAsync<string>(
+            "() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + secret.getAttribute('style'); }"));
+    }
+
+    private static void AssertPdfDoesNotContain(byte[] bytes, string unexpectedText) {
+        using MemoryStream stream = new(bytes, writable: false);
+        using PdfDocument document = PdfDocument.Open(stream);
+        string text = string.Join(" ", document.GetPages().Select(page => page.Text));
+        Assert.DoesNotContain(unexpectedText, text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task NearFuturePersistentCookieRemainsAvailableDuringCapture() {
         await using LoopbackHtmlServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
@@ -200,6 +278,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
     public async Task ExplicitBlankPopupRequestsWaitForOriginScopedHeaderInterception(int operation) {
         await using LoopbackPopupServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
@@ -210,20 +291,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             0 => "const popup = window.open('', '_blank'); popup.fetch('/blank-popup-fetch').then(response => response.text()).then(text => document.querySelector('#result').textContent = text); true",
             1 => "const popup = window.open('about:blank', '_blank'); popup.location = '/blank-popup-location'; true",
             2 => "const popup = window.open('about:blank', '_blank'); popup.location.href = '/blank-popup-location'; true",
-            _ => "const popup = window.open('about:blank', '_blank'); popup.location.assign('/blank-popup-location'); true"
+            3 => "const popup = window.open('about:blank', '_blank'); popup.location.assign('/blank-popup-location'); true",
+            4 => $"const popup = window.open('', '_blank'); popup.document.write(`<iframe src='{server.BlankPopupResourceUrl}'></iframe>`); true",
+            5 => $"const popup = window.open('', '_blank'); popup.document.body.innerHTML = `<iframe src='{server.BlankPopupResourceUrl}'></iframe>`; true",
+            _ => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); frame.src = '{server.BlankPopupResourceUrl}'; popup.document.body.appendChild(frame); true"
         };
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(
-                skipLoadState: true,
-                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
-                timeout: 10000),
+            readiness: operation >= 4
+                ? new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 2000)
+                : new HtmlBrowserPdfReadiness(
+                    skipLoadState: true,
+                    function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                    timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
-        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.True(operation < 4 || server.BlankPopupResourceRequests > 0, "The staged popup resource request was not observed by the origin server.");
         Assert.Equal("popup-token", server.LastPopupToken);
+        if (operation < 4) AssertPdfContains(result.PdfBytes, "popup authorized");
     }
 
     [Fact]
@@ -553,6 +640,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupReferer;
         private string? _lastExistingContextToken;
         private string? _lastSubmitAction;
+        private int _blankPopupResourceRequests;
         private readonly string _namedContextInitialUrl;
 
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
@@ -560,6 +648,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
+            BlankPopupResourceUrl = $"http://127.0.0.1:{port}/blank-popup-resource";
             NestedPopupUrl = $"http://127.0.0.1:{port}/nested-main";
             NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
@@ -583,6 +672,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
 
         internal string HeaderUrl { get; }
+        internal string BlankPopupResourceUrl { get; }
         internal string NestedPopupUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
@@ -606,6 +696,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
+        internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -650,6 +741,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         string result = LastPopupToken == "popup-token" ? "popup authorized" : "popup denied";
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
+                    } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
+                        Interlocked.Increment(ref _blankPopupResourceRequests);
+                        Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "application/javascript; charset=utf-8";
+                        body = "void 0;";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";

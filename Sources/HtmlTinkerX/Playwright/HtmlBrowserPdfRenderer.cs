@@ -67,7 +67,14 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
                 await RecycleUnavailableIdleSlotsAsync().ConfigureAwait(false);
                 while (_slots.Count < _options.MinimumBrowserInstances) {
                     operationToken.ThrowIfCancellationRequested();
-                    BrowserSlot slot = await CreateSlotAsync(operationToken).ConfigureAwait(false);
+                    using CancellationTokenSource setupDeadline = CancellationTokenSource.CreateLinkedTokenSource(operationToken);
+                    setupDeadline.CancelAfter(_options.SetupTimeout);
+                    BrowserSlot slot;
+                    try {
+                        slot = await CreateSlotAsync(setupDeadline.Token).ConfigureAwait(false);
+                    } catch (OperationCanceledException) when (!operationToken.IsCancellationRequested && setupDeadline.IsCancellationRequested) {
+                        throw new TimeoutException($"Browser prewarm setup did not complete within {_options.SetupTimeout.TotalMilliseconds:0} ms.");
+                    }
                     _available.Enqueue(slot);
                 }
             } finally {

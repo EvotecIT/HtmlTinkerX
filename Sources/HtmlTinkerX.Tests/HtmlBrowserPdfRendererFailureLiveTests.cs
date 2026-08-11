@@ -9,6 +9,32 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task PreWarmSetupDeadlineIncludesBrowserProvisioning() {
+        TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>())).Returns(pendingBrowser.Task);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        try {
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                minimumBrowserInstances: 1,
+                maximumBrowserInstances: 1,
+                setupTimeout: TimeSpan.FromMilliseconds(25),
+                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+            TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.PreWarmAsync());
+
+            Assert.Contains("prewarm setup", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, renderer.GetMetricsSnapshot().BrowsersCreated);
+        } finally {
+            pendingBrowser.TrySetResult(Mock.Of<IBrowser>());
+            await Task.Yield();
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task SetupDeadlineIncludesBrowserProvisioningBeforeASlotExists() {
         TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var browserType = new Mock<IBrowserType>();

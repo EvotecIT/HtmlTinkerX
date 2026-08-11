@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -51,11 +52,11 @@ public static partial class HtmlBrowser {
     private const string ApplyVisualMaskScript =
         @"({ selectors, color, token }) => {
             const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
-            const stateKey = Symbol.for('htmltinkerx-visual-mask:' + token);
-            let state = document[stateKey];
+            const stateKey = 'htmltinkerxVisualMask' + token;
+            let state = globalThis[stateKey];
             if (!state) {
                 state = { masked: [], overlays: [], seen: new WeakSet() };
-                Object.defineProperty(document, stateKey, { value: state, configurable: true });
+                Object.defineProperty(globalThis, stateKey, { value: state, configurable: true });
             }
             const roots = [document];
             for (let index = 0; index < roots.length; index++) {
@@ -120,13 +121,13 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        (string token, IReadOnlyList<IFrame> maskedChildFrames) = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
+        TemporaryVisualMask mask = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
         try {
             cancellationToken.ThrowIfCancellationRequested();
             return await action().ConfigureAwait(false);
         } finally {
             try {
-                await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames, token).ConfigureAwait(false);
+                await mask.DisposeAsync().ConfigureAwait(false);
             } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
                 // Cancellation closes the page to interrupt Playwright. Preserve the original
                 // cancellation instead of replacing it with cleanup failure from the closed page.
@@ -151,43 +152,79 @@ public static partial class HtmlBrowser {
         return selectors.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static async Task<(string Token, IReadOnlyList<IFrame> MaskedChildFrames)> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
+    private static async Task<TemporaryVisualMask> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         string color = string.IsNullOrWhiteSpace(maskColor) ? "#000000" : maskColor!;
         string token = Guid.NewGuid().ToString("N");
-        object arguments = new {
+        string arguments = JsonSerializer.Serialize(new {
             selectors,
             color,
             token
-        };
-        await page.EvaluateAsync(ApplyVisualMaskScript, arguments).ConfigureAwait(false);
-
-        List<IFrame> maskedChildFrames = new();
-        IReadOnlyList<IFrame>? frames = page.Frames;
-        if (frames == null) return (token, maskedChildFrames);
+        });
+        ICDPSession session = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
+        List<int> executionContexts = new();
         try {
-            foreach (IFrame frame in frames) {
-                if (ReferenceEquals(frame, page.MainFrame)) continue;
+            JsonElement? treeResult = await session.SendAsync("Page.getFrameTree").ConfigureAwait(false);
+            if (!treeResult.HasValue || !treeResult.Value.TryGetProperty("frameTree", out JsonElement frameTree)) {
+                throw new PlaywrightException("Chromium did not return a frame tree for visual masking.");
+            }
+            List<string> frameIds = new();
+            AddFrameIds(frameTree, frameIds);
+            foreach (string frameId in frameIds) {
                 cancellationToken.ThrowIfCancellationRequested();
-                try {
-                    await frame.EvaluateAsync(ApplyVisualMaskScript, arguments).ConfigureAwait(false);
-                    maskedChildFrames.Add(frame);
-                } catch (PlaywrightException) when (frame.IsDetached) {
-                    // Detached frames are no longer part of the artifact.
+                JsonElement? worldResult = await session.SendAsync("Page.createIsolatedWorld", new Dictionary<string, object> {
+                    ["frameId"] = frameId,
+                    ["worldName"] = "HtmlTinkerX.VisualMask",
+                    ["grantUniveralAccess"] = false
+                }).ConfigureAwait(false);
+                if (!worldResult.HasValue
+                    || !worldResult.Value.TryGetProperty("executionContextId", out JsonElement contextIdElement)
+                    || !contextIdElement.TryGetInt32(out int contextId)) {
+                    throw new PlaywrightException("Chromium did not create an isolated execution world for visual masking.");
                 }
+                await EvaluateInIsolatedWorldAsync(session, contextId, $"({ApplyVisualMaskScript})({arguments})").ConfigureAwait(false);
+                executionContexts.Add(contextId);
             }
         } catch {
-            try { await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames, token).ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await RemoveTemporaryVisualMaskAsync(session, executionContexts, token).ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
             throw;
         }
-        return (token, maskedChildFrames);
+        return new TemporaryVisualMask(session, executionContexts, token);
     }
 
-    private static async Task RemoveTemporaryVisualMaskAsync(IPage page, IReadOnlyList<IFrame> maskedChildFrames, string token) {
+    private static void AddFrameIds(JsonElement frameTree, List<string> frameIds) {
+        if (frameTree.TryGetProperty("frame", out JsonElement frame)
+            && frame.TryGetProperty("id", out JsonElement id)
+            && !string.IsNullOrWhiteSpace(id.GetString())) {
+            frameIds.Add(id.GetString()!);
+        }
+        if (!frameTree.TryGetProperty("childFrames", out JsonElement children)
+            || children.ValueKind != JsonValueKind.Array) return;
+        foreach (JsonElement child in children.EnumerateArray()) AddFrameIds(child, frameIds);
+    }
+
+    private static async Task EvaluateInIsolatedWorldAsync(ICDPSession session, int executionContextId, string expression) {
+        JsonElement? result = await session.SendAsync("Runtime.evaluate", new Dictionary<string, object> {
+            ["expression"] = expression,
+            ["contextId"] = executionContextId,
+            ["awaitPromise"] = true,
+            ["returnByValue"] = true
+        }).ConfigureAwait(false);
+        if (result.HasValue && result.Value.TryGetProperty("exceptionDetails", out JsonElement exception)) {
+            string message = exception.TryGetProperty("exception", out JsonElement thrown)
+                && thrown.TryGetProperty("description", out JsonElement description)
+                ? description.GetString() ?? "Visual masking failed in Chromium's isolated world."
+                : "Visual masking failed in Chromium's isolated world.";
+            throw new PlaywrightException(message);
+        }
+    }
+
+    private static async Task RemoveTemporaryVisualMaskAsync(ICDPSession session, IReadOnlyList<int> executionContexts, string token) {
         const string restoreScript =
             @"({ token }) => {
-                const stateKey = Symbol.for('htmltinkerx-visual-mask:' + token);
-                const state = document[stateKey];
+                const stateKey = 'htmltinkerxVisualMask' + token;
+                const state = globalThis[stateKey];
                 if (!state) return;
                 for (const overlay of state.overlays) overlay.remove();
                 for (const item of state.masked) {
@@ -198,15 +235,36 @@ public static partial class HtmlBrowser {
                         item.element.setAttribute('style', item.style);
                     }
                 }
-                delete document[stateKey];
+                delete globalThis[stateKey];
             }";
-        object arguments = new { token };
-        await page.EvaluateAsync(restoreScript, arguments).ConfigureAwait(false);
-        foreach (IFrame frame in maskedChildFrames) {
+        string arguments = JsonSerializer.Serialize(new { token });
+        foreach (int executionContext in executionContexts) {
             try {
-                await frame.EvaluateAsync(restoreScript, arguments).ConfigureAwait(false);
-            } catch (PlaywrightException) when (frame.IsDetached) {
-                // Detached frames no longer require restoration.
+                await EvaluateInIsolatedWorldAsync(session, executionContext, $"({restoreScript})({arguments})").ConfigureAwait(false);
+            } catch (PlaywrightException) {
+                // Detached or navigated frames no longer contain the masked document.
+            }
+        }
+    }
+
+    private sealed class TemporaryVisualMask : IAsyncDisposable {
+        private readonly ICDPSession _session;
+        private readonly IReadOnlyList<int> _executionContexts;
+        private readonly string _token;
+        private int _disposed;
+
+        internal TemporaryVisualMask(ICDPSession session, IReadOnlyList<int> executionContexts, string token) {
+            _session = session;
+            _executionContexts = executionContexts;
+            _token = token;
+        }
+
+        public async ValueTask DisposeAsync() {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            try {
+                await RemoveTemporaryVisualMaskAsync(_session, _executionContexts, _token).ConfigureAwait(false);
+            } finally {
+                await _session.DetachAsync().ConfigureAwait(false);
             }
         }
     }
