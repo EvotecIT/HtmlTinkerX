@@ -421,6 +421,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             StorageUrl = $"http://127.0.0.1:{port}/storage-main";
             ExistingContextUrl = $"http://127.0.0.1:{port}/existing-context-main";
             NamedContextUrl = $"http://127.0.0.1:{port}/named-context-main";
+            DeclarativeAnchorUrl = $"http://127.0.0.1:{port}/declarative-anchor-main";
+            DeclarativeFormUrl = $"http://127.0.0.1:{port}/declarative-form-main";
             _serverTask = ServeAsync();
         }
 
@@ -429,6 +431,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string StorageUrl { get; }
         internal string ExistingContextUrl { get; }
         internal string NamedContextUrl { get; }
+        internal string DeclarativeAnchorUrl { get; }
+        internal string DeclarativeFormUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
@@ -456,6 +460,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token" ? "popup authorized" : "popup denied";
+                    } else if (requestTarget.StartsWith("/popup-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token" ? "popup authorized" : "pending";
                     } else if (requestTarget.StartsWith("/storage-popup", StringComparison.Ordinal)) {
                         body = "<script>localStorage.setItem('observed', localStorage.getItem('token') || 'missing'); close();</script>";
                     } else if (requestTarget.StartsWith("/storage-main", StringComparison.Ordinal)) {
@@ -472,6 +479,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p>";
                     } else if (requestTarget.StartsWith("/header-noopener-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>setInterval(() => document.querySelector('#result').textContent = localStorage.getItem('popup-result') || 'pending', 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-anchor-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-form-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><form action='/header-popup' method='post' target='_blank'><button type='submit'>open</button></form><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     }

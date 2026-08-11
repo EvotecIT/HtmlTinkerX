@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 /// </summary>
 public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     private readonly HtmlBrowserPdfRendererOptions _options;
+    private readonly HtmlBrowserNetworkPolicyEvaluator _networkPolicy;
     private readonly SemaphoreSlim _admissionGate;
     private readonly SemaphoreSlim _leaseGate;
     private readonly SemaphoreSlim _poolMutation = new(1, 1);
@@ -38,6 +39,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     /// <summary>Initializes a pooled Chromium PDF renderer.</summary>
     public HtmlBrowserPdfRenderer(HtmlBrowserPdfRendererOptions? options = null) {
         _options = options ?? new HtmlBrowserPdfRendererOptions();
+        _networkPolicy = new HtmlBrowserNetworkPolicyEvaluator(_options.NetworkPolicy);
         if (!_options.NetworkPolicy.AllowPrivateNetworks && !string.IsNullOrWhiteSpace(_options.Proxy)) {
             throw new ArgumentException("A caller-supplied proxy cannot be combined with public-network-only enforcement because HtmlTinkerX cannot bind the proxy's DNS decision to the remote socket. Enable private-network access explicitly when the trusted proxy owns that boundary.", nameof(options));
         }

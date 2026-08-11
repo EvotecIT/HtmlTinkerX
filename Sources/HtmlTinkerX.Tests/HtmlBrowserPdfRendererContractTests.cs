@@ -380,18 +380,21 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         int calls = 0;
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
-            _ => Interlocked.Increment(ref calls) == 1
-                ? pendingLookup.Task
-                : Task.FromResult(new[] { IPAddress.Parse("8.8.8.8") }),
+            _ => {
+                Interlocked.Increment(ref calls);
+                return pendingLookup.Task;
+            },
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
         Assert.Same(allowed, await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(2))));
         Assert.False(await allowed);
-        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
-        Assert.Equal(2, calls);
+        Assert.False(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
+        Assert.Equal(1, calls);
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
+        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
+        Assert.Equal(1, calls);
     }
 
     [Fact]

@@ -58,7 +58,15 @@ internal static class HtmlBrowserFileSystemPath {
                 if (IsWindowsUnsafeDriveRoot(root, GetDriveType, QueryDosDeviceTarget)) return false;
                 return !ContainsWindowsReparsePoint(fullPath);
             }
-            return true;
+            if (HtmlBrowserUnixFileSystemPath.IsPseudoFileSystemPath(fullPath)) return false;
+            string resolved;
+            try {
+                resolved = ResolveUnixPath(fullPath);
+            } catch (Win32Exception ex) when (ex.NativeErrorCode == 2) {
+                // Preserve validation of not-yet-created ordinary local paths.
+                return true;
+            }
+            return HtmlBrowserUnixFileSystemPath.IsRegularFileOrDirectory(resolved);
         } catch {
             // Path safety checks fail closed before existence or content probes.
             return false;

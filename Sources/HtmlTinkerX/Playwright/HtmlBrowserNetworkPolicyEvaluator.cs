@@ -96,7 +96,8 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
                 entry = GetOrRefreshDnsEntry(host);
                 addresses = await WaitAsync(entry.Lookup, deadline.Token).ConfigureAwait(false);
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
-                if (entry != null) RemoveDnsEntry(host, entry);
+                // Retain an unfinished lookup so later requests share the same globally bounded
+                // work instead of consuming another permit while the resolver is still running.
                 return Array.Empty<IPAddress>();
             } catch (SocketException) {
                 if (entry != null) RemoveDnsEntry(host, entry);

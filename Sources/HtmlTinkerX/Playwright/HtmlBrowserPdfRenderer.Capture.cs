@@ -35,7 +35,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             bool leaseAcquired = false;
             bool countedAsQueued = false;
             try {
-                HtmlBrowserNetworkPolicyEvaluator policy = new(_options.NetworkPolicy);
+                HtmlBrowserNetworkPolicyEvaluator policy = _networkPolicy;
                 string? selectedFileDirectory = request.Source.Kind == HtmlBrowserPdfSourceKind.File
                     ? Path.GetDirectoryName(request.Source.FilePath!)
                     : request.Source.FileBaseDirectory;

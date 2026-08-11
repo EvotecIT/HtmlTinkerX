@@ -2,7 +2,6 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -24,6 +23,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackHttpsServer server = new();
         HtmlBrowserNetworkPolicy policy = new(allowPrivateNetworks: true);
         string[] browserArguments = { "--host-resolver-rules=MAP localhost 127.0.0.1" };
+        HtmlBrowserPdfResult result;
+        await using (HtmlBrowserPdfRenderer trusted = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            ignoreHttpsErrors: true,
+            browserArguments: browserArguments,
+            networkPolicy: policy))) {
+            result = await trusted.CaptureAsync(
+                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url)));
+        }
+
         await using (HtmlBrowserPdfRenderer strict = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             browserArguments: browserArguments,
@@ -31,14 +40,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             await Assert.ThrowsAsync<PlaywrightException>(() => strict.CaptureAsync(
                 new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url))));
         }
-
-        await using HtmlBrowserPdfRenderer trusted = new(new HtmlBrowserPdfRendererOptions(
-            maximumBrowserInstances: 1,
-            ignoreHttpsErrors: true,
-            browserArguments: browserArguments,
-            networkPolicy: policy));
-        HtmlBrowserPdfResult result = await trusted.CaptureAsync(
-            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromUrl(server.Url)));
 
         AssertPdfContains(result.PdfBytes, "trusted TLS page");
     }
@@ -67,12 +68,30 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             usages.Add(new Oid("1.3.6.1.5.5.7.3.1"));
             request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, false));
             request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-            _certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1));
+            using X509Certificate2 generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(1));
+            string password = Guid.NewGuid().ToString("N");
+            byte[] pfx = generated.Export(X509ContentType.Pfx, password);
+            try {
+#if NET10_0_OR_GREATER
+                _certificate = X509CertificateLoader.LoadPkcs12(
+                    pfx,
+                    password,
+                    X509KeyStorageFlags.Exportable);
+#else
+#pragma warning disable SYSLIB0057
+                _certificate = new X509Certificate2(
+                    pfx,
+                    password,
+                    X509KeyStorageFlags.Exportable);
+#pragma warning restore SYSLIB0057
+#endif
+            } finally {
+                Array.Clear(pfx, 0, pfx.Length);
+            }
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             Url = $"https://localhost:{port}/certificate";
             _serverTask = ServeAsync();
-            WaitUntilReady(port);
         }
 
         internal string Url { get; }
@@ -105,8 +124,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 try {
                     await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions {
                         ServerCertificate = _certificate,
-                        EnabledSslProtocols = SslProtocols.Tls12,
-                        ApplicationProtocols = new System.Collections.Generic.List<SslApplicationProtocol> { SslApplicationProtocol.Http11 }
+                        EnabledSslProtocols = SslProtocols.None
                     }, _cancellation.Token);
                     byte[] request = new byte[16384];
                     int totalRead = 0;
@@ -134,47 +152,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     // The strict browser can close immediately after certificate validation.
                 }
             }
-        }
-
-        private static void WaitUntilReady(int port) {
-            Exception? lastError = null;
-            Stopwatch deadline = Stopwatch.StartNew();
-            while (deadline.Elapsed < TimeSpan.FromSeconds(15)) {
-                try {
-                    using TcpClient client = new(AddressFamily.InterNetwork) {
-                        ReceiveTimeout = 2000,
-                        SendTimeout = 2000
-                    };
-                    client.Connect(IPAddress.Loopback, port);
-                    using SslStream stream = new(client.GetStream(), false, (_, _, _, _) => true) {
-                        ReadTimeout = 2000,
-                        WriteTimeout = 2000
-                    };
-                    stream.AuthenticateAsClient(new SslClientAuthenticationOptions {
-                        TargetHost = "localhost",
-                        EnabledSslProtocols = SslProtocols.Tls12,
-                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
-                        ApplicationProtocols = new System.Collections.Generic.List<SslApplicationProtocol> { SslApplicationProtocol.Http11 }
-                    });
-                    byte[] request = Encoding.ASCII.GetBytes("GET /certificate HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-                    stream.Write(request, 0, request.Length);
-                    stream.Flush();
-                    byte[] response = new byte[8192];
-                    StringBuilder body = new();
-                    while (body.Length < 65536) {
-                        int read = stream.Read(response, 0, response.Length);
-                        if (read == 0) break;
-                        body.Append(Encoding.UTF8.GetString(response, 0, read));
-                        if (body.ToString().Contains("200 OK", StringComparison.Ordinal)
-                            && body.ToString().Contains("trusted TLS page", StringComparison.Ordinal)) return;
-                    }
-                    lastError = new InvalidOperationException("The loopback HTTPS fixture returned unexpected content.");
-                } catch (Exception ex) when (ex is IOException || ex is SocketException || ex is AuthenticationException) {
-                    lastError = ex;
-                }
-                Thread.Sleep(100);
-            }
-            throw new InvalidOperationException("The loopback HTTPS fixture did not complete a TLS request.", lastError);
         }
 
         public async ValueTask DisposeAsync() {
