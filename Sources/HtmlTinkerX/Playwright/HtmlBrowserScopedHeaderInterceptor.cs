@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 
 /// <summary>Injects capture-scoped Chromium request headers without buffering responses.</summary>
 internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
+    private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
     private readonly ICDPSession _session;
     private readonly Uri? _origin;
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
@@ -20,16 +21,23 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly EventHandler<JsonElement?> _targetAttachedHandler;
     private readonly EventHandler<JsonElement?> _targetMessageHandler;
     private readonly EventHandler<JsonElement?> _targetDetachedHandler;
+    private readonly TimeSpan _cleanupTimeout;
+    private readonly Action _cleanupTimedOut;
     private long _nextWorkerCommandId;
     private int _disposed;
+    private int _subscribed;
 
-    private HtmlBrowserScopedHeaderInterceptor(
+    internal HtmlBrowserScopedHeaderInterceptor(
         ICDPSession session,
         Uri? origin,
-        IReadOnlyDictionary<string, string> captureHeaders) {
+        IReadOnlyDictionary<string, string> captureHeaders,
+        TimeSpan? cleanupTimeout = null,
+        Action? cleanupTimedOut = null) {
         _session = session;
         _origin = origin;
         _captureHeaders = captureHeaders;
+        _cleanupTimeout = cleanupTimeout ?? DefaultCleanupTimeout;
+        _cleanupTimedOut = cleanupTimedOut ?? NoOp;
         _handler = OnRequestPaused;
         _targetAttachedHandler = OnTargetAttached;
         _targetMessageHandler = OnTargetMessage;
@@ -41,14 +49,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         IPage page,
         Uri? origin,
         IReadOnlyDictionary<string, string> captureHeaders,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        Action? cleanupTimedOut = null,
+        TimeSpan? cleanupTimeout = null) {
         cancellationToken.ThrowIfCancellationRequested();
         ICDPSession session = await context.NewCDPSessionAsync(page).ConfigureAwait(false);
-        HtmlBrowserScopedHeaderInterceptor interceptor = new(session, origin, captureHeaders);
-        session.Event("Fetch.requestPaused").OnEvent += interceptor._handler;
-        session.Event("Target.attachedToTarget").OnEvent += interceptor._targetAttachedHandler;
-        session.Event("Target.receivedMessageFromTarget").OnEvent += interceptor._targetMessageHandler;
-        session.Event("Target.detachedFromTarget").OnEvent += interceptor._targetDetachedHandler;
+        HtmlBrowserScopedHeaderInterceptor interceptor = new(session, origin, captureHeaders, cleanupTimeout, cleanupTimedOut);
+        interceptor.Subscribe();
         try {
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
                 ["patterns"] = CreateFetchPatterns()
@@ -185,6 +192,16 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Unsubscribe();
+        Task cleanup = DisposeCoreAsync();
+        if (await Task.WhenAny(cleanup, Task.Delay(_cleanupTimeout)).ConfigureAwait(false) == cleanup) {
+            await cleanup.ConfigureAwait(false);
+            return;
+        }
+        _cleanupTimedOut();
+        ObserveLateFault(cleanup);
+    }
+
+    private async Task DisposeCoreAsync() {
         try {
             await _session.SendAsync("Target.setAutoAttach", new Dictionary<string, object> {
                 ["autoAttach"] = false,
@@ -209,7 +226,25 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try { await _session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
     }
 
+    private static void ObserveLateFault(Task task) =>
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+    private static void NoOp() { }
+
+    private void Subscribe() {
+        if (Interlocked.Exchange(ref _subscribed, 1) != 0) return;
+        _session.Event("Fetch.requestPaused").OnEvent += _handler;
+        _session.Event("Target.attachedToTarget").OnEvent += _targetAttachedHandler;
+        _session.Event("Target.receivedMessageFromTarget").OnEvent += _targetMessageHandler;
+        _session.Event("Target.detachedFromTarget").OnEvent += _targetDetachedHandler;
+    }
+
     private void Unsubscribe() {
+        if (Interlocked.Exchange(ref _subscribed, 0) == 0) return;
         _session.Event("Fetch.requestPaused").OnEvent -= _handler;
         _session.Event("Target.attachedToTarget").OnEvent -= _targetAttachedHandler;
         _session.Event("Target.receivedMessageFromTarget").OnEvent -= _targetMessageHandler;

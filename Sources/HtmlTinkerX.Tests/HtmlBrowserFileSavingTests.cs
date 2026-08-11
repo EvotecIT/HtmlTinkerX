@@ -105,7 +105,7 @@ public class HtmlBrowserFileSavingTests {
         var page = new Mock<IPage>();
         page.Setup(p => p.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
             .Callback<string, object?>((script, argument) => {
-                operations.Add(script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "restore" : "mask");
+                operations.Add(script.Contains("delete document[stateKey]", StringComparison.Ordinal) ? "restore" : "mask");
                 evaluateArguments.Add(argument);
             })
             .ReturnsAsync((JsonElement?)default);
@@ -141,14 +141,14 @@ public class HtmlBrowserFileSavingTests {
         childFrame.SetupGet(frame => frame.IsDetached).Returns(false);
         childFrame.Setup(frame => frame.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
             .Callback<string, object?>((script, _) => operations.Add(
-                script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "child-restore" : "child-mask"))
+                script.Contains("delete document[stateKey]", StringComparison.Ordinal) ? "child-restore" : "child-mask"))
             .ReturnsAsync((JsonElement?)default);
         var page = new Mock<IPage>();
         page.SetupGet(value => value.MainFrame).Returns(mainFrame.Object);
         page.SetupGet(value => value.Frames).Returns(new[] { mainFrame.Object, childFrame.Object });
         page.Setup(value => value.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
             .Callback<string, object?>((script, _) => operations.Add(
-                script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal) ? "main-restore" : "main-mask"))
+                script.Contains("delete document[stateKey]", StringComparison.Ordinal) ? "main-restore" : "main-mask"))
             .ReturnsAsync((JsonElement?)default);
         page.Setup(value => value.PdfAsync(It.IsAny<PagePdfOptions>()))
             .Callback<PagePdfOptions>(options => {

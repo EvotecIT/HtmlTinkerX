@@ -1,34 +1,38 @@
 (() => {
     const originalOpen = window.open;
     const originalSubmit = HTMLFormElement.prototype.submit;
-    const releasedForms = new WeakSet();
     const specialTargets = ['_self', '_parent', '_top'];
 
     const normalizedTarget = target => target == null || String(target).length === 0
         ? '_blank'
         : String(target).toLowerCase();
 
+    const normalizedDeclarativeTarget = target => target == null || String(target).length === 0
+        ? '_self'
+        : String(target).toLowerCase();
+
+    const targetsExistingFrame = target => {
+        if (target == null || String(target).length === 0) return false;
+        return Array.from(document.querySelectorAll('iframe[name], frame[name]'))
+            .some(frame => frame.getAttribute('name') === String(target));
+    };
+
     const armBlankPopup = (popup, target, navigate) => {
         let currentUrl;
         try { currentUrl = popup.location.href; } catch { currentUrl = null; }
         const normalized = normalizedTarget(target);
         if (currentUrl !== 'about:blank' || specialTargets.includes(normalized)) {
-            globalThis.setTimeout(navigate, 0);
+            globalThis.setTimeout(() => navigate(currentUrl === null), 0);
             return;
         }
 
-        let fallback;
         const release = () => {
-            if (fallback != null) globalThis.clearTimeout(fallback);
             try { delete popup.__htmlTinkerXReleasePopupNavigation; } catch { }
             navigate();
         };
         popup.__htmlTinkerXReleasePopupNavigation = release;
         if (popup.__htmlTinkerXPopupHeadersReady === true) {
             release();
-        } else if (normalized !== '_blank') {
-            // Existing named about:blank contexts do not raise a new-page event.
-            fallback = globalThis.setTimeout(release, 1000);
         }
     };
 
@@ -49,14 +53,22 @@
         const initialFeatures = suppressOpener
             ? featureTokens.filter(token => !['noopener', 'noreferrer'].includes(token.toLowerCase().split('=', 1)[0])).join(',')
             : features;
-        const popup = originalOpen.call(this, '', target, initialFeatures);
+        if (targetsExistingFrame(target)) {
+            return originalOpen.call(this, destination, target, features);
+        }
+        const initialTarget = suppressOpener && !specialTargets.includes(normalizedTarget(target)) ? '_blank' : target;
+        const popup = originalOpen.call(this, '', initialTarget, initialFeatures);
         if (popup) {
             if (suppressOpener) {
                 try { popup.opener = null; } catch { }
             }
-            const navigate = () => {
-                try {
-                    if (suppressReferrer) {
+        const navigate = useNativeTargeting => {
+            if (useNativeTargeting) {
+                originalOpen.call(window, destination, target, features);
+                return;
+            }
+            try {
+                if (suppressReferrer) {
                         const link = popup.document.createElement('a');
                         link.href = destination;
                         link.rel = 'noreferrer';
@@ -72,7 +84,7 @@
                     originalOpen.call(window, destination, target, features);
                 }
             };
-            armBlankPopup(popup, target, navigate);
+            armBlankPopup(popup, initialTarget, navigate);
         }
         return suppressOpener ? null : popup;
     };
@@ -84,13 +96,36 @@
         return base == null ? '' : base.target;
     };
 
-    const deferBlankFormSubmission = (form, submitter, submit) => {
+    const restoreAfterPopupNavigation = (popup, restore) => {
+        let restored = false;
+        let interval;
+        let fallback;
+        const restoreOnce = () => {
+            if (restored) return;
+            restored = true;
+            if (interval != null) globalThis.clearInterval(interval);
+            if (fallback != null) globalThis.clearTimeout(fallback);
+            restore();
+        };
+        interval = globalThis.setInterval(() => {
+            try {
+                if (popup.closed || popup.location.href !== 'about:blank') restoreOnce();
+            } catch {
+                restoreOnce();
+            }
+        }, 10);
+        fallback = globalThis.setTimeout(restoreOnce, 5000);
+    };
+
+    const deferPopupFormSubmission = (form, submitter, submit) => {
         const target = effectiveTarget(form.target, submitter == null ? '' : submitter.formTarget);
-        if (normalizedTarget(target) !== '_blank') return false;
+        const normalized = normalizedDeclarativeTarget(target);
+        if (specialTargets.includes(normalized)) return false;
+        if (targetsExistingFrame(target)) return false;
         const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
         if (action.origin !== location.origin || String(submitter?.formMethod || form.method).toLowerCase() === 'dialog') return false;
 
-        const popup = originalOpen.call(window, '', '_blank');
+        const popup = originalOpen.call(window, '', target);
         if (!popup) return false;
         const rel = form.relList;
         const suppressOpener = rel.contains('noreferrer')
@@ -99,22 +134,63 @@
         if (suppressOpener) {
             try { popup.opener = null; } catch { }
         }
-        const popupName = `htmltinkerx-popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        try { popup.name = popupName; } catch { }
+        const submissionTarget = normalized === '_blank'
+            ? `htmltinkerx-popup-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            : target;
+        if (normalized === '_blank') {
+            try { popup.name = submissionTarget; } catch { }
+        }
 
-        armBlankPopup(popup, '_blank', () => {
+        armBlankPopup(popup, target, () => {
             const previousFormTarget = form.target;
             const previousSubmitterTarget = submitter == null ? null : submitter.formTarget;
-            form.target = popupName;
-            if (submitter != null) submitter.formTarget = popupName;
+            form.target = submissionTarget;
+            if (submitter != null) submitter.formTarget = submissionTarget;
             try {
-                submit();
-            } finally {
+                const restoreSubmission = submit();
+                restoreAfterPopupNavigation(popup, () => {
+                    if (typeof restoreSubmission === 'function') restoreSubmission();
+                    form.target = previousFormTarget;
+                    if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
+                });
+            } catch (error) {
                 form.target = previousFormTarget;
                 if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
+                throw error;
             }
         });
         return true;
+    };
+
+    const submitWithoutRedispatch = (form, submitter) => {
+        const overrides = [
+            ['action', 'formaction'],
+            ['method', 'formmethod'],
+            ['enctype', 'formenctype']
+        ];
+        const previous = [];
+        if (submitter != null) {
+            for (const [formAttribute, submitterAttribute] of overrides) {
+                if (!submitter.hasAttribute(submitterAttribute)) continue;
+                previous.push([formAttribute, form.getAttribute(formAttribute)]);
+                form.setAttribute(formAttribute, submitter.getAttribute(submitterAttribute));
+            }
+        }
+        try {
+            originalSubmit.call(form);
+            return () => {
+                for (const [attribute, value] of previous) {
+                    if (value === null) form.removeAttribute(attribute);
+                    else form.setAttribute(attribute, value);
+                }
+            };
+        } catch (error) {
+            for (const [attribute, value] of previous) {
+                if (value === null) form.removeAttribute(attribute);
+                else form.setAttribute(attribute, value);
+            }
+            throw error;
+        }
     };
 
     document.addEventListener('click', event => {
@@ -123,7 +199,8 @@
         const anchor = path.find(node => node instanceof HTMLAnchorElement)
             || (event.target instanceof Element ? event.target.closest('a[href]') : null);
         if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download')) return;
-        if (normalizedTarget(effectiveTarget(anchor.target, '')) !== '_blank') return;
+        const target = effectiveTarget(anchor.target, '');
+        if (specialTargets.includes(normalizedDeclarativeTarget(target))) return;
         const destination = new URL(anchor.href, document.baseURI);
         if (destination.origin !== location.origin) return;
 
@@ -132,30 +209,19 @@
         const features = rel.contains('noreferrer')
             ? 'noreferrer'
             : rel.contains('noopener') || !rel.contains('opener') ? 'noopener' : undefined;
-        window.open(destination.href, '_blank', features);
+        window.open(destination.href, target, features);
     }, false);
 
-    document.addEventListener('submit', event => {
+    window.addEventListener('submit', event => {
         const form = event.target;
-        if (!(form instanceof HTMLFormElement) || releasedForms.delete(form) || event.defaultPrevented) return;
+        if (!(form instanceof HTMLFormElement) || event.defaultPrevented) return;
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
-        if (deferBlankFormSubmission(form, submitter, () => {
-            releasedForms.add(form);
-            try {
-                if (typeof form.requestSubmit === 'function') {
-                    submitter == null ? form.requestSubmit() : form.requestSubmit(submitter);
-                } else {
-                    originalSubmit.call(form);
-                }
-            } finally {
-                releasedForms.delete(form);
-            }
-        })) event.preventDefault();
+        if (deferPopupFormSubmission(form, submitter, () => submitWithoutRedispatch(form, submitter))) event.preventDefault();
     }, false);
 
     HTMLFormElement.prototype.submit = function() {
         const form = this;
-        if (!deferBlankFormSubmission(form, null, () => originalSubmit.call(form))) {
+        if (!deferPopupFormSubmission(form, null, () => originalSubmit.call(form))) {
             return originalSubmit.call(form);
         }
     };

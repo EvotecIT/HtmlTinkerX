@@ -217,7 +217,9 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             TimeSpan remaining = _connectTimeout - TimeSpan.FromSeconds(elapsedSeconds);
             if (remaining <= TimeSpan.Zero) return null;
             TimeSpan fairShare = TimeSpan.FromTicks(Math.Max(1, remaining.Ticks / (addresses.Length - index)));
-            TimeSpan attemptTimeout = fairShare <= MaximumAddressAttemptTimeout ? fairShare : MaximumAddressAttemptTimeout;
+            TimeSpan attemptTimeout = index == addresses.Length - 1
+                ? remaining
+                : fairShare <= MaximumAddressAttemptTimeout ? fairShare : MaximumAddressAttemptTimeout;
             using CancellationTokenSource attemptDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             attemptDeadline.CancelAfter(attemptTimeout);
             IPAddress address = addresses[index];

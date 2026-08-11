@@ -2,6 +2,7 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Text.Json;
@@ -11,6 +12,26 @@ namespace HtmlTinkerX.Tests;
 
 [Collection("Playwright collection")]
 public class HtmlBrowserPdfExportTests {
+    [Fact]
+    public async Task ScopedHeaderInterceptorBoundsItsEntireTeardown() {
+        TaskCompletionSource<JsonElement?> pendingCommand = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> cleanupTimedOut = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new Mock<ICDPSession>();
+        session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns(pendingCommand.Task);
+        HtmlBrowserScopedHeaderInterceptor interceptor = new(
+            session.Object,
+            new Uri("https://example.test"),
+            new Dictionary<string, string> { ["X-Test"] = "value" },
+            TimeSpan.FromMilliseconds(25),
+            () => cleanupTimedOut.TrySetResult(true));
+
+        await interceptor.DisposeAsync();
+
+        Assert.Equal(TaskStatus.RanToCompletion, cleanupTimedOut.Task.Status);
+        Assert.False(pendingCommand.Task.IsCompleted);
+    }
+
     [Fact]
     public async Task GetPagePdfAsync_ReturnsBytes() {
         var page = new Mock<IPage>();
@@ -315,7 +336,7 @@ public class HtmlBrowserPdfExportTests {
         var page = new Mock<IPage>();
         page.SetupGet(p => p.IsClosed).Returns(() => closed);
         page.Setup(p => p.EvaluateAsync(It.IsAny<string>(), It.IsAny<object?>()))
-            .Returns<string, object?>((script, _) => script.Contains("querySelectorAll('[' + marker + ']')", StringComparison.Ordinal)
+            .Returns<string, object?>((script, _) => script.Contains("delete document[stateKey]", StringComparison.Ordinal)
                 ? Task.FromException<JsonElement?>(new PlaywrightException("Target page has been closed"))
                 : Task.FromResult<JsonElement?>(null));
         page.Setup(p => p.PdfAsync(It.IsAny<PagePdfOptions>())).Returns(pendingPdf.Task);

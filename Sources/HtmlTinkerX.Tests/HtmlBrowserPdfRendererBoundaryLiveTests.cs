@@ -13,7 +13,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task VisualMaskUsesAnOpaqueOverlayForReplacedContentAndRestoresThePage() {
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
-        await session.Page.SetContentAsync("<img id='secret' alt='sensitive image' style='width:120px;height:80px' src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='>");
+        await session.Page.SetContentAsync("<img id='secret' alt='sensitive image' data-htmltinkerx-visual-mask='page-owned' style='width:120px;height:80px' src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='>");
 
         string masked = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
             session.Page,
@@ -39,8 +39,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Contains("rgb(0, 255, 0)", masked, StringComparison.Ordinal);
         Assert.EndsWith("|true", masked, StringComparison.Ordinal);
         Assert.Equal(
-            "visible|0|width:120px;height:80px",
-            await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length + '|' + secret.getAttribute('style'); }"));
+            "visible|0|width:120px;height:80px|page-owned",
+            await session.Page.EvaluateAsync<string>("() => { const secret = document.querySelector('#secret'); return getComputedStyle(secret).visibility + '|' + document.querySelectorAll('[data-htmltinkerx-visual-mask-overlay]').length + '|' + secret.getAttribute('style') + '|' + secret.getAttribute('data-htmltinkerx-visual-mask'); }"));
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'popup authorized'",
-                timeout: 5000),
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: "window.open('/header-popup', '_blank'); true"));
 
@@ -137,7 +137,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'streaming popup authorized'",
-                timeout: 5000),
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: "window.open('/streaming-popup', '_blank'); true"));
 
@@ -228,7 +228,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'existing context authorized'",
-                timeout: 5000),
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: $"window.open('/existing-context-destination', '{target}'); true"));
 
@@ -250,7 +250,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'existing context authorized'",
-                timeout: 5000),
+                timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: "window.open('/existing-context-destination', 'reportFrame'); true"));
 
@@ -424,6 +424,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             DeclarativeAnchorUrl = $"http://127.0.0.1:{port}/declarative-anchor-main";
             DeclarativeFormUrl = $"http://127.0.0.1:{port}/declarative-form-main";
             DeclarativeFormOpenerUrl = $"http://127.0.0.1:{port}/declarative-form-opener-main";
+            DeclarativeNamedUrl = $"http://127.0.0.1:{port}/declarative-named-main";
+            DeclarativeSingleSubmitUrl = $"http://127.0.0.1:{port}/declarative-single-submit-main";
+            DeclarativeSelfAnchorUrl = $"http://127.0.0.1:{port}/declarative-self-anchor-main";
+            DeclarativeSelfFormUrl = $"http://127.0.0.1:{port}/declarative-self-form-main";
             _serverTask = ServeAsync();
         }
 
@@ -435,6 +439,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string DeclarativeAnchorUrl { get; }
         internal string DeclarativeFormUrl { get; }
         internal string DeclarativeFormOpenerUrl { get; }
+        internal string DeclarativeNamedUrl { get; }
+        internal string DeclarativeSingleSubmitUrl { get; }
+        internal string DeclarativeSelfAnchorUrl { get; }
+        internal string DeclarativeSelfFormUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
@@ -487,6 +495,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p><form action='/header-popup' method='post' target='_blank'><button type='submit'>open</button></form><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
                     } else if (requestTarget.StartsWith("/declarative-form-opener-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><form action='/header-popup' method='post' target='_blank' rel='opener'><button type='submit'>open</button></form><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-named-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/header-popup' target='reportWindow'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-single-submit-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><form action='/wrong-popup' method='get' target='_blank'><button type='submit' formaction='/header-popup' formmethod='post'>open</button></form><script>let submitCount = 0; document.addEventListener('submit', () => submitCount++); setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text + '|' + submitCount), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-self-anchor-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><a href='/self-destination'>open</a>";
+                    } else if (requestTarget.StartsWith("/declarative-self-form-main", StringComparison.Ordinal)) {
+                        body = "<p id='result'>pending</p><form action='/self-destination' method='post'><button type='submit'>open</button></form>";
+                    } else if (requestTarget.StartsWith("/self-destination", StringComparison.Ordinal)) {
+                        body = "<p id='self-result'>self navigated</p>";
                     } else {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";
                     }

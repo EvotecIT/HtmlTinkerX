@@ -198,7 +198,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         page,
                         request.Source.SecurityOrigin,
                         request.Headers,
-                        cancellationToken),
+                        cancellationToken,
+                        slot.MarkBroken),
                     cancellationToken).ConfigureAwait(false);
             await using HtmlBrowserPopupHeaderCoordinator? popupCoordinator = request.Headers.Count == 0
                 ? null
@@ -207,7 +208,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
                     page,
                     request.Source.SecurityOrigin,
                     request.Headers,
-                    cancellationToken);
+                    cancellationToken,
+                    slot.MarkBroken);
             if (popupCoordinator != null) {
                 await ExecuteCancellablePageOperationAsync(
                     page,

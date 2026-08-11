@@ -49,11 +49,14 @@ public static partial class HtmlBrowser {
         "textarea[id*='pin' i]"
     };
     private const string ApplyVisualMaskScript =
-        @"({ selectors, color }) => {
-            const marker = 'data-htmltinkerx-visual-mask';
+        @"({ selectors, color, token }) => {
             const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
-            const previousStyle = 'data-htmltinkerx-visual-mask-style';
-            const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
+            const stateKey = Symbol.for('htmltinkerx-visual-mask:' + token);
+            let state = document[stateKey];
+            if (!state) {
+                state = { masked: [], overlays: [], seen: new WeakSet() };
+                Object.defineProperty(document, stateKey, { value: state, configurable: true });
+            }
             for (const selector of selectors || []) {
                 if (!selector || !selector.trim()) continue;
                 let elements = [];
@@ -63,17 +66,15 @@ public static partial class HtmlBrowser {
                 } catch { continue; }
                 for (const element of elements) {
                     if (!(element instanceof HTMLElement)) continue;
-                    if (element.hasAttribute(marker)) continue;
-                    const currentStyle = element.getAttribute('style');
-                    element.setAttribute(previousStyle, currentStyle || '');
-                    element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
-                    element.setAttribute(marker, 'true');
+                    if (state.seen.has(element)) continue;
+                    state.seen.add(element);
+                    state.masked.push({ element, style: element.getAttribute('style') });
                     const rect = element.getBoundingClientRect();
                     const computed = getComputedStyle(element);
                     element.style.setProperty('visibility', 'hidden', 'important');
 
                     const overlay = document.createElement('div');
-                    overlay.setAttribute(overlayMarker, 'true');
+                    overlay.setAttribute(overlayMarker, token);
                     overlay.style.setProperty('position', computed.position === 'fixed' ? 'fixed' : 'absolute', 'important');
                     overlay.style.setProperty('left', `${rect.left + (computed.position === 'fixed' ? 0 : window.scrollX)}px`, 'important');
                     overlay.style.setProperty('top', `${rect.top + (computed.position === 'fixed' ? 0 : window.scrollY)}px`, 'important');
@@ -93,6 +94,7 @@ public static partial class HtmlBrowser {
                     overlay.style.setProperty('print-color-adjust', 'exact', 'important');
                     overlay.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
                     document.documentElement.appendChild(overlay);
+                    state.overlays.push(overlay);
                 }
             }
         }";
@@ -110,13 +112,13 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        IReadOnlyList<IFrame> maskedChildFrames = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
+        (string token, IReadOnlyList<IFrame> maskedChildFrames) = await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
         try {
             cancellationToken.ThrowIfCancellationRequested();
             return await action().ConfigureAwait(false);
         } finally {
             try {
-                await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames).ConfigureAwait(false);
+                await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames, token).ConfigureAwait(false);
             } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
                 // Cancellation closes the page to interrupt Playwright. Preserve the original
                 // cancellation instead of replacing it with cleanup failure from the closed page.
@@ -141,18 +143,20 @@ public static partial class HtmlBrowser {
         return selectors.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static async Task<IReadOnlyList<IFrame>> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
+    private static async Task<(string Token, IReadOnlyList<IFrame> MaskedChildFrames)> ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         string color = string.IsNullOrWhiteSpace(maskColor) ? "#000000" : maskColor!;
+        string token = Guid.NewGuid().ToString("N");
         object arguments = new {
             selectors,
-            color
+            color,
+            token
         };
         await page.EvaluateAsync(ApplyVisualMaskScript, arguments).ConfigureAwait(false);
 
         List<IFrame> maskedChildFrames = new();
         IReadOnlyList<IFrame>? frames = page.Frames;
-        if (frames == null) return maskedChildFrames;
+        if (frames == null) return (token, maskedChildFrames);
         try {
             foreach (IFrame frame in frames) {
                 if (ReferenceEquals(frame, page.MainFrame)) continue;
@@ -165,44 +169,34 @@ public static partial class HtmlBrowser {
                 }
             }
         } catch {
-            try { await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames).ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await RemoveTemporaryVisualMaskAsync(page, maskedChildFrames, token).ConfigureAwait(false); } catch (PlaywrightException) { }
             throw;
         }
-        return maskedChildFrames;
+        return (token, maskedChildFrames);
     }
 
-    private static async Task RemoveTemporaryVisualMaskAsync(IPage page, IReadOnlyList<IFrame> maskedChildFrames) {
+    private static async Task RemoveTemporaryVisualMaskAsync(IPage page, IReadOnlyList<IFrame> maskedChildFrames, string token) {
         const string restoreScript =
-            @"() => {
-                const marker = 'data-htmltinkerx-visual-mask';
-                const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
-                const previousStyle = 'data-htmltinkerx-visual-mask-style';
-                const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
-                for (const overlay of Array.from(document.querySelectorAll('[' + overlayMarker + ']'))) {
-                    overlay.remove();
-                }
-                for (const element of Array.from(document.querySelectorAll('[' + marker + ']'))) {
-                    if (!(element instanceof HTMLElement)) {
-                        continue;
-                    }
-
-                    const originalStyle = element.getAttribute(previousStyle) || '';
-                    const originalHadStyle = element.getAttribute(hadStyle) === 'true';
-                    if (originalHadStyle) {
-                        element.setAttribute('style', originalStyle);
+            @"({ token }) => {
+                const stateKey = Symbol.for('htmltinkerx-visual-mask:' + token);
+                const state = document[stateKey];
+                if (!state) return;
+                for (const overlay of state.overlays) overlay.remove();
+                for (const item of state.masked) {
+                    if (!(item.element instanceof HTMLElement)) continue;
+                    if (item.style === null) {
+                        item.element.removeAttribute('style');
                     } else {
-                        element.removeAttribute('style');
+                        item.element.setAttribute('style', item.style);
                     }
-
-                    element.removeAttribute(marker);
-                    element.removeAttribute(previousStyle);
-                    element.removeAttribute(hadStyle);
                 }
+                delete document[stateKey];
             }";
-        await page.EvaluateAsync(restoreScript).ConfigureAwait(false);
+        object arguments = new { token };
+        await page.EvaluateAsync(restoreScript, arguments).ConfigureAwait(false);
         foreach (IFrame frame in maskedChildFrames) {
             try {
-                await frame.EvaluateAsync(restoreScript).ConfigureAwait(false);
+                await frame.EvaluateAsync(restoreScript, arguments).ConfigureAwait(false);
             } catch (PlaywrightException) when (frame.IsDetached) {
                 // Detached frames no longer require restoration.
             }
