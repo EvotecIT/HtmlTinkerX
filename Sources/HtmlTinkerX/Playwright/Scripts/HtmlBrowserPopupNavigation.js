@@ -1,6 +1,22 @@
 (() => {
     if (globalThis.__htmlTinkerXPopupNavigationShimInstalled === true) return;
-    Object.defineProperty(globalThis, '__htmlTinkerXPopupNavigationShimInstalled', {
+    const nativeDefineProperty = Object.defineProperty;
+    const nativeGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const nativeGetPrototypeOf = Object.getPrototypeOf;
+    const nativeHasOwnProperty = Object.prototype.hasOwnProperty;
+    const nativeReflectApply = Reflect.apply;
+    const nativeReflectConstruct = Reflect.construct;
+    const nativeReflectGet = Reflect.get;
+    const nativeReflectSet = Reflect.set;
+    const nativeQuerySelectorAll = Document.prototype.querySelectorAll;
+    const nativeGetAttribute = Element.prototype.getAttribute;
+    const iframePrototype = HTMLIFrameElement.prototype;
+    const framePrototype = typeof HTMLFrameElement === 'undefined' ? null : HTMLFrameElement.prototype;
+    const iframeContentDocument = nativeGetOwnPropertyDescriptor(iframePrototype, 'contentDocument')?.get;
+    const frameContentDocument = framePrototype == null
+        ? null
+        : nativeGetOwnPropertyDescriptor(framePrototype, 'contentDocument')?.get;
+    nativeDefineProperty(globalThis, '__htmlTinkerXPopupNavigationShimInstalled', {
         value: true,
         configurable: false
     });
@@ -9,7 +25,7 @@
     const originalAddEventListener = EventTarget.prototype.addEventListener;
     const originalRemoveEventListener = EventTarget.prototype.removeEventListener;
     const originalPreventDefault = Event.prototype.preventDefault;
-    const defaultPreventedDescriptor = Object.getOwnPropertyDescriptor(Event.prototype, 'defaultPrevented');
+    const defaultPreventedDescriptor = nativeGetOwnPropertyDescriptor(Event.prototype, 'defaultPrevented');
     const internallyCancelledEvents = new WeakSet();
     const pageCancelledEvents = new WeakSet();
     const specialTargets = ['_self', '_parent', '_top'];
@@ -20,7 +36,7 @@
         pageCancelledEvents.add(this);
         return originalPreventDefault.call(this);
     };
-    Object.defineProperty(Event.prototype, 'defaultPrevented', {
+    nativeDefineProperty(Event.prototype, 'defaultPrevented', {
         ...defaultPreventedDescriptor,
         get() {
             return internallyCancelledEvents.has(this)
@@ -44,10 +60,18 @@
         const containsNamedFrame = currentDocument => {
             if (visited.has(currentDocument)) return false;
             visited.add(currentDocument);
-            for (const frame of currentDocument.querySelectorAll('iframe, frame')) {
-                if (frame.getAttribute('name') === expected) return true;
+            const frames = nativeQuerySelectorAll.call(currentDocument, 'iframe, frame');
+            for (let index = 0; index < frames.length; index++) {
+                const frame = frames[index];
+                if (nativeGetAttribute.call(frame, 'name') === expected) return true;
                 try {
-                    if (frame.contentDocument && containsNamedFrame(frame.contentDocument)) return true;
+                    let childDocument = null;
+                    try {
+                        childDocument = iframeContentDocument == null ? null : iframeContentDocument.call(frame);
+                    } catch {
+                        childDocument = frameContentDocument == null ? null : frameContentDocument.call(frame);
+                    }
+                    if (childDocument && containsNamedFrame(childDocument)) return true;
                 } catch { }
             }
             return false;
@@ -74,7 +98,7 @@
         const release = () => {
             navigate();
         };
-        Object.defineProperty(popup, popupReleaseProperty, {
+        nativeDefineProperty(popup, popupReleaseProperty, {
             value: release,
             configurable: true
         });
@@ -116,28 +140,49 @@
                 }
             });
         });
-        Object.defineProperty(popup.Window.prototype, 'fetch', {
+        nativeDefineProperty(popup.Window.prototype, 'fetch', {
             value: stagedFetch,
             writable: false,
             configurable: false
         });
-        Object.defineProperty(popup, 'fetch', {
+        nativeDefineProperty(popup, 'fetch', {
             value: stagedFetch,
             writable: false,
             configurable: false
         });
+        const nativeXhrSend = popup.XMLHttpRequest.prototype.send;
+        const stagedXhrSend = function(...args) {
+            runWhenReady(() => nativeReflectApply(nativeXhrSend, this, args));
+        };
+        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'send', {
+            value: stagedXhrSend,
+            writable: false,
+            configurable: false
+        });
+        const nativeSendBeacon = popup.Navigator.prototype.sendBeacon;
+        if (typeof nativeSendBeacon === 'function') {
+            const stagedSendBeacon = function(...args) {
+                runWhenReady(() => nativeReflectApply(nativeSendBeacon, this, args));
+                return true;
+            };
+            nativeDefineProperty(popup.Navigator.prototype, 'sendBeacon', {
+                value: stagedSendBeacon,
+                writable: false,
+                configurable: false
+            });
+        }
         const nativeLocation = popup.location;
         let popupFacade;
         const locationFacade = new Proxy({}, {
             get(_, property) {
-                const value = Reflect.get(nativeLocation, property, nativeLocation);
+                const value = nativeReflectGet(nativeLocation, property, nativeLocation);
                 if (['assign', 'replace', 'reload'].includes(property)) {
-                    return (...args) => runWhenReady(() => Reflect.apply(value, nativeLocation, args));
+                    return (...args) => runWhenReady(() => nativeReflectApply(value, nativeLocation, args));
                 }
                 return typeof value === 'function' ? value.bind(nativeLocation) : value;
             },
             set(_, property, value) {
-                runWhenReady(() => Reflect.set(nativeLocation, property, value, nativeLocation));
+                runWhenReady(() => nativeReflectSet(nativeLocation, property, value, nativeLocation));
                 return true;
             }
         });
@@ -159,11 +204,11 @@
                 let descriptor = null;
                 let prototype = element;
                 while (prototype && descriptor == null) {
-                    descriptor = Object.getOwnPropertyDescriptor(prototype, property);
-                    prototype = Object.getPrototypeOf(prototype);
+                    descriptor = nativeGetOwnPropertyDescriptor(prototype, property);
+                    prototype = nativeGetPrototypeOf(prototype);
                 }
-                if (descriptor == null || descriptor.configurable === false && Object.prototype.hasOwnProperty.call(element, property)) continue;
-                Object.defineProperty(element, property, {
+                if (descriptor == null || descriptor.configurable === false && nativeHasOwnProperty.call(element, property)) continue;
+                nativeDefineProperty(element, property, {
                     configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
@@ -179,7 +224,7 @@
             }
             const nativeSetAttribute = element.setAttribute;
             const nativeRemoveAttribute = element.removeAttribute;
-            Object.defineProperty(element, 'setAttribute', {
+            nativeDefineProperty(element, 'setAttribute', {
                 configurable: false,
                 value(name, value) {
                     const attribute = String(name).toLowerCase();
@@ -190,7 +235,7 @@
                     return nativeSetAttribute.call(this, name, value);
                 }
             });
-            Object.defineProperty(element, 'removeAttribute', {
+            nativeDefineProperty(element, 'removeAttribute', {
                 configurable: false,
                 value(name) {
                     const attribute = String(name).toLowerCase();
@@ -218,6 +263,16 @@
             guardDeferredAttributes(element, values);
             return element;
         };
+        const stagedElementConstructors = new Map();
+        for (const name of ['Image', 'Audio']) {
+            const constructor = popup[name];
+            if (typeof constructor !== 'function') continue;
+            stagedElementConstructors.set(name, new Proxy(constructor, {
+                construct(target, args) {
+                    return guardCreatedElement(nativeReflectConstruct(target, args));
+                }
+            }));
+        }
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
             documentWriteParts.push(args.map(value => String(value)).join('') + (method === 'writeln' ? '\n' : ''));
@@ -256,7 +311,7 @@
                 element.setAttribute('data-htmltinkerx-staged-resource', marker);
                 descriptors.push({ marker, values, styleText, script });
             }
-            Reflect.apply(nativeDocument.write, nativeDocument, [template.innerHTML]);
+            nativeReflectApply(nativeDocument.write, nativeDocument, [template.innerHTML]);
             for (const { marker, values, styleText, script } of descriptors) {
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
@@ -322,10 +377,10 @@
             const facade = new Proxy({}, {
                 get(_, property) {
                     const target = resolve();
-                    const member = Reflect.get(target, property, target);
+                    const member = nativeReflectGet(target, property, target);
                     if (typeof member !== 'function') {
                         return member instanceof popup.Node
-                            ? stagedObject(() => Reflect.get(resolve(), property, resolve()))
+                            ? stagedObject(() => nativeReflectGet(resolve(), property, resolve()))
                             : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
                     }
                     return (...args) => {
@@ -336,8 +391,8 @@
                         if (!mutationMethods.has(property) || ready) {
                             const invoke = () => {
                                 const current = resolve();
-                                const currentMember = Reflect.get(current, property, current);
-                                return Reflect.apply(currentMember, current, args.map(unwrap));
+                                const currentMember = nativeReflectGet(current, property, current);
+                                return nativeReflectApply(currentMember, current, args.map(unwrap));
                             };
                             const initialResult = invoke();
                             if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
@@ -350,8 +405,8 @@
                         if (property === 'close') documentCloseQueued = true;
                         queued.push(() => {
                             const current = resolve();
-                            const currentMember = Reflect.get(current, property, current);
-                            Reflect.apply(currentMember, current, args.map(unwrap));
+                            const currentMember = nativeReflectGet(current, property, current);
+                            nativeReflectApply(currentMember, current, args.map(unwrap));
                         });
                         return result;
                     };
@@ -360,7 +415,7 @@
                     if (!ready) documentMutationQueued = true;
                     runWhenReady(() => {
                         const current = resolve();
-                        Reflect.set(current, property, unwrap(valueToSet), current);
+                        nativeReflectSet(current, property, unwrap(valueToSet), current);
                     });
                     return true;
                 }
@@ -374,7 +429,8 @@
                 if (property === 'location') return locationFacade;
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
-                const value = Reflect.get(targetWindow, property, targetWindow);
+                if (stagedElementConstructors.has(property)) return stagedElementConstructors.get(property);
+                const value = nativeReflectGet(targetWindow, property, targetWindow);
                 if (value === stagedFetch) return stagedFetch;
                 if (value === targetWindow) return popupFacade;
                 return typeof value === 'function' ? value.bind(targetWindow) : value;
@@ -384,7 +440,7 @@
                     runWhenReady(() => { targetWindow.location = value; });
                     return true;
                 }
-                return Reflect.set(targetWindow, property, value, targetWindow);
+                return nativeReflectSet(targetWindow, property, value, targetWindow);
             }
         });
         armBlankPopup(popup, target, () => {
@@ -463,12 +519,12 @@
     const stagedWindowOpen = function(url, target, features) {
         return openWithReferrerPolicy.call(this, url, target, features, '');
     };
-    Object.defineProperty(Window.prototype, 'open', {
+    nativeDefineProperty(Window.prototype, 'open', {
         value: stagedWindowOpen,
         writable: false,
         configurable: false
     });
-    Object.defineProperty(window, 'open', {
+    nativeDefineProperty(window, 'open', {
         value: stagedWindowOpen,
         writable: false,
         configurable: false

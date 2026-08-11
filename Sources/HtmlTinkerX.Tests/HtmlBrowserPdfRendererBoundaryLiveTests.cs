@@ -448,6 +448,32 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task PageMonkeypatchCannotForgeAnExistingNamedContext() {
+        await using LoopbackPopupServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.ExistingContextUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: @"document.querySelectorAll = () => [{ getAttribute: () => 'forgedFrame', contentDocument: document }];
+                Object.defineProperty = () => { throw new Error('page defineProperty'); };
+                Object.getOwnPropertyDescriptor = () => { throw new Error('page descriptor'); };
+                Object.getPrototypeOf = () => { throw new Error('page prototype'); };
+                Reflect.apply = () => { throw new Error('page apply'); };
+                Reflect.construct = () => { throw new Error('page construct'); };
+                Reflect.get = () => { throw new Error('page get'); };
+                Reflect.set = () => { throw new Error('page set'); };
+                window.open('/existing-context-destination', 'forgedFrame');
+                true"));
+
+        Assert.Equal("popup-token", server.LastExistingContextToken);
+    }
+
+    [Fact]
     public async Task WebStorageSeedsOnlyTheInitialTopLevelDocument() {
         const string html = "<html><body><p id='result'>pending</p><script>document.querySelector('#result').textContent = localStorage.getItem('token') || 'not-restored';</script></body></html>";
         await using LoopbackContentServer server = new(html);

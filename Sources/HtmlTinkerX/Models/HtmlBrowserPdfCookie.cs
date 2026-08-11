@@ -17,20 +17,23 @@ public sealed class HtmlBrowserPdfCookie {
         HtmlBrowserCookieSameSite? sameSite = null) {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Cookie name cannot be empty.", nameof(name));
         if (value == null) throw new ArgumentNullException(nameof(value));
-        if (string.IsNullOrWhiteSpace(url) && string.IsNullOrWhiteSpace(domain)) {
+        string? normalizedUrl = string.IsNullOrWhiteSpace(url) ? null : url;
+        string? normalizedDomain = string.IsNullOrWhiteSpace(domain) ? null : domain;
+        string? normalizedPath = string.IsNullOrWhiteSpace(path) ? null : path;
+        if (normalizedUrl == null && normalizedDomain == null) {
             throw new ArgumentException("A cookie requires either a URL or a domain.", nameof(url));
         }
-        if (!string.IsNullOrWhiteSpace(url) && (!string.IsNullOrWhiteSpace(domain) || !string.IsNullOrWhiteSpace(path))) {
+        if (normalizedUrl != null && (normalizedDomain != null || normalizedPath != null)) {
             throw new ArgumentException("A cookie URL cannot be combined with domain or path scope. Use either URL or a domain/path pair.", nameof(url));
         }
 
         Name = name;
         Value = value;
-        Url = url;
-        Domain = domain;
-        Path = string.IsNullOrWhiteSpace(url) && !string.IsNullOrWhiteSpace(domain) && string.IsNullOrWhiteSpace(path)
+        Url = normalizedUrl;
+        Domain = normalizedDomain;
+        Path = normalizedUrl == null && normalizedDomain != null && normalizedPath == null
             ? "/"
-            : path;
+            : normalizedPath;
         Expires = expires;
         HttpOnly = httpOnly;
         Secure = secure;

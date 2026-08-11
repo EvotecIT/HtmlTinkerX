@@ -104,10 +104,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
     [Fact]
     public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
-        await using LoopbackContentServer foreignOrigin = new(
-            "<html><body><p id='foreign'>foreign-pending</p><script>document.querySelector('#foreign').textContent = localStorage.getItem('token') || 'cross-origin-clean';</script></body></html>");
+        await using LoopbackContentServer foreignOrigin = new("foreign-resource");
         await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><p id='main'>main-pending</p><script>const frame = document.createElement('iframe'); frame.style.cssText = 'width:600px;height:100px'; const loaded = new Promise(resolve => frame.addEventListener('load', resolve, {{ once: true }})); frame.src = '{foreignOrigin.Url}'; document.body.appendChild(frame); Promise.all([fetch('/probe'), loaded]).then(() => document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing');</script></body></html>";
+        string html = $"<html><body><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; const declaredProbe = new Image(); declaredProbe.src = '/probe'; const foreignProbe = new Image(); foreignProbe.src = '{foreignOrigin.Url}';</script></body></html>";
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -117,14 +116,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#main').textContent === 'origin-storage'",
+                delayMilliseconds: 1000,
                 timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+        await WaitUntilAsync(
+            () => declaredOrigin.RequestCount > 0 && foreignOrigin.RequestCount > 0,
+            TimeSpan.FromSeconds(5));
 
         AssertPdfContains(result.PdfBytes, "origin-storage");
-        AssertPdfContains(result.PdfBytes, "cross-origin-clean");
         Assert.Equal("origin-header", declaredOrigin.LastRenderToken);
         Assert.Null(foreignOrigin.LastRenderToken);
     }

@@ -905,6 +905,19 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public void PdfCookieNormalizesWhitespaceOnlyScopeFields() {
+        HtmlBrowserPdfCookie domainCookie = new("session", "value", url: " ", domain: "example.com", path: "\t");
+        HtmlBrowserPdfCookie urlCookie = new("session", "value", url: "https://example.com", domain: " ", path: "\r\n");
+
+        Assert.Null(domainCookie.Url);
+        Assert.Equal("example.com", domainCookie.Domain);
+        Assert.Equal("/", domainCookie.Path);
+        Assert.Equal("https://example.com", urlCookie.Url);
+        Assert.Null(urlCookie.Domain);
+        Assert.Null(urlCookie.Path);
+    }
+
+    [Fact]
     public void PdfFileSourceRejectsNetworkAndDevicePathsBeforeNormalization() {
         Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile(@"\\server\share\report.html"));
         Assert.Throws<ArgumentException>(() => HtmlBrowserPdfSource.FromFile("file://server/share/report.html"));

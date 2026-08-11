@@ -111,6 +111,31 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastPopupToken);
     }
 
+    [Fact]
+    public async Task BlankPopupRequestApisWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            popup.navigator.sendBeacon('{server.BlankPopupResourceUrl}', 'beacon');
+            const request = new popup.XMLHttpRequest();
+            request.open('POST', '{server.BlankPopupResourceUrl}');
+            request.send('xhr');
+            const image = new popup.Image();
+            image.src = '{server.BlankPopupResourceUrl}';
+            true";
+
+        await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.True(server.BlankPopupResourceRequests >= 3);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
