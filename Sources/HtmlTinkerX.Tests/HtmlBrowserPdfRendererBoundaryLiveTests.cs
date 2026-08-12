@@ -469,7 +469,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 function: "() => document.querySelector('#result').textContent === 'not-restored'",
                 timeout: 5000),
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "one-time" },
-            beforeCaptureScript: "localStorage.removeItem('token'); setTimeout(() => location.reload(), 0); true"));
+            beforeCaptureScript: "localStorage.clear(); sessionStorage.clear(); setTimeout(() => location.reload(), 0); true"));
 
         AssertPdfContains(result.PdfBytes, "not-restored");
     }
@@ -580,6 +580,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupEventToken;
         private int _blankPopupResourceRequests;
         private int _unauthorizedBlankPopupResourceRequests;
+        private int _styleTextResourceRequests;
         private int _removedNamespacedResourceRequests;
         private int _popupRequestCount;
         private readonly string _namedContextInitialUrl;
@@ -648,6 +649,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
+        internal int StyleTextResourceRequests => Volatile.Read(ref _styleTextResourceRequests);
         internal int RemovedNamespacedResourceRequests => Volatile.Read(ref _removedNamespacedResourceRequests);
         internal int PopupRequestCount => Volatile.Read(ref _popupRequestCount);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
@@ -762,6 +764,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
                     } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _blankPopupResourceRequests);
+                        if (requestTarget.Contains("source=style-text", StringComparison.Ordinal)) Interlocked.Increment(ref _styleTextResourceRequests);
                         if (requestTarget.Contains("source=removed-namespace", StringComparison.Ordinal)) Interlocked.Increment(ref _removedNamespacedResourceRequests);
                         string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                         if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);

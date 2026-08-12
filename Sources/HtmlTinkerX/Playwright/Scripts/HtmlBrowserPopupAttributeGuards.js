@@ -79,6 +79,7 @@
             const ownerDocument = getOwnPropertyDescriptor(prototype, 'ownerDocument');
             const getRootNode = prototype.getRootNode;
             const cloneNode = prototype.cloneNode;
+            const textContent = getOwnPropertyDescriptor(prototype, 'textContent');
             defineProperty(prototype, 'ownerDocument', {
                 ...ownerDocument,
                 get() { return states.get(this)?.document() ?? ownerDocument.get.call(this); }
@@ -94,6 +95,17 @@
                 value(...args) {
                     const clone = reflectApply(cloneNode, this, args);
                     return states.get(this)?.clone(clone) ?? clone;
+                }
+            });
+            if (textContent?.get && textContent?.set) defineProperty(prototype, 'textContent', {
+                ...textContent,
+                get() {
+                    const staged = states.get(this)?.textContent();
+                    return staged?.handled ? staged.value : textContent.get.call(this);
+                },
+                set(value) {
+                    if (states.get(this)?.setTextContent(value)) return;
+                    return textContent.set.call(this, value);
                 }
             });
         };
@@ -114,12 +126,22 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone, synchronizeAttribute) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone, synchronizeAttribute, textState) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
                 document,
                 clone(value) { return typeof guardClone === 'function' ? guardClone(value) : value; },
+                textContent() {
+                    return !isReleased() && textState != null
+                        ? { handled: true, value: textState.get() }
+                        : { handled: false };
+                },
+                setTextContent(value) {
+                    if (isReleased() || textState == null) return false;
+                    textState.set(stringValue(value));
+                    return true;
+                },
                 copy(target) {
                     for (const [name, value] of values) target.setAttribute(name, value);
                     for (const value of namespacedValues.values()) {

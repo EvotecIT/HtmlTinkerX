@@ -27,7 +27,6 @@ internal static class HtmlBrowserStorageInitializer {
         string worldName = "HtmlTinkerX.Storage." + Guid.NewGuid().ToString("N");
         string configuration = JsonSerializer.Serialize(new {
             expectedOrigin = request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority),
-            marker = "__htmltinkerx_seed_" + Guid.NewGuid().ToString("N"),
             statusKey = statusKeyValue,
             local = request.LocalStorage,
             session = request.SessionStorage
@@ -44,13 +43,20 @@ internal static class HtmlBrowserStorageInitializer {
                 worldName,
                 statusKeyValue,
                 mainFrameId,
+                request.Source.SecurityOrigin!.GetLeftPart(UriPartial.Authority),
                 cleanupTimedOut,
                 cleanupTimeout ?? DefaultCleanupTimeout);
-            await session.SendAsync("Page.addScriptToEvaluateOnNewDocument", new Dictionary<string, object> {
+            JsonElement? registration = await session.SendAsync("Page.addScriptToEvaluateOnNewDocument", new Dictionary<string, object> {
                 ["source"] = script,
                 ["worldName"] = worldName,
                 ["runImmediately"] = true
             }).ConfigureAwait(false);
+            if (!registration.HasValue
+                || !registration.Value.TryGetProperty("identifier", out JsonElement identifier)
+                || string.IsNullOrEmpty(identifier.GetString())) {
+                throw new PlaywrightException("Chromium did not return the web-storage initialization script identifier.");
+            }
+            initialization.SetScriptIdentifier(identifier.GetString()!);
             return initialization;
         } catch {
             if (initialization != null) {
@@ -88,10 +94,14 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
     private readonly string _worldName;
     private readonly string _statusKey;
     private readonly string _mainFrameId;
+    private readonly string _expectedOrigin;
     private readonly ICDPSessionEvent _contextCreatedEvent;
     private readonly Action _cleanupTimedOut;
     private readonly TimeSpan _cleanupTimeout;
     private int _executionContextId;
+    private string? _scriptIdentifier;
+    private Task? _scriptRemoval;
+    private int _scriptRemovalStarted;
     private int _disposed;
 
     internal HtmlBrowserStorageInitialization(
@@ -99,12 +109,14 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
         string worldName,
         string statusKey,
         string mainFrameId,
+        string expectedOrigin,
         Action? cleanupTimedOut = null,
         TimeSpan? cleanupTimeout = null) {
         _session = session;
         _worldName = worldName;
         _statusKey = statusKey;
         _mainFrameId = mainFrameId;
+        _expectedOrigin = expectedOrigin;
         _cleanupTimedOut = cleanupTimedOut ?? NoOp;
         _cleanupTimeout = cleanupTimeout ?? TimeSpan.FromSeconds(2);
         _contextCreatedEvent = session.Event("Runtime.executionContextCreated");
@@ -115,6 +127,8 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
         if (Volatile.Read(ref _disposed) != 0) throw new ObjectDisposedException(nameof(HtmlBrowserStorageInitialization));
         int contextId = Volatile.Read(ref _executionContextId);
         if (contextId == 0) throw new InvalidOperationException("Requested web storage was not initialized for the capture origin.");
+        Task? removal = Volatile.Read(ref _scriptRemoval);
+        if (removal != null) await removal.ConfigureAwait(false);
         string statusKey = JsonSerializer.Serialize(_statusKey);
         JsonElement? evaluation = await _session.SendAsync("Runtime.evaluate", new Dictionary<string, object> {
             ["expression"] = $"globalThis[{statusKey}] || null",
@@ -149,9 +163,26 @@ internal sealed class HtmlBrowserStorageInitialization : IAsyncDisposable {
             || !context.TryGetProperty("auxData", out JsonElement auxiliaryData)
             || !auxiliaryData.TryGetProperty("frameId", out JsonElement frameId)
             || !string.Equals(frameId.GetString(), _mainFrameId, StringComparison.Ordinal)
+            || !context.TryGetProperty("origin", out JsonElement origin)
+            || !string.Equals(origin.GetString(), _expectedOrigin, StringComparison.OrdinalIgnoreCase)
             || !context.TryGetProperty("id", out JsonElement id)
             || !id.TryGetInt32(out int contextId)) return;
+        RemoveRegisteredScript();
         Volatile.Write(ref _executionContextId, contextId);
+    }
+
+    internal void SetScriptIdentifier(string identifier) {
+        _scriptIdentifier = identifier;
+        if (Volatile.Read(ref _executionContextId) != 0) RemoveRegisteredScript();
+    }
+
+    private void RemoveRegisteredScript() {
+        string? identifier = _scriptIdentifier;
+        if (identifier == null || Interlocked.Exchange(ref _scriptRemovalStarted, 1) != 0) return;
+        Task removal = _session.SendAsync("Page.removeScriptToEvaluateOnNewDocument", new Dictionary<string, object> {
+            ["identifier"] = identifier
+        });
+        Volatile.Write(ref _scriptRemoval, removal);
     }
 
     public async ValueTask DisposeAsync() {

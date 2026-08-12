@@ -219,6 +219,7 @@ public class HtmlBrowserPdfExportTests {
             "storage-world",
             "storage-status",
             "main-frame",
+            "https://example.test",
             () => cleanupTimedOut.TrySetResult(true),
             TimeSpan.FromMilliseconds(25));
 

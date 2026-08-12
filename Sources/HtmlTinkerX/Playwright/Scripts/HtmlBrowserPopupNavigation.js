@@ -71,7 +71,6 @@
     attributeGuards.installNode(Node.prototype);
     const createXhrStager = globalThis.__htmlTinkerXCreatePopupXhrStager;
     delete globalThis.__htmlTinkerXCreatePopupXhrStager;
-
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
         return originalPreventDefault.call(this);
@@ -155,6 +154,7 @@
             return popup;
         }
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
+        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent');
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
         attributeGuards.install(popup.Element.prototype);
@@ -296,10 +296,10 @@
         const guardDeferredAttributes = (element, initialValues) => {
             if (guardedElements.has(element)) return;
             guardedElements.add(element);
-            const values = new Map(initialValues);
-            const namespacedValues = new Map();
-            let released = false;
-            const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
+            const values = new Map(initialValues); const namespacedValues = new Map();
+            const stagesStyleText = element.localName === 'style'; let stagedText = stagesStyleText ? popupTextContent.get.call(element) : null;
+            if (stagesStyleText) popupTextContent.set.call(element, '');
+            let released = false; const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
             const state = attributeGuards.createState(
                 element,
                 values,
@@ -309,7 +309,8 @@
                 () => documentFacade,
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
-                attribute => { if (attribute === 'style') styleGuard?.synchronize(); });
+                attribute => { if (attribute === 'style') styleGuard?.synchronize(); },
+                stagesStyleText ? { get: () => stagedText, set: value => { stagedText = value; } } : null);
             if (styleGuard != null) nativeDefineProperty(element, 'style', {
                 configurable: false,
                 enumerable: true,
@@ -322,6 +323,7 @@
             });
             const deferredProperties = [...requestAttributes];
             if (element.localName === 'iframe' || element.localName === 'frame') deferredProperties.push(['srcdoc', 'srcdoc']);
+            if (element.localName === 'meta') deferredProperties.push(['content', 'content']);
             for (const [attribute, property] of deferredProperties) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -338,11 +340,11 @@
                     configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
-                        if (!released && values.has(attribute)) return values.get(attribute);
+                        if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return values.get(attribute);
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
                     set(value) {
-                        if (!released) values.set(attribute, nativeString(value));
+                        if (!released && shouldDeferAttribute(element, attribute)) values.set(attribute, nativeString(value));
                         else if (descriptor.set) descriptor.set.call(element, value);
                         else nativeSetAttribute.call(element, attribute, nativeString(value));
                     }
@@ -372,6 +374,7 @@
                     nativeSetAttributeNS.call(element, value.namespace, value.qualified, value.value);
                 }
                 attributeGuards.release(element);
+                if (stagesStyleText) popupTextContent.set.call(element, stagedText);
             });
         };
         const stageElementMarkup = createMarkupStager({

@@ -236,6 +236,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             body.append(openerHost);
             const openerShadow = openerAttachShadow.call(openerHost, {{ mode: 'open' }});
             openerShadow.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=opener-shadow"">';
+            const style = popup.document.createElement('style');
+            const nativeTextSetter = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent').set;
+            nativeTextSetter.call(style, '@import url({server.BlankPopupResourceUrl}?source=style-text);');
+            popup.document.head.append(style);
             document.querySelector('#result').textContent = body.getAttribute('style').includes('background-image')
                 ? 'cssom state staged'
                 : 'cssom state lost';
@@ -249,6 +253,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "cssom state staged");
         Assert.True(server.BlankPopupResourceRequests >= 6);
+        Assert.Equal(1, server.StyleTextResourceRequests);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
@@ -276,6 +281,15 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 '/blank-popup-location',
                 navigationOptions);
             navigationOptions.history = 'invalid-after-call';
+            const refreshPopup = window.open('', '_blank');
+            const meta = refreshPopup.document.createElement('meta');
+            meta.httpEquiv = 'refresh';
+            let metaOwner = Object.getPrototypeOf(meta);
+            let contentDescriptor;
+            while (metaOwner && !contentDescriptor) {{ contentDescriptor = Object.getOwnPropertyDescriptor(metaOwner, 'content'); metaOwner = Object.getPrototypeOf(metaOwner); }}
+            const contentSetter = contentDescriptor.set;
+            contentSetter.call(meta, '0;url=/blank-popup-location');
+            refreshPopup.document.head.append(meta);
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
