@@ -552,6 +552,40 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ChildIdleCallbackSnapshotsTimeoutOptions() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            const child = frame.contentDocument.defaultView;
+            child.requestIdleCallback = (callback, options) => {
+                document.querySelector('#result').textContent = options?.timeout === 123
+                    ? 'idle options preserved'
+                    : 'idle options lost';
+                callback({ didTimeout: false, timeRemaining: () => 1 });
+                return 17;
+            };
+            const options = { timeout: 123 };
+            frame.contentWindow.requestIdleCallback(() => undefined, options);
+            options.timeout = 999;
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "idle options preserved");
+    }
+
+    [Fact]
     public async Task StagedXhrAbortDispatchesEventsWithoutSending() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

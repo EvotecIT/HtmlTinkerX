@@ -133,6 +133,12 @@
                 ? popup.document.baseURI.startsWith('about:') ? fallbackBaseUri : popup.document.baseURI
                 : new url(stagedBase, fallbackBaseUri).href;
         };
+        const documentBaseFor = currentDocument => {
+            const baseElement = reflectApply(popupQuerySelector, currentDocument, ['base']);
+            const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
+            const nativeBase = currentDocument.baseURI.startsWith('about:') ? documentBase() : currentDocument.baseURI;
+            return stagedBase == null ? nativeBase : new url(stagedBase, nativeBase).href;
+        };
         installSheetMutations(popup.CSSStyleSheet.prototype);
         const sheetDescriptor = installSheetRoute(popup.HTMLStyleElement.prototype);
         const styleDescriptor = installStyleRoute(popup.HTMLElement.prototype);
@@ -221,9 +227,9 @@
                 }
                 return new blob([toDomString(body)]).size;
             };
-            const stagedSendBeacon = (receiver, args) => {
+            const stagedSendBeacon = (receiver, args, baseUri) => {
                 if (args.length === 0) throw new TypeError("Failed to execute 'sendBeacon': 1 argument required");
-                const normalizedArgs = [new url(toDomString(args[0]), popup.document.baseURI).href];
+                const normalizedArgs = [new url(toDomString(args[0]), baseUri).href];
                 if (args.length > 1) normalizedArgs.push(snapshotBody(args[1]));
                 if (isReady()) return reflectApply(popupSendBeacon, receiver, normalizedArgs);
                 const size = payloadSize(normalizedArgs[1]);
@@ -232,9 +238,9 @@
                 runWhenReady(() => reflectApply(popupSendBeacon, receiver, normalizedArgs));
                 return true;
             };
-            guardNavigator = (navigator, navigatorType) => {
+            guardNavigator = (navigator, navigatorType, documentProvider = () => popup.document) => {
                 if (navigator == null || typeof navigatorType !== 'function') return;
-                beaconStates.set(navigator, stagedSendBeacon);
+                beaconStates.set(navigator, (receiver, args) => stagedSendBeacon(receiver, args, documentBaseFor(documentProvider())));
                 const prototype = navigatorType.prototype;
                 if (beaconPrototypes.has(prototype)) return;
                 const descriptor = getOwnPropertyDescriptor(prototype, 'sendBeacon');
@@ -283,12 +289,7 @@
         };
         return {
             guardNavigator,
-            documentBaseFor(currentDocument) {
-                const baseElement = reflectApply(popupQuerySelector, currentDocument, ['base']);
-                const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
-                const nativeBase = currentDocument.baseURI.startsWith('about:') ? documentBase() : currentDocument.baseURI;
-                return stagedBase == null ? nativeBase : new url(stagedBase, nativeBase).href;
-            },
+            documentBaseFor,
             snapshotFetchArguments(args, baseUri) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
                 const input = isInstance(args[0], popup.Request, nativeRequest)

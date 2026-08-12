@@ -103,19 +103,20 @@
             timerRealmStates.set(popup, members);
         };
 
-        const installShadowRoots = () => {
-            if (typeof popup.ShadowRoot !== 'function') return;
-            const attachShadow = popup.Element.prototype.attachShadow;
-            const innerHtml = getOwnPropertyDescriptor(popup.ShadowRoot.prototype, 'innerHTML');
-            let adoptedOwner = popup.ShadowRoot.prototype;
+        const installShadowRoots = target => {
+            if (typeof target?.ShadowRoot !== 'function' || shadowRealmStates.has(target)) return;
+            const attachShadow = target.Element.prototype.attachShadow;
+            const innerHtml = getOwnPropertyDescriptor(target.ShadowRoot.prototype, 'innerHTML');
+            const setHtmlUnsafe = target.ShadowRoot.prototype.setHTMLUnsafe;
+            let adoptedOwner = target.ShadowRoot.prototype;
             let adopted = null;
             while (adoptedOwner && adopted == null) {
                 adopted = getOwnPropertyDescriptor(adoptedOwner, 'adoptedStyleSheets');
                 adoptedOwner = getPrototypeOf(adoptedOwner);
             }
             const states = new weakMap();
-            const stageMarkup = (root, markup) => {
-                const template = popup.document.createElement('template');
+            const stageMarkup = (root, markup, method = 'innerHTML') => {
+                const template = target.document.createElement('template');
                 template.innerHTML = stringValue(markup);
                 const descriptors = [];
                 let markerIndex = 0;
@@ -133,7 +134,8 @@
                     descendant.setAttribute('data-htmltinkerx-staged-resource', marker);
                     descriptors.push({ marker, values, styleText });
                 }
-                innerHtml.set.call(root, template.innerHTML);
+                if (method === 'setHTMLUnsafe') reflectApply(setHtmlUnsafe, root, [template.innerHTML]);
+                else innerHtml.set.call(root, template.innerHTML);
                 for (const { marker, values, styleText } of descriptors) {
                     const descendant = root.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                     if (!descendant) continue;
@@ -143,7 +145,7 @@
                 }
             };
             if (innerHtml?.get && innerHtml?.set && innerHtml.configurable !== false) {
-                defineProperty(popup.ShadowRoot.prototype, 'innerHTML', {
+                defineProperty(target.ShadowRoot.prototype, 'innerHTML', {
                     ...innerHtml,
                     configurable: false,
                     get() { return innerHtml.get.call(this); },
@@ -153,8 +155,20 @@
                     }
                 });
             }
+            if (typeof setHtmlUnsafe === 'function') defineProperty(target.ShadowRoot.prototype, 'setHTMLUnsafe', {
+                configurable: false,
+                writable: false,
+                value(...args) {
+                    if (args.length === 0) return reflectApply(setHtmlUnsafe, this, args);
+                    if (states.has(this) && !isReady()) {
+                        stageMarkup(this, args[0], 'setHTMLUnsafe');
+                        return undefined;
+                    }
+                    return reflectApply(setHtmlUnsafe, this, args);
+                }
+            });
             if (adopted?.get && adopted?.set && adopted.configurable !== false) {
-                defineProperty(popup.ShadowRoot.prototype, 'adoptedStyleSheets', {
+                defineProperty(target.ShadowRoot.prototype, 'adoptedStyleSheets', {
                     ...adopted,
                     configurable: false,
                     get() {
@@ -181,8 +195,8 @@
                     }
                     return root;
                 };
-            shadowRealmStates.set(popup, attach);
-            if (typeof attachShadow === 'function') defineProperty(popup.Element.prototype, 'attachShadow', {
+            shadowRealmStates.set(target, attach);
+            if (typeof attachShadow === 'function') defineProperty(target.Element.prototype, 'attachShadow', {
                 value: routedAttachShadow,
                 writable: false,
                 configurable: false
@@ -190,8 +204,9 @@
         };
 
         installTimers();
-        installShadowRoots();
+        installShadowRoots(popup);
         members.registerFacade = facade => timerRealmStates.set(facade, members);
+        members.guardShadowRealm = installShadowRoots;
         return members;
     };
 })();

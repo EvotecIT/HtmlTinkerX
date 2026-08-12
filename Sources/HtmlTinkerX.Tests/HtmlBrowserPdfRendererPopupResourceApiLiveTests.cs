@@ -143,7 +143,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
-    public async Task ChildFrameNodesAndFetchUseTheChildDocumentStagingRealm() {
+    public async Task ChildFrameNodesFetchAndBeaconUseTheChildDocumentStagingRealm() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -155,6 +155,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             base.href = '{server.BlankPopupResourceUrl}?source=child-base-fetch';
             frame.contentDocument.head.appendChild(base);
             frame.contentDocument.body.innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=child-realm-node'>`;
+            frame.contentWindow.navigator.sendBeacon('', 'audit');
             frame.contentWindow.fetch('').then(() => document.querySelector('#result').textContent = 'child realm staged');
             true";
 
@@ -169,7 +170,50 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "child realm staged");
         Assert.Equal(1, server.BlankPopupSourceRequests("child-realm-node"));
-        Assert.Equal(1, server.BlankPopupSourceRequests("child-base-fetch"));
+        Assert.Equal(2, server.BlankPopupSourceRequests("child-base-fetch"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task UnsafeMarkupAndMediaPlaybackWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            let missingMarkupRejected = false;
+            try {{ popup.document.body.setHTMLUnsafe(); }} catch (error) {{ missingMarkupRejected = error.name === 'TypeError'; }}
+            popup.document.body.setHTMLUnsafe(`<div id='unsafe-host'><img src='{server.BlankPopupResourceUrl}?source=unsafe-element'></div>`);
+            const shadow = popup.document.querySelector('#unsafe-host').attachShadow({{ mode: 'open' }});
+            shadow.setHTMLUnsafe(`<img src='{server.BlankPopupResourceUrl}?source=unsafe-shadow'>`);
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            void frame.contentWindow;
+            const childHost = frame.contentDocument.createElement('div');
+            frame.contentDocument.body.append(childHost);
+            childHost.attachShadow({{ mode: 'open' }}).setHTMLUnsafe(`<img src='{server.BlankPopupResourceUrl}?source=unsafe-child-shadow'>`);
+            const audio = frame.contentDocument.createElement('audio');
+            audio.src = '{server.BlankPopupResourceUrl}?source=media-play';
+            frame.contentDocument.body.append(audio);
+            audio.play().then(
+                () => document.querySelector('#result').textContent = missingMarkupRejected ? 'media playback settled' : 'markup validation lost',
+                () => document.querySelector('#result').textContent = missingMarkupRejected ? 'media playback settled' : 'markup validation lost');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'media playback settled'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "media playback settled");
+        Assert.Equal(1, server.BlankPopupSourceRequests("unsafe-element"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("unsafe-shadow"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("unsafe-child-shadow"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("media-play"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 

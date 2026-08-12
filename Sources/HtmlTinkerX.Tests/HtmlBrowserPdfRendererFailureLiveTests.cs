@@ -110,6 +110,45 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task PreWarmCancellationDoesNotWaitForStaleBrowserCleanup() {
+        TaskCompletionSource<bool> closeStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(value => value.IsConnected).Returns(true);
+        browser.Setup(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()))
+            .Callback(() => closeStarted.TrySetResult(true))
+            .Returns(pendingClose.Task);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>())).ReturnsAsync(browser.Object);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        try {
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                minimumBrowserInstances: 1,
+                maximumBrowserInstances: 1,
+                maximumBrowserAge: TimeSpan.FromMilliseconds(1),
+                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+            await renderer.PreWarmAsync();
+            await Task.Delay(20);
+            using CancellationTokenSource cancellation = new();
+
+            Task prewarm = renderer.PreWarmAsync(cancellation.Token);
+            Assert.Same(closeStarted.Task, await Task.WhenAny(closeStarted.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            cancellation.Cancel();
+
+            Assert.Same(prewarm, await Task.WhenAny(prewarm, Task.Delay(TimeSpan.FromSeconds(1))));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => prewarm);
+            Assert.False(pendingClose.Task.IsCompleted);
+            Assert.Equal(1, renderer.GetMetricsSnapshot().BrowsersRecycled);
+        } finally {
+            pendingClose.TrySetResult(true);
+            await Task.Yield();
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task LateBrowserProvisioningBoundsCloseAndAlwaysDisposesPlaywright() {
         TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> launchStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);

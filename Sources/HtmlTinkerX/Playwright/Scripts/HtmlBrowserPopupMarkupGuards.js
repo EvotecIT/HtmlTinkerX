@@ -11,6 +11,7 @@
         innerHtml,
         outerHtml,
         insertAdjacentHtml,
+        setHtmlUnsafe,
         reflectApply,
         stringValue,
         shouldDeferAttribute,
@@ -40,6 +41,9 @@
             let searchRoot;
             if (method === 'innerHTML') {
                 innerHtml.set.call(element, template.innerHTML);
+                searchRoot = element;
+            } else if (method === 'setHTMLUnsafe') {
+                reflectApply(setHtmlUnsafe, element, [template.innerHTML]);
                 searchRoot = element;
             } else if (method === 'outerHTML') {
                 searchRoot = element.parentNode;

@@ -80,7 +80,7 @@
                         return target.navigation;
                     }
                     if (property === 'navigator') {
-                        transportGuards.guardNavigator(target.navigator, target.Navigator);
+                        transportGuards.guardNavigator(target.navigator, target.Navigator, () => target.document);
                         return target.navigator;
                     }
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));

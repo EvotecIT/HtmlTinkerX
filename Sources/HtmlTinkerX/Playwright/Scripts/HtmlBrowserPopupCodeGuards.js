@@ -6,6 +6,7 @@
     const reflectGet = Reflect.get;
     const weakMap = WeakMap;
     const numberValue = Number;
+    const objectValue = Object;
 
     const createCodeGuards = ({ popup, isReady, runWhenReady, stringValue }) => {
         const realms = new weakMap();
@@ -85,18 +86,25 @@
                 const nativeRequest = target[requestName];
                 const nativeCancel = target[cancelName];
                 if (typeof nativeRequest !== 'function') return;
-                members.set(requestName, callback => {
-                    if (typeof callback !== 'function') return reflectApply(nativeRequest, target, [callback]);
-                    if (isReady()) return reflectApply(nativeRequest, target, [callback]);
+                members.set(requestName, function(callback, options) {
+                    const requestArgs = [callback];
+                    if (requestName === 'requestIdleCallback' && arguments.length > 1) {
+                        const source = options == null ? {} : objectValue(options);
+                        const snapshot = {};
+                        if (source.timeout !== undefined) snapshot.timeout = numberValue(source.timeout);
+                        requestArgs.push(snapshot);
+                    }
+                    if (typeof callback !== 'function' || isReady()) return reflectApply(nativeRequest, target, requestArgs);
                     const identifier = nextIdentifier--;
                     const state = { actual: null, cancelled: false };
                     callbacks.set(identifier, state);
                     runWhenReady(() => {
                         if (state.cancelled) return;
-                        state.actual = reflectApply(nativeRequest, target, [(...args) => {
+                        requestArgs[0] = (...args) => {
                             callbacks.delete(identifier);
                             return reflectApply(callback, target, args);
-                        }]);
+                        };
+                        state.actual = reflectApply(nativeRequest, target, requestArgs);
                     });
                     return identifier;
                 });
