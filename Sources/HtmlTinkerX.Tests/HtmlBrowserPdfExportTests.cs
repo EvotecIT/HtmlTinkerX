@@ -99,6 +99,69 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task ScopedHeaderInterceptorCorrelatesNestedWorkerEnvelopeFailure() {
+        Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
+        Mock<ICDPSessionEvent> Event(string name) {
+            if (!events.TryGetValue(name, out Mock<ICDPSessionEvent>? value)) events[name] = value = new Mock<ICDPSessionEvent>();
+            return value;
+        }
+        List<string> sentMessages = new();
+        TaskCompletionSource<bool> interceptionFailed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new Mock<ICDPSession>();
+        session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
+        session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+                if (method == "Target.sendMessageToTarget" && arguments != null) sentMessages.Add(arguments["message"].ToString()!);
+                return Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
+                    ? ParseJson(@"{""frameTree"":{""frame"":{""id"":""main-frame""}}}")
+                    : null);
+            });
+        session.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var page = new Mock<IPage>();
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(session.Object);
+        await using HtmlBrowserScopedHeaderInterceptor interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+            context.Object, page.Object, new Uri("https://example.test"), new Dictionary<string, string>(),
+            CancellationToken.None, () => interceptionFailed.TrySetResult(true));
+        void RaiseRootMessage(object message) => Event("Target.receivedMessageFromTarget").Raise(
+            value => value.OnEvent += null, session.Object, ParseJson(JsonSerializer.Serialize(new {
+                sessionId = "worker-1", message = JsonSerializer.Serialize(message)
+            })));
+
+        Event("Target.attachedToTarget").Raise(value => value.OnEvent += null, session.Object,
+            ParseJson(@"{""sessionId"":""worker-1"",""targetInfo"":{""type"":""worker""}}"));
+        Assert.True(SpinWait.SpinUntil(() => sentMessages.Count >= 1, TimeSpan.FromSeconds(2)));
+        using (JsonDocument rootConfig = JsonDocument.Parse(sentMessages[0])) RaiseRootMessage(new { id = rootConfig.RootElement.GetProperty("id").GetInt64(), result = new { } });
+        Assert.True(SpinWait.SpinUntil(() => sentMessages.Count >= 2, TimeSpan.FromSeconds(2)));
+        using (JsonDocument rootResume = JsonDocument.Parse(sentMessages[1])) RaiseRootMessage(new { id = rootResume.RootElement.GetProperty("id").GetInt64(), result = new { } });
+
+        RaiseRootMessage(new {
+            method = "Target.attachedToTarget",
+            @params = new { sessionId = "worker-2", targetInfo = new { type = "worker" } }
+        });
+        Assert.True(SpinWait.SpinUntil(() => sentMessages.Count >= 3, TimeSpan.FromSeconds(2)));
+        long failedEnvelopeId;
+        using (JsonDocument nestedConfig = JsonDocument.Parse(sentMessages[2])) failedEnvelopeId = nestedConfig.RootElement.GetProperty("id").GetInt64();
+        RaiseRootMessage(new { id = failedEnvelopeId, error = new { message = "nested worker dispatch failed" } });
+        Assert.True(SpinWait.SpinUntil(() => sentMessages.Count >= 4, TimeSpan.FromSeconds(2)));
+        long resumeEnvelopeId;
+        long resumeCommandId;
+        using (JsonDocument nestedResume = JsonDocument.Parse(sentMessages[3])) {
+            resumeEnvelopeId = nestedResume.RootElement.GetProperty("id").GetInt64();
+            resumeCommandId = JsonDocument.Parse(nestedResume.RootElement.GetProperty("params").GetProperty("message").GetString()!).RootElement.GetProperty("id").GetInt64();
+        }
+        RaiseRootMessage(new { id = resumeEnvelopeId, result = new { } });
+        RaiseRootMessage(new {
+            method = "Target.receivedMessageFromTarget",
+            @params = new { sessionId = "worker-2", message = JsonSerializer.Serialize(new { id = resumeCommandId, result = new { } }) }
+        });
+        Assert.Same(interceptionFailed.Task, await Task.WhenAny(interceptionFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted);
+        Assert.Contains("nested worker dispatch failed", exception.InnerException?.Message);
+    }
+
+    [Fact]
     public async Task ScopedHeaderInterceptorIdentifiesOnlyThePrimaryFrameDocumentAsTopLevel() {
         Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
         Mock<ICDPSessionEvent> Event(string name) {

@@ -115,7 +115,8 @@ public static partial class HtmlBrowser {
         string? maskColor,
         Func<Task<T>> action,
         CancellationToken cancellationToken,
-        bool freezePageScriptsDuringAction = false) {
+        bool freezePageScriptsDuringAction = false,
+        string? captureStyleSheet = null) {
         string[] selectors = CreateVisualMaskSelectors(maskSensitiveElements, maskSelectors);
         if (selectors.Length == 0 && !freezePageScriptsDuringAction) {
             return await action().ConfigureAwait(false);
@@ -142,6 +143,9 @@ public static partial class HtmlBrowser {
                 maskColor,
                 cancellationToken,
                 disablePageScripts: freezePageScriptsDuringAction).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(captureStyleSheet)) {
+                await ApplyCaptureStyleSheetAsync(page, captureStyleSheet!, cancellationToken).ConfigureAwait(false);
+            }
         } catch {
             if (navigationGuard != null) await RemoveNavigationGuardAsync(page, navigationGuard).ConfigureAwait(false);
             if (frameNavigated != null) page.FrameNavigated -= frameNavigated;

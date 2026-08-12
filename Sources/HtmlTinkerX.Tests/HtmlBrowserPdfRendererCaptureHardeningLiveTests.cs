@@ -11,17 +11,25 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackContentServer server = new("<p id='replacement'>replacement sensitive value</p>");
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
         await session.Page.SetContentAsync($"<iframe srcdoc=\"<meta http-equiv='refresh' content='0.5;url={server.Url}'><p id='secret'>original sensitive value</p>\"></iframe>");
+        IFrame child = session.Page.Frames[1];
 
-        await Assert.ThrowsAsync<PlaywrightException>(() => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
-            session.Page,
-            maskSensitiveElements: false,
-            maskSelectors: new[] { "#secret" },
-            maskColor: "#000000",
-            action: async () => { await Task.Delay(1500); return true; },
-            cancellationToken: CancellationToken.None,
-            freezePageScriptsDuringAction: true));
+        string? state = null;
+        try {
+            state = await HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+                session.Page,
+                maskSensitiveElements: false,
+                maskSelectors: new[] { "#secret" },
+                maskColor: "#000000",
+                action: async () => {
+                    await Task.Delay(1500);
+                    return await child.EvaluateAsync<string>("() => getComputedStyle(document.querySelector('#secret')).visibility + '|' + document.body.textContent.trim()");
+                },
+                cancellationToken: CancellationToken.None,
+                freezePageScriptsDuringAction: true);
+        } catch (PlaywrightException) { }
 
         Assert.Equal(0, server.RequestCount);
+        if (state != null) Assert.Equal("hidden|original sensitive value", state);
     }
 
     [Fact]
@@ -161,5 +169,25 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "public beforeprint style marker");
         AssertPdfDoesNotContain(result.PdfBytes, "beforeprint style sensitive value");
+    }
+
+    [Fact]
+    public async Task FinalCaptureStyleSheetCannotBeRemovedByMutationObservers() {
+        const string html = @"<p>public protected style marker</p><p id='secret'>observer style sensitive value</p><script>
+            new MutationObserver(() => {
+                document.querySelector('style[data-htmltinkerx-pdf-capture-style]')?.remove();
+            }).observe(document.documentElement, { subtree: true, childList: true });
+        </script>";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 200),
+            styleSheetContent: "#secret { display: none !important; }"));
+
+        AssertPdfContains(result.PdfBytes, "public protected style marker");
+        AssertPdfDoesNotContain(result.PdfBytes, "observer style sensitive value");
     }
 }

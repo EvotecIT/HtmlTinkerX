@@ -17,6 +17,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
     private readonly ConcurrentDictionary<Task, byte> _pending = new();
     private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> _workerCommandResponses = new();
+    private readonly ConcurrentDictionary<long, long> _workerEnvelopeCommands = new();
     private readonly ConcurrentDictionary<string, string[]> _workerSessions = new(StringComparer.Ordinal);
     private readonly EventHandler<JsonElement?> _handler;
     private readonly EventHandler<JsonElement?> _targetAttachedHandler;
@@ -163,13 +164,18 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private void ProcessWorkerMessage(string[] workerPath, JsonElement message) {
         if (message.TryGetProperty("id", out JsonElement responseId)
-            && responseId.TryGetInt64(out long commandId)
-            && _workerCommandResponses.TryRemove(commandId, out TaskCompletionSource<bool>? response)) {
+            && responseId.TryGetInt64(out long commandId)) {
+            if (_workerEnvelopeCommands.TryRemove(commandId, out long innerCommandId)
+                && message.TryGetProperty("error", out JsonElement envelopeError)
+                && _workerCommandResponses.TryRemove(innerCommandId, out TaskCompletionSource<bool>? envelopeResponse)) {
+                RemoveWorkerEnvelopes(innerCommandId);
+                envelopeResponse.TrySetException(CreateWorkerCommandException(envelopeError));
+                return;
+            }
+            if (!_workerCommandResponses.TryRemove(commandId, out TaskCompletionSource<bool>? response)) return;
+            RemoveWorkerEnvelopes(commandId);
             if (message.TryGetProperty("error", out JsonElement error)) {
-                string detail = error.TryGetProperty("message", out JsonElement errorMessage)
-                    ? errorMessage.GetString() ?? error.GetRawText()
-                    : error.GetRawText();
-                response.TrySetException(new PlaywrightException(detail));
+                response.TrySetException(CreateWorkerCommandException(error));
             } else {
                 response.TrySetResult(true);
             }
@@ -317,8 +323,10 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             ["params"] = arguments
         });
         for (int index = workerPath.Count - 1; index >= 1; index--) {
+            long envelopeId = Interlocked.Increment(ref _nextWorkerCommandId);
+            if (response != null) _workerEnvelopeCommands[envelopeId] = commandId;
             message = JsonSerializer.Serialize(new Dictionary<string, object> {
-                ["id"] = Interlocked.Increment(ref _nextWorkerCommandId),
+                ["id"] = envelopeId,
                 ["method"] = "Target.sendMessageToTarget",
                 ["params"] = new Dictionary<string, object> {
                     ["sessionId"] = workerPath[index],
@@ -333,9 +341,27 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             }).ConfigureAwait(false);
             if (response != null) await response.Task.ConfigureAwait(false);
         } catch {
-            if (response != null) _workerCommandResponses.TryRemove(commandId, out _);
+            if (response != null) RemoveWorkerCommand(commandId);
             throw;
         }
+    }
+
+    private void RemoveWorkerCommand(long commandId) {
+        _workerCommandResponses.TryRemove(commandId, out _);
+        RemoveWorkerEnvelopes(commandId);
+    }
+
+    private void RemoveWorkerEnvelopes(long commandId) {
+        foreach (KeyValuePair<long, long> envelope in _workerEnvelopeCommands) {
+            if (envelope.Value == commandId) _workerEnvelopeCommands.TryRemove(envelope.Key, out _);
+        }
+    }
+
+    private static PlaywrightException CreateWorkerCommandException(JsonElement error) {
+        string detail = error.TryGetProperty("message", out JsonElement errorMessage)
+            ? errorMessage.GetString() ?? error.GetRawText()
+            : error.GetRawText();
+        return new PlaywrightException(detail);
     }
 
     private static string WorkerPathKey(IEnumerable<string> workerPath) => string.Join("/", workerPath);
@@ -383,6 +409,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             response.TrySetException(new PlaywrightException("Worker target detached before the CDP command completed."));
         }
         _workerCommandResponses.Clear();
+        _workerEnvelopeCommands.Clear();
         Task[] pending = _pending.Keys.ToArray();
         if (pending.Length > 0) {
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (PlaywrightException) { }

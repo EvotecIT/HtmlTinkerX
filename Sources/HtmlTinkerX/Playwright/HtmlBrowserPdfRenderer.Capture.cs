@@ -259,10 +259,18 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 // blocked destination has already been replaced with an empty response.
             }
             if (storageInitialization != null) {
-                await ExecuteCancellablePageOperationAsync(
-                    page,
-                    () => storageInitialization.ValidateAsync(),
-                    cancellationToken).ConfigureAwait(false);
+                using CancellationTokenSource? storageDeadline = request.NavigationTimeout == 0
+                    ? null
+                    : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                storageDeadline?.CancelAfter(request.NavigationTimeout);
+                try {
+                    await ExecuteCancellableSlotOperationAsync(
+                        slot,
+                        () => storageInitialization.ValidateAsync(),
+                        storageDeadline?.Token ?? cancellationToken).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && storageDeadline?.IsCancellationRequested == true) {
+                    throw new TimeoutException($"Web-storage validation did not complete within {request.NavigationTimeout} ms.");
+                }
             }
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
@@ -296,7 +304,8 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         pdfToken,
                         freezePageScriptsDuringAction: request.PdfOptions.MaskSensitiveElements
                             || request.PdfOptions.MaskSelectors.Count > 0
-                            || !string.IsNullOrWhiteSpace(request.StyleSheetContent)),
+                            || !string.IsNullOrWhiteSpace(request.StyleSheetContent),
+                        captureStyleSheet: request.StyleSheetContent),
                     () => AbortSlotAsync(slot),
                     pdfToken).ConfigureAwait(false);
                 bytes = HtmlBrowserPdfCapture.ValidateOutputSize(bytes, request.MaximumPdfBytes);
@@ -477,9 +486,6 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
 
         await HtmlBrowserPdfCapture.WaitForReadinessAsync(page, request.Readiness, cancellationToken).ConfigureAwait(false);
-        if (hasCaptureStyle) {
-            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
-        }
     }
 
     private static async Task AddCookiesAsync(
