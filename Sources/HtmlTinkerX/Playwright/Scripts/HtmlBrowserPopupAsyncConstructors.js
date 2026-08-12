@@ -1,6 +1,7 @@
 (() => {
     globalThis.__htmlTinkerXCreatePopupAsyncConstructors = ({
         defineProperty,
+        getOwnPropertyDescriptor,
         reflectApply,
         reflectConstruct,
         reflectGet,
@@ -149,8 +150,50 @@
             });
             constructors.set(name, stagedConstructor);
         };
+        const stageFontFace = () => {
+            const nativeConstructor = popup.FontFace;
+            if (typeof nativeConstructor !== 'function') return;
+            const nativeLoad = nativeConstructor.prototype.load;
+            if (typeof nativeLoad !== 'function') return;
+            const fontStates = new WeakMap();
+            const load = font => {
+                const state = fontStates.get(font);
+                if (state == null) return reflectApply(nativeLoad, font, []);
+                if (state.loadPromise == null) state.loadPromise = new popup.Promise((resolve, reject) => runWhenReady(() => {
+                    try { reflectApply(nativeLoad, font, []).then(resolve, reject); }
+                    catch (error) { reject(error); }
+                }));
+                return state.loadPromise;
+            };
+            const stagedConstructor = new Proxy(nativeConstructor, {
+                construct(target, args, newTarget) {
+                    const font = reflectConstruct(target, args, newTarget === stagedConstructor ? target : newTarget);
+                    fontStates.set(font, { loadPromise: null });
+                    defineProperty(font, 'load', { value: () => load(font), writable: false, configurable: false });
+                    return font;
+                }
+            });
+            const loadDescriptor = getOwnPropertyDescriptor(nativeConstructor.prototype, 'load');
+            if (loadDescriptor?.configurable !== false) defineProperty(nativeConstructor.prototype, 'load', {
+                ...loadDescriptor,
+                value() { return load(this); },
+                writable: false,
+                configurable: false
+            });
+            const constructorDescriptor = getOwnPropertyDescriptor(nativeConstructor.prototype, 'constructor');
+            if (constructorDescriptor?.configurable !== false) defineProperty(nativeConstructor.prototype, 'constructor', {
+                ...constructorDescriptor,
+                value: stagedConstructor,
+                writable: false,
+                configurable: false
+            });
+            defineProperty(popup.Window.prototype, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
+            defineProperty(popup, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
+            constructors.set('FontFace', stagedConstructor);
+        };
         stage('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
         stage('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
+        stageFontFace();
         return constructors;
     };
 })();

@@ -509,6 +509,7 @@ public static partial class HtmlBrowser {
         bool closeContextOnDispose = true;
         bool closeBrowserOnDispose = true;
         bool closePageOnDispose = false;
+        bool pageScopedInitScripts = false;
         int ownershipAborted = 0;
 
         Task AbortOwnershipAsync() {
@@ -528,6 +529,7 @@ public static partial class HtmlBrowser {
                 closePageOnDispose = true;
                 if (browserInstance.Contexts.Count > 0) {
                     context = browserInstance.Contexts[0];
+                    pageScopedInitScripts = true;
                     Task<IPage> pageCreation = context.NewPageAsync();
                     try {
                         page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -565,7 +567,9 @@ public static partial class HtmlBrowser {
             }
 
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                () => ApplyInitScriptsAsync(context!, options, cancellationToken),
+                () => pageScopedInitScripts
+                    ? ApplyInitScriptsAsync(page!, options, cancellationToken)
+                    : ApplyInitScriptsAsync(context!, options, cancellationToken),
                 AbortOwnershipAsync,
                 cancellationToken).ConfigureAwait(false);
 
@@ -657,23 +661,6 @@ public static partial class HtmlBrowser {
         || options.GeoLongitude.HasValue
         || !string.IsNullOrWhiteSpace(options.Timezone)
         || options.Permissions.Count > 0;
-
-    private static async Task ApplyInitScriptsAsync(IBrowserContext context, HtmlBrowserLaunchOptions options, CancellationToken cancellationToken) {
-        if (options.PreventSsoAutoSubmit) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(PreventSsoAutoSubmitInitScript).ConfigureAwait(false);
-        }
-
-        foreach (string script in options.InitScripts) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(script).ConfigureAwait(false);
-        }
-
-        foreach (string scriptPath in options.InitScriptPaths) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(scriptPath: scriptPath.ToFullPath()).ConfigureAwait(false);
-        }
-    }
 
     /// <summary>
     /// Creates a new <see cref="HtmlBrowserSession"/> using reusable launch options and navigates to the specified URL.

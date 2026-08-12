@@ -1,6 +1,6 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, codeGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
@@ -57,6 +57,7 @@
         const windowFor = target => {
             const existing = windows.get(target);
             if (existing != null) return existing;
+            const codeMembers = codeGuards.forWindow(target);
             let facade;
             facade = new Proxy({}, {
                 get(_, property) {
@@ -79,6 +80,7 @@
                         return target.navigator;
                     }
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));
+                    if (codeMembers.has(property)) return codeMembers.get(property);
                     if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                     const value = reflectGet(target, property, target);
                     if (value === target) return facade;

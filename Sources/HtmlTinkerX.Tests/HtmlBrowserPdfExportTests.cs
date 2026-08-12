@@ -592,6 +592,41 @@ public class HtmlBrowserPdfExportTests {
     }
 
     [Fact]
+    public async Task OpenSessionAsync_CdpExistingContextKeepsInitScriptsPageScoped() {
+        var page = new Mock<IPage>();
+        var initScript = new Mock<IAsyncDisposable>();
+        page.SetupGet(value => value.IsClosed).Returns(false);
+        page.Setup(value => value.AddInitScriptAsync(It.IsAny<string?>(), It.IsAny<string?>())).ReturnsAsync(initScript.Object);
+        page.Setup(value => value.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>())).ReturnsAsync((IResponse?)null);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(Task.CompletedTask);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewPageAsync()).ReturnsAsync(page.Object);
+        var browser = new Mock<IBrowser>();
+        browser.SetupGet(value => value.Contexts).Returns(new[] { context.Object });
+        browser.SetupGet(value => value.IsConnected).Returns(true);
+        var browserType = new Mock<IBrowserType>();
+        browserType.Setup(value => value.ConnectOverCDPAsync(It.IsAny<string>(), It.IsAny<BrowserTypeConnectOverCDPOptions>())).ReturnsAsync(browser.Object);
+        var playwright = new Mock<IPlaywright>();
+        playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
+        HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        HtmlBrowserLaunchOptions options = new() {
+            CdpEndpointUrl = "http://127.0.0.1:9222",
+            PreventSsoAutoSubmit = true
+        };
+        options.InitScripts.Add("window.__setup = true;");
+        try {
+            await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("https://example.com", options);
+
+            page.Verify(value => value.AddInitScriptAsync(It.IsAny<string?>(), It.IsAny<string?>()), Times.Exactly(2));
+            context.Verify(value => value.AddInitScriptAsync(It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Never);
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Never);
+        } finally {
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task MaskCleanupDoesNotReplaceActivePdfCancellation() {
         TaskCompletionSource<byte[]> pendingPdf = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool closed = false;

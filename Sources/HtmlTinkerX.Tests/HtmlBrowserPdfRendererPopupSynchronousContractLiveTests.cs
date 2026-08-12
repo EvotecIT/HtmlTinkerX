@@ -558,4 +558,56 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal(1, server.BlankPopupSourceRequests($"dynamic-script-{setter}"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
+
+    [Fact]
+    public async Task PopupRealmCodeExecutionWaitsForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            popup.eval(`fetch('{server.BlankPopupResourceUrl}?source=popup-eval')`);
+            new popup.Function(`fetch('{server.BlankPopupResourceUrl}?source=popup-function')`)();
+            popup.queueMicrotask(() => popup.fetch('{server.BlankPopupResourceUrl}?source=popup-microtask'));
+            popup.requestAnimationFrame(() => popup.fetch('{server.BlankPopupResourceUrl}?source=popup-animation'));
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            frame.contentWindow.eval(`fetch('{server.BlankPopupResourceUrl}?source=frame-eval')`);
+            frame.contentWindow.setTimeout(`fetch('{server.BlankPopupResourceUrl}?source=frame-timer')`, 0);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        foreach (string source in new[] { "popup-eval", "popup-function", "popup-microtask", "popup-animation", "frame-eval", "frame-timer" }) {
+            Assert.Equal(1, server.BlankPopupSourceRequests(source));
+        }
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task PopupFontFaceLoadsOnlyAfterHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const direct = new popup.FontFace('direct', `url('{server.BlankPopupResourceUrl}?source=font-load')`);
+            direct.load().catch(() => undefined);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("font-load"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
 }

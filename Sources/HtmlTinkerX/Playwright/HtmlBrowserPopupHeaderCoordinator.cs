@@ -15,6 +15,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
     private const string AttributeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js";
     private const string FrameGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupFrameGuards.js";
+    private const string CodeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupCodeGuards.js";
     private const string AsyncConstructorsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAsyncConstructors.js";
     private const string MarkupGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupMarkupGuards.js";
     private const string RealmGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupRealmGuards.js";
@@ -74,7 +75,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, FrameGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, RealmGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, FrameGuardsResource)}\n{LoadEmbeddedScript(assembly, CodeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, RealmGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
     }
 
     private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {

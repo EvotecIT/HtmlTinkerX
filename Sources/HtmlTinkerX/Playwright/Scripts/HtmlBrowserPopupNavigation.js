@@ -44,15 +44,13 @@
     const imageSubmitCoordinates = new WeakMap();
     const popupReleaseProperty = '__HTMLTINKERX_POPUP_RELEASE_PROPERTY__';
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
-    const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager;
-    delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
-    const createRealmGuards = globalThis.__htmlTinkerXCreatePopupRealmGuards;
-    delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
+    const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager; delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    const createRealmGuards = globalThis.__htmlTinkerXCreatePopupRealmGuards; delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
     const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
     delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
-    const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards;
+    const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards; const createCodeGuards = globalThis.__htmlTinkerXCreatePopupCodeGuards; delete globalThis.__htmlTinkerXCreatePopupCodeGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
-        defineProperty: nativeDefineProperty,
+        defineProperty: nativeDefineProperty, getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
         reflectApply: nativeReflectApply,
         reflectConstruct: nativeReflectConstruct,
         reflectGet: nativeReflectGet,
@@ -181,6 +179,7 @@
             if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
             return nativeString(value);
         };
+        const codeGuards = createCodeGuards({ popup, isReady: () => ready, runWhenReady, stringValue: toDomString }); const stagedCodeMembers = codeGuards.forWindow(popup);
         const transportGuards = createTransportGuards({ popup, fallbackBaseUri: document.baseURI, isReady: () => ready, runWhenReady, toDomString });
         const popupFetch = popup.fetch.bind(popup);
         const stagedFetch = (...args) => {
@@ -613,7 +612,7 @@
             return facade;
         };
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } }; const isDocumentValue = value => { try { return nativeReflectApply(popupNodeType, value, []) === 9; } catch { return false; } }; const documentFacade = stagedObject(() => popup.document);
-        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, codeGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
         stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
@@ -623,6 +622,7 @@
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 if (property === 'XMLHttpRequest') return stagedXhrConstructor;
                 if (stagedRealmMembers.has(property)) return stagedRealmMembers.get(property);
+                if (stagedCodeMembers.has(property)) return stagedCodeMembers.get(property);
                 if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                 if (stagedElementConstructors.has(property)) return stagedElementConstructors.get(property);
                 const value = nativeReflectGet(targetWindow, property, targetWindow);
