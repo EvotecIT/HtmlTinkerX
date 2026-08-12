@@ -10,12 +10,12 @@
         reflectGet,
         reflectSet
     }) => ({ popup, runWhenReady, normalizeArguments, normalizeOperation, stringValue }) => {
-        const constructors = new Map();
-        const stage = (name, handlerNames, operationNames, stopName) => {
-            const nativeConstructor = popup[name];
+        const realmConstructors = new WeakMap();
+        const stage = (targetWindow, constructors, name, handlerNames, operationNames, stopName) => {
+            const nativeConstructor = targetWindow[name];
             if (typeof nativeConstructor !== 'function') return;
             const deferredInstance = (constructor, args) => {
-                const normalizedArgs = normalizeArguments(name, args);
+                const normalizedArgs = normalizeArguments(name, args, targetWindow.document);
                 let instance = null;
                 let stopped = false;
                 const handlers = new Map();
@@ -143,20 +143,20 @@
                 writable: false,
                 configurable: false
             });
-            defineProperty(popup.Window.prototype, name, {
+            defineProperty(targetWindow.Window.prototype, name, {
                 value: stagedConstructor,
                 writable: false,
                 configurable: false
             });
-            defineProperty(popup, name, {
+            defineProperty(targetWindow, name, {
                 value: stagedConstructor,
                 writable: false,
                 configurable: false
             });
             constructors.set(name, stagedConstructor);
         };
-        const stageFontFace = () => {
-            const nativeConstructor = popup.FontFace;
+        const stageFontFace = (targetWindow, constructors) => {
+            const nativeConstructor = targetWindow.FontFace;
             if (typeof nativeConstructor !== 'function') return;
             const nativeLoad = nativeConstructor.prototype.load;
             if (typeof nativeLoad !== 'function') return;
@@ -164,7 +164,7 @@
             const load = font => {
                 const state = fontStates.get(font);
                 if (state == null) return reflectApply(nativeLoad, font, []);
-                if (state.loadPromise == null) state.loadPromise = new popup.Promise((resolve, reject) => runWhenReady(() => {
+                if (state.loadPromise == null) state.loadPromise = new targetWindow.Promise((resolve, reject) => runWhenReady(() => {
                     try { reflectApply(nativeLoad, font, []).then(resolve, reject); }
                     catch (error) { reject(error); }
                 }));
@@ -192,8 +192,8 @@
                 writable: false,
                 configurable: false
             });
-            defineProperty(popup.Window.prototype, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
-            defineProperty(popup, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
+            defineProperty(targetWindow.Window.prototype, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
+            defineProperty(targetWindow, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
             constructors.set('FontFace', stagedConstructor);
         };
         const installFontSetRoute = prototype => {
@@ -222,18 +222,28 @@
                     if (args.length === 0) throw new TypeError("Failed to execute 'load': 1 argument required");
                     normalized = [stringValue(args[0])];
                     if (args.length > 1) normalized.push(stringValue(args[1]));
-                } catch (error) { return popup.Promise.reject(error); }
-                return new popup.Promise((resolve, reject) => runWhenReady(() => {
+                } catch (error) { return (document?.defaultView?.Promise ?? popup.Promise).reject(error); }
+                const promise = document?.defaultView?.Promise ?? popup.Promise;
+                return new promise((resolve, reject) => runWhenReady(() => {
                     try { reflectApply(load, fonts, normalized).then(resolve, reject); }
                     catch (error) { reject(error); }
                 }));
             });
         };
-        stage('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
-        stage('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
-        stageFontFace();
+        const constructorsFor = targetWindow => {
+            const existing = realmConstructors.get(targetWindow);
+            if (existing != null) return existing;
+            const constructors = new Map();
+            stage(targetWindow, constructors, 'Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
+            stage(targetWindow, constructors, 'EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
+            stageFontFace(targetWindow, constructors);
+            realmConstructors.set(targetWindow, constructors);
+            return constructors;
+        };
+        const constructors = constructorsFor(popup);
         guardFontSet(popup.document);
         constructors.guardFontSet = guardFontSet;
+        constructors.forWindow = constructorsFor;
         return constructors;
     };
 })();

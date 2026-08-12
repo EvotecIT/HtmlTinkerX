@@ -175,6 +175,39 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ChildFrameResourceApisResolveAgainstTheChildStagedBase() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            const base = frame.contentDocument.createElement('base');
+            base.href = '{server.BlankPopupResourceUrl}?source=child-api-base';
+            frame.contentDocument.head.append(base);
+            const request = new frame.contentWindow.XMLHttpRequest();
+            request.open('GET', '');
+            request.send();
+            frame.contentWindow.caches.open('htmltinkerx-child-base').then(cache => cache.add(''));
+            new frame.contentWindow.Worker('');
+            const events = new frame.contentWindow.EventSource('');
+            events.onerror = () => events.close();
+            frame.contentWindow.fetch(new frame.contentWindow.Request(''));
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.True(server.BlankPopupSourceRequests("child-api-base") >= 5);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task UnsafeMarkupAndMediaPlaybackWaitForHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

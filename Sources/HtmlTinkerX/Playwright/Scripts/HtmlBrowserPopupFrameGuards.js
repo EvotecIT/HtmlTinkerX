@@ -62,6 +62,7 @@
             cacheGuards.guardWindow(target);
             stagedAsyncConstructors.guardFontSet(target.document);
             const codeMembers = codeGuards.forWindow(target);
+            const asyncConstructors = stagedAsyncConstructors.forWindow(target);
             let facade;
             facade = new Proxy({}, {
                 get(_, property) {
@@ -74,7 +75,7 @@
                     }
                     if (property === 'location') return locationFor(target);
                     if (property === 'fetch') return fetchFor(target);
-                    if (property === 'XMLHttpRequest') return stagedXhrConstructor;
+                    if (property === 'XMLHttpRequest') return stagedXhrConstructor.forWindow(target);
                     if (property === 'navigation' && target.navigation != null) {
                         transportGuards.guardNavigation(target.navigation, target.Navigation, () => target.document);
                         return target.navigation;
@@ -86,9 +87,10 @@
                     if (property === 'CSS') return transportGuards.guardCss(target.CSS, () => target.document);
                     if (property === 'getSelection') return (...args) => domGuards.guardSelection(reflectApply(target.getSelection, target, args));
                     if (property === 'DOMParser') return domGuards.constructorFor(target);
+                    if (property === 'Request') return transportGuards.requestConstructorFor(target);
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));
                     if (codeMembers.has(property)) return codeMembers.get(property);
-                    if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
+                    if (asyncConstructors.has(property)) return asyncConstructors.get(property);
                     const value = reflectGet(target, property, target);
                     if (value === target) return facade;
                     if (value === popup) return mainWindowFacade();

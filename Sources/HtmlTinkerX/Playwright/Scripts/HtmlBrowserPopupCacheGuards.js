@@ -39,15 +39,15 @@
     installCacheRoutes(globalThis.Cache?.prototype);
     installStorageRoute(globalThis.CacheStorage?.prototype);
     globalThis.__htmlTinkerXCreatePopupCacheGuards = ({ popup, runWhenReady, normalizeRequest }) => {
-        const guardCache = cache => {
+        const guardCache = (cache, document = popup.document) => {
             if (cache == null) return cache;
             cacheStates.set(cache, (name, method, args) => {
                 let normalized;
                 try {
                     if (args.length === 0) throw new TypeError(`Failed to execute '${name}': 1 argument required`);
                     normalized = name === 'addAll'
-                        ? [Array.from(args[0], normalizeRequest)]
-                        : [normalizeRequest(args[0])];
+                        ? [Array.from(args[0], value => normalizeRequest(value, document))]
+                        : [normalizeRequest(args[0], document)];
                 } catch (error) { return popup.Promise.reject(error); }
                 return new popup.Promise((resolve, reject) => runWhenReady(() => {
                     try { reflectApply(method, cache, normalized).then(resolve, reject); }
@@ -60,7 +60,7 @@
             if (target == null) return;
             installCacheRoutes(target.Cache?.prototype);
             installStorageRoute(target.CacheStorage?.prototype);
-            if (target.caches != null) storageStates.set(target.caches, guardCache);
+            if (target.caches != null) storageStates.set(target.caches, cache => guardCache(cache, target.document));
         };
         guardWindow(popup);
         return { guardCache, guardWindow };

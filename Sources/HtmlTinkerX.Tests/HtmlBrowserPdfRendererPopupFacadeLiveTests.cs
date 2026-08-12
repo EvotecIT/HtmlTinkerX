@@ -147,6 +147,21 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const removedImage = popup.document.createElement('img');
             Object.getPrototypeOf(removedImage).setAttributeNS.call(removedImage, null, 'src', '{server.BlankPopupResourceUrl}?source=removed');
             Object.getPrototypeOf(removedImage).removeAttributeNS.call(removedImage, null, 'src');
+            const orderedImage = popup.document.createElement('img');
+            popup.document.body.append(orderedImage);
+            const orderedBase = popup.document.createElement('base');
+            orderedBase.href = '{server.BlankPopupResourceUrl}';
+            popup.document.head.append(orderedBase);
+            orderedImage.src = '?source=mutation-ordered-base';
+            const routedAttributeImages = ['value', 'nodeValue', 'textContent'].map((property, index) => {{
+                const image = popup.document.createElement('img');
+                image.src = '{server.BlankPopupResourceUrl}?source=attribute-before-' + index;
+                const attribute = image.getAttributeNode('src');
+                attribute[property] = '{server.BlankPopupResourceUrl}?source=attribute-after-' + property;
+                if (image.getAttribute('src') !== attribute[property]) throw new Error('staged Attr mutation diverged');
+                popup.document.body.append(image);
+                return image;
+            }});
             const markupContainer = popup.document.createElement('div');
             markupContainer.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=inner-html""><link rel=""stylesheet"" href=""{server.BlankPopupResourceUrl}?source=inner-html-link"">';
             markupContainer.insertAdjacentHTML('beforeend', '<img src=""{server.BlankPopupResourceUrl}?source=adjacent-html"">');
@@ -162,6 +177,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.True(server.BlankPopupResourceRequests >= 9);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
         Assert.Equal(0, server.RemovedNamespacedResourceRequests);
+        Assert.Equal(1, server.BlankPopupSourceRequests("mutation-ordered-base"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("attribute-after-value"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("attribute-after-nodeValue"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("attribute-after-textContent"));
+        Assert.Equal(0, server.BlankPopupSourceRequests("attribute-before-0"));
+        Assert.Equal(0, server.BlankPopupSourceRequests("attribute-before-1"));
+        Assert.Equal(0, server.BlankPopupSourceRequests("attribute-before-2"));
         Assert.Equal("popup-token", server.LastPopupToken);
     }
 

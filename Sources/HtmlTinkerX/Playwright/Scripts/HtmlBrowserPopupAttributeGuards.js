@@ -1,10 +1,27 @@
 (() => {
-    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, stringValue, booleanValue }) => {
+    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, getPrototypeOf, reflectApply, stringValue, booleanValue }) => {
         const states = new WeakMap();
         const insertionStates = new WeakMap();
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
+        const attrStates = new WeakMap();
+        const attrPrototypes = new WeakSet();
+        const installAttr = prototype => {
+            if (!prototype || attrPrototypes.has(prototype)) return;
+            attrPrototypes.add(prototype);
+            for (const name of ['value', 'nodeValue', 'textContent']) {
+                let owner = prototype, descriptor = null;
+                while (owner && descriptor == null) { descriptor = getOwnPropertyDescriptor(owner, name); if (descriptor == null) owner = getPrototypeOf(owner); }
+                if (!descriptor?.get || !descriptor?.set) continue;
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    enumerable: descriptor.enumerable,
+                    get() { return attrStates.get(this)?.get() ?? descriptor.get.call(this); },
+                    set(value) { const state = attrStates.get(this); if (state) state.set(stringValue(value)); else descriptor.set.call(this, value); }
+                });
+            }
+        };
         const install = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
             prototypes.add(prototype);
@@ -219,7 +236,7 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, window, stageMarkup, guardClone, guardTree, synchronizeAttribute, textState) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, window, stageMarkup, guardClone, guardTree, synchronizeAttribute, textState, touch = () => { }) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
@@ -290,6 +307,19 @@
                             ? document().createAttribute(qualified)
                             : document().createAttributeNS(namespace, qualified);
                         attribute.value = value;
+                        attrStates.set(attribute, {
+                            get: () => {
+                                if (isReleased()) { attrStates.delete(attribute); return attribute.value; }
+                                if (namespace == null || namespace.length === 0) return values.get(name) ?? '';
+                                return namespacedValues.get(`${namespace}\0${qualified}`)?.value ?? '';
+                            },
+                            set: next => {
+                                if (isReleased()) { attrStates.delete(attribute); attribute.value = next; return; }
+                                if (namespace == null || namespace.length === 0) values.set(name, next);
+                                else namespacedValues.set(`${namespace}\0${qualified}`, { namespace, qualified, value: next });
+                                touch();
+                            }
+                        });
                         return { handled: true, value: attribute };
                     }
                     return { handled: true, value: value ?? null };
@@ -298,12 +328,14 @@
                     const attribute = normalized(name);
                     if (isReleased() || !shouldDefer(element, attribute)) return false;
                     values.set(attribute, stringValue(value));
+                    touch();
                     return true;
                 },
                 removeAttribute(name) {
                     const attribute = normalized(name);
                     if (isReleased() || !shouldDefer(element, attribute)) return false;
                     values.delete(attribute);
+                    touch();
                     return true;
                 },
                 setAttributeNS(namespaceUri, qualifiedName, value) {
@@ -313,6 +345,7 @@
                     if (isReleased() || !shouldDefer(element, attribute)) return false;
                     if (namespace == null || namespace.length === 0) values.set(attribute, stringValue(value));
                     else namespacedValues.set(`${namespace}\0${qualified}`, { namespace, qualified, value: stringValue(value) });
+                    touch();
                     return true;
                 },
                 setAttributeNode(attribute) { return stageAttributeNode(attribute); },
@@ -329,6 +362,7 @@
                             namespacedValues.delete(key);
                         }
                     }
+                    touch();
                     return true;
                 },
                 removeAttributeNode(attribute) { return removeAttributeNode(attribute); },
@@ -340,6 +374,7 @@
                     const enabled = arguments.length < 2 ? !values.has(attribute) : booleanValue(force);
                     if (enabled) values.set(attribute, '');
                     else values.delete(attribute);
+                    touch();
                     state.result = enabled;
                     return true;
                 }
@@ -351,6 +386,7 @@
                 const qualified = stringValue(attribute.name);
                 if (namespace == null || namespace.length === 0) values.set(name, stringValue(attribute.value));
                 else namespacedValues.set(`${namespace}\0${qualified}`, { namespace, qualified, value: stringValue(attribute.value) });
+                touch();
                 state.result = null;
                 return true;
             };
@@ -358,6 +394,7 @@
                 const name = normalized(attribute.name);
                 if (isReleased() || !shouldDefer(element, name)) return false;
                 values.delete(name);
+                touch();
                 state.result = attribute;
                 return true;
             };
@@ -369,6 +406,7 @@
                 else for (const [key, value] of namespacedValues) {
                     if (value.namespace === namespace && normalized(value.qualified.split(':').pop()) === name) namespacedValues.delete(key);
                 }
+                touch();
                 state.result = null;
                 return true;
             };
@@ -397,6 +435,7 @@
             installNamedNodeMap,
             installNode,
             installFrame,
+            installAttr,
             installProperty,
             guardLegacyHandler,
             guardInsertionTarget(target, guard) { insertionStates.set(target, guard); },

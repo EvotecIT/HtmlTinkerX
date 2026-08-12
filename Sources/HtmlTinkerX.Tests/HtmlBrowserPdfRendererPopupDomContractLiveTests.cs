@@ -221,7 +221,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             button.type = 'submit';
             requestForm.append(button);
             requestPopup.document.body.append(requestForm);
+            let invalidSubmitterRejected = false;
+            try {{ requestForm.requestSubmit({{ localName: 'button', type: 'submit', form: requestForm }}); }} catch (error) {{ invalidSubmitterRejected = error.name === 'TypeError'; }}
+            if (!invalidSubmitterRejected) throw new Error('forged submitter accepted');
             requestForm.requestSubmit(button);
+            const clickPopup = window.open('', '_blank');
+            const clickForm = clickPopup.document.createElement('form');
+            clickForm.method = 'post';
+            clickForm.action = '{server.BlankPopupResourceUrl}?source=form-button-click';
+            const clickButton = clickPopup.document.createElement('button');
+            clickButton.type = 'submit';
+            clickForm.append(clickButton);
+            clickPopup.document.body.append(clickForm);
+            clickButton.click();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -233,6 +245,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupSourceRequests("form-submit"));
         Assert.Equal(1, server.BlankPopupSourceRequests("form-request-submit"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("form-button-click"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }

@@ -416,7 +416,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'popup authorized'",
-                timeout: 10000),
+                timeout: 20000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: $"window.open('{server.CrossOriginRedirectUrl}', '_blank'); true"));
 

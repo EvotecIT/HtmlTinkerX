@@ -13,16 +13,17 @@
     const iterator = Symbol.iterator;
     const navigatorPrototype = Navigator.prototype;
     const nativeSendBeacon = navigatorPrototype.sendBeacon;
-    const nativeRequest = Request;
     const nodeClone = Node.prototype.cloneNode;
     const objectValue = Object;
     const defineProperty = Object.defineProperty;
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const nativeRequestUrl = getOwnPropertyDescriptor(Request.prototype, 'url').get;
     const nodeType = getOwnPropertyDescriptor(Node.prototype, 'nodeType').get;
     const nodeListItem = NodeList.prototype.item;
     const htmlCollectionItem = HTMLCollection.prototype.item;
     const getPrototypeOf = Object.getPrototypeOf;
     const reflectApply = Reflect.apply;
+    const reflectConstruct = Reflect.construct;
     const reflectGet = Reflect.get;
     const reflectSet = Reflect.set;
     const uint8Array = Uint8Array;
@@ -42,6 +43,7 @@
     const attributeStyleMapStates = new WeakMap();
     const attributeStyleMapRouteDescriptors = new WeakMap();
     const workletStates = new WeakMap();
+    const requestConstructors = new WeakMap();
     const installedWorkletPrototypes = new WeakSet();
     const styleSheetListItem = StyleSheetList.prototype.item;
     const installWorkletRoute = prototype => {
@@ -197,6 +199,7 @@
             try { reflectApply(nodeType, value, []); return true; }
             catch { return false; }
         };
+        const isRequest = value => { try { reflectApply(nativeRequestUrl, value, []); return true; } catch { return false; } };
         const collectionLength = value => {
             if (value == null) return null;
             try { reflectApply(nodeListItem, value, [0]); return value.length; }
@@ -313,6 +316,22 @@
             guardNavigator,
             guardCss,
             documentBaseFor,
+            requestConstructorFor(targetWindow) {
+                const existing = requestConstructors.get(targetWindow);
+                if (existing != null) return existing;
+                const nativeConstructor = targetWindow.Request;
+                if (typeof nativeConstructor !== 'function') return nativeConstructor;
+                let routed;
+                routed = new Proxy(nativeConstructor, {
+                    construct(target, args, newTarget) {
+                        const normalized = args.slice();
+                        if (normalized.length > 0 && !isRequest(normalized[0])) normalized[0] = new url(toDomString(normalized[0]), documentBaseFor(targetWindow.document)).href;
+                        return reflectConstruct(target, normalized, newTarget === routed ? target : newTarget);
+                    }
+                });
+                requestConstructors.set(targetWindow, routed);
+                return routed;
+            },
             guardStyleSheetCollection(collection) {
                 if (collection == null) return collection;
                 const existing = sheetCollectionFacades.get(collection);
@@ -341,7 +360,7 @@
             },
             snapshotFetchArguments(args, baseUri) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
-                const input = isInstance(args[0], popup.Request, nativeRequest)
+                const input = isRequest(args[0])
                     ? args[0]
                     : new url(toDomString(args[0]), baseUri ?? documentBase()).href;
                 const request = args.length > 1

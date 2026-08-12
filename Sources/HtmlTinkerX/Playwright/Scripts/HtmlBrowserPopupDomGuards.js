@@ -1,5 +1,6 @@
 (() => {
     const defineProperty = Object.defineProperty;
+    const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
     const reflectApply = Reflect.apply;
     const reflectConstruct = Reflect.construct;
     const rangeStates = new WeakMap();
@@ -17,6 +18,20 @@
     const parserRoutes = new WeakMap();
     const parserConstructors = new WeakMap();
     const installedParserPrototypes = new WeakSet();
+    const buttonType = getOwnPropertyDescriptor(HTMLButtonElement.prototype, 'type')?.get;
+    const buttonForm = getOwnPropertyDescriptor(HTMLButtonElement.prototype, 'form')?.get;
+    const inputType = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'type')?.get;
+    const inputForm = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'form')?.get;
+    const submitterState = value => {
+        try {
+            const type = reflectApply(buttonType, value, []);
+            return { valid: type === 'submit', form: reflectApply(buttonForm, value, []) };
+        } catch { }
+        try {
+            const type = reflectApply(inputType, value, []);
+            return { valid: type === 'submit' || type === 'image', form: reflectApply(inputForm, value, []) };
+        } catch { return { valid: false, form: null }; }
+    };
     const installRangeRoutes = prototype => {
         if (prototype == null || installedRangePrototypes.has(prototype)) return;
         installedRangePrototypes.add(prototype);
@@ -178,9 +193,11 @@
                 return selection;
             },
             guardActivation(element) {
-                if (element?.localName !== 'a' && element?.localName !== 'area') return;
+                const link = element?.localName === 'a' || element?.localName === 'area';
+                if (!link && element?.localName !== 'button' && element?.localName !== 'input') return;
                 installActivationRoute(element.ownerDocument?.defaultView?.HTMLElement?.prototype);
                 activationStates.set(element, (click, args) => {
+                    if (!link && !submitterState(element).valid) return reflectApply(click, element, args);
                     runWhenReady(() => reflectApply(click, element, args));
                     return undefined;
                 });
@@ -209,12 +226,11 @@
                     const normalized = [];
                     if (name === 'requestSubmit' && args.length > 0 && args[0] != null) {
                         const submitter = args[0];
-                        const localName = submitter?.localName;
-                        const type = submitter?.type;
-                        if (!((localName === 'button' && (type === 'submit' || type === '')) || (localName === 'input' && (type === 'submit' || type === 'image')))) {
+                        const state = submitterState(submitter);
+                        if (!state.valid) {
                             throw new TypeError("Failed to execute 'requestSubmit': the specified element is not a submit button");
                         }
-                        if (submitter.form !== element) throw new popup.DOMException('The specified element is not owned by this form element', 'NotFoundError');
+                        if (state.form !== element) throw new popup.DOMException('The specified element is not owned by this form element', 'NotFoundError');
                         normalized.push(submitter);
                     }
                     runWhenReady(() => reflectApply(method, element, normalized));
