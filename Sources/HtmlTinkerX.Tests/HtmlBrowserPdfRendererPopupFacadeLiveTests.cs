@@ -97,6 +97,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         string script = $@"const popup = window.open('', '_blank');
             const popupPrototypeImage = popup.document.createElement('img');
             Object.getPrototypeOf(popupPrototypeImage).setAttribute.call(popupPrototypeImage, 'src', '{server.BlankPopupResourceUrl}?source=popup-prototype');
+            if (popupPrototypeImage.getAttribute('src') !== '{server.BlankPopupResourceUrl}?source=popup-prototype'
+                || popupPrototypeImage.getAttributeNode('src')?.value !== '{server.BlankPopupResourceUrl}?source=popup-prototype'
+                || !popupPrototypeImage.hasAttribute('src')) throw new Error('staged attribute reads diverged');
             const idlImage = popup.document.createElement('img');
             Object.getOwnPropertyDescriptor(Object.getPrototypeOf(idlImage), 'src').set.call(idlImage, '{server.BlankPopupResourceUrl}?source=idl-setter');
             const openerPrototypeImage = popup.document.createElement('img');
@@ -331,7 +334,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         const string script = @"const popup = window.open('', '_blank');
             const worker = new popup.Worker('/popup/worker.js');
             const nativeIdentity = worker instanceof popup.Worker;
-            worker.onmessage = event => document.querySelector('#result').textContent = nativeIdentity ? event.data : 'worker identity lost';
+            worker.onmessage = function(event) { const eventIdentity = this === worker && event.target === worker && event.currentTarget === worker; document.querySelector('#result').textContent = nativeIdentity && eventIdentity ? event.data : 'worker identity lost'; };
             worker.postMessage('start');
             true";
 
@@ -357,8 +360,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         const string script = @"const popup = window.open('', '_blank');
             const source = new popup.EventSource('/popup/events');
             const nativeIdentity = source instanceof popup.EventSource;
-            source.onmessage = event => {
-                document.querySelector('#result').textContent = nativeIdentity ? event.data : 'event source identity lost';
+            source.onmessage = function(event) {
+                const eventIdentity = this === source && event.target === source && event.currentTarget === source;
+                document.querySelector('#result').textContent = nativeIdentity && eventIdentity ? event.data : 'event source identity lost';
                 source.close();
             };
             true";

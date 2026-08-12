@@ -441,8 +441,17 @@ public sealed partial class HtmlBrowserPdfRenderer {
                             WaitUntil = WaitUntilState.DOMContentLoaded
                         }), cancellationToken).ConfigureAwait(false);
                     } finally {
+                        using CancellationTokenSource? routeCleanupDeadline = timeout == 0
+                            ? null
+                            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        routeCleanupDeadline?.CancelAfter(timeout);
                         try {
-                            await page.UnrouteAsync(documentUrl, initialDocumentRoute).ConfigureAwait(false);
+                            await ExecuteCancellablePageOperationAsync(
+                                page,
+                                () => page.UnrouteAsync(documentUrl, initialDocumentRoute),
+                                routeCleanupDeadline?.Token ?? cancellationToken).ConfigureAwait(false);
+                        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && routeCleanupDeadline?.IsCancellationRequested == true) {
+                            throw new TimeoutException($"Temporary HTML route removal did not complete within {timeout} ms.");
                         } catch (PlaywrightException) when (page.IsClosed) {
                             // Cancellation closes the page and removes its routes.
                         }

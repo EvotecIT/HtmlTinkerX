@@ -280,12 +280,25 @@
                 let stopped = false;
                 const handlers = new Map();
                 const listeners = [];
+                const callbackWrappers = new WeakMap();
                 const pending = [];
                 const handlerProperties = new Set(handlerNames);
                 const operationProperties = new Set(operationNames);
                 const target = {};
-                const facade = new Proxy(target, {
+                let facade;
+                const wrapCallback = callback => {
+                    if (typeof callback !== 'function') return callback;
+                    let wrapper = callbackWrappers.get(callback);
+                    if (!wrapper) {
+                        wrapper = event => nativeReflectApply(callback, facade, [new Proxy(event, { get(current, property) { const value = nativeReflectGet(current, property, current); if ((property === 'target' || property === 'currentTarget') && value === instance) return facade; return typeof value === 'function' ? value.bind(current) : value; } })]);
+                        callbackWrappers.set(callback, wrapper);
+                    }
+                    return wrapper;
+                };
+                facade = new Proxy(target, {
                     get(_, property) {
+                        if (property === 'addEventListener') return (type, listener, options) => instance == null ? listeners.push({ type, listener, options }) : instance.addEventListener(type, wrapCallback(listener), options);
+                        if (property === 'removeEventListener') return (type, listener) => instance == null ? listeners.splice(0, listeners.length, ...listeners.filter(current => current.type !== type || current.listener !== listener)) : instance.removeEventListener(type, wrapCallback(listener));
                         if (instance != null) {
                             const value = nativeReflectGet(instance, property, instance);
                             return typeof value === 'function' ? value.bind(instance) : value;
@@ -305,17 +318,6 @@
                                 nativeReflectApply(operation, current, operationArgs);
                             });
                         }
-                        if (property === 'addEventListener') {
-                            return (type, listener, options) => listeners.push({ type, listener, options });
-                        }
-                        if (property === 'removeEventListener') {
-                            return (type, listener) => {
-                                for (let index = listeners.length - 1; index >= 0; index--) {
-                                    const current = listeners[index];
-                                    if (current.type === type && current.listener === listener) listeners.splice(index, 1);
-                                }
-                            };
-                        }
                         if (property === stopName) {
                             return () => {
                                 stopped = true;
@@ -325,11 +327,12 @@
                         return nativeReflectGet(target, property, target);
                     },
                     set(_, property, value) {
-                        if (instance != null) return nativeReflectSet(instance, property, value, instance);
                         if (handlerProperties.has(property)) {
                             handlers.set(property, value);
+                            if (instance != null) nativeReflectSet(instance, property, wrapCallback(value), instance);
                             return true;
                         }
+                        if (instance != null) return nativeReflectSet(instance, property, value, instance);
                         return nativeReflectSet(target, property, value, target);
                     },
                     getPrototypeOf() {
@@ -339,10 +342,10 @@
                 runWhenReady(() => {
                     if (stopped) return;
                     instance = nativeReflectConstruct(constructor, normalizedArgs);
-                    for (const [property, value] of handlers) nativeReflectSet(instance, property, value, instance);
+                    for (const [property, value] of handlers) nativeReflectSet(instance, property, wrapCallback(value), instance);
                     for (const { type, listener, options } of listeners) {
                         const addEventListener = nativeReflectGet(instance, 'addEventListener', instance);
-                        nativeReflectApply(addEventListener, instance, [type, listener, options]);
+                        nativeReflectApply(addEventListener, instance, [type, wrapCallback(listener), options]);
                     }
                     while (pending.length > 0) pending.shift()(instance);
                 });

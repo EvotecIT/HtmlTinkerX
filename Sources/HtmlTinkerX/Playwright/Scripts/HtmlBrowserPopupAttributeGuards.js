@@ -20,6 +20,18 @@
                     }
                 });
             }
+            for (const name of ['getAttribute', 'getAttributeNS', 'hasAttribute', 'hasAttributeNS', 'getAttributeNode', 'getAttributeNodeNS']) {
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const read = states.get(this)?.read(name, args);
+                        return read?.handled ? read.value : reflectApply(method, this, args);
+                    }
+                });
+            }
         };
         const installNamedNodeMap = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
@@ -74,6 +86,31 @@
             const state = {
                 result: undefined,
                 document,
+                read(method, args) {
+                    const namespaceAware = method.endsWith('NS');
+                    const namespace = namespaceAware && args[0] != null ? stringValue(args[0]) : null;
+                    const name = normalized(args[namespaceAware ? 1 : 0]);
+                    if (isReleased() || !shouldDefer(element, name)) return { handled: false };
+                    let value = namespace == null || namespace.length === 0 ? values.get(name) : undefined;
+                    let qualified = name;
+                    if (namespace != null && namespace.length > 0) for (const staged of namespacedValues.values()) {
+                        if (staged.namespace === namespace && normalized(staged.qualified.split(':').pop()) === name) {
+                            value = staged.value;
+                            qualified = staged.qualified;
+                            break;
+                        }
+                    }
+                    if (method.startsWith('has')) return { handled: true, value: value !== undefined };
+                    if (method.includes('Node')) {
+                        if (value === undefined) return { handled: true, value: null };
+                        const attribute = namespace == null || namespace.length === 0
+                            ? document().createAttribute(qualified)
+                            : document().createAttributeNS(namespace, qualified);
+                        attribute.value = value;
+                        return { handled: true, value: attribute };
+                    }
+                    return { handled: true, value: value ?? null };
+                },
                 setAttribute(name, value) {
                     const attribute = normalized(name);
                     if (isReleased() || !shouldDefer(element, attribute)) return false;
