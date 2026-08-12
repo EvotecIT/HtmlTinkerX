@@ -65,6 +65,8 @@
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupCacheGuards.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupAttributeGuards.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js" />
+        <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupAnimatedAttributeGuards.js"
+                          LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAnimatedAttributeGuards.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupFrameGuards.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupFrameGuards.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupCodeGuards.js"

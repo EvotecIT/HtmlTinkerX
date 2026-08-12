@@ -1,6 +1,6 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, guardRealm, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
@@ -25,13 +25,13 @@
                 get(_, property) {
                     const value = reflectGet(location, property, location);
                     if (['assign', 'replace', 'reload'].includes(property)) return (...args) => {
-                        const normalized = transportGuards.normalizeLocationArguments(property, args);
+                        const normalized = transportGuards.normalizeLocationArguments(property, args, transportGuards.documentBaseFor(target.document));
                         runWhenReady(() => reflectApply(value, location, normalized));
                     };
                     return typeof value === 'function' ? reflectApply(bind, value, [location]) : value;
                 },
                 set(_, property, value) {
-                    const normalized = transportGuards.normalizeLocationSetter(property, value);
+                    const normalized = transportGuards.normalizeLocationSetter(property, value, transportGuards.documentBaseFor(target.document));
                     runWhenReady(() => reflectSet(location, property, normalized, location));
                     return true;
                 }
@@ -45,7 +45,7 @@
             const nativeFetch = reflectApply(bind, target.fetch, [target]);
             const staged = (...args) => {
                 let snapshot;
-                try { snapshot = transportGuards.snapshotFetchArguments(args); }
+                try { snapshot = transportGuards.snapshotFetchArguments(args, transportGuards.documentBaseFor(target.document)); }
                 catch (error) { return Promise.reject(error); }
                 return new Promise((resolve, reject) => runWhenReady(() => {
                     try { nativeFetch(...snapshot).then(resolve, reject); }
@@ -58,6 +58,7 @@
         const windowFor = target => {
             const existing = windows.get(target);
             if (existing != null) return existing;
+            guardRealm(target);
             cacheGuards.guardWindow(target);
             stagedAsyncConstructors.guardFontSet(target.document);
             const codeMembers = codeGuards.forWindow(target);
@@ -93,7 +94,7 @@
                 },
                 set(_, property, value) {
                     if (property === 'location') {
-                        const normalized = transportGuards.normalizeLocationSetter('href', value);
+                        const normalized = transportGuards.normalizeLocationSetter('href', value, transportGuards.documentBaseFor(target.document));
                         runWhenReady(() => reflectSet(target, 'location', normalized, target));
                         return true;
                     }

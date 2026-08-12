@@ -5,6 +5,7 @@
     const reflectConstruct = Reflect.construct;
     const reflectGet = Reflect.get;
     const weakMap = WeakMap;
+    const numberValue = Number;
 
     const createCodeGuards = ({ popup, isReady, runWhenReady, stringValue }) => {
         const realms = new weakMap();
@@ -52,6 +53,7 @@
                     if (arguments.length === 0) throw new TypeError(`Failed to execute '${setName}': 1 argument required`);
                     if (isReady()) return reflectApply(nativeSet, target, [handler, delay, ...args]);
                     const normalizedHandler = typeof handler === 'function' ? handler : stringValue(handler);
+                    const normalizedDelay = numberValue(delay) || 0;
                     const identifier = nextIdentifier--;
                     const state = { actual: null, cancelled: false };
                     timers.set(identifier, state);
@@ -63,7 +65,7 @@
                         const scheduled = repeating
                             ? (...callbackArgs) => invoke(callbackArgs)
                             : (...callbackArgs) => { timers.delete(identifier); return invoke(callbackArgs); };
-                        state.actual = reflectApply(nativeSet, target, [scheduled, Number(delay) || 0, ...args]);
+                        state.actual = reflectApply(nativeSet, target, [scheduled, normalizedDelay, ...args]);
                     });
                     return identifier;
                 });

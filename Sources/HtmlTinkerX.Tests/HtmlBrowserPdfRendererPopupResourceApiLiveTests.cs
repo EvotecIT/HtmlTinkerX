@@ -143,6 +143,63 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ChildFrameNodesAndFetchUseTheChildDocumentStagingRealm() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            const base = frame.contentDocument.createElement('base');
+            base.href = '{server.BlankPopupResourceUrl}?source=child-base-fetch';
+            frame.contentDocument.head.appendChild(base);
+            frame.contentDocument.body.innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=child-realm-node'>`;
+            frame.contentWindow.fetch('').then(() => document.querySelector('#result').textContent = 'child realm staged');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'child realm staged'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "child realm staged");
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-realm-node"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-base-fetch"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task AudioConstructorAndSvgAnimatedHrefWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const audio = new popup.Audio('{server.BlankPopupResourceUrl}?source=audio-constructor');
+            popup.document.body.append(audio);
+            const image = popup.document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            popup.document.body.append(image);
+            image.href.baseVal = '{server.BlankPopupResourceUrl}?source=image-decode-svg';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("audio-constructor"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("image-decode-svg"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task DeferredWorkerAndEventSourcePreserveExpandosAfterActivation() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

@@ -68,9 +68,16 @@
         booleanValue: nativeBoolean
     });
     delete globalThis.__htmlTinkerXCreatePopupAttributeGuards;
+    const createAnimatedAttributeGuard = globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
+    delete globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
     attributeGuards.install(Element.prototype);
     attributeGuards.installNamedNodeMap(NamedNodeMap.prototype);
     attributeGuards.installNode(Node.prototype);
+    const installPopupRealmAttributeGuards = target => {
+        attributeGuards.install(target.Element?.prototype); attributeGuards.install(target.HTMLElement?.prototype); attributeGuards.install(target.HTMLScriptElement?.prototype);
+        attributeGuards.installNamedNodeMap(target.NamedNodeMap?.prototype); attributeGuards.installNode(target.Node?.prototype);
+        attributeGuards.installFrame(target.HTMLIFrameElement?.prototype); attributeGuards.installFrame(target.HTMLFrameElement?.prototype);
+    };
     const createXhrStager = globalThis.__htmlTinkerXCreatePopupXhrStager;
     delete globalThis.__htmlTinkerXCreatePopupXhrStager;
     Event.prototype.preventDefault = function() {
@@ -310,10 +317,14 @@
                 }
                 if (descriptor == null || descriptor.configurable === false && nativeHasOwnProperty.call(element, property)) continue;
                 attributeGuards.installProperty(descriptorOwner, property, attribute);
+                const animated = element.namespaceURI === 'http://www.w3.org/2000/svg' && property === 'href'
+                    ? createAnimatedAttributeGuard({ target: element, readNative: () => descriptor.get.call(element), isReleased: () => released, isDeferred: () => shouldDeferAttribute(element, attribute), hasStaged: () => values.has(attribute), readStaged: () => values.get(attribute), writeStaged: value => values.set(attribute, value), normalize: value => transportGuards.normalizeDeferredProperty(attribute, value), stringValue: toDomString, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet })
+                    : null;
                 nativeDefineProperty(element, property, {
                     configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
+                        if (animated != null) return animated();
                         if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return transportGuards.normalizeDeferredProperty(attribute, values.get(attribute));
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
@@ -402,8 +413,14 @@
             const constructor = popup[name];
             if (typeof constructor !== 'function') continue;
             stagedElementConstructors.set(name, new Proxy(constructor, {
-                construct(target, args) {
-                    return guardCreatedTree(nativeReflectConstruct(target, args));
+                construct(target, args, newTarget) {
+                    if (name === 'Audio' && !ready && args.length > 0) {
+                        const source = toDomString(args[0]);
+                        const audio = guardCreatedTree(nativeReflectConstruct(target, [], newTarget));
+                        audio.src = source;
+                        return audio;
+                    }
+                    return guardCreatedTree(nativeReflectConstruct(target, args, newTarget));
                 }
             }));
         }
@@ -588,7 +605,7 @@
             return facade;
         };
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } }; const isDocumentValue = value => { try { return nativeReflectApply(popupNodeType, value, []) === 9; } catch { return false; } }; const documentFacade = stagedObject(() => popup.document);
-        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, guardRealm: installPopupRealmAttributeGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
         stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {

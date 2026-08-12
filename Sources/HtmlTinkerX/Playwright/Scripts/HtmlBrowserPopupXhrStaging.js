@@ -50,14 +50,17 @@
         const nativeSetRequestHeader = prototype.setRequestHeader;
         const nativeReadyState = getOwnPropertyDescriptor(prototype, 'readyState').get;
         const nativeWithCredentials = getOwnPropertyDescriptor(prototype, 'withCredentials');
+        const nativeDispatchEvent = popup.EventTarget.prototype.dispatchEvent;
+        const progressEvent = popup.ProgressEvent;
         const opened = popup.XMLHttpRequest.OPENED;
         const pendingSends = new weakMap();
         const domException = popup.DOMException;
         const cancelPending = request => {
             const pending = pendingSends.get(request);
-            if (pending == null) return;
+            if (pending == null) return false;
             pending.aborted = true;
             pendingSends.delete(request);
+            return true;
         };
         const throwInvalidState = () => {
             throw new domException('The object is in an invalid state.', 'InvalidStateError');
@@ -83,8 +86,13 @@
                 });
             },
             abort(request, args) {
-                cancelPending(request);
-                return reflectApply(nativeAbort, request, args);
+                const stagedSend = cancelPending(request);
+                const result = reflectApply(nativeAbort, request, args);
+                if (stagedSend) {
+                    reflectApply(nativeDispatchEvent, request, [reflectConstruct(progressEvent, ['abort'])]);
+                    reflectApply(nativeDispatchEvent, request, [reflectConstruct(progressEvent, ['loadend'])]);
+                }
+                return result;
             },
             setRequestHeader(request, args) {
                 if (pendingSends.has(request)) throwInvalidState();

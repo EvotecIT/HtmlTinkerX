@@ -523,6 +523,67 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal(0, server.BlankPopupResourceRequests);
     }
 
+    [Fact]
+    public async Task ChildTimerDelayConversionThrowsSynchronously() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            let timerRejected = false;
+            try { frame.contentWindow.setTimeout(() => undefined, Symbol()); }
+            catch (error) { timerRejected = error.name === 'TypeError'; }
+            document.querySelector('#result').textContent = timerRejected ? 'timer conversion synchronous' : 'timer conversion deferred';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000,
+                delayMilliseconds: 500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "timer conversion synchronous");
+    }
+
+    [Fact]
+    public async Task StagedXhrAbortDispatchesEventsWithoutSending() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const request = new popup.XMLHttpRequest();
+            const events = [];
+            request.addEventListener('abort', () => events.push('abort'));
+            request.addEventListener('loadend', () => events.push('loadend'));
+            request.addEventListener('load', () => events.push('load'));
+            request.open('GET', 'data:text/plain,unexpected');
+            request.send();
+            request.abort();
+            document.querySelector('#result').textContent = events.join(',') === 'abort,loadend'
+                ? 'xhr abort synchronous'
+                : 'xhr abort lost';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000,
+                delayMilliseconds: 500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "xhr abort synchronous");
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]

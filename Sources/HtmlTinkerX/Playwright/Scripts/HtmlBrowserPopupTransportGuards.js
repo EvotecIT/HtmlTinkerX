@@ -18,6 +18,9 @@
     const objectValue = Object;
     const defineProperty = Object.defineProperty;
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const nodeType = getOwnPropertyDescriptor(Node.prototype, 'nodeType').get;
+    const nodeListItem = NodeList.prototype.item;
+    const htmlCollectionItem = HTMLCollection.prototype.item;
     const getPrototypeOf = Object.getPrototypeOf;
     const reflectApply = Reflect.apply;
     const reflectGet = Reflect.get;
@@ -162,6 +165,18 @@
         for (const name of ['paintWorklet', 'animationWorklet', 'layoutWorklet']) guardWorklet(popup.CSS?.[name]);
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
+        const isNode = value => {
+            try { reflectApply(nodeType, value, []); return true; }
+            catch { return false; }
+        };
+        const collectionLength = value => {
+            if (value == null) return null;
+            try { reflectApply(nodeListItem, value, [0]); return value.length; }
+            catch {
+                try { reflectApply(htmlCollectionItem, value, [0]); return value.length; }
+                catch { return null; }
+            }
+        };
         const snapshotBody = body => {
             if (body == null) return body;
             if (isInstance(body, popup.Blob, blob)) return body;
@@ -268,25 +283,31 @@
         };
         return {
             guardNavigator,
-            snapshotFetchArguments(args) {
+            documentBaseFor(currentDocument) {
+                const baseElement = reflectApply(popupQuerySelector, currentDocument, ['base']);
+                const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
+                const nativeBase = currentDocument.baseURI.startsWith('about:') ? documentBase() : currentDocument.baseURI;
+                return stagedBase == null ? nativeBase : new url(stagedBase, nativeBase).href;
+            },
+            snapshotFetchArguments(args, baseUri) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
                 const input = isInstance(args[0], popup.Request, nativeRequest)
                     ? args[0]
-                    : new url(toDomString(args[0]), documentBase()).href;
+                    : new url(toDomString(args[0]), baseUri ?? documentBase()).href;
                 const request = args.length > 1
                     ? new popup.Request(input, args[1])
                     : new popup.Request(input);
                 return [request];
             },
-            normalizeLocationArguments(name, args) {
+            normalizeLocationArguments(name, args, baseUri) {
                 if (name === 'reload') return [];
                 if (args.length === 0) throw new TypeError(`Failed to execute '${name}': 1 argument required`);
-                return [new url(toDomString(args[0]), popup.document.baseURI).href];
+                return [new url(toDomString(args[0]), baseUri ?? popup.document.baseURI).href];
             },
-            normalizeLocationSetter(property, value) {
+            normalizeLocationSetter(property, value, baseUri) {
                 const normalized = toDomString(value);
                 return property === 'href'
-                    ? new url(normalized, popup.document.baseURI).href
+                    ? new url(normalized, baseUri ?? popup.document.baseURI).href
                     : normalized;
             },
             guardNavigation(navigation, navigationType) {
@@ -430,12 +451,12 @@
             snapshotMutationArguments(property, args) {
                 const required = { appendChild: 1, insertAdjacentElement: 2, insertAdjacentHTML: 2, insertAdjacentText: 2, insertBefore: 2, removeAttribute: 1, removeAttributeNS: 2, removeChild: 1, replaceChild: 2, setAttribute: 2, setAttributeNS: 3, toggleAttribute: 1 }[property] ?? 0;
                 if (args.length < required) throw new TypeError(`Failed to execute '${property}': ${required} argument${required === 1 ? '' : 's'} required`);
-                const requireNode = index => { if (!(args[index] instanceof popup.Node)) throw new TypeError(`Failed to execute '${property}': parameter ${index + 1} is not of type 'Node'`); };
+                const requireNode = index => { if (!isNode(args[index])) throw new TypeError(`Failed to execute '${property}': parameter ${index + 1} is not of type 'Node'`); };
                 if (property === 'appendChild' || property === 'removeChild') requireNode(0);
                 if (property === 'insertBefore') { requireNode(0); if (args[1] != null) requireNode(1); }
                 if (property === 'replaceChild') { requireNode(0); requireNode(1); }
                 if (property === 'insertAdjacentElement' && args[1] != null) requireNode(1);
-                if (['append', 'after', 'before', 'prepend', 'replaceChildren', 'replaceWith'].includes(property)) for (let index = 0; index < args.length; index++) if (!(args[index] instanceof popup.Node)) args[index] = toDomString(args[index]);
+                if (['append', 'after', 'before', 'prepend', 'replaceChildren', 'replaceWith'].includes(property)) for (let index = 0; index < args.length; index++) if (!isNode(args[index])) args[index] = toDomString(args[index]);
                 if (['insertAdjacentElement', 'insertAdjacentHTML', 'insertAdjacentText'].includes(property)) args[0] = toDomString(args[0]).toLowerCase();
                 if (['insertAdjacentHTML', 'insertAdjacentText'].includes(property)) args[1] = toDomString(args[1]);
                 if (property === 'setAttribute') { args[0] = toDomString(args[0]); args[1] = toDomString(args[1]); }
@@ -446,10 +467,11 @@
                 return args;
             },
             guardReturnedNodes(value, guard) {
-                if (value instanceof popup.Node) guard(value);
-                else if ((typeof popup.NodeList === 'function' && value instanceof popup.NodeList)
-                    || (typeof popup.HTMLCollection === 'function' && value instanceof popup.HTMLCollection)) {
-                    for (let index = 0; index < value.length; index++) if (value[index] instanceof popup.Node) guard(value[index]);
+                if (isNode(value)) guard(value);
+                else {
+                    const length = collectionLength(value);
+                    if (length == null) return value;
+                    for (let index = 0; index < length; index++) if (isNode(value[index])) guard(value[index]);
                 }
                 return value;
             },
