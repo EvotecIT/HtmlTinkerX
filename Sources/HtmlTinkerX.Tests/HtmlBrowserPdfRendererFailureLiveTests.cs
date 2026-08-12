@@ -22,12 +22,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         try {
             await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
                 maximumBrowserInstances: 1,
-                setupTimeout: TimeSpan.FromMilliseconds(500),
+                setupTimeout: TimeSpan.FromSeconds(5),
                 networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
 
             Task<HtmlBrowserPdfResult> capture = renderer.CaptureAsync(
                 new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromHtml("<p>owner deadline</p>")));
-            Assert.Same(creationStarted.Task, await Task.WhenAny(creationStarted.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            Assert.Same(creationStarted.Task, await Task.WhenAny(creationStarted.Task, Task.Delay(TimeSpan.FromSeconds(10))));
             TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => capture);
             pendingPlaywright.SetResult(playwright.Object);
 

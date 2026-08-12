@@ -34,6 +34,29 @@
     const sheetMutationStates = new WeakMap();
     const installedSheetPrototypes = new WeakSet();
     const styleStates = new WeakMap();
+    const workletStates = new WeakMap();
+    const installedWorkletPrototypes = new WeakSet();
+    const installWorkletRoute = prototype => {
+        if (prototype == null || installedWorkletPrototypes.has(prototype)) return;
+        installedWorkletPrototypes.add(prototype);
+        const addModule = prototype.addModule;
+        if (typeof addModule !== 'function') return;
+        defineProperty(prototype, 'addModule', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const stage = workletStates.get(this);
+                return stage == null ? reflectApply(addModule, this, args) : stage(addModule, args);
+            }
+        });
+    };
+    const installWorklet = worklet => {
+        if (worklet == null) return;
+        let prototype = getPrototypeOf(worklet);
+        while (prototype != null && typeof prototype.addModule !== 'function') prototype = getPrototypeOf(prototype);
+        installWorkletRoute(prototype);
+    };
+    for (const name of ['paintWorklet', 'animationWorklet', 'layoutWorklet']) installWorklet(globalThis.CSS?.[name]);
     const installSheetMutations = prototype => {
         if (prototype == null || installedSheetPrototypes.has(prototype)) return;
         installedSheetPrototypes.add(prototype);
@@ -100,9 +123,43 @@
         const popupGetAttribute = popup.Element.prototype.getAttribute;
         const popupQuerySelector = popup.Document.prototype.querySelector;
         const popupUrlSearchParams = popup.URLSearchParams;
+        const documentBase = () => {
+            const baseElement = reflectApply(popupQuerySelector, popup.document, ['base']);
+            const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
+            return stagedBase == null
+                ? popup.document.baseURI.startsWith('about:') ? fallbackBaseUri : popup.document.baseURI
+                : new url(stagedBase, fallbackBaseUri).href;
+        };
         installSheetMutations(popup.CSSStyleSheet.prototype);
         const sheetDescriptor = installSheetRoute(popup.HTMLStyleElement.prototype);
         const styleDescriptor = installStyleRoute(popup.HTMLElement.prototype);
+        const guardWorklet = worklet => {
+            if (worklet == null) return worklet;
+            installWorklet(worklet);
+            workletStates.set(worklet, (addModule, args) => {
+                let normalized;
+                try {
+                    if (args.length === 0) throw new TypeError("Failed to execute 'addModule': 1 argument required");
+                    normalized = [new url(toDomString(args[0]), documentBase()).href];
+                    if (args.length > 1) {
+                        const source = args[1] == null ? {} : objectValue(args[1]);
+                        const options = {};
+                        if (source.credentials !== undefined) {
+                            const credentials = toDomString(source.credentials);
+                            if (!['omit', 'same-origin', 'include'].includes(credentials)) throw new TypeError(`Invalid Worklet credentials '${credentials}'`);
+                            options.credentials = credentials;
+                        }
+                        normalized.push(options);
+                    }
+                } catch (error) { return popup.Promise.reject(error); }
+                return new popup.Promise((resolve, reject) => runWhenReady(() => {
+                    try { reflectApply(addModule, worklet, normalized).then(resolve, reject); }
+                    catch (error) { reject(error); }
+                }));
+            });
+            return worklet;
+        };
+        for (const name of ['paintWorklet', 'animationWorklet', 'layoutWorklet']) guardWorklet(popup.CSS?.[name]);
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
         const snapshotBody = body => {
@@ -213,14 +270,9 @@
             guardNavigator,
             snapshotFetchArguments(args) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
-                const baseElement = reflectApply(popupQuerySelector, popup.document, ['base']);
-                const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
-                const documentBase = stagedBase == null
-                    ? popup.document.baseURI.startsWith('about:') ? fallbackBaseUri : popup.document.baseURI
-                    : new url(stagedBase, fallbackBaseUri).href;
                 const input = isInstance(args[0], popup.Request, nativeRequest)
                     ? args[0]
-                    : new url(toDomString(args[0]), documentBase).href;
+                    : new url(toDomString(args[0]), documentBase()).href;
                 const request = args.length > 1
                     ? new popup.Request(input, args[1])
                     : new popup.Request(input);

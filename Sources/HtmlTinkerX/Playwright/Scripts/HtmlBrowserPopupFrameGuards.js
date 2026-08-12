@@ -85,6 +85,7 @@
                     const value = reflectGet(target, property, target);
                     if (value === target) return facade;
                     if (value === popup) return mainWindowFacade();
+                    try { if (value != null && reflectGet(value, 'window', value) === value) return windowFor(value); } catch { }
                     return typeof value === 'function' ? reflectApply(bind, value, [target]) : value;
                 },
                 set(_, property, value) {
@@ -99,7 +100,12 @@
             windows.set(target, facade);
             return facade;
         };
-        return { documentFor, windowFor };
+        const guardReturnedWindow = value => {
+            if (value === popup) return mainWindowFacade();
+            try { return value != null && reflectGet(value, 'window', value) === value ? windowFor(value) : value; }
+            catch { return value; }
+        };
+        return { documentFor, windowFor, guardReturnedWindow };
     };
     Object.defineProperty(globalThis, '__htmlTinkerXCreatePopupFrameGuards', { value: createFrameGuards, configurable: true });
 })();

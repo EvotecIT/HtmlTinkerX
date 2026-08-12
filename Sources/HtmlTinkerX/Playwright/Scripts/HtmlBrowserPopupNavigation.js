@@ -48,7 +48,7 @@
     const createRealmGuards = globalThis.__htmlTinkerXCreatePopupRealmGuards; delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
     const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
     delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
-    const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards; const createCodeGuards = globalThis.__htmlTinkerXCreatePopupCodeGuards; delete globalThis.__htmlTinkerXCreatePopupCodeGuards;
+    const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards; const createCodeGuards = globalThis.__htmlTinkerXCreatePopupCodeGuards; delete globalThis.__htmlTinkerXCreatePopupCodeGuards; const createDomGuards = globalThis.__htmlTinkerXCreatePopupDomGuards; delete globalThis.__htmlTinkerXCreatePopupDomGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
         defineProperty: nativeDefineProperty, getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
         reflectApply: nativeReflectApply,
@@ -150,7 +150,7 @@
             return popup;
         }
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
-        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupNodeType = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get; const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild;
+        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupNodeType = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get; const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild; const popupFragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
         attributeGuards.install(popup.Element.prototype); attributeGuards.install(popup.HTMLElement.prototype); attributeGuards.install(popup.HTMLScriptElement.prototype);
@@ -289,9 +289,9 @@
             || attribute.startsWith('on')
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
             || (element.localName === 'meta' && attribute === 'content');
-        const guardDeferredAttributes = (element, initialValues) => {
+        let domGuards; const guardDeferredAttributes = (element, initialValues) => {
             if (guardedElements.has(element)) return;
-            guardedElements.add(element);
+            guardedElements.add(element); domGuards?.guardActivation(element);
             const values = new Map(initialValues); const namespacedValues = new Map();
             const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null; const stagedTextNodes = stagesScriptText ? popup.document.createElement('script') : null; if (stagedTextNodes != null) { nativeSetAttribute.call(stagedTextNodes, 'type', 'application/x-htmltinkerx-staged'); popupTextContent.set.call(stagedTextNodes, stagedText); }
             if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
@@ -401,11 +401,9 @@
         };
         const guardCreatedTree = element => {
             guardCreatedElement(element);
-            if (element instanceof popup.Element || element instanceof popup.DocumentFragment) {
-                for (const descendant of nativeElementQuerySelectorAll.call(element, '*')) guardCreatedElement(descendant);
-            }
+            if (element instanceof popup.Element || element instanceof popup.DocumentFragment) for (const descendant of nativeReflectApply(element instanceof popup.Element ? nativeElementQuerySelectorAll : popupFragmentQuerySelectorAll, element, ['*'])) guardCreatedElement(descendant);
             return element;
-        };
+        }; domGuards = createDomGuards({ popup, runWhenReady, guardCreatedTree });
         const guardClonedTree = (source, clone) => {
             guardCreatedTree(clone);
             attributeGuards.copy(source, clone);
@@ -583,7 +581,7 @@
                                 return nativeReflectApply(currentMember, current, args.map(unwrap));
                             };
                             const initialResult = invoke();
-                            return ready ? initialResult : stageReturnedValue(initialResult);
+                            if (!ready && property === 'createRange') return domGuards.guardRange(initialResult); return ready ? initialResult : stageReturnedValue(initialResult);
                         }
                         const snapshot = transportGuards.snapshotMutationArguments(property, args.map(unwrap));
                         const result = stagedMutationResult(resolve, property, args);
@@ -628,7 +626,7 @@
                 const value = nativeReflectGet(targetWindow, property, targetWindow);
                 if (value === stagedFetch) return stagedFetch;
                 if (value === targetWindow) return popupFacade;
-                return typeof value === 'function' ? value.bind(targetWindow) : value;
+                const guardedWindow = frameGuards.guardReturnedWindow(value); if (guardedWindow !== value) return guardedWindow; return typeof value === 'function' ? value.bind(targetWindow) : value;
             },
             set(targetWindow, property, value) {
                 if (property === 'location') {
