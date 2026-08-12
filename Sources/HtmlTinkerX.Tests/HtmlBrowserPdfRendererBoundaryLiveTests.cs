@@ -260,9 +260,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [InlineData(4)]
     [InlineData(5)]
     [InlineData(6)]
+    [InlineData(7)]
     public async Task ExplicitBlankPopupRequestsWaitForOriginScopedHeaderInterception(int operation) {
         await using LoopbackPopupServer server = new();
-        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        HtmlBrowserNetworkPolicy policy = HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
@@ -273,7 +274,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             3 => "const popup = window.open('about:blank', '_blank'); popup.location.assign('/blank-popup-location'); true",
             4 => $"const popup = window.open('', '_blank'); popup.document.write(`<iframe src='{server.BlankPopupResourceUrl}'></iframe>`); true",
             5 => $"const popup = window.open('', '_blank'); popup.document.body.innerHTML = `<iframe src='{server.BlankPopupResourceUrl}'></iframe>`; true",
-            _ => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); frame.src = '{server.BlankPopupResourceUrl}'; popup.document.body.appendChild(frame); true"
+            6 => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); frame.src = '{server.BlankPopupResourceUrl}'; popup.document.body.appendChild(frame); true",
+            _ => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); popup.document.body.append(frame); frame.contentDocument.body.innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=frame-content-document'>`; frame.contentWindow.document.body.insertAdjacentHTML('beforeend', `<img src='{server.BlankPopupResourceUrl}?source=frame-content-window'>`); true"
         };
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -286,8 +288,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
-
         Assert.True(operation < 4 || server.BlankPopupResourceRequests > 0, "The staged popup resource request was not observed by the origin server.");
+        if (operation == 7) {
+            Assert.Equal(1, server.BlankPopupSourceRequests("frame-content-document"));
+            Assert.Equal(1, server.BlankPopupSourceRequests("frame-content-window"));
+        }
         Assert.Equal("popup-token", server.LastPopupToken);
         if (operation < 4) AssertPdfContains(result.PdfBytes, "popup authorized");
     }

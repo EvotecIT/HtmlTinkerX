@@ -139,8 +139,9 @@
                 if (typeof popup.FormData === 'function' && body instanceof popup.FormData) {
                     let size = 128;
                     for (const [name, value] of body.entries()) {
-                        size += new blob([name]).size + 128;
-                        size += typeof value === 'string' ? new blob([value]).size : value.size;
+                        size += new blob([name]).size * 3 + 512;
+                        if (typeof value === 'string') size += new blob([value]).size;
+                        else size += value.size + new blob([value.name, value.type]).size * 3;
                     }
                     return size;
                 }

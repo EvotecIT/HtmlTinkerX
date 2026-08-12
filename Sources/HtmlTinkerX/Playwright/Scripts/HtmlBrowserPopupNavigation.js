@@ -61,7 +61,7 @@
     const attributeGuards = globalThis.__htmlTinkerXCreatePopupAttributeGuards({
         defineProperty: nativeDefineProperty,
         getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
-        reflectApply: nativeReflectApply,
+        reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet,
         stringValue: nativeString,
         booleanValue: nativeBoolean
     });
@@ -83,7 +83,6 @@
                 : defaultPreventedDescriptor.get.call(this);
         }
     });
-
     const normalizedTarget = target => target == null || nativeString(target).length === 0 ? '_blank' : nativeString(target).toLowerCase();
     const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0 ? '_self' : nativeString(target).toLowerCase();
 
@@ -160,6 +159,7 @@
         attributeGuards.install(popup.Element.prototype);
         attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
         attributeGuards.installNode(popup.Node.prototype);
+        attributeGuards.installFrame(popup.HTMLIFrameElement.prototype); attributeGuards.installFrame(popup.HTMLFrameElement?.prototype);
 
         let ready = false;
         let documentMutationQueued = false;
@@ -304,7 +304,7 @@
                 namespacedValues,
                 () => released,
                 shouldDeferAttribute,
-                () => documentFacade,
+                value => value == null || value === popup.document ? documentFacade : stagedObject(() => value),
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
                 attribute => { if (attribute === 'style') styleGuard?.synchronize(); },

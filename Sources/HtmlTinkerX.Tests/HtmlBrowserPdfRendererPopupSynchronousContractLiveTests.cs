@@ -71,14 +71,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
-    public async Task OversizedStagedBeaconReturnsFalseWithoutQueuingARequest() {
+    public async Task OversizedStagedBeaconsReturnFalseWithoutQueuingARequest() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
             const accepted = popup.navigator.sendBeacon('{server.BlankPopupResourceUrl}', 'x'.repeat(64 * 1024 + 1));
-            document.querySelector('#result').textContent = accepted ? 'oversized beacon accepted' : 'oversized beacon rejected';
+            const form = new popup.FormData();
+            form.append('file', new popup.File(['x'], 'n'.repeat(64 * 1024), {{ type: 'text/plain' }}));
+            const formAccepted = popup.navigator.sendBeacon('{server.BlankPopupResourceUrl}?form-data', form);
+            document.querySelector('#result').textContent = accepted || formAccepted ? 'oversized beacon accepted' : 'oversized beacon rejected';
             popup.close();
             true";
 

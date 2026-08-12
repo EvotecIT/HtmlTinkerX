@@ -1,9 +1,11 @@
 (() => {
-    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, stringValue, booleanValue }) => {
+    const bind = Function.prototype.bind;
+    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, reflectGet, reflectSet, stringValue, booleanValue }) => {
         const states = new WeakMap();
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
+        const frameWindows = new WeakMap();
         const install = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
             prototypes.add(prototype);
@@ -109,6 +111,48 @@
                 set(value) {
                     if (states.get(this)?.setTextContent(value)) return;
                     return textContent.set.call(this, value);
+                }
+            });
+        };
+        const installFrame = prototype => {
+            if (!prototype || prototypes.has(prototype)) return;
+            prototypes.add(prototype);
+            const contentDocument = getOwnPropertyDescriptor(prototype, 'contentDocument');
+            const contentWindow = getOwnPropertyDescriptor(prototype, 'contentWindow');
+            if (contentDocument?.get) defineProperty(prototype, 'contentDocument', {
+                ...contentDocument,
+                get() {
+                    const document = contentDocument.get.call(this);
+                    return document == null ? document : states.get(this)?.document(document) ?? document;
+                }
+            });
+            if (contentWindow?.get) defineProperty(prototype, 'contentWindow', {
+                ...contentWindow,
+                get() {
+                    const target = contentWindow.get.call(this);
+                    const state = states.get(this);
+                    if (target == null || state == null) return target;
+                    const existing = frameWindows.get(this);
+                    if (existing?.target === target) return existing.facade;
+                    const bound = new Map();
+                    const facade = new Proxy({}, {
+                        get: (_, property) => {
+                            if (property === 'document') {
+                                const document = contentDocument?.get.call(this) ?? target.document;
+                                return document == null ? document : state.document(document);
+                            }
+                            const value = reflectGet(target, property, target);
+                            if (typeof value !== 'function') return value;
+                            const cached = bound.get(property);
+                            if (cached?.source === value) return cached.value;
+                            const valueBound = reflectApply(bind, value, [target]);
+                            bound.set(property, { source: value, value: valueBound });
+                            return valueBound;
+                        },
+                        set: (_, property, value) => reflectSet(target, property, value, target)
+                    });
+                    frameWindows.set(this, { target, facade });
+                    return facade;
                 }
             });
         };
@@ -283,6 +327,7 @@
             install,
             installNamedNodeMap,
             installNode,
+            installFrame,
             installProperty,
             guardLegacyHandler,
             createState,
