@@ -211,10 +211,31 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
-        string script = $@"const popup = window.open('', '_blank');
+        string script = $@"let openerStyleOwner = HTMLElement.prototype;
+            let openerStyleDescriptor;
+            while (openerStyleOwner && !openerStyleDescriptor) {{ openerStyleDescriptor = Object.getOwnPropertyDescriptor(openerStyleOwner, 'style'); openerStyleOwner = Object.getPrototypeOf(openerStyleOwner); }}
+            const openerAttachShadow = Element.prototype.attachShadow;
+            const popup = window.open('', '_blank');
             const body = popup.document.querySelector('body');
             body.style.backgroundImage = 'url({server.BlankPopupResourceUrl}?source=cssom)';
             body.style.color = 'red';
+            let styleOwner = Object.getPrototypeOf(body);
+            let styleDescriptor;
+            while (styleOwner && !styleDescriptor) {{ styleDescriptor = Object.getOwnPropertyDescriptor(styleOwner, 'style'); styleOwner = Object.getPrototypeOf(styleOwner); }}
+            const nativeStyleGetter = styleDescriptor.get;
+            nativeStyleGetter.call(body).borderImageSource = 'url({server.BlankPopupResourceUrl}?source=borrowed-style)';
+            openerStyleDescriptor.get.call(body).maskImage = 'url({server.BlankPopupResourceUrl}?source=opener-borrowed-style)';
+            const host = popup.document.createElement('div');
+            body.append(host);
+            const shadow = host.attachShadow({{ mode: 'open' }});
+            shadow.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=shadow-markup"">';
+            const sheet = new popup.CSSStyleSheet();
+            sheet.replaceSync(':host {{ background-image: url({server.BlankPopupResourceUrl}?source=shadow-sheet); }}');
+            shadow.adoptedStyleSheets = [sheet];
+            const openerHost = popup.document.createElement('div');
+            body.append(openerHost);
+            const openerShadow = openerAttachShadow.call(openerHost, {{ mode: 'open' }});
+            openerShadow.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=opener-shadow"">';
             document.querySelector('#result').textContent = body.getAttribute('style').includes('background-image')
                 ? 'cssom state staged'
                 : 'cssom state lost';
@@ -227,7 +248,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             beforeCaptureScript: script));
 
         AssertPdfContains(result.PdfBytes, "cssom state staged");
-        Assert.True(server.BlankPopupResourceRequests >= 1);
+        Assert.True(server.BlankPopupResourceRequests >= 6);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
@@ -285,7 +306,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             try { popup.location.href = 'http://['; } catch { invalidSetterCaught = true; }
             const source = new popup.EventSource('/popup/events');
             source.close();
-            globalThis.popupSynchronousState = invalidLocationCaught && invalidSetterCaught && source.readyState === popup.EventSource.CLOSED;
+            globalThis.popupSynchronousState = invalidLocationCaught
+                && invalidSetterCaught
+                && source.CONNECTING === popup.EventSource.CONNECTING
+                && source.CLOSED === popup.EventSource.CLOSED
+                && source.readyState === source.CLOSED;
             popup.location.assign('/blank-popup-location');
             true";
 
@@ -352,5 +377,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             beforeCaptureScript: script));
 
         AssertPdfContains(result.PdfBytes, "parser order preserved");
+    }
+
+    [Fact]
+    public async Task BlankPopupTimersRunOnlyAfterHeaderInterceptionIsReady() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const openerSetTimeout = Window.prototype.setTimeout;
+            const popup = window.open('', '_blank');
+            const cancelled = popup.setTimeout(() => popup.document.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=cancelled-timer"">', 0);
+            popup.clearTimeout(cancelled);
+            openerSetTimeout.call(popup, () => popup.document.body.append(Object.assign(popup.document.createElement('img'), {{ src: '{server.BlankPopupResourceUrl}?source=opener-timer' }})), 0);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupResourceRequests);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }

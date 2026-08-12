@@ -46,6 +46,8 @@
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
     const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager;
     delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    const createRealmGuards = globalThis.__htmlTinkerXCreatePopupRealmGuards;
+    delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
     const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
     delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
@@ -128,14 +130,15 @@
         }
 
         let released = false;
+        let completed = false;
         nativeDefineProperty(popup, popupReleaseProperty, {
             configurable: false,
             enumerable: false,
-            get() { return undefined; },
+            get() { return completed ? popupReleaseToken : undefined; },
             set(value) {
                 if (released || value !== popupReleaseToken) return;
                 released = true;
-                navigate();
+                navigate(() => { completed = true; });
             }
         });
     };
@@ -396,7 +399,7 @@
         };
         const guardCreatedTree = element => {
             guardCreatedElement(element);
-            if (element instanceof popup.Element) {
+            if (element instanceof popup.Element || element instanceof popup.DocumentFragment) {
                 for (const descendant of nativeElementQuerySelectorAll.call(element, '*')) guardCreatedElement(descendant);
             }
             return element;
@@ -426,6 +429,7 @@
                 }
             }));
         }
+        const stagedRealmMembers = createRealmGuards({ popup, isReady: () => ready, runWhenReady, shouldDeferAttribute, guardDeferredAttributes, guardedResources, stringValue: toDomString });
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
             documentWriteParts.push(args.map(value => nativeString(value)).join('') + (method === 'writeln' ? '\n' : ''));
@@ -611,6 +615,7 @@
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 if (property === 'XMLHttpRequest') return stagedXhrConstructor;
+                if (stagedRealmMembers.has(property)) return stagedRealmMembers.get(property);
                 if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                 if (stagedElementConstructors.has(property)) return stagedElementConstructors.get(property);
                 const value = nativeReflectGet(targetWindow, property, targetWindow);
@@ -627,6 +632,7 @@
                 return nativeReflectSet(targetWindow, property, value, targetWindow);
             }
         });
+        stagedRealmMembers.registerFacade(popupFacade);
         const nestedWindowOpen = function(url, nestedTarget, nestedFeatures) {
             const resolved = url == null || nativeString(url).length === 0
                 ? url
@@ -645,7 +651,7 @@
             writable: false,
             configurable: false
         });
-        armBlankPopup(popup, target, () => {
+        armBlankPopup(popup, target, complete => {
             // Run document replacement from the opener realm. Performing document.open()
             // in the popup's release evaluation destroys that evaluation context before
             // queued mutations can be replayed.
@@ -659,6 +665,7 @@
                 while (guardedResources.length > 0) await guardedResources.shift()();
                 while (queued.length > 0) queued.shift()();
                 if (documentWriteQueued && !documentCloseQueued) popup.document.close();
+                complete();
             }, 0);
         });
         return popupFacade;
@@ -789,7 +796,7 @@
             try { popup.name = submissionTarget; } catch { }
         }
 
-        armBlankPopup(popup, target, () => {
+        armBlankPopup(popup, target, complete => {
             const restoreFormTarget = setTemporaryAttribute(form, 'target', submissionTarget);
             const restoreSubmitterTarget = submitter == null
                 ? null
@@ -804,8 +811,10 @@
                     if (typeof restoreSubmission === 'function') restoreSubmission();
                     restoreTargets();
                 });
+                complete();
             } catch (error) {
                 restoreTargets();
+                complete();
                 throw error;
             }
         });

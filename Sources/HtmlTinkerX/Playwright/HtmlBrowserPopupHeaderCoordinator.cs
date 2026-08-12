@@ -16,6 +16,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private const string AttributeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js";
     private const string AsyncConstructorsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAsyncConstructors.js";
     private const string MarkupGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupMarkupGuards.js";
+    private const string RealmGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupRealmGuards.js";
     private const string TransportGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupTransportGuards.js";
     private const string XhrStagingResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupXhrStaging.js";
     private const string NavigationShimResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js";
@@ -72,7 +73,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, RealmGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
     }
 
     private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {
@@ -132,12 +133,54 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         await page.EvaluateAsync(@"release => {
             globalThis[release.propertyName] = release.token;
         }", new { propertyName = _releasePropertyName, token = _releaseToken }).ConfigureAwait(false);
+        while (!page.IsClosed && string.Equals(page.Url, "about:blank", StringComparison.OrdinalIgnoreCase)) {
+            bool completed;
+            try {
+                completed = await page.EvaluateAsync<bool>(
+                    "release => globalThis[release.propertyName] === release.token",
+                    new { propertyName = _releasePropertyName, token = _releaseToken }).ConfigureAwait(false);
+            } catch (PlaywrightException) {
+                // The release callback can navigate and destroy this one-time blank realm
+                // between the setter and acknowledgement probe.
+                return;
+            }
+            if (completed) return;
+            await Task.Delay(10, _cancellationToken).ConfigureAwait(false);
+        }
     }
 
     internal void ThrowIfFaulted() {
         Exception? failure = Volatile.Read(ref _failure);
         if (failure != null) {
             throw new InvalidOperationException("Popup header interception failed before capture completed.", failure);
+        }
+    }
+
+    /// <summary>Waits until popup interception and the opener-side release handshake are quiescent.</summary>
+    internal async Task WaitForPendingAsync(CancellationToken cancellationToken) {
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            Task[] pending = _pending.Keys.ToArray();
+            if (pending.Length == 0) {
+                await Task.Yield();
+                if (_pending.IsEmpty) {
+                    ThrowIfFaulted();
+                    return;
+                }
+                continue;
+            }
+            Task completion = Task.WhenAll(pending);
+            if (cancellationToken.CanBeCanceled && !completion.IsCompleted) {
+                TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                using CancellationTokenRegistration registration = cancellationToken.Register(
+                    static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
+                    cancelled);
+                if (await Task.WhenAny(completion, cancelled.Task).ConfigureAwait(false) != completion) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            try { await completion.ConfigureAwait(false); } catch { }
+            ThrowIfFaulted();
         }
     }
 

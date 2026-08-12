@@ -275,7 +275,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
             long readinessStarted = Stopwatch.GetTimestamp();
-            await PreparePageAsync(page, slot, request, cancellationToken).ConfigureAwait(false);
+            await PreparePageAsync(page, slot, request, popupCoordinator, cancellationToken).ConfigureAwait(false);
             scopedHeaders?.ThrowIfFaulted();
             popupCoordinator?.ThrowIfFaulted();
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
@@ -463,7 +463,12 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
     }
 
-    private static async Task PreparePageAsync(IPage page, BrowserSlot slot, HtmlBrowserPdfRequest request, CancellationToken cancellationToken) {
+    private static async Task PreparePageAsync(
+        IPage page,
+        BrowserSlot slot,
+        HtmlBrowserPdfRequest request,
+        HtmlBrowserPopupHeaderCoordinator? popupCoordinator,
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         using (CancellationTokenSource preparationDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)) {
             preparationDeadline.CancelAfter(request.PreparationTimeout);
@@ -498,6 +503,18 @@ public sealed partial class HtmlBrowserPdfRenderer {
             }
             if (hasCaptureStyle) {
                 await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, request.PreparationTimeout, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (popupCoordinator != null) {
+            using CancellationTokenSource? popupDeadline = request.Readiness.Timeout == 0
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            popupDeadline?.CancelAfter(request.Readiness.Timeout);
+            try {
+                await popupCoordinator.WaitForPendingAsync(popupDeadline?.Token ?? cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && popupDeadline?.IsCancellationRequested == true) {
+                throw new TimeoutException($"Popup header attachment did not complete within {request.Readiness.Timeout} ms.");
             }
         }
 

@@ -81,6 +81,7 @@
                         }
                         if (name === 'EventSource' && property === 'url') return normalizedArgs[0];
                         if (name === 'EventSource' && property === 'withCredentials') return normalizedArgs[1].withCredentials;
+                        if (name === 'EventSource' && ['CONNECTING', 'OPEN', 'CLOSED'].includes(property)) return constructor[property];
                         if (handlerProperties.has(property)) return handlers.get(property) ?? null;
                         if (operationProperties.has(property)) {
                             return (...operationArgs) => {

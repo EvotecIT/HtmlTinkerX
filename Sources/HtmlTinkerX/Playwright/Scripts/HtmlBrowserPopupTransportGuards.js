@@ -28,6 +28,25 @@
     const urlSearchParamsToString = URLSearchParams.prototype.toString;
     const beaconStates = new WeakMap();
     const navigationStates = new WeakMap();
+    const styleStates = new WeakMap();
+    const installStyleRoute = prototype => {
+        let owner = prototype;
+        let descriptor = null;
+        while (owner && descriptor == null) {
+            descriptor = getOwnPropertyDescriptor(owner, 'style');
+            if (descriptor == null) owner = getPrototypeOf(owner);
+        }
+        if (descriptor?.get && descriptor.configurable !== false) defineProperty(owner, 'style', {
+            ...descriptor,
+            configurable: false,
+            get() {
+                const staged = styleStates.get(this);
+                return staged == null ? descriptor.get.call(this) : staged();
+            }
+        });
+        return descriptor;
+    };
+    installStyleRoute(HTMLElement.prototype);
     let openerBeaconInstalled = false;
     const routedSendBeacon = function(...args) {
         const staged = beaconStates.get(this);
@@ -41,6 +60,7 @@
         const popupGetAttribute = popup.Element.prototype.getAttribute;
         const popupQuerySelector = popup.Document.prototype.querySelector;
         const popupUrlSearchParams = popup.URLSearchParams;
+        const styleDescriptor = installStyleRoute(popup.HTMLElement.prototype);
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
         const snapshotBody = body => {
@@ -201,12 +221,7 @@
                 }
             },
             createStyleGuard(element, values, isReleased) {
-                let owner = element;
-                let descriptor = null;
-                while (owner && descriptor == null) {
-                    descriptor = getOwnPropertyDescriptor(owner, 'style');
-                    owner = getPrototypeOf(owner);
-                }
+                const descriptor = styleDescriptor;
                 if (descriptor == null || typeof descriptor.get !== 'function') return null;
                 const stagedElement = popup.document.createElement('span');
                 const staged = stagedElement.style;
@@ -249,6 +264,7 @@
                         return result;
                     }
                 });
+                styleStates.set(element, () => isReleased() ? descriptor.get.call(element) : facade);
                 const stagedAttributeStyleMap = stagedElement.attributeStyleMap;
                 let attributeStyleMapOwner = element;
                 let attributeStyleMapDescriptor = null;
@@ -267,6 +283,7 @@
                     release() {
                         synchronizeFromAttributes();
                         synchronizeToAttributes();
+                        styleStates.delete(element);
                     }
                 };
             },
