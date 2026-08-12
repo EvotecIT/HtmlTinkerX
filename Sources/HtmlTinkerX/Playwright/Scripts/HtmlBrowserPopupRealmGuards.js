@@ -62,8 +62,13 @@
                     pending.set(identifier, state);
                     runWhenReady(() => {
                         if (state.cancelled) return;
-                        state.actual = reflectApply(nativeSet, popup, [normalizedHandler, normalizedDelay, ...args]);
-                        if (!repeating) pending.delete(identifier);
+                        const invoke = typeof normalizedHandler === 'function'
+                            ? callbackArgs => reflectApply(normalizedHandler, popup, callbackArgs)
+                            : () => reflectApply(popup.eval, popup, [normalizedHandler]);
+                        const scheduledHandler = repeating
+                            ? (...callbackArgs) => invoke(callbackArgs)
+                            : (...callbackArgs) => { pending.delete(identifier); return invoke(callbackArgs); };
+                        state.actual = reflectApply(nativeSet, popup, [scheduledHandler, normalizedDelay, ...args]);
                     });
                     return identifier;
                 };

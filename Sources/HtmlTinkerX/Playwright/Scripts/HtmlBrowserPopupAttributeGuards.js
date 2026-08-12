@@ -87,7 +87,10 @@
             defineProperty(prototype, 'getRootNode', {
                 configurable: false,
                 writable: false,
-                value(...args) { return states.get(this)?.document() ?? reflectApply(getRootNode, this, args); }
+                value(...args) {
+                    const root = reflectApply(getRootNode, this, args);
+                    return root?.nodeType === 9 ? states.get(this)?.document() ?? root : root;
+                }
             });
             defineProperty(prototype, 'cloneNode', {
                 configurable: false,

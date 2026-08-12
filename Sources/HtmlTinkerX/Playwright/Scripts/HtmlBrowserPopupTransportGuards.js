@@ -2,6 +2,7 @@
     const arrayFrom = Array.from;
     const structuredCloneValue = structuredClone;
     const blob = Blob;
+    const booleanValue = Boolean;
     const arrayBuffer = ArrayBuffer;
     const arrayBufferIsView = ArrayBuffer.isView;
     const arrayBufferSlice = ArrayBuffer.prototype.slice;
@@ -364,6 +365,24 @@
             },
             snapshotBodyArguments(args) {
                 return args.length === 0 ? [] : [snapshotBody(args[0])];
+            },
+            snapshotMutationArguments(property, args) {
+                const required = { appendChild: 1, insertAdjacentElement: 2, insertAdjacentHTML: 2, insertAdjacentText: 2, insertBefore: 2, removeAttribute: 1, removeAttributeNS: 2, removeChild: 1, replaceChild: 2, setAttribute: 2, setAttributeNS: 3, toggleAttribute: 1 }[property] ?? 0;
+                if (args.length < required) throw new TypeError(`Failed to execute '${property}': ${required} argument${required === 1 ? '' : 's'} required`);
+                const requireNode = index => { if (!(args[index] instanceof popup.Node)) throw new TypeError(`Failed to execute '${property}': parameter ${index + 1} is not of type 'Node'`); };
+                if (property === 'appendChild' || property === 'removeChild') requireNode(0);
+                if (property === 'insertBefore') { requireNode(0); if (args[1] != null) requireNode(1); }
+                if (property === 'replaceChild') { requireNode(0); requireNode(1); }
+                if (property === 'insertAdjacentElement' && args[1] != null) requireNode(1);
+                if (['append', 'after', 'before', 'prepend', 'replaceChildren', 'replaceWith'].includes(property)) for (let index = 0; index < args.length; index++) if (!(args[index] instanceof popup.Node)) args[index] = toDomString(args[index]);
+                if (['insertAdjacentElement', 'insertAdjacentHTML', 'insertAdjacentText'].includes(property)) args[0] = toDomString(args[0]).toLowerCase();
+                if (['insertAdjacentHTML', 'insertAdjacentText'].includes(property)) args[1] = toDomString(args[1]);
+                if (property === 'setAttribute') { args[0] = toDomString(args[0]); args[1] = toDomString(args[1]); }
+                if (property === 'setAttributeNS') { args[0] = args[0] == null ? null : toDomString(args[0]); args[1] = toDomString(args[1]); args[2] = toDomString(args[2]); }
+                if (property === 'removeAttribute') args[0] = toDomString(args[0]);
+                if (property === 'removeAttributeNS') { args[0] = args[0] == null ? null : toDomString(args[0]); args[1] = toDomString(args[1]); }
+                if (property === 'toggleAttribute') { args[0] = toDomString(args[0]); if (args.length > 1) args[1] = booleanValue(args[1]); }
+                return args;
             },
             guardReturnedNodes(value, guard) {
                 if (value instanceof popup.Node) guard(value);

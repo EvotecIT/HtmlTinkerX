@@ -369,7 +369,7 @@
                 released = true;
                 const applyAttributes = target => { for (const [attribute, value] of values) nativeSetAttribute.call(target, attribute, value); for (const value of namespacedValues.values()) nativeSetAttributeNS.call(target, value.namespace, value.qualified, value.value); };
                 attributeGuards.release(element);
-                if (stagesScriptText && element.parentNode != null) {
+                if (stagesScriptText && element.parentNode != null && !values.has('src')) {
                     const replacement = nativeReflectApply(popupCloneNode, element, [false]); applyAttributes(replacement);
                     popupTextContent.set.call(replacement, stagedText); nativeReflectApply(popupReplaceChild, element.parentNode, [replacement, element]);
                 } else {
@@ -587,15 +587,16 @@
                             const initialResult = invoke();
                             return ready ? initialResult : stageReturnedValue(initialResult);
                         }
+                        const snapshot = transportGuards.snapshotMutationArguments(property, args.map(unwrap));
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;
-                        for (const value of args) guardCreatedTree(unwrap(value));
+                        for (const value of snapshot) guardCreatedTree(value);
                         if (property === 'write' || property === 'writeln') documentWriteQueued = true;
                         if (property === 'close') documentCloseQueued = true;
                         queued.push(() => {
                             const current = resolve();
                             const currentMember = nativeReflectGet(current, property, current);
-                            nativeReflectApply(currentMember, current, args.map(unwrap));
+                            nativeReflectApply(currentMember, current, snapshot);
                         });
                         return result;
                     };
@@ -767,7 +768,6 @@
         }, 10);
         fallback = globalThis.setTimeout(restoreOnce, 5000);
     };
-
     const setTemporaryAttribute = (element, name, value) => {
         const existed = nativeHasAttribute.call(element, name);
         const previous = existed ? nativeGetAttribute.call(element, name) : null;

@@ -543,16 +543,15 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task PreparationTimeoutRecyclesTheBrowserWhenReadinessIsUnlimited() {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(maximumBrowserInstances: 1));
-        string blockedHtml = "<html><body><p>blocked</p>"
-            + string.Concat(Enumerable.Repeat("<iframe srcdoc='<p>frame</p>'></iframe>", 200))
-            + "</body></html>";
 
         TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => renderer.CaptureAsync(
             new HtmlBrowserPdfRequest(
-                HtmlBrowserPdfSource.FromHtml(blockedHtml),
+                HtmlBrowserPdfSource.FromHtml("<html><body><p>blocked</p></body></html>"),
                 readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, timeout: 0),
                 styleSheetContent: "body { color: black; }",
-                preparationTimeout: 1)));
+                beforeCaptureScript: "new Promise(resolve => setTimeout(resolve, 1000))",
+                preparationTimeout: 50,
+                beforeCaptureScriptTimeout: 5000)));
 
         Assert.Contains("preparation", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.True(renderer.GetMetricsSnapshot().BrowsersRecycled >= 1);

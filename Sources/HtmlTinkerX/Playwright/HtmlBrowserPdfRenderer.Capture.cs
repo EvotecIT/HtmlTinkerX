@@ -479,30 +479,32 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         Media = request.MediaType == HtmlBrowserPdfMediaType.Screen ? Media.Screen : Media.Print
                     }),
                     preparationDeadline.Token).ConfigureAwait(false);
+                bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
+                if (hasCaptureStyle) {
+                    await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, preparationDeadline.Token).ConfigureAwait(false);
+                }
+                if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
+                    using CancellationTokenSource? scriptDeadline = request.BeforeCaptureScriptTimeout == 0
+                        ? null
+                        : CancellationTokenSource.CreateLinkedTokenSource(preparationDeadline.Token);
+                    scriptDeadline?.CancelAfter(request.BeforeCaptureScriptTimeout);
+                    try {
+                        await ExecuteCancellablePageOperationAsync(
+                            page,
+                            () => page.EvaluateAsync(request.BeforeCaptureScript!),
+                            scriptDeadline?.Token ?? preparationDeadline.Token).ConfigureAwait(false);
+                    } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                        && !preparationDeadline.IsCancellationRequested
+                        && scriptDeadline?.IsCancellationRequested == true) {
+                        throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
+                    }
+                    if (hasCaptureStyle) {
+                        await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, preparationDeadline.Token).ConfigureAwait(false);
+                    }
+                }
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && preparationDeadline.IsCancellationRequested) {
+                await AbortSlotAsync(slot).ConfigureAwait(false);
                 throw new TimeoutException($"Browser capture preparation did not complete within {request.PreparationTimeout} ms.");
-            }
-        }
-
-        bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
-        if (hasCaptureStyle) {
-            await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, request.PreparationTimeout, cancellationToken).ConfigureAwait(false);
-        }
-        if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
-            using CancellationTokenSource? deadline = request.BeforeCaptureScriptTimeout == 0
-                ? null
-                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline?.CancelAfter(request.BeforeCaptureScriptTimeout);
-            try {
-                await ExecuteCancellablePageOperationAsync(
-                    page,
-                    () => page.EvaluateAsync(request.BeforeCaptureScript!),
-                    deadline?.Token ?? cancellationToken).ConfigureAwait(false);
-            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
-                throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
-            }
-            if (hasCaptureStyle) {
-                await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, request.PreparationTimeout, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -580,21 +582,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
         _ => null
     };
 
-    private static async Task ApplyStyleSheetAsync(IPage page, BrowserSlot slot, string styleSheetContent, int timeout, CancellationToken cancellationToken) {
-        using CancellationTokenSource? deadline = timeout == 0
-            ? null
-            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline?.CancelAfter(timeout);
-        CancellationToken operationToken = deadline?.Token ?? cancellationToken;
-        try {
-            await ExecuteCancellableSlotOperationAsync(
-                slot,
-                () => HtmlBrowser.ApplyCaptureStyleSheetAsync(page, styleSheetContent, operationToken),
-                operationToken).ConfigureAwait(false);
-        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {
-            throw new TimeoutException($"Capture stylesheet injection did not complete within {timeout} ms.");
-        }
-    }
+    private static Task ApplyStyleSheetAsync(IPage page, BrowserSlot slot, string styleSheetContent, CancellationToken cancellationToken) =>
+        ExecuteCancellableSlotOperationAsync(
+            slot,
+            () => HtmlBrowser.ApplyCaptureStyleSheetAsync(page, styleSheetContent, cancellationToken),
+            cancellationToken);
 
     private static string AddBaseElement(string html, Uri? baseUri) {
         if (baseUri == null) return html;

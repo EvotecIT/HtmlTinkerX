@@ -232,6 +232,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             body.append(host);
             const shadow = host.attachShadow({{ mode: 'open' }});
             shadow.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=shadow-markup"">';
+            const shadowChild = popup.document.createElement('span');
+            shadow.append(shadowChild);
+            if (shadowChild.getRootNode() !== shadow || shadowChild.getRootNode().host !== host) throw new Error('shadow root identity was not preserved');
             const sheet = new popup.CSSStyleSheet();
             sheet.replaceSync(':host {{ background-image: url({server.BlankPopupResourceUrl}?source=shadow-sheet); }}');
             shadow.adoptedStyleSheets = [sheet];
@@ -250,6 +253,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const dynamicScript = popup.document.createElement('script');
             nativeTextSetter.call(dynamicScript, `fetch('{server.BlankPopupResourceUrl}?source=dynamic-script')`);
             popup.document.head.append(dynamicScript);
+            const externalScript = popup.document.createElement('script');
+            externalScript.onload = event => {{
+                if (event.target !== externalScript) throw new Error('external script identity changed');
+                fetch('{server.BlankPopupResourceUrl}?source=dynamic-script-property-load');
+            }};
+            externalScript.addEventListener('load', () => fetch('{server.BlankPopupResourceUrl}?source=dynamic-script-listener-load'));
+            externalScript.src = '{server.BlankPopupResourceUrl}?source=dynamic-external-script';
+            popup.document.head.append(externalScript);
             const auxiliary = popup.document.implementation.createHTMLDocument('');
             auxiliary.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=auxiliary-document"">';
             popup.document.body.append(auxiliary.images[0]);
@@ -269,6 +280,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal(1, server.StyleTextResourceRequests);
         Assert.True(server.BlankPopupSourceRequests("style-sheet") >= 1);
         Assert.True(server.BlankPopupSourceRequests("dynamic-script") >= 1);
+        Assert.Equal(1, server.BlankPopupSourceRequests("dynamic-external-script"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("dynamic-script-property-load"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("dynamic-script-listener-load"));
         Assert.True(server.BlankPopupSourceRequests("auxiliary-document") >= 1);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
@@ -294,6 +308,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             normalizedImage.src = '/blank-popup-resource?source=normalized-url';
             if (normalizedImage.src !== '{server.BlankPopupResourceUrl}?source=normalized-url') throw new Error('staged URL was not normalized');
             framedPopup.document.body.append(normalizedImage);
+            let mutationTypeError = false;
+            try {{ framedPopup.document.appendChild(); }} catch (error) {{ mutationTypeError = error instanceof TypeError; }}
+            if (!mutationTypeError) throw new Error('invalid mutation did not fail synchronously');
             const navigatingPopup = window.open('', '_blank');
             const navigationOptions = {{ history: 'replace' }};
             Object.getPrototypeOf(navigatingPopup.navigation).navigate.call(
@@ -424,6 +441,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const popup = window.open('', '_blank');
             const cancelled = popup.setTimeout(() => popup.document.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=cancelled-timer"">', 0);
             popup.clearTimeout(cancelled);
+            const delayed = popup.setTimeout(() => popup.document.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=late-cancelled-timer"">', 100);
+            popup.setTimeout(() => popup.clearTimeout(delayed), 0);
             openerSetTimeout.call(popup, () => popup.document.body.append(Object.assign(popup.document.createElement('img'), {{ src: '{server.BlankPopupResourceUrl}?source=opener-timer' }})), 0);
             true";
 
@@ -435,6 +454,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupResourceRequests);
+        Assert.Equal(0, server.BlankPopupSourceRequests("late-cancelled-timer"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }
