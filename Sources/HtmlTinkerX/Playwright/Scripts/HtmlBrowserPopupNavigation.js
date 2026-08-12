@@ -45,6 +45,8 @@
     const popupReleaseProperty = '__HTMLTINKERX_POPUP_RELEASE_PROPERTY__';
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
     const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager; delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    const createContextRegistry = globalThis.__htmlTinkerXCreatePopupContextRegistry; delete globalThis.__htmlTinkerXCreatePopupContextRegistry;
+    const createCacheGuards = globalThis.__htmlTinkerXCreatePopupCacheGuards; delete globalThis.__htmlTinkerXCreatePopupCacheGuards;
     const createRealmGuards = globalThis.__htmlTinkerXCreatePopupRealmGuards; delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
     const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
     delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
@@ -84,38 +86,7 @@
     });
     const normalizedTarget = target => target == null || nativeString(target).length === 0 ? '_blank' : nativeString(target).toLowerCase();
     const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0 ? '_self' : nativeString(target).toLowerCase();
-    const targetsExistingFrame = target => {
-        if (target == null || nativeString(target).length === 0) return false;
-        const expected = nativeString(target);
-        const visited = new WeakSet();
-        const containsNamedFrame = currentDocument => {
-            if (visited.has(currentDocument)) return false;
-            visited.add(currentDocument);
-            const frames = nativeQuerySelectorAll.call(currentDocument, 'iframe, frame');
-            for (let index = 0; index < frames.length; index++) {
-                const frame = frames[index];
-                if (nativeGetAttribute.call(frame, 'name') === expected) return true;
-                try {
-                    let childDocument = null;
-                    try {
-                        childDocument = iframeContentDocument == null ? null : iframeContentDocument.call(frame);
-                    } catch {
-                        childDocument = frameContentDocument == null ? null : frameContentDocument.call(frame);
-                    }
-                    if (childDocument && containsNamedFrame(childDocument)) return true;
-                } catch { }
-            }
-            return false;
-        };
-        let root = window;
-        while (root !== root.parent) {
-            try {
-                void root.parent.document;
-                root = root.parent;
-            } catch { break; }
-        }
-        try { return containsNamedFrame(root.document); } catch { return false; }
-    };
+    const popupContexts = createContextRegistry({ stringValue: nativeString, querySelectorAll: nativeQuerySelectorAll, getAttribute: nativeGetAttribute, iframeContentDocument, frameContentDocument, specialTargets });
     const armBlankPopup = (popup, target, navigate) => {
         let currentUrl;
         try { currentUrl = popup.location.href; } catch { currentUrl = null; }
@@ -138,8 +109,10 @@
         });
     };
     const openStagedBlankPopup = function(url, target, features, initialAction, existingAction) {
+        const existing = popupContexts.claim(target, initialAction, existingAction);
+        if (existing != null) return existing;
         const popup = originalOpen.call(this, url, target, features);
-        if (!popup || specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) return popup;
+        if (!popup || specialTargets.includes(normalizedTarget(target)) || popupContexts.targetsExistingFrame(target)) return popup;
         try {
             if (popup.location.href !== 'about:blank') {
                 if (typeof existingAction === 'function') existingAction(popup);
@@ -181,6 +154,7 @@
         };
         const codeGuards = createCodeGuards({ popup, isReady: () => ready, runWhenReady, stringValue: toDomString }); const stagedCodeMembers = codeGuards.forWindow(popup);
         const transportGuards = createTransportGuards({ popup, fallbackBaseUri: document.baseURI, isReady: () => ready, runWhenReady, toDomString });
+        createCacheGuards({ popup, runWhenReady, normalizeRequest: value => transportGuards.snapshotFetchArguments([value])[0] });
         const popupFetch = popup.fetch.bind(popup);
         const stagedFetch = (...args) => {
             let snapshot;
@@ -258,7 +232,8 @@
             popup,
             runWhenReady,
             normalizeArguments: normalizeConstructorArguments,
-            normalizeOperation: transportGuards.normalizeOperation
+            normalizeOperation: transportGuards.normalizeOperation,
+            stringValue: toDomString
         });
         const nativeLocation = popup.location;
         const nativeNavigation = popup.navigation;
@@ -291,7 +266,7 @@
             || (element.localName === 'meta' && attribute === 'content');
         let domGuards; const guardDeferredAttributes = (element, initialValues) => {
             if (guardedElements.has(element)) return;
-            guardedElements.add(element); domGuards?.guardActivation(element);
+            guardedElements.add(element); domGuards?.guardActivation(element); domGuards?.guardImageDecode(element);
             const values = new Map(initialValues); const namespacedValues = new Map();
             const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null; const stagedTextNodes = stagesScriptText ? popup.document.createElement('script') : null; if (stagedTextNodes != null) { nativeSetAttribute.call(stagedTextNodes, 'type', 'application/x-htmltinkerx-staged'); popupTextContent.set.call(stagedTextNodes, stagedText); }
             if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
@@ -673,6 +648,7 @@
                 complete();
             }, 0);
         });
+        popupContexts.register(target, popup, popupFacade, runWhenReady);
         return popupFacade;
     };
     const openWithReferrerPolicy = function(url, target, features, referrerPolicy) {
@@ -692,7 +668,7 @@
         const initialFeatures = suppressOpener
             ? featureTokens.filter(token => !['noopener', 'noreferrer'].includes(token.toLowerCase().split('=', 1)[0])).join(',')
             : features;
-        if (specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) {
+        if (specialTargets.includes(normalizedTarget(target)) || popupContexts.targetsExistingFrame(target)) {
             return originalOpen.call(this, destination, target, features);
         }
         const initialTarget = suppressOpener && !specialTargets.includes(normalizedTarget(target)) ? '_blank' : target;
@@ -825,7 +801,7 @@
     const canDeferPopupFormSubmission = (form, submitter) => {
         const target = effectiveTarget(form, submitter);
         const normalized = normalizedDeclarativeTarget(target);
-        if (specialTargets.includes(normalized) || targetsExistingFrame(target)) return false;
+        if (specialTargets.includes(normalized) || popupContexts.targetsExistingFrame(target)) return false;
         const method = submitter != null && nativeHasAttribute.call(submitter, 'formmethod')
             ? nativeGetAttribute.call(submitter, 'formmethod')
             : nativeGetAttribute.call(form, 'method');

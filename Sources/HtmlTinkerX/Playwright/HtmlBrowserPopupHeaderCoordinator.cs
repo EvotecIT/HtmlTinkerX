@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
     private const string AttributeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js";
+    private const string ContextRegistryResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupContextRegistry.js";
+    private const string CacheGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupCacheGuards.js";
     private const string FrameGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupFrameGuards.js";
     private const string CodeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupCodeGuards.js";
     private const string DomGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupDomGuards.js";
@@ -76,7 +78,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, FrameGuardsResource)}\n{LoadEmbeddedScript(assembly, CodeGuardsResource)}\n{LoadEmbeddedScript(assembly, DomGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, RealmGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+        return $"{LoadEmbeddedScript(assembly, ContextRegistryResource)}\n{LoadEmbeddedScript(assembly, CacheGuardsResource)}\n{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, FrameGuardsResource)}\n{LoadEmbeddedScript(assembly, CodeGuardsResource)}\n{LoadEmbeddedScript(assembly, DomGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, RealmGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
     }
 
     private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {

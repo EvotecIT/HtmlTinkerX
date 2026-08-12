@@ -3,8 +3,10 @@
     const reflectApply = Reflect.apply;
     const rangeStates = new WeakMap();
     const activationStates = new WeakMap();
+    const imageDecodeStates = new WeakMap();
     const installedRangePrototypes = new WeakSet();
     const installedActivationPrototypes = new WeakSet();
+    const installedImagePrototypes = new WeakSet();
     const installRangeRoutes = prototype => {
         if (prototype == null || installedRangePrototypes.has(prototype)) return;
         installedRangePrototypes.add(prototype);
@@ -40,11 +42,27 @@
             }
         });
     };
+    const installImageDecodeRoute = prototype => {
+        if (prototype == null || installedImagePrototypes.has(prototype)) return;
+        installedImagePrototypes.add(prototype);
+        const decode = prototype.decode;
+        if (typeof decode !== 'function') return;
+        defineProperty(prototype, 'decode', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const stage = imageDecodeStates.get(this);
+                return stage == null ? reflectApply(decode, this, args) : stage(decode, args);
+            }
+        });
+    };
     globalThis.__htmlTinkerXCreatePopupDomGuards = ({ popup, runWhenReady, guardCreatedTree }) => {
         installRangeRoutes(Range.prototype);
         installRangeRoutes(popup.Range?.prototype);
         installActivationRoute(HTMLElement.prototype);
         installActivationRoute(popup.HTMLElement?.prototype);
+        installImageDecodeRoute(HTMLImageElement.prototype);
+        installImageDecodeRoute(popup.HTMLImageElement?.prototype);
         return {
             guardRange(range) {
                 if (range != null) rangeStates.set(range, guardCreatedTree);
@@ -56,6 +74,13 @@
                     runWhenReady(() => reflectApply(click, element, args));
                     return undefined;
                 });
+            },
+            guardImageDecode(element) {
+                if (element?.localName !== 'img') return;
+                imageDecodeStates.set(element, (decode, args) => new popup.Promise((resolve, reject) => runWhenReady(() => {
+                    try { reflectApply(decode, element, args).then(resolve, reject); }
+                    catch (error) { reject(error); }
+                })));
             }
         };
     };

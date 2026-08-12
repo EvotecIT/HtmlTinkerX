@@ -782,9 +782,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);
                         Volatile.Write(ref _lastPopupToken, token);
                         int bodyOffset = request.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-                        bool echoBody = requestTarget.Contains("echo-body", StringComparison.Ordinal);
-                        contentType = echoBody ? "text/plain; charset=utf-8" : "application/javascript; charset=utf-8";
-                        body = echoBody && bodyOffset >= 0 ? request.Substring(bodyOffset + 4) : "void 0;";
+                        bool echoBody = requestTarget.Contains("echo-body", StringComparison.Ordinal); bool imageBody = requestTarget.Contains("source=image-decode", StringComparison.Ordinal);
+                        contentType = echoBody ? "text/plain; charset=utf-8" : imageBody ? "image/svg+xml" : "application/javascript; charset=utf-8";
+                        body = echoBody && bodyOffset >= 0 ? request.Substring(bodyOffset + 4) : imageBody ? "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>" : "void 0;";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";

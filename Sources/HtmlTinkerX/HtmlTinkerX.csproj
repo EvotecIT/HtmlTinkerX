@@ -59,6 +59,10 @@
     <ItemGroup>
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupNavigation.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js" />
+        <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupContextRegistry.js"
+                          LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupContextRegistry.js" />
+        <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupCacheGuards.js"
+                          LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupCacheGuards.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupAttributeGuards.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupFrameGuards.js"

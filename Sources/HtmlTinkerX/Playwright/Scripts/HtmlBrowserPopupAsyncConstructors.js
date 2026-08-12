@@ -1,4 +1,6 @@
 (() => {
+    const fontSetStates = new WeakMap();
+    const installedFontSetPrototypes = new WeakSet();
     globalThis.__htmlTinkerXCreatePopupAsyncConstructors = ({
         defineProperty,
         getOwnPropertyDescriptor,
@@ -6,7 +8,7 @@
         reflectConstruct,
         reflectGet,
         reflectSet
-    }) => ({ popup, runWhenReady, normalizeArguments, normalizeOperation }) => {
+    }) => ({ popup, runWhenReady, normalizeArguments, normalizeOperation, stringValue }) => {
         const constructors = new Map();
         const stage = (name, handlerNames, operationNames, stopName) => {
             const nativeConstructor = popup[name];
@@ -191,9 +193,42 @@
             defineProperty(popup, 'FontFace', { value: stagedConstructor, writable: false, configurable: false });
             constructors.set('FontFace', stagedConstructor);
         };
+        const installFontSetRoute = prototype => {
+            if (prototype == null || installedFontSetPrototypes.has(prototype)) return;
+            installedFontSetPrototypes.add(prototype);
+            const load = prototype.load;
+            if (typeof load !== 'function') return;
+            defineProperty(prototype, 'load', {
+                configurable: false,
+                writable: false,
+                value(...args) {
+                    const stage = fontSetStates.get(this);
+                    return stage == null ? reflectApply(load, this, args) : stage(load, args);
+                }
+            });
+        };
+        const stageFontSet = () => {
+            installFontSetRoute(globalThis.FontFaceSet?.prototype);
+            installFontSetRoute(popup.FontFaceSet?.prototype);
+            const fonts = popup.document?.fonts;
+            if (fonts == null) return;
+            fontSetStates.set(fonts, (load, args) => {
+                let normalized;
+                try {
+                    if (args.length === 0) throw new TypeError("Failed to execute 'load': 1 argument required");
+                    normalized = [stringValue(args[0])];
+                    if (args.length > 1) normalized.push(stringValue(args[1]));
+                } catch (error) { return popup.Promise.reject(error); }
+                return new popup.Promise((resolve, reject) => runWhenReady(() => {
+                    try { reflectApply(load, fonts, normalized).then(resolve, reject); }
+                    catch (error) { reject(error); }
+                }));
+            });
+        };
         stage('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
         stage('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
         stageFontFace();
+        stageFontSet();
         return constructors;
     };
 })();
