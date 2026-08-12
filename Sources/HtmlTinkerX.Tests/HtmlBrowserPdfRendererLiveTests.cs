@@ -106,7 +106,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
         await using LoopbackContentServer foreignOrigin = new("foreign-resource");
         await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; globalThis.completedCredentialProbes = 0; const completed = () => globalThis.completedCredentialProbes++; const declaredProbe = new Image(); declaredProbe.onload = declaredProbe.onerror = completed; declaredProbe.src = '/probe'; const foreignProbe = new Image(); foreignProbe.onload = foreignProbe.onerror = completed; foreignProbe.src = '{foreignOrigin.Url}';</script></body></html>";
+        string html = $"<html><body><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; globalThis.completedCredentialProbes = false; Promise.all([fetch('/probe', {{ mode: 'no-cors', cache: 'no-store' }}), fetch('{foreignOrigin.Url}', {{ mode: 'no-cors', cache: 'no-store' }})]).then(() => globalThis.completedCredentialProbes = true);</script></body></html>";
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -115,8 +115,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
-                function: "() => document.querySelector('#main').textContent === 'origin-storage' && globalThis.completedCredentialProbes === 2",
-                timeout: 10000),
+                function: "() => document.querySelector('#main').textContent === 'origin-storage' && globalThis.completedCredentialProbes === true",
+                timeout: 20000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
 

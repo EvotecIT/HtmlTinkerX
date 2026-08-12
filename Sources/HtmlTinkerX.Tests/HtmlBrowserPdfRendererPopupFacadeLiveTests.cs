@@ -6,14 +6,14 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
-    public async Task BlankPopupSelfAliasesRemainStagedBehindThePrivateReleaseHandshake() {
+    public async Task BlankPopupDoesNotExposeAnInvokablePrivateReleaseHandshake() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = @"const popup = window.open('', '_blank');
-            for (const name of Object.getOwnPropertyNames(popup)) {
-                if (name.toLowerCase().includes('htmltinkerx') && typeof popup[name] === 'function') popup[name]();
+            for (const name of [...Object.getOwnPropertyNames(popup), ...Object.getOwnPropertySymbols(popup)]) {
+                if ((String(name).toLowerCase().includes('htmltinkerx') || /^[0-9a-f]{32}$/.test(String(name))) && typeof popup[name] === 'function') popup[name]();
             }
             popup.window.location.href = '/header-popup';
             true";
@@ -95,9 +95,15 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
-            const image = popup.document.createElement('img');
-            delete image.src;
-            image.src = '{server.BlankPopupResourceUrl}';
+            const popupPrototypeImage = popup.document.createElement('img');
+            Object.getPrototypeOf(popupPrototypeImage).setAttribute.call(popupPrototypeImage, 'src', '{server.BlankPopupResourceUrl}?source=popup-prototype');
+            const openerPrototypeImage = popup.document.createElement('img');
+            Element.prototype.setAttribute.call(openerPrototypeImage, 'src', '{server.BlankPopupResourceUrl}?source=opener-prototype');
+            const namespaceImage = popup.document.createElement('img');
+            Object.getPrototypeOf(namespaceImage).setAttributeNS.call(namespaceImage, null, 'src', '{server.BlankPopupResourceUrl}?source=namespace');
+            const removedImage = popup.document.createElement('img');
+            Object.getPrototypeOf(removedImage).setAttributeNS.call(removedImage, null, 'src', '{server.BlankPopupResourceUrl}?source=removed');
+            Object.getPrototypeOf(removedImage).removeAttributeNS.call(removedImage, null, 'src');
             true";
 
         await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -106,7 +112,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
-        Assert.True(server.BlankPopupResourceRequests > 0);
+        Assert.True(server.BlankPopupResourceRequests >= 3);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
         Assert.Equal("popup-token", server.LastPopupToken);
     }

@@ -234,7 +234,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             HtmlBrowserPdfSource.FromUrl(server.DeclarativeFormUrl),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
-                function: "() => document.querySelector('#target-state')?.textContent !== 'pending'",
+                function: "() => document.querySelector('#target-state')?.textContent === 'base target restored'",
                 timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));

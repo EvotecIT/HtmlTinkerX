@@ -13,8 +13,10 @@ using System.Threading.Tasks;
 /// <summary>Attaches streaming header interception before newly opened popups navigate.</summary>
 internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
+    private const string AttributeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js";
     private const string NavigationShimResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js";
     private const string ReleasePropertyPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_PROPERTY__";
+    private const string ReleaseTokenPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_TOKEN__";
     private static readonly Lazy<string> NavigationShim = new(LoadNavigationShim, LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IBrowserContext _context;
     private readonly IPage _primaryPage;
@@ -29,6 +31,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private readonly Func<string, Task<bool>>? _requestAllowed;
     private readonly Action<string, bool>? _requestBlocked;
     private readonly string _releasePropertyName;
+    private readonly string _releaseToken;
     private readonly string _navigationShim;
     private Exception? _failure;
     private int _disposed;
@@ -53,7 +56,10 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _requestAllowed = requestAllowed;
         _requestBlocked = requestBlocked;
         _releasePropertyName = Guid.NewGuid().ToString("N");
-        _navigationShim = NavigationShim.Value.Replace(ReleasePropertyPlaceholder, _releasePropertyName);
+        _releaseToken = Guid.NewGuid().ToString("N");
+        _navigationShim = NavigationShim.Value
+            .Replace(ReleasePropertyPlaceholder, _releasePropertyName)
+            .Replace(ReleaseTokenPlaceholder, _releaseToken);
         _pageHandler = OnPage;
         context.Page += _pageHandler;
     }
@@ -62,8 +68,12 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        using Stream stream = assembly.GetManifestResourceStream(NavigationShimResource)
-            ?? throw new InvalidOperationException($"Embedded browser script '{NavigationShimResource}' was not found.");
+        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+    }
+
+    private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {
+        using Stream stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded browser script '{resourceName}' was not found.");
         using StreamReader reader = new(stream);
         return reader.ReadToEnd();
     }
@@ -103,15 +113,16 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             // Every attached popup can open another popup. Install the same staging shim
             // before releasing this page so nested navigation cannot outrun interception.
             await AddNavigationShimAsync(page).ConfigureAwait(false);
-            await page.EvaluateAsync(@"propertyName => {
-                const release = globalThis[propertyName];
-                if (typeof release !== 'function') return;
-                delete globalThis[propertyName];
-                release();
-            }", _releasePropertyName).ConfigureAwait(false);
+            await ReleasePopupAsync(page).ConfigureAwait(false);
         } catch (PlaywrightException) when (page.IsClosed || !string.Equals(page.Url, "about:blank", StringComparison.OrdinalIgnoreCase)) {
             // A caller can close the popup or navigate it before the release handshake finishes.
         }
+    }
+
+    private async Task ReleasePopupAsync(IPage page) {
+        await page.EvaluateAsync(@"release => {
+            globalThis[release.propertyName] = release.token;
+        }", new { propertyName = _releasePropertyName, token = _releaseToken }).ConfigureAwait(false);
     }
 
     internal void ThrowIfFaulted() {

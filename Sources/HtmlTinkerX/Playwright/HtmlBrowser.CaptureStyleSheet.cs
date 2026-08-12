@@ -16,14 +16,14 @@ public static partial class HtmlBrowser {
             const createElement = Document.prototype.createElement;
             const setAttribute = Element.prototype.setAttribute;
             const prepend = Element.prototype.prepend;
-            const textContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent').set;
+            const textContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
             let style = querySelector.call(document, `style[${attribute}]`);
             if (!style) {
                 style = createElement.call(document, 'style');
                 setAttribute.call(style, attribute, '');
                 prepend.call(document.head || document.documentElement, style);
             }
-            textContent.call(style, css);
+            if (textContent.get.call(style) !== css) textContent.set.call(style, css);
         }";
 
     internal static async Task ApplyCaptureStyleSheetAsync(

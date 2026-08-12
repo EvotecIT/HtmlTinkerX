@@ -19,6 +19,7 @@
     const nativeHasAttribute = Element.prototype.hasAttribute;
     const nativeRemoveAttribute = Element.prototype.removeAttribute;
     const nativeSetAttribute = Element.prototype.setAttribute;
+    const nativeSetAttributeNS = Element.prototype.setAttributeNS;
     const nativeComposedPath = Event.prototype.composedPath;
     const iframePrototype = HTMLIFrameElement.prototype;
     const framePrototype = typeof HTMLFrameElement === 'undefined' ? null : HTMLFrameElement.prototype;
@@ -41,6 +42,15 @@
     const specialTargets = ['_self', '_parent', '_top'];
     const imageSubmitCoordinates = new WeakMap();
     const popupReleaseProperty = '__HTMLTINKERX_POPUP_RELEASE_PROPERTY__';
+    const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
+    const attributeGuards = globalThis.__htmlTinkerXCreatePopupAttributeGuards({
+        defineProperty: nativeDefineProperty,
+        reflectApply: nativeReflectApply,
+        stringValue: nativeString,
+        booleanValue: nativeBoolean
+    });
+    delete globalThis.__htmlTinkerXCreatePopupAttributeGuards;
+    attributeGuards.install(Element.prototype);
 
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
@@ -105,12 +115,16 @@
             return;
         }
 
-        const release = () => {
-            navigate();
-        };
+        let released = false;
         nativeDefineProperty(popup, popupReleaseProperty, {
-            value: release,
-            configurable: true
+            configurable: false,
+            enumerable: false,
+            get() { return undefined; },
+            set(value) {
+                if (released || value !== popupReleaseToken) return;
+                released = true;
+                navigate();
+            }
         });
     };
 
@@ -122,6 +136,7 @@
         } catch {
             return popup;
         }
+        attributeGuards.install(popup.Element.prototype);
 
         let ready = false;
         let documentMutationQueued = false;
@@ -385,7 +400,14 @@
             if (guardedElements.has(element)) return;
             guardedElements.add(element);
             const values = new Map(initialValues);
+            const namespacedValues = new Map();
             let released = false;
+            const state = attributeGuards.createState(
+                element,
+                values,
+                namespacedValues,
+                () => released,
+                shouldDeferAttribute);
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -409,33 +431,29 @@
                     }
                 });
             }
-            const nativeSetAttribute = element.setAttribute;
-            const nativeRemoveAttribute = element.removeAttribute;
+            const elementSetAttribute = element.setAttribute;
+            const elementRemoveAttribute = element.removeAttribute;
             nativeDefineProperty(element, 'setAttribute', {
                 configurable: false,
                 value(name, value) {
-                    const attribute = nativeString(name).toLowerCase();
-                    if (!released && shouldDeferAttribute(element, attribute)) {
-                        values.set(attribute, nativeString(value));
-                        return;
-                    }
-                    return nativeSetAttribute.call(this, name, value);
+                    if (state.setAttribute(name, value)) return;
+                    return elementSetAttribute.call(this, name, value);
                 }
             });
             nativeDefineProperty(element, 'removeAttribute', {
                 configurable: false,
                 value(name) {
-                    const attribute = nativeString(name).toLowerCase();
-                    if (!released && shouldDeferAttribute(element, attribute)) {
-                        values.delete(attribute);
-                        return;
-                    }
-                    return nativeRemoveAttribute.call(this, name);
+                    if (state.removeAttribute(name)) return;
+                    return elementRemoveAttribute.call(this, name);
                 }
             });
             guardedResources.push(() => {
                 released = true;
                 for (const [attribute, value] of values) nativeSetAttribute.call(element, attribute, value);
+                for (const value of namespacedValues.values()) {
+                    nativeSetAttributeNS.call(element, value.namespace, value.qualified, value.value);
+                }
+                attributeGuards.release(element);
             });
         };
         const guardCreatedElement = element => {

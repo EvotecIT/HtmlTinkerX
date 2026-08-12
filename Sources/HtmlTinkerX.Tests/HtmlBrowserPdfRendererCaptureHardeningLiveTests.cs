@@ -102,6 +102,29 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task CaptureStyleSheetDoesNotRewriteIdenticalContentAfterReadiness() {
+        const string html = "<p id='result'>capture style pending</p><p id='secret'>stable stylesheet sensitive value</p>";
+        const string beforeCaptureScript = @"const marker = document.querySelector('#result');
+            const style = document.querySelector('style[data-htmltinkerx-pdf-capture-style]');
+            marker.textContent = 'capture style stable';
+            new MutationObserver(() => marker.textContent = 'capture style rewritten')
+                .observe(style, { subtree: true, childList: true, characterData: true });";
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml(html),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 200),
+            styleSheetContent: "#secret { display: none !important; }",
+            beforeCaptureScript: beforeCaptureScript));
+
+        AssertPdfContains(result.PdfBytes, "capture style stable");
+        AssertPdfDoesNotContain(result.PdfBytes, "capture style rewritten");
+        AssertPdfDoesNotContain(result.PdfBytes, "stable stylesheet sensitive value");
+    }
+
+    [Fact]
     public async Task CaptureStyleSheetCannotBeRemovedByBeforePrintHandlers() {
         const string html = @"<p>public beforeprint style marker</p><p id='secret'>beforeprint style sensitive value</p><script>
             addEventListener('beforeprint', () => {
