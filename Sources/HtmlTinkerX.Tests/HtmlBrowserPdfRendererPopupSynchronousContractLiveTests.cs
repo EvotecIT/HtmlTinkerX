@@ -214,6 +214,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         string script = $@"let openerStyleOwner = HTMLElement.prototype;
             let openerStyleDescriptor;
             while (openerStyleOwner && !openerStyleDescriptor) {{ openerStyleDescriptor = Object.getOwnPropertyDescriptor(openerStyleOwner, 'style'); openerStyleOwner = Object.getPrototypeOf(openerStyleOwner); }}
+            let openerSheetOwner = HTMLStyleElement.prototype;
+            let openerSheetDescriptor;
+            while (openerSheetOwner && !openerSheetDescriptor) {{ openerSheetDescriptor = Object.getOwnPropertyDescriptor(openerSheetOwner, 'sheet'); openerSheetOwner = Object.getPrototypeOf(openerSheetOwner); }}
             const openerAttachShadow = Element.prototype.attachShadow;
             const popup = window.open('', '_blank');
             const body = popup.document.querySelector('body');
@@ -240,6 +243,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const nativeTextSetter = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent').set;
             nativeTextSetter.call(style, '@import url({server.BlankPopupResourceUrl}?source=style-text);');
             popup.document.head.append(style);
+            openerSheetDescriptor.get.call(style).insertRule('@import url({server.BlankPopupResourceUrl}?source=style-sheet);', 0);
+            let replaceSyncRejected = false;
+            try {{ style.sheet.replaceSync('body {{ color: red; }}'); }} catch (error) {{ replaceSyncRejected = error.name === 'NotAllowedError'; }}
+            if (!replaceSyncRejected) throw new Error('non-constructed stylesheet replaceSync semantics changed');
+            const dynamicScript = popup.document.createElement('script');
+            nativeTextSetter.call(dynamicScript, `fetch('{server.BlankPopupResourceUrl}?source=dynamic-script')`);
+            popup.document.head.append(dynamicScript);
+            const auxiliary = popup.document.implementation.createHTMLDocument('');
+            auxiliary.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=auxiliary-document"">';
+            popup.document.body.append(auxiliary.images[0]);
             document.querySelector('#result').textContent = body.getAttribute('style').includes('background-image')
                 ? 'cssom state staged'
                 : 'cssom state lost';
@@ -252,8 +265,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             beforeCaptureScript: script));
 
         AssertPdfContains(result.PdfBytes, "cssom state staged");
-        Assert.True(server.BlankPopupResourceRequests >= 6);
+        Assert.True(server.BlankPopupResourceRequests >= 8);
         Assert.Equal(1, server.StyleTextResourceRequests);
+        Assert.True(server.BlankPopupSourceRequests("style-sheet") >= 1);
+        Assert.True(server.BlankPopupSourceRequests("dynamic-script") >= 1);
+        Assert.True(server.BlankPopupSourceRequests("auxiliary-document") >= 1);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
@@ -274,6 +290,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const frame = framedPopup.document.createElement('iframe');
             frame.srcdoc = '<script src=""{server.BlankPopupResourceUrl}?source=srcdoc""></script>';
             framedPopup.document.body.append(frame);
+            const normalizedImage = framedPopup.document.createElement('img');
+            normalizedImage.src = '/blank-popup-resource?source=normalized-url';
+            if (normalizedImage.src !== '{server.BlankPopupResourceUrl}?source=normalized-url') throw new Error('staged URL was not normalized');
+            framedPopup.document.body.append(normalizedImage);
             const navigatingPopup = window.open('', '_blank');
             const navigationOptions = {{ history: 'replace' }};
             Object.getPrototypeOf(navigatingPopup.navigation).navigate.call(
@@ -283,12 +303,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             navigationOptions.history = 'invalid-after-call';
             const refreshPopup = window.open('', '_blank');
             const meta = refreshPopup.document.createElement('meta');
-            meta.httpEquiv = 'refresh';
             let metaOwner = Object.getPrototypeOf(meta);
             let contentDescriptor;
             while (metaOwner && !contentDescriptor) {{ contentDescriptor = Object.getOwnPropertyDescriptor(metaOwner, 'content'); metaOwner = Object.getPrototypeOf(metaOwner); }}
             const contentSetter = contentDescriptor.set;
             contentSetter.call(meta, '0;url=/blank-popup-location');
+            meta.httpEquiv = 'refresh';
             refreshPopup.document.head.append(meta);
             true";
 
@@ -304,6 +324,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
         Assert.True(server.BlankPopupResourceRequests >= 2);
+        Assert.Equal(1, server.BlankPopupSourceRequests("normalized-url"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 

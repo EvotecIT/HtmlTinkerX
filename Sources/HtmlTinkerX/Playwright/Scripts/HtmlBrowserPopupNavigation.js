@@ -154,7 +154,7 @@
             return popup;
         }
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
-        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent');
+        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild;
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
         attributeGuards.install(popup.Element.prototype);
@@ -290,16 +290,14 @@
             || attribute === 'style'
             || attribute.startsWith('on')
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
-            || (element.localName === 'meta'
-                && attribute === 'content'
-                && nativeString(nativeGetAttribute.call(element, 'http-equiv')).toLowerCase() === 'refresh');
+            || (element.localName === 'meta' && attribute === 'content');
         const guardDeferredAttributes = (element, initialValues) => {
             if (guardedElements.has(element)) return;
             guardedElements.add(element);
             const values = new Map(initialValues); const namespacedValues = new Map();
-            const stagesStyleText = element.localName === 'style'; let stagedText = stagesStyleText ? popupTextContent.get.call(element) : null;
-            if (stagesStyleText) popupTextContent.set.call(element, '');
-            let released = false; const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
+            const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null;
+            if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
+            let released = false; const styleGuard = transportGuards.createStyleGuard(element, values, () => released); const sheetGuard = transportGuards.createStyleSheetGuard(element, stagedText, () => released);
             const state = attributeGuards.createState(
                 element,
                 values,
@@ -310,7 +308,7 @@
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
                 attribute => { if (attribute === 'style') styleGuard?.synchronize(); },
-                stagesStyleText ? { get: () => stagedText, set: value => { stagedText = value; } } : null);
+                stagesStyleText || stagesScriptText ? { get: () => stagedText, set: value => { stagedText = value; if (sheetGuard != null) sheetGuard.text = value; } } : null);
             if (styleGuard != null) nativeDefineProperty(element, 'style', {
                 configurable: false,
                 enumerable: true,
@@ -340,7 +338,7 @@
                     configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
-                        if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return values.get(attribute);
+                        if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return transportGuards.normalizeDeferredProperty(attribute, values.get(attribute));
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
                     set(value) {
@@ -369,12 +367,15 @@
             guardedResources.push(() => {
                 if (styleGuard != null) styleGuard.release();
                 released = true;
-                for (const [attribute, value] of values) nativeSetAttribute.call(element, attribute, value);
-                for (const value of namespacedValues.values()) {
-                    nativeSetAttributeNS.call(element, value.namespace, value.qualified, value.value);
-                }
+                const applyAttributes = target => { for (const [attribute, value] of values) nativeSetAttribute.call(target, attribute, value); for (const value of namespacedValues.values()) nativeSetAttributeNS.call(target, value.namespace, value.qualified, value.value); };
                 attributeGuards.release(element);
-                if (stagesStyleText) popupTextContent.set.call(element, stagedText);
+                if (stagesScriptText && element.parentNode != null) {
+                    const replacement = nativeReflectApply(popupCloneNode, element, [false]); applyAttributes(replacement);
+                    popupTextContent.set.call(replacement, stagedText); nativeReflectApply(popupReplaceChild, element.parentNode, [replacement, element]);
+                } else {
+                    applyAttributes(element); if (stagesStyleText) popupTextContent.set.call(element, sheetGuard?.release() ?? stagedText);
+                    else if (stagesScriptText) popupTextContent.set.call(element, stagedText);
+                }
             });
         };
         const stageElementMarkup = createMarkupStager({
@@ -588,6 +589,7 @@
                         }
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;
+                        for (const value of args) guardCreatedTree(unwrap(value));
                         if (property === 'write' || property === 'writeln') documentWriteQueued = true;
                         if (property === 'close') documentCloseQueued = true;
                         queued.push(() => {
@@ -673,7 +675,6 @@
         });
         return popupFacade;
     };
-
     const openWithReferrerPolicy = function(url, target, features, referrerPolicy) {
         if (url == null || nativeString(url).length === 0 || nativeString(url).toLowerCase() === 'about:blank') {
             return openStagedBlankPopup.call(this, url, target, features);
@@ -713,7 +714,6 @@
         }
         return suppressOpener ? null : popup;
     };
-
     const stagedWindowOpen = function(url, target, features) {
         return openWithReferrerPolicy.call(this, url, target, features, '');
     };

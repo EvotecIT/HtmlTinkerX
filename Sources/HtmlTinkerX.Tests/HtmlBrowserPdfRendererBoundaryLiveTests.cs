@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -583,6 +584,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private int _styleTextResourceRequests;
         private int _removedNamespacedResourceRequests;
         private int _popupRequestCount;
+        private readonly ConcurrentDictionary<string, int> _blankPopupSources = new(StringComparer.Ordinal);
         private readonly string _namedContextInitialUrl;
 
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
@@ -650,6 +652,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
         internal int StyleTextResourceRequests => Volatile.Read(ref _styleTextResourceRequests);
+        internal int BlankPopupSourceRequests(string source) => _blankPopupSources.TryGetValue(source, out int count) ? count : 0;
         internal int RemovedNamespacedResourceRequests => Volatile.Read(ref _removedNamespacedResourceRequests);
         internal int PopupRequestCount => Volatile.Read(ref _popupRequestCount);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
@@ -764,6 +767,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
                     } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _blankPopupResourceRequests);
+                        int sourceStart = requestTarget.IndexOf("source=", StringComparison.Ordinal);
+                        if (sourceStart >= 0) {
+                            string source = requestTarget.Substring(sourceStart + 7).Split('&')[0];
+                            _blankPopupSources.AddOrUpdate(source, 1, (_, count) => count + 1);
+                        }
                         if (requestTarget.Contains("source=style-text", StringComparison.Ordinal)) Interlocked.Increment(ref _styleTextResourceRequests);
                         if (requestTarget.Contains("source=removed-namespace", StringComparison.Ordinal)) Interlocked.Increment(ref _removedNamespacedResourceRequests);
                         string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");

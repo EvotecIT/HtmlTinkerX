@@ -28,7 +28,43 @@
     const urlSearchParamsToString = URLSearchParams.prototype.toString;
     const beaconStates = new WeakMap();
     const navigationStates = new WeakMap();
+    const sheetStates = new WeakMap();
+    const sheetMutationStates = new WeakMap();
+    const installedSheetPrototypes = new WeakSet();
     const styleStates = new WeakMap();
+    const installSheetMutations = prototype => {
+        if (prototype == null || installedSheetPrototypes.has(prototype)) return;
+        installedSheetPrototypes.add(prototype);
+        for (const name of ['deleteRule', 'insertRule', 'replace', 'replaceSync']) {
+            const method = prototype[name];
+            if (typeof method !== 'function') continue;
+            defineProperty(prototype, name, {
+                configurable: false,
+                writable: false,
+                value(...args) {
+                    const stage = sheetMutationStates.get(this);
+                    return stage == null ? reflectApply(method, this, args) : stage(name, args, method);
+                }
+            });
+        }
+    };
+    const installSheetRoute = prototype => {
+        let owner = prototype;
+        let descriptor = null;
+        while (owner && descriptor == null) {
+            descriptor = getOwnPropertyDescriptor(owner, 'sheet');
+            if (descriptor == null) owner = getPrototypeOf(owner);
+        }
+        if (descriptor?.get && descriptor.configurable !== false) defineProperty(owner, 'sheet', {
+            ...descriptor,
+            configurable: false,
+            get() {
+                const staged = sheetStates.get(this);
+                return staged == null ? descriptor.get.call(this) : staged();
+            }
+        });
+        return descriptor;
+    };
     const installStyleRoute = prototype => {
         let owner = prototype;
         let descriptor = null;
@@ -46,6 +82,8 @@
         });
         return descriptor;
     };
+    installSheetMutations(CSSStyleSheet.prototype);
+    installSheetRoute(HTMLStyleElement.prototype);
     installStyleRoute(HTMLElement.prototype);
     let openerBeaconInstalled = false;
     const routedSendBeacon = function(...args) {
@@ -60,6 +98,8 @@
         const popupGetAttribute = popup.Element.prototype.getAttribute;
         const popupQuerySelector = popup.Document.prototype.querySelector;
         const popupUrlSearchParams = popup.URLSearchParams;
+        installSheetMutations(popup.CSSStyleSheet.prototype);
+        const sheetDescriptor = installSheetRoute(popup.HTMLStyleElement.prototype);
         const styleDescriptor = installStyleRoute(popup.HTMLElement.prototype);
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
@@ -286,6 +326,41 @@
                         styleStates.delete(element);
                     }
                 };
+            },
+            createStyleSheetGuard(element, initialText, isReleased) {
+                if (element.localName !== 'style' || sheetDescriptor?.get == null) return null;
+                const stagingDocument = popup.document.implementation.createHTMLDocument('');
+                const stagingElement = stagingDocument.createElement('style');
+                stagingDocument.head.append(stagingElement);
+                const stagingSheet = stagingElement.sheet;
+                if (stagingSheet == null) return null;
+                let stagedText = initialText;
+                sheetStates.set(element, () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet);
+                sheetMutationStates.set(stagingSheet, (name, args, method) => {
+                    const result = reflectApply(method, stagingSheet, args);
+                    if (name === 'replace') return result.then(value => { stagedText = ''; return value; });
+                    if (name !== 'insertRule') stagedText = '';
+                    return result;
+                });
+                const guard = {
+                    set text(value) {
+                        stagedText = toDomString(value);
+                        stagingElement.textContent = stagedText;
+                    },
+                    release() {
+                        sheetStates.delete(element);
+                        sheetMutationStates.delete(stagingSheet);
+                        const rules = arrayFrom(stagingSheet.cssRules, rule => rule.cssText).join('\n');
+                        return [stagedText, rules].filter(value => value.length > 0).join('\n');
+                    }
+                };
+                guard.text = initialText;
+                return guard;
+            },
+            normalizeDeferredProperty(attribute, value) {
+                if (!['action', 'data', 'formaction', 'href', 'poster', 'src'].includes(attribute)) return value;
+                try { return new url(value, popup.document.baseURI).href; }
+                catch { return value; }
             },
             snapshotBodyArguments(args) {
                 return args.length === 0 ? [] : [snapshotBody(args[0])];
