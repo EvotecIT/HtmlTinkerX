@@ -380,26 +380,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "updated");
     }
 
-    [Fact]
-    public async Task NestedDedicatedWorkerRequestsReceiveOriginScopedHeaders() {
-        await using LoopbackWorkerHeaderServer server = new();
-        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
-        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
-            maximumBrowserInstances: 1,
-            networkPolicy: policy));
-
-        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
-            HtmlBrowserPdfSource.FromUrl(server.Url),
-            readiness: new HtmlBrowserPdfReadiness(
-                skipLoadState: true,
-                function: "() => document.querySelector('#result').textContent === 'worker authorized'",
-                timeout: 5000),
-            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "worker-token" }));
-
-        AssertPdfContains(result.PdfBytes, "worker authorized");
-        Assert.Equal("worker-token", server.LastProtectedToken);
-    }
-
     [Theory]
     [InlineData("_self", false)]
     [InlineData("_parent", false)]
@@ -589,6 +569,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupToken;
         private string? _lastProtectedToken;
         private string? _lastPopupReferer;
+        private string? _lastSelfReferer;
         private string? _lastExistingContextToken;
         private string? _lastSubmitAction;
         private string? _lastImageSubmitCoordinates;
@@ -630,6 +611,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             DeclarativeCancelledAnchorUrl = $"http://127.0.0.1:{port}/declarative-cancelled-anchor-main";
             DeclarativeWindowCancelledAnchorUrl = $"http://127.0.0.1:{port}/declarative-window-cancelled-anchor-main";
             DeclarativeReferrerPolicyUrl = $"http://127.0.0.1:{port}/declarative-referrer-policy-main";
+            DeclarativeExplicitSelfReferrerPolicyUrl = $"http://127.0.0.1:{port}/declarative-explicit-self-referrer-policy-main";
             SiblingNamedContextUrl = $"http://127.0.0.1:{port}/sibling-named-context-main";
             _serverTask = ServeAsync();
         }
@@ -657,10 +639,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string DeclarativeCancelledAnchorUrl { get; }
         internal string DeclarativeWindowCancelledAnchorUrl { get; }
         internal string DeclarativeReferrerPolicyUrl { get; }
+        internal string DeclarativeExplicitSelfReferrerPolicyUrl { get; }
         internal string SiblingNamedContextUrl { get; }
         internal string? LastPopupToken => Volatile.Read(ref _lastPopupToken);
         internal string? LastProtectedToken => Volatile.Read(ref _lastProtectedToken);
         internal string? LastPopupReferer => Volatile.Read(ref _lastPopupReferer);
+        internal string? LastSelfReferer => Volatile.Read(ref _lastSelfReferer);
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
@@ -854,7 +838,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='_blank'>open</a><script>window.addEventListener('click', event => { event.preventDefault(); document.querySelector('#result').textContent = 'window navigation cancelled'; });</script>";
                     } else if (requestTarget.StartsWith("/declarative-referrer-policy-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><a href='/header-popup' target='_blank' rel='opener' referrerpolicy='no-referrer'>open</a><script>setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);</script>";
+                    } else if (requestTarget.StartsWith("/declarative-explicit-self-referrer-policy-main", StringComparison.Ordinal)) {
+                        body = "<base target='_blank'><p id='result'>pending</p><a href='/self-destination' target='' referrerpolicy='no-referrer'>open</a>";
                     } else if (requestTarget.StartsWith("/self-destination", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastSelfReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         body = "<p id='self-result'>self navigated</p>";
                     } else {
                         body = "<p id='result'>pending</p><script>addEventListener('message', event => document.querySelector('#result').textContent = event.data);</script>";

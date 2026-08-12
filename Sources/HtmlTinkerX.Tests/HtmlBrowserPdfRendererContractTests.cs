@@ -867,7 +867,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             TaskCompletionSource<bool> neverConnects = new(TaskCreationOptions.RunContinuationsAsynchronously);
             await using HtmlBrowserPolicyProxy proxy = new(
                 evaluator,
-                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(30),
                 (client, address, port) => address.Equals(stalledAddress)
                     ? neverConnects.Task
                     : client.ConnectAsync(address, port));

@@ -232,6 +232,47 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task BlankPopupTypedCssSrcdocAndNavigationWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const styledPopup = window.open('', '_blank');
+            const body = styledPopup.document.querySelector('body');
+            Object.getPrototypeOf(body.attributeStyleMap).set.call(
+                body.attributeStyleMap,
+                'background-image',
+                'url({server.BlankPopupResourceUrl}?source=typed-om)');
+            if (!body.getAttribute('style').includes('background-image')) throw new Error('typed style state lost');
+            const framedPopup = window.open('', '_blank');
+            const frame = framedPopup.document.createElement('iframe');
+            frame.srcdoc = '<script src=""{server.BlankPopupResourceUrl}?source=srcdoc""></script>';
+            framedPopup.document.body.append(frame);
+            const navigatingPopup = window.open('', '_blank');
+            const navigationOptions = {{ history: 'replace' }};
+            Object.getPrototypeOf(navigatingPopup.navigation).navigate.call(
+                navigatingPopup.navigation,
+                '/blank-popup-location',
+                navigationOptions);
+            navigationOptions.history = 'invalid-after-call';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                delayMilliseconds: 1000,
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.True(server.BlankPopupResourceRequests >= 2);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task BlankPopupLocationAndEventSourceExposeSynchronousState() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
@@ -240,9 +281,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         const string script = @"const popup = window.open('', '_blank');
             let invalidLocationCaught = false;
             try { popup.location.assign('http://['); } catch { invalidLocationCaught = true; }
+            let invalidSetterCaught = false;
+            try { popup.location.href = 'http://['; } catch { invalidSetterCaught = true; }
             const source = new popup.EventSource('/popup/events');
             source.close();
-            globalThis.popupSynchronousState = invalidLocationCaught && source.readyState === popup.EventSource.CLOSED;
+            globalThis.popupSynchronousState = invalidLocationCaught && invalidSetterCaught && source.readyState === popup.EventSource.CLOSED;
             popup.location.assign('/blank-popup-location');
             true";
 

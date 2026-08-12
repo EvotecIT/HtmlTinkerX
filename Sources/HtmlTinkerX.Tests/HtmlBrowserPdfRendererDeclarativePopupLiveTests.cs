@@ -385,6 +385,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ExplicitCurrentAnchorPreservesItsNoReferrerPolicy() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeExplicitSelfReferrerPolicyUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                selector: "#self-result",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "document.querySelector('a').click(); true"));
+
+        AssertPdfContains(result.PdfBytes, "self navigated");
+        Assert.Null(server.LastSelfReferer);
+    }
+
+    [Fact]
     public async Task CrossOriginPopupRedirectBackToCaptureOriginReceivesScopedHeaders() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

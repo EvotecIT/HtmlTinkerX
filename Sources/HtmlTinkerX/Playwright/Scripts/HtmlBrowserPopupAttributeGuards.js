@@ -114,7 +114,7 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone, synchronizeAttribute) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
@@ -135,6 +135,7 @@
                     const namespace = namespaceAware && args[0] != null ? stringValue(args[0]) : null;
                     const name = normalized(args[namespaceAware ? 1 : 0]);
                     if (isReleased() || !shouldDefer(element, name)) return { handled: false };
+                    if (typeof synchronizeAttribute === 'function') synchronizeAttribute(name);
                     let value = namespace == null || namespace.length === 0 ? values.get(name) : undefined;
                     let qualified = name;
                     if (namespace != null && namespace.length > 0) for (const staged of namespacedValues.values()) {

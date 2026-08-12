@@ -54,6 +54,31 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ReleasedInlineScriptCannotOutrunNestedPopupInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.document.write('<script>window.open(""/header-popup"", ""_blank"");</script>');
+            setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+    }
+
+    [Fact]
     public async Task ExplicitBlankPopupPreservesCreatedNodeIdentityAndBindsWindowMethods() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

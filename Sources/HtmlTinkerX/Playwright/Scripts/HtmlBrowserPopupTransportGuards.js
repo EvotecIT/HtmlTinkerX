@@ -27,6 +27,7 @@
     const urlSearchParams = URLSearchParams;
     const urlSearchParamsToString = URLSearchParams.prototype.toString;
     const beaconStates = new WeakMap();
+    const navigationStates = new WeakMap();
     let openerBeaconInstalled = false;
     const routedSendBeacon = function(...args) {
         const staged = beaconStates.get(this);
@@ -110,6 +111,35 @@
                 configurable: false
             });
         }
+        const normalizeNavigationArguments = (name, args) => {
+            const snapshotOptions = value => {
+                const source = value == null ? {} : objectValue(value);
+                const options = {};
+                if (source.info !== undefined) options.info = source.info;
+                if ((name === 'navigate' || name === 'reload') && source.state !== undefined) {
+                    options.state = structuredCloneValue(source.state);
+                }
+                if (name === 'navigate' && source.history !== undefined) {
+                    const history = toDomString(source.history);
+                    if (!['auto', 'push', 'replace'].includes(history)) throw new TypeError(`Invalid Navigation history '${history}'`);
+                    options.history = history;
+                }
+                return options;
+            };
+            if (name === 'navigate') {
+                if (args.length === 0) throw new TypeError("Failed to execute 'navigate': 1 argument required");
+                const normalized = [new url(toDomString(args[0]), popup.document.baseURI).href];
+                if (args.length > 1) normalized.push(snapshotOptions(args[1]));
+                return normalized;
+            }
+            if (name === 'traverseTo') {
+                if (args.length === 0) throw new TypeError("Failed to execute 'traverseTo': 1 argument required");
+                const normalized = [toDomString(args[0])];
+                if (args.length > 1) normalized.push(snapshotOptions(args[1]));
+                return normalized;
+            }
+            return args.length === 0 ? [] : [snapshotOptions(args[0])];
+        };
         return {
             snapshotFetchArguments(args) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
@@ -131,6 +161,45 @@
                 if (args.length === 0) throw new TypeError(`Failed to execute '${name}': 1 argument required`);
                 return [new url(toDomString(args[0]), popup.document.baseURI).href];
             },
+            normalizeLocationSetter(property, value) {
+                const normalized = toDomString(value);
+                return property === 'href'
+                    ? new url(normalized, popup.document.baseURI).href
+                    : normalized;
+            },
+            guardNavigation(navigation, navigationType) {
+                if (navigation == null || typeof navigationType !== 'function') return;
+                navigationStates.set(navigation, (property, args, nativeMethod) => {
+                    const normalized = normalizeNavigationArguments(property, args);
+                    let resolveCommitted, rejectCommitted, resolveFinished, rejectFinished;
+                    const committed = new Promise((resolve, reject) => { resolveCommitted = resolve; rejectCommitted = reject; });
+                    const finished = new Promise((resolve, reject) => { resolveFinished = resolve; rejectFinished = reject; });
+                    runWhenReady(() => {
+                        try {
+                            const result = reflectApply(nativeMethod, navigation, normalized);
+                            result.committed.then(resolveCommitted, rejectCommitted);
+                            result.finished.then(resolveFinished, rejectFinished);
+                        } catch (error) {
+                            rejectCommitted(error);
+                            rejectFinished(error);
+                        }
+                    });
+                    return { committed, finished };
+                });
+                for (const property of ['navigate', 'reload', 'back', 'forward', 'traverseTo']) {
+                    const descriptor = getOwnPropertyDescriptor(navigationType.prototype, property);
+                    if (descriptor == null || typeof descriptor.value !== 'function' || descriptor.configurable === false) continue;
+                    const nativeMethod = descriptor.value;
+                    defineProperty(navigationType.prototype, property, {
+                        ...descriptor,
+                        configurable: false,
+                        value(...args) {
+                            const stage = navigationStates.get(this);
+                            return stage == null ? reflectApply(nativeMethod, this, args) : stage(property, args, nativeMethod);
+                        }
+                    });
+                }
+            },
             createStyleGuard(element, values, isReleased) {
                 let owner = element;
                 let descriptor = null;
@@ -139,9 +208,16 @@
                     owner = getPrototypeOf(owner);
                 }
                 if (descriptor == null || typeof descriptor.get !== 'function') return null;
-                const staged = popup.document.createElement('span').style;
+                const stagedElement = popup.document.createElement('span');
+                const staged = stagedElement.style;
                 let lastText = '';
                 const synchronizeFromAttributes = () => {
+                    if (staged.cssText !== lastText) {
+                        lastText = staged.cssText;
+                        if (lastText.length === 0) values.delete('style');
+                        else values.set('style', lastText);
+                        return;
+                    }
                     const current = values.get('style') ?? '';
                     if (current !== lastText) {
                         staged.cssText = current;
@@ -173,8 +249,21 @@
                         return result;
                     }
                 });
+                const stagedAttributeStyleMap = stagedElement.attributeStyleMap;
+                let attributeStyleMapOwner = element;
+                let attributeStyleMapDescriptor = null;
+                while (attributeStyleMapOwner && attributeStyleMapDescriptor == null) {
+                    attributeStyleMapDescriptor = getOwnPropertyDescriptor(attributeStyleMapOwner, 'attributeStyleMap');
+                    attributeStyleMapOwner = getPrototypeOf(attributeStyleMapOwner);
+                }
                 return {
                     facade,
+                    get attributeStyleMapFacade() {
+                        return isReleased() && typeof attributeStyleMapDescriptor?.get === 'function'
+                            ? attributeStyleMapDescriptor.get.call(element)
+                            : stagedAttributeStyleMap;
+                    },
+                    synchronize: synchronizeFromAttributes,
                     release() {
                         synchronizeFromAttributes();
                         synchronizeToAttributes();

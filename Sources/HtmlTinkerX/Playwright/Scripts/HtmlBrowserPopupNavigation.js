@@ -261,6 +261,7 @@
             normalizeOperation: transportGuards.normalizeOperation
         });
         const nativeLocation = popup.location;
+        const nativeNavigation = popup.navigation;
         let popupFacade;
         const locationFacade = new Proxy({}, {
             get(_, property) {
@@ -275,10 +276,12 @@
                 };
             },
             set(_, property, value) {
-                runWhenReady(() => nativeReflectSet(nativeLocation, property, value, nativeLocation));
+                const normalized = transportGuards.normalizeLocationSetter(property, value);
+                runWhenReady(() => nativeReflectSet(nativeLocation, property, normalized, nativeLocation));
                 return true;
             }
         });
+        transportGuards.guardNavigation(nativeNavigation, popup.Navigation);
         const nativeObjects = new WeakMap();
         const shouldDeferAttribute = (element, attribute) => requestAttributes.has(attribute)
             || attribute === 'style'
@@ -293,6 +296,7 @@
             const values = new Map(initialValues);
             const namespacedValues = new Map();
             let released = false;
+            const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
             const state = attributeGuards.createState(
                 element,
                 values,
@@ -301,14 +305,21 @@
                 shouldDeferAttribute,
                 () => documentFacade,
                 (method, args) => stageElementMarkup(element, method, args),
-                clone => guardClonedTree(element, clone));
-            const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
+                clone => guardClonedTree(element, clone),
+                attribute => { if (attribute === 'style') styleGuard?.synchronize(); });
             if (styleGuard != null) nativeDefineProperty(element, 'style', {
                 configurable: false,
                 enumerable: true,
                 get() { return styleGuard.facade; }
             });
-            for (const [attribute, property] of requestAttributes) {
+            if (styleGuard?.attributeStyleMapFacade != null) nativeDefineProperty(element, 'attributeStyleMap', {
+                configurable: false,
+                enumerable: true,
+                get() { return styleGuard.attributeStyleMapFacade; }
+            });
+            const deferredProperties = [...requestAttributes];
+            if (element.localName === 'iframe' || element.localName === 'frame') deferredProperties.push(['srcdoc', 'srcdoc']);
+            for (const [attribute, property] of deferredProperties) {
                 if (!(property in element)) continue;
                 let descriptor = null;
                 let prototype = element;
@@ -596,6 +607,7 @@
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
+                if (property === 'navigation' && nativeNavigation != null) return nativeNavigation;
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 if (property === 'XMLHttpRequest') return stagedXhrConstructor;
@@ -608,11 +620,30 @@
             },
             set(targetWindow, property, value) {
                 if (property === 'location') {
-                    runWhenReady(() => { targetWindow.location = value; });
+                    const normalized = transportGuards.normalizeLocationSetter('href', value);
+                    runWhenReady(() => { targetWindow.location = normalized; });
                     return true;
                 }
                 return nativeReflectSet(targetWindow, property, value, targetWindow);
             }
+        });
+        const nestedWindowOpen = function(url, nestedTarget, nestedFeatures) {
+            const resolved = url == null || nativeString(url).length === 0
+                ? url
+                : new nativeUrl(nativeString(url), popup.document.baseURI).href;
+            return openWithReferrerPolicy.call(popup, resolved, nestedTarget, nestedFeatures, '');
+        };
+        const popupPrototypeOpen = nativeGetOwnPropertyDescriptor(popup.Window.prototype, 'open');
+        if (popupPrototypeOpen?.configurable !== false) nativeDefineProperty(popup.Window.prototype, 'open', {
+            value: nestedWindowOpen,
+            writable: false,
+            configurable: false
+        });
+        const popupOwnOpen = nativeGetOwnPropertyDescriptor(popup, 'open');
+        if (popupOwnOpen?.configurable !== false) nativeDefineProperty(popup, 'open', {
+            value: nestedWindowOpen,
+            writable: false,
+            configurable: false
         });
         armBlankPopup(popup, target, () => {
             // Run document replacement from the opener realm. Performing document.open()
@@ -873,6 +904,16 @@
         }, true);
     };
 
+    const navigateCurrentWithReferrerPolicy = (destination, referrerPolicy) => {
+        if (referrerPolicy) {
+            const meta = document.createElement('meta');
+            meta.name = 'referrer';
+            meta.content = referrerPolicy;
+            (document.head || document.documentElement).appendChild(meta);
+        }
+        originalOpen.call(window, destination, '_self');
+    };
+
     const stagedClickAnchor = event => {
         if (event.button !== 0) return null;
         const path = typeof nativeComposedPath === 'function' ? nativeComposedPath.call(event) : [];
@@ -903,12 +944,14 @@
         const staged = stagedClickAnchor(event);
         if (staged === null) return;
         const { anchor, target, explicitlyCurrent, destination } = staged;
+        const rel = anchor.relList;
         if (explicitlyCurrent) {
-            originalOpen.call(window, destination.href, '_self');
+            navigateCurrentWithReferrerPolicy(
+                destination.href,
+                rel.contains('noreferrer') ? 'no-referrer' : anchor.referrerPolicy || '');
             return;
         }
 
-        const rel = anchor.relList;
         const features = rel.contains('noreferrer')
             ? 'noreferrer'
             : rel.contains('noopener') || !rel.contains('opener') ? 'noopener' : undefined;

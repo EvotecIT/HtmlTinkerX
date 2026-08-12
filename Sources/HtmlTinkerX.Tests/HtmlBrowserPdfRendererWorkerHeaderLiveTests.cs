@@ -1,13 +1,35 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
+    [Fact]
+    public async Task NestedDedicatedWorkerRequestsReceiveOriginScopedHeaders() {
+        await using LoopbackWorkerHeaderServer server = new();
+        HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: policy));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.Url),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'worker authorized'",
+                timeout: 5000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "worker-token" }));
+
+        AssertPdfContains(result.PdfBytes, "worker authorized");
+        Assert.Equal("worker-token", server.LastProtectedToken);
+    }
+
     private sealed class LoopbackWorkerHeaderServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();

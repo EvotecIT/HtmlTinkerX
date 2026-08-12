@@ -119,8 +119,8 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
             return;
         }
         try {
-            // Every attached popup can open another popup. Install the same staging shim
-            // before releasing this page so nested navigation cannot outrun interception.
+            // Future popup documents inherit the complete shim. The opener-side blank-popup
+            // facade already installs the nested window.open route in the current realm.
             await AddNavigationShimAsync(page).ConfigureAwait(false);
             await ReleasePopupAsync(page).ConfigureAwait(false);
         } catch (PlaywrightException) when (page.IsClosed || !string.Equals(page.Url, "about:blank", StringComparison.OrdinalIgnoreCase)) {
