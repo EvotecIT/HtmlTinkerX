@@ -588,9 +588,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private int _styleTextResourceRequests;
         private int _removedNamespacedResourceRequests;
         private int _popupRequestCount;
-        private readonly ConcurrentDictionary<string, int> _blankPopupSources = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, (int Count, string Cookie)> _blankPopupSources = new(StringComparer.Ordinal);
         private readonly string _namedContextInitialUrl;
-
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
             _namedContextInitialUrl = namedContextInitialUrl ?? "/existing-context-initial";
             _listener.Start();
@@ -622,7 +621,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             SiblingNamedContextUrl = $"http://127.0.0.1:{port}/sibling-named-context-main";
             _serverTask = ServeAsync();
         }
-
         internal string HeaderUrl { get; }
         internal string CrossOriginRedirectUrl { get; }
         internal string BlankPopupResourceUrl { get; }
@@ -656,7 +654,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
         internal int StyleTextResourceRequests => Volatile.Read(ref _styleTextResourceRequests);
-        internal int BlankPopupSourceRequests(string source) => _blankPopupSources.TryGetValue(source, out int count) ? count : 0;
+        internal int BlankPopupSourceRequests(string source) => _blankPopupSources.TryGetValue(source, out var request) ? request.Count : 0;
+        internal string BlankPopupSourceCookie(string source) => _blankPopupSources.TryGetValue(source, out var request) ? request.Cookie : string.Empty;
         internal int RemovedNamespacedResourceRequests => Volatile.Read(ref _removedNamespacedResourceRequests);
         internal int PopupRequestCount => Volatile.Read(ref _popupRequestCount);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
@@ -774,7 +773,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         int sourceStart = requestTarget.IndexOf("source=", StringComparison.Ordinal);
                         if (sourceStart >= 0) {
                             string source = requestTarget.Substring(sourceStart + 7).Split('&')[0];
-                            _blankPopupSources.AddOrUpdate(source, 1, (_, count) => count + 1);
+                            string cookie = LoopbackHtmlServer.ReadHeader(request, "Cookie") ?? string.Empty;
+                            _blankPopupSources.AddOrUpdate(source, (1, cookie), (_, previous) => (previous.Count + 1, cookie));
                         }
                         if (requestTarget.Contains("source=style-text", StringComparison.Ordinal)) Interlocked.Increment(ref _styleTextResourceRequests);
                         if (requestTarget.Contains("source=removed-namespace", StringComparison.Ordinal)) Interlocked.Increment(ref _removedNamespacedResourceRequests);

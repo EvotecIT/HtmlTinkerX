@@ -1,6 +1,6 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, guardRealm, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardRealm, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
@@ -83,6 +83,7 @@
                         transportGuards.guardNavigator(target.navigator, target.Navigator, () => target.document);
                         return target.navigator;
                     }
+                    if (property === 'DOMParser') return domGuards.constructorFor(target);
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));
                     if (codeMembers.has(property)) return codeMembers.get(property);
                     if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);

@@ -22,6 +22,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     private readonly object _lifecycleSync = new();
     private readonly ConcurrentQueue<BrowserSlot> _available = new();
     private readonly ConcurrentDictionary<long, BrowserSlot> _slots = new();
+    private readonly ConcurrentDictionary<Task, byte> _detachedCleanups = new();
     private long _nextBrowserId;
     private long _accepted;
     private long _succeeded;
@@ -206,7 +207,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         await WaitForCleanupAsync(cleanup, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task WaitForCleanupAsync(Task cleanup, CancellationToken cancellationToken) {
+    private async Task WaitForCleanupAsync(Task cleanup, CancellationToken cancellationToken) {
         if (!cancellationToken.CanBeCanceled || cleanup.IsCompleted) {
             await cleanup.ConfigureAwait(false);
             return;
@@ -217,10 +218,14 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
             static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
             cancelled);
         if (await Task.WhenAny(cleanup, cancelled.Task).ConfigureAwait(false) != cleanup) {
+            _detachedCleanups[cleanup] = 0;
             _ = cleanup.ContinueWith(
-                static completed => _ = completed.Exception,
+                completed => {
+                    _detachedCleanups.TryRemove(completed, out _);
+                    _ = completed.Exception;
+                },
                 CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -268,6 +273,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         foreach (BrowserSlot slot in _slots.Values) {
             await RecycleSlotAsync(slot).ConfigureAwait(false);
         }
+        await Task.WhenAll(_detachedCleanups.Keys).ConfigureAwait(false);
 
         _lifetimeCancellation.Dispose();
         _poolMutation.Dispose();

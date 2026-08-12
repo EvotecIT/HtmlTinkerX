@@ -70,14 +70,12 @@
     delete globalThis.__htmlTinkerXCreatePopupAttributeGuards;
     const createAnimatedAttributeGuard = globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
     delete globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
-    attributeGuards.install(Element.prototype);
-    attributeGuards.installNamedNodeMap(NamedNodeMap.prototype);
-    attributeGuards.installNode(Node.prototype);
     const installPopupRealmAttributeGuards = target => {
-        attributeGuards.install(target.Element?.prototype); attributeGuards.install(target.HTMLElement?.prototype); attributeGuards.install(target.HTMLScriptElement?.prototype);
+        attributeGuards.install(target.Element?.prototype);
         attributeGuards.installNamedNodeMap(target.NamedNodeMap?.prototype); attributeGuards.installNode(target.Node?.prototype);
         attributeGuards.installFrame(target.HTMLIFrameElement?.prototype); attributeGuards.installFrame(target.HTMLFrameElement?.prototype);
     };
+    installPopupRealmAttributeGuards(globalThis);
     const createXhrStager = globalThis.__htmlTinkerXCreatePopupXhrStager;
     delete globalThis.__htmlTinkerXCreatePopupXhrStager;
     Event.prototype.preventDefault = function() {
@@ -137,10 +135,7 @@
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } };
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML; const popupSetHtmlUnsafe = popup.Element.prototype.setHTMLUnsafe;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
-        attributeGuards.install(popup.Element.prototype); attributeGuards.install(popup.HTMLElement.prototype); attributeGuards.install(popup.HTMLScriptElement.prototype);
-        attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
-        attributeGuards.installNode(popup.Node.prototype);
-        attributeGuards.installFrame(popup.HTMLIFrameElement.prototype); attributeGuards.installFrame(popup.HTMLFrameElement?.prototype);
+        installPopupRealmAttributeGuards(popup);
         let ready = false;
         let documentMutationQueued = false;
         let documentWriteQueued = false;
@@ -291,6 +286,7 @@
                 value => stagedDocument(value ?? popup.document), value => stagedChildWindow(value),
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
+                value => guardCreatedTree(value),
                 attribute => { if (attribute === 'style') styleGuard?.synchronize(); },
                 stagesStyleText || stagesScriptText ? { get: () => stagedTextNodes == null ? stagedText : popupTextContent.get.call(stagedTextNodes), set: value => { stagedText = value; if (stagedTextNodes != null) popupTextContent.set.call(stagedTextNodes, value); if (sheetGuard != null) sheetGuard.text = value; }, target: stagedTextNodes } : null);
             if (styleGuard != null) nativeDefineProperty(element, 'style', {
@@ -378,7 +374,7 @@
             guardDeferredAttributes,
             guardedResources
         });
-        const guardCreatedElement = element => {
+        const guardCreatedElement = element => { if (ready) return element;
             if (!isNodeValue(element) || nativeReflectApply(popupNodeType, element, []) !== 1 || guardedElements.has(element)) return element;
             const values = [];
             for (const attribute of Array.from(element.attributes)) {
@@ -390,12 +386,12 @@
             guardDeferredAttributes(element, values);
             return element;
         };
-        const guardCreatedTree = element => {
+        const guardCreatedTree = element => { if (ready) return element;
             guardCreatedElement(element);
             const type = isNodeValue(element) ? nativeReflectApply(popupNodeType, element, []) : 0;
             if (type === 1 || type === 11) for (const descendant of nativeReflectApply(type === 1 ? nativeElementQuerySelectorAll : popupFragmentQuerySelectorAll, element, ['*'])) guardCreatedElement(descendant);
             return element;
-        }; domGuards = createDomGuards({ popup, runWhenReady, guardCreatedTree });
+        }; domGuards = createDomGuards({ popup, isReady: () => ready, runWhenReady, guardCreatedTree });
         const guardClonedTree = (source, clone) => {
             guardCreatedTree(clone);
             attributeGuards.copy(source, clone);
@@ -596,6 +592,10 @@
                     };
                 },
                 set(_, property, valueToSet) {
+                    if (!ready && property === 'cookie') {
+                        const current = resolve();
+                        if (isDocumentValue(current)) return nativeReflectSet(current, property, unwrap(valueToSet), current);
+                    }
                     if (!ready) documentMutationQueued = true;
                     runWhenReady(() => {
                         const current = resolve();
@@ -608,13 +608,14 @@
             return facade;
         };
         const isDocumentValue = value => { try { return nativeReflectApply(popupNodeType, value, []) === 9; } catch { return false; } }; const documentFacade = stagedObject(() => popup.document);
-        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, guardRealm: target => { installPopupRealmAttributeGuards(target); stagedRealmMembers.guardShadowRealm(target); }, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardRealm: target => { installPopupRealmAttributeGuards(target); stagedRealmMembers.guardShadowRealm(target); domGuards.guardRealm(target); }, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
         stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
                 if (property === 'navigation' && nativeNavigation != null) return nativeNavigation;
                 if (property === 'document') return documentFacade;
+                if (property === 'DOMParser') return domGuards.constructorFor(targetWindow);
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 if (property === 'XMLHttpRequest') return stagedXhrConstructor;
                 if (stagedRealmMembers.has(property)) return stagedRealmMembers.get(property);

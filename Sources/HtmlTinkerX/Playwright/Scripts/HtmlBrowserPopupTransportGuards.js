@@ -37,6 +37,9 @@
     const sheetMutationStates = new WeakMap();
     const installedSheetPrototypes = new WeakSet();
     const styleStates = new WeakMap();
+    const styleRouteDescriptors = new WeakMap();
+    const attributeStyleMapStates = new WeakMap();
+    const attributeStyleMapRouteDescriptors = new WeakMap();
     const workletStates = new WeakMap();
     const installedWorkletPrototypes = new WeakSet();
     const installWorkletRoute = prototype => {
@@ -93,26 +96,33 @@
         });
         return descriptor;
     };
-    const installStyleRoute = prototype => {
+    const installGetterRoute = (prototype, property, states, descriptors) => {
         let owner = prototype;
         let descriptor = null;
         while (owner && descriptor == null) {
-            descriptor = getOwnPropertyDescriptor(owner, 'style');
+            descriptor = getOwnPropertyDescriptor(owner, property);
             if (descriptor == null) owner = getPrototypeOf(owner);
         }
-        if (descriptor?.get && descriptor.configurable !== false) defineProperty(owner, 'style', {
+        if (owner == null || descriptor?.get == null) return null;
+        const installed = descriptors.get(owner);
+        if (installed != null) return installed;
+        descriptors.set(owner, descriptor);
+        if (descriptor.configurable !== false) defineProperty(owner, property, {
             ...descriptor,
             configurable: false,
             get() {
-                const staged = styleStates.get(this);
+                const staged = states.get(this);
                 return staged == null ? descriptor.get.call(this) : staged();
             }
         });
         return descriptor;
     };
+    const installStyleRoute = prototype => installGetterRoute(prototype, 'style', styleStates, styleRouteDescriptors);
+    const installAttributeStyleMapRoute = prototype => installGetterRoute(prototype, 'attributeStyleMap', attributeStyleMapStates, attributeStyleMapRouteDescriptors);
     installSheetMutations(CSSStyleSheet.prototype);
     installSheetRoute(HTMLStyleElement.prototype);
     installStyleRoute(HTMLElement.prototype);
+    installAttributeStyleMapRoute(HTMLElement.prototype);
     let openerBeaconInstalled = false;
     const routedSendBeacon = function(...args) {
         const staged = beaconStates.get(this);
@@ -345,8 +355,10 @@
                 }
             },
             createStyleGuard(element, values, isReleased) {
-                const descriptor = styleDescriptor;
+                const prototype = getPrototypeOf(element);
+                const descriptor = installStyleRoute(prototype) ?? styleDescriptor;
                 if (descriptor == null || typeof descriptor.get !== 'function') return null;
+                const attributeStyleMapDescriptor = installAttributeStyleMapRoute(prototype);
                 const stagedElement = popup.document.createElement('span');
                 const staged = stagedElement.style;
                 let lastText = '';
@@ -390,12 +402,9 @@
                 });
                 styleStates.set(element, () => isReleased() ? descriptor.get.call(element) : facade);
                 const stagedAttributeStyleMap = stagedElement.attributeStyleMap;
-                let attributeStyleMapOwner = element;
-                let attributeStyleMapDescriptor = null;
-                while (attributeStyleMapOwner && attributeStyleMapDescriptor == null) {
-                    attributeStyleMapDescriptor = getOwnPropertyDescriptor(attributeStyleMapOwner, 'attributeStyleMap');
-                    attributeStyleMapOwner = getPrototypeOf(attributeStyleMapOwner);
-                }
+                attributeStyleMapStates.set(element, () => isReleased() && attributeStyleMapDescriptor?.get
+                    ? attributeStyleMapDescriptor.get.call(element)
+                    : stagedAttributeStyleMap);
                 return {
                     facade,
                     get attributeStyleMapFacade() {
@@ -408,6 +417,7 @@
                         synchronizeFromAttributes();
                         synchronizeToAttributes();
                         styleStates.delete(element);
+                        attributeStyleMapStates.delete(element);
                     }
                 };
             },

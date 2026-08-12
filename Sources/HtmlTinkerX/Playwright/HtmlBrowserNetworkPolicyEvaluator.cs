@@ -22,6 +22,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     private readonly TimeSpan _dnsCacheDuration;
     private readonly TimeSpan _dnsLookupTimeout;
     private readonly int _maximumDnsCacheEntries;
+    private readonly SemaphoreSlim _dnsLookupGate;
     private readonly ConcurrentDictionary<string, DnsCacheEntry> _dns = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _dnsSync = new();
 
@@ -31,13 +32,15 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         TimeSpan? dnsCacheDuration = null,
         Func<DateTimeOffset>? utcNow = null,
         TimeSpan? dnsLookupTimeout = null,
-        int maximumDnsCacheEntries = DefaultMaximumDnsCacheEntries) {
+        int maximumDnsCacheEntries = DefaultMaximumDnsCacheEntries,
+        SemaphoreSlim? dnsLookupGate = null) {
         if (maximumDnsCacheEntries <= 0) throw new ArgumentOutOfRangeException(nameof(maximumDnsCacheEntries));
         _policy = policy;
         _resolveHost = resolveHost ?? Dns.GetHostAddressesAsync;
         _dnsCacheDuration = dnsCacheDuration ?? DefaultDnsCacheDuration;
         _dnsLookupTimeout = dnsLookupTimeout ?? DefaultDnsLookupTimeout;
         _maximumDnsCacheEntries = maximumDnsCacheEntries;
+        _dnsLookupGate = dnsLookupGate ?? DnsLookupGate;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
@@ -161,11 +164,11 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     }
 
     private async Task<IPAddress[]> ResolveHostBoundedAsync(string host) {
-        if (!DnsLookupGate.Wait(0)) throw new DnsLookupCapacityException();
+        if (!_dnsLookupGate.Wait(0)) throw new DnsLookupCapacityException();
         try {
             return await _resolveHost(host).ConfigureAwait(false);
         } finally {
-            DnsLookupGate.Release();
+            _dnsLookupGate.Release();
         }
     }
 

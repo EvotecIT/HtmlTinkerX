@@ -91,8 +91,22 @@
                     configurable: false,
                     writable: false,
                     value(...args) {
-                        const staged = states.get(this)?.mutateText(method, args);
+                        const state = states.get(this);
+                        state?.guardInsertion(name, args);
+                        const staged = state?.mutateText(method, args);
                         return staged?.handled ? staged.value : reflectApply(method, this, args);
+                    }
+                });
+            }
+            for (const name of ['after', 'before', 'replaceWith', 'insertAdjacentElement']) {
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        states.get(this)?.guardInsertion(name, args);
+                        return reflectApply(method, this, args);
                     }
                 });
             }
@@ -127,7 +141,9 @@
                     configurable: false,
                     writable: false,
                     value(...args) {
-                        const staged = states.get(this)?.mutateText(method, args);
+                        const state = states.get(this);
+                        state?.guardInsertion(name, args);
+                        const staged = state?.mutateText(method, args);
                         return staged?.handled ? staged.value : reflectApply(method, this, args);
                     }
                 });
@@ -202,13 +218,27 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, window, stageMarkup, guardClone, synchronizeAttribute, textState) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, window, stageMarkup, guardClone, guardTree, synchronizeAttribute, textState) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
                 document,
                 window,
                 clone(value) { return typeof guardClone === 'function' ? guardClone(value) : value; },
+                guardInsertion(method, args) {
+                    if (isReleased() || typeof guardTree !== 'function') return;
+                    if (method === 'insertAdjacentElement') {
+                        if (args.length > 1) guardTree(args[1]);
+                        return;
+                    }
+                    if (method === 'appendChild' || method === 'insertBefore' || method === 'replaceChild') {
+                        if (args.length > 0) guardTree(args[0]);
+                        return;
+                    }
+                    if (['append', 'prepend', 'replaceChildren', 'after', 'before', 'replaceWith'].includes(method)) {
+                        for (const value of args) guardTree(value);
+                    }
+                },
                 textContent() {
                     return !isReleased() && textState != null
                         ? { handled: true, value: textState.get() }

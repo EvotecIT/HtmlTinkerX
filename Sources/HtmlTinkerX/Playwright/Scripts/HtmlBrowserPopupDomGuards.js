@@ -1,6 +1,7 @@
 (() => {
     const defineProperty = Object.defineProperty;
     const reflectApply = Reflect.apply;
+    const reflectConstruct = Reflect.construct;
     const rangeStates = new WeakMap();
     const activationStates = new WeakMap();
     const imageDecodeStates = new WeakMap();
@@ -9,6 +10,9 @@
     const installedActivationPrototypes = new WeakSet();
     const installedImagePrototypes = new WeakSet();
     const installedMediaPrototypes = new WeakSet();
+    const parserRoutes = new WeakMap();
+    const parserConstructors = new WeakMap();
+    const installedParserPrototypes = new WeakSet();
     const installRangeRoutes = prototype => {
         if (prototype == null || installedRangePrototypes.has(prototype)) return;
         installedRangePrototypes.add(prototype);
@@ -72,7 +76,23 @@
             }
         });
     };
-    globalThis.__htmlTinkerXCreatePopupDomGuards = ({ popup, runWhenReady, guardCreatedTree }) => {
+    const installParserRoute = target => {
+        const prototype = target?.DOMParser?.prototype;
+        if (prototype == null || installedParserPrototypes.has(prototype)) return;
+        const parse = prototype.parseFromString;
+        if (typeof parse !== 'function') return;
+        installedParserPrototypes.add(prototype);
+        defineProperty(prototype, 'parseFromString', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const route = parserRoutes.get(this);
+                return route == null ? reflectApply(parse, this, args) : route(parse, args);
+            }
+        });
+    };
+    installParserRoute(globalThis);
+    globalThis.__htmlTinkerXCreatePopupDomGuards = ({ popup, isReady, runWhenReady, guardCreatedTree }) => {
         installRangeRoutes(Range.prototype);
         installRangeRoutes(popup.Range?.prototype);
         installActivationRoute(HTMLElement.prototype);
@@ -81,7 +101,29 @@
         installImageDecodeRoute(popup.HTMLImageElement?.prototype);
         installMediaPlayRoute(HTMLMediaElement.prototype);
         installMediaPlayRoute(popup.HTMLMediaElement?.prototype);
+        installParserRoute(popup);
+        const constructorFor = target => {
+            const existing = parserConstructors.get(target);
+            if (existing != null) return existing;
+            installParserRoute(target);
+            const constructor = target.DOMParser;
+            const routed = new Proxy(constructor, {
+                construct(current, args, newTarget) {
+                    const parser = reflectConstruct(current, args, newTarget === routed ? current : newTarget);
+                    parserRoutes.set(parser, (parse, parseArgs) => {
+                        const document = reflectApply(parse, parser, parseArgs);
+                        if (!isReady()) guardCreatedTree(document.documentElement);
+                        return document;
+                    });
+                    return parser;
+                }
+            });
+            parserConstructors.set(target, routed);
+            return routed;
+        };
         return {
+            constructorFor,
+            guardRealm(target) { installParserRoute(target); },
             guardRange(range) {
                 if (range != null) rangeStates.set(range, guardCreatedTree);
                 return range;

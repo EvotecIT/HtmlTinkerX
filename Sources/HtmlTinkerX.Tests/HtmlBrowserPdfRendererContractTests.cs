@@ -511,7 +511,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
             _ => Interlocked.Increment(ref calls) == 1 ? first.Task : second.Task,
             dnsLookupTimeout: TimeSpan.FromMilliseconds(25),
-            maximumDnsCacheEntries: 2);
+            maximumDnsCacheEntries: 2,
+            dnsLookupGate: new SemaphoreSlim(32, 32));
 
         Assert.False(await evaluator.IsAllowedAsync("https://one.example/report", null, CancellationToken.None));
         Assert.False(await evaluator.IsAllowedAsync("https://two.example/report", null, CancellationToken.None));
@@ -533,7 +534,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
                 Interlocked.Increment(ref calls);
                 return pendingLookup.Task;
             },
-            dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
+            dnsLookupTimeout: TimeSpan.FromMilliseconds(50),
+            dnsLookupGate: new SemaphoreSlim(32, 32));
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
@@ -571,7 +573,8 @@ public sealed class HtmlBrowserPdfRendererContractTests {
                 startedHosts.TryAdd(host, 0);
                 return pendingLookup.Task;
             },
-            dnsLookupTimeout: TimeSpan.FromMilliseconds(50));
+            dnsLookupTimeout: TimeSpan.FromMilliseconds(50),
+            dnsLookupGate: new SemaphoreSlim(32, 32));
         Task<bool>[] lookups = Enumerable.Range(0, 64)
             .Select(index => evaluator.IsAllowedAsync($"https://bounded-{index}.example/report", null, CancellationToken.None))
             .ToArray();

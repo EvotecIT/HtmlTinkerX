@@ -236,6 +236,20 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const nativeStyleGetter = styleDescriptor.get;
             nativeStyleGetter.call(body).borderImageSource = 'url({server.BlankPopupResourceUrl}?source=borrowed-style)';
             openerStyleDescriptor.get.call(body).maskImage = 'url({server.BlankPopupResourceUrl}?source=opener-borrowed-style)';
+            let attributeMapOwner = Object.getPrototypeOf(body);
+            let attributeMapDescriptor;
+            while (attributeMapOwner && !attributeMapDescriptor) {{ attributeMapDescriptor = Object.getOwnPropertyDescriptor(attributeMapOwner, 'attributeStyleMap'); attributeMapOwner = Object.getPrototypeOf(attributeMapOwner); }}
+            Object.getPrototypeOf(attributeMapDescriptor.get.call(body)).set.call(
+                attributeMapDescriptor.get.call(body),
+                'background-image',
+                'url({server.BlankPopupResourceUrl}?source=borrowed-typed-om)');
+            let openerAttributeMapOwner = HTMLElement.prototype;
+            let openerAttributeMapDescriptor;
+            while (openerAttributeMapOwner && !openerAttributeMapDescriptor) {{ openerAttributeMapDescriptor = Object.getOwnPropertyDescriptor(openerAttributeMapOwner, 'attributeStyleMap'); openerAttributeMapOwner = Object.getPrototypeOf(openerAttributeMapOwner); }}
+            Object.getPrototypeOf(openerAttributeMapDescriptor.get.call(body)).set.call(
+                openerAttributeMapDescriptor.get.call(body),
+                'mask-image',
+                'url({server.BlankPopupResourceUrl}?source=opener-borrowed-typed-om)');
             const host = popup.document.createElement('div');
             body.append(host);
             const shadow = host.attachShadow({{ mode: 'open' }});
@@ -287,6 +301,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.True(server.BlankPopupResourceRequests >= 8);
         Assert.Equal(1, server.StyleTextResourceRequests);
         Assert.Equal(1, server.BlankPopupSourceRequests("legacy-background"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("borrowed-typed-om"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("opener-borrowed-typed-om"));
         Assert.True(server.BlankPopupSourceRequests("style-sheet") >= 1);
         Assert.True(server.BlankPopupSourceRequests("dynamic-script") >= 1);
         Assert.Equal(1, server.BlankPopupSourceRequests("dynamic-external-script"));

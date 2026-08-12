@@ -141,6 +141,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => prewarm);
             Assert.False(pendingClose.Task.IsCompleted);
             Assert.Equal(1, renderer.GetMetricsSnapshot().BrowsersRecycled);
+
+            Task disposal = renderer.DisposeAsync().AsTask();
+            Assert.NotSame(disposal, await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromMilliseconds(100))));
+            pendingClose.TrySetResult(true);
+            Assert.Same(disposal, await Task.WhenAny(disposal, Task.Delay(TimeSpan.FromSeconds(2))));
+            await disposal;
         } finally {
             pendingClose.TrySetResult(true);
             await Task.Yield();

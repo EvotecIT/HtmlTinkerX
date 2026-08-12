@@ -218,6 +218,61 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task AdoptedNodesParsedResourcesAndCookiesWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const body = popup.document.querySelector('body');
+            const openerImage = document.createElement('img');
+            Node.prototype.appendChild.call(body, openerImage);
+            Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set.call(
+                openerImage,
+                '{server.BlankPopupResourceUrl}?source=adopted-opener-node');
+            const appendedImage = document.createElement('img');
+            Element.prototype.append.call(body, appendedImage);
+            Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set.call(
+                appendedImage,
+                '{server.BlankPopupResourceUrl}?source=adopted-opener-append');
+            const parsed = new popup.DOMParser().parseFromString(
+                `<img src='{server.BlankPopupResourceUrl}?source=popup-dom-parser'>`,
+                'text/html');
+            body.append(parsed.images[0]);
+            const borrowedParser = new popup.DOMParser();
+            const borrowed = DOMParser.prototype.parseFromString.call(
+                borrowedParser,
+                `<img src='{server.BlankPopupResourceUrl}?source=borrowed-dom-parser'>`,
+                'text/html');
+            body.append(borrowed.images[0]);
+            const frame = popup.document.createElement('iframe');
+            body.append(frame);
+            const childParsed = new frame.contentWindow.DOMParser().parseFromString(
+                `<img src='{server.BlankPopupResourceUrl}?source=child-dom-parser'>`,
+                'text/html');
+            body.append(childParsed.images[0]);
+            popup.document.cookie = 'stage=ready; path=/';
+            const external = popup.document.createElement('script');
+            external.src = '{server.BlankPopupResourceUrl}?source=cookie-script';
+            body.append(external);
+            document.querySelector('#result').textContent = 'popup DOM staged';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup DOM staged");
+        foreach (string source in new[] { "adopted-opener-node", "adopted-opener-append", "popup-dom-parser", "borrowed-dom-parser", "child-dom-parser", "cookie-script" }) {
+            Assert.Equal(1, server.BlankPopupSourceRequests(source));
+        }
+        Assert.Contains("stage=ready", server.BlankPopupSourceCookie("cookie-script"), StringComparison.Ordinal);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task AudioConstructorAndSvgAnimatedHrefWaitForHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
