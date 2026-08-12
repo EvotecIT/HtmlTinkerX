@@ -1,6 +1,6 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, createDocumentFacade, mainDocumentFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
@@ -62,6 +62,11 @@
                 get(_, property) {
                     if (property === 'document') return documentFor(target.document);
                     if (property === 'window' || property === 'self' || property === 'frames') return facade;
+                    if (property === 'parent' || property === 'top') {
+                        const ancestor = reflectGet(target, property, target);
+                        if (ancestor === popup) return mainWindowFacade();
+                        return ancestor === target ? facade : windowFor(ancestor);
+                    }
                     if (property === 'location') return locationFor(target);
                     if (property === 'fetch') return fetchFor(target);
                     if (property === 'XMLHttpRequest') return stagedXhrConstructor;
@@ -77,6 +82,7 @@
                     if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                     const value = reflectGet(target, property, target);
                     if (value === target) return facade;
+                    if (value === popup) return mainWindowFacade();
                     return typeof value === 'function' ? reflectApply(bind, value, [target]) : value;
                 },
                 set(_, property, value) {

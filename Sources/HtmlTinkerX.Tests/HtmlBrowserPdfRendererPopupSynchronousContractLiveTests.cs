@@ -449,7 +449,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         string script = $@"const openerSetTimeout = Window.prototype.setTimeout;
             const popup = window.open('', '_blank');
             const cancelled = popup.setTimeout(() => popup.document.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=cancelled-timer"">', 0);
-            popup.clearTimeout(cancelled);
+            popup.clearTimeout(String(cancelled));
             const delayed = popup.setTimeout(() => popup.document.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=late-cancelled-timer"">', 100);
             popup.setTimeout(() => popup.clearTimeout(delayed), 0);
             openerSetTimeout.call(popup, () => popup.document.body.append(Object.assign(popup.document.createElement('img'), {{ src: '{server.BlankPopupResourceUrl}?source=opener-timer' }})), 0);
@@ -464,6 +464,98 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupResourceRequests);
         Assert.Equal(0, server.BlankPopupSourceRequests("late-cancelled-timer"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task ChildFrameDocumentsAndAncestorsStayBehindPopupStaging() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            frame.contentDocument.body.innerHTML = '<img src=""{server.BlankPopupResourceUrl}?source=child-document-realm"">';
+            const parentImage = frame.contentWindow.parent.document.createElement('img');
+            parentImage.src = '{server.BlankPopupResourceUrl}?source=child-parent-window';
+            frame.contentWindow.top.document.querySelector('body').appendChild(parentImage);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-document-realm"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-parent-window"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task SynchronousPopupXhrIsRejectedBeforeItCanAppearDeferred() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            let rejected = false;
+            let defaultedAsync = false;
+            try { const request = new popup.XMLHttpRequest(); request.open('GET', '/blank-popup-resource', undefined); request.abort(); defaultedAsync = true; }
+            catch { defaultedAsync = false; }
+            try { const request = new popup.XMLHttpRequest(); request.open('GET', '/blank-popup-resource', false); }
+            catch (error) { rejected = error.name === 'NotSupportedError'; }
+            document.querySelector('#result').textContent = rejected && defaultedAsync ? 'sync xhr rejected' : 'sync xhr deferred';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "sync xhr rejected");
+        Assert.Equal(0, server.BlankPopupResourceRequests);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public async Task DynamicPopupScriptTextWaitsForHeaderInterception(int setter) {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string scriptText = $"fetch('{server.BlankPopupResourceUrl}?source=dynamic-script-{setter}')";
+        string assignment = setter switch {
+            0 => $"dynamic.text = {System.Text.Json.JsonSerializer.Serialize(scriptText)};",
+            1 => $"dynamic.innerHTML = {System.Text.Json.JsonSerializer.Serialize(scriptText)};",
+            2 => $"dynamic.appendChild(popup.document.createTextNode({System.Text.Json.JsonSerializer.Serialize(scriptText)}));",
+            3 => $"dynamic.innerText = {System.Text.Json.JsonSerializer.Serialize(scriptText)};",
+            _ => $"dynamic.append({System.Text.Json.JsonSerializer.Serialize(scriptText)});"
+        };
+        string script = $@"const popup = window.open('', '_blank');
+            const dynamic = popup.document.createElement('script');
+            {assignment}
+            popup.document.querySelector('head').appendChild(dynamic);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests($"dynamic-script-{setter}"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }

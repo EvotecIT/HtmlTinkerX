@@ -73,10 +73,11 @@
                     return identifier;
                 };
                 const stagedClear = function(identifier) {
-                    const state = pending.get(identifier);
-                    if (state == null) return reflectApply(nativeClear, popup, [identifier]);
+                    const normalizedIdentifier = identifier === undefined ? 0 : identifier >> 0;
+                    const state = pending.get(normalizedIdentifier);
+                    if (state == null) return reflectApply(nativeClear, popup, [normalizedIdentifier]);
                     state.cancelled = true;
-                    pending.delete(identifier);
+                    pending.delete(normalizedIdentifier);
                     if (state.actual != null) reflectApply(nativeClear, popup, [state.actual]);
                 };
                 members.set(setName, stagedSet);

@@ -44,6 +44,21 @@
                     }
                 });
             }
+            for (const name of ['text', 'innerText']) {
+                const text = getOwnPropertyDescriptor(prototype, name);
+                if (!text?.get || !text?.set) continue;
+                defineProperty(prototype, name, {
+                    ...text,
+                    get() {
+                        const staged = states.get(this)?.textContent();
+                        return staged?.handled ? staged.value : text.get.call(this);
+                    },
+                    set(value) {
+                        if (states.get(this)?.setTextContent(value)) return;
+                        return text.set.call(this, value);
+                    }
+                });
+            }
             const insertAdjacentHTML = prototype.insertAdjacentHTML;
             if (typeof insertAdjacentHTML === 'function') {
                 defineProperty(prototype, 'insertAdjacentHTML', {
@@ -53,6 +68,18 @@
                         const state = states.get(this);
                         if (state?.markup('insertAdjacentHTML', args)) return;
                         return reflectApply(insertAdjacentHTML, this, args);
+                    }
+                });
+            }
+            for (const name of ['append', 'prepend', 'replaceChildren']) {
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const staged = states.get(this)?.mutateText(method, args);
+                        return staged?.handled ? staged.value : reflectApply(method, this, args);
                     }
                 });
             }
@@ -80,6 +107,18 @@
             const getRootNode = prototype.getRootNode;
             const cloneNode = prototype.cloneNode;
             const textContent = getOwnPropertyDescriptor(prototype, 'textContent');
+            for (const name of ['appendChild', 'insertBefore', 'replaceChild', 'removeChild']) {
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const staged = states.get(this)?.mutateText(method, args);
+                        return staged?.handled ? staged.value : reflectApply(method, this, args);
+                    }
+                });
+            }
             defineProperty(prototype, 'ownerDocument', {
                 ...ownerDocument,
                 get() { return states.get(this)?.document() ?? ownerDocument.get.call(this); }
@@ -175,7 +214,15 @@
                     return target;
                 },
                 markup(method, args) {
+                    if (!isReleased() && textState != null && method === 'innerHTML') {
+                        textState.set(stringValue(args[0]));
+                        return true;
+                    }
                     return !isReleased() && typeof stageMarkup === 'function' && stageMarkup(method, args);
+                },
+                mutateText(method, args) {
+                    if (isReleased() || textState?.target == null) return { handled: false };
+                    return { handled: true, value: reflectApply(method, textState.target, args) };
                 },
                 read(method, args) {
                     const namespaceAware = method.endsWith('NS');

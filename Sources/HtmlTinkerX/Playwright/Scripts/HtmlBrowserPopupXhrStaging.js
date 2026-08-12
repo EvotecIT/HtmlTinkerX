@@ -65,6 +65,9 @@
         const operations = {
             open(request, args) {
                 cancelPending(request);
+                if (args.length >= 3 && args[2] !== undefined && !args[2]) {
+                    throw new domException('Synchronous XMLHttpRequest is not supported while popup requests are staged.', 'NotSupportedError');
+                }
                 return reflectApply(nativeOpen, request, args);
             },
             send(request, args) {
