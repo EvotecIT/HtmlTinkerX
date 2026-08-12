@@ -171,4 +171,110 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfDoesNotContain(result.PdfBytes, "after");
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
+
+    [Fact]
+    public async Task BlankPopupCssomResourcesWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const body = popup.document.querySelector('body');
+            body.style.backgroundImage = 'url({server.BlankPopupResourceUrl}?source=cssom)';
+            body.style.color = 'red';
+            document.querySelector('#result').textContent = body.getAttribute('style').includes('background-image')
+                ? 'cssom state staged'
+                : 'cssom state lost';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "cssom state staged");
+        Assert.True(server.BlankPopupResourceRequests >= 1);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task BlankPopupLocationAndEventSourceExposeSynchronousState() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            let invalidLocationCaught = false;
+            try { popup.location.assign('http://['); } catch { invalidLocationCaught = true; }
+            const source = new popup.EventSource('/popup/events');
+            source.close();
+            globalThis.popupSynchronousState = invalidLocationCaught && source.readyState === popup.EventSource.CLOSED;
+            popup.location.assign('/blank-popup-location');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => globalThis.popupSynchronousState === true && document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Null(server.LastPopupEventToken);
+    }
+
+    [Fact]
+    public async Task StagedFetchSnapshotsUrlOptionsAndBodyAtCallTime() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const url = new popup.URL('{server.BlankPopupResourceUrl}?echo-body');
+            const body = new popup.FormData();
+            body.append('value', 'before');
+            popup.fetch(url, {{ method: 'POST', body }}).then(response => response.text()).then(text => document.querySelector('#result').textContent = text).catch(error => document.querySelector('#result').textContent = error.name + ': ' + error.message);
+            url.pathname = '/changed-after-fetch';
+            body.set('value', 'after');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "before");
+        AssertPdfDoesNotContain(result.PdfBytes, "after");
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task StagedDocumentWriteRunsInlineScriptsAtParserPosition() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.document.write('<script>const laterAbsent=!document.querySelector(""#later"");document.write(""<span id=written>nested write</span>"");opener.document.querySelector(""#result"").textContent=laterAbsent&&document.querySelector(""#written"")?""parser order preserved"":""parser order broken"";</script><p id=later>later</p>');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "parser order preserved");
+    }
 }

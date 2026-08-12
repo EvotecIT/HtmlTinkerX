@@ -107,7 +107,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
         await using LoopbackContentServer foreignOrigin = new("foreign-resource");
         await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; fetch('/probe', {{ mode: 'no-cors', cache: 'no-store' }}); fetch('{foreignOrigin.Url}', {{ mode: 'no-cors', cache: 'no-store' }});</script></body></html>";
+        string html = $"<html><body data-loaded='0'><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; function loaded() {{ document.body.dataset.loaded = String(Number(document.body.dataset.loaded) + 1); }}</script><iframe src='/probe' onload='loaded()'></iframe><iframe src='{foreignOrigin.Url}' onload='loaded()'></iframe></body></html>";
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -116,14 +116,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
-                function: "() => document.querySelector('#main').textContent === 'origin-storage'",
-                delayMilliseconds: 500,
+                function: "() => document.querySelector('#main').textContent === 'origin-storage' && document.body.dataset.loaded === '2'",
                 timeout: 10000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
-        await WaitUntilAsync(() => declaredOrigin.LastRenderToken != null && foreignOrigin.RequestCount > 0, TimeSpan.FromSeconds(10));
         AssertPdfContains(result.PdfBytes, "origin-storage");
         Assert.Equal("origin-header", declaredOrigin.LastRenderToken);
         Assert.Null(foreignOrigin.LastRenderToken);

@@ -12,10 +12,15 @@
     const iterator = Symbol.iterator;
     const navigatorPrototype = Navigator.prototype;
     const nativeSendBeacon = navigatorPrototype.sendBeacon;
+    const nativeRequest = Request;
     const nodeClone = Node.prototype.cloneNode;
     const objectValue = Object;
     const defineProperty = Object.defineProperty;
+    const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const getPrototypeOf = Object.getPrototypeOf;
     const reflectApply = Reflect.apply;
+    const reflectGet = Reflect.get;
+    const reflectSet = Reflect.set;
     const uint8Array = Uint8Array;
     const uint8ArraySlice = Uint8Array.prototype.slice;
     const url = URL;
@@ -29,9 +34,11 @@
             ? reflectApply(nativeSendBeacon, this, args)
             : staged(this, args);
     };
-    globalThis.__htmlTinkerXCreatePopupTransportGuards = ({ popup, isReady, runWhenReady, toDomString }) => {
+    globalThis.__htmlTinkerXCreatePopupTransportGuards = ({ popup, fallbackBaseUri, isReady, runWhenReady, toDomString }) => {
         const popupFormData = popup.FormData;
         const popupFormDataAppend = popupFormData.prototype.append;
+        const popupGetAttribute = popup.Element.prototype.getAttribute;
+        const popupQuerySelector = popup.Document.prototype.querySelector;
         const popupUrlSearchParams = popup.URLSearchParams;
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
@@ -104,6 +111,76 @@
             });
         }
         return {
+            snapshotFetchArguments(args) {
+                if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
+                const baseElement = reflectApply(popupQuerySelector, popup.document, ['base']);
+                const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
+                const documentBase = stagedBase == null
+                    ? popup.document.baseURI.startsWith('about:') ? fallbackBaseUri : popup.document.baseURI
+                    : new url(stagedBase, fallbackBaseUri).href;
+                const input = isInstance(args[0], popup.Request, nativeRequest)
+                    ? args[0]
+                    : new url(toDomString(args[0]), documentBase).href;
+                const request = args.length > 1
+                    ? new popup.Request(input, args[1])
+                    : new popup.Request(input);
+                return [request];
+            },
+            normalizeLocationArguments(name, args) {
+                if (name === 'reload') return [];
+                if (args.length === 0) throw new TypeError(`Failed to execute '${name}': 1 argument required`);
+                return [new url(toDomString(args[0]), popup.document.baseURI).href];
+            },
+            createStyleGuard(element, values, isReleased) {
+                let owner = element;
+                let descriptor = null;
+                while (owner && descriptor == null) {
+                    descriptor = getOwnPropertyDescriptor(owner, 'style');
+                    owner = getPrototypeOf(owner);
+                }
+                if (descriptor == null || typeof descriptor.get !== 'function') return null;
+                const staged = popup.document.createElement('span').style;
+                let lastText = '';
+                const synchronizeFromAttributes = () => {
+                    const current = values.get('style') ?? '';
+                    if (current !== lastText) {
+                        staged.cssText = current;
+                        lastText = staged.cssText;
+                    }
+                };
+                const synchronizeToAttributes = () => {
+                    lastText = staged.cssText;
+                    if (lastText.length === 0) values.delete('style');
+                    else values.set('style', lastText);
+                };
+                const facade = new Proxy(staged, {
+                    get(_, property) {
+                        const current = isReleased() ? descriptor.get.call(element) : staged;
+                        if (!isReleased()) synchronizeFromAttributes();
+                        const value = reflectGet(current, property, current);
+                        if (typeof value !== 'function') return value;
+                        return (...args) => {
+                            const result = reflectApply(value, current, args);
+                            if (!isReleased()) synchronizeToAttributes();
+                            return result;
+                        };
+                    },
+                    set(_, property, value) {
+                        const current = isReleased() ? descriptor.get.call(element) : staged;
+                        if (!isReleased()) synchronizeFromAttributes();
+                        const result = reflectSet(current, property, value, current);
+                        if (!isReleased()) synchronizeToAttributes();
+                        return result;
+                    }
+                });
+                return {
+                    facade,
+                    release() {
+                        synchronizeFromAttributes();
+                        synchronizeToAttributes();
+                    }
+                };
+            },
             snapshotBodyArguments(args) {
                 return args.length === 0 ? [] : [snapshotBody(args[0])];
             },

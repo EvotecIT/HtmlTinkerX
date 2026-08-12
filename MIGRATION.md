@@ -25,6 +25,8 @@ await File.WriteAllBytesAsync("page.pdf", result.PdfBytes);
 
 Initial navigation uses `HtmlBrowserPdfRequest.NavigationTimeout`. `HtmlBrowserPdfReadiness.Timeout` now applies only to each configured load-state, selector, function, or stability check, so a short readiness deadline no longer shortens source loading.
 
+`HtmlBrowserPdfRequest.PreparationTimeout` is a required finite deadline for post-navigation browser preparation, including media emulation, and defaults to 30 seconds. A preparation timeout invalidates and recycles the affected browser slot.
+
 `HtmlBrowserPdfRequest.BeforeCaptureScriptTimeout` bounds an optional pre-capture script independently and defaults to 30 seconds. Set it to zero only when the script may intentionally run without a deadline.
 
 `HtmlBrowserPdfRequest.PdfTimeout` independently bounds Chromium PDF generation and also defaults to 30 seconds. A PDF timeout aborts and recycles the affected browser without replaying the capture.

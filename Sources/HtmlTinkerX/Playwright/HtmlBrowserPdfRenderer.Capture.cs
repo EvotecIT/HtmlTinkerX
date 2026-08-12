@@ -275,7 +275,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
             TimeSpan navigationDuration = StopwatchElapsed(navigationStarted);
 
             long readinessStarted = Stopwatch.GetTimestamp();
-            await PreparePageAsync(page, request, cancellationToken).ConfigureAwait(false);
+            await PreparePageAsync(page, slot, request, cancellationToken).ConfigureAwait(false);
             scopedHeaders?.ThrowIfFaulted();
             popupCoordinator?.ThrowIfFaulted();
             TimeSpan readinessDuration = StopwatchElapsed(readinessStarted);
@@ -463,14 +463,21 @@ public sealed partial class HtmlBrowserPdfRenderer {
         }
     }
 
-    private static async Task PreparePageAsync(IPage page, HtmlBrowserPdfRequest request, CancellationToken cancellationToken) {
+    private static async Task PreparePageAsync(IPage page, BrowserSlot slot, HtmlBrowserPdfRequest request, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        await ExecuteCancellablePageOperationAsync(
-            page,
-            () => page.EmulateMediaAsync(new PageEmulateMediaOptions {
-                Media = request.MediaType == HtmlBrowserPdfMediaType.Screen ? Media.Screen : Media.Print
-            }),
-            cancellationToken).ConfigureAwait(false);
+        using (CancellationTokenSource preparationDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)) {
+            preparationDeadline.CancelAfter(request.PreparationTimeout);
+            try {
+                await ExecuteCancellableSlotOperationAsync(
+                    slot,
+                    () => page.EmulateMediaAsync(new PageEmulateMediaOptions {
+                        Media = request.MediaType == HtmlBrowserPdfMediaType.Screen ? Media.Screen : Media.Print
+                    }),
+                    preparationDeadline.Token).ConfigureAwait(false);
+            } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && preparationDeadline.IsCancellationRequested) {
+                throw new TimeoutException($"Browser capture preparation did not complete within {request.PreparationTimeout} ms.");
+            }
+        }
 
         bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
         if (hasCaptureStyle) {

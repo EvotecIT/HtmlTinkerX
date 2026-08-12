@@ -76,7 +76,9 @@
                             return typeof value === 'function' ? value.bind(instance) : value;
                         }
                         if (property === Symbol.toStringTag) return name;
-                        if (name === 'EventSource' && property === 'readyState') return nativeConstructor.CONNECTING;
+                        if (name === 'EventSource' && property === 'readyState') {
+                            return stopped ? nativeConstructor.CLOSED : nativeConstructor.CONNECTING;
+                        }
                         if (name === 'EventSource' && property === 'url') return normalizedArgs[0];
                         if (name === 'EventSource' && property === 'withCredentials') return normalizedArgs[1].withCredentials;
                         if (handlerProperties.has(property)) return handlers.get(property) ?? null;

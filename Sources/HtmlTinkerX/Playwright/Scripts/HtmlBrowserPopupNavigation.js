@@ -187,16 +187,23 @@
             else queued.push(action);
         };
         if (typeof initialAction === 'function') runWhenReady(() => initialAction(popup));
+        const toDomString = value => {
+            if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
+            return nativeString(value);
+        };
+        const transportGuards = createTransportGuards({ popup, fallbackBaseUri: document.baseURI, isReady: () => ready, runWhenReady, toDomString });
         const popupFetch = popup.fetch.bind(popup);
-        const stagedFetch = (...args) => new Promise((resolve, reject) => {
-            runWhenReady(() => {
-                try {
-                    popupFetch(...args).then(resolve, reject);
-                } catch (error) {
-                    reject(error);
-                }
+        const stagedFetch = (...args) => {
+            let snapshot;
+            try { snapshot = transportGuards.snapshotFetchArguments(args); }
+            catch (error) { return Promise.reject(error); }
+            return new Promise((resolve, reject) => {
+                runWhenReady(() => {
+                    try { popupFetch(...snapshot).then(resolve, reject); }
+                    catch (error) { reject(error); }
+                });
             });
-        });
+        };
         nativeDefineProperty(popup.Window.prototype, 'fetch', {
             value: stagedFetch,
             writable: false,
@@ -286,16 +293,6 @@
             writable: false,
             configurable: false
         });
-        const toDomString = value => {
-            if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
-            return nativeString(value);
-        };
-        const transportGuards = createTransportGuards({
-            popup,
-            isReady: () => ready,
-            runWhenReady,
-            toDomString
-        });
         const normalizeConstructorArguments = (name, args) => {
             if (args.length === 0) throw new TypeError(`Failed to construct '${name}': 1 argument required`);
             const resolvedUrl = new nativeUrl(toDomString(args[0]), popup.document.baseURI);
@@ -338,7 +335,7 @@
             get(_, property) {
                 const value = nativeReflectGet(nativeLocation, property, nativeLocation);
                 if (['assign', 'replace', 'reload'].includes(property)) {
-                    return (...args) => runWhenReady(() => nativeReflectApply(value, nativeLocation, args));
+                    return (...args) => { const normalized = transportGuards.normalizeLocationArguments(property, args); return runWhenReady(() => nativeReflectApply(value, nativeLocation, normalized)); };
                 }
                 if (typeof value !== 'function') return value;
                 return (...args) => {
@@ -374,6 +371,12 @@
                 () => documentFacade,
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone));
+            const styleGuard = transportGuards.createStyleGuard(element, values, () => released);
+            if (styleGuard != null) nativeDefineProperty(element, 'style', {
+                configurable: false,
+                enumerable: true,
+                get() { return styleGuard.facade; }
+            });
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -417,6 +420,7 @@
                 }
             });
             guardedResources.push(() => {
+                if (styleGuard != null) styleGuard.release();
                 released = true;
                 for (const [attribute, value] of values) nativeSetAttribute.call(element, attribute, value);
                 for (const value of namespacedValues.values()) {
@@ -531,10 +535,10 @@
                     guardedResources.push(() => {
                         const replacement = nativeDocument.createElement('script');
                         const attributes = new Map(script.attributes.map(([name, value]) => [name.toLowerCase(), value]));
-                        const blockingExternal = attributes.has('src')
-                            && !attributes.has('async')
+                        const parserBlocking = !attributes.has('async')
                             && !attributes.has('defer')
                             && nativeString(attributes.get('type') || '').toLowerCase() !== 'module';
+                        const blockingExternal = attributes.has('src') && parserBlocking;
                         let completed = null;
                         if (blockingExternal) {
                             completed = new Promise(resolve => {
@@ -544,12 +548,14 @@
                         }
                         for (const [name, value] of script.attributes) replacement.setAttribute(name, value);
                         replacement.textContent = script.text;
-                        element.replaceWith(replacement);
+                        const stagedCompletion = parserBlocking
+                            ? stageElementMarkup.replaceParserBlockingScript(element, replacement, completed)
+                            : (element.replaceWith(replacement), completed);
                         if (blockingExternal && documentWriteQueued && !documentCloseQueued) {
                             nativeDocument.close();
                             documentCloseQueued = true;
                         }
-                        return completed;
+                        return stagedCompletion;
                     });
                 }
             }

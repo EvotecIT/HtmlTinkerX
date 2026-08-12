@@ -145,16 +145,21 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             HtmlBrowserPdfSource.FromHtml("<p>timeouts</p>"),
             readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "p", timeout: 50),
             navigationTimeout: 2000,
+            preparationTimeout: 60,
             beforeCaptureScriptTimeout: 75,
             pdfTimeout: 125);
 
         Assert.Equal(50, request.Readiness.Timeout);
         Assert.Equal(2000, request.NavigationTimeout);
+        Assert.Equal(60, request.PreparationTimeout);
         Assert.Equal(75, request.BeforeCaptureScriptTimeout);
         Assert.Equal(125, request.PdfTimeout);
         Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromHtml("<p>invalid PDF timeout</p>"),
             pdfTimeout: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromHtml("<p>invalid preparation timeout</p>"),
+            preparationTimeout: 0));
     }
 
     [Fact]
@@ -852,6 +857,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
                 Assert.Contains("GET /fallback HTTP/1.1", Encoding.ASCII.GetString(request, 0, read), StringComparison.Ordinal);
                 byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nfallback");
                 await stream.WriteAsync(response, 0, response.Length);
+                accepted.Client.Shutdown(SocketShutdown.Send);
             });
             IPAddress stalledAddress = IPAddress.Parse("127.0.0.2");
             HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "render.invalid" });

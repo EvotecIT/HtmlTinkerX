@@ -24,11 +24,13 @@ public sealed class HtmlBrowserPdfRequest {
         bool bypassContentSecurityPolicy = false,
         HtmlBrowserPdfMediaType mediaType = HtmlBrowserPdfMediaType.Print,
         int navigationTimeout = 30000,
+        int preparationTimeout = 30000,
         int beforeCaptureScriptTimeout = 30000,
         int pdfTimeout = 30000,
         bool retryOnBrowserFailure = false,
         long maximumPdfBytes = DefaultMaximumPdfBytes) {
         if (navigationTimeout < 0) throw new ArgumentOutOfRangeException(nameof(navigationTimeout));
+        if (preparationTimeout <= 0) throw new ArgumentOutOfRangeException(nameof(preparationTimeout));
         if (beforeCaptureScriptTimeout < 0) throw new ArgumentOutOfRangeException(nameof(beforeCaptureScriptTimeout));
         if (pdfTimeout < 0) throw new ArgumentOutOfRangeException(nameof(pdfTimeout));
         if (maximumPdfBytes < 0 || maximumPdfBytes > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(maximumPdfBytes));
@@ -49,6 +51,7 @@ public sealed class HtmlBrowserPdfRequest {
         BypassContentSecurityPolicy = bypassContentSecurityPolicy;
         MediaType = mediaType;
         NavigationTimeout = navigationTimeout;
+        PreparationTimeout = preparationTimeout;
         BeforeCaptureScriptTimeout = beforeCaptureScriptTimeout;
         PdfTimeout = pdfTimeout;
         RetryOnBrowserFailure = retryOnBrowserFailure;
@@ -79,6 +82,8 @@ public sealed class HtmlBrowserPdfRequest {
     public HtmlBrowserPdfMediaType MediaType { get; }
     /// <summary>Gets the timeout in milliseconds for initial source navigation or content loading. Zero disables the timeout.</summary>
     public int NavigationTimeout { get; }
+    /// <summary>Gets the finite timeout in milliseconds for post-navigation browser preparation, including media emulation.</summary>
+    public int PreparationTimeout { get; }
     /// <summary>Gets the timeout in milliseconds for the optional pre-capture script. Zero disables the timeout.</summary>
     public int BeforeCaptureScriptTimeout { get; }
     /// <summary>Gets the timeout in milliseconds for Chromium PDF generation. Zero disables the timeout.</summary>
