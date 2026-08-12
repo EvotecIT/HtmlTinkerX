@@ -1,11 +1,9 @@
 (() => {
-    const bind = Function.prototype.bind;
-    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, reflectGet, reflectSet, stringValue, booleanValue }) => {
+    const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, stringValue, booleanValue }) => {
         const states = new WeakMap();
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
-        const frameWindows = new WeakMap();
         const install = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
             prototypes.add(prototype);
@@ -131,28 +129,7 @@
                 get() {
                     const target = contentWindow.get.call(this);
                     const state = states.get(this);
-                    if (target == null || state == null) return target;
-                    const existing = frameWindows.get(this);
-                    if (existing?.target === target) return existing.facade;
-                    const bound = new Map();
-                    const facade = new Proxy({}, {
-                        get: (_, property) => {
-                            if (property === 'document') {
-                                const document = contentDocument?.get.call(this) ?? target.document;
-                                return document == null ? document : state.document(document);
-                            }
-                            const value = reflectGet(target, property, target);
-                            if (typeof value !== 'function') return value;
-                            const cached = bound.get(property);
-                            if (cached?.source === value) return cached.value;
-                            const valueBound = reflectApply(bind, value, [target]);
-                            bound.set(property, { source: value, value: valueBound });
-                            return valueBound;
-                        },
-                        set: (_, property, value) => reflectSet(target, property, value, target)
-                    });
-                    frameWindows.set(this, { target, facade });
-                    return facade;
+                    return target == null ? target : state?.window(target) ?? target;
                 }
             });
         };
@@ -173,11 +150,12 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone, synchronizeAttribute, textState) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, window, stageMarkup, guardClone, synchronizeAttribute, textState) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
                 document,
+                window,
                 clone(value) { return typeof guardClone === 'function' ? guardClone(value) : value; },
                 textContent() {
                     return !isReleased() && textState != null

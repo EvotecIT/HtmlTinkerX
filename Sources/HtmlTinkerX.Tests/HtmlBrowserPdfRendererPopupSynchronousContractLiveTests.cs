@@ -108,6 +108,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const popup = window.open('', '_blank');
             const accepted = openerSendBeacon.call(popup.navigator, '{server.BlankPopupResourceUrl}', 'beacon');
             document.querySelector('#result').textContent = accepted ? 'opener beacon staged' : 'opener beacon rejected';
+            popup.close();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -224,6 +225,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const popup = window.open('', '_blank');
             const body = popup.document.querySelector('body');
             body.style.backgroundImage = 'url({server.BlankPopupResourceUrl}?source=cssom)';
+            const legacyTable = popup.document.createElement('table');
+            legacyTable.setAttribute('background', '{server.BlankPopupResourceUrl}?source=legacy-background');
+            legacyTable.innerHTML = '<tr><td>legacy background</td></tr>';
+            body.append(legacyTable);
             body.style.color = 'red';
             let styleOwner = Object.getPrototypeOf(body);
             let styleDescriptor;
@@ -281,6 +286,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "cssom state staged");
         Assert.True(server.BlankPopupResourceRequests >= 8);
         Assert.Equal(1, server.StyleTextResourceRequests);
+        Assert.Equal(1, server.BlankPopupSourceRequests("legacy-background"));
         Assert.True(server.BlankPopupSourceRequests("style-sheet") >= 1);
         Assert.True(server.BlankPopupSourceRequests("dynamic-script") >= 1);
         Assert.Equal(1, server.BlankPopupSourceRequests("dynamic-external-script"));

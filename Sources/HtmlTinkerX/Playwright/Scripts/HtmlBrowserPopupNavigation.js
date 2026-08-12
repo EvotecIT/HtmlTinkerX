@@ -50,6 +50,7 @@
     delete globalThis.__htmlTinkerXCreatePopupRealmGuards;
     const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
     delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
+    const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
         defineProperty: nativeDefineProperty,
         reflectApply: nativeReflectApply,
@@ -61,7 +62,7 @@
     const attributeGuards = globalThis.__htmlTinkerXCreatePopupAttributeGuards({
         defineProperty: nativeDefineProperty,
         getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
-        reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet,
+        reflectApply: nativeReflectApply,
         stringValue: nativeString,
         booleanValue: nativeBoolean
     });
@@ -85,7 +86,6 @@
     });
     const normalizedTarget = target => target == null || nativeString(target).length === 0 ? '_blank' : nativeString(target).toLowerCase();
     const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0 ? '_self' : nativeString(target).toLowerCase();
-
     const targetsExistingFrame = target => {
         if (target == null || nativeString(target).length === 0) return false;
         const expected = nativeString(target);
@@ -126,7 +126,6 @@
             globalThis.setTimeout(() => navigate(currentUrl === null), 0);
             return;
         }
-
         let released = false;
         let completed = false;
         nativeDefineProperty(popup, popupReleaseProperty, {
@@ -160,7 +159,6 @@
         attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
         attributeGuards.installNode(popup.Node.prototype);
         attributeGuards.installFrame(popup.HTMLIFrameElement.prototype); attributeGuards.installFrame(popup.HTMLFrameElement?.prototype);
-
         let ready = false;
         let documentMutationQueued = false;
         let documentWriteQueued = false;
@@ -172,7 +170,7 @@
         const guardedElements = new WeakSet();
         const requestAttributes = new Map([
             ['src', 'src'], ['srcset', 'srcset'], ['href', 'href'], ['action', 'action'],
-            ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction']
+            ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction'], ['background', 'background']
         ]);
         const runWhenReady = action => {
             if (ready) action();
@@ -286,6 +284,7 @@
         });
         transportGuards.guardNavigation(nativeNavigation, popup.Navigation);
         const nativeObjects = new WeakMap();
+        let stagedDocument, stagedChildWindow;
         const shouldDeferAttribute = (element, attribute) => requestAttributes.has(attribute)
             || attribute === 'style'
             || attribute.startsWith('on')
@@ -304,7 +303,7 @@
                 namespacedValues,
                 () => released,
                 shouldDeferAttribute,
-                value => value == null || value === popup.document ? documentFacade : stagedObject(() => value),
+                value => stagedDocument(value ?? popup.document), value => stagedChildWindow(value),
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
                 attribute => { if (attribute === 'style') styleGuard?.synchronize(); },
@@ -614,6 +613,8 @@
             return facade;
         };
         const documentFacade = stagedObject(() => popup.document);
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
@@ -728,7 +729,6 @@
         writable: false,
         configurable: false
     });
-
     const effectiveTarget = (element, submitter) => {
         if (submitter != null && nativeHasAttribute.call(submitter, 'formtarget')) {
             return nativeGetAttribute.call(submitter, 'formtarget') || '';

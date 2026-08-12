@@ -10,9 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Playwright;
 using UglyToad.PdfPig;
 using Xunit;
-
 namespace HtmlTinkerX.Tests;
-
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task VisualMaskUsesAnOpaqueOverlayForReplacedContentAndRestoresThePage() {
@@ -275,7 +273,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             4 => $"const popup = window.open('', '_blank'); popup.document.write(`<iframe src='{server.BlankPopupResourceUrl}'></iframe>`); true",
             5 => $"const popup = window.open('', '_blank'); popup.document.body.innerHTML = `<iframe src='{server.BlankPopupResourceUrl}'></iframe>`; true",
             6 => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); frame.src = '{server.BlankPopupResourceUrl}'; popup.document.body.appendChild(frame); true",
-            _ => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); popup.document.body.append(frame); frame.contentDocument.body.innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=frame-content-document'>`; frame.contentWindow.document.body.insertAdjacentHTML('beforeend', `<img src='{server.BlankPopupResourceUrl}?source=frame-content-window'>`); true"
+            _ => $"const popup = window.open('', '_blank'); const frame = popup.document.createElement('iframe'); popup.document.body.append(frame); if (frame.contentDocument !== frame.contentDocument || frame.contentWindow.document !== frame.contentDocument) throw new Error('child document identity changed'); frame.contentDocument.body.innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=frame-content-document'>`; frame.contentWindow.document.body.insertAdjacentHTML('beforeend', `<img src='{server.BlankPopupResourceUrl}?source=frame-content-window'>`); frame.contentWindow.fetch('{server.BlankPopupResourceUrl}?source=frame-window-fetch'); frame.contentWindow.navigator.sendBeacon('{server.BlankPopupResourceUrl}?source=frame-window-beacon', 'audit'); true"
         };
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -292,6 +290,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         if (operation == 7) {
             Assert.Equal(1, server.BlankPopupSourceRequests("frame-content-document"));
             Assert.Equal(1, server.BlankPopupSourceRequests("frame-content-window"));
+            Assert.Equal(1, server.BlankPopupSourceRequests("frame-window-fetch"));
+            Assert.Equal(1, server.BlankPopupSourceRequests("frame-window-beacon"));
         }
         Assert.Equal("popup-token", server.LastPopupToken);
         if (operation < 4) AssertPdfContains(result.PdfBytes, "popup authorized");

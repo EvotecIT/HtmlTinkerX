@@ -28,6 +28,7 @@
     const urlSearchParams = URLSearchParams;
     const urlSearchParamsToString = URLSearchParams.prototype.toString;
     const beaconStates = new WeakMap();
+    const beaconPrototypes = new WeakSet();
     const navigationStates = new WeakMap();
     const sheetStates = new WeakMap();
     const sheetMutationStates = new WeakMap();
@@ -126,6 +127,7 @@
             return toDomString(body);
         };
         let stagedBeaconBytes = 0;
+        let guardNavigator = () => { };
         const popupSendBeacon = popup.Navigator.prototype.sendBeacon;
         if (typeof popupSendBeacon === 'function') {
             const payloadSize = body => {
@@ -158,7 +160,17 @@
                 runWhenReady(() => reflectApply(popupSendBeacon, receiver, normalizedArgs));
                 return true;
             };
-            beaconStates.set(popup.navigator, stagedSendBeacon);
+            guardNavigator = (navigator, navigatorType) => {
+                if (navigator == null || typeof navigatorType !== 'function') return;
+                beaconStates.set(navigator, stagedSendBeacon);
+                const prototype = navigatorType.prototype;
+                if (beaconPrototypes.has(prototype)) return;
+                const descriptor = getOwnPropertyDescriptor(prototype, 'sendBeacon');
+                if (descriptor == null || descriptor.configurable === false) return;
+                defineProperty(prototype, 'sendBeacon', { ...descriptor, value: routedSendBeacon, configurable: false });
+                beaconPrototypes.add(prototype);
+            };
+            guardNavigator(popup.navigator, popup.Navigator);
             if (!openerBeaconInstalled && typeof nativeSendBeacon === 'function') {
                 defineProperty(navigatorPrototype, 'sendBeacon', {
                     value: routedSendBeacon,
@@ -167,11 +179,6 @@
                 });
                 openerBeaconInstalled = true;
             }
-            defineProperty(popup.Navigator.prototype, 'sendBeacon', {
-                value: routedSendBeacon,
-                writable: false,
-                configurable: false
-            });
         }
         const normalizeNavigationArguments = (name, args) => {
             const snapshotOptions = value => {
@@ -203,6 +210,7 @@
             return args.length === 0 ? [] : [snapshotOptions(args[0])];
         };
         return {
+            guardNavigator,
             snapshotFetchArguments(args) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
                 const baseElement = reflectApply(popupQuerySelector, popup.document, ['base']);
@@ -360,7 +368,7 @@
                 return guard;
             },
             normalizeDeferredProperty(attribute, value) {
-                if (!['action', 'data', 'formaction', 'href', 'poster', 'src'].includes(attribute)) return value;
+                if (!['action', 'background', 'data', 'formaction', 'href', 'poster', 'src'].includes(attribute)) return value;
                 try { return new url(value, popup.document.baseURI).href; }
                 catch { return value; }
             },
