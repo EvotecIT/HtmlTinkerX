@@ -37,13 +37,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task LateBrowserProvisioningBoundsCloseAndAlwaysDisposesPlaywright() {
         TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> launchStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> pendingClose = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> playwrightDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var browser = new Mock<IBrowser>();
         browser.SetupGet(value => value.IsConnected).Returns(true);
         browser.Setup(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>())).Returns(pendingClose.Task);
         var browserType = new Mock<IBrowserType>();
-        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>())).Returns(pendingBrowser.Task);
+        browserType.Setup(value => value.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .Callback(() => launchStarted.TrySetResult(true))
+            .Returns(pendingBrowser.Task);
         var playwright = new Mock<IPlaywright>();
         playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
         playwright.Setup(value => value.Dispose()).Callback(() => playwrightDisposed.TrySetResult(true));
@@ -52,10 +55,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
                 minimumBrowserInstances: 1,
                 maximumBrowserInstances: 1,
-                setupTimeout: TimeSpan.FromMilliseconds(25),
+                setupTimeout: TimeSpan.FromMilliseconds(500),
                 networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
 
-            await Assert.ThrowsAsync<TimeoutException>(() => renderer.PreWarmAsync());
+            Task prewarm = renderer.PreWarmAsync();
+            await launchStarted.Task;
+            await Assert.ThrowsAsync<TimeoutException>(() => prewarm);
             pendingBrowser.SetResult(browser.Object);
 
             Assert.Same(

@@ -597,6 +597,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupEventToken;
         private int _blankPopupResourceRequests;
         private int _unauthorizedBlankPopupResourceRequests;
+        private int _removedNamespacedResourceRequests;
         private int _popupRequestCount;
         private readonly string _namedContextInitialUrl;
 
@@ -661,6 +662,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
+        internal int RemovedNamespacedResourceRequests => Volatile.Read(ref _removedNamespacedResourceRequests);
         internal int PopupRequestCount => Volatile.Read(ref _popupRequestCount);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
         internal string? LastPopupCssToken => Volatile.Read(ref _lastPopupCssToken);
@@ -776,6 +778,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
                     } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _blankPopupResourceRequests);
+                        if (requestTarget.Contains("source=removed-namespace", StringComparison.Ordinal)) Interlocked.Increment(ref _removedNamespacedResourceRequests);
                         string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                         if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);
                         Volatile.Write(ref _lastPopupToken, token);

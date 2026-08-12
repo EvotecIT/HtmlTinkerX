@@ -2,6 +2,7 @@
     const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, stringValue, booleanValue }) => {
         const states = new WeakMap();
         const prototypes = new WeakSet();
+        const propertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
         const install = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
@@ -49,6 +50,23 @@
                 configurable: false,
                 writable: false,
                 value(...args) { return states.get(this)?.document() ?? reflectApply(getRootNode, this, args); }
+            });
+        };
+        const installProperty = (prototype, property, attribute) => {
+            if (!prototype) return;
+            let guarded = propertyGuards.get(prototype);
+            if (!guarded) propertyGuards.set(prototype, guarded = new Set());
+            if (guarded.has(property)) return;
+            const descriptor = getOwnPropertyDescriptor(prototype, property);
+            if (!descriptor || typeof descriptor.set !== 'function') return;
+            guarded.add(property);
+            defineProperty(prototype, property, {
+                ...descriptor,
+                set(value) {
+                    const state = states.get(this);
+                    if (state && state.setAttribute(attribute, value)) return;
+                    return descriptor.set.call(this, value);
+                }
             });
         };
         const createState = (element, values, namespacedValues, isReleased, shouldDefer, document) => {
@@ -107,7 +125,7 @@
                 }
             };
             const stageAttributeNode = attribute => {
-                const name = normalized(attribute.name);
+                const name = normalized(attribute.localName || attribute.name);
                 if (isReleased() || !shouldDefer(element, name)) return false;
                 const namespace = attribute.namespaceURI == null ? null : stringValue(attribute.namespaceURI);
                 const qualified = stringValue(attribute.name);
@@ -124,9 +142,13 @@
                 return true;
             };
             const removeNamedItem = (namespaceUri, localName) => {
+                const namespace = namespaceUri == null ? null : stringValue(namespaceUri);
                 const name = normalized(localName);
                 if (isReleased() || !shouldDefer(element, name)) return false;
-                values.delete(name);
+                if (namespace == null || namespace.length === 0) values.delete(name);
+                else for (const [key, value] of namespacedValues) {
+                    if (value.namespace === namespace && normalized(value.qualified.split(':').pop()) === name) namespacedValues.delete(key);
+                }
                 state.result = null;
                 return true;
             };
@@ -154,6 +176,7 @@
             install,
             installNamedNodeMap,
             installNode,
+            installProperty,
             guardLegacyHandler,
             createState,
             release(element) { states.delete(element.attributes); states.delete(element); }

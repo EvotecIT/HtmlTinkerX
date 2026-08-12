@@ -126,7 +126,7 @@
         });
     };
 
-    const openStagedBlankPopup = function(url, target, features) {
+    const openStagedBlankPopup = function(url, target, features, initialAction) {
         const popup = originalOpen.call(this, url, target, features);
         if (!popup || specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) return popup;
         try {
@@ -155,6 +155,7 @@
             if (ready) action();
             else queued.push(action);
         };
+        if (typeof initialAction === 'function') runWhenReady(() => initialAction(popup));
         const popupFetch = popup.fetch.bind(popup);
         const stagedFetch = (...args) => new Promise((resolve, reject) => {
             runWhenReady(() => {
@@ -415,11 +416,14 @@
                 if (!(property in element)) continue;
                 let descriptor = null;
                 let prototype = element;
+                let descriptorOwner = null;
                 while (prototype && descriptor == null) {
                     descriptor = nativeGetOwnPropertyDescriptor(prototype, property);
+                    if (descriptor != null) descriptorOwner = prototype;
                     prototype = nativeGetPrototypeOf(prototype);
                 }
                 if (descriptor == null || descriptor.configurable === false && nativeHasOwnProperty.call(element, property)) continue;
+                attributeGuards.installProperty(descriptorOwner, property, attribute);
                 nativeDefineProperty(element, property, {
                     configurable: false,
                     enumerable: descriptor.enumerable,
@@ -688,39 +692,25 @@
         const initialFeatures = suppressOpener
             ? featureTokens.filter(token => !['noopener', 'noreferrer'].includes(token.toLowerCase().split('=', 1)[0])).join(',')
             : features;
-        if (targetsExistingFrame(target)) {
+        if (specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) {
             return originalOpen.call(this, destination, target, features);
         }
         const initialTarget = suppressOpener && !specialTargets.includes(normalizedTarget(target)) ? '_blank' : target;
-        const popup = originalOpen.call(this, '', initialTarget, initialFeatures);
+        const popup = openStagedBlankPopup.call(this, '', initialTarget, initialFeatures, releasedPopup => {
+            if (suppressReferrer || referrerPolicy) {
+                const link = releasedPopup.document.createElement('a');
+                link.href = destination;
+                if (suppressReferrer) link.rel = 'noreferrer';
+                if (referrerPolicy) link.referrerPolicy = referrerPolicy;
+                link.target = '_self';
+                (releasedPopup.document.body || releasedPopup.document.documentElement).appendChild(link);
+                link.click();
+            } else releasedPopup.location.href = destination;
+        });
         if (popup) {
             if (suppressOpener) {
                 try { popup.opener = null; } catch { }
             }
-            const navigate = useNativeTargeting => {
-                if (useNativeTargeting) {
-                    originalOpen.call(window, destination, target, features);
-                    return;
-                }
-                try {
-                    if (suppressReferrer || referrerPolicy) {
-                        const link = popup.document.createElement('a');
-                        link.href = destination;
-                        if (suppressReferrer) link.rel = 'noreferrer';
-                        if (referrerPolicy) link.referrerPolicy = referrerPolicy;
-                        link.target = '_self';
-                        (popup.document.body || popup.document.documentElement).appendChild(link);
-                        link.click();
-                    } else {
-                        popup.location.href = destination;
-                    }
-                } catch {
-                    // Existing named contexts can be cross-origin. Native navigation is the
-                    // standards-safe fallback when their WindowProxy cannot be inspected.
-                    originalOpen.call(window, destination, target, features);
-                }
-            };
-            armBlankPopup(popup, initialTarget, navigate);
         }
         return suppressOpener ? null : popup;
     };

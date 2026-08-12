@@ -95,16 +95,21 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     }
 
     private async Task AttachAsync(IPage page) {
-        HtmlBrowserScopedHeaderInterceptor interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
-            _context,
-            page,
-            _origin,
-            _captureHeaders,
-            _cancellationToken,
-            _cleanupTimedOut,
-            _cleanupTimeout,
-            _requestAllowed,
-            _requestBlocked).ConfigureAwait(false);
+        HtmlBrowserScopedHeaderInterceptor interceptor;
+        try {
+            interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+                _context,
+                page,
+                _origin,
+                _captureHeaders,
+                _cancellationToken,
+                _cleanupTimedOut,
+                _cleanupTimeout,
+                _requestAllowed,
+                _requestBlocked).ConfigureAwait(false);
+        } catch (PlaywrightException) when (page.IsClosed) {
+            return;
+        }
         if (!_interceptors.TryAdd(page, interceptor)) {
             await interceptor.DisposeAsync().ConfigureAwait(false);
             return;

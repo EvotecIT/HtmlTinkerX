@@ -97,6 +97,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         string script = $@"const popup = window.open('', '_blank');
             const popupPrototypeImage = popup.document.createElement('img');
             Object.getPrototypeOf(popupPrototypeImage).setAttribute.call(popupPrototypeImage, 'src', '{server.BlankPopupResourceUrl}?source=popup-prototype');
+            const idlImage = popup.document.createElement('img');
+            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(idlImage), 'src').set.call(idlImage, '{server.BlankPopupResourceUrl}?source=idl-setter');
             const openerPrototypeImage = popup.document.createElement('img');
             Element.prototype.setAttribute.call(openerPrototypeImage, 'src', '{server.BlankPopupResourceUrl}?source=opener-prototype');
             const namespaceImage = popup.document.createElement('img');
@@ -109,6 +111,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const namedItemAttribute = popup.document.createAttribute('src');
             namedItemAttribute.value = '{server.BlankPopupResourceUrl}?source=named-item';
             namedItemImage.attributes.setNamedItem(namedItemAttribute);
+            const svgImage = popup.document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            const namespacedHref = popup.document.createAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href');
+            namespacedHref.value = '{server.BlankPopupResourceUrl}?source=removed-namespace';
+            svgImage.attributes.setNamedItemNS(namespacedHref);
+            svgImage.attributes.removeNamedItemNS('http://www.w3.org/1999/xlink', 'href');
             const removedImage = popup.document.createElement('img');
             Object.getPrototypeOf(removedImage).setAttributeNS.call(removedImage, null, 'src', '{server.BlankPopupResourceUrl}?source=removed');
             Object.getPrototypeOf(removedImage).removeAttributeNS.call(removedImage, null, 'src');
@@ -120,9 +127,47 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
-        Assert.True(server.BlankPopupResourceRequests >= 5);
+        Assert.True(server.BlankPopupResourceRequests >= 6);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+        Assert.Equal(0, server.RemovedNamespacedResourceRequests);
         Assert.Equal("popup-token", server.LastPopupToken);
+    }
+
+    [Fact]
+    public async Task NonblankPopupReferenceStagesRequestsUntilHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('/header-popup', '_blank');
+            popup.fetch('{server.BlankPopupResourceUrl}');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, function: "() => document.querySelector('#result').textContent === 'popup authorized'", timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.True(server.BlankPopupResourceRequests > 0);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task PopupClosedBeforeInterceptorAttachmentDoesNotFailCapture() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 250),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: "const popup = window.open('', '_blank'); popup.close(); document.querySelector('#result').textContent = 'closed intentionally'; true"));
+
+        AssertPdfContains(result.PdfBytes, "closed intentionally");
     }
 
     [Fact]

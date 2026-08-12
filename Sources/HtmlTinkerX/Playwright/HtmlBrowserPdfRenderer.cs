@@ -168,42 +168,8 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
 
     private static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserWithCancellationAsync(
         HtmlBrowserLaunchOptions launchOptions,
-        CancellationToken cancellationToken) {
-        // The renderer owns setup cancellation. Let the underlying launch settle so a browser
-        // that appears after the deadline can still be closed before its Playwright owner is disposed.
-        Task<(IPlaywright Playwright, IBrowser Browser)> launch = HtmlBrowser.LaunchBrowserAsync(
-            launchOptions,
-            CancellationToken.None);
-        if (!cancellationToken.CanBeCanceled || launch.IsCompleted) return await launch.ConfigureAwait(false);
-
-        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        using CancellationTokenRegistration registration = cancellationToken.Register(
-            static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
-            cancelled);
-        if (await Task.WhenAny(launch, cancelled.Task).ConfigureAwait(false) != launch) {
-            _ = launch.ContinueWith(
-                static async completed => {
-                    if (completed.Status == TaskStatus.RanToCompletion) {
-                        (IPlaywright playwright, IBrowser browser) = completed.Result;
-                        try {
-                            await CloseBrowserWithinDeadlineAsync(browser).ConfigureAwait(false);
-                        } catch (Exception) {
-                            // The cancelled operation has already returned. Late browser cleanup
-                            // is best-effort, but the Playwright transport must always be released.
-                        } finally {
-                            playwright.Dispose();
-                        }
-                    } else if (completed.IsFaulted) {
-                        _ = completed.Exception;
-                    }
-                },
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default).Unwrap();
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-        return await launch.ConfigureAwait(false);
-    }
+        CancellationToken cancellationToken) =>
+        await HtmlBrowser.LaunchBrowserAsync(launchOptions, cancellationToken).ConfigureAwait(false);
 
     private static async Task CloseBrowserWithinDeadlineAsync(IBrowser browser) {
         if (!browser.IsConnected) return;
