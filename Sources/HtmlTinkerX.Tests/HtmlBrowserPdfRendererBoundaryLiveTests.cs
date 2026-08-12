@@ -688,9 +688,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 using (client) {
                     using NetworkStream stream = client.GetStream();
                     using CancellationTokenRegistration registration = _cancellation.Token.Register(client.Dispose);
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string request = await LoopbackHttpRequestReader.ReadAsync(stream, _cancellation.Token);
                     string requestTarget = request.Split(' ')[1];
                     string contentType = "text/html; charset=utf-8";
                     string body;
@@ -782,8 +780,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                         if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);
                         Volatile.Write(ref _lastPopupToken, token);
-                        contentType = "application/javascript; charset=utf-8";
-                        body = "void 0;";
+                        int bodyOffset = request.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                        bool echoBody = requestTarget.Contains("echo-body", StringComparison.Ordinal);
+                        contentType = echoBody ? "text/plain; charset=utf-8" : "application/javascript; charset=utf-8";
+                        body = echoBody && bodyOffset >= 0 ? request.Substring(bodyOffset + 4) : "void 0;";
                     } else if (requestTarget.StartsWith("/protected", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastProtectedToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";

@@ -229,12 +229,12 @@
                 if (nativeReflectApply(nativeXhrReadyState, request, []) !== xhrOpened || pendingXhrSends.has(request)) {
                     throw new nativeDomException('The object is in an invalid state.', 'InvalidStateError');
                 }
-                const pending = { aborted: false };
+                const pending = { aborted: false, args: transportGuards.snapshotBodyArguments(args) };
                 pendingXhrSends.set(request, pending);
                 runWhenReady(() => {
                     if (pending.aborted) return;
                     pendingXhrSends.delete(request);
-                    nativeReflectApply(nativeXhrSend, request, args);
+                    nativeReflectApply(nativeXhrSend, request, pending.args);
                 });
             },
             abort(request, args) {
@@ -564,7 +564,6 @@
             'replaceChildren', 'replaceWith', 'requestSubmit', 'setAttribute', 'setAttributeNS',
             'submit', 'toggleAttribute', 'write', 'writeln'
         ]);
-        const createdNodeMethods = new Set(['adoptNode', 'cloneNode', 'createElement', 'createElementNS', 'importNode']);
         const unwrap = value => {
             const resolve = nativeObjects.get(value);
             return resolve ? resolve() : value;
@@ -586,6 +585,7 @@
                     const target = resolve();
                     const member = nativeReflectGet(target, property, target);
                     if (typeof member !== 'function') {
+                        if (!ready) transportGuards.guardReturnedNodes(member, guardCreatedTree);
                         return member instanceof popup.Node
                             ? stagedObject(() => nativeReflectGet(resolve(), property, resolve()))
                             : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
@@ -613,9 +613,7 @@
                                 return nativeReflectApply(currentMember, current, args.map(unwrap));
                             };
                             const initialResult = invoke();
-                            if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
-                            if (!ready && createdNodeMethods.has(property)) guardCreatedTree(initialResult);
-                            return initialResult;
+                            return ready ? initialResult : transportGuards.guardReturnedNodes(initialResult, guardCreatedTree);
                         }
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;

@@ -72,7 +72,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try {
             mainFrameId = await GetMainFrameIdAsync(session).ConfigureAwait(false);
         } catch {
-            try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await session.DetachAsync().ConfigureAwait(false); } catch { }
             throw;
         }
         HtmlBrowserScopedHeaderInterceptor interceptor = new(
@@ -94,7 +94,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             return interceptor;
         } catch {
             interceptor.Unsubscribe();
-            try { await session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
+            try { await session.DetachAsync().ConfigureAwait(false); } catch { }
             throw;
         }
     }

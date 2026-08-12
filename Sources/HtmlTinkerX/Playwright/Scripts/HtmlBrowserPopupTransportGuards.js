@@ -4,16 +4,61 @@
     const blob = Blob;
     const arrayBuffer = ArrayBuffer;
     const arrayBufferIsView = ArrayBuffer.isView;
+    const arrayBufferSlice = ArrayBuffer.prototype.slice;
+    const documentValue = Document;
     const domException = DOMException;
+    const formData = FormData;
+    const formDataEntries = FormData.prototype.entries;
     const iterator = Symbol.iterator;
+    const navigatorPrototype = Navigator.prototype;
+    const nativeSendBeacon = navigatorPrototype.sendBeacon;
+    const nodeClone = Node.prototype.cloneNode;
     const objectValue = Object;
     const defineProperty = Object.defineProperty;
     const reflectApply = Reflect.apply;
+    const uint8Array = Uint8Array;
+    const uint8ArraySlice = Uint8Array.prototype.slice;
     const url = URL;
+    const urlSearchParams = URLSearchParams;
+    const urlSearchParamsToString = URLSearchParams.prototype.toString;
+    const beaconStates = new WeakMap();
+    let openerBeaconInstalled = false;
+    const routedSendBeacon = function(...args) {
+        const staged = beaconStates.get(this);
+        return staged == null
+            ? reflectApply(nativeSendBeacon, this, args)
+            : staged(this, args);
+    };
     globalThis.__htmlTinkerXCreatePopupTransportGuards = ({ popup, isReady, runWhenReady, toDomString }) => {
+        const popupFormData = popup.FormData;
+        const popupFormDataAppend = popupFormData.prototype.append;
+        const popupUrlSearchParams = popup.URLSearchParams;
+        const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
+            || (typeof openerType === 'function' && value instanceof openerType);
+        const snapshotBody = body => {
+            if (body == null) return body;
+            if (isInstance(body, popup.Blob, blob)) return body;
+            if (isInstance(body, popup.ArrayBuffer, arrayBuffer)) return reflectApply(arrayBufferSlice, body, [0]);
+            if (arrayBufferIsView(body) || popup.ArrayBuffer.isView(body)) {
+                const bytes = new uint8Array(body.buffer, body.byteOffset, body.byteLength);
+                return reflectApply(uint8ArraySlice, bytes, []).buffer;
+            }
+            if (isInstance(body, popup.URLSearchParams, urlSearchParams)) {
+                return new popupUrlSearchParams(reflectApply(urlSearchParamsToString, body, []));
+            }
+            if (isInstance(body, popup.FormData, formData)) {
+                const copy = new popupFormData();
+                for (const [name, value] of reflectApply(formDataEntries, body, [])) {
+                    reflectApply(popupFormDataAppend, copy, [name, value]);
+                }
+                return copy;
+            }
+            if (isInstance(body, popup.Document, documentValue)) return reflectApply(nodeClone, body, [true]);
+            return toDomString(body);
+        };
         let stagedBeaconBytes = 0;
-        const nativeSendBeacon = popup.Navigator.prototype.sendBeacon;
-        if (typeof nativeSendBeacon === 'function') {
+        const popupSendBeacon = popup.Navigator.prototype.sendBeacon;
+        if (typeof popupSendBeacon === 'function') {
             const payloadSize = body => {
                 if (body == null) return 0;
                 if ((typeof popup.Blob === 'function' && body instanceof popup.Blob) || body instanceof blob) return body.size;
@@ -32,23 +77,44 @@
                 }
                 return new blob([toDomString(body)]).size;
             };
-            const stagedSendBeacon = function(...args) {
+            const stagedSendBeacon = (receiver, args) => {
                 if (args.length === 0) throw new TypeError("Failed to execute 'sendBeacon': 1 argument required");
-                const normalizedArgs = [new url(toDomString(args[0]), popup.document.baseURI).href, ...args.slice(1)];
-                if (isReady()) return reflectApply(nativeSendBeacon, this, normalizedArgs);
+                const normalizedArgs = [new url(toDomString(args[0]), popup.document.baseURI).href];
+                if (args.length > 1) normalizedArgs.push(snapshotBody(args[1]));
+                if (isReady()) return reflectApply(popupSendBeacon, receiver, normalizedArgs);
                 const size = payloadSize(normalizedArgs[1]);
                 if (size > 64 * 1024 - stagedBeaconBytes) return false;
                 stagedBeaconBytes += size;
-                runWhenReady(() => reflectApply(nativeSendBeacon, this, normalizedArgs));
+                runWhenReady(() => reflectApply(popupSendBeacon, receiver, normalizedArgs));
                 return true;
             };
+            beaconStates.set(popup.navigator, stagedSendBeacon);
+            if (!openerBeaconInstalled && typeof nativeSendBeacon === 'function') {
+                defineProperty(navigatorPrototype, 'sendBeacon', {
+                    value: routedSendBeacon,
+                    writable: false,
+                    configurable: false
+                });
+                openerBeaconInstalled = true;
+            }
             defineProperty(popup.Navigator.prototype, 'sendBeacon', {
-                value: stagedSendBeacon,
+                value: routedSendBeacon,
                 writable: false,
                 configurable: false
             });
         }
         return {
+            snapshotBodyArguments(args) {
+                return args.length === 0 ? [] : [snapshotBody(args[0])];
+            },
+            guardReturnedNodes(value, guard) {
+                if (value instanceof popup.Node) guard(value);
+                else if ((typeof popup.NodeList === 'function' && value instanceof popup.NodeList)
+                    || (typeof popup.HTMLCollection === 'function' && value instanceof popup.HTMLCollection)) {
+                    for (let index = 0; index < value.length; index++) if (value[index] instanceof popup.Node) guard(value[index]);
+                }
+                return value;
+            },
             validateWorkerUrl(resolvedUrl) {
                 const sourceOrigin = new url(popup.document.baseURI).origin;
                 if ((resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:')

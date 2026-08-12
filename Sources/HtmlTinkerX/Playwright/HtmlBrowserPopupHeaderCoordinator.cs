@@ -110,7 +110,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                 _cleanupTimeout,
                 _requestAllowed,
                 _requestBlocked).ConfigureAwait(false);
-        } catch (PlaywrightException) when (page.IsClosed) {
+        } catch (Exception) when (page.IsClosed) {
             return;
         }
         if (!_interceptors.TryAdd(page, interceptor)) {

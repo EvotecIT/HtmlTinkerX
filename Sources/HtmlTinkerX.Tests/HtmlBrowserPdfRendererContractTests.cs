@@ -761,6 +761,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         TcpListener origin = new(IPAddress.Loopback, 0);
         origin.Start();
         using CancellationTokenSource originLifetime = new();
+        TaskCompletionSource<bool> originRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Task originTask = Task.CompletedTask;
         try {
             int originPort = ((IPEndPoint)origin.LocalEndpoint).Port;
@@ -770,6 +771,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
                     using NetworkStream stream = accepted.GetStream();
                     byte[] payload = new byte[1];
                     Assert.Equal(1, await stream.ReadAsync(payload, 0, payload.Length));
+                    originRead.TrySetResult(true);
                     try { await Task.Delay(Timeout.Infinite, originLifetime.Token); } catch (OperationCanceledException) { }
                 } catch (SocketException) when (originLifetime.IsCancellationRequested) {
                 } catch (ObjectDisposedException) when (originLifetime.IsCancellationRequested) {
@@ -784,6 +786,7 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             using NetworkStream browserStream = browser.GetStream();
             byte[] connect = Encoding.ASCII.GetBytes($"CONNECT render.invalid:{originPort} HTTP/1.1\r\nHost: render.invalid:{originPort}\r\n\r\nx");
             await browserStream.WriteAsync(connect, 0, connect.Length);
+            Assert.Same(originRead.Task, await Task.WhenAny(originRead.Task, Task.Delay(TimeSpan.FromSeconds(5))));
             browser.Client.Shutdown(SocketShutdown.Send);
 
             using MemoryStream responseBytes = new();

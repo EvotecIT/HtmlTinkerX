@@ -1,6 +1,7 @@
 using HtmlTinkerX;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -23,28 +24,18 @@ public class HtmlHttpClientFactoryTests {
         return field?.GetValue(client) as HttpClientHandler;
     }
 
-    private static int GetFreePort() {
-        var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+    private static TcpListener StartCookieServer(out string url, out Task request) {
+        TcpListener listener = new(IPAddress.Loopback, 0);
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
-
-    private static HttpListener StartCookieServer(out string url) {
-        int port = GetFreePort();
-        string prefix = $"http://localhost:{port}/";
-        url = prefix;
-        HttpListener listener = new();
-        listener.Prefixes.Add(prefix);
-        listener.Start();
-        _ = Task.Run(async () => {
-            var context = await listener.GetContextAsync();
-            context.Response.Headers.Add("Set-Cookie", "session=abc");
-            byte[] data = System.Text.Encoding.UTF8.GetBytes("ok");
-            context.Response.ContentLength64 = data.Length;
-            await context.Response.OutputStream.WriteAsync(data, 0, data.Length);
-            context.Response.OutputStream.Close();
+        url = $"http://127.0.0.1:{port}/";
+        request = Task.Run(async () => {
+            using TcpClient client = await listener.AcceptTcpClientAsync();
+            using NetworkStream stream = client.GetStream();
+            byte[] requestBytes = new byte[4096];
+            _ = await stream.ReadAsync(requestBytes, 0, requestBytes.Length);
+            byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nSet-Cookie: session=abc\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+            await stream.WriteAsync(response, 0, response.Length);
         });
         return listener;
     }
@@ -164,17 +155,18 @@ public class HtmlHttpClientFactoryTests {
 
     [Fact]
     public async Task Create_WithCookieContainer_StoresCookies() {
-        HttpListener server = StartCookieServer(out string url);
+        TcpListener server = StartCookieServer(out string url, out Task serverRequest);
         try {
             using HttpClient client = HtmlHttpClientFactory.Create(out CookieContainer container);
-            HttpResponseMessage response = await client.GetAsync(url);
+            using HttpResponseMessage response = await client.GetAsync(url);
             response.EnsureSuccessStatusCode();
+            await serverRequest;
             Cookie? cookie = container.GetCookies(new System.Uri(url))["session"];
             Assert.NotNull(cookie);
             Assert.Equal("abc", cookie.Value);
         } finally {
             server.Stop();
-            server.Close();
+            try { await serverRequest; } catch (SocketException) { } catch (ObjectDisposedException) { }
         }
     }
 
