@@ -32,6 +32,30 @@
                     }
                 });
             }
+            for (const name of ['innerHTML', 'outerHTML']) {
+                const descriptor = getOwnPropertyDescriptor(prototype, name);
+                if (!descriptor || typeof descriptor.set !== 'function') continue;
+                defineProperty(prototype, name, {
+                    ...descriptor,
+                    set(value) {
+                        const state = states.get(this);
+                        if (state?.markup(name, [value])) return;
+                        return descriptor.set.call(this, value);
+                    }
+                });
+            }
+            const insertAdjacentHTML = prototype.insertAdjacentHTML;
+            if (typeof insertAdjacentHTML === 'function') {
+                defineProperty(prototype, 'insertAdjacentHTML', {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const state = states.get(this);
+                        if (state?.markup('insertAdjacentHTML', args)) return;
+                        return reflectApply(insertAdjacentHTML, this, args);
+                    }
+                });
+            }
         };
         const installNamedNodeMap = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
@@ -81,11 +105,14 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
                 document,
+                markup(method, args) {
+                    return !isReleased() && typeof stageMarkup === 'function' && stageMarkup(method, args);
+                },
                 read(method, args) {
                     const namespaceAware = method.endsWith('NS');
                     const namespace = namespaceAware && args[0] != null ? stringValue(args[0]) : null;

@@ -899,9 +899,15 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             using (client)
             using (NetworkStream stream = client.GetStream()) {
                 byte[] buffer = new byte[8192];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
-                if (read == 0) return;
-                string request = Encoding.ASCII.GetString(buffer, 0, read);
+                using MemoryStream requestBytes = new();
+                string request;
+                do {
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
+                    if (read == 0) return;
+                    requestBytes.Write(buffer, 0, read);
+                    if (requestBytes.Length > 65536) throw new InvalidDataException("Loopback CORS request headers exceeded 64 KiB.");
+                    request = Encoding.ASCII.GetString(requestBytes.GetBuffer(), 0, checked((int)requestBytes.Length));
+                } while (!request.Contains("\r\n\r\n", StringComparison.Ordinal));
                 string? origin = LoopbackHtmlServer.ReadHeader(request, "Origin");
                 bool preflight = request.StartsWith("OPTIONS ", StringComparison.Ordinal);
                 if (!preflight) {

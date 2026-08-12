@@ -43,6 +43,16 @@
     const imageSubmitCoordinates = new WeakMap();
     const popupReleaseProperty = '__HTMLTINKERX_POPUP_RELEASE_PROPERTY__';
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
+    const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
+        defineProperty: nativeDefineProperty,
+        reflectApply: nativeReflectApply,
+        reflectConstruct: nativeReflectConstruct,
+        reflectGet: nativeReflectGet,
+        reflectSet: nativeReflectSet
+    });
+    delete globalThis.__htmlTinkerXCreatePopupAsyncConstructors;
     const attributeGuards = globalThis.__htmlTinkerXCreatePopupAttributeGuards({
         defineProperty: nativeDefineProperty,
         getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
@@ -54,6 +64,20 @@
     attributeGuards.install(Element.prototype);
     attributeGuards.installNamedNodeMap(NamedNodeMap.prototype);
     attributeGuards.installNode(Node.prototype);
+    const popupXhrOperations = new WeakMap();
+    for (const name of ['open', 'send', 'abort']) {
+        const method = XMLHttpRequest.prototype[name];
+        nativeDefineProperty(XMLHttpRequest.prototype, name, {
+            value: function(...args) {
+                const operations = popupXhrOperations.get(this);
+                return operations == null
+                    ? nativeReflectApply(method, this, args)
+                    : operations[name](this, args);
+            },
+            writable: false,
+            configurable: false
+        });
+    }
 
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
@@ -103,7 +127,6 @@
         }
         try { return containsNamedFrame(root.document); } catch { return false; }
     };
-
     const armBlankPopup = (popup, target, navigate) => {
         let currentUrl;
         try { currentUrl = popup.location.href; } catch { currentUrl = null; }
@@ -125,15 +148,20 @@
             }
         });
     };
-
-    const openStagedBlankPopup = function(url, target, features, initialAction) {
+    const openStagedBlankPopup = function(url, target, features, initialAction, existingAction) {
         const popup = originalOpen.call(this, url, target, features);
         if (!popup || specialTargets.includes(normalizedTarget(target)) || targetsExistingFrame(target)) return popup;
         try {
-            if (popup.location.href !== 'about:blank') return popup;
+            if (popup.location.href !== 'about:blank') {
+                if (typeof existingAction === 'function') existingAction(popup);
+                return popup;
+            }
         } catch {
+            if (typeof existingAction === 'function') existingAction(popup);
             return popup;
         }
+        const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
+        const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML;
         attributeGuards.install(popup.Element.prototype);
         attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
         attributeGuards.installNode(popup.Node.prototype);
@@ -189,38 +217,69 @@
             pending.aborted = true;
             pendingXhrSends.delete(request);
         };
-        const stagedXhrOpen = function(...args) {
-            cancelPendingXhrSend(this);
-            return nativeReflectApply(nativeXhrOpen, this, args);
-        };
-        const stagedXhrSend = function(...args) {
-            if (nativeReflectApply(nativeXhrReadyState, this, []) !== xhrOpened || pendingXhrSends.has(this)) {
-                throw new nativeDomException('The object is in an invalid state.', 'InvalidStateError');
+        const xhrOperations = {
+            open(request, args) {
+                cancelPendingXhrSend(request);
+                return nativeReflectApply(nativeXhrOpen, request, args);
+            },
+            send(request, args) {
+                if (nativeReflectApply(nativeXhrReadyState, request, []) !== xhrOpened || pendingXhrSends.has(request)) {
+                    throw new nativeDomException('The object is in an invalid state.', 'InvalidStateError');
+                }
+                const pending = { aborted: false };
+                pendingXhrSends.set(request, pending);
+                runWhenReady(() => {
+                    if (pending.aborted) return;
+                    pendingXhrSends.delete(request);
+                    nativeReflectApply(nativeXhrSend, request, args);
+                });
+            },
+            abort(request, args) {
+                cancelPendingXhrSend(request);
+                return nativeReflectApply(nativeXhrAbort, request, args);
             }
-            const pending = { aborted: false };
-            pendingXhrSends.set(this, pending);
-            runWhenReady(() => {
-                if (pending.aborted) return;
-                pendingXhrSends.delete(this);
-                nativeReflectApply(nativeXhrSend, this, args);
-            });
         };
-        const stagedXhrAbort = function(...args) {
-            cancelPendingXhrSend(this);
-            return nativeReflectApply(nativeXhrAbort, this, args);
+        const routeXhr = name => function(...args) {
+            const operations = popupXhrOperations.get(this);
+            return operations === xhrOperations
+                ? operations[name](this, args)
+                : nativeReflectApply(name === 'open' ? nativeXhrOpen : name === 'send' ? nativeXhrSend : nativeXhrAbort, this, args);
         };
         nativeDefineProperty(popup.XMLHttpRequest.prototype, 'open', {
-            value: stagedXhrOpen,
+            value: routeXhr('open'),
             writable: false,
             configurable: false
         });
         nativeDefineProperty(popup.XMLHttpRequest.prototype, 'send', {
-            value: stagedXhrSend,
+            value: routeXhr('send'),
             writable: false,
             configurable: false
         });
         nativeDefineProperty(popup.XMLHttpRequest.prototype, 'abort', {
-            value: stagedXhrAbort,
+            value: routeXhr('abort'),
+            writable: false,
+            configurable: false
+        });
+        const nativeXhrConstructor = popup.XMLHttpRequest;
+        const stagedXhrConstructor = new Proxy(nativeXhrConstructor, {
+            construct(target, args) {
+                const request = nativeReflectConstruct(target, args);
+                popupXhrOperations.set(request, xhrOperations);
+                return request;
+            }
+        });
+        nativeDefineProperty(nativeXhrConstructor.prototype, 'constructor', {
+            value: stagedXhrConstructor,
+            writable: false,
+            configurable: false
+        });
+        nativeDefineProperty(popup.Window.prototype, 'XMLHttpRequest', {
+            value: stagedXhrConstructor,
+            writable: false,
+            configurable: false
+        });
+        nativeDefineProperty(popup, 'XMLHttpRequest', {
+            value: stagedXhrConstructor,
             writable: false,
             configurable: false
         });
@@ -242,7 +301,6 @@
                 configurable: false
             });
         }
-        const stagedAsyncConstructors = new Map();
         const normalizeConstructorArguments = (name, args) => {
             if (args.length === 0) throw new TypeError(`Failed to construct '${name}': 1 argument required`);
             const url = new nativeUrl(toDomString(args[0]), popup.document.baseURI).href;
@@ -271,110 +329,11 @@
             if (nameValue !== undefined) normalized.name = toDomString(nameValue);
             return [url, normalized];
         };
-        const stageAsyncConstructor = (name, handlerNames, operationNames, stopName) => {
-            const nativeConstructor = popup[name];
-            if (typeof nativeConstructor !== 'function') return;
-            const deferredInstance = (constructor, args) => {
-                const normalizedArgs = normalizeConstructorArguments(name, args);
-                let instance = null;
-                let stopped = false;
-                const handlers = new Map();
-                const listeners = [];
-                const callbackWrappers = new WeakMap();
-                const pending = [];
-                const handlerProperties = new Set(handlerNames);
-                const operationProperties = new Set(operationNames);
-                const target = {};
-                let facade;
-                const wrapCallback = callback => {
-                    if (typeof callback !== 'function') return callback;
-                    let wrapper = callbackWrappers.get(callback);
-                    if (!wrapper) {
-                        wrapper = event => nativeReflectApply(callback, facade, [new Proxy(event, { get(current, property) { const value = nativeReflectGet(current, property, current); if ((property === 'target' || property === 'currentTarget') && value === instance) return facade; return typeof value === 'function' ? value.bind(current) : value; } })]);
-                        callbackWrappers.set(callback, wrapper);
-                    }
-                    return wrapper;
-                };
-                facade = new Proxy(target, {
-                    get(_, property) {
-                        if (property === 'addEventListener') return (type, listener, options) => instance == null ? listeners.push({ type, listener, options }) : instance.addEventListener(type, wrapCallback(listener), options);
-                        if (property === 'removeEventListener') return (type, listener) => instance == null ? listeners.splice(0, listeners.length, ...listeners.filter(current => current.type !== type || current.listener !== listener)) : instance.removeEventListener(type, wrapCallback(listener));
-                        if (instance != null) {
-                            const value = nativeReflectGet(instance, property, instance);
-                            return typeof value === 'function' ? value.bind(instance) : value;
-                        }
-                        if (property === Symbol.toStringTag) return name;
-                        if (name === 'EventSource' && property === 'readyState') return nativeConstructor.CONNECTING;
-                        if (name === 'EventSource' && property === 'url') {
-                            return normalizedArgs[0];
-                        }
-                        if (name === 'EventSource' && property === 'withCredentials') {
-                            return normalizedArgs[1].withCredentials;
-                        }
-                        if (handlerProperties.has(property)) return handlers.get(property) ?? null;
-                        if (operationProperties.has(property)) {
-                            return (...operationArgs) => pending.push(current => {
-                                const operation = nativeReflectGet(current, property, current);
-                                nativeReflectApply(operation, current, operationArgs);
-                            });
-                        }
-                        if (property === stopName) {
-                            return () => {
-                                stopped = true;
-                                pending.length = 0;
-                            };
-                        }
-                        return nativeReflectGet(target, property, target);
-                    },
-                    set(_, property, value) {
-                        if (handlerProperties.has(property)) {
-                            handlers.set(property, value);
-                            if (instance != null) nativeReflectSet(instance, property, wrapCallback(value), instance);
-                            return true;
-                        }
-                        if (instance != null) return nativeReflectSet(instance, property, value, instance);
-                        return nativeReflectSet(target, property, value, target);
-                    },
-                    getPrototypeOf() {
-                        return constructor.prototype;
-                    }
-                });
-                runWhenReady(() => {
-                    if (stopped) return;
-                    instance = nativeReflectConstruct(constructor, normalizedArgs);
-                    for (const [property, value] of handlers) nativeReflectSet(instance, property, wrapCallback(value), instance);
-                    for (const { type, listener, options } of listeners) {
-                        const addEventListener = nativeReflectGet(instance, 'addEventListener', instance);
-                        nativeReflectApply(addEventListener, instance, [type, wrapCallback(listener), options]);
-                    }
-                    while (pending.length > 0) pending.shift()(instance);
-                });
-                return facade;
-            };
-            const stagedConstructor = new Proxy(nativeConstructor, {
-                construct(target, args) {
-                    return deferredInstance(target, args);
-                }
-            });
-            nativeDefineProperty(nativeConstructor.prototype, 'constructor', {
-                value: stagedConstructor,
-                writable: false,
-                configurable: false
-            });
-            nativeDefineProperty(popup.Window.prototype, name, {
-                value: stagedConstructor,
-                writable: false,
-                configurable: false
-            });
-            nativeDefineProperty(popup, name, {
-                value: stagedConstructor,
-                writable: false,
-                configurable: false
-            });
-            stagedAsyncConstructors.set(name, stagedConstructor);
-        };
-        stageAsyncConstructor('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
-        stageAsyncConstructor('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
+        const stagedAsyncConstructors = createAsyncConstructors({
+            popup,
+            runWhenReady,
+            normalizeArguments: normalizeConstructorArguments
+        });
         const nativeLocation = popup.location;
         let popupFacade;
         const locationFacade = new Proxy({}, {
@@ -414,7 +373,8 @@
                 namespacedValues,
                 () => released,
                 shouldDeferAttribute,
-                () => documentFacade);
+                () => documentFacade,
+                (method, args) => stageElementMarkup(element, method, args));
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -466,6 +426,17 @@
                 attributeGuards.release(element);
             });
         };
+        const stageElementMarkup = createMarkupStager({
+            popup,
+            innerHtml: popupInnerHtml,
+            outerHtml: popupOuterHtml,
+            insertAdjacentHtml: popupInsertAdjacentHtml,
+            reflectApply: nativeReflectApply,
+            stringValue: nativeString,
+            shouldDeferAttribute,
+            guardDeferredAttributes,
+            guardedResources
+        });
         const guardCreatedElement = element => {
             if (!(element instanceof popup.Element) || guardedElements.has(element)) return element;
             const values = [];
@@ -599,6 +570,17 @@
                             : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
                     }
                     return (...args) => {
+                        if (!ready && property === 'open' && resolve() === popup.document && args.length < 3) {
+                            const current = resolve();
+                            const result = nativeReflectApply(nativeReflectGet(current, property, current), current, args);
+                            documentWriteParts.length = 0;
+                            guardedResources.length = 0;
+                            documentWriteQueued = false;
+                            documentCloseQueued = false;
+                            documentWrittenSynchronously = false;
+                            documentMutationQueued = true;
+                            return stagedObject(() => result);
+                        }
                         if (!ready && (property === 'write' || property === 'writeln') && resolve() === popup.document) {
                             writeStagedMarkup(property, args);
                             return undefined;
@@ -644,6 +626,7 @@
                 if (property === 'location') return locationFacade;
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
+                if (property === 'XMLHttpRequest') return stagedXhrConstructor;
                 if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                 if (stagedElementConstructors.has(property)) return stagedElementConstructors.get(property);
                 const value = nativeReflectGet(targetWindow, property, targetWindow);
@@ -709,7 +692,7 @@
                 (releasedPopup.document.body || releasedPopup.document.documentElement).appendChild(link);
                 link.click();
             } else releasedPopup.location.href = destination;
-        });
+        }, () => originalOpen.call(this, destination, target, features));
         if (popup) {
             if (suppressOpener) {
                 try { popup.opener = null; } catch { }
