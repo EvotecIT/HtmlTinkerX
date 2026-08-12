@@ -137,6 +137,84 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task BlankPopupXhrAbortBeforeReleaseCancelsTheQueuedSend() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const request = new popup.XMLHttpRequest();
+            request.open('POST', '{server.BlankPopupResourceUrl}');
+            request.send('xhr');
+            request.abort();
+            popup.location.href = '/blank-popup-location';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal(0, server.BlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task BlankPopupXhrOpenReplacesAnEarlierQueuedSend() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const request = new popup.XMLHttpRequest();
+            request.open('POST', '{server.BlankPopupResourceUrl}?superseded');
+            request.send('old');
+            let duplicateRejected = false;
+            try {{ request.send('duplicate'); }} catch {{ duplicateRejected = true; }}
+            document.querySelector('#result').textContent = duplicateRejected ? 'xhr lifecycle preserved' : 'duplicate send accepted';
+            request.open('POST', '{server.BlankPopupResourceUrl}?current');
+            request.send('new');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "xhr lifecycle preserved");
+        Assert.Equal(1, server.BlankPopupResourceRequests);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task BlankPopupLocationValueOfRemainsBehindHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.location.valueOf().href = '/blank-popup-location';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+    }
+
+    [Fact]
     public async Task BlankPopupWorkerWaitsForHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
@@ -188,6 +266,34 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "popup event authorized");
         Assert.Equal("popup-token", server.LastPopupEventToken);
+    }
+
+    [Theory]
+    [InlineData("Worker")]
+    [InlineData("EventSource")]
+    public async Task InvalidStagedConstructorThrowsSynchronouslyWithoutBlockingLaterNavigation(string constructorName) {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            let caught = false;
+            try {{ new popup.{constructorName}('http://['); }} catch {{ caught = true; }}
+            globalThis.constructorFailureCaught = caught;
+            popup.location.href = '/blank-popup-location';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => globalThis.constructorFailureCaught === true && document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
     }
 
     [Theory]

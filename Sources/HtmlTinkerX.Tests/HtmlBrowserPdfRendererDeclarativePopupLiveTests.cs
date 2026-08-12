@@ -204,6 +204,46 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task InheritedFormPopupTargetRemainsEffectiveAfterTemporarySubmissionTargetRestoration() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const form = document.querySelector('form');
+            form.removeAttribute('target');
+            const base = document.createElement('base');
+            base.target = '_blank';
+            document.head.appendChild(base);
+            const state = document.createElement('p');
+            state.id = 'target-state';
+            state.textContent = 'pending';
+            document.body.appendChild(state);
+            let submittedAgain = false;
+            setInterval(() => fetch('/popup-count-status').then(response => response.text()).then(text => {
+                const count = Number(text);
+                if (count >= 1 && !submittedAgain && !form.hasAttribute('target')) {
+                    submittedAgain = true;
+                    form.requestSubmit();
+                }
+                if (count >= 2) state.textContent = form.hasAttribute('target') ? 'target leaked' : 'base target restored';
+            }), 20);
+            form.requestSubmit();
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeFormUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#target-state')?.textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "base target restored");
+        Assert.Equal(2, server.PopupRequestCount);
+    }
+
+    [Fact]
     public async Task DelegatedDocumentClickHandlerCanCancelDeclarativePopup() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

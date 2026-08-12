@@ -1,6 +1,10 @@
 (() => {
     if (globalThis.__htmlTinkerXPopupNavigationShimInstalled === true) return;
     const nativeDefineProperty = Object.defineProperty;
+    const nativeObject = Object;
+    const nativeString = String;
+    const nativeBoolean = Boolean;
+    const nativeUrl = URL;
     const nativeGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
     const nativeGetPrototypeOf = Object.getPrototypeOf;
     const nativeHasOwnProperty = Object.prototype.hasOwnProperty;
@@ -51,17 +55,17 @@
         }
     });
 
-    const normalizedTarget = target => target == null || String(target).length === 0
+    const normalizedTarget = target => target == null || nativeString(target).length === 0
         ? '_blank'
-        : String(target).toLowerCase();
+        : nativeString(target).toLowerCase();
 
-    const normalizedDeclarativeTarget = target => target == null || String(target).length === 0
+    const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0
         ? '_self'
-        : String(target).toLowerCase();
+        : nativeString(target).toLowerCase();
 
     const targetsExistingFrame = target => {
-        if (target == null || String(target).length === 0) return false;
-        const expected = String(target);
+        if (target == null || nativeString(target).length === 0) return false;
+        const expected = nativeString(target);
         const visited = new WeakSet();
         const containsNamedFrame = currentDocument => {
             if (visited.has(currentDocument)) return false;
@@ -156,12 +160,51 @@
             writable: false,
             configurable: false
         });
+        const nativeXhrOpen = popup.XMLHttpRequest.prototype.open;
         const nativeXhrSend = popup.XMLHttpRequest.prototype.send;
-        const stagedXhrSend = function(...args) {
-            runWhenReady(() => nativeReflectApply(nativeXhrSend, this, args));
+        const nativeXhrAbort = popup.XMLHttpRequest.prototype.abort;
+        const nativeXhrReadyState = nativeGetOwnPropertyDescriptor(popup.XMLHttpRequest.prototype, 'readyState').get;
+        const nativeDomException = popup.DOMException;
+        const xhrOpened = popup.XMLHttpRequest.OPENED;
+        const pendingXhrSends = new WeakMap();
+        const cancelPendingXhrSend = request => {
+            const pending = pendingXhrSends.get(request);
+            if (pending == null) return;
+            pending.aborted = true;
+            pendingXhrSends.delete(request);
         };
+        const stagedXhrOpen = function(...args) {
+            cancelPendingXhrSend(this);
+            return nativeReflectApply(nativeXhrOpen, this, args);
+        };
+        const stagedXhrSend = function(...args) {
+            if (nativeReflectApply(nativeXhrReadyState, this, []) !== xhrOpened || pendingXhrSends.has(this)) {
+                throw new nativeDomException('The object is in an invalid state.', 'InvalidStateError');
+            }
+            const pending = { aborted: false };
+            pendingXhrSends.set(this, pending);
+            runWhenReady(() => {
+                if (pending.aborted) return;
+                pendingXhrSends.delete(this);
+                nativeReflectApply(nativeXhrSend, this, args);
+            });
+        };
+        const stagedXhrAbort = function(...args) {
+            cancelPendingXhrSend(this);
+            return nativeReflectApply(nativeXhrAbort, this, args);
+        };
+        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'open', {
+            value: stagedXhrOpen,
+            writable: false,
+            configurable: false
+        });
         nativeDefineProperty(popup.XMLHttpRequest.prototype, 'send', {
             value: stagedXhrSend,
+            writable: false,
+            configurable: false
+        });
+        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'abort', {
+            value: stagedXhrAbort,
             writable: false,
             configurable: false
         });
@@ -178,10 +221,43 @@
             });
         }
         const stagedAsyncConstructors = new Map();
+        const toDomString = value => {
+            if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
+            return nativeString(value);
+        };
+        const normalizeConstructorArguments = (name, args) => {
+            if (args.length === 0) throw new TypeError(`Failed to construct '${name}': 1 argument required`);
+            const url = new nativeUrl(toDomString(args[0]), popup.document.baseURI).href;
+            if (name === 'EventSource') {
+                const options = args[1] == null ? {} : nativeObject(args[1]);
+                const withCredentials = options.withCredentials;
+                return [url, { withCredentials: nativeBoolean(withCredentials) }];
+            }
+            const options = args[1] == null ? {} : nativeObject(args[1]);
+            const normalized = {};
+            const typeValue = options.type;
+            if (typeValue !== undefined) {
+                const type = toDomString(typeValue);
+                if (!['classic', 'module'].includes(type)) throw new TypeError(`Invalid Worker type '${type}'`);
+                normalized.type = type;
+            }
+            const credentialsValue = options.credentials;
+            if (credentialsValue !== undefined) {
+                const credentials = toDomString(credentialsValue);
+                if (!['omit', 'same-origin', 'include'].includes(credentials)) {
+                    throw new TypeError(`Invalid Worker credentials '${credentials}'`);
+                }
+                normalized.credentials = credentials;
+            }
+            const nameValue = options.name;
+            if (nameValue !== undefined) normalized.name = toDomString(nameValue);
+            return [url, normalized];
+        };
         const stageAsyncConstructor = (name, handlerNames, operationNames, stopName) => {
             const nativeConstructor = popup[name];
             if (typeof nativeConstructor !== 'function') return;
             const deferredInstance = (constructor, args) => {
+                const normalizedArgs = normalizeConstructorArguments(name, args);
                 let instance = null;
                 let stopped = false;
                 const handlers = new Map();
@@ -199,10 +275,10 @@
                         if (property === Symbol.toStringTag) return name;
                         if (name === 'EventSource' && property === 'readyState') return nativeConstructor.CONNECTING;
                         if (name === 'EventSource' && property === 'url') {
-                            return new URL(String(args[0]), popup.document.baseURI).href;
+                            return normalizedArgs[0];
                         }
                         if (name === 'EventSource' && property === 'withCredentials') {
-                            return Boolean(args[1]?.withCredentials);
+                            return normalizedArgs[1].withCredentials;
                         }
                         if (handlerProperties.has(property)) return handlers.get(property) ?? null;
                         if (operationProperties.has(property)) {
@@ -244,7 +320,7 @@
                 });
                 runWhenReady(() => {
                     if (stopped) return;
-                    instance = nativeReflectConstruct(constructor, args);
+                    instance = nativeReflectConstruct(constructor, normalizedArgs);
                     for (const [property, value] of handlers) nativeReflectSet(instance, property, value, instance);
                     for (const { type, listener, options } of listeners) {
                         const addEventListener = nativeReflectGet(instance, 'addEventListener', instance);
@@ -286,7 +362,11 @@
                 if (['assign', 'replace', 'reload'].includes(property)) {
                     return (...args) => runWhenReady(() => nativeReflectApply(value, nativeLocation, args));
                 }
-                return typeof value === 'function' ? value.bind(nativeLocation) : value;
+                if (typeof value !== 'function') return value;
+                return (...args) => {
+                    const result = nativeReflectApply(value, nativeLocation, args);
+                    return result === nativeLocation ? locationFacade : result;
+                };
             },
             set(_, property, value) {
                 runWhenReady(() => nativeReflectSet(nativeLocation, property, value, nativeLocation));
@@ -300,7 +380,7 @@
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
             || (element.localName === 'meta'
                 && attribute === 'content'
-                && String(element.getAttribute('http-equiv')).toLowerCase() === 'refresh');
+                && nativeString(nativeGetAttribute.call(element, 'http-equiv')).toLowerCase() === 'refresh');
         const guardDeferredAttributes = (element, initialValues) => {
             if (guardedElements.has(element)) return;
             guardedElements.add(element);
@@ -323,9 +403,9 @@
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
                     set(value) {
-                        if (!released) values.set(attribute, String(value));
+                        if (!released) values.set(attribute, nativeString(value));
                         else if (descriptor.set) descriptor.set.call(element, value);
-                        else nativeSetAttribute.call(element, attribute, String(value));
+                        else nativeSetAttribute.call(element, attribute, nativeString(value));
                     }
                 });
             }
@@ -334,9 +414,9 @@
             nativeDefineProperty(element, 'setAttribute', {
                 configurable: false,
                 value(name, value) {
-                    const attribute = String(name).toLowerCase();
+                    const attribute = nativeString(name).toLowerCase();
                     if (!released && shouldDeferAttribute(element, attribute)) {
-                        values.set(attribute, String(value));
+                        values.set(attribute, nativeString(value));
                         return;
                     }
                     return nativeSetAttribute.call(this, name, value);
@@ -345,7 +425,7 @@
             nativeDefineProperty(element, 'removeAttribute', {
                 configurable: false,
                 value(name) {
-                    const attribute = String(name).toLowerCase();
+                    const attribute = nativeString(name).toLowerCase();
                     if (!released && shouldDeferAttribute(element, attribute)) {
                         values.delete(attribute);
                         return;
@@ -382,7 +462,7 @@
         }
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
-            documentWriteParts.push(args.map(value => String(value)).join('') + (method === 'writeln' ? '\n' : ''));
+            documentWriteParts.push(args.map(value => nativeString(value)).join('') + (method === 'writeln' ? '\n' : ''));
             if (documentWriteParts.length > 1) {
                 nativeDocument.open();
                 guardedResources.length = 0;
@@ -434,7 +514,7 @@
                         const blockingExternal = attributes.has('src')
                             && !attributes.has('async')
                             && !attributes.has('defer')
-                            && String(attributes.get('type') || '').toLowerCase() !== 'module';
+                            && nativeString(attributes.get('type') || '').toLowerCase() !== 'module';
                         let completed = null;
                         if (blockingExternal) {
                             completed = new Promise(resolve => {
@@ -571,13 +651,13 @@
     };
 
     const openWithReferrerPolicy = function(url, target, features, referrerPolicy) {
-        if (url == null || String(url).length === 0 || String(url).toLowerCase() === 'about:blank') {
+        if (url == null || nativeString(url).length === 0 || nativeString(url).toLowerCase() === 'about:blank') {
             return openStagedBlankPopup.call(this, url, target, features);
         }
-        const destination = new URL(String(url), document.baseURI).href;
+        const destination = new nativeUrl(nativeString(url), document.baseURI).href;
         const featureTokens = features == null
             ? []
-            : String(features).split(',').map(token => token.trim()).filter(Boolean);
+            : nativeString(features).split(',').map(token => token.trim()).filter(nativeBoolean);
         const isEnabled = name => featureTokens.some(token => {
             const parts = token.toLowerCase().split('=', 2);
             return parts[0] === name && (parts.length === 1 || !['0', 'no', 'false'].includes(parts[1]));
@@ -678,6 +758,16 @@
         fallback = globalThis.setTimeout(restoreOnce, 5000);
     };
 
+    const setTemporaryAttribute = (element, name, value) => {
+        const existed = nativeHasAttribute.call(element, name);
+        const previous = existed ? nativeGetAttribute.call(element, name) : null;
+        nativeSetAttribute.call(element, name, value);
+        return () => {
+            if (existed) nativeSetAttribute.call(element, name, previous);
+            else nativeRemoveAttribute.call(element, name);
+        };
+    };
+
     const deferPopupFormSubmission = (form, submitter, submit) => {
         if (!canDeferPopupFormSubmission(form, submitter)) return false;
         const target = effectiveTarget(form, submitter);
@@ -700,20 +790,22 @@
         }
 
         armBlankPopup(popup, target, () => {
-            const previousFormTarget = form.target;
-            const previousSubmitterTarget = submitter == null ? null : submitter.formTarget;
-            form.target = submissionTarget;
-            if (submitter != null) submitter.formTarget = submissionTarget;
+            const restoreFormTarget = setTemporaryAttribute(form, 'target', submissionTarget);
+            const restoreSubmitterTarget = submitter == null
+                ? null
+                : setTemporaryAttribute(submitter, 'formtarget', submissionTarget);
+            const restoreTargets = () => {
+                restoreFormTarget();
+                if (restoreSubmitterTarget != null) restoreSubmitterTarget();
+            };
             try {
                 const restoreSubmission = submit();
                 restoreAfterPopupNavigation(popup, () => {
                     if (typeof restoreSubmission === 'function') restoreSubmission();
-                    form.target = previousFormTarget;
-                    if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
+                    restoreTargets();
                 });
             } catch (error) {
-                form.target = previousFormTarget;
-                if (submitter != null && previousSubmitterTarget != null) submitter.formTarget = previousSubmitterTarget;
+                restoreTargets();
                 throw error;
             }
         });
@@ -727,7 +819,7 @@
         const method = submitter != null && nativeHasAttribute.call(submitter, 'formmethod')
             ? nativeGetAttribute.call(submitter, 'formmethod')
             : nativeGetAttribute.call(form, 'method');
-        return String(method || 'get').toLowerCase() !== 'dialog';
+        return nativeString(method || 'get').toLowerCase() !== 'dialog';
     };
 
     const submitWithoutRedispatch = (form, submitter) => {
@@ -755,8 +847,8 @@
             if (!submitter.disabled && submitter instanceof HTMLInputElement && submitter.type.toLowerCase() === 'image') {
                 const coordinates = imageSubmitCoordinates.get(submitter) || { x: 0, y: 0 };
                 const prefix = submitter.name ? `${submitter.name}.` : '';
-                appendSuccessfulControl(`${prefix}x`, String(coordinates.x));
-                appendSuccessfulControl(`${prefix}y`, String(coordinates.y));
+                appendSuccessfulControl(`${prefix}x`, nativeString(coordinates.x));
+                appendSuccessfulControl(`${prefix}y`, nativeString(coordinates.y));
             } else if (!submitter.disabled && nativeGetAttribute.call(submitter, 'name')) {
                 appendSuccessfulControl(nativeGetAttribute.call(submitter, 'name'), submitter.value || '');
             }
@@ -778,8 +870,7 @@
     };
 
     const submitInCurrentContext = (form, submit) => {
-        const previousTarget = form.target;
-        form.target = '_self';
+        const restoreTarget = setTemporaryAttribute(form, 'target', '_self');
         try {
             const restoreSubmission = submit();
             let restored = false;
@@ -787,12 +878,12 @@
                 if (restored) return;
                 restored = true;
                 if (typeof restoreSubmission === 'function') restoreSubmission();
-                form.target = previousTarget;
+                restoreTarget();
             };
             globalThis.addEventListener('pagehide', restore, { once: true });
             globalThis.setTimeout(restore, 5000);
         } catch (error) {
-            form.target = previousTarget;
+            restoreTarget();
             throw error;
         }
     };
@@ -821,7 +912,7 @@
         if (!(anchor instanceof HTMLAnchorElement) || nativeHasAttribute.call(anchor, 'download')) return null;
         const target = effectiveTarget(anchor, null);
         const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
-        const destination = new URL(anchor.href, document.baseURI);
+        const destination = new nativeUrl(anchor.href, document.baseURI);
         if (!explicitlyCurrent
             && specialTargets.includes(normalizedDeclarativeTarget(target))) return null;
         return { anchor, target, explicitlyCurrent, destination, path };

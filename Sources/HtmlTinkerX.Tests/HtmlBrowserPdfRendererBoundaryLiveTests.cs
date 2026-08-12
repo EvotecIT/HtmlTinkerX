@@ -597,6 +597,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupEventToken;
         private int _blankPopupResourceRequests;
         private int _unauthorizedBlankPopupResourceRequests;
+        private int _popupRequestCount;
         private readonly string _namedContextInitialUrl;
 
         internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
@@ -660,6 +661,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
+        internal int PopupRequestCount => Volatile.Read(ref _popupRequestCount);
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
         internal string? LastPopupCssToken => Volatile.Read(ref _lastPopupCssToken);
         internal string? LastPopupScriptToken => Volatile.Read(ref _lastPopupScriptToken);
@@ -714,6 +716,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";
                     } else if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
+                        Interlocked.Increment(ref _popupRequestCount);
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         if (requestTarget.Contains("action=approve", StringComparison.Ordinal)) {
@@ -785,6 +788,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     } else if (requestTarget.StartsWith("/popup-status", StringComparison.Ordinal)) {
                         contentType = "text/plain; charset=utf-8";
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token" ? "popup authorized" : "pending";
+                    } else if (requestTarget.StartsWith("/popup-count-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = PopupRequestCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     } else if (requestTarget.StartsWith("/submitter-status", StringComparison.Ordinal)) {
                         contentType = "text/plain; charset=utf-8";
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
