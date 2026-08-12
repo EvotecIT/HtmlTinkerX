@@ -67,20 +67,8 @@
     attributeGuards.install(Element.prototype);
     attributeGuards.installNamedNodeMap(NamedNodeMap.prototype);
     attributeGuards.installNode(Node.prototype);
-    const popupXhrOperations = new WeakMap();
-    for (const name of ['open', 'send', 'abort']) {
-        const method = XMLHttpRequest.prototype[name];
-        nativeDefineProperty(XMLHttpRequest.prototype, name, {
-            value: function(...args) {
-                const operations = popupXhrOperations.get(this);
-                return operations == null
-                    ? nativeReflectApply(method, this, args)
-                    : operations[name](this, args);
-            },
-            writable: false,
-            configurable: false
-        });
-    }
+    const createXhrStager = globalThis.__htmlTinkerXCreatePopupXhrStager;
+    delete globalThis.__htmlTinkerXCreatePopupXhrStager;
 
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
@@ -165,6 +153,7 @@
         }
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML;
+        const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
         attributeGuards.install(popup.Element.prototype);
         attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
         attributeGuards.installNode(popup.Node.prototype);
@@ -214,69 +203,11 @@
             writable: false,
             configurable: false
         });
-        const nativeXhrOpen = popup.XMLHttpRequest.prototype.open;
-        const nativeXhrSend = popup.XMLHttpRequest.prototype.send;
-        const nativeXhrAbort = popup.XMLHttpRequest.prototype.abort;
-        const nativeXhrReadyState = nativeGetOwnPropertyDescriptor(popup.XMLHttpRequest.prototype, 'readyState').get;
-        const nativeDomException = popup.DOMException;
-        const xhrOpened = popup.XMLHttpRequest.OPENED;
-        const pendingXhrSends = new WeakMap();
-        const cancelPendingXhrSend = request => {
-            const pending = pendingXhrSends.get(request);
-            if (pending == null) return;
-            pending.aborted = true;
-            pendingXhrSends.delete(request);
-        };
-        const xhrOperations = {
-            open(request, args) {
-                cancelPendingXhrSend(request);
-                return nativeReflectApply(nativeXhrOpen, request, args);
-            },
-            send(request, args) {
-                if (nativeReflectApply(nativeXhrReadyState, request, []) !== xhrOpened || pendingXhrSends.has(request)) {
-                    throw new nativeDomException('The object is in an invalid state.', 'InvalidStateError');
-                }
-                const pending = { aborted: false, args: transportGuards.snapshotBodyArguments(args) };
-                pendingXhrSends.set(request, pending);
-                runWhenReady(() => {
-                    if (pending.aborted) return;
-                    pendingXhrSends.delete(request);
-                    nativeReflectApply(nativeXhrSend, request, pending.args);
-                });
-            },
-            abort(request, args) {
-                cancelPendingXhrSend(request);
-                return nativeReflectApply(nativeXhrAbort, request, args);
-            }
-        };
-        const routeXhr = name => function(...args) {
-            const operations = popupXhrOperations.get(this);
-            return operations === xhrOperations
-                ? operations[name](this, args)
-                : nativeReflectApply(name === 'open' ? nativeXhrOpen : name === 'send' ? nativeXhrSend : nativeXhrAbort, this, args);
-        };
-        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'open', {
-            value: routeXhr('open'),
-            writable: false,
-            configurable: false
-        });
-        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'send', {
-            value: routeXhr('send'),
-            writable: false,
-            configurable: false
-        });
-        nativeDefineProperty(popup.XMLHttpRequest.prototype, 'abort', {
-            value: routeXhr('abort'),
-            writable: false,
-            configurable: false
-        });
         const nativeXhrConstructor = popup.XMLHttpRequest;
-        const stagedXhrConstructor = new Proxy(nativeXhrConstructor, {
-            construct(target, args) {
-                const request = nativeReflectConstruct(target, args);
-                popupXhrOperations.set(request, xhrOperations);
-                return request;
-            }
+        const stagedXhrConstructor = createXhrStager({
+            popup,
+            runWhenReady,
+            snapshotBodyArguments: transportGuards.snapshotBodyArguments
         });
         nativeDefineProperty(nativeXhrConstructor.prototype, 'constructor', {
             value: stagedXhrConstructor,
@@ -487,9 +418,9 @@
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
             documentWriteParts.push(args.map(value => nativeString(value)).join('') + (method === 'writeln' ? '\n' : ''));
+            let previousRoot = null;
             if (documentWriteParts.length > 1) {
-                nativeDocument.open();
-                guardedResources.length = 0;
+                previousRoot = nativeDocument.documentElement;
                 documentCloseQueued = false;
             }
             const template = nativeDocument.createElement('template');
@@ -522,11 +453,22 @@
                 element.setAttribute('data-htmltinkerx-staged-resource', marker);
                 descriptors.push({ marker, values, styleText, script });
             }
-            nativeReflectApply(nativeDocument.write, nativeDocument, [template.innerHTML]);
+            let desiredRoot = null;
+            if (previousRoot == null) {
+                nativeReflectApply(nativeDocument.write, nativeDocument, [template.innerHTML]);
+            } else {
+                const stagedDocument = nativeReflectApply(createHtmlDocument, nativeDocument.implementation, ['']);
+                nativeReflectApply(stagedDocument.open, stagedDocument, []);
+                nativeReflectApply(stagedDocument.write, stagedDocument, [template.innerHTML]);
+                nativeReflectApply(stagedDocument.close, stagedDocument, []);
+                desiredRoot = stagedDocument.documentElement;
+            }
+            const reusedWriteNodes = stageElementMarkup.preserveWrittenNodes(nativeDocument, previousRoot, desiredRoot);
             for (const { marker, values, styleText, script } of descriptors) {
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
                 element.removeAttribute('data-htmltinkerx-staged-resource');
+                if (reusedWriteNodes.has(element)) continue;
                 guardDeferredAttributes(element, values);
                 if (styleText !== null) {
                     guardedResources.push(() => { element.textContent = styleText; });
@@ -581,11 +523,16 @@
             }
             return undefined;
         };
+        const stageReturnedValue = value => {
+            transportGuards.guardReturnedNodes(value, guardCreatedTree);
+            return value;
+        };
         const stagedObject = resolve => {
             const value = resolve();
             if (value === nativeLocation) return locationFacade;
             if (value === popup) return popupFacade;
             if (!value || !(value instanceof popup.Node)) return value;
+            if (!(value instanceof popup.Document)) return stageReturnedValue(value);
             const facade = new Proxy({}, {
                 get(_, property) {
                     const target = resolve();
@@ -619,7 +566,7 @@
                                 return nativeReflectApply(currentMember, current, args.map(unwrap));
                             };
                             const initialResult = invoke();
-                            return ready ? initialResult : transportGuards.guardReturnedNodes(initialResult, guardCreatedTree);
+                            return ready ? initialResult : stageReturnedValue(initialResult);
                         }
                         const result = stagedMutationResult(resolve, property, args);
                         documentMutationQueued = true;

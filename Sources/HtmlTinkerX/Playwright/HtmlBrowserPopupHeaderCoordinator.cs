@@ -17,6 +17,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private const string AsyncConstructorsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAsyncConstructors.js";
     private const string MarkupGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupMarkupGuards.js";
     private const string TransportGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupTransportGuards.js";
+    private const string XhrStagingResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupXhrStaging.js";
     private const string NavigationShimResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js";
     private const string ReleasePropertyPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_PROPERTY__";
     private const string ReleaseTokenPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_TOKEN__";
@@ -71,7 +72,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, XhrStagingResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
     }
 
     private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {

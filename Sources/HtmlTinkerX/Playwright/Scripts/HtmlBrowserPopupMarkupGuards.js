@@ -4,6 +4,8 @@
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
     const promiseThen = Promise.prototype.then;
     const stringValueNative = String;
+    const weakMap = WeakMap;
+    const weakSet = WeakSet;
     globalThis.__htmlTinkerXCreatePopupMarkupStager = ({
         popup,
         innerHtml,
@@ -54,6 +56,63 @@
                 if (styleText !== null) guardedResources.push(() => { descendant.textContent = styleText; });
             }
             return true;
+        };
+        const appendChild = popup.Node.prototype.appendChild;
+        const childNodes = getOwnPropertyDescriptor(popup.Node.prototype, 'childNodes').get;
+        const documentElement = getOwnPropertyDescriptor(popup.Document.prototype, 'documentElement').get;
+        const nodeType = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get;
+        const nodeName = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeName').get;
+        const elementGetAttribute = popup.Element.prototype.getAttribute;
+        const elementHasAttribute = popup.Element.prototype.hasAttribute;
+        const elementSetAttribute = popup.Element.prototype.setAttribute;
+        const markerAttribute = 'data-htmltinkerx-staged-resource';
+        const writtenNodes = new weakSet();
+        const writtenChildCounts = new weakMap();
+        const compatible = (existing, desired) => reflectApply(nodeType, existing, []) === reflectApply(nodeType, desired, [])
+            && reflectApply(nodeName, existing, []) === reflectApply(nodeName, desired, []);
+        const rememberWriteTree = node => {
+            writtenNodes.add(node);
+            const children = arrayFrom(reflectApply(childNodes, node, []));
+            writtenChildCounts.set(node, children.length);
+            for (const child of children) rememberWriteTree(child);
+        };
+        const mergeWriteTrees = (existing, desired, reused) => {
+            reused.add(existing);
+            if (existing instanceof popup.Element
+                && desired instanceof popup.Element
+                && reflectApply(elementHasAttribute, desired, [markerAttribute])) {
+                reflectApply(elementSetAttribute, existing, [markerAttribute, reflectApply(elementGetAttribute, desired, [markerAttribute])]);
+            }
+            const existingChildren = arrayFrom(reflectApply(childNodes, existing, []));
+            const desiredChildren = arrayFrom(reflectApply(childNodes, desired, []));
+            const previousWrittenCount = writtenChildCounts.get(existing) || 0;
+            const existingWrittenChildren = [];
+            for (const child of existingChildren) if (writtenNodes.has(child)) existingWrittenChildren.push(child);
+            const reusableCount = previousWrittenCount < desiredChildren.length ? previousWrittenCount : desiredChildren.length;
+            for (let index = 0; index < reusableCount; index++) {
+                const existingChild = existingWrittenChildren[index];
+                if (existingChild && compatible(existingChild, desiredChildren[index])) {
+                    mergeWriteTrees(existingChild, desiredChildren[index], reused);
+                }
+            }
+            for (let index = previousWrittenCount; index < desiredChildren.length; index++) {
+                const child = desiredChildren[index];
+                reflectApply(appendChild, existing, [child]);
+                rememberWriteTree(child);
+            }
+            writtenChildCounts.set(existing, desiredChildren.length);
+        };
+        stager.preserveWrittenNodes = (document, previousRoot, desiredRoot = null) => {
+            const currentRoot = desiredRoot || reflectApply(documentElement, document, []);
+            const reused = new weakSet();
+            if (!currentRoot) return reused;
+            if (!previousRoot) {
+                rememberWriteTree(currentRoot);
+                return reused;
+            }
+            if (!compatible(previousRoot, currentRoot)) return reused;
+            mergeWriteTrees(previousRoot, currentRoot, reused);
+            return reused;
         };
         stager.replaceParserBlockingScript = (element, replacement, completed) => {
             const document = element.ownerDocument;

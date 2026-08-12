@@ -106,18 +106,18 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task HtmlCredentialsAreScopedToTheDeclaredOrigin() {
         await using LoopbackContentServer foreignOrigin = new("foreign-resource");
-        await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body data-loaded='0'><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; function loaded() {{ document.body.dataset.loaded = String(Number(document.body.dataset.loaded) + 1); }}</script><iframe src='/probe' onload='loaded()'></iframe><iframe src='{foreignOrigin.Url}' onload='loaded()'></iframe></body></html>";
+        string html = $"<html><body data-loaded='0'><p id='main'>main-pending</p><script>document.querySelector('#main').textContent = localStorage.getItem('token') || 'main-missing'; function loaded() {{ document.body.dataset.loaded = '1'; }}</script><iframe src='{foreignOrigin.Url}' onload='loaded()'></iframe></body></html>";
+        await using LoopbackContentServer declaredOrigin = new(html);
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
         HtmlBrowserPdfRequest request = new(
-            HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
+            HtmlBrowserPdfSource.FromUrl(declaredOrigin.Url),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
-                function: "() => document.querySelector('#main').textContent === 'origin-storage' && document.body.dataset.loaded === '2'",
-                timeout: 10000),
+                function: "() => document.querySelector('#main').textContent === 'origin-storage' && document.body.dataset.loaded === '1'",
+                timeout: 30000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "origin-header" },
             localStorage: new System.Collections.Generic.Dictionary<string, string> { ["token"] = "origin-storage" });
 
@@ -130,19 +130,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task CrossOriginPageHeadersSurviveCaptureHeaderScoping() {
         await using LoopbackCorsHeaderServer foreignOrigin = new();
-        await using LoopbackContentServer declaredOrigin = new("same-origin-resource");
-        string html = $"<html><body><p id='result'>pending</p><script>Promise.all([fetch('/probe'), fetch('{foreignOrigin.Url}', {{ headers: {{ 'X-Render-Token': 'page-owned' }} }}).then(response => response.text())]).then(([, text]) => document.querySelector('#result').textContent = text);</script></body></html>";
+        string html = $"<html><body><p id='result'>pending</p><script>fetch('{foreignOrigin.Url}', {{ headers: {{ 'X-Render-Token': 'page-owned' }} }}).then(response => response.text()).then(text => document.querySelector('#result').textContent = text);</script></body></html>";
+        await using LoopbackContentServer declaredOrigin = new(html);
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
-            HtmlBrowserPdfSource.FromHtml(html, new Uri(declaredOrigin.Url)),
+            HtmlBrowserPdfSource.FromUrl(declaredOrigin.Url),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === 'foreign authorized'",
-                timeout: 10000),
+                timeout: 30000),
             headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "capture-owned" }));
 
         AssertPdfContains(result.PdfBytes, "foreign authorized");

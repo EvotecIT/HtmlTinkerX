@@ -173,6 +173,39 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task StagedXhrRejectsConfigurationChangesAfterSend() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const request = new popup.XMLHttpRequest();
+            request.open('POST', '{server.BlankPopupResourceUrl}?configuration-frozen');
+            request.send('body');
+            let headerRejected = false;
+            let credentialsRejected = false;
+            try {{ request.setRequestHeader('X-Late', 'changed'); }} catch (error) {{ headerRejected = error.name === 'InvalidStateError'; }}
+            try {{ request.withCredentials = true; }} catch (error) {{ credentialsRejected = error.name === 'InvalidStateError'; }}
+            request.abort();
+            document.querySelector('#result').textContent = headerRejected && credentialsRejected
+                ? 'xhr settings locked'
+                : 'xhr settings changed';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "xhr settings locked");
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task BlankPopupCssomResourcesWaitForHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

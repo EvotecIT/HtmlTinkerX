@@ -481,7 +481,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
 
         bool hasCaptureStyle = !string.IsNullOrWhiteSpace(request.StyleSheetContent);
         if (hasCaptureStyle) {
-            await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
+            await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, request.PreparationTimeout, cancellationToken).ConfigureAwait(false);
         }
         if (!string.IsNullOrWhiteSpace(request.BeforeCaptureScript)) {
             using CancellationTokenSource? deadline = request.BeforeCaptureScriptTimeout == 0
@@ -497,7 +497,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new TimeoutException($"The pre-capture script did not complete within {request.BeforeCaptureScriptTimeout} ms.");
             }
             if (hasCaptureStyle) {
-                await ApplyStyleSheetAsync(page, request.StyleSheetContent!, request.Readiness.Timeout, cancellationToken).ConfigureAwait(false);
+                await ApplyStyleSheetAsync(page, slot, request.StyleSheetContent!, request.PreparationTimeout, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -563,15 +563,15 @@ public sealed partial class HtmlBrowserPdfRenderer {
         _ => null
     };
 
-    private static async Task ApplyStyleSheetAsync(IPage page, string styleSheetContent, int timeout, CancellationToken cancellationToken) {
+    private static async Task ApplyStyleSheetAsync(IPage page, BrowserSlot slot, string styleSheetContent, int timeout, CancellationToken cancellationToken) {
         using CancellationTokenSource? deadline = timeout == 0
             ? null
             : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline?.CancelAfter(timeout);
         CancellationToken operationToken = deadline?.Token ?? cancellationToken;
         try {
-            await ExecuteCancellablePageOperationAsync(
-                page,
+            await ExecuteCancellableSlotOperationAsync(
+                slot,
                 () => HtmlBrowser.ApplyCaptureStyleSheetAsync(page, styleSheetContent, operationToken),
                 operationToken).ConfigureAwait(false);
         } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline?.IsCancellationRequested == true) {

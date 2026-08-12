@@ -566,6 +566,40 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task RepeatedPopupWritesPreserveNodeIdentityAndMutations() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            popup.document.write('<button id=""kept"">original</button>');
+            const body = popup.document.body;
+            const retained = popup.document.querySelector('#kept');
+            const identityStable = body === popup.document.body && body === popup.document.querySelector('body');
+            let eventObserved = false;
+            retained.addEventListener('htmltinkerx-check', () => eventObserved = true);
+            retained.textContent = 'mutated';
+            popup.document.write('<p id=""later"">later write</p>');
+            retained.dispatchEvent(new popup.Event('htmltinkerx-check'));
+            const preserved = identityStable && eventObserved && retained.isConnected
+                && retained.textContent === 'mutated' && popup.document.querySelector('#later') !== null;
+            document.querySelector('#result').textContent = preserved ? 'write identity preserved' : 'write identity lost';
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "write identity preserved");
+        AssertPdfDoesNotContain(result.PdfBytes, "write identity lost");
+    }
+
+    [Fact]
     public async Task PopupDocumentOpenResetsTheStagedWriteStreamBeforeLaterWrites() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
