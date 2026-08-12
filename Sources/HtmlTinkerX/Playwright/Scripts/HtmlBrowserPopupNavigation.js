@@ -45,12 +45,15 @@
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
     const attributeGuards = globalThis.__htmlTinkerXCreatePopupAttributeGuards({
         defineProperty: nativeDefineProperty,
+        getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
         reflectApply: nativeReflectApply,
         stringValue: nativeString,
         booleanValue: nativeBoolean
     });
     delete globalThis.__htmlTinkerXCreatePopupAttributeGuards;
     attributeGuards.install(Element.prototype);
+    attributeGuards.installNamedNodeMap(NamedNodeMap.prototype);
+    attributeGuards.installNode(Node.prototype);
 
     Event.prototype.preventDefault = function() {
         pageCancelledEvents.add(this);
@@ -65,13 +68,8 @@
         }
     });
 
-    const normalizedTarget = target => target == null || nativeString(target).length === 0
-        ? '_blank'
-        : nativeString(target).toLowerCase();
-
-    const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0
-        ? '_self'
-        : nativeString(target).toLowerCase();
+    const normalizedTarget = target => target == null || nativeString(target).length === 0 ? '_blank' : nativeString(target).toLowerCase();
+    const normalizedDeclarativeTarget = target => target == null || nativeString(target).length === 0 ? '_self' : nativeString(target).toLowerCase();
 
     const targetsExistingFrame = target => {
         if (target == null || nativeString(target).length === 0) return false;
@@ -137,6 +135,8 @@
             return popup;
         }
         attributeGuards.install(popup.Element.prototype);
+        attributeGuards.installNamedNodeMap(popup.NamedNodeMap.prototype);
+        attributeGuards.installNode(popup.Node.prototype);
 
         let ready = false;
         let documentMutationQueued = false;
@@ -223,10 +223,16 @@
             writable: false,
             configurable: false
         });
+        const toDomString = value => {
+            if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
+            return nativeString(value);
+        };
         const nativeSendBeacon = popup.Navigator.prototype.sendBeacon;
         if (typeof nativeSendBeacon === 'function') {
             const stagedSendBeacon = function(...args) {
-                runWhenReady(() => nativeReflectApply(nativeSendBeacon, this, args));
+                if (args.length === 0) throw new TypeError("Failed to execute 'sendBeacon': 1 argument required");
+                const normalizedArgs = [new nativeUrl(toDomString(args[0]), popup.document.baseURI).href, ...args.slice(1)];
+                runWhenReady(() => nativeReflectApply(nativeSendBeacon, this, normalizedArgs));
                 return true;
             };
             nativeDefineProperty(popup.Navigator.prototype, 'sendBeacon', {
@@ -236,10 +242,6 @@
             });
         }
         const stagedAsyncConstructors = new Map();
-        const toDomString = value => {
-            if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
-            return nativeString(value);
-        };
         const normalizeConstructorArguments = (name, args) => {
             if (args.length === 0) throw new TypeError(`Failed to construct '${name}': 1 argument required`);
             const url = new nativeUrl(toDomString(args[0]), popup.document.baseURI).href;
@@ -407,7 +409,8 @@
                 values,
                 namespacedValues,
                 () => released,
-                shouldDeferAttribute);
+                shouldDeferAttribute,
+                () => documentFacade);
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -947,7 +950,7 @@
         });
     };
 
-    afterPagePropagationHandlers('click', event => stagedClickAnchor(event) !== null, event => {
+    afterPagePropagationHandlers('click', event => { const staged = stagedClickAnchor(event); for (const node of staged?.path || []) attributeGuards.guardLegacyHandler(node, 'onclick', pageCancelledEvents); return staged !== null; }, event => {
         if (event.defaultPrevented) return;
         const staged = stagedClickAnchor(event);
         if (staged === null) return;
@@ -967,6 +970,7 @@
     afterPagePropagationHandlers('submit', event => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return false;
+        for (const node of nativeComposedPath.call(event)) attributeGuards.guardLegacyHandler(node, 'onsubmit', pageCancelledEvents);
         const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
         return hasExplicitEmptyTarget(form, submitter) || canDeferPopupFormSubmission(form, submitter);
     }, event => {

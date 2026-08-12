@@ -1,9 +1,29 @@
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
+    [Fact]
+    public async Task VisualMaskBlocksChildFrameNavigationUntilPrintActionCompletes() {
+        await using LoopbackContentServer server = new("<p id='replacement'>replacement sensitive value</p>");
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await session.Page.SetContentAsync($"<iframe srcdoc=\"<meta http-equiv='refresh' content='0.5;url={server.Url}'><p id='secret'>original sensitive value</p>\"></iframe>");
+
+        await Assert.ThrowsAsync<PlaywrightException>(() => HtmlBrowser.ExecuteWithTemporaryVisualMaskAsync(
+            session.Page,
+            maskSensitiveElements: false,
+            maskSelectors: new[] { "#secret" },
+            maskColor: "#000000",
+            action: async () => { await Task.Delay(1500); return true; },
+            cancellationToken: CancellationToken.None,
+            freezePageScriptsDuringAction: true));
+
+        Assert.Equal(0, server.RequestCount);
+    }
+
     [Fact]
     public async Task OrdinaryCapturePreservesBeforePrintHandlers() {
         const string html = @"<p id='result'>beforeprint pending</p><script>

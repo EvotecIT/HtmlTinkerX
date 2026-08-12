@@ -122,23 +122,71 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        TemporaryVisualMask mask = await ApplyTemporaryVisualMaskAsync(
-            page,
-            selectors,
-            maskColor,
-            cancellationToken,
-            disablePageScripts: freezePageScriptsDuringAction).ConfigureAwait(false);
+        Func<IRoute, Task>? navigationGuard = null;
+        TaskCompletionSource<bool>? navigationDetected = null;
+        EventHandler<IFrame>? frameNavigated = null;
+        if (freezePageScriptsDuringAction) {
+            navigationDetected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            frameNavigated = (_, _) => navigationDetected.TrySetResult(true);
+            page.FrameNavigated += frameNavigated;
+            navigationGuard = route => route.Request.IsNavigationRequest
+                ? route.AbortAsync("blockedbyclient")
+                : route.FallbackAsync();
+            await page.RouteAsync("**/*", navigationGuard).ConfigureAwait(false);
+        }
+        TemporaryVisualMask mask;
+        try {
+            mask = await ApplyTemporaryVisualMaskAsync(
+                page,
+                selectors,
+                maskColor,
+                cancellationToken,
+                disablePageScripts: freezePageScriptsDuringAction).ConfigureAwait(false);
+        } catch {
+            if (navigationGuard != null) await RemoveNavigationGuardAsync(page, navigationGuard).ConfigureAwait(false);
+            if (frameNavigated != null) page.FrameNavigated -= frameNavigated;
+            throw;
+        }
         try {
             cancellationToken.ThrowIfCancellationRequested();
-            return await action().ConfigureAwait(false);
+            Task<T> actionTask = action();
+            if (navigationDetected != null) {
+                Task completed = await Task.WhenAny(actionTask, navigationDetected.Task).ConfigureAwait(false);
+                if (!ReferenceEquals(completed, actionTask)) {
+                    await CloseNavigatedPageAsync(page).ConfigureAwait(false);
+                    try { await actionTask.ConfigureAwait(false); } catch { }
+                    throw new PlaywrightException("A frame navigated while sensitive content was masked for capture.");
+                }
+            }
+            T result = await actionTask.ConfigureAwait(false);
+            if (navigationDetected?.Task.IsCompleted == true) {
+                await CloseNavigatedPageAsync(page).ConfigureAwait(false);
+                throw new PlaywrightException("A frame navigated while sensitive content was masked for capture.");
+            }
+            return result;
         } finally {
             try {
-                await mask.DisposeAsync().ConfigureAwait(false);
-            } catch (PlaywrightException) when (cancellationToken.IsCancellationRequested || page.IsClosed) {
-                // Cancellation closes the page to interrupt Playwright. Preserve the original
-                // cancellation instead of replacing it with cleanup failure from the closed page.
+                try {
+                    await mask.DisposeAsync().ConfigureAwait(false);
+                } catch (Exception) when (page.IsClosed) {
+                    // Cancellation and fail-closed navigation handling interrupt Playwright by
+                    // closing the page. Preserve the original failure instead of cleanup noise.
+                }
+            } finally {
+                if (navigationGuard != null) await RemoveNavigationGuardAsync(page, navigationGuard).ConfigureAwait(false);
+                if (frameNavigated != null) page.FrameNavigated -= frameNavigated;
             }
         }
+    }
+
+    private static async Task CloseNavigatedPageAsync(IPage page) {
+        try { await page.CloseAsync().ConfigureAwait(false); }
+        catch (PlaywrightException) when (page.IsClosed) { }
+    }
+
+    private static async Task RemoveNavigationGuardAsync(IPage page, Func<IRoute, Task> navigationGuard) {
+        try { await page.UnrouteAsync("**/*", navigationGuard).ConfigureAwait(false); }
+        catch (PlaywrightException) when (page.IsClosed) { }
     }
 
     private static string[] CreateVisualMaskSelectors(bool maskSensitiveElements, IEnumerable<string>? maskSelectors) {

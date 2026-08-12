@@ -309,6 +309,41 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal("popup-token", server.LastProtectedToken);
     }
 
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 1)]
+    [InlineData(false, 2)]
+    [InlineData(false, 3)]
+    [InlineData(true, 0)]
+    [InlineData(true, 1)]
+    [InlineData(true, 2)]
+    [InlineData(true, 3)]
+    public async Task LegacyHandlerReturnFalseCancelsDeclarativePopup(bool form, int handlerMode) {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = (form, handlerMode) switch {
+            (true, 0) => "const form = document.querySelector('form'); form.onsubmit = () => false; form.requestSubmit(); true",
+            (true, 1) => "const form = document.querySelector('form'); form.setAttribute('onsubmit', 'return false'); form.requestSubmit(); true",
+            (true, 2) => "const form = document.querySelector('form'); document.body.onsubmit = () => false; form.requestSubmit(); true",
+            (true, _) => "const form = document.querySelector('form'); document.body.setAttribute('onsubmit', 'return false'); form.requestSubmit(); true",
+            (false, 0) => "const anchor = document.querySelector('a'); anchor.onclick = () => false; anchor.click(); true",
+            (false, 1) => "const anchor = document.querySelector('a'); anchor.setAttribute('onclick', 'return false'); anchor.click(); true",
+            (false, 2) => "const anchor = document.querySelector('a'); document.body.onclick = () => false; anchor.click(); true",
+            _ => "const anchor = document.querySelector('a'); document.body.setAttribute('onclick', 'return false'); anchor.click(); true"
+        };
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(form ? server.DeclarativeFormUrl : server.DeclarativeAnchorUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.Null(server.LastPopupToken);
+        Assert.Null(server.LastProtectedToken);
+    }
+
     [Fact]
     public async Task BlankNamedSiblingFrameUsesNativeTargetedNavigation() {
         await using LoopbackPopupServer server = new();
