@@ -39,8 +39,6 @@
     installCacheRoutes(globalThis.Cache?.prototype);
     installStorageRoute(globalThis.CacheStorage?.prototype);
     globalThis.__htmlTinkerXCreatePopupCacheGuards = ({ popup, runWhenReady, normalizeRequest }) => {
-        installCacheRoutes(popup.Cache?.prototype);
-        installStorageRoute(popup.CacheStorage?.prototype);
         const guardCache = cache => {
             if (cache == null) return cache;
             cacheStates.set(cache, (name, method, args) => {
@@ -58,7 +56,13 @@
             });
             return cache;
         };
-        if (popup.caches != null) storageStates.set(popup.caches, guardCache);
-        return { guardCache };
+        const guardWindow = target => {
+            if (target == null) return;
+            installCacheRoutes(target.Cache?.prototype);
+            installStorageRoute(target.CacheStorage?.prototype);
+            if (target.caches != null) storageStates.set(target.caches, guardCache);
+        };
+        guardWindow(popup);
+        return { guardCache, guardWindow };
     };
 })();

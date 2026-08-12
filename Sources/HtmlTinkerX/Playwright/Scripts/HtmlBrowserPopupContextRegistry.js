@@ -8,6 +8,7 @@
         specialTargets
     }) => {
         const namedPopups = new Map();
+        const popupContexts = new WeakMap();
         const reusableName = target => {
             if (target == null) return null;
             const name = stringValue(target);
@@ -50,7 +51,7 @@
                 const existing = namedPopups.get(name);
                 if (existing == null) return null;
                 try {
-                    if (existing.popup.closed) {
+                    if (existing.popup.closed || reusableName(existing.popup.name) !== name) {
                         namedPopups.delete(name);
                         return null;
                     }
@@ -62,9 +63,29 @@
                 if (typeof action === 'function') existing.runWhenReady(() => action(existing.popup));
                 return existing.facade;
             },
+            claimPopup(popup, initialAction, existingAction) {
+                const existing = popupContexts.get(popup);
+                if (existing == null) return null;
+                const name = reusableName(popup.name);
+                if (existing.name != null && namedPopups.get(existing.name) === existing) namedPopups.delete(existing.name);
+                existing.name = name;
+                if (name != null) namedPopups.set(name, existing);
+                const action = typeof initialAction === 'function' ? initialAction : existingAction;
+                if (typeof action === 'function') existing.runWhenReady(() => action(existing.popup));
+                return existing.facade;
+            },
+            syncName(popup) {
+                const existing = popupContexts.get(popup);
+                if (existing == null) return;
+                if (existing.name != null && namedPopups.get(existing.name) === existing) namedPopups.delete(existing.name);
+                existing.name = reusableName(popup.name);
+                if (existing.name != null) namedPopups.set(existing.name, existing);
+            },
             register(target, popup, facade, runWhenReady) {
                 const name = reusableName(target);
-                if (name != null) namedPopups.set(name, { popup, facade, runWhenReady });
+                const context = { popup, facade, runWhenReady, name };
+                popupContexts.set(popup, context);
+                if (name != null) namedPopups.set(name, context);
             }
         };
     };

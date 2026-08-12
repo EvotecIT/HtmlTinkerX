@@ -124,7 +124,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
             if (!ShouldRecycle(available)) {
                 return available;
             }
-            await RecycleSlotAsync(available).ConfigureAwait(false);
+            await RecycleSlotAsync(available, cancellationToken).ConfigureAwait(false);
         }
 
         await _poolMutation.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -133,7 +133,7 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
                 if (!ShouldRecycle(available)) {
                     return available;
                 }
-                await RecycleSlotAsync(available).ConfigureAwait(false);
+                await RecycleSlotAsync(available, cancellationToken).ConfigureAwait(false);
             }
 
             return await CreateSlotAsync(cancellationToken).ConfigureAwait(false);
@@ -196,13 +196,36 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
         || slot.RenderCount >= _options.MaximumRendersPerBrowser
         || DateTimeOffset.UtcNow - slot.CreatedAt >= _options.MaximumBrowserAge;
 
-    private async Task RecycleSlotAsync(BrowserSlot slot) {
+    private async Task RecycleSlotAsync(BrowserSlot slot, CancellationToken cancellationToken = default) {
         if (!_slots.TryRemove(slot.Id, out _)) {
             return;
         }
 
         Interlocked.Increment(ref _recycled);
-        await slot.DisposeAsync().ConfigureAwait(false);
+        Task cleanup = slot.DisposeAsync().AsTask();
+        await WaitForCleanupAsync(cleanup, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WaitForCleanupAsync(Task cleanup, CancellationToken cancellationToken) {
+        if (!cancellationToken.CanBeCanceled || cleanup.IsCompleted) {
+            await cleanup.ConfigureAwait(false);
+            return;
+        }
+
+        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenRegistration registration = cancellationToken.Register(
+            static state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
+            cancelled);
+        if (await Task.WhenAny(cleanup, cancelled.Task).ConfigureAwait(false) != cleanup) {
+            _ = cleanup.ContinueWith(
+                static completed => _ = completed.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        await cleanup.ConfigureAwait(false);
     }
 
     private void ThrowIfDisposed() {

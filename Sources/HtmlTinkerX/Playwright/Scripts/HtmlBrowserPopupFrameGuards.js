@@ -1,12 +1,13 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, codeGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
         const documents = new WeakMap([[popup.document, mainDocumentFacade]]);
         const documentFor = value => {
             if (value == null) return value;
+            stagedAsyncConstructors.guardFontSet(value);
             const existing = documents.get(value);
             if (existing != null) return existing;
             const facade = createDocumentFacade(value);
@@ -57,6 +58,8 @@
         const windowFor = target => {
             const existing = windows.get(target);
             if (existing != null) return existing;
+            cacheGuards.guardWindow(target);
+            stagedAsyncConstructors.guardFontSet(target.document);
             const codeMembers = codeGuards.forWindow(target);
             let facade;
             facade = new Proxy({}, {

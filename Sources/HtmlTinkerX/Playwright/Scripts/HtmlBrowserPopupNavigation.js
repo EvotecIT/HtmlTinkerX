@@ -53,6 +53,7 @@
     const createFrameGuards = globalThis.__htmlTinkerXCreatePopupFrameGuards; delete globalThis.__htmlTinkerXCreatePopupFrameGuards; const createCodeGuards = globalThis.__htmlTinkerXCreatePopupCodeGuards; delete globalThis.__htmlTinkerXCreatePopupCodeGuards; const createDomGuards = globalThis.__htmlTinkerXCreatePopupDomGuards; delete globalThis.__htmlTinkerXCreatePopupDomGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
         defineProperty: nativeDefineProperty, getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor,
+        hasOwnProperty: nativeHasOwnProperty,
         reflectApply: nativeReflectApply,
         reflectConstruct: nativeReflectConstruct,
         reflectGet: nativeReflectGet,
@@ -113,6 +114,8 @@
         if (existing != null) return existing;
         const popup = originalOpen.call(this, url, target, features);
         if (!popup || specialTargets.includes(normalizedTarget(target)) || popupContexts.targetsExistingFrame(target)) return popup;
+        const guarded = popupContexts.claimPopup(popup, initialAction, existingAction);
+        if (guarded != null) return guarded;
         try {
             if (popup.location.href !== 'about:blank') {
                 if (typeof existingAction === 'function') existingAction(popup);
@@ -154,7 +157,7 @@
         };
         const codeGuards = createCodeGuards({ popup, isReady: () => ready, runWhenReady, stringValue: toDomString }); const stagedCodeMembers = codeGuards.forWindow(popup);
         const transportGuards = createTransportGuards({ popup, fallbackBaseUri: document.baseURI, isReady: () => ready, runWhenReady, toDomString });
-        createCacheGuards({ popup, runWhenReady, normalizeRequest: value => transportGuards.snapshotFetchArguments([value])[0] });
+        const cacheGuards = createCacheGuards({ popup, runWhenReady, normalizeRequest: value => transportGuards.snapshotFetchArguments([value])[0] });
         const popupFetch = popup.fetch.bind(popup);
         const stagedFetch = (...args) => {
             let snapshot;
@@ -585,7 +588,7 @@
             return facade;
         };
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } }; const isDocumentValue = value => { try { return nativeReflectApply(popupNodeType, value, []) === 9; } catch { return false; } }; const documentFacade = stagedObject(() => popup.document);
-        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, codeGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
         stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
@@ -609,7 +612,9 @@
                     runWhenReady(() => { targetWindow.location = normalized; });
                     return true;
                 }
-                return nativeReflectSet(targetWindow, property, value, targetWindow);
+                const result = nativeReflectSet(targetWindow, property, value, targetWindow);
+                if (property === 'name') popupContexts.syncName(targetWindow);
+                return result;
             }
         });
         stagedRealmMembers.registerFacade(popupFacade);

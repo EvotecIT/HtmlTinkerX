@@ -104,12 +104,87 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task ChildFrameCacheAndFontFaceSetWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            const direct = new popup.FontFace('child-direct', `url('{server.BlankPopupResourceUrl}?source=child-font-set')`);
+            const borrowed = new popup.FontFace('child-borrowed', `url('{server.BlankPopupResourceUrl}?source=child-font-set-borrowed')`);
+            frame.contentDocument.fonts.add(direct).add(borrowed);
+            const openerFontLoad = Object.getPrototypeOf(document.fonts).load;
+            const openerCacheOpen = Object.getPrototypeOf(caches).open;
+            Promise.allSettled([
+                frame.contentDocument.fonts.load('12px child-direct'),
+                openerFontLoad.call(frame.contentDocument.fonts, '12px child-borrowed'),
+                frame.contentWindow.caches.open('htmltinkerx-child').then(cache => cache.add('{server.BlankPopupResourceUrl}?source=child-cache')),
+                openerCacheOpen.call(frame.contentWindow.caches, 'htmltinkerx-child-borrowed').then(cache => Cache.prototype.add.call(cache, '{server.BlankPopupResourceUrl}?source=child-cache-borrowed'))
+            ]).then(() => document.querySelector('#result').textContent = 'child resources staged');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'child resources staged'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "child resources staged");
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-font-set"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-font-set-borrowed"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-cache"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("child-cache-borrowed"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task DeferredWorkerAndEventSourcePreserveExpandosAfterActivation() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const worker = new popup.Worker('/popup/worker.js');
+            const source = new popup.EventSource('/popup/events');
+            worker.jobId = 'worker-report';
+            source.jobId = 'event-report';
+            let workerOk = false;
+            let sourceOk = false;
+            const complete = () => {
+                if (workerOk && sourceOk) document.querySelector('#result').textContent = 'expandos preserved';
+            };
+            worker.onmessage = () => { workerOk = worker.jobId === 'worker-report'; complete(); };
+            source.onmessage = () => { sourceOk = source.jobId === 'event-report'; source.close(); complete(); };
+            worker.postMessage('start');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'expandos preserved'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "expandos preserved");
+        Assert.Equal("popup-token", server.LastPopupWorkerToken);
+        Assert.Equal("popup-token", server.LastPopupEventToken);
+    }
+
+    [Fact]
     public async Task RepeatedNamedWindowOpenReusesTheGuardedPopup() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
-        const string script = @"const first = window.open('', 'report');
+        const string script = @"const first = window.open('', '_blank');
+            first.name = 'report';
             const second = window.open('/blank-popup-location', 'report');
             if (first !== second) throw new Error('named popup facade was not reused');
             true";

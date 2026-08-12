@@ -4,6 +4,7 @@
     globalThis.__htmlTinkerXCreatePopupAsyncConstructors = ({
         defineProperty,
         getOwnPropertyDescriptor,
+        hasOwnProperty,
         reflectApply,
         reflectConstruct,
         reflectGet,
@@ -74,6 +75,7 @@
                                 }
                             };
                         }
+                        if (reflectApply(hasOwnProperty, target, [property])) return reflectGet(target, property, target);
                         if (instance != null) {
                             const value = reflectGet(instance, property, instance);
                             return typeof value === 'function' ? value.bind(instance) : value;
@@ -111,6 +113,7 @@
                             if (instance != null) reflectSet(instance, property, wrapCallback(value), instance);
                             return true;
                         }
+                        if (reflectApply(hasOwnProperty, target, [property])) return reflectSet(target, property, value, target);
                         return instance != null
                             ? reflectSet(instance, property, value, instance)
                             : reflectSet(target, property, value, target);
@@ -207,10 +210,11 @@
                 }
             });
         };
-        const stageFontSet = () => {
+        const guardFontSet = document => {
             installFontSetRoute(globalThis.FontFaceSet?.prototype);
             installFontSetRoute(popup.FontFaceSet?.prototype);
-            const fonts = popup.document?.fonts;
+            installFontSetRoute(document?.defaultView?.FontFaceSet?.prototype);
+            const fonts = document?.fonts;
             if (fonts == null) return;
             fontSetStates.set(fonts, (load, args) => {
                 let normalized;
@@ -228,7 +232,8 @@
         stage('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
         stage('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
         stageFontFace();
-        stageFontSet();
+        guardFontSet(popup.document);
+        constructors.guardFontSet = guardFontSet;
         return constructors;
     };
 })();
