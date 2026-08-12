@@ -7,18 +7,20 @@
     const activationStates = new WeakMap();
     const imageDecodeStates = new WeakMap();
     const mediaPlayStates = new WeakMap();
+    const formSubmissionStates = new WeakMap();
     const installedRangePrototypes = new WeakSet();
     const installedSelectionPrototypes = new WeakSet();
     const installedActivationPrototypes = new WeakSet();
     const installedImagePrototypes = new WeakSet();
     const installedMediaPrototypes = new WeakSet();
+    const installedFormPrototypes = new WeakSet();
     const parserRoutes = new WeakMap();
     const parserConstructors = new WeakMap();
     const installedParserPrototypes = new WeakSet();
     const installRangeRoutes = prototype => {
         if (prototype == null || installedRangePrototypes.has(prototype)) return;
         installedRangePrototypes.add(prototype);
-        for (const name of ['cloneContents', 'createContextualFragment', 'extractContents', 'insertNode', 'surroundContents']) {
+        for (const name of ['cloneContents', 'cloneRange', 'createContextualFragment', 'extractContents', 'insertNode', 'surroundContents']) {
             const method = prototype[name];
             if (typeof method !== 'function') continue;
             defineProperty(prototype, name, {
@@ -27,6 +29,11 @@
                 value(...args) {
                     const guardTree = rangeStates.get(this);
                     if (guardTree == null) return reflectApply(method, this, args);
+                    if (name === 'cloneRange') {
+                        const clone = reflectApply(method, this, args);
+                        rangeStates.set(clone, guardTree);
+                        return clone;
+                    }
                     if (name === 'insertNode' || name === 'surroundContents') {
                         if (args.length > 0) guardTree(args[0]);
                         return reflectApply(method, this, args);
@@ -94,6 +101,22 @@
             }
         });
     };
+    const installFormRoutes = prototype => {
+        if (prototype == null || installedFormPrototypes.has(prototype)) return;
+        installedFormPrototypes.add(prototype);
+        for (const name of ['submit', 'requestSubmit']) {
+            const method = prototype[name];
+            if (typeof method !== 'function') continue;
+            defineProperty(prototype, name, {
+                configurable: false,
+                writable: false,
+                value(...args) {
+                    const stage = formSubmissionStates.get(this);
+                    return stage == null ? reflectApply(method, this, args) : stage(name, method, args);
+                }
+            });
+        }
+    };
     const installParserRoute = target => {
         const prototype = target?.DOMParser?.prototype;
         if (prototype == null || installedParserPrototypes.has(prototype)) return;
@@ -121,6 +144,8 @@
         installImageDecodeRoute(popup.HTMLImageElement?.prototype);
         installMediaPlayRoute(HTMLMediaElement.prototype);
         installMediaPlayRoute(popup.HTMLMediaElement?.prototype);
+        installFormRoutes(HTMLFormElement.prototype);
+        installFormRoutes(popup.HTMLFormElement?.prototype);
         installParserRoute(popup);
         const constructorFor = target => {
             const existing = parserConstructors.get(target);
@@ -143,7 +168,7 @@
         };
         return {
             constructorFor,
-            guardRealm(target) { installParserRoute(target); installRangeRoutes(target?.Range?.prototype); installSelectionRoutes(target?.Selection?.prototype); },
+            guardRealm(target) { installParserRoute(target); installRangeRoutes(target?.Range?.prototype); installSelectionRoutes(target?.Selection?.prototype); installFormRoutes(target?.HTMLFormElement?.prototype); },
             guardRange(range) {
                 if (range != null) rangeStates.set(range, guardCreatedTree);
                 return range;
@@ -175,6 +200,26 @@
                     try { reflectApply(play, element, args).then(resolve, reject); }
                     catch (error) { reject(error); }
                 })));
+            },
+            guardFormSubmission(element) {
+                if (element?.localName !== 'form') return;
+                installFormRoutes(element.ownerDocument?.defaultView?.HTMLFormElement?.prototype);
+                formSubmissionStates.set(element, (name, method, args) => {
+                    if (isReady()) return reflectApply(method, element, args);
+                    const normalized = [];
+                    if (name === 'requestSubmit' && args.length > 0 && args[0] != null) {
+                        const submitter = args[0];
+                        const localName = submitter?.localName;
+                        const type = submitter?.type;
+                        if (!((localName === 'button' && (type === 'submit' || type === '')) || (localName === 'input' && (type === 'submit' || type === 'image')))) {
+                            throw new TypeError("Failed to execute 'requestSubmit': the specified element is not a submit button");
+                        }
+                        if (submitter.form !== element) throw new popup.DOMException('The specified element is not owned by this form element', 'NotFoundError');
+                        normalized.push(submitter);
+                    }
+                    runWhenReady(() => reflectApply(method, element, normalized));
+                    return undefined;
+                });
             }
         };
     };

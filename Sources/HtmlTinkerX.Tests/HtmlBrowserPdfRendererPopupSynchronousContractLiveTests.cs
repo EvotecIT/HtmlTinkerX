@@ -337,6 +337,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             try {{ framedPopup.document.appendChild(); }} catch (error) {{ mutationTypeError = error instanceof TypeError; }}
             if (!mutationTypeError) throw new Error('invalid mutation did not fail synchronously');
             const navigatingPopup = window.open('', '_blank');
+            const targetOnlyBase = navigatingPopup.document.createElement('base');
+            targetOnlyBase.target = '_blank';
+            navigatingPopup.document.head.append(targetOnlyBase);
             const navigationBase = navigatingPopup.document.createElement('base');
             navigationBase.href = '{server.BlankPopupResourceUrl}?source=navigation-base';
             navigatingPopup.document.head.append(navigationBase);

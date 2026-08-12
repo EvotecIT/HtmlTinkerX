@@ -93,6 +93,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
             if (!popup.CSS?.paintWorklet) throw new Error('paint worklet unavailable');
+            const targetBase = popup.document.createElement('base');
+            targetBase.target = '_blank';
+            popup.document.head.append(targetBase);
             const base = popup.document.createElement('base');
             base.href = '{server.BlankPopupResourceUrl}';
             popup.document.head.append(base);
@@ -132,9 +135,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
+            const baseTarget = popup.document.createElement('base');
+            baseTarget.target = '_blank';
+            popup.document.head.append(baseTarget);
+            const base = popup.document.createElement('base');
+            base.href = '{server.BlankPopupResourceUrl}';
+            popup.document.head.append(base);
             const style = popup.document.createElement('style');
             popup.document.head.append(style);
             popup.document.styleSheets[0].insertRule('@import url({server.BlankPopupResourceUrl}?source=document-stylesheet);', 0);
+            for (const sheet of popup.document.styleSheets) sheet.insertRule('@import url({server.BlankPopupResourceUrl}?source=document-stylesheet-iterator);', 0);
             const selected = popup.document.createElement('span');
             selected.textContent = 'selection';
             popup.document.body.append(selected);
@@ -146,12 +156,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const selectedImage = popup.document.createElement('img');
             selectedImage.src = '{server.BlankPopupResourceUrl}?source=selection-range';
             selection.getRangeAt(0).insertNode(selectedImage);
+            const clonedImage = popup.document.createElement('img');
+            clonedImage.src = '{server.BlankPopupResourceUrl}?source=cloned-selection-range';
+            selection.getRangeAt(0).cloneRange().insertNode(clonedImage);
             const host = popup.document.createElement('div');
             popup.document.body.append(host);
             const root = host.attachShadow({{ mode: 'open' }});
             const shadowStyle = document.createElement('style');
             shadowStyle.textContent = '@import url({server.BlankPopupResourceUrl}?source=shadow-insertion);';
             root.appendChild(shadowStyle);
+            const adopted = document.createElement('img');
+            popup.document.body.appendChild(adopted);
+            adopted.src = '?source=adopted-node';
+            popup.fetch(adopted.src);
             const editable = popup.document.createElement('div');
             editable.contentEditable = 'true';
             editable.textContent = 'edit';
@@ -161,6 +178,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             selection.removeAllRanges();
             selection.addRange(editRange);
             editable.focus();
+            let invalidExecCommandRejected = false;
+            try {{ popup.document.execCommand(); }} catch (error) {{ invalidExecCommandRejected = error.name === 'TypeError'; }}
+            if (!invalidExecCommandRejected) throw new Error('invalid execCommand did not fail synchronously');
             popup.document.execCommand('insertHTML', false, '<img src=""{server.BlankPopupResourceUrl}?source=exec-command"">');
             true";
 
@@ -172,9 +192,47 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupSourceRequests("document-stylesheet"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("document-stylesheet-iterator"));
         Assert.Equal(1, server.BlankPopupSourceRequests("selection-range"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("cloned-selection-range"));
         Assert.Equal(1, server.BlankPopupSourceRequests("shadow-insertion"));
+        Assert.Equal(2, server.BlankPopupSourceRequests("adopted-node"));
         Assert.Equal(1, server.BlankPopupSourceRequests("exec-command"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task PopupFormMethodsWaitForStagedActions() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const directPopup = window.open('', '_blank');
+            const directForm = directPopup.document.createElement('form');
+            directForm.method = 'post';
+            directForm.action = '{server.BlankPopupResourceUrl}?source=form-submit';
+            directPopup.document.body.append(directForm);
+            directForm.submit();
+            const requestPopup = window.open('', '_blank');
+            const requestForm = requestPopup.document.createElement('form');
+            requestForm.method = 'post';
+            requestForm.action = '{server.BlankPopupResourceUrl}?source=form-request-submit';
+            const button = requestPopup.document.createElement('button');
+            button.type = 'submit';
+            requestForm.append(button);
+            requestPopup.document.body.append(requestForm);
+            requestForm.requestSubmit(button);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("form-submit"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("form-request-submit"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }

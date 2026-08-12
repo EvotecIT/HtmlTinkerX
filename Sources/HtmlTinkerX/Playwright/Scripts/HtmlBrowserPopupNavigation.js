@@ -270,9 +270,9 @@
             || attribute.startsWith('on')
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
             || (element.localName === 'meta' && attribute === 'content');
-        let domGuards; const guardDeferredAttributes = (element, initialValues) => { const elementDocument = nativeReflectApply(popupOwnerDocument, element, []);
+        let domGuards; const guardDeferredAttributes = (element, initialValues) => { const elementDocument = () => nativeReflectApply(popupOwnerDocument, element, []);
             if (guardedElements.has(element)) return;
-            guardedElements.add(element); domGuards?.guardActivation(element); domGuards?.guardImageDecode(element); domGuards?.guardMediaPlayback(element);
+            guardedElements.add(element); domGuards?.guardActivation(element); domGuards?.guardImageDecode(element); domGuards?.guardMediaPlayback(element); domGuards?.guardFormSubmission(element);
             const values = new Map(initialValues); const namespacedValues = new Map();
             const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null; const stagedTextNodes = stagesScriptText ? popup.document.createElement('script') : null; if (stagedTextNodes != null) { nativeSetAttribute.call(stagedTextNodes, 'type', 'application/x-htmltinkerx-staged'); popupTextContent.set.call(stagedTextNodes, stagedText); }
             if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
@@ -283,7 +283,7 @@
                 namespacedValues,
                 () => released,
                 shouldDeferAttribute,
-                value => stagedDocument(value ?? popup.document), value => stagedChildWindow(value),
+                value => stagedDocument(value ?? elementDocument()), value => stagedChildWindow(value),
                 (method, args) => stageElementMarkup(element, method, args),
                 clone => guardClonedTree(element, clone),
                 value => guardCreatedTree(value),
@@ -315,14 +315,14 @@
                 if (descriptor == null || descriptor.configurable === false && nativeHasOwnProperty.call(element, property)) continue;
                 attributeGuards.installProperty(descriptorOwner, property, attribute);
                 const animated = element.namespaceURI === 'http://www.w3.org/2000/svg' && property === 'href'
-                    ? createAnimatedAttributeGuard({ target: element, readNative: () => descriptor.get.call(element), isReleased: () => released, isDeferred: () => shouldDeferAttribute(element, attribute), hasStaged: () => values.has(attribute), readStaged: () => values.get(attribute), writeStaged: value => values.set(attribute, value), normalize: value => transportGuards.normalizeDeferredProperty(attribute, value, elementDocument), stringValue: toDomString, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet })
+                    ? createAnimatedAttributeGuard({ target: element, readNative: () => descriptor.get.call(element), isReleased: () => released, isDeferred: () => shouldDeferAttribute(element, attribute), hasStaged: () => values.has(attribute), readStaged: () => values.get(attribute), writeStaged: value => values.set(attribute, value), normalize: value => transportGuards.normalizeDeferredProperty(attribute, value, elementDocument()), stringValue: toDomString, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet })
                     : null;
                 nativeDefineProperty(element, property, {
                     configurable: false,
                     enumerable: descriptor.enumerable,
                     get() {
                         if (animated != null) return animated();
-                        if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return transportGuards.normalizeDeferredProperty(attribute, values.get(attribute), elementDocument);
+                        if (!released && shouldDeferAttribute(element, attribute) && values.has(attribute)) return transportGuards.normalizeDeferredProperty(attribute, values.get(attribute), elementDocument());
                         return descriptor.get ? descriptor.get.call(element) : '';
                     },
                     set(value) {

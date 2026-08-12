@@ -43,6 +43,7 @@
     const attributeStyleMapRouteDescriptors = new WeakMap();
     const workletStates = new WeakMap();
     const installedWorkletPrototypes = new WeakSet();
+    const styleSheetListItem = StyleSheetList.prototype.item;
     const installWorkletRoute = prototype => {
         if (prototype == null || installedWorkletPrototypes.has(prototype)) return;
         installedWorkletPrototypes.add(prototype);
@@ -135,20 +136,25 @@
         const popupFormData = popup.FormData;
         const popupFormDataAppend = popupFormData.prototype.append;
         const popupGetAttribute = popup.Element.prototype.getAttribute;
-        const popupQuerySelector = popup.Document.prototype.querySelector;
+        const popupQuerySelectorAll = popup.Document.prototype.querySelectorAll;
         const popupUrlSearchParams = popup.URLSearchParams;
+        const stagedBase = currentDocument => {
+            for (const element of reflectApply(popupQuerySelectorAll, currentDocument, ['base'])) {
+                const href = reflectApply(popupGetAttribute, element, ['href']);
+                if (href != null) return href;
+            }
+            return null;
+        };
         const documentBase = () => {
-            const baseElement = reflectApply(popupQuerySelector, popup.document, ['base']);
-            const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
-            return stagedBase == null
+            const base = stagedBase(popup.document);
+            return base == null
                 ? popup.document.baseURI.startsWith('about:') ? fallbackBaseUri : popup.document.baseURI
-                : new url(stagedBase, fallbackBaseUri).href;
+                : new url(base, fallbackBaseUri).href;
         };
         const documentBaseFor = currentDocument => {
-            const baseElement = reflectApply(popupQuerySelector, currentDocument, ['base']);
-            const stagedBase = baseElement == null ? null : reflectApply(popupGetAttribute, baseElement, ['href']);
+            const base = stagedBase(currentDocument);
             const nativeBase = currentDocument.baseURI.startsWith('about:') ? documentBase() : currentDocument.baseURI;
-            return stagedBase == null ? nativeBase : new url(stagedBase, nativeBase).href;
+            return base == null ? nativeBase : new url(base, nativeBase).href;
         };
         installSheetMutations(popup.CSSStyleSheet.prototype);
         const sheetDescriptor = installSheetRoute(popup.HTMLStyleElement.prototype);
@@ -314,7 +320,8 @@
                 const resolveSheet = sheet => sheetStates.get(sheet?.ownerNode)?.() ?? sheet;
                 const facade = new Proxy(collection, {
                     get(target, property) {
-                        if (property === 'item') return index => resolveSheet(target.item(index));
+                        if (property === 'item') return index => resolveSheet(reflectApply(styleSheetListItem, target, [index]));
+                        if (property === iterator) return function*() { for (let index = 0; index < target.length; index++) yield resolveSheet(reflectApply(styleSheetListItem, target, [index])); };
                         const value = reflectGet(target, property, target);
                         if (typeof property === 'string' && /^\d+$/.test(property)) return resolveSheet(value);
                         return typeof value === 'function' ? value.bind(target) : value;
@@ -324,6 +331,7 @@
                 return facade;
             },
             stageExecCommand(document, args) {
+                if (args.length === 0) throw new TypeError("Failed to execute 'execCommand': 1 argument required");
                 const normalized = [];
                 if (args.length > 0) normalized.push(toDomString(args[0]));
                 if (args.length > 1) normalized.push(booleanValue(args[1]));
