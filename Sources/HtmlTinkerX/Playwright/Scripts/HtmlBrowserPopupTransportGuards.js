@@ -35,6 +35,7 @@
     const navigationStates = new WeakMap();
     const sheetStates = new WeakMap();
     const sheetMutationStates = new WeakMap();
+    const sheetCollectionFacades = new WeakMap();
     const installedSheetPrototypes = new WeakSet();
     const styleStates = new WeakMap();
     const styleRouteDescriptors = new WeakMap();
@@ -152,14 +153,14 @@
         installSheetMutations(popup.CSSStyleSheet.prototype);
         const sheetDescriptor = installSheetRoute(popup.HTMLStyleElement.prototype);
         const styleDescriptor = installStyleRoute(popup.HTMLElement.prototype);
-        const guardWorklet = worklet => {
+        const guardWorklet = (worklet, documentProvider = () => popup.document) => {
             if (worklet == null) return worklet;
             installWorklet(worklet);
             workletStates.set(worklet, (addModule, args) => {
                 let normalized;
                 try {
                     if (args.length === 0) throw new TypeError("Failed to execute 'addModule': 1 argument required");
-                    normalized = [new url(toDomString(args[0]), documentBase()).href];
+                    normalized = [new url(toDomString(args[0]), documentBaseFor(documentProvider())).href];
                     if (args.length > 1) {
                         const source = args[1] == null ? {} : objectValue(args[1]);
                         const options = {};
@@ -178,7 +179,12 @@
             });
             return worklet;
         };
-        for (const name of ['paintWorklet', 'animationWorklet', 'layoutWorklet']) guardWorklet(popup.CSS?.[name]);
+        const guardCss = (css, documentProvider = () => popup.document) => {
+            if (css == null) return css;
+            for (const name of ['paintWorklet', 'animationWorklet', 'layoutWorklet']) guardWorklet(css[name], documentProvider);
+            return css;
+        };
+        guardCss(popup.CSS);
         const isInstance = (value, popupType, openerType) => (typeof popupType === 'function' && value instanceof popupType)
             || (typeof openerType === 'function' && value instanceof openerType);
         const isNode = value => {
@@ -268,7 +274,7 @@
                 openerBeaconInstalled = true;
             }
         }
-        const normalizeNavigationArguments = (name, args) => {
+        const normalizeNavigationArguments = (name, args, baseUri) => {
             const snapshotOptions = value => {
                 const source = value == null ? {} : objectValue(value);
                 const options = {};
@@ -285,7 +291,7 @@
             };
             if (name === 'navigate') {
                 if (args.length === 0) throw new TypeError("Failed to execute 'navigate': 1 argument required");
-                const normalized = [new url(toDomString(args[0]), popup.document.baseURI).href];
+                const normalized = [new url(toDomString(args[0]), baseUri ?? documentBase()).href];
                 if (args.length > 1) normalized.push(snapshotOptions(args[1]));
                 return normalized;
             }
@@ -299,7 +305,32 @@
         };
         return {
             guardNavigator,
+            guardCss,
             documentBaseFor,
+            guardStyleSheetCollection(collection) {
+                if (collection == null) return collection;
+                const existing = sheetCollectionFacades.get(collection);
+                if (existing != null) return existing;
+                const resolveSheet = sheet => sheetStates.get(sheet?.ownerNode)?.() ?? sheet;
+                const facade = new Proxy(collection, {
+                    get(target, property) {
+                        if (property === 'item') return index => resolveSheet(target.item(index));
+                        const value = reflectGet(target, property, target);
+                        if (typeof property === 'string' && /^\d+$/.test(property)) return resolveSheet(value);
+                        return typeof value === 'function' ? value.bind(target) : value;
+                    }
+                });
+                sheetCollectionFacades.set(collection, facade);
+                return facade;
+            },
+            stageExecCommand(document, args) {
+                const normalized = [];
+                if (args.length > 0) normalized.push(toDomString(args[0]));
+                if (args.length > 1) normalized.push(booleanValue(args[1]));
+                if (args.length > 2) normalized.push(toDomString(args[2]));
+                runWhenReady(() => reflectApply(document.execCommand, document, normalized));
+                return true;
+            },
             snapshotFetchArguments(args, baseUri) {
                 if (args.length === 0) throw new TypeError("Failed to execute 'fetch': 1 argument required");
                 const input = isInstance(args[0], popup.Request, nativeRequest)
@@ -313,18 +344,18 @@
             normalizeLocationArguments(name, args, baseUri) {
                 if (name === 'reload') return [];
                 if (args.length === 0) throw new TypeError(`Failed to execute '${name}': 1 argument required`);
-                return [new url(toDomString(args[0]), baseUri ?? popup.document.baseURI).href];
+                return [new url(toDomString(args[0]), baseUri ?? documentBase()).href];
             },
             normalizeLocationSetter(property, value, baseUri) {
                 const normalized = toDomString(value);
                 return property === 'href'
-                    ? new url(normalized, baseUri ?? popup.document.baseURI).href
+                    ? new url(normalized, baseUri ?? documentBase()).href
                     : normalized;
             },
-            guardNavigation(navigation, navigationType) {
+            guardNavigation(navigation, navigationType, documentProvider = () => popup.document) {
                 if (navigation == null || typeof navigationType !== 'function') return;
                 navigationStates.set(navigation, (property, args, nativeMethod) => {
-                    const normalized = normalizeNavigationArguments(property, args);
+                    const normalized = normalizeNavigationArguments(property, args, documentBaseFor(documentProvider()));
                     let resolveCommitted, rejectCommitted, resolveFinished, rejectFinished;
                     const committed = new Promise((resolve, reject) => { resolveCommitted = resolve; rejectCommitted = reject; });
                     const finished = new Promise((resolve, reject) => { resolveFinished = resolve; rejectFinished = reject; });
@@ -451,9 +482,9 @@
                 guard.text = initialText;
                 return guard;
             },
-            normalizeDeferredProperty(attribute, value) {
+            normalizeDeferredProperty(attribute, value, document = popup.document) {
                 if (!['action', 'background', 'data', 'formaction', 'href', 'poster', 'src'].includes(attribute)) return value;
-                try { return new url(value, popup.document.baseURI).href; }
+                try { return new url(value, documentBaseFor(document)).href; }
                 catch { return value; }
             },
             snapshotBodyArguments(args) {

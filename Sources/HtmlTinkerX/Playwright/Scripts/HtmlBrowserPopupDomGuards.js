@@ -3,10 +3,12 @@
     const reflectApply = Reflect.apply;
     const reflectConstruct = Reflect.construct;
     const rangeStates = new WeakMap();
+    const selectionStates = new WeakMap();
     const activationStates = new WeakMap();
     const imageDecodeStates = new WeakMap();
     const mediaPlayStates = new WeakMap();
     const installedRangePrototypes = new WeakSet();
+    const installedSelectionPrototypes = new WeakSet();
     const installedActivationPrototypes = new WeakSet();
     const installedImagePrototypes = new WeakSet();
     const installedMediaPrototypes = new WeakSet();
@@ -33,6 +35,22 @@
                 }
             });
         }
+    };
+    const installSelectionRoutes = prototype => {
+        if (prototype == null || installedSelectionPrototypes.has(prototype)) return;
+        installedSelectionPrototypes.add(prototype);
+        const getRangeAt = prototype.getRangeAt;
+        if (typeof getRangeAt !== 'function') return;
+        defineProperty(prototype, 'getRangeAt', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const range = reflectApply(getRangeAt, this, args);
+                const guardTree = selectionStates.get(this);
+                if (guardTree != null) rangeStates.set(range, guardTree);
+                return range;
+            }
+        });
     };
     const installActivationRoute = prototype => {
         if (prototype == null || installedActivationPrototypes.has(prototype)) return;
@@ -95,6 +113,8 @@
     globalThis.__htmlTinkerXCreatePopupDomGuards = ({ popup, isReady, runWhenReady, guardCreatedTree }) => {
         installRangeRoutes(Range.prototype);
         installRangeRoutes(popup.Range?.prototype);
+        installSelectionRoutes(Selection.prototype);
+        installSelectionRoutes(popup.Selection?.prototype);
         installActivationRoute(HTMLElement.prototype);
         installActivationRoute(popup.HTMLElement?.prototype);
         installImageDecodeRoute(HTMLImageElement.prototype);
@@ -123,10 +143,14 @@
         };
         return {
             constructorFor,
-            guardRealm(target) { installParserRoute(target); },
+            guardRealm(target) { installParserRoute(target); installRangeRoutes(target?.Range?.prototype); installSelectionRoutes(target?.Selection?.prototype); },
             guardRange(range) {
                 if (range != null) rangeStates.set(range, guardCreatedTree);
                 return range;
+            },
+            guardSelection(selection) {
+                if (selection != null) selectionStates.set(selection, guardCreatedTree);
+                return selection;
             },
             guardActivation(element) {
                 if (element?.localName !== 'a' && element?.localName !== 'area') return;

@@ -305,8 +305,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         const string script = @"const popup = window.open('', '_blank');
-            const worker = new popup.Worker('/popup/worker.js');
-            const source = new popup.EventSource('/popup/events');
+            const base = popup.document.createElement('base');
+            base.href = '/popup/';
+            popup.document.head.append(base);
+            const worker = new popup.Worker('worker.js');
+            const source = new popup.EventSource('events');
             worker.jobId = 'worker-report';
             source.jobId = 'event-report';
             let workerOk = false;

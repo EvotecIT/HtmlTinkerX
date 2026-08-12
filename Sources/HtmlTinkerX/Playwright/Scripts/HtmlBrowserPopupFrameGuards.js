@@ -76,13 +76,15 @@
                     if (property === 'fetch') return fetchFor(target);
                     if (property === 'XMLHttpRequest') return stagedXhrConstructor;
                     if (property === 'navigation' && target.navigation != null) {
-                        transportGuards.guardNavigation(target.navigation, target.Navigation);
+                        transportGuards.guardNavigation(target.navigation, target.Navigation, () => target.document);
                         return target.navigation;
                     }
                     if (property === 'navigator') {
                         transportGuards.guardNavigator(target.navigator, target.Navigator, () => target.document);
                         return target.navigator;
                     }
+                    if (property === 'CSS') return transportGuards.guardCss(target.CSS, () => target.document);
+                    if (property === 'getSelection') return (...args) => domGuards.guardSelection(reflectApply(target.getSelection, target, args));
                     if (property === 'DOMParser') return domGuards.constructorFor(target);
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));
                     if (codeMembers.has(property)) return codeMembers.get(property);

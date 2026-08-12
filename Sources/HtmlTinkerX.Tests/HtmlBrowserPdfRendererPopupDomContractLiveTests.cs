@@ -93,10 +93,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
             if (!popup.CSS?.paintWorklet) throw new Error('paint worklet unavailable');
+            const base = popup.document.createElement('base');
+            base.href = '{server.BlankPopupResourceUrl}';
+            popup.document.head.append(base);
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            const childBase = frame.contentDocument.createElement('base');
+            childBase.href = '{server.BlankPopupResourceUrl}';
+            frame.contentDocument.head.append(childBase);
             const openerAddModule = Object.getPrototypeOf(CSS.paintWorklet).addModule;
             Promise.all([
-                popup.CSS.paintWorklet.addModule('{server.BlankPopupResourceUrl}?source=paint-worklet'),
-                openerAddModule.call(popup.CSS.paintWorklet, '{server.BlankPopupResourceUrl}?source=paint-worklet-borrowed')
+                popup.CSS.paintWorklet.addModule('?source=paint-worklet'),
+                openerAddModule.call(popup.CSS.paintWorklet, '?source=paint-worklet-borrowed'),
+                frame.contentWindow.CSS.paintWorklet.addModule('?source=paint-worklet-child')
             ]).then(() => document.querySelector('#result').textContent = 'paint worklet loaded');
             true";
 
@@ -112,6 +121,60 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "paint worklet loaded");
         Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet"));
         Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet-borrowed"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet-child"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task PopupDocumentMutationSurfacesRemainBehindStaging() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const style = popup.document.createElement('style');
+            popup.document.head.append(style);
+            popup.document.styleSheets[0].insertRule('@import url({server.BlankPopupResourceUrl}?source=document-stylesheet);', 0);
+            const selected = popup.document.createElement('span');
+            selected.textContent = 'selection';
+            popup.document.body.append(selected);
+            const initial = popup.document.createRange();
+            initial.selectNode(selected);
+            const selection = popup.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(initial);
+            const selectedImage = popup.document.createElement('img');
+            selectedImage.src = '{server.BlankPopupResourceUrl}?source=selection-range';
+            selection.getRangeAt(0).insertNode(selectedImage);
+            const host = popup.document.createElement('div');
+            popup.document.body.append(host);
+            const root = host.attachShadow({{ mode: 'open' }});
+            const shadowStyle = document.createElement('style');
+            shadowStyle.textContent = '@import url({server.BlankPopupResourceUrl}?source=shadow-insertion);';
+            root.appendChild(shadowStyle);
+            const editable = popup.document.createElement('div');
+            editable.contentEditable = 'true';
+            editable.textContent = 'edit';
+            popup.document.body.append(editable);
+            const editRange = popup.document.createRange();
+            editRange.selectNodeContents(editable);
+            selection.removeAllRanges();
+            selection.addRange(editRange);
+            editable.focus();
+            popup.document.execCommand('insertHTML', false, '<img src=""{server.BlankPopupResourceUrl}?source=exec-command"">');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("document-stylesheet"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("selection-range"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("shadow-insertion"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("exec-command"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 }

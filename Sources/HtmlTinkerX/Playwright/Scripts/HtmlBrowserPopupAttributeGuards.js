@@ -1,6 +1,7 @@
 (() => {
     const createGuards = ({ defineProperty, getOwnPropertyDescriptor, reflectApply, stringValue, booleanValue }) => {
         const states = new WeakMap();
+        const insertionStates = new WeakMap();
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
@@ -92,7 +93,7 @@
                     writable: false,
                     value(...args) {
                         const state = states.get(this);
-                        state?.guardInsertion(name, args);
+                        (state?.guardInsertion ?? insertionStates.get(this))?.(name, args);
                         const staged = state?.mutateText(method, args);
                         return staged?.handled ? staged.value : reflectApply(method, this, args);
                     }
@@ -105,7 +106,7 @@
                     configurable: false,
                     writable: false,
                     value(...args) {
-                        states.get(this)?.guardInsertion(name, args);
+                        (states.get(this)?.guardInsertion ?? insertionStates.get(this))?.(name, args);
                         return reflectApply(method, this, args);
                     }
                 });
@@ -142,7 +143,7 @@
                     writable: false,
                     value(...args) {
                         const state = states.get(this);
-                        state?.guardInsertion(name, args);
+                        (state?.guardInsertion ?? insertionStates.get(this))?.(name, args);
                         const staged = state?.mutateText(method, args);
                         return staged?.handled ? staged.value : reflectApply(method, this, args);
                     }
@@ -398,6 +399,8 @@
             installFrame,
             installProperty,
             guardLegacyHandler,
+            guardInsertionTarget(target, guard) { insertionStates.set(target, guard); },
+            releaseInsertionTarget(target) { insertionStates.delete(target); },
             createState,
             copy(source, target) { return states.get(source)?.copy(target) ?? target; },
             release(element) { states.delete(element.attributes); states.delete(element); }

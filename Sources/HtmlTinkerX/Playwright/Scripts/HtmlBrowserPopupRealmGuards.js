@@ -41,6 +41,9 @@
         runWhenReady,
         shouldDeferAttribute,
         guardDeferredAttributes,
+        guardInsertionTarget,
+        releaseInsertionTarget,
+        guardCreatedTree,
         guardedResources,
         stringValue
     }) => {
@@ -188,8 +191,14 @@
                     if (!isReady()) {
                         const state = { sheets: null };
                         states.set(root, state);
+                        guardInsertionTarget(root, (method, values) => {
+                            if (method === 'insertAdjacentElement') { if (values.length > 1) guardCreatedTree(values[1]); return; }
+                            if (method === 'appendChild' || method === 'insertBefore' || method === 'replaceChild') { if (values.length > 0) guardCreatedTree(values[0]); return; }
+                            if (['append', 'prepend', 'replaceChildren', 'after', 'before', 'replaceWith'].includes(method)) for (const value of values) guardCreatedTree(value);
+                        });
                         guardedResources.push(() => {
                             states.delete(root);
+                            releaseInsertionTarget(root);
                             if (state.sheets != null && adopted?.set) adopted.set.call(root, state.sheets);
                         });
                     }

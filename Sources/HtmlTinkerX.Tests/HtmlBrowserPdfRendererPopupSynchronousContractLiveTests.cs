@@ -337,10 +337,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             try {{ framedPopup.document.appendChild(); }} catch (error) {{ mutationTypeError = error instanceof TypeError; }}
             if (!mutationTypeError) throw new Error('invalid mutation did not fail synchronously');
             const navigatingPopup = window.open('', '_blank');
+            const navigationBase = navigatingPopup.document.createElement('base');
+            navigationBase.href = '{server.BlankPopupResourceUrl}?source=navigation-base';
+            navigatingPopup.document.head.append(navigationBase);
             const navigationOptions = {{ history: 'replace' }};
             Object.getPrototypeOf(navigatingPopup.navigation).navigate.call(
                 navigatingPopup.navigation,
-                '/blank-popup-location',
+                '',
                 navigationOptions);
             navigationOptions.history = 'invalid-after-call';
             const refreshPopup = window.open('', '_blank');
@@ -367,6 +370,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "popup authorized");
         Assert.True(server.BlankPopupResourceRequests >= 2);
         Assert.Equal(1, server.BlankPopupSourceRequests("normalized-url"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("navigation-base"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
