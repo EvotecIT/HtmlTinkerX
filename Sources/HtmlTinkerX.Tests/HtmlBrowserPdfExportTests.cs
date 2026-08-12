@@ -238,7 +238,7 @@ public class HtmlBrowserPdfExportTests {
         var context = new Mock<IBrowserContext>();
         context.Setup(value => value.NewCDPSessionAsync(popupPage.Object))
             .ThrowsAsync(new PlaywrightException("attachment failed"));
-        await using HtmlBrowserPopupHeaderCoordinator coordinator = new(
+        HtmlBrowserPopupHeaderCoordinator coordinator = new(
             context.Object,
             primaryPage.Object,
             new Uri("https://example.test"),
@@ -251,6 +251,9 @@ public class HtmlBrowserPdfExportTests {
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(coordinator.ThrowIfFaulted);
         Assert.Contains("attachment failed", exception.InnerException?.Message);
+        InvalidOperationException disposal = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => coordinator.DisposeAsync().AsTask());
+        Assert.Contains("attachment failed", disposal.InnerException?.Message);
     }
 
     [Fact]

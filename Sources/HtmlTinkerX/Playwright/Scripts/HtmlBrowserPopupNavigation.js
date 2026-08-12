@@ -14,6 +14,7 @@
     const nativeReflectSet = Reflect.set;
     const nativeQuerySelectorAll = Document.prototype.querySelectorAll;
     const nativeQuerySelector = Document.prototype.querySelector;
+    const nativeElementQuerySelectorAll = Element.prototype.querySelectorAll;
     const nativeClosest = Element.prototype.closest;
     const nativeGetAttribute = Element.prototype.getAttribute;
     const nativeHasAttribute = Element.prototype.hasAttribute;
@@ -45,6 +46,8 @@
     const popupReleaseToken = '__HTMLTINKERX_POPUP_RELEASE_TOKEN__';
     const createMarkupStager = globalThis.__htmlTinkerXCreatePopupMarkupStager;
     delete globalThis.__htmlTinkerXCreatePopupMarkupStager;
+    const createTransportGuards = globalThis.__htmlTinkerXCreatePopupTransportGuards;
+    delete globalThis.__htmlTinkerXCreatePopupTransportGuards;
     const createAsyncConstructors = globalThis.__htmlTinkerXCreatePopupAsyncConstructors({
         defineProperty: nativeDefineProperty,
         reflectApply: nativeReflectApply,
@@ -287,28 +290,22 @@
             if (typeof value === 'symbol') throw new TypeError('Cannot convert a Symbol value to a string');
             return nativeString(value);
         };
-        const nativeSendBeacon = popup.Navigator.prototype.sendBeacon;
-        if (typeof nativeSendBeacon === 'function') {
-            const stagedSendBeacon = function(...args) {
-                if (args.length === 0) throw new TypeError("Failed to execute 'sendBeacon': 1 argument required");
-                const normalizedArgs = [new nativeUrl(toDomString(args[0]), popup.document.baseURI).href, ...args.slice(1)];
-                runWhenReady(() => nativeReflectApply(nativeSendBeacon, this, normalizedArgs));
-                return true;
-            };
-            nativeDefineProperty(popup.Navigator.prototype, 'sendBeacon', {
-                value: stagedSendBeacon,
-                writable: false,
-                configurable: false
-            });
-        }
+        const transportGuards = createTransportGuards({
+            popup,
+            isReady: () => ready,
+            runWhenReady,
+            toDomString
+        });
         const normalizeConstructorArguments = (name, args) => {
             if (args.length === 0) throw new TypeError(`Failed to construct '${name}': 1 argument required`);
-            const url = new nativeUrl(toDomString(args[0]), popup.document.baseURI).href;
+            const resolvedUrl = new nativeUrl(toDomString(args[0]), popup.document.baseURI);
+            const url = resolvedUrl.href;
             if (name === 'EventSource') {
                 const options = args[1] == null ? {} : nativeObject(args[1]);
                 const withCredentials = options.withCredentials;
                 return [url, { withCredentials: nativeBoolean(withCredentials) }];
             }
+            transportGuards.validateWorkerUrl(resolvedUrl);
             const options = args[1] == null ? {} : nativeObject(args[1]);
             const normalized = {};
             const typeValue = options.type;
@@ -332,7 +329,8 @@
         const stagedAsyncConstructors = createAsyncConstructors({
             popup,
             runWhenReady,
-            normalizeArguments: normalizeConstructorArguments
+            normalizeArguments: normalizeConstructorArguments,
+            normalizeOperation: transportGuards.normalizeOperation
         });
         const nativeLocation = popup.location;
         let popupFacade;
@@ -374,7 +372,8 @@
                 () => released,
                 shouldDeferAttribute,
                 () => documentFacade,
-                (method, args) => stageElementMarkup(element, method, args));
+                (method, args) => stageElementMarkup(element, method, args),
+                clone => guardClonedTree(element, clone));
             for (const [attribute, property] of requestAttributes) {
                 if (!(property in element)) continue;
                 let descriptor = null;
@@ -449,13 +448,35 @@
             guardDeferredAttributes(element, values);
             return element;
         };
+        const guardCreatedTree = element => {
+            guardCreatedElement(element);
+            if (element instanceof popup.Element) {
+                for (const descendant of nativeElementQuerySelectorAll.call(element, '*')) guardCreatedElement(descendant);
+            }
+            return element;
+        };
+        const guardClonedTree = (source, clone) => {
+            guardCreatedTree(clone);
+            attributeGuards.copy(source, clone);
+            if (source instanceof popup.Element && clone instanceof popup.Element) {
+                const sourceDescendants = nativeElementQuerySelectorAll.call(source, '*');
+                const cloneDescendants = nativeElementQuerySelectorAll.call(clone, '*');
+                const count = sourceDescendants.length < cloneDescendants.length
+                    ? sourceDescendants.length
+                    : cloneDescendants.length;
+                for (let index = 0; index < count; index++) {
+                    attributeGuards.copy(sourceDescendants[index], cloneDescendants[index]);
+                }
+            }
+            return clone;
+        };
         const stagedElementConstructors = new Map();
         for (const name of ['Image', 'Audio']) {
             const constructor = popup[name];
             if (typeof constructor !== 'function') continue;
             stagedElementConstructors.set(name, new Proxy(constructor, {
                 construct(target, args) {
-                    return guardCreatedElement(nativeReflectConstruct(target, args));
+                    return guardCreatedTree(nativeReflectConstruct(target, args));
                 }
             }));
         }
@@ -593,7 +614,7 @@
                             };
                             const initialResult = invoke();
                             if (!initialResult || !(initialResult instanceof popup.Node)) return initialResult;
-                            if (!ready && createdNodeMethods.has(property)) guardCreatedElement(initialResult);
+                            if (!ready && createdNodeMethods.has(property)) guardCreatedTree(initialResult);
                             return initialResult;
                         }
                         const result = stagedMutationResult(resolve, property, args);

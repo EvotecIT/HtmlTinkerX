@@ -9,6 +9,41 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task SetupDeadlineIncludesPlaywrightOwnerCreation() {
+        TaskCompletionSource<IPlaywright> pendingPlaywright = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> creationStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> playwrightDisposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(value => value.Dispose()).Callback(() => playwrightDisposed.TrySetResult(true));
+        HtmlBrowser.PlaywrightFactory = () => {
+            creationStarted.TrySetResult(true);
+            return pendingPlaywright.Task;
+        };
+        try {
+            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+                maximumBrowserInstances: 1,
+                setupTimeout: TimeSpan.FromMilliseconds(500),
+                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
+
+            Task<HtmlBrowserPdfResult> capture = renderer.CaptureAsync(
+                new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromHtml("<p>owner deadline</p>")));
+            Assert.Same(creationStarted.Task, await Task.WhenAny(creationStarted.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            TimeoutException exception = await Assert.ThrowsAsync<TimeoutException>(() => capture);
+            pendingPlaywright.SetResult(playwright.Object);
+
+            Assert.Contains("capture setup", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Same(
+                playwrightDisposed.Task,
+                await Task.WhenAny(playwrightDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            Assert.Equal(0, renderer.GetMetricsSnapshot().BrowsersCreated);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            pendingPlaywright.TrySetResult(playwright.Object);
+            HtmlBrowser.PlaywrightFactory = null;
+        }
+    }
+
+    [Fact]
     public async Task PreWarmSetupDeadlineIncludesBrowserProvisioning() {
         TaskCompletionSource<IBrowser> pendingBrowser = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var browserType = new Mock<IBrowserType>();

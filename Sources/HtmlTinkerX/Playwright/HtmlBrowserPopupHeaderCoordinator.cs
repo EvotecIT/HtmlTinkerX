@@ -16,6 +16,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
     private const string AttributeGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAttributeGuards.js";
     private const string AsyncConstructorsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupAsyncConstructors.js";
     private const string MarkupGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupMarkupGuards.js";
+    private const string TransportGuardsResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupTransportGuards.js";
     private const string NavigationShimResource = "HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js";
     private const string ReleasePropertyPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_PROPERTY__";
     private const string ReleaseTokenPlaceholder = "__HTMLTINKERX_POPUP_RELEASE_TOKEN__";
@@ -70,7 +71,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private static string LoadNavigationShim() {
         Assembly assembly = typeof(HtmlBrowserPopupHeaderCoordinator).Assembly;
-        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
+        return $"{LoadEmbeddedScript(assembly, AttributeGuardsResource)}\n{LoadEmbeddedScript(assembly, AsyncConstructorsResource)}\n{LoadEmbeddedScript(assembly, MarkupGuardsResource)}\n{LoadEmbeddedScript(assembly, TransportGuardsResource)}\n{LoadEmbeddedScript(assembly, NavigationShimResource)}";
     }
 
     private static string LoadEmbeddedScript(Assembly assembly, string resourceName) {
@@ -87,7 +88,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _ = pending.ContinueWith(
             completed => {
                 _pending.TryRemove(completed, out _);
-                if (!completed.IsFaulted || Volatile.Read(ref _disposed) != 0) return;
+                if (!completed.IsFaulted) return;
                 Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
                 _cleanupTimedOut();
             },
@@ -159,10 +160,16 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         Task[] pending = _pending.Keys.ToArray();
         if (pending.Length > 0) {
             try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (Exception) { }
+            foreach (Task completed in pending) {
+                if (completed.IsFaulted) {
+                    Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
+                }
+            }
         }
         foreach (HtmlBrowserScopedHeaderInterceptor interceptor in _interceptors.Values) {
             await interceptor.DisposeAsync().ConfigureAwait(false);
         }
         _interceptors.Clear();
+        ThrowIfFaulted();
     }
 }

@@ -50,4 +50,14 @@ public static partial class HtmlBrowser {
                 playwright.Dispose();
             }
         });
+
+    private static void DisposePlaywrightWhenCreated(Task<IPlaywright> creation) =>
+        _ = creation.ContinueWith(
+            static completed => {
+                if (completed.Status == TaskStatus.RanToCompletion) completed.Result.Dispose();
+                else _ = completed.Exception;
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 }

@@ -5,7 +5,7 @@
         reflectConstruct,
         reflectGet,
         reflectSet
-    }) => ({ popup, runWhenReady, normalizeArguments }) => {
+    }) => ({ popup, runWhenReady, normalizeArguments, normalizeOperation }) => {
         const constructors = new Map();
         const stage = (name, handlerNames, operationNames, stopName) => {
             const nativeConstructor = popup[name];
@@ -81,10 +81,15 @@
                         if (name === 'EventSource' && property === 'withCredentials') return normalizedArgs[1].withCredentials;
                         if (handlerProperties.has(property)) return handlers.get(property) ?? null;
                         if (operationProperties.has(property)) {
-                            return (...operationArgs) => pending.push(current => {
-                                const operation = reflectGet(current, property, current);
-                                reflectApply(operation, current, operationArgs);
-                            });
+                            return (...operationArgs) => {
+                                const normalizedOperationArgs = typeof normalizeOperation === 'function'
+                                    ? normalizeOperation(name, property, operationArgs)
+                                    : operationArgs;
+                                pending.push(current => {
+                                    const operation = reflectGet(current, property, current);
+                                    reflectApply(operation, current, normalizedOperationArgs);
+                                });
+                            };
                         }
                         if (property === stopName) {
                             return () => {

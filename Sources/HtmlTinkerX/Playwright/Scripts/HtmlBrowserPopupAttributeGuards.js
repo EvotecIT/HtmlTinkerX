@@ -78,6 +78,7 @@
             prototypes.add(prototype);
             const ownerDocument = getOwnPropertyDescriptor(prototype, 'ownerDocument');
             const getRootNode = prototype.getRootNode;
+            const cloneNode = prototype.cloneNode;
             defineProperty(prototype, 'ownerDocument', {
                 ...ownerDocument,
                 get() { return states.get(this)?.document() ?? ownerDocument.get.call(this); }
@@ -86,6 +87,14 @@
                 configurable: false,
                 writable: false,
                 value(...args) { return states.get(this)?.document() ?? reflectApply(getRootNode, this, args); }
+            });
+            defineProperty(prototype, 'cloneNode', {
+                configurable: false,
+                writable: false,
+                value(...args) {
+                    const clone = reflectApply(cloneNode, this, args);
+                    return states.get(this)?.clone(clone) ?? clone;
+                }
             });
         };
         const installProperty = (prototype, property, attribute) => {
@@ -105,11 +114,19 @@
                 }
             });
         };
-        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup) => {
+        const createState = (element, values, namespacedValues, isReleased, shouldDefer, document, stageMarkup, guardClone) => {
             const normalized = name => stringValue(name).toLowerCase();
             const state = {
                 result: undefined,
                 document,
+                clone(value) { return typeof guardClone === 'function' ? guardClone(value) : value; },
+                copy(target) {
+                    for (const [name, value] of values) target.setAttribute(name, value);
+                    for (const value of namespacedValues.values()) {
+                        target.setAttributeNS(value.namespace, value.qualified, value.value);
+                    }
+                    return target;
+                },
                 markup(method, args) {
                     return !isReleased() && typeof stageMarkup === 'function' && stageMarkup(method, args);
                 },
@@ -243,6 +260,7 @@
             installProperty,
             guardLegacyHandler,
             createState,
+            copy(source, target) { return states.get(source)?.copy(target) ?? target; },
             release(element) { states.delete(element.attributes); states.delete(element); }
         };
     };

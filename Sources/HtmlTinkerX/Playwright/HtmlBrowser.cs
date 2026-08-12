@@ -19,15 +19,14 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            await CleanInstallationAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
+        await ExecuteSetupStageAsync(
+            () => EnsureBrowserRuntimeAvailableAsync(options),
+            cancellationToken).ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IPlaywright playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
         int playwrightDisposed = 0;
         Task DisposeOwnerAsync() {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
@@ -65,13 +64,10 @@ public static partial class HtmlBrowser {
         }
 
         if (PlaywrightFactory == null) {
-            await EnsureDriverInstalledAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(EnsureDriverInstalledAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IPlaywright playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
         int playwrightDisposed = 0;
         Task DisposeOwnerAsync() {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
@@ -100,17 +96,16 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            await CleanInstallationAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
+        await ExecuteSetupStageAsync(
+            () => EnsureBrowserRuntimeAvailableAsync(options),
+            cancellationToken).ConfigureAwait(false);
 
         string userDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IPlaywright playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
         int playwrightDisposed = 0;
         Task DisposeOwnerAsync() {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
@@ -165,6 +160,29 @@ public static partial class HtmlBrowser {
         ShouldInstallBundledRuntime(options)
             ? EnsureInstalledAsync(options.Browser)
             : EnsureDriverInstalledAsync();
+
+    private static Task ExecuteSetupStageAsync(Func<Task> operation, CancellationToken cancellationToken) =>
+        HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            operation,
+            static () => Task.CompletedTask,
+            cancellationToken);
+
+    private static async Task<IPlaywright> CreatePlaywrightAsync(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Task<IPlaywright> creation = PlaywrightFactory != null
+            ? PlaywrightFactory()
+            : Playwright.CreateAsync();
+        int lateCleanupStarted = 0;
+        return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => creation,
+            () => {
+                if (Interlocked.Exchange(ref lateCleanupStarted, 1) == 0) {
+                    DisposePlaywrightWhenCreated(creation);
+                }
+                return Task.CompletedTask;
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
 
     internal static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
         var launchOptions = new BrowserTypeLaunchOptions {
