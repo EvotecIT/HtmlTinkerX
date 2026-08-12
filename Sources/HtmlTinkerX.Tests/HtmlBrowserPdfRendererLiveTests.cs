@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -583,6 +584,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     private sealed class LoopbackContentServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
+        private readonly ConcurrentDictionary<Task, byte> _connections = new();
         private readonly Task _serverTask;
         private readonly string _body;
         private readonly TimeSpan _responseDelay;
@@ -605,19 +607,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
                 try {
-                    using TcpClient client = await _listener.AcceptTcpClientAsync();
-                    using NetworkStream stream = client.GetStream();
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    Interlocked.Increment(ref _requestCount);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
-                    string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
-                    if (token != null) Volatile.Write(ref _lastRenderToken, token);
-                    if (_responseDelay > TimeSpan.Zero) await Task.Delay(_responseDelay, _cancellation.Token);
-                    byte[] bodyBytes = Encoding.UTF8.GetBytes(_body);
-                    byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
-                    await stream.WriteAsync(headers, 0, headers.Length);
-                    await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length);
+                    TrackConnection(HandleConnectionAsync(await _listener.AcceptTcpClientAsync()));
                 } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
                     return;
                 } catch (SocketException) when (_cancellation.IsCancellationRequested) {
@@ -626,10 +616,38 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             }
         }
 
+        private async Task HandleConnectionAsync(TcpClient client) {
+            using (client)
+            using (NetworkStream stream = client.GetStream()) {
+                byte[] buffer = new byte[8192];
+                int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
+                if (read == 0) return;
+                Interlocked.Increment(ref _requestCount);
+                string request = Encoding.ASCII.GetString(buffer, 0, read);
+                string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
+                if (token != null) Volatile.Write(ref _lastRenderToken, token);
+                if (_responseDelay > TimeSpan.Zero) await Task.Delay(_responseDelay, _cancellation.Token);
+                byte[] bodyBytes = Encoding.UTF8.GetBytes(_body);
+                byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {bodyBytes.Length}\r\nConnection: close\r\n\r\n");
+                await stream.WriteAsync(headers, 0, headers.Length, _cancellation.Token);
+                await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length, _cancellation.Token);
+            }
+        }
+
+        private void TrackConnection(Task connection) {
+            _connections[connection] = 0;
+            _ = connection.ContinueWith(
+                completed => _connections.TryRemove(completed, out _),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
         public async ValueTask DisposeAsync() {
             _cancellation.Cancel();
             _listener.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            try { await Task.WhenAll(_connections.Keys); } catch (OperationCanceledException) { } catch (ObjectDisposedException) { } catch (IOException) { } catch (SocketException) { }
             _cancellation.Dispose();
         }
     }
@@ -844,6 +862,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     private sealed class LoopbackCorsHeaderServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
+        private readonly ConcurrentDictionary<Task, byte> _connections = new();
         private readonly Task _serverTask;
         private string? _lastRenderToken;
 
@@ -860,27 +879,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
                 try {
-                    using TcpClient client = await _listener.AcceptTcpClientAsync();
-                    using NetworkStream stream = client.GetStream();
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
-                    string? origin = LoopbackHtmlServer.ReadHeader(request, "Origin");
-                    bool preflight = request.StartsWith("OPTIONS ", StringComparison.Ordinal);
-                    if (!preflight) {
-                        Volatile.Write(ref _lastRenderToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
-                    }
-                    byte[] body = preflight ? Array.Empty<byte>() : Encoding.UTF8.GetBytes("foreign authorized");
-                    StringBuilder headers = new();
-                    headers.Append("HTTP/1.1 200 OK\r\n")
-                        .Append("Content-Type: text/plain; charset=utf-8\r\n")
-                        .Append("Access-Control-Allow-Headers: X-Render-Token\r\n")
-                        .Append("Access-Control-Allow-Methods: GET, OPTIONS\r\n");
-                    if (origin != null) headers.Append("Access-Control-Allow-Origin: ").Append(origin).Append("\r\n");
-                    headers.Append("Content-Length: ").Append(body.Length).Append("\r\nConnection: close\r\n\r\n");
-                    byte[] headerBytes = Encoding.ASCII.GetBytes(headers.ToString());
-                    await stream.WriteAsync(headerBytes, 0, headerBytes.Length);
-                    if (body.Length > 0) await stream.WriteAsync(body, 0, body.Length);
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
+                    Task connection = HandleConnectionAsync(client);
+                    _connections[connection] = 0;
+                    _ = connection.ContinueWith(
+                        completed => _connections.TryRemove(completed, out _),
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
                 } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
                     return;
                 } catch (SocketException) when (_cancellation.IsCancellationRequested) {
@@ -889,10 +895,37 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             }
         }
 
+        private async Task HandleConnectionAsync(TcpClient client) {
+            using (client)
+            using (NetworkStream stream = client.GetStream()) {
+                byte[] buffer = new byte[8192];
+                int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
+                if (read == 0) return;
+                string request = Encoding.ASCII.GetString(buffer, 0, read);
+                string? origin = LoopbackHtmlServer.ReadHeader(request, "Origin");
+                bool preflight = request.StartsWith("OPTIONS ", StringComparison.Ordinal);
+                if (!preflight) {
+                    Volatile.Write(ref _lastRenderToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                }
+                byte[] body = preflight ? Array.Empty<byte>() : Encoding.UTF8.GetBytes("foreign authorized");
+                StringBuilder headers = new();
+                headers.Append("HTTP/1.1 200 OK\r\n")
+                    .Append("Content-Type: text/plain; charset=utf-8\r\n")
+                    .Append("Access-Control-Allow-Headers: X-Render-Token\r\n")
+                    .Append("Access-Control-Allow-Methods: GET, OPTIONS\r\n");
+                if (origin != null) headers.Append("Access-Control-Allow-Origin: ").Append(origin).Append("\r\n");
+                headers.Append("Content-Length: ").Append(body.Length).Append("\r\nConnection: close\r\n\r\n");
+                byte[] headerBytes = Encoding.ASCII.GetBytes(headers.ToString());
+                await stream.WriteAsync(headerBytes, 0, headerBytes.Length, _cancellation.Token);
+                if (body.Length > 0) await stream.WriteAsync(body, 0, body.Length, _cancellation.Token);
+            }
+        }
+
         public async ValueTask DisposeAsync() {
             _cancellation.Cancel();
             _listener.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            try { await Task.WhenAll(_connections.Keys); } catch (OperationCanceledException) { } catch (ObjectDisposedException) { } catch (IOException) { } catch (SocketException) { }
             _cancellation.Dispose();
         }
     }
