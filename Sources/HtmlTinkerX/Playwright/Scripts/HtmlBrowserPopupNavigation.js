@@ -9,7 +9,13 @@
     const nativeReflectGet = Reflect.get;
     const nativeReflectSet = Reflect.set;
     const nativeQuerySelectorAll = Document.prototype.querySelectorAll;
+    const nativeQuerySelector = Document.prototype.querySelector;
+    const nativeClosest = Element.prototype.closest;
     const nativeGetAttribute = Element.prototype.getAttribute;
+    const nativeHasAttribute = Element.prototype.hasAttribute;
+    const nativeRemoveAttribute = Element.prototype.removeAttribute;
+    const nativeSetAttribute = Element.prototype.setAttribute;
+    const nativeComposedPath = Event.prototype.composedPath;
     const iframePrototype = HTMLIFrameElement.prototype;
     const framePrototype = typeof HTMLFrameElement === 'undefined' ? null : HTMLFrameElement.prototype;
     const iframeContentDocument = nativeGetOwnPropertyDescriptor(iframePrototype, 'contentDocument')?.get;
@@ -171,6 +177,107 @@
                 configurable: false
             });
         }
+        const stagedAsyncConstructors = new Map();
+        const stageAsyncConstructor = (name, handlerNames, operationNames, stopName) => {
+            const nativeConstructor = popup[name];
+            if (typeof nativeConstructor !== 'function') return;
+            const deferredInstance = (constructor, args) => {
+                let instance = null;
+                let stopped = false;
+                const handlers = new Map();
+                const listeners = [];
+                const pending = [];
+                const handlerProperties = new Set(handlerNames);
+                const operationProperties = new Set(operationNames);
+                const target = {};
+                const facade = new Proxy(target, {
+                    get(_, property) {
+                        if (instance != null) {
+                            const value = nativeReflectGet(instance, property, instance);
+                            return typeof value === 'function' ? value.bind(instance) : value;
+                        }
+                        if (property === Symbol.toStringTag) return name;
+                        if (name === 'EventSource' && property === 'readyState') return nativeConstructor.CONNECTING;
+                        if (name === 'EventSource' && property === 'url') {
+                            return new URL(String(args[0]), popup.document.baseURI).href;
+                        }
+                        if (name === 'EventSource' && property === 'withCredentials') {
+                            return Boolean(args[1]?.withCredentials);
+                        }
+                        if (handlerProperties.has(property)) return handlers.get(property) ?? null;
+                        if (operationProperties.has(property)) {
+                            return (...operationArgs) => pending.push(current => {
+                                const operation = nativeReflectGet(current, property, current);
+                                nativeReflectApply(operation, current, operationArgs);
+                            });
+                        }
+                        if (property === 'addEventListener') {
+                            return (type, listener, options) => listeners.push({ type, listener, options });
+                        }
+                        if (property === 'removeEventListener') {
+                            return (type, listener) => {
+                                for (let index = listeners.length - 1; index >= 0; index--) {
+                                    const current = listeners[index];
+                                    if (current.type === type && current.listener === listener) listeners.splice(index, 1);
+                                }
+                            };
+                        }
+                        if (property === stopName) {
+                            return () => {
+                                stopped = true;
+                                pending.length = 0;
+                            };
+                        }
+                        return nativeReflectGet(target, property, target);
+                    },
+                    set(_, property, value) {
+                        if (instance != null) return nativeReflectSet(instance, property, value, instance);
+                        if (handlerProperties.has(property)) {
+                            handlers.set(property, value);
+                            return true;
+                        }
+                        return nativeReflectSet(target, property, value, target);
+                    },
+                    getPrototypeOf() {
+                        return constructor.prototype;
+                    }
+                });
+                runWhenReady(() => {
+                    if (stopped) return;
+                    instance = nativeReflectConstruct(constructor, args);
+                    for (const [property, value] of handlers) nativeReflectSet(instance, property, value, instance);
+                    for (const { type, listener, options } of listeners) {
+                        const addEventListener = nativeReflectGet(instance, 'addEventListener', instance);
+                        nativeReflectApply(addEventListener, instance, [type, listener, options]);
+                    }
+                    while (pending.length > 0) pending.shift()(instance);
+                });
+                return facade;
+            };
+            const stagedConstructor = new Proxy(nativeConstructor, {
+                construct(target, args) {
+                    return deferredInstance(target, args);
+                }
+            });
+            nativeDefineProperty(nativeConstructor.prototype, 'constructor', {
+                value: stagedConstructor,
+                writable: false,
+                configurable: false
+            });
+            nativeDefineProperty(popup.Window.prototype, name, {
+                value: stagedConstructor,
+                writable: false,
+                configurable: false
+            });
+            nativeDefineProperty(popup, name, {
+                value: stagedConstructor,
+                writable: false,
+                configurable: false
+            });
+            stagedAsyncConstructors.set(name, stagedConstructor);
+        };
+        stageAsyncConstructor('Worker', ['onerror', 'onmessage', 'onmessageerror'], ['postMessage'], 'terminate');
+        stageAsyncConstructor('EventSource', ['onerror', 'onmessage', 'onopen'], [], 'close');
         const nativeLocation = popup.location;
         let popupFacade;
         const locationFacade = new Proxy({}, {
@@ -429,6 +536,7 @@
                 if (property === 'location') return locationFacade;
                 if (property === 'document') return documentFacade;
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
+                if (stagedAsyncConstructors.has(property)) return stagedAsyncConstructors.get(property);
                 if (stagedElementConstructors.has(property)) return stagedElementConstructors.get(property);
                 const value = nativeReflectGet(targetWindow, property, targetWindow);
                 if (value === stagedFetch) return stagedFetch;
@@ -531,21 +639,22 @@
     });
 
     const effectiveTarget = (element, submitter) => {
-        if (submitter != null && submitter.hasAttribute('formtarget')) {
-            return submitter.getAttribute('formtarget') || '';
+        if (submitter != null && nativeHasAttribute.call(submitter, 'formtarget')) {
+            return nativeGetAttribute.call(submitter, 'formtarget') || '';
         }
-        if (element.hasAttribute('target')) {
-            return element.getAttribute('target') || '';
+        if (nativeHasAttribute.call(element, 'target')) {
+            return nativeGetAttribute.call(element, 'target') || '';
         }
-        const base = document.querySelector('base[target]');
-        return base == null ? '' : base.getAttribute('target') || '';
+        const base = nativeQuerySelector.call(document, 'base[target]');
+        return base == null ? '' : nativeGetAttribute.call(base, 'target') || '';
     };
 
     const hasExplicitEmptyTarget = (element, submitter) => {
-        if (submitter != null && submitter.hasAttribute('formtarget')) {
-            return (submitter.getAttribute('formtarget') || '') === '';
+        if (submitter != null && nativeHasAttribute.call(submitter, 'formtarget')) {
+            return (nativeGetAttribute.call(submitter, 'formtarget') || '') === '';
         }
-        return element.hasAttribute('target') && (element.getAttribute('target') || '') === '';
+        return nativeHasAttribute.call(element, 'target')
+            && (nativeGetAttribute.call(element, 'target') || '') === '';
     };
 
     const restoreAfterPopupNavigation = (popup, restore) => {
@@ -615,8 +724,10 @@
         const target = effectiveTarget(form, submitter);
         const normalized = normalizedDeclarativeTarget(target);
         if (specialTargets.includes(normalized) || targetsExistingFrame(target)) return false;
-        const action = new URL(submitter?.formAction || form.action || document.URL, document.baseURI);
-        return String(submitter?.formMethod || form.method).toLowerCase() !== 'dialog';
+        const method = submitter != null && nativeHasAttribute.call(submitter, 'formmethod')
+            ? nativeGetAttribute.call(submitter, 'formmethod')
+            : nativeGetAttribute.call(form, 'method');
+        return String(method || 'get').toLowerCase() !== 'dialog';
     };
 
     const submitWithoutRedispatch = (form, submitter) => {
@@ -629,9 +740,9 @@
         const successfulControls = [];
         if (submitter != null) {
             for (const [formAttribute, submitterAttribute] of overrides) {
-                if (!submitter.hasAttribute(submitterAttribute)) continue;
-                previous.push([formAttribute, form.getAttribute(formAttribute)]);
-                form.setAttribute(formAttribute, submitter.getAttribute(submitterAttribute));
+                if (!nativeHasAttribute.call(submitter, submitterAttribute)) continue;
+                previous.push([formAttribute, nativeGetAttribute.call(form, formAttribute)]);
+                nativeSetAttribute.call(form, formAttribute, nativeGetAttribute.call(submitter, submitterAttribute));
             }
             const appendSuccessfulControl = (name, value) => {
                 const control = document.createElement('input');
@@ -646,15 +757,15 @@
                 const prefix = submitter.name ? `${submitter.name}.` : '';
                 appendSuccessfulControl(`${prefix}x`, String(coordinates.x));
                 appendSuccessfulControl(`${prefix}y`, String(coordinates.y));
-            } else if (!submitter.disabled && submitter.getAttribute('name')) {
-                appendSuccessfulControl(submitter.getAttribute('name'), submitter.value || '');
+            } else if (!submitter.disabled && nativeGetAttribute.call(submitter, 'name')) {
+                appendSuccessfulControl(nativeGetAttribute.call(submitter, 'name'), submitter.value || '');
             }
         }
         const restore = () => {
             for (const control of successfulControls) control.remove();
             for (const [attribute, value] of previous) {
-                if (value === null) form.removeAttribute(attribute);
-                else form.setAttribute(attribute, value);
+                if (value === null) nativeRemoveAttribute.call(form, attribute);
+                else nativeSetAttribute.call(form, attribute, value);
             }
         };
         try {
@@ -704,10 +815,10 @@
 
     const stagedClickAnchor = event => {
         if (event.button !== 0) return null;
-        const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+        const path = typeof nativeComposedPath === 'function' ? nativeComposedPath.call(event) : [];
         const anchor = path.find(node => node instanceof HTMLAnchorElement)
-            || (event.target instanceof Element ? event.target.closest('a[href]') : null);
-        if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute('download')) return null;
+            || (event.target instanceof Element ? nativeClosest.call(event.target, 'a[href]') : null);
+        if (!(anchor instanceof HTMLAnchorElement) || nativeHasAttribute.call(anchor, 'download')) return null;
         const target = effectiveTarget(anchor, null);
         const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
         const destination = new URL(anchor.href, document.baseURI);
@@ -718,7 +829,7 @@
 
     const recordImageSubmitCoordinates = event => {
         if (event.button !== 0) return;
-        const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+        const path = typeof nativeComposedPath === 'function' ? nativeComposedPath.call(event) : [];
         const submitter = path.find(node => node instanceof HTMLInputElement && node.type.toLowerCase() === 'image');
         if (!(submitter instanceof HTMLInputElement)) return;
         imageSubmitCoordinates.set(submitter, {

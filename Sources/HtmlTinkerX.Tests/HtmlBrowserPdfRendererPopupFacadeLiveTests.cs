@@ -136,6 +136,60 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
+    [Fact]
+    public async Task BlankPopupWorkerWaitsForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const worker = new popup.Worker('/popup/worker.js');
+            const nativeIdentity = worker instanceof popup.Worker;
+            worker.onmessage = event => document.querySelector('#result').textContent = nativeIdentity ? event.data : 'worker identity lost';
+            worker.postMessage('start');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup worker authorized");
+        Assert.Equal("popup-token", server.LastPopupWorkerToken);
+    }
+
+    [Fact]
+    public async Task BlankPopupEventSourceWaitsForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const popup = window.open('', '_blank');
+            const source = new popup.EventSource('/popup/events');
+            const nativeIdentity = source instanceof popup.EventSource;
+            source.onmessage = event => {
+                document.querySelector('#result').textContent = nativeIdentity ? event.data : 'event source identity lost';
+                source.close();
+            };
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent !== 'pending'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup event authorized");
+        Assert.Equal("popup-token", server.LastPopupEventToken);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -35,6 +35,41 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task PageMonkeypatchCannotHideADeclarativePopupTarget() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        const string script = @"const anchor = document.querySelector('a');
+            const hasAttribute = Element.prototype.hasAttribute;
+            const getAttribute = Element.prototype.getAttribute;
+            const querySelector = Document.prototype.querySelector;
+            Element.prototype.hasAttribute = () => false;
+            Element.prototype.getAttribute = () => null;
+            Document.prototype.querySelector = () => null;
+            anchor.click();
+            setTimeout(() => {
+                Element.prototype.hasAttribute = hasAttribute;
+                Element.prototype.getAttribute = getAttribute;
+                Document.prototype.querySelector = querySelector;
+            }, 0);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.DeclarativeAnchorUrl),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.Equal("popup-token", server.LastPopupToken);
+        Assert.Equal("popup-token", server.LastProtectedToken);
+    }
+
+    [Fact]
     public async Task DeclarativeFormRelOpenerPreservesTheExplicitOpenerRelationship() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

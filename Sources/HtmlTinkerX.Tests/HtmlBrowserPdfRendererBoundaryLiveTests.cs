@@ -593,6 +593,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupFetchToken;
         private string? _lastPopupCssToken;
         private string? _lastPopupScriptToken;
+        private string? _lastPopupWorkerToken;
+        private string? _lastPopupEventToken;
         private int _blankPopupResourceRequests;
         private int _unauthorizedBlankPopupResourceRequests;
         private readonly string _namedContextInitialUrl;
@@ -661,6 +663,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastPopupFetchToken => Volatile.Read(ref _lastPopupFetchToken);
         internal string? LastPopupCssToken => Volatile.Read(ref _lastPopupCssToken);
         internal string? LastPopupScriptToken => Volatile.Read(ref _lastPopupScriptToken);
+        internal string? LastPopupWorkerToken => Volatile.Read(ref _lastPopupWorkerToken);
+        internal string? LastPopupEventToken => Volatile.Read(ref _lastPopupEventToken);
 
         private async Task ServeAsync() {
             while (!_cancellation.IsCancellationRequested) {
@@ -737,6 +741,18 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupScriptToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         contentType = "text/plain; charset=utf-8";
                         body = "popup script completed";
+                    } else if (requestTarget.StartsWith("/popup/worker.js", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupWorkerToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "application/javascript; charset=utf-8";
+                        body = LastPopupWorkerToken == "popup-token"
+                            ? "onmessage = () => postMessage('popup worker authorized');"
+                            : "onmessage = () => postMessage('popup worker denied');";
+                    } else if (requestTarget.StartsWith("/popup/events", StringComparison.Ordinal)) {
+                        Volatile.Write(ref _lastPopupEventToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
+                        contentType = "text/event-stream; charset=utf-8";
+                        body = LastPopupEventToken == "popup-token"
+                            ? "data: popup event authorized\n\n"
+                            : "data: popup event denied\n\n";
                     } else if (requestTarget.StartsWith("/popup/blocking.js", StringComparison.Ordinal)) {
                         contentType = "application/javascript; charset=utf-8";
                         body = "globalThis.externalReady = true;";
