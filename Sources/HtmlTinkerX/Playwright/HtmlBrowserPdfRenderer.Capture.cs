@@ -340,7 +340,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 Volatile.Read(ref blockedRequestCount),
                 blockedRequests.ToArray(),
                 warnings.ToArray());
-            return new HtmlBrowserPdfResult(bytes, diagnostics);
+            return new HtmlBrowserPdfResult(bytes, diagnostics, request.PdfOptions.Tagged);
         } finally {
             if (popupCoordinator != null) await popupCoordinator.DisposeAsync().ConfigureAwait(false);
             if (scopedHeaders != null) await scopedHeaders.DisposeAsync().ConfigureAwait(false);
