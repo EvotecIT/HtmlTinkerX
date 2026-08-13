@@ -86,7 +86,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
-    public async Task PopupPaintWorkletLoadsOnlyAfterHeaderInterception() {
+    public async Task PopupWorkletsLoadOnlyAfterHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
@@ -104,12 +104,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const childBase = frame.contentDocument.createElement('base');
             childBase.href = '{server.BlankPopupResourceUrl}';
             frame.contentDocument.head.append(childBase);
+            const popupAudio = new popup.AudioContext();
+            const childAudio = new frame.contentWindow.AudioContext();
+            if (!popupAudio.audioWorklet || !childAudio.audioWorklet) throw new Error('audio worklet unavailable');
             const openerAddModule = Object.getPrototypeOf(CSS.paintWorklet).addModule;
             Promise.all([
                 popup.CSS.paintWorklet.addModule('?source=paint-worklet'),
                 openerAddModule.call(popup.CSS.paintWorklet, '?source=paint-worklet-borrowed'),
-                frame.contentWindow.CSS.paintWorklet.addModule('?source=paint-worklet-child')
-            ]).then(() => document.querySelector('#result').textContent = 'paint worklet loaded');
+                frame.contentWindow.CSS.paintWorklet.addModule('?source=paint-worklet-child'),
+                popupAudio.audioWorklet.addModule('?source=audio-worklet'),
+                childAudio.audioWorklet.addModule('?source=audio-worklet-child')
+            ]).then(() => document.querySelector('#result').textContent = 'worklets loaded');
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -121,10 +126,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
-        AssertPdfContains(result.PdfBytes, "paint worklet loaded");
+        AssertPdfContains(result.PdfBytes, "worklets loaded");
         Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet"));
         Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet-borrowed"));
         Assert.Equal(1, server.BlankPopupSourceRequests("paint-worklet-child"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("audio-worklet"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("audio-worklet-child"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 

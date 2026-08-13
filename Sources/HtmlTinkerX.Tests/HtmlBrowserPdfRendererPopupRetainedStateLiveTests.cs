@@ -62,13 +62,15 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 
-    [Fact]
-    public async Task HtmlAreaPopupWaitsForHeaderInterception() {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HtmlAreaAndSvgAnchorPopupsWaitForHeaderInterception(bool useSvgAnchor) {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
-        const string script = @"const map = document.createElement('map');
+        const string areaScript = @"const map = document.createElement('map');
             map.name = 'htmltinkerx-map';
             const area = document.createElement('area');
             area.href = new URL('/blank-popup-location', location.href).href;
@@ -77,12 +79,20 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             document.body.append(map);
             area.click();
             true";
+        const string svgScript = @"const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            const anchor = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+            anchor.setAttribute('href', new URL('/blank-popup-location', location.href).href);
+            anchor.setAttribute('target', '_blank');
+            svg.append(anchor);
+            document.body.append(svg);
+            anchor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+            true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
             readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
-            beforeCaptureScript: script));
+            beforeCaptureScript: useSvgAnchor ? svgScript : areaScript));
 
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal("popup-token", server.LastPopupToken);

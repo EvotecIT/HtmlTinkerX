@@ -122,6 +122,7 @@
                         return target.navigator;
                     }
                     if (property === 'CSS') return transportGuards.guardCss(target.CSS, () => target.document);
+                    if (property === 'AudioContext' || property === 'OfflineAudioContext' || property === 'webkitAudioContext') return transportGuards.audioContextConstructorFor(target, property, () => target.document);
                     if (property === 'getSelection') return (...args) => domGuards.guardSelection(reflectApply(target.getSelection, target, args));
                     if (property === 'DOMParser') return domGuards.constructorFor(target);
                     if (property === 'Request') return transportGuards.requestConstructorFor(target);

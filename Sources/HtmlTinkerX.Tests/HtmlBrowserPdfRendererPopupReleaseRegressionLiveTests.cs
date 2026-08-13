@@ -94,7 +94,24 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             style.textContent = 'body {{ color: red; background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-initial); }}';
             popup.document.head.append(style);
             style.sheet.insertRule('html {{ background-color: white; background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-inserted); }}', 0);
+            const legacyStyle = popup.document.createElement('style');
+            popup.document.head.append(legacyStyle);
+            legacyStyle.sheet.addRule('#legacy-css-target', 'background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-legacy)');
+            legacyStyle.sheet.addRule('#removed-css-target', 'background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-legacy-removed)');
+            legacyStyle.sheet.removeRule(1);
+            const legacyTarget = popup.document.createElement('div');
+            legacyTarget.id = 'legacy-css-target';
+            popup.document.body.append(legacyTarget);
+            const disabledStyle = popup.document.createElement('style');
+            disabledStyle.textContent = '#disabled-css-target {{ background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-disabled); }}';
+            popup.document.head.append(disabledStyle);
+            disabledStyle.sheet.disabled = true;
+            const disabledTarget = popup.document.createElement('div');
+            disabledTarget.id = 'disabled-css-target';
+            popup.document.body.append(disabledTarget);
             window.__htmlTinkerXStyleElement = style;
+            window.__htmlTinkerXLegacyStyleElement = legacyStyle;
+            window.__htmlTinkerXDisabledStyleElement = disabledStyle;
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -103,7 +120,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 skipLoadState: true,
                 function: @"() => {
                     const rules = Array.from(window.__htmlTinkerXStyleElement?.sheet?.cssRules || [], rule => rule.cssText);
-                    if (rules.length !== 2 || rules.filter(rule => rule.includes('color: red')).length !== 1) return false;
+                    if (rules.length !== 2 || rules.filter(rule => rule.includes('color: red')).length !== 1) throw new Error('base:' + rules.length);
+                    if (window.__htmlTinkerXLegacyStyleElement?.sheet?.cssRules?.length !== 1) throw new Error('legacy:' + window.__htmlTinkerXLegacyStyleElement?.sheet?.cssRules?.length);
+                    if (window.__htmlTinkerXDisabledStyleElement?.sheet?.disabled !== true) throw new Error('disabled:' + window.__htmlTinkerXDisabledStyleElement?.sheet?.disabled);
                     document.querySelector('#result').textContent = 'stylesheet restored once';
                     return true;
                 }",
@@ -114,6 +133,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         AssertPdfContains(result.PdfBytes, "stylesheet restored once");
         Assert.Equal(1, server.BlankPopupSourceRequests("stylesheet-initial"));
         Assert.Equal(1, server.BlankPopupSourceRequests("stylesheet-inserted"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("stylesheet-legacy"));
+        Assert.Equal(0, server.BlankPopupSourceRequests("stylesheet-legacy-removed"));
+        Assert.Equal(0, server.BlankPopupSourceRequests("stylesheet-disabled"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 

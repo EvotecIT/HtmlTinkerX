@@ -45,6 +45,7 @@
     const attributeStyleMapRouteDescriptors = new WeakMap();
     const workletStates = new WeakMap();
     const requestConstructors = new WeakMap();
+    const audioContextConstructors = new WeakMap();
     const installedWorkletPrototypes = new WeakSet();
     const styleSheetListItem = StyleSheetList.prototype.item;
     const installWorkletRoute = prototype => {
@@ -71,7 +72,7 @@
     const installSheetMutations = prototype => {
         if (prototype == null || installedSheetPrototypes.has(prototype)) return;
         installedSheetPrototypes.add(prototype);
-        for (const name of ['deleteRule', 'insertRule', 'replace', 'replaceSync']) {
+        for (const name of ['addRule', 'deleteRule', 'insertRule', 'removeRule', 'replace', 'replaceSync']) {
             const method = prototype[name];
             if (typeof method !== 'function') continue;
             defineProperty(prototype, name, {
@@ -316,6 +317,22 @@
         return {
             guardNavigator,
             guardCss,
+            audioContextConstructorFor(targetWindow, name, documentProvider = () => targetWindow.document) {
+                const nativeConstructor = targetWindow[name];
+                if (typeof nativeConstructor !== 'function') return nativeConstructor;
+                const existing = audioContextConstructors.get(nativeConstructor);
+                if (existing != null) return existing;
+                let routed;
+                routed = new Proxy(nativeConstructor, {
+                    construct(target, args, newTarget) {
+                        const instance = reflectConstruct(target, args, newTarget === routed ? target : newTarget);
+                        guardWorklet(instance.audioWorklet, documentProvider);
+                        return instance;
+                    }
+                });
+                audioContextConstructors.set(nativeConstructor, routed);
+                return routed;
+            },
             documentBaseFor,
             requestConstructorFor(targetWindow) {
                 const existing = requestConstructors.get(targetWindow);
@@ -563,6 +580,7 @@
                 });
                 sheetStates.set(element, () => facade);
                 sheetMutationStates.set(stagingSheet, routeMutation);
+                let releasedDisabled = false;
                 const guard = {
                     set text(value) {
                         stagedText = toDomString(value);
@@ -573,10 +591,15 @@
                     },
                     release() {
                         sheetMutationStates.delete(stagingSheet);
+                        releasedDisabled = stagingSheet.disabled;
                         const rules = arrayFrom(stagingSheet.cssRules, rule => rule.cssText).join('\n');
                         if (!mutated) return stagedText;
                         if (sourceParsed) return rules;
                         return [stagedText, rules].filter(value => value.length > 0).join('\n');
+                    },
+                    restore() {
+                        const liveSheet = sheetDescriptor.get.call(element);
+                        if (liveSheet != null) liveSheet.disabled = releasedDisabled;
                     }
                 };
                 guard.text = initialText;

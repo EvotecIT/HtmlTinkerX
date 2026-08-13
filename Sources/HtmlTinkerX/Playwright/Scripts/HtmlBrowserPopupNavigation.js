@@ -364,7 +364,7 @@
                     const replacement = nativeReflectApply(popupCloneNode, element, [false]); applyAttributes(replacement);
                     popupTextContent.set.call(replacement, stagedText); nativeReflectApply(popupReplaceChild, element.parentNode, [replacement, element]);
                 } else {
-                    applyAttributes(element); if (stagesStyleText) popupTextContent.set.call(element, sheetGuard?.release() ?? stagedText);
+                    applyAttributes(element); if (stagesStyleText) { popupTextContent.set.call(element, sheetGuard?.release() ?? stagedText); sheetGuard?.restore(); }
                     else if (stagesScriptText) popupTextContent.set.call(element, stagedText);
                 }
             }; guardedReleaseActions.set(element, releaseResource); guardedResources.push(releaseResource);
@@ -619,7 +619,7 @@
                 if (property === 'location') return locationFacade;
                 if (property === 'navigation' && nativeNavigation != null) return nativeNavigation;
                 if (property === 'document') return documentFacade;
-                if (property === 'DOMParser') return domGuards.constructorFor(targetWindow); if (property === 'CSS') return transportGuards.guardCss(targetWindow.CSS); if (property === 'getSelection') return (...args) => domGuards.guardSelection(nativeReflectApply(targetWindow.getSelection, targetWindow, args)); if (property === 'Request') return transportGuards.requestConstructorFor(targetWindow);
+                if (property === 'DOMParser') return domGuards.constructorFor(targetWindow); if (property === 'CSS') return transportGuards.guardCss(targetWindow.CSS); if (property === 'AudioContext' || property === 'OfflineAudioContext' || property === 'webkitAudioContext') return transportGuards.audioContextConstructorFor(targetWindow, property); if (property === 'getSelection') return (...args) => domGuards.guardSelection(nativeReflectApply(targetWindow.getSelection, targetWindow, args)); if (property === 'Request') return transportGuards.requestConstructorFor(targetWindow);
                 if (property === 'window' || property === 'self' || property === 'frames') return popupFacade;
                 if (property === 'XMLHttpRequest') return stagedXhrConstructor;
                 if (stagedRealmMembers.has(property)) return stagedRealmMembers.get(property);
@@ -928,12 +928,12 @@
     const stagedClickAnchor = event => {
         if (event.button !== 0) return null;
         const path = typeof nativeComposedPath === 'function' ? nativeComposedPath.call(event) : [];
-        const anchor = path.find(node => node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement)
+        const anchor = path.find(node => node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement || (typeof SVGAElement !== 'undefined' && node instanceof SVGAElement))
             || (event.target instanceof Element ? nativeClosest.call(event.target, 'a[href],area[href]') : null);
-        if (!(anchor instanceof HTMLAnchorElement || anchor instanceof HTMLAreaElement) || nativeHasAttribute.call(anchor, 'download')) return null;
+        if (!(anchor instanceof HTMLAnchorElement || anchor instanceof HTMLAreaElement || (typeof SVGAElement !== 'undefined' && anchor instanceof SVGAElement)) || nativeHasAttribute.call(anchor, 'download')) return null;
         const target = effectiveTarget(anchor, null);
         const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
-        const destination = new nativeUrl(anchor.href, document.baseURI);
+        const destination = new nativeUrl(typeof SVGAElement !== 'undefined' && anchor instanceof SVGAElement ? anchor.href.baseVal : anchor.href, document.baseURI);
         if (!explicitlyCurrent
             && specialTargets.includes(normalizedDeclarativeTarget(target))) return null;
         return { anchor, target, explicitlyCurrent, destination, path };
@@ -955,7 +955,7 @@
         const staged = stagedClickAnchor(event);
         if (staged === null) return;
         const { anchor, target, explicitlyCurrent, destination } = staged;
-        const rel = anchor.relList;
+        const rel = anchor.relList ?? { contains: value => (nativeGetAttribute.call(anchor, 'rel') || '').split(/\s+/).includes(value) };
         if (explicitlyCurrent) {
             navigateCurrentWithReferrerPolicy(
                 destination.href,
