@@ -7,17 +7,36 @@
     const reflectGet = Reflect.get;
     const reflectSet = Reflect.set;
     const weakMap = WeakMap;
+    const weakSet = WeakSet;
     const numberValue = Number;
+    const objectCreate = Object.create;
     const openerAttachShadow = Element.prototype.attachShadow;
+    const openerAnimate = Element.prototype.animate;
+    const openerShadowRoot = getOwnPropertyDescriptor(Element.prototype, 'shadowRoot').get;
+    const knownShadowRoots = new weakMap();
+    const animationRealmStates = new weakMap();
+    const customElementRealms = new weakSet();
     const shadowRealmStates = new weakMap();
     const timerRealmStates = new weakMap();
     const routedAttachShadow = function(...args) {
         const view = this.ownerDocument?.defaultView;
         const route = view == null ? null : shadowRealmStates.get(view);
-        return route == null ? reflectApply(openerAttachShadow, this, args) : route(this, args);
+        const root = route == null ? reflectApply(openerAttachShadow, this, args) : route(this, args);
+        knownShadowRoots.set(this, root);
+        return root;
     };
     if (typeof openerAttachShadow === 'function') defineProperty(Element.prototype, 'attachShadow', {
         value: routedAttachShadow,
+        writable: false,
+        configurable: false
+    });
+    const routedAnimate = function(...args) {
+        const view = this.ownerDocument?.defaultView;
+        const route = view == null ? null : animationRealmStates.get(view);
+        return route == null ? reflectApply(openerAnimate, this, args) : route(this, args);
+    };
+    if (typeof openerAnimate === 'function') defineProperty(Element.prototype, 'animate', {
+        value: routedAnimate,
         writable: false,
         configurable: false
     });
@@ -48,6 +67,87 @@
         stringValue
     }) => {
         const members = new Map();
+        const installAnimations = target => {
+            if (animationRealmStates.has(target)) return;
+            const prototype = target?.Element?.prototype;
+            const nativeAnimate = prototype?.animate;
+            if (typeof nativeAnimate !== 'function') return;
+            const animate = (receiver, args) => {
+                    if (isReady()) return reflectApply(nativeAnimate, receiver, args);
+                    const stagingElement = target.document.createElement(receiver.localName || 'div');
+                    const staged = reflectApply(nativeAnimate, stagingElement, args);
+                    let current = staged;
+                    const facade = new Proxy(objectCreate(getPrototypeOf(staged)), {
+                        get(_, property) {
+                            const value = reflectGet(current, property, current);
+                            return typeof value === 'function' ? (...values) => reflectApply(value, current, values) : value;
+                        },
+                        set(_, property, value) { return reflectSet(current, property, value, current); }
+                    });
+                    runWhenReady(() => {
+                        const keyframes = staged.effect?.getKeyframes?.() ?? args[0];
+                        const timing = staged.effect?.getTiming?.() ?? args[1];
+                        const playState = staged.playState;
+                        const currentTime = staged.currentTime;
+                        const playbackRate = staged.playbackRate;
+                        const handlers = [staged.oncancel, staged.onfinish, staged.onremove];
+                        current = reflectApply(nativeAnimate, receiver, [keyframes, timing]);
+                        current.playbackRate = playbackRate;
+                        if (currentTime != null) current.currentTime = currentTime;
+                        [current.oncancel, current.onfinish, current.onremove] = handlers;
+                        if (playState === 'idle') current.cancel();
+                        else if (playState === 'paused') current.pause();
+                        else if (playState === 'finished') current.finish();
+                    });
+                    return facade;
+                };
+            animationRealmStates.set(target, animate);
+            defineProperty(prototype, 'animate', {
+                configurable: false,
+                writable: false,
+                value: routedAnimate
+            });
+        };
+        const installCustomElements = target => {
+            if (customElementRealms.has(target)) return;
+            const registry = target?.customElements;
+            const prototype = target?.CustomElementRegistry?.prototype;
+            const nativeDefine = prototype?.define;
+            if (registry == null || typeof nativeDefine !== 'function') return;
+            customElementRealms.add(target);
+            const pending = new Map();
+            const nativeGet = prototype.get;
+            const nativeGetName = prototype.getName;
+            const nativeWhenDefined = prototype.whenDefined;
+            defineProperty(prototype, 'define', {
+                configurable: false,
+                writable: false,
+                value(name, constructor, options) {
+                    if (isReady()) return reflectApply(nativeDefine, this, arguments);
+                    const normalized = stringValue(name);
+                    if (pending.has(normalized) || reflectApply(nativeGet, this, [normalized]) != null) throw new target.DOMException(`the name "${normalized}" has already been used`, 'NotSupportedError');
+                    let resolveDefinition;
+                    const completion = new Promise(resolve => { resolveDefinition = resolve; });
+                    pending.set(normalized, { constructor, options, completion });
+                    runWhenReady(() => { const definition = pending.get(normalized); pending.delete(normalized); reflectApply(nativeDefine, registry, [normalized, definition.constructor, definition.options]); resolveDefinition(definition.constructor); });
+                }
+            });
+            defineProperty(prototype, 'get', {
+                configurable: false,
+                writable: false,
+                value(name) { return pending.get(stringValue(name))?.constructor ?? reflectApply(nativeGet, this, arguments); }
+            });
+            if (typeof nativeGetName === 'function') defineProperty(prototype, 'getName', {
+                configurable: false,
+                writable: false,
+                value(constructor) { for (const [name, definition] of pending) if (definition.constructor === constructor) return name; return reflectApply(nativeGetName, this, arguments); }
+            });
+            defineProperty(prototype, 'whenDefined', {
+                configurable: false,
+                writable: false,
+                value(name) { const normalized = stringValue(name); return pending.get(normalized)?.completion ?? reflectApply(nativeWhenDefined, this, [normalized]); }
+            });
+        };
         const installTimers = () => {
             const pending = new Map();
             let nextIdentifier = -1;
@@ -247,8 +347,11 @@
 
         installTimers();
         installShadowRoots(popup);
+        installAnimations(popup);
+        installCustomElements(popup);
         members.registerFacade = facade => timerRealmStates.set(facade, members);
-        members.guardShadowRealm = installShadowRoots;
+        members.guardShadowRealm = target => { installShadowRoots(target); installAnimations(target); installCustomElements(target); };
+        members.shadowRootFor = element => knownShadowRoots.get(element) ?? reflectApply(openerShadowRoot, element, []);
         return members;
     };
 })();

@@ -99,8 +99,10 @@
                 if (ownDescriptor?.configurable !== false) defineProperty(target, name, { value: constructor, writable: false, configurable: false });
             }
             let facade;
+            const overrides = new Set();
             facade = new Proxy({}, {
                 get(_, property) {
+                    if (overrides.has(property)) { const value = reflectGet(target, property, target); return typeof value === 'function' ? reflectApply(bind, value, [target]) : value; }
                     if (property === 'document') return documentFor(target.document);
                     if (property === 'window' || property === 'self' || property === 'frames') return facade;
                     if (property === 'parent' || property === 'top') {
@@ -140,6 +142,7 @@
                         runWhenReady(() => reflectSet(target, 'location', normalized, target));
                         return true;
                     }
+                    overrides.add(property);
                     return reflectSet(target, property, value, target);
                 }
             });

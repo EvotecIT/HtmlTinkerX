@@ -26,6 +26,7 @@
         const nodeName = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeName').get;
         const nodeValue = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeValue');
         const elementQuerySelectorAll = popup.Element.prototype.querySelectorAll;
+        const documentQuerySelectorAll = popup.Document.prototype.querySelectorAll;
         const elementGetAttribute = popup.Element.prototype.getAttribute;
         const fragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
         const elementShadowRoot = getOwnPropertyDescriptor(popup.Element.prototype, 'shadowRoot').get;
@@ -33,7 +34,8 @@
         const elementsOf = root => {
             const elements = [];
             const visit = current => {
-                const method = reflectApply(nodeType, current, []) === 1 ? elementQuerySelectorAll : fragmentQuerySelectorAll;
+                const type = reflectApply(nodeType, current, []);
+                const method = type === 1 ? elementQuerySelectorAll : type === 9 ? documentQuerySelectorAll : fragmentQuerySelectorAll;
                 for (const descendant of reflectApply(method, current, ['*'])) {
                     elements.push(descendant);
                     if (descendant.localName === 'template') visit(templateContent.call(descendant));
@@ -202,6 +204,8 @@
                 error => { restore(); throw error; }
             ]);
         };
+        stager.elementsOf = elementsOf;
+        stager.findMarker = findMarker;
         return stager;
     };
 })();

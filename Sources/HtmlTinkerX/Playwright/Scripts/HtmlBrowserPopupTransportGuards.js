@@ -516,6 +516,7 @@
                 let stagedText = initialText;
                 let mutated = false;
                 let sourceParsed = false;
+                const nestedFacades = new WeakMap();
                 const currentSheet = () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet;
                 const routeMutation = (name, args, method) => {
                     const result = reflectApply(method, currentSheet(), args);
@@ -527,11 +528,36 @@
                     }
                     return result;
                 };
+                const guardNested = value => {
+                    if (isReleased() || value == null || typeof value !== 'object') return value;
+                    const name = value.constructor?.name || '';
+                    if (!name.startsWith('CSS')) return value;
+                    const existing = nestedFacades.get(value);
+                    if (existing != null) return existing;
+                    const nested = new Proxy(objectCreate(getPrototypeOf(value)), {
+                        get(_, property) {
+                            const member = reflectGet(value, property, value);
+                            if (typeof member === 'function') return (...args) => {
+                                mutated = true;
+                                touch();
+                                return guardNested(reflectApply(member, value, args));
+                            };
+                            return guardNested(member);
+                        },
+                        set(_, property, next) {
+                            mutated = true;
+                            touch();
+                            return reflectSet(value, property, next, value);
+                        }
+                    });
+                    nestedFacades.set(value, nested);
+                    return nested;
+                };
                 const facade = new Proxy(objectCreate(getPrototypeOf(stagingSheet)), {
                     get(_, property) {
                         const current = currentSheet();
                         const value = reflectGet(current, property, current);
-                        return typeof value === 'function' ? (...args) => reflectApply(value, current, args) : value;
+                        return typeof value === 'function' ? (...args) => guardNested(reflectApply(value, current, args)) : guardNested(value);
                     },
                     set(_, property, value) { const current = currentSheet(); return reflectSet(current, property, value, current); }
                 });

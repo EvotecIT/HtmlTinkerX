@@ -276,7 +276,7 @@
             || attribute.startsWith('on')
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
             || (element.localName === 'meta' && attribute === 'content');
-        let domGuards; const guardDeferredAttributes = (element, initialValues, initialNamespacedValues = []) => { const elementDocument = () => nativeReflectApply(popupOwnerDocument, element, []);
+        let domGuards, stagedRealmMembers; const guardDeferredAttributes = (element, initialValues, initialNamespacedValues = []) => { const elementDocument = () => nativeReflectApply(popupOwnerDocument, element, []);
             if (guardedElements.has(element)) return;
             guardedElements.add(element); domGuards?.guardActivation(element); domGuards?.guardImageDecode(element); domGuards?.guardMediaPlayback(element); domGuards?.guardFormSubmission(element);
             const values = new Map(initialValues); const namespacedValues = new Map(); for (const value of initialNamespacedValues) namespacedValues.set(`${value.namespace}\0${value.qualified}`, value);
@@ -395,14 +395,14 @@
             guardDeferredAttributes(element, values, namespacedValues);
             return element;
         };
-        const shouldTraverseShadow = element => nativeReflectApply(popupOwnerDocument, element, []) !== popup.document || !nativeReflectApply(popupIsConnected, element, []);
+        const shouldTraverseShadow = element => nativeReflectApply(popupOwnerDocument, element, []) !== popup.document || !nativeReflectApply(popupIsConnected, element, []); const shadowRootFor = element => stagedRealmMembers?.shadowRootFor(element) ?? nativeReflectApply(nativeElementShadowRoot, element, []);
         const guardCreatedTree = element => { if (ready) return element;
             guardCreatedElement(element);
             const type = isNodeValue(element) ? nativeReflectApply(popupNodeType, element, []) : 0;
-            if (type === 1 && shouldTraverseShadow(element)) { const shadow = nativeReflectApply(nativeElementShadowRoot, element, []); if (shadow != null) guardCreatedTree(shadow); }
+            if (type === 1 && shouldTraverseShadow(element)) { const shadow = shadowRootFor(element); if (shadow != null) guardCreatedTree(shadow); }
             if (type === 1 || type === 11) for (const descendant of nativeReflectApply(type === 1 ? nativeElementQuerySelectorAll : popupFragmentQuerySelectorAll, element, ['*'])) {
                 guardCreatedElement(descendant);
-                if (shouldTraverseShadow(descendant)) { const shadow = nativeReflectApply(nativeElementShadowRoot, descendant, []); if (shadow != null) guardCreatedTree(shadow); }
+                if (shouldTraverseShadow(descendant)) { const shadow = shadowRootFor(descendant); if (shadow != null) guardCreatedTree(shadow); }
             }
             return element;
         }; domGuards = createDomGuards({ popup, isReady: () => ready, runWhenReady, guardCreatedTree });
@@ -421,7 +421,7 @@
             }
             return clone;
         };
-        const stagedRealmMembers = createRealmGuards({ popup, isReady: () => ready, runWhenReady, shouldDeferAttribute, guardDeferredAttributes, guardInsertionTarget: attributeGuards.guardInsertionTarget, releaseInsertionTarget: attributeGuards.releaseInsertionTarget, guardCreatedTree, guardedResources, stringValue: toDomString });
+        stagedRealmMembers = createRealmGuards({ popup, isReady: () => ready, runWhenReady, shouldDeferAttribute, guardDeferredAttributes, guardInsertionTarget: attributeGuards.guardInsertionTarget, releaseInsertionTarget: attributeGuards.releaseInsertionTarget, guardCreatedTree, guardedResources, stringValue: toDomString });
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
             documentWriteParts.push(args.map(value => nativeString(value)).join('') + (method === 'writeln' ? '\n' : ''));
@@ -434,7 +434,7 @@
             template.innerHTML = documentWriteParts.join('');
             const descriptors = [];
             let markerIndex = 0;
-            for (const element of template.content.querySelectorAll('*')) {
+            for (const element of stageElementMarkup.elementsOf(template.content)) {
                 const script = element.localName === 'script'
                     ? {
                         attributes: Array.from(element.attributes, attribute => [attribute.name, attribute.value]),
@@ -472,7 +472,7 @@
             }
             const reusedWriteNodes = stageElementMarkup.preserveWrittenNodes(nativeDocument, previousRoot, desiredRoot);
             for (const { marker, values, namespacedValues, styleText, script } of descriptors) {
-                const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
+                const element = stageElementMarkup.findMarker(nativeDocument, marker);
                 if (!element) continue;
                 element.removeAttribute('data-htmltinkerx-staged-resource');
                 if (reusedWriteNodes.has(element)) { if (styleText !== null) guardedResources.push(() => { element.textContent = styleText; }); continue; }
@@ -545,9 +545,9 @@
                     const member = nativeReflectGet(target, property, target);
                     if (typeof member !== 'function') {
                         if (!ready) transportGuards.guardReturnedNodes(member, guardCreatedTree); if (!ready && property === 'styleSheets') return transportGuards.guardStyleSheetCollection(member);
-                        return isNodeValue(member)
+                        const guardedWindow = frameGuards.guardReturnedWindow(member); return isNodeValue(member)
                             ? stagedObject(() => nativeReflectGet(resolve(), property, resolve()))
-                            : member === popup || member === nativeLocation ? stagedObject(() => member) : member;
+                            : guardedWindow !== member ? guardedWindow : member === nativeLocation ? stagedObject(() => member) : member;
                     }
                     return (...args) => { if (!ready && property === 'getSelection') { const current = resolve(); return domGuards.guardSelection(nativeReflectApply(nativeReflectGet(current, property, current), current, args)); } if (!ready && property === 'execCommand') return transportGuards.stageExecCommand(resolve(), args);
                         if (!ready && property === 'open' && resolve() === popup.document && args.length < 3) {
@@ -928,9 +928,9 @@
     const stagedClickAnchor = event => {
         if (event.button !== 0) return null;
         const path = typeof nativeComposedPath === 'function' ? nativeComposedPath.call(event) : [];
-        const anchor = path.find(node => node instanceof HTMLAnchorElement)
-            || (event.target instanceof Element ? nativeClosest.call(event.target, 'a[href]') : null);
-        if (!(anchor instanceof HTMLAnchorElement) || nativeHasAttribute.call(anchor, 'download')) return null;
+        const anchor = path.find(node => node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement)
+            || (event.target instanceof Element ? nativeClosest.call(event.target, 'a[href],area[href]') : null);
+        if (!(anchor instanceof HTMLAnchorElement || anchor instanceof HTMLAreaElement) || nativeHasAttribute.call(anchor, 'download')) return null;
         const target = effectiveTarget(anchor, null);
         const explicitlyCurrent = hasExplicitEmptyTarget(anchor, null);
         const destination = new nativeUrl(anchor.href, document.baseURI);
