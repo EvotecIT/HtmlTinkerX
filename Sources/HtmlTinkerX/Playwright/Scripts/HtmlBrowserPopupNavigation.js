@@ -15,6 +15,7 @@
     const nativeQuerySelectorAll = Document.prototype.querySelectorAll;
     const nativeQuerySelector = Document.prototype.querySelector;
     const nativeElementQuerySelectorAll = Element.prototype.querySelectorAll;
+    const nativeElementShadowRoot = nativeGetOwnPropertyDescriptor(Element.prototype, 'shadowRoot').get;
     const nativeClosest = Element.prototype.closest;
     const nativeGetAttribute = Element.prototype.getAttribute;
     const nativeHasAttribute = Element.prototype.hasAttribute;
@@ -131,7 +132,7 @@
             return popup;
         }
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
-        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupNodeType = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get; const popupOwnerDocument = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'ownerDocument').get; const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild; const popupFragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
+        const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupNodeType = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get; const popupOwnerDocument = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'ownerDocument').get; const popupIsConnected = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'isConnected').get; const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild; const popupFragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } };
         const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML; const popupSetHtmlUnsafe = popup.Element.prototype.setHTMLUnsafe;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
@@ -145,7 +146,7 @@
         const queued = [];
         const guardedResources = createResourceQueue(); const guardedElements = new WeakSet(); const guardedReleaseActions = new WeakMap();
         const requestAttributes = new Map([
-            ['src', 'src'], ['srcset', 'srcset'], ['href', 'href'], ['action', 'action'],
+            ['src', 'src'], ['srcset', 'srcset'], ['imagesrcset', 'imageSrcset'], ['href', 'href'], ['action', 'action'],
             ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction'], ['background', 'background']
         ]);
         const runWhenReady = action => {
@@ -348,6 +349,7 @@
                 }
             });
             releaseResource = () => {
+                if (released) return;
                 if (styleGuard != null) styleGuard.release();
                 released = true;
                 const applyAttributes = target => { for (const [attribute, value] of values) nativeSetAttribute.call(target, attribute, value); for (const value of namespacedValues.values()) nativeSetAttributeNS.call(target, value.namespace, value.qualified, value.value); };
@@ -386,10 +388,15 @@
             guardDeferredAttributes(element, values);
             return element;
         };
+        const shouldTraverseShadow = element => nativeReflectApply(popupOwnerDocument, element, []) !== popup.document || !nativeReflectApply(popupIsConnected, element, []);
         const guardCreatedTree = element => { if (ready) return element;
             guardCreatedElement(element);
             const type = isNodeValue(element) ? nativeReflectApply(popupNodeType, element, []) : 0;
-            if (type === 1 || type === 11) for (const descendant of nativeReflectApply(type === 1 ? nativeElementQuerySelectorAll : popupFragmentQuerySelectorAll, element, ['*'])) guardCreatedElement(descendant);
+            if (type === 1 && shouldTraverseShadow(element)) { const shadow = nativeReflectApply(nativeElementShadowRoot, element, []); if (shadow != null) guardCreatedTree(shadow); }
+            if (type === 1 || type === 11) for (const descendant of nativeReflectApply(type === 1 ? nativeElementQuerySelectorAll : popupFragmentQuerySelectorAll, element, ['*'])) {
+                guardCreatedElement(descendant);
+                if (shouldTraverseShadow(descendant)) { const shadow = nativeReflectApply(nativeElementShadowRoot, descendant, []); if (shadow != null) guardCreatedTree(shadow); }
+            }
             return element;
         }; domGuards = createDomGuards({ popup, isReady: () => ready, runWhenReady, guardCreatedTree });
         const guardClonedTree = (source, clone) => {
@@ -407,22 +414,6 @@
             }
             return clone;
         };
-        const stagedElementConstructors = new Map();
-        for (const name of ['Image', 'Audio']) {
-            const constructor = popup[name];
-            if (typeof constructor !== 'function') continue;
-            stagedElementConstructors.set(name, new Proxy(constructor, {
-                construct(target, args, newTarget) {
-                    if (name === 'Audio' && !ready && args.length > 0) {
-                        const source = toDomString(args[0]);
-                        const audio = guardCreatedTree(nativeReflectConstruct(target, [], newTarget));
-                        audio.src = source;
-                        return audio;
-                    }
-                    return guardCreatedTree(nativeReflectConstruct(target, args, newTarget));
-                }
-            }));
-        }
         const stagedRealmMembers = createRealmGuards({ popup, isReady: () => ready, runWhenReady, shouldDeferAttribute, guardDeferredAttributes, guardInsertionTarget: attributeGuards.guardInsertionTarget, releaseInsertionTarget: attributeGuards.releaseInsertionTarget, guardCreatedTree, guardedResources, stringValue: toDomString });
         const writeStagedMarkup = (method, args) => {
             const nativeDocument = popup.document;
@@ -607,8 +598,15 @@
             return facade;
         };
         const isDocumentValue = value => { try { return nativeReflectApply(popupNodeType, value, []) === 9; } catch { return false; } }; const documentFacade = stagedObject(() => popup.document);
-        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, reflectApply: nativeReflectApply, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardRealm: target => { installPopupRealmAttributeGuards(target); stagedRealmMembers.guardShadowRealm(target); domGuards.guardRealm(target); }, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors });
+        const openForWindow = targetWindow => function(url, nestedTarget, nestedFeatures) {
+            const resolved = url == null || nativeString(url).length === 0
+                ? url
+                : new nativeUrl(nativeString(url), transportGuards.documentBaseFor(targetWindow.document)).href;
+            return openWithReferrerPolicy.call(targetWindow, resolved, nestedTarget, nestedFeatures, '');
+        };
+        const frameGuards = createFrameGuards({ popup, defineProperty: nativeDefineProperty, getOwnPropertyDescriptor: nativeGetOwnPropertyDescriptor, reflectApply: nativeReflectApply, reflectConstruct: nativeReflectConstruct, reflectGet: nativeReflectGet, reflectSet: nativeReflectSet, isReady: () => ready, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardCreatedTree, guardRealm: target => { installPopupRealmAttributeGuards(target); stagedRealmMembers.guardShadowRealm(target); domGuards.guardRealm(target); }, createDocumentFacade: value => stagedObject(() => value), mainDocumentFacade: documentFacade, mainWindowFacade: () => popupFacade, stagedXhrConstructor, stagedAsyncConstructors, stringValue: toDomString, openForWindow });
         stagedDocument = frameGuards.documentFor; stagedChildWindow = frameGuards.windowFor;
+        const stagedElementConstructors = frameGuards.elementConstructorsFor(popup);
         popupFacade = new Proxy(popup, {
             get(targetWindow, property) {
                 if (property === 'location') return locationFacade;
@@ -638,12 +636,7 @@
             }
         });
         stagedRealmMembers.registerFacade(popupFacade);
-        const nestedWindowOpen = function(url, nestedTarget, nestedFeatures) {
-            const resolved = url == null || nativeString(url).length === 0
-                ? url
-                : new nativeUrl(nativeString(url), transportGuards.documentBaseFor(popup.document)).href;
-            return openWithReferrerPolicy.call(popup, resolved, nestedTarget, nestedFeatures, '');
-        };
+        const nestedWindowOpen = openForWindow(popup);
         const popupPrototypeOpen = nativeGetOwnPropertyDescriptor(popup.Window.prototype, 'open');
         if (popupPrototypeOpen?.configurable !== false) nativeDefineProperty(popup.Window.prototype, 'open', {
             value: nestedWindowOpen,

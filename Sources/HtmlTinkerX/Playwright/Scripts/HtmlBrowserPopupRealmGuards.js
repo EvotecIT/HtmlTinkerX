@@ -111,6 +111,29 @@
             const attachShadow = target.Element.prototype.attachShadow;
             const innerHtml = getOwnPropertyDescriptor(target.ShadowRoot.prototype, 'innerHTML');
             const setHtmlUnsafe = target.ShadowRoot.prototype.setHTMLUnsafe;
+            const nodeType = getOwnPropertyDescriptor(target.Node.prototype, 'nodeType').get;
+            const elementQuerySelectorAll = target.Element.prototype.querySelectorAll;
+            const elementGetAttribute = target.Element.prototype.getAttribute;
+            const fragmentQuerySelectorAll = target.DocumentFragment.prototype.querySelectorAll;
+            const elementShadowRoot = getOwnPropertyDescriptor(target.Element.prototype, 'shadowRoot').get;
+            const templateContent = getOwnPropertyDescriptor(target.HTMLTemplateElement.prototype, 'content').get;
+            const elementsOf = root => {
+                const elements = [];
+                const visit = current => {
+                    const method = reflectApply(nodeType, current, []) === 1 ? elementQuerySelectorAll : fragmentQuerySelectorAll;
+                    for (const descendant of reflectApply(method, current, ['*'])) {
+                        elements.push(descendant);
+                        if (descendant.localName === 'template') visit(templateContent.call(descendant));
+                        const shadow = elementShadowRoot.call(descendant); if (shadow != null) visit(shadow);
+                    }
+                };
+                visit(root);
+                return elements;
+            };
+            const findMarker = (root, marker) => {
+                for (const descendant of elementsOf(root)) if (reflectApply(elementGetAttribute, descendant, ['data-htmltinkerx-staged-resource']) === marker) return descendant;
+                return null;
+            };
             let adoptedOwner = target.ShadowRoot.prototype;
             let adopted = null;
             while (adoptedOwner && adopted == null) {
@@ -123,7 +146,7 @@
                 template.innerHTML = stringValue(markup);
                 const descriptors = [];
                 let markerIndex = 0;
-                for (const descendant of template.content.querySelectorAll('*')) {
+                for (const descendant of elementsOf(templateContent.call(template))) {
                     const values = [];
                     for (const attribute of arrayFrom(descendant.attributes)) {
                         const name = attribute.name.toLowerCase();
@@ -140,7 +163,7 @@
                 if (method === 'setHTMLUnsafe') reflectApply(setHtmlUnsafe, root, [template.innerHTML]);
                 else innerHtml.set.call(root, template.innerHTML);
                 for (const { marker, values, styleText } of descriptors) {
-                    const descendant = root.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
+                    const descendant = findMarker(root, marker);
                     if (!descendant) continue;
                     descendant.removeAttribute('data-htmltinkerx-staged-resource');
                     guardDeferredAttributes(descendant, values);

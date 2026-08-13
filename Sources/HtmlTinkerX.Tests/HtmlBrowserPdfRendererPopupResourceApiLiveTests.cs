@@ -6,6 +6,73 @@ namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
+    public async Task PopupPreloadAdoptedShadowAndDeclarativeShadowResourcesWaitForInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const preload = popup.document.createElement('link');
+            preload.rel = 'preload';
+            preload.as = 'image';
+            preload.imageSrcset = '{server.BlankPopupResourceUrl}?source=image-preload-srcset 1x';
+            popup.document.head.append(preload);
+            const auxiliary = document.implementation.createHTMLDocument('');
+            const adoptedHost = auxiliary.createElement('div');
+            adoptedHost.attachShadow({{ mode: 'open' }}).innerHTML = `<img src='{server.BlankPopupResourceUrl}?source=adopted-shadow-tree'>`;
+            popup.document.body.append(adoptedHost);
+            const unsafeContainer = popup.document.createElement('section');
+            popup.document.body.append(unsafeContainer);
+            unsafeContainer.setHTMLUnsafe(`<div><template shadowrootmode='open'><img src='{server.BlankPopupResourceUrl}?source=declarative-shadow-element'></template></div>`);
+            const unsafeShadowHost = popup.document.createElement('div');
+            popup.document.body.append(unsafeShadowHost);
+            unsafeShadowHost.attachShadow({{ mode: 'open' }}).setHTMLUnsafe(`<div><template shadowrootmode='open'><img src='{server.BlankPopupResourceUrl}?source=declarative-shadow-root'></template></div>`);
+            popup.setTimeout(() => document.querySelector('#result').textContent = preload.imageSrcset.includes('image-preload-srcset') ? 'preload restored' : 'preload lost', 0);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, function: "() => document.querySelector('#result').textContent !== 'pending'", timeout: 10000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        AssertPdfContains(result.PdfBytes, "preload restored");
+        foreach (string source in new[] { "adopted-shadow-tree", "declarative-shadow-element", "declarative-shadow-root" }) Assert.Equal(1, server.BlankPopupSourceRequests(source));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
+    public async Task ChildFrameOpenImageAndAudioWaitForPopupInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            frame.contentWindow.open('{server.BlankPopupResourceUrl}?source=child-window-open', '_blank');
+            const image = new frame.contentWindow.Image();
+            image.src = '{server.BlankPopupResourceUrl}?source=child-image-constructor';
+            frame.contentDocument.body.append(image);
+            const audio = new frame.contentWindow.Audio('{server.BlankPopupResourceUrl}?source=child-audio-constructor');
+            frame.contentDocument.body.append(audio);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        foreach (string source in new[] { "child-window-open", "child-image-constructor", "child-audio-constructor" }) {
+            Assert.Equal(1, server.BlankPopupSourceRequests(source));
+        }
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task PopupFontFaceSetLoadsOnlyAfterHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

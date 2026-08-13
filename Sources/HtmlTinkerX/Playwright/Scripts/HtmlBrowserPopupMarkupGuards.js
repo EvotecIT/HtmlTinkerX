@@ -18,13 +18,41 @@
         guardDeferredAttributes,
         guardedResources
     }) => {
+        const appendChild = popup.Node.prototype.appendChild;
+        const childNodes = getOwnPropertyDescriptor(popup.Node.prototype, 'childNodes').get;
+        const documentElement = getOwnPropertyDescriptor(popup.Document.prototype, 'documentElement').get;
+        const nodeType = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get;
+        const nodeName = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeName').get;
+        const nodeValue = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeValue');
+        const elementQuerySelectorAll = popup.Element.prototype.querySelectorAll;
+        const elementGetAttribute = popup.Element.prototype.getAttribute;
+        const fragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
+        const elementShadowRoot = getOwnPropertyDescriptor(popup.Element.prototype, 'shadowRoot').get;
+        const templateContent = getOwnPropertyDescriptor(popup.HTMLTemplateElement.prototype, 'content').get;
+        const elementsOf = root => {
+            const elements = [];
+            const visit = current => {
+                const method = reflectApply(nodeType, current, []) === 1 ? elementQuerySelectorAll : fragmentQuerySelectorAll;
+                for (const descendant of reflectApply(method, current, ['*'])) {
+                    elements.push(descendant);
+                    if (descendant.localName === 'template') visit(templateContent.call(descendant));
+                    const shadow = elementShadowRoot.call(descendant); if (shadow != null) visit(shadow);
+                }
+            };
+            visit(root);
+            return elements;
+        };
+        const findMarker = (root, marker) => {
+            for (const descendant of elementsOf(root)) if (reflectApply(elementGetAttribute, descendant, ['data-htmltinkerx-staged-resource']) === marker) return descendant;
+            return null;
+        };
         const stager = (element, method, args) => {
             const markup = stringValue(args[method === 'insertAdjacentHTML' ? 1 : 0]);
             const template = popup.document.createElement('template');
             template.innerHTML = markup;
             const descriptors = [];
             let markerIndex = 0;
-            for (const descendant of template.content.querySelectorAll('*')) {
+            for (const descendant of elementsOf(templateContent.call(template))) {
                 const values = [];
                 for (const attribute of arrayFrom(descendant.attributes)) {
                     const name = attribute.name.toLowerCase();
@@ -52,8 +80,8 @@
                 searchRoot = element.parentNode || element;
                 reflectApply(insertAdjacentHtml, element, [args[0], template.innerHTML]);
             }
-            if (searchRoot?.querySelector) for (const { marker, values, styleText } of descriptors) {
-                const descendant = searchRoot.querySelector('[data-htmltinkerx-staged-resource="' + marker + '"]');
+            if (searchRoot != null) for (const { marker, values, styleText } of descriptors) {
+                const descendant = findMarker(searchRoot, marker);
                 if (!descendant) continue;
                 descendant.removeAttribute('data-htmltinkerx-staged-resource');
                 guardDeferredAttributes(descendant, values);
@@ -61,13 +89,6 @@
             }
             return true;
         };
-        const appendChild = popup.Node.prototype.appendChild;
-        const childNodes = getOwnPropertyDescriptor(popup.Node.prototype, 'childNodes').get;
-        const documentElement = getOwnPropertyDescriptor(popup.Document.prototype, 'documentElement').get;
-        const nodeType = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get;
-        const nodeName = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeName').get;
-        const nodeValue = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeValue');
-        const elementGetAttribute = popup.Element.prototype.getAttribute;
         const elementHasAttribute = popup.Element.prototype.hasAttribute;
         const elementSetAttribute = popup.Element.prototype.setAttribute;
         const markerAttribute = 'data-htmltinkerx-staged-resource';

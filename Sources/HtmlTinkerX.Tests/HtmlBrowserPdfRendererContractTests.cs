@@ -544,7 +544,14 @@ public sealed class HtmlBrowserPdfRendererContractTests {
         Assert.False(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
         Assert.Equal(1, calls);
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
-        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
+
+        bool recovered = false;
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+        while (!recovered && DateTime.UtcNow < deadline) {
+            recovered = await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
+            if (!recovered) await Task.Delay(10);
+        }
+        Assert.True(recovered);
         Assert.Equal(1, calls);
     }
 

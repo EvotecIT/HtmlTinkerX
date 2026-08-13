@@ -1,9 +1,10 @@
 (() => {
     const bind = Function.prototype.bind;
-    const createFrameGuards = ({ popup, defineProperty, reflectApply, reflectGet, reflectSet, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardRealm, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors }) => {
+    const createFrameGuards = ({ popup, defineProperty, getOwnPropertyDescriptor, reflectApply, reflectConstruct, reflectGet, reflectSet, isReady, runWhenReady, transportGuards, cacheGuards, codeGuards, domGuards, guardCreatedTree, guardRealm, createDocumentFacade, mainDocumentFacade, mainWindowFacade, stagedXhrConstructor, stagedAsyncConstructors, stringValue, openForWindow }) => {
         const windows = new WeakMap();
         const locations = new WeakMap();
         const fetches = new WeakMap();
+        const elementConstructors = new WeakMap();
         const documents = new WeakMap([[popup.document, mainDocumentFacade]]);
         const documentFor = value => {
             if (value == null) return value;
@@ -17,6 +18,28 @@
         const popupClose = popup.close;
         const stagedClose = (...args) => runWhenReady(() => reflectApply(popupClose, popup, args));
         defineProperty(popup.Window.prototype, 'close', { value: stagedClose, writable: false, configurable: false });
+        const elementConstructorsFor = targetWindow => {
+            const existing = elementConstructors.get(targetWindow);
+            if (existing != null) return existing;
+            const constructors = new Map();
+            for (const name of ['Image', 'Audio']) {
+                const constructor = targetWindow[name];
+                if (typeof constructor !== 'function') continue;
+                constructors.set(name, new Proxy(constructor, {
+                    construct(target, args, newTarget) {
+                        if (name === 'Audio' && !isReady() && args.length > 0) {
+                            const source = stringValue(args[0]);
+                            const audio = guardCreatedTree(reflectConstruct(target, [], newTarget));
+                            audio.src = source;
+                            return audio;
+                        }
+                        return guardCreatedTree(reflectConstruct(target, args, newTarget));
+                    }
+                }));
+            }
+            elementConstructors.set(targetWindow, constructors);
+            return constructors;
+        };
         const locationFor = target => {
             const location = target.location;
             const existing = locations.get(location);
@@ -63,6 +86,18 @@
             stagedAsyncConstructors.guardFontSet(target.document);
             const codeMembers = codeGuards.forWindow(target);
             const asyncConstructors = stagedAsyncConstructors.forWindow(target);
+            const elementConstructors = elementConstructorsFor(target);
+            const stagedOpen = openForWindow(target);
+            const openDescriptor = getOwnPropertyDescriptor(target.Window.prototype, 'open');
+            if (openDescriptor?.configurable !== false) defineProperty(target.Window.prototype, 'open', { ...openDescriptor, value: stagedOpen, writable: false, configurable: false });
+            const ownOpenDescriptor = getOwnPropertyDescriptor(target, 'open');
+            if (ownOpenDescriptor?.configurable !== false) defineProperty(target, 'open', { value: stagedOpen, writable: false, configurable: false });
+            for (const [name, constructor] of elementConstructors) {
+                const descriptor = getOwnPropertyDescriptor(target.Window.prototype, name);
+                if (descriptor?.configurable !== false) defineProperty(target.Window.prototype, name, { ...descriptor, value: constructor, writable: false, configurable: false });
+                const ownDescriptor = getOwnPropertyDescriptor(target, name);
+                if (ownDescriptor?.configurable !== false) defineProperty(target, name, { value: constructor, writable: false, configurable: false });
+            }
             let facade;
             facade = new Proxy({}, {
                 get(_, property) {
@@ -88,9 +123,11 @@
                     if (property === 'getSelection') return (...args) => domGuards.guardSelection(reflectApply(target.getSelection, target, args));
                     if (property === 'DOMParser') return domGuards.constructorFor(target);
                     if (property === 'Request') return transportGuards.requestConstructorFor(target);
+                    if (property === 'open') return stagedOpen;
                     if (property === 'close') return (...args) => runWhenReady(() => reflectApply(target.close, target, args));
                     if (codeMembers.has(property)) return codeMembers.get(property);
                     if (asyncConstructors.has(property)) return asyncConstructors.get(property);
+                    if (elementConstructors.has(property)) return elementConstructors.get(property);
                     const value = reflectGet(target, property, target);
                     if (value === target) return facade;
                     if (value === popup) return mainWindowFacade();
@@ -114,7 +151,7 @@
             try { return value != null && reflectGet(value, 'window', value) === value ? windowFor(value) : value; }
             catch { return value; }
         };
-        return { documentFor, windowFor, guardReturnedWindow };
+        return { documentFor, windowFor, guardReturnedWindow, elementConstructorsFor };
     };
     Object.defineProperty(globalThis, '__htmlTinkerXCreatePopupFrameGuards', { value: createFrameGuards, configurable: true });
 })();
