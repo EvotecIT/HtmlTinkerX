@@ -11,30 +11,48 @@ namespace HtmlTinkerX;
 /// Helper methods for retrieving HTML content using a headless browser.
 /// </summary>
 public static partial class HtmlBrowser {
+    private static readonly TimeSpan LateCdpPageCleanupTimeout = TimeSpan.FromSeconds(2);
     internal static Func<Task<IPlaywright>>? PlaywrightFactory { get; set; }
 
-    private static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
+    internal static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            await CleanInstallationAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
+        await ExecuteSetupStageAsync(
+            () => EnsureBrowserRuntimeAvailableAsync(options),
+            cancellationToken).ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
-
-        IBrowserType type = ResolveBrowserType(playwright, options.Browser);
-
-        BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var browserInstance = await type.LaunchAsync(launchOptions);
-        return (playwright, browserInstance);
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        int lateLaunchCleanupOwnsPlaywright = 0;
+        try {
+            IBrowserType type = ResolveBrowserType(playwright, options.Browser);
+            BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
+            Task<IBrowser> launch = type.LaunchAsync(launchOptions);
+            IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => launch,
+                () => {
+                    if (Interlocked.Exchange(ref lateLaunchCleanupOwnsPlaywright, 1) == 0) {
+                        CloseBrowserWhenLaunchCompletes(launch, playwright);
+                    }
+                    return Task.CompletedTask;
+                },
+                cancellationToken).ConfigureAwait(false);
+            return (playwright, browserInstance);
+        } catch {
+            if (Volatile.Read(ref lateLaunchCleanupOwnsPlaywright) == 0) {
+                await DisposeOwnerAsync().ConfigureAwait(false);
+            }
+            throw;
+        }
     }
 
     private static async Task<(IPlaywright Playwright, IBrowser Browser)> ConnectOverCdpAsync(
@@ -46,22 +64,31 @@ public static partial class HtmlBrowser {
         }
 
         if (PlaywrightFactory == null) {
-            await EnsureDriverInstalledAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(EnsureDriverInstalledAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        try {
+            IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => playwright.Chromium.ConnectOverCDPAsync(
+                    options.CdpEndpointUrl!,
+                    new BrowserTypeConnectOverCDPOptions {
+                        SlowMo = options.SlowMo,
+                        Timeout = options.Timeout
+                    }),
+                DisposeOwnerAsync,
+                cancellationToken).ConfigureAwait(false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        IBrowser browserInstance = await playwright.Chromium.ConnectOverCDPAsync(
-            options.CdpEndpointUrl!,
-            new BrowserTypeConnectOverCDPOptions {
-                Timeout = options.Timeout
-            }).ConfigureAwait(false);
-
-        return (playwright, browserInstance);
+            return (playwright, browserInstance);
+        } catch {
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task<(IPlaywright Playwright, IBrowserContext Context, IPage Page)> LaunchPersistentContextAsync(
@@ -69,28 +96,53 @@ public static partial class HtmlBrowser {
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
-            await CleanInstallationAsync().ConfigureAwait(false);
+            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
         }
 
-        await EnsureBrowserRuntimeAvailableAsync(options).ConfigureAwait(false);
+        await ExecuteSetupStageAsync(
+            () => EnsureBrowserRuntimeAvailableAsync(options),
+            cancellationToken).ConfigureAwait(false);
 
         string userDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var playwright = PlaywrightFactory != null
-            ? await PlaywrightFactory().ConfigureAwait(false)
-            : await Playwright.CreateAsync();
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
+        int playwrightDisposed = 0;
+        Task DisposeOwnerAsync() {
+            if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
+            return Task.CompletedTask;
+        }
+        IBrowserContext? context = null;
+        int lateLaunchCleanupOwnsPlaywright = 0;
+        try {
+            IBrowserType type = ResolveBrowserType(playwright, options.Browser);
+            BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
+            Task<IBrowserContext> launch = type.LaunchPersistentContextAsync(userDataDirectory, contextOptions);
+            context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => launch,
+                () => {
+                    if (Interlocked.Exchange(ref lateLaunchCleanupOwnsPlaywright, 1) == 0) {
+                        ClosePersistentContextWhenLaunchCompletes(launch, playwright);
+                    }
+                    return Task.CompletedTask;
+                },
+                cancellationToken).ConfigureAwait(false);
+            IPage page = context.Pages.Count > 0
+                ? context.Pages[0]
+                : await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    context.NewPageAsync,
+                    () => context.CloseAsync(),
+                    cancellationToken).ConfigureAwait(false);
 
-        IBrowserType type = ResolveBrowserType(playwright, options.Browser);
-        BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        IBrowserContext context = await type.LaunchPersistentContextAsync(userDataDirectory, contextOptions).ConfigureAwait(false);
-        IPage page = context.Pages.Count > 0
-            ? context.Pages[0]
-            : await context.NewPageAsync().ConfigureAwait(false);
-
-        return (playwright, context, page);
+            return (playwright, context, page);
+        } catch {
+            if (context != null) {
+                StartBestEffortClose(() => context.CloseAsync());
+            }
+            if (Volatile.Read(ref lateLaunchCleanupOwnsPlaywright) == 0) {
+                await DisposeOwnerAsync().ConfigureAwait(false);
+            }
+            throw;
+        }
     }
 
     private static IBrowserType ResolveBrowserType(IPlaywright playwright, HtmlBrowserEngine browser) =>
@@ -109,17 +161,40 @@ public static partial class HtmlBrowser {
             ? EnsureInstalledAsync(options.Browser)
             : EnsureDriverInstalledAsync();
 
-    private static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
+    private static Task ExecuteSetupStageAsync(Func<Task> operation, CancellationToken cancellationToken) =>
+        HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            operation,
+            static () => Task.CompletedTask,
+            cancellationToken);
+
+    private static async Task<IPlaywright> CreatePlaywrightAsync(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Task<IPlaywright> creation = PlaywrightFactory != null
+            ? PlaywrightFactory()
+            : Playwright.CreateAsync();
+        int lateCleanupStarted = 0;
+        return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => creation,
+            () => {
+                if (Interlocked.Exchange(ref lateCleanupStarted, 1) == 0) {
+                    DisposePlaywrightWhenCreated(creation);
+                }
+                return Task.CompletedTask;
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
         var launchOptions = new BrowserTypeLaunchOptions {
             Headless = options.Headless,
             SlowMo = options.SlowMo
         };
 
-        if (!string.IsNullOrEmpty(options.BrowserChannel)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)) {
             launchOptions.Channel = options.BrowserChannel;
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserExecutablePath)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserExecutablePath)) {
             launchOptions.ExecutablePath = options.BrowserExecutablePath!.ToFullPath();
         }
 
@@ -131,7 +206,7 @@ public static partial class HtmlBrowser {
             launchOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
         }
 
-        if (!string.IsNullOrEmpty(options.Proxy)) {
+        if (!string.IsNullOrWhiteSpace(options.Proxy)) {
             launchOptions.Proxy = new Proxy {
                 Server = options.Proxy!,
                 Username = options.ProxyUsername,
@@ -142,11 +217,11 @@ public static partial class HtmlBrowser {
         return launchOptions;
     }
 
-    private static BrowserTypeLaunchPersistentContextOptions CreatePersistentContextOptions(HtmlBrowserLaunchOptions options) {
+    internal static BrowserTypeLaunchPersistentContextOptions CreatePersistentContextOptions(HtmlBrowserLaunchOptions options) {
         BrowserTypeLaunchPersistentContextOptions contextOptions = new() {
             Headless = options.Headless,
             SlowMo = options.SlowMo,
-            IgnoreHTTPSErrors = true
+            IgnoreHTTPSErrors = options.IgnoreHTTPSErrors
         };
 
         ApplySharedContextOptions(
@@ -161,11 +236,11 @@ public static partial class HtmlBrowser {
             };
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserChannel)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)) {
             contextOptions.Channel = options.BrowserChannel;
         }
 
-        if (!string.IsNullOrEmpty(options.BrowserExecutablePath)) {
+        if (!string.IsNullOrWhiteSpace(options.BrowserExecutablePath)) {
             contextOptions.ExecutablePath = options.BrowserExecutablePath!.ToFullPath();
         }
 
@@ -177,7 +252,7 @@ public static partial class HtmlBrowser {
             contextOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
         }
 
-        if (!string.IsNullOrEmpty(options.Proxy)) {
+        if (!string.IsNullOrWhiteSpace(options.Proxy)) {
             contextOptions.Proxy = new Proxy {
                 Server = options.Proxy!,
                 Username = options.ProxyUsername,
@@ -191,7 +266,9 @@ public static partial class HtmlBrowser {
     private static async Task<(IBrowserContext Context, IPage Page)> CreateBrowserContextAsync(
         IBrowser browserInstance,
         HtmlBrowserLaunchOptions options,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool closeBrowserOnCancellation = true,
+        Action<Task<IBrowserContext>>? contextCreationCanceled = null) {
         BrowserNewContextOptions? contextOptions = null;
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -203,33 +280,111 @@ public static partial class HtmlBrowser {
         }
 
         contextOptions ??= new BrowserNewContextOptions();
-        contextOptions.IgnoreHTTPSErrors = true;
+        contextOptions.IgnoreHTTPSErrors = options.IgnoreHTTPSErrors;
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        var context = await browserInstance.NewContextAsync(contextOptions);
-        var page = await context.NewPageAsync();
-        return (context, page);
+        Task<IBrowserContext> contextCreation = browserInstance.NewContextAsync(contextOptions);
+        IBrowserContext context;
+        try {
+            context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => contextCreation,
+                closeBrowserOnCancellation ? () => browserInstance.CloseAsync() : static () => Task.CompletedTask,
+                cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (!closeBrowserOnCancellation) {
+            if (contextCreationCanceled != null) {
+                contextCreationCanceled(contextCreation);
+            } else {
+                CloseContextWhenCreated(contextCreation);
+            }
+            throw;
+        }
+        try {
+            IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                context.NewPageAsync,
+                () => context.CloseAsync(),
+                cancellationToken).ConfigureAwait(false);
+            return (context, page);
+        } catch {
+            StartBestEffortClose(() => context.CloseAsync());
+            throw;
+        }
     }
 
+    internal static void CloseContextWhenCreated(
+        Task<IBrowserContext> contextCreation,
+        IPlaywright? playwrightOwner = null,
+        TimeSpan? cleanupTimeout = null) =>
+        StartBestEffortClose(async () => {
+            try {
+                Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
+                if (await Task.WhenAny(contextCreation, deadline).ConfigureAwait(false) == contextCreation) {
+                    IBrowserContext context = await contextCreation.ConfigureAwait(false);
+                    Task close = context.CloseAsync();
+                    if (await Task.WhenAny(close, deadline).ConfigureAwait(false) == close) {
+                        await close.ConfigureAwait(false);
+                    } else {
+                        ObserveLateFault(close);
+                    }
+                } else {
+                    ObserveLateFault(contextCreation);
+                }
+            } finally {
+                // Disposing this local owner disconnects only the CDP client and guarantees
+                // cleanup even when the externally owned browser never answers NewContext.
+                playwrightOwner?.Dispose();
+            }
+        });
+
+    internal static void ClosePageWhenCreated(
+        Task<IPage> pageCreation,
+        IPlaywright playwrightOwner,
+        TimeSpan? cleanupTimeout = null) =>
+        StartBestEffortClose(async () => {
+            try {
+                Task deadline = Task.Delay(cleanupTimeout ?? LateCdpPageCleanupTimeout);
+                if (await Task.WhenAny(pageCreation, deadline).ConfigureAwait(false) == pageCreation) {
+                    IPage page = await pageCreation.ConfigureAwait(false);
+                    Task close = page.CloseAsync();
+                    if (await Task.WhenAny(close, deadline).ConfigureAwait(false) == close) {
+                        await close.ConfigureAwait(false);
+                    } else {
+                        ObserveLateFault(close);
+                    }
+                } else {
+                    ObserveLateFault(pageCreation);
+                }
+            } finally {
+                // Disposing the local Playwright owner only disconnects this CDP client. It
+                // bounds cleanup even when the externally owned browser never answers NewPage.
+                playwrightOwner.Dispose();
+            }
+        });
+
+    private static void ObserveLateFault(Task task) =>
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
     private static void ApplySharedContextOptions(BrowserNewContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
-        if (setStorageState && !string.IsNullOrEmpty(options.StorageStatePath)) {
+        if (setStorageState && !string.IsNullOrWhiteSpace(options.StorageStatePath)) {
             contextOptions.StorageStatePath = options.StorageStatePath;
         }
 
-        if (!string.IsNullOrEmpty(options.VideoPath)) {
+        if (!string.IsNullOrWhiteSpace(options.VideoPath)) {
             string resolved = HtmlUtilities.EnsureDirectoryExists(options.VideoPath!);
             string dir = Path.GetDirectoryName(resolved) ?? resolved;
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = options.VideoWidth, Height = options.VideoHeight };
         }
 
-        if (!string.IsNullOrEmpty(options.UserAgent)) {
+        if (!string.IsNullOrWhiteSpace(options.UserAgent)) {
             contextOptions.UserAgent = options.UserAgent;
         }
 
-        if (!string.IsNullOrEmpty(options.Locale)) {
+        if (!string.IsNullOrWhiteSpace(options.Locale)) {
             contextOptions.Locale = options.Locale;
         }
 
@@ -267,24 +422,24 @@ public static partial class HtmlBrowser {
             contextOptions.Permissions = new[] { "geolocation" };
         }
 
-        if (!string.IsNullOrEmpty(options.Timezone)) {
+        if (!string.IsNullOrWhiteSpace(options.Timezone)) {
             contextOptions.TimezoneId = options.Timezone;
         }
     }
 
     private static void ApplySharedContextOptions(BrowserTypeLaunchPersistentContextOptions contextOptions, HtmlBrowserLaunchOptions options, bool setStorageState) {
-        if (!string.IsNullOrEmpty(options.VideoPath)) {
+        if (!string.IsNullOrWhiteSpace(options.VideoPath)) {
             string resolved = HtmlUtilities.EnsureDirectoryExists(options.VideoPath!);
             string dir = Path.GetDirectoryName(resolved) ?? resolved;
             contextOptions.RecordVideoDir = dir;
             contextOptions.RecordVideoSize = new RecordVideoSize { Width = options.VideoWidth, Height = options.VideoHeight };
         }
 
-        if (!string.IsNullOrEmpty(options.UserAgent)) {
+        if (!string.IsNullOrWhiteSpace(options.UserAgent)) {
             contextOptions.UserAgent = options.UserAgent;
         }
 
-        if (!string.IsNullOrEmpty(options.Locale)) {
+        if (!string.IsNullOrWhiteSpace(options.Locale)) {
             contextOptions.Locale = options.Locale;
         }
 
@@ -322,7 +477,7 @@ public static partial class HtmlBrowser {
             contextOptions.Permissions = new[] { "geolocation" };
         }
 
-        if (!string.IsNullOrEmpty(options.Timezone)) {
+        if (!string.IsNullOrWhiteSpace(options.Timezone)) {
             contextOptions.TimezoneId = options.Timezone;
         }
     }
@@ -346,60 +501,122 @@ public static partial class HtmlBrowser {
             options.Headless = false;
         }
 
-        IPlaywright playwright;
-        IBrowser? browserInstance;
-        IBrowserContext context;
-        IPage page;
+        IPlaywright? playwright = null;
+        IBrowser? browserInstance = null;
+        IBrowserContext? context = null;
+        IPage? page = null;
         string? resolvedUserDataDirectory = null;
         bool closeContextOnDispose = true;
         bool closeBrowserOnDispose = true;
         bool closePageOnDispose = false;
+        bool pageScopedInitScripts = false;
+        int ownershipAborted = 0;
 
-        if (!string.IsNullOrWhiteSpace(options.CdpEndpointUrl)) {
-            (playwright, browserInstance) = await ConnectOverCdpAsync(options, cancellationToken).ConfigureAwait(false);
-            if (browserInstance.Contexts.Count > 0) {
-                context = browserInstance.Contexts[0];
-                page = await context.NewPageAsync().ConfigureAwait(false);
+        Task AbortOwnershipAsync() {
+            if (Interlocked.Exchange(ref ownershipAborted, 1) != 0) return Task.CompletedTask;
+            if (closePageOnDispose && page != null && !page.IsClosed) StartBestEffortClose(() => page.CloseAsync());
+            if (closeContextOnDispose && context != null) StartBestEffortClose(() => context.CloseAsync());
+            if (closeBrowserOnDispose && browserInstance != null && browserInstance.IsConnected) StartBestEffortClose(() => browserInstance.CloseAsync());
+            try { playwright?.Dispose(); } catch (Exception) { }
+            return Task.CompletedTask;
+        }
+
+        try {
+            if (!string.IsNullOrWhiteSpace(options.CdpEndpointUrl)) {
+                (playwright, browserInstance) = await ConnectOverCdpAsync(options, cancellationToken).ConfigureAwait(false);
+                closeContextOnDispose = false;
+                closeBrowserOnDispose = false;
+                closePageOnDispose = true;
+                if (browserInstance.Contexts.Count > 0) {
+                    context = browserInstance.Contexts[0];
+                    pageScopedInitScripts = true;
+                    Task<IPage> pageCreation = context.NewPageAsync();
+                    try {
+                        page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                            () => pageCreation,
+                            static () => Task.CompletedTask,
+                            cancellationToken).ConfigureAwait(false);
+                    } catch (OperationCanceledException) {
+                        IPlaywright playwrightOwner = playwright!;
+                        playwright = null;
+                        ClosePageWhenCreated(pageCreation, playwrightOwner);
+                        throw;
+                    }
+                } else {
+                    closeContextOnDispose = true;
+                    closePageOnDispose = false;
+                    (context, page) = await CreateBrowserContextAsync(
+                        browserInstance,
+                        options,
+                        cancellationToken,
+                        closeBrowserOnCancellation: false,
+                        contextCreationCanceled: contextCreation => {
+                            IPlaywright playwrightOwner = playwright!;
+                            playwright = null;
+                            CloseContextWhenCreated(contextCreation, playwrightOwner);
+                        }).ConfigureAwait(false);
+                }
+            } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
+                resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
+                (playwright, context, page) = await LaunchPersistentContextAsync(options, cancellationToken).ConfigureAwait(false);
+                browserInstance = context.Browser;
+                closeBrowserOnDispose = false;
             } else {
+                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);
                 (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
             }
-            closeContextOnDispose = false;
-            closeBrowserOnDispose = false;
-            closePageOnDispose = true;
-        } else if (!string.IsNullOrWhiteSpace(options.UserDataDirectory)) {
-            resolvedUserDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
-            (playwright, context, page) = await LaunchPersistentContextAsync(options, cancellationToken).ConfigureAwait(false);
-            browserInstance = context.Browser;
-            closeBrowserOnDispose = false;
-        } else {
-            (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);
-            (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
+
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => pageScopedInitScripts
+                    ? ApplyInitScriptsAsync(page!, options, cancellationToken)
+                    : ApplyInitScriptsAsync(context!, options, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+
+            var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
+            HtmlBrowserSession session = new(
+                playwright!,
+                browserInstance,
+                context!,
+                page!,
+                !string.IsNullOrWhiteSpace(options.VideoPath) ? page!.Video : null,
+                options.VideoPath,
+                network,
+                resolvedUserDataDirectory,
+                options.CdpEndpointUrl,
+                closeContextOnDispose,
+                closeBrowserOnDispose,
+                closePageOnDispose);
+
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => ApplyResourceBlockingAsync(page!, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+            await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                () => NavigateAsync(page!, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken),
+                AbortOwnershipAsync,
+                cancellationToken).ConfigureAwait(false);
+            if (options.ManualLogin) {
+                await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    () => WaitForManualLoginAsync(session, options.LoginSuccessSelector, options.LoginTimeout, cancellationToken),
+                    AbortOwnershipAsync,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return session;
+        } catch {
+            await AbortOwnershipAsync().ConfigureAwait(false);
+            throw;
         }
+    }
 
-        await ApplyInitScriptsAsync(context, options, cancellationToken).ConfigureAwait(false);
-
-        var network = new System.Collections.Concurrent.ConcurrentDictionary<IRequest, HtmlNetworkEntry>();
-        HtmlBrowserSession session = new(
-            playwright,
-            browserInstance,
-            context,
-            page,
-            !string.IsNullOrEmpty(options.VideoPath) ? page.Video : null,
-            options.VideoPath,
-            network,
-            resolvedUserDataDirectory,
-            options.CdpEndpointUrl,
-            closeContextOnDispose,
-            closeBrowserOnDispose,
-            closePageOnDispose);
-
-        await ApplyResourceBlockingAsync(page, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken).ConfigureAwait(false);
-        await NavigateAsync(page, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken);
-        if (options.ManualLogin) {
-            await WaitForManualLoginAsync(session, options.LoginSuccessSelector, options.LoginTimeout, cancellationToken).ConfigureAwait(false);
+    private static void StartBestEffortClose(Func<Task> close) {
+        try {
+            Task task = close();
+            _ = task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        } catch (Exception) {
+            // The transport is already gone; disposing Playwright below completes ownership cleanup.
         }
-
-        return session;
     }
 
     private static void ValidateCdpAttachOptions(HtmlBrowserLaunchOptions options) {
@@ -411,17 +628,24 @@ public static partial class HtmlBrowser {
             throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context. Do not combine CdpEndpointUrl with StatePath or StorageStatePath.");
         }
 
-        if (!string.IsNullOrWhiteSpace(options.BrowserChannel) || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath) || options.Clean) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used.");
+        if (!string.IsNullOrWhiteSpace(options.BrowserChannel)
+            || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath)
+            || options.BrowserArguments.Count > 0
+            || options.ChromiumSandbox.HasValue
+            || options.Clean) {
+            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used. BrowserArguments and ChromiumSandbox are not used either.");
         }
 
         if (HasCdpContextOnlyOptions(options)) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. Launch Chrome with those settings before attaching.");
+            throw new ArgumentException("CdpEndpointUrl attaches to an existing browser context, so context options such as Proxy, UserAgent, Locale, viewport, geolocation, timezone, and permissions are not applied. IgnoreHTTPSErrors, HTTP credentials, and video recording are not applied either. Launch Chrome with those settings before attaching.");
         }
     }
 
     private static bool HasCdpContextOnlyOptions(HtmlBrowserLaunchOptions options) =>
-        !string.IsNullOrWhiteSpace(options.Proxy)
+        options.IgnoreHTTPSErrors
+        || (!string.IsNullOrWhiteSpace(options.VideoPath))
+        || (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null)
+        || !string.IsNullOrWhiteSpace(options.Proxy)
         || !string.IsNullOrWhiteSpace(options.ProxyUsername)
         || !string.IsNullOrWhiteSpace(options.ProxyPassword)
         || !string.IsNullOrWhiteSpace(options.UserAgent)
@@ -437,23 +661,6 @@ public static partial class HtmlBrowser {
         || options.GeoLongitude.HasValue
         || !string.IsNullOrWhiteSpace(options.Timezone)
         || options.Permissions.Count > 0;
-
-    private static async Task ApplyInitScriptsAsync(IBrowserContext context, HtmlBrowserLaunchOptions options, CancellationToken cancellationToken) {
-        if (options.PreventSsoAutoSubmit) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(PreventSsoAutoSubmitInitScript).ConfigureAwait(false);
-        }
-
-        foreach (string script in options.InitScripts) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(script).ConfigureAwait(false);
-        }
-
-        foreach (string scriptPath in options.InitScriptPaths) {
-            cancellationToken.ThrowIfCancellationRequested();
-            await context.AddInitScriptAsync(scriptPath: scriptPath.ToFullPath()).ConfigureAwait(false);
-        }
-    }
 
     /// <summary>
     /// Creates a new <see cref="HtmlBrowserSession"/> using reusable launch options and navigates to the specified URL.

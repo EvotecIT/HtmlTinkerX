@@ -22,7 +22,7 @@ Build-Module -ModuleName 'PSParseHTML' -RunMode $RunMode {
         # ID used to uniquely identify this module
         GUID                 = 'f0387960-7034-4918-a1e1-d5847cbf90df'
         # Version number of this module.
-        ModuleVersion        = '2.2.X'
+        ModuleVersion        = '3.0.X'
         # Author of this module
         Author               = 'Przemyslaw Klys'
         # Company or vendor of this module

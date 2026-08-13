@@ -201,7 +201,7 @@ public sealed class CmdletExportHtmlBrowserEvidence : AsyncPSCmdlet {
         }
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
+            ? HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri
             : Url!;
 
         await using HtmlBrowserSession oneShotSession = await HtmlBrowser.OpenSessionAsync(target, launchOptions, token).ConfigureAwait(false);

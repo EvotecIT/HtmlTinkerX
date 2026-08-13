@@ -332,7 +332,7 @@ public sealed class CmdletInvokeHtmlRendering : AsyncPSCmdlet {
         }
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
+            ? HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri
             : Url;
 
         if (Session.IsPresent) {

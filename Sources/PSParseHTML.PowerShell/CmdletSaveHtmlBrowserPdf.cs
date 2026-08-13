@@ -82,6 +82,11 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetFile)]
     public SwitchParameter Visible { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors for a trusted URL or file source.</summary>
+    [Parameter(ParameterSetName = ParameterSetDefault)]
+    [Parameter(ParameterSetName = ParameterSetFile)]
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <summary>Proxy server address used when launching the browser.</summary>
     [Parameter(ParameterSetName = ParameterSetDefault)]
     [Parameter(ParameterSetName = ParameterSetFile)]
@@ -224,32 +229,12 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
                 await HtmlBrowser.SavePagePdfAsync(
                     (session ?? throw new PSInvalidOperationException("No session provided and no default session found.")).Page,
                     outPath,
-                    Delay,
-                    Selector,
-                    Landscape.IsPresent,
-                    PrintBackground.IsPresent,
-                    Format,
-                    Width,
-                    Height,
-                    MarginTop,
-                    MarginRight,
-                    MarginBottom,
-                    MarginLeft,
-                    PageRanges,
-                    Scale,
-                    DisplayHeaderFooter.IsPresent,
-                    HeaderTemplate,
-                    FooterTemplate,
-                    PreferCssPageSize.IsPresent,
-                    outline: false,
-                    tagged: false,
-                    cancellationToken: token,
-                    maskSensitiveElements: MaskSensitiveElement.IsPresent,
-                    maskSelectors: MaskSelector,
-                    maskColor: MaskColor).ConfigureAwait(false);
+                    CreatePdfOptions(),
+                    CreatePdfReadiness(),
+                    token).ConfigureAwait(false);
                 break;
             case ParameterSetFile:
-                await SaveOneShotAsync(new System.Uri(System.IO.Path.GetFullPath(Path!)).AbsoluteUri, outPath, token).ConfigureAwait(false);
+                await SaveOneShotAsync(HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri, outPath, token).ConfigureAwait(false);
                 break;
             default:
                 await SaveOneShotAsync(Url, outPath, token).ConfigureAwait(false);
@@ -266,33 +251,44 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
 
     private async Task SaveOneShotAsync(string target, string outPath, CancellationToken cancellationToken) {
         HtmlBrowserLaunchOptions launchOptions = await CreateLaunchOptionsAsync(cancellationToken).ConfigureAwait(false);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(target, launchOptions, cancellationToken).ConfigureAwait(false);
         await HtmlBrowser.SavePagePdfAsync(
-            target,
+            session.Page,
             outPath,
-            launchOptions,
-            Delay,
-            Selector,
-            Landscape.IsPresent,
-            PrintBackground.IsPresent,
-            Format,
-            Width,
-            Height,
-            MarginTop,
-            MarginRight,
-            MarginBottom,
-            MarginLeft,
-            PageRanges,
-            Scale,
-            DisplayHeaderFooter.IsPresent,
-            HeaderTemplate,
-            FooterTemplate,
-            PreferCssPageSize.IsPresent,
-            outline: false,
-            tagged: false,
-            cancellationToken,
-            MaskSensitiveElement.IsPresent,
-            MaskSelector,
-            MaskColor).ConfigureAwait(false);
+            CreatePdfOptions(),
+            CreatePdfReadiness(),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private HtmlBrowserPdfOptions CreatePdfOptions() {
+        return new HtmlBrowserPdfOptions(
+            landscape: Landscape.IsPresent,
+            printBackground: PrintBackground.IsPresent,
+            format: Format,
+            width: Width,
+            height: Height,
+            marginTop: MarginTop,
+            marginRight: MarginRight,
+            marginBottom: MarginBottom,
+            marginLeft: MarginLeft,
+            pageRanges: PageRanges,
+            scale: Scale,
+            displayHeaderFooter: DisplayHeaderFooter.IsPresent,
+            headerTemplate: HeaderTemplate,
+            footerTemplate: FooterTemplate,
+            preferCssPageSize: PreferCssPageSize.IsPresent,
+            maskSensitiveElements: MaskSensitiveElement.IsPresent,
+            maskSelectors: MaskSelector,
+            maskColor: MaskColor);
+    }
+
+    private HtmlBrowserPdfReadiness? CreatePdfReadiness() {
+        if (Delay == 0 && string.IsNullOrWhiteSpace(Selector)) return null;
+        return new HtmlBrowserPdfReadiness(
+            skipLoadState: true,
+            selector: Selector,
+            timeout: 10000,
+            delayMilliseconds: Delay);
     }
 
     private async Task<HtmlBrowserLaunchOptions> CreateLaunchOptionsAsync(CancellationToken cancellationToken) {
@@ -303,6 +299,7 @@ public sealed class CmdletSaveHtmlBrowserPdf : AsyncPSCmdlet {
             Browser = Browser,
             Clean = Clean,
             Visible = Visible,
+            IgnoreHttpsErrors = IgnoreHttpsErrors,
             SlowMo = SlowMo,
             Timeout = Timeout,
             LoadState = LoadState,

@@ -78,6 +78,10 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Visible { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors in the browser context.</summary>
+    [Parameter]
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <summary>Delay Playwright actions by the specified milliseconds.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
@@ -235,7 +239,7 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
         ValidateProxy(options.Proxy, ProxyCredential);
 
         string target = ParameterSetName == ParameterSetFile
-            ? new System.Uri(Path!.ToFullPath()).AbsoluteUri
+            ? HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri
             : Url!;
 
         HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync(target, options, token).ConfigureAwait(false);
@@ -254,6 +258,7 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
             Browser = Browser,
             Clean = Clean,
             Visible = Visible,
+            IgnoreHttpsErrors = IgnoreHttpsErrors,
             SlowMo = SlowMo,
             Timeout = Timeout,
             UserDataDirectory = UserDataDirectory,

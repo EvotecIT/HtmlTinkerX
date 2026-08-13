@@ -46,6 +46,10 @@ public sealed class CmdletMeasureHtmlBrowserPerformance : AsyncPSCmdlet {
     [Parameter]
     public PSCredential? ProxyCredential { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors.</summary>
+    [Parameter]
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         string? proxyUsername = null;
@@ -57,9 +61,9 @@ public sealed class CmdletMeasureHtmlBrowserPerformance : AsyncPSCmdlet {
 
         HtmlBrowserTestResult result;
         if (ParameterSetName == ParameterSetFile) {
-            result = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout).ConfigureAwait(false);
+            result = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout, IgnoreHttpsErrors.IsPresent).ConfigureAwait(false);
         } else {
-            result = await HtmlBrowserTester.TestUrlAsync(Url, Engine, Headless, Timeout, Proxy, proxyUsername, proxyPassword).ConfigureAwait(false);
+            result = await HtmlBrowserTester.TestUrlAsync(Url, Engine, Headless, Timeout, Proxy, proxyUsername, proxyPassword, IgnoreHttpsErrors.IsPresent).ConfigureAwait(false);
         }
 
         WriteObject(result.GetPerformanceMetrics());

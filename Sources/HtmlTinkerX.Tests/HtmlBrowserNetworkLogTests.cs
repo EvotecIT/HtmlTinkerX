@@ -73,10 +73,13 @@ public class HtmlBrowserNetworkLogTests {
         page.Raise(p => p.Response += null!, page.Object, response.Object);
 
         using CancellationTokenSource cts = new();
-        cts.CancelAfter(50);
+        Task capture = session.CaptureResponseBodiesAsync(
+            100,
+            new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch },
+            cts.Token);
+        cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            session.CaptureResponseBodiesAsync(100, new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch }, cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => capture);
         Assert.Null(HtmlBrowser.GetNetworkLog(session).Single().ResponseBodyError);
         await session.DisposeAsync();
     }

@@ -24,11 +24,16 @@
         <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.3.11" Condition=" '$(TargetFramework)' == 'net472' " />
         <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.3.11" Condition=" '$(TargetFramework)' == 'net472' " />
         <PackageReference Include="Moq" Version="4.20.72" />
+        <PackageReference Include="PdfPig" Version="0.1.14" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\HtmlTinkerX\HtmlTinkerX.csproj" />
         <ProjectReference Include="..\PSParseHTML.PowerShell\PSParseHTML.PowerShell.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(TargetFramework)' != 'net472' ">
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
     <ItemGroup>

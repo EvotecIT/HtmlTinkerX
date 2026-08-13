@@ -22,6 +22,13 @@ Describe 'Save-HtmlBrowserPdf' {
             Should -Throw -ExpectedMessage '*BlockResourceType Document would abort page navigation*'
     }
 
+    It 'rejects network file paths before browser navigation' {
+        $outfile = Join-Path $TestDrive 'network-path.pdf'
+
+        { Save-HtmlBrowserPdf -Path '\\server\share\report.html' -OutFile $outfile } |
+            Should -Throw -ExpectedMessage '*Only direct local paths are supported*'
+    }
+
     It 'Creates a PDF file' {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri

@@ -44,6 +44,10 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
     [Alias("CdpEndpoint", "RemoteDebuggingUrl")]
     public string? CdpEndpointUrl { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors when the profile is used.</summary>
+    [Parameter]
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <summary>Locale used by the browser context.</summary>
     [Parameter]
     public string? Locale { get; set; }
@@ -119,6 +123,7 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
             BrowserChannel = BrowserChannel,
             BrowserExecutablePath = BrowserExecutablePath?.ToFullPath(),
             CdpEndpointUrl = CdpEndpointUrl,
+            IgnoreHttpsErrors = MyInvocation.BoundParameters.ContainsKey(nameof(IgnoreHttpsErrors)) ? IgnoreHttpsErrors.IsPresent : null,
             Locale = Locale,
             Timezone = Timezone,
             ViewportWidth = ViewportWidth,

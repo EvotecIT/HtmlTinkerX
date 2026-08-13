@@ -56,6 +56,10 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
     [Parameter()]
     public PSCredential? ProxyCredential { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors.</summary>
+    [Parameter()]
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <summary>
     /// Return only performance metrics.
     /// </summary>
@@ -89,18 +93,21 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
         // Determine if testing URL or file
         bool isFile = ParameterSetName == "File";
         string targetUrl = isFile ? Path : Url;
+        HtmlBrowserTestResult result = isFile
+            ? await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout, IgnoreHttpsErrors.IsPresent).ConfigureAwait(false)
+            : await HtmlBrowserTester.TestUrlAsync(
+                Url,
+                Engine,
+                Headless,
+                Timeout,
+                Proxy,
+                proxyUsername,
+                proxyPassword,
+                IgnoreHttpsErrors.IsPresent).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(CssResource)) {
             WriteVerbose($"Testing for CSS resource: {CssResource}");
-
-            HtmlNetworkEntryDetailed? cssEntry;
-            if (isFile) {
-                // For file testing, first run full test then extract CSS
-                var fileResult = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout);
-                cssEntry = fileResult.CssResources.FirstOrDefault(r => r.Url.Contains(CssResource));
-            } else {
-                cssEntry = await HtmlBrowserTester.TestCssResourceAsync(Url, CssResource!, Engine);
-            }
+            HtmlNetworkEntryDetailed? cssEntry = result.CssResources.FirstOrDefault(r => r.Url.Contains(CssResource));
 
             if (cssEntry != null) {
                 WriteObject(cssEntry);
@@ -112,14 +119,7 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
 
         if (ErrorsOnly) {
             WriteVerbose("Testing for console errors only");
-
-            IList<HtmlConsoleEntryDetailed> errors;
-            if (isFile) {
-                var fileResult = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout);
-                errors = fileResult.ConsoleErrors.ToList();
-            } else {
-                errors = await HtmlBrowserTester.TestConsoleErrorsAsync(Url, Engine);
-            }
+            IList<HtmlConsoleEntryDetailed> errors = result.ConsoleErrors.ToList();
 
             foreach (var error in errors) {
                 WriteObject(error);
@@ -133,35 +133,12 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
 
         if (PerformanceOnly) {
             WriteVerbose("Testing performance metrics only");
-
-            HtmlPerformanceMetrics metrics;
-            if (isFile) {
-                var fileResult = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout);
-                metrics = fileResult.GetPerformanceMetrics();
-            } else {
-                metrics = await HtmlBrowserTester.TestPerformanceAsync(Url, Engine);
-            }
-
-            WriteObject(metrics);
+            WriteObject(result.GetPerformanceMetrics());
             return;
         }
 
         // Full test
         WriteVerbose($"Running full browser test on: {targetUrl}");
-
-        HtmlBrowserTestResult result;
-        if (isFile) {
-            result = await HtmlBrowserTester.TestFileAsync(Path, Engine, Headless, Timeout);
-        } else {
-            result = await HtmlBrowserTester.TestUrlAsync(
-                Url,
-                Engine,
-                Headless,
-                Timeout,
-                Proxy,
-                proxyUsername,
-                proxyPassword);
-        }
 
         WriteVerbose($"Test completed. {result.Summary}");
         WriteObject(result);

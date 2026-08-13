@@ -21,6 +21,7 @@ public static class HtmlBrowserTester {
     /// <param name="proxy">Proxy server URL.</param>
     /// <param name="proxyUsername">Proxy username.</param>
     /// <param name="proxyPassword">Proxy password.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     /// <returns>Detailed test results.</returns>
     public static async Task<HtmlBrowserTestResult> TestUrlAsync(
         string url,
@@ -29,7 +30,8 @@ public static class HtmlBrowserTester {
         int timeout = 30000,
         string? proxy = null,
         string? proxyUsername = null,
-        string? proxyPassword = null) {
+        string? proxyPassword = null,
+        bool ignoreHttpsErrors = false) {
         
         var result = new HtmlBrowserTestResult { Url = url };
         var startTime = DateTimeOffset.UtcNow;
@@ -59,7 +61,7 @@ public static class HtmlBrowserTester {
 
                 var browser = await browserType.LaunchAsync(launchOptions);
                 try {
-                    var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = true };
+                    var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = ignoreHttpsErrors };
                     var context = await browser.NewContextAsync(contextOptions);
                     try {
                         var page = await context.NewPageAsync();
@@ -118,34 +120,47 @@ public static class HtmlBrowserTester {
     /// <summary>
     /// Tests if a specific CSS resource is loaded.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="cssUrl">CSS resource URL fragment to find.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<HtmlNetworkEntryDetailed?> TestCssResourceAsync(
         string url,
         string cssUrl,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.CssResources.FirstOrDefault(r => r.Url.Contains(cssUrl));
     }
     
     /// <summary>
     /// Tests for console errors on a page.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<IList<HtmlConsoleEntryDetailed>> TestConsoleErrorsAsync(
         string url,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.ConsoleErrors.ToList();
     }
     
     /// <summary>
     /// Tests page performance metrics.
     /// </summary>
+    /// <param name="url">URL to test.</param>
+    /// <param name="engine">Browser engine to use.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     public static async Task<HtmlPerformanceMetrics> TestPerformanceAsync(
         string url,
-        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium) {
+        HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
+        bool ignoreHttpsErrors = false) {
         
-        var result = await TestUrlAsync(url, engine);
+        var result = await TestUrlAsync(url, engine, ignoreHttpsErrors: ignoreHttpsErrors);
         return result.GetPerformanceMetrics();
     }
     
@@ -156,24 +171,23 @@ public static class HtmlBrowserTester {
     /// <param name="engine">Browser engine to use.</param>
     /// <param name="headless">Run in headless mode.</param>
     /// <param name="timeout">Timeout in milliseconds.</param>
+    /// <param name="ignoreHttpsErrors">Ignore HTTPS certificate errors.</param>
     /// <returns>Detailed test results.</returns>
     public static async Task<HtmlBrowserTestResult> TestFileAsync(
         string filePath,
         HtmlBrowserEngine engine = HtmlBrowserEngine.Chromium,
         bool headless = true,
-        int timeout = 30000) {
+        int timeout = 30000,
+        bool ignoreHttpsErrors = false) {
         
-        // Resolve the file path
-        var resolvedPath = filePath.ToFullPath();
+        Uri fileUri = HtmlBrowser.CreateLocalFileUri(filePath);
+        string resolvedPath = fileUri.LocalPath;
         if (!System.IO.File.Exists(resolvedPath)) {
             throw new System.IO.FileNotFoundException($"HTML file not found: {resolvedPath}");
         }
-        
-        // Convert to file:// URL
-        var fileUrl = new System.Uri(resolvedPath).AbsoluteUri;
-        
+
         // Test the file URL
-        return await TestUrlAsync(fileUrl, engine, headless, timeout);
+        return await TestUrlAsync(fileUri.AbsoluteUri, engine, headless, timeout, ignoreHttpsErrors: ignoreHttpsErrors);
     }
 
     /// <summary>

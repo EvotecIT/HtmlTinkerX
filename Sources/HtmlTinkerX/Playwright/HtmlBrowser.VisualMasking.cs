@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -48,27 +49,148 @@ public static partial class HtmlBrowser {
         "textarea[name*='pin' i]",
         "textarea[id*='pin' i]"
     };
+    private const string ApplyVisualMaskScript =
+        @"({ selectors, color, token }) => {
+            const overlayMarker = 'data-htmltinkerx-visual-mask-overlay';
+            const stateKey = 'htmltinkerxVisualMask' + token;
+            let state = globalThis[stateKey];
+            if (!state) {
+                state = { masked: [], overlays: [], seen: new WeakSet() };
+                Object.defineProperty(globalThis, stateKey, { value: state, configurable: true });
+            }
+            const roots = [document];
+            for (let index = 0; index < roots.length; index++) {
+                for (const element of roots[index].querySelectorAll('*')) {
+                    if (element.shadowRoot && !roots.includes(element.shadowRoot)) roots.push(element.shadowRoot);
+                }
+            }
+            const selections = [];
+            for (const selector of selectors || []) {
+                if (!selector || !selector.trim()) continue;
+                const elements = roots
+                    .flatMap(root => Array.from(root.querySelectorAll(selector)))
+                    .filter(element => !element.hasAttribute(overlayMarker));
+                selections.push(elements);
+            }
+            for (const elements of selections) {
+                for (const element of elements) {
+                    if (!(element instanceof Element) || !element.style) continue;
+                    if (state.seen.has(element)) continue;
+                    state.seen.add(element);
+                    state.masked.push({ element, style: element.getAttribute('style') });
+                    const rect = element.getBoundingClientRect();
+                    const computed = getComputedStyle(element);
+                    element.style.setProperty('visibility', 'hidden', 'important');
 
-    private static async Task<T> ExecuteWithTemporaryVisualMaskAsync<T>(
+                    const overlay = document.createElement('div');
+                    overlay.setAttribute(overlayMarker, token);
+                    overlay.style.setProperty('position', computed.position === 'fixed' ? 'fixed' : 'absolute', 'important');
+                    overlay.style.setProperty('left', `${rect.left + (computed.position === 'fixed' ? 0 : window.scrollX)}px`, 'important');
+                    overlay.style.setProperty('top', `${rect.top + (computed.position === 'fixed' ? 0 : window.scrollY)}px`, 'important');
+                    overlay.style.setProperty('width', `${rect.width}px`, 'important');
+                    overlay.style.setProperty('height', `${rect.height}px`, 'important');
+                    overlay.style.setProperty('margin', '0', 'important');
+                    overlay.style.setProperty('padding', '0', 'important');
+                    overlay.style.setProperty('border', '0', 'important');
+                    overlay.style.setProperty('background-color', '#000000', 'important');
+                    overlay.style.setProperty('background-image', `linear-gradient(${color}, ${color})`, 'important');
+                    overlay.style.setProperty('box-shadow', 'none', 'important');
+                    overlay.style.setProperty('filter', 'none', 'important');
+                    overlay.style.setProperty('opacity', '1', 'important');
+                    overlay.style.setProperty('visibility', 'visible', 'important');
+                    overlay.style.setProperty('pointer-events', 'none', 'important');
+                    overlay.style.setProperty('z-index', '2147483647', 'important');
+                    overlay.style.setProperty('print-color-adjust', 'exact', 'important');
+                    overlay.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+                    document.documentElement.appendChild(overlay);
+                    state.overlays.push(overlay);
+                }
+            }
+        }";
+
+    internal static async Task<T> ExecuteWithTemporaryVisualMaskAsync<T>(
         IPage page,
         bool maskSensitiveElements,
         IEnumerable<string>? maskSelectors,
         string? maskColor,
         Func<Task<T>> action,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool freezePageScriptsDuringAction = false,
+        string? captureStyleSheet = null) {
         string[] selectors = CreateVisualMaskSelectors(maskSensitiveElements, maskSelectors);
-        if (selectors.Length == 0) {
+        if (selectors.Length == 0 && !freezePageScriptsDuringAction) {
             return await action().ConfigureAwait(false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await ApplyTemporaryVisualMaskAsync(page, selectors, maskColor, cancellationToken).ConfigureAwait(false);
+        Func<IRoute, Task>? navigationGuard = null;
+        TaskCompletionSource<bool>? navigationDetected = null;
+        EventHandler<IFrame>? frameNavigated = null;
+        if (freezePageScriptsDuringAction) {
+            navigationDetected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            frameNavigated = (_, _) => navigationDetected.TrySetResult(true);
+            page.FrameNavigated += frameNavigated;
+            navigationGuard = route => route.Request.IsNavigationRequest
+                ? route.AbortAsync("blockedbyclient")
+                : route.FallbackAsync();
+            await page.RouteAsync("**/*", navigationGuard).ConfigureAwait(false);
+        }
+        TemporaryVisualMask mask;
+        try {
+            mask = await ApplyTemporaryVisualMaskAsync(
+                page,
+                selectors,
+                maskColor,
+                cancellationToken,
+                disablePageScripts: freezePageScriptsDuringAction).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(captureStyleSheet)) {
+                await ApplyCaptureStyleSheetAsync(page, captureStyleSheet!, cancellationToken).ConfigureAwait(false);
+            }
+        } catch {
+            if (navigationGuard != null) await RemoveNavigationGuardAsync(page, navigationGuard).ConfigureAwait(false);
+            if (frameNavigated != null) page.FrameNavigated -= frameNavigated;
+            throw;
+        }
         try {
             cancellationToken.ThrowIfCancellationRequested();
-            return await action().ConfigureAwait(false);
+            Task<T> actionTask = action();
+            if (navigationDetected != null) {
+                Task completed = await Task.WhenAny(actionTask, navigationDetected.Task).ConfigureAwait(false);
+                if (!ReferenceEquals(completed, actionTask)) {
+                    await CloseNavigatedPageAsync(page).ConfigureAwait(false);
+                    try { await actionTask.ConfigureAwait(false); } catch { }
+                    throw new PlaywrightException("A frame navigated while sensitive content was masked for capture.");
+                }
+            }
+            T result = await actionTask.ConfigureAwait(false);
+            if (navigationDetected?.Task.IsCompleted == true) {
+                await CloseNavigatedPageAsync(page).ConfigureAwait(false);
+                throw new PlaywrightException("A frame navigated while sensitive content was masked for capture.");
+            }
+            return result;
         } finally {
-            await RemoveTemporaryVisualMaskAsync(page).ConfigureAwait(false);
+            try {
+                try {
+                    await mask.DisposeAsync().ConfigureAwait(false);
+                } catch (Exception) when (page.IsClosed) {
+                    // Cancellation and fail-closed navigation handling interrupt Playwright by
+                    // closing the page. Preserve the original failure instead of cleanup noise.
+                }
+            } finally {
+                if (navigationGuard != null) await RemoveNavigationGuardAsync(page, navigationGuard).ConfigureAwait(false);
+                if (frameNavigated != null) page.FrameNavigated -= frameNavigated;
+            }
         }
+    }
+
+    private static async Task CloseNavigatedPageAsync(IPage page) {
+        try { await page.CloseAsync().ConfigureAwait(false); }
+        catch (PlaywrightException) when (page.IsClosed) { }
+    }
+
+    private static async Task RemoveNavigationGuardAsync(IPage page, Func<IRoute, Task> navigationGuard) {
+        try { await page.UnrouteAsync("**/*", navigationGuard).ConfigureAwait(false); }
+        catch (PlaywrightException) when (page.IsClosed) { }
     }
 
     private static string[] CreateVisualMaskSelectors(bool maskSensitiveElements, IEnumerable<string>? maskSelectors) {
@@ -88,77 +210,206 @@ public static partial class HtmlBrowser {
         return selectors.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static Task ApplyTemporaryVisualMaskAsync(IPage page, string[] selectors, string? maskColor, CancellationToken cancellationToken) {
+    private static async Task<TemporaryVisualMask> ApplyTemporaryVisualMaskAsync(
+        IPage page,
+        string[] selectors,
+        string? maskColor,
+        CancellationToken cancellationToken,
+        bool disablePageScripts = false) {
         cancellationToken.ThrowIfCancellationRequested();
         string color = string.IsNullOrWhiteSpace(maskColor) ? "#000000" : maskColor!;
-        return page.EvaluateAsync(
-            @"({ selectors, color }) => {
-                const marker = 'data-htmltinkerx-visual-mask';
-                const previousStyle = 'data-htmltinkerx-visual-mask-style';
-                const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
-                for (const selector of selectors || []) {
-                    if (!selector || !selector.trim()) {
-                        continue;
-                    }
-
-                    let elements = [];
-                    try {
-                        elements = Array.from(document.querySelectorAll(selector));
-                    } catch {
-                        continue;
-                    }
-
-                    for (const element of elements) {
-                        if (!(element instanceof HTMLElement)) {
-                            continue;
-                        }
-
-                        if (!element.hasAttribute(marker)) {
-                            const currentStyle = element.getAttribute('style');
-                            element.setAttribute(previousStyle, currentStyle || '');
-                            element.setAttribute(hadStyle, currentStyle === null ? 'false' : 'true');
-                            element.setAttribute(marker, 'true');
-                        }
-
-                        element.style.setProperty('background-color', color, 'important');
-                        element.style.setProperty('border-color', color, 'important');
-                        element.style.setProperty('box-shadow', 'none', 'important');
-                        element.style.setProperty('caret-color', 'transparent', 'important');
-                        element.style.setProperty('color', 'transparent', 'important');
-                        element.style.setProperty('filter', 'none', 'important');
-                        element.style.setProperty('outline-color', color, 'important');
-                        element.style.setProperty('text-shadow', 'none', 'important');
-                    }
+        string token = Guid.NewGuid().ToString("N");
+        string arguments = JsonSerializer.Serialize(new {
+            selectors,
+            color,
+            token
+        });
+        ICDPSession session = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
+        List<VisualMaskExecutionContext> executionContexts = new();
+        bool scriptsDisabled = false;
+        try {
+            if (disablePageScripts) {
+                await SetPageScriptExecutionDisabledAsync(session, disabled: true).ConfigureAwait(false);
+                scriptsDisabled = true;
+            }
+            if (selectors.Length > 0) {
+                IReadOnlyList<string> frameIds = await GetFrameIdsAsync(session).ConfigureAwait(false);
+                foreach (string frameId in frameIds) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    VisualMaskExecutionContext? executionContext = await ApplyVisualMaskToFrameAsync(
+                        session,
+                        frameId,
+                        arguments).ConfigureAwait(false);
+                    if (executionContext.HasValue) executionContexts.Add(executionContext.Value);
                 }
-            }",
-            new {
-                selectors,
-                color
-            });
+            }
+        } catch (Exception setupError) {
+            Exception? cleanupError = null;
+            try { await RemoveTemporaryVisualMaskAsync(session, executionContexts, token).ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = error; }
+            if (scriptsDisabled) {
+                try { await SetPageScriptExecutionDisabledAsync(session, disabled: false).ConfigureAwait(false); }
+                catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            }
+            try { await session.DetachAsync().ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            if (cleanupError != null) throw new AggregateException(setupError, cleanupError);
+            throw;
+        }
+        return new TemporaryVisualMask(session, executionContexts, token, scriptsDisabled);
     }
 
-    private static Task RemoveTemporaryVisualMaskAsync(IPage page) =>
-        page.EvaluateAsync(
-            @"() => {
-                const marker = 'data-htmltinkerx-visual-mask';
-                const previousStyle = 'data-htmltinkerx-visual-mask-style';
-                const hadStyle = 'data-htmltinkerx-visual-mask-had-style';
-                for (const element of Array.from(document.querySelectorAll('[' + marker + ']'))) {
-                    if (!(element instanceof HTMLElement)) {
-                        continue;
-                    }
+    private static Task SetPageScriptExecutionDisabledAsync(ICDPSession session, bool disabled) =>
+        session.SendAsync("Emulation.setScriptExecutionDisabled", new Dictionary<string, object> {
+            ["value"] = disabled
+        });
 
-                    const originalStyle = element.getAttribute(previousStyle) || '';
-                    const originalHadStyle = element.getAttribute(hadStyle) === 'true';
-                    if (originalHadStyle) {
-                        element.setAttribute('style', originalStyle);
-                    } else {
-                        element.removeAttribute('style');
-                    }
-
-                    element.removeAttribute(marker);
-                    element.removeAttribute(previousStyle);
-                    element.removeAttribute(hadStyle);
+    private static async Task<VisualMaskExecutionContext?> ApplyVisualMaskToFrameAsync(
+        ICDPSession session,
+        string frameId,
+        string arguments) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                JsonElement? worldResult = await session.SendAsync("Page.createIsolatedWorld", new Dictionary<string, object> {
+                    ["frameId"] = frameId,
+                    ["worldName"] = "HtmlTinkerX.VisualMask",
+                    ["grantUniversalAccess"] = false
+                }).ConfigureAwait(false);
+                if (!worldResult.HasValue
+                    || !worldResult.Value.TryGetProperty("executionContextId", out JsonElement contextIdElement)
+                    || !contextIdElement.TryGetInt32(out int contextId)) {
+                    throw new PlaywrightException("Chromium did not create an isolated execution world for visual masking.");
                 }
-            }");
+                await EvaluateInIsolatedWorldAsync(session, contextId, $"({ApplyVisualMaskScript})({arguments})").ConfigureAwait(false);
+                return new VisualMaskExecutionContext(frameId, contextId);
+            } catch (PlaywrightException) {
+                if (!await IsFramePresentAsync(session, frameId).ConfigureAwait(false)) return null;
+                if (attempt != 0) throw;
+            }
+        }
+        return null;
+    }
+
+    private static async Task<IReadOnlyList<string>> GetFrameIdsAsync(ICDPSession session) {
+        JsonElement? treeResult = await session.SendAsync("Page.getFrameTree").ConfigureAwait(false);
+        if (!treeResult.HasValue || !treeResult.Value.TryGetProperty("frameTree", out JsonElement frameTree)) {
+            throw new PlaywrightException("Chromium did not return a frame tree for visual masking.");
+        }
+        List<string> frameIds = new();
+        AddFrameIds(frameTree, frameIds);
+        return frameIds;
+    }
+
+    private static async Task<bool> IsFramePresentAsync(ICDPSession session, string frameId) =>
+        (await GetFrameIdsAsync(session).ConfigureAwait(false)).Contains(frameId, StringComparer.Ordinal);
+
+    private static void AddFrameIds(JsonElement frameTree, List<string> frameIds) {
+        if (frameTree.TryGetProperty("frame", out JsonElement frame)
+            && frame.TryGetProperty("id", out JsonElement id)
+            && !string.IsNullOrWhiteSpace(id.GetString())) {
+            frameIds.Add(id.GetString()!);
+        }
+        if (!frameTree.TryGetProperty("childFrames", out JsonElement children)
+            || children.ValueKind != JsonValueKind.Array) return;
+        foreach (JsonElement child in children.EnumerateArray()) AddFrameIds(child, frameIds);
+    }
+
+    private static async Task EvaluateInIsolatedWorldAsync(ICDPSession session, int executionContextId, string expression) {
+        JsonElement? result = await session.SendAsync("Runtime.evaluate", new Dictionary<string, object> {
+            ["expression"] = expression,
+            ["contextId"] = executionContextId,
+            ["awaitPromise"] = true,
+            ["returnByValue"] = true
+        }).ConfigureAwait(false);
+        if (result.HasValue && result.Value.TryGetProperty("exceptionDetails", out JsonElement exception)) {
+            string message = exception.TryGetProperty("exception", out JsonElement thrown)
+                && thrown.TryGetProperty("description", out JsonElement description)
+                ? description.GetString() ?? "Visual masking failed in Chromium's isolated world."
+                : "Visual masking failed in Chromium's isolated world.";
+            throw new PlaywrightException(message);
+        }
+    }
+
+    private static async Task RemoveTemporaryVisualMaskAsync(
+        ICDPSession session,
+        IReadOnlyList<VisualMaskExecutionContext> executionContexts,
+        string token) {
+        const string restoreScript =
+            @"({ token }) => {
+                const stateKey = 'htmltinkerxVisualMask' + token;
+                const state = globalThis[stateKey];
+                if (!state) return;
+                for (const overlay of state.overlays) overlay.remove();
+                for (const item of state.masked) {
+                    if (!(item.element instanceof Element) || !item.element.style) continue;
+                    if (item.style === null) {
+                        item.element.removeAttribute('style');
+                    } else {
+                        item.element.setAttribute('style', item.style);
+                    }
+                }
+                delete globalThis[stateKey];
+            }";
+        string arguments = JsonSerializer.Serialize(new { token });
+        foreach (VisualMaskExecutionContext executionContext in executionContexts) {
+            try {
+                await EvaluateInIsolatedWorldAsync(
+                    session,
+                    executionContext.ExecutionContextId,
+                    $"({restoreScript})({arguments})").ConfigureAwait(false);
+            } catch (PlaywrightException error) {
+                if (!await IsFramePresentAsync(session, executionContext.FrameId).ConfigureAwait(false)
+                    || IsMissingExecutionContext(error)) continue;
+                throw;
+            }
+        }
+    }
+
+    private static bool IsMissingExecutionContext(PlaywrightException error) =>
+        error.Message.IndexOf("Cannot find context with specified id", StringComparison.OrdinalIgnoreCase) >= 0
+        || error.Message.IndexOf("Execution context was destroyed", StringComparison.OrdinalIgnoreCase) >= 0
+        || error.Message.IndexOf("Cannot find execution context", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private readonly struct VisualMaskExecutionContext {
+        internal VisualMaskExecutionContext(string frameId, int executionContextId) {
+            FrameId = frameId;
+            ExecutionContextId = executionContextId;
+        }
+
+        internal string FrameId { get; }
+        internal int ExecutionContextId { get; }
+    }
+
+    private sealed class TemporaryVisualMask : IAsyncDisposable {
+        private readonly ICDPSession _session;
+        private readonly IReadOnlyList<VisualMaskExecutionContext> _executionContexts;
+        private readonly string _token;
+        private readonly bool _scriptsDisabled;
+        private int _disposed;
+
+        internal TemporaryVisualMask(
+            ICDPSession session,
+            IReadOnlyList<VisualMaskExecutionContext> executionContexts,
+            string token,
+            bool scriptsDisabled) {
+            _session = session;
+            _executionContexts = executionContexts;
+            _token = token;
+            _scriptsDisabled = scriptsDisabled;
+        }
+
+        public async ValueTask DisposeAsync() {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            Exception? cleanupError = null;
+            try { await RemoveTemporaryVisualMaskAsync(_session, _executionContexts, _token).ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = error; }
+            if (_scriptsDisabled) {
+                try { await SetPageScriptExecutionDisabledAsync(_session, disabled: false).ConfigureAwait(false); }
+                catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            }
+            try { await _session.DetachAsync().ConfigureAwait(false); }
+            catch (Exception error) { cleanupError = cleanupError == null ? error : new AggregateException(cleanupError, error); }
+            if (cleanupError != null) throw cleanupError;
+        }
+    }
 }

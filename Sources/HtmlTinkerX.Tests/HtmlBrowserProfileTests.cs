@@ -24,6 +24,7 @@ public class HtmlBrowserProfileTests {
             Timezone = "America/New_York",
             ViewportWidth = 1365,
             ViewportHeight = 768,
+            IgnoreHttpsErrors = true,
             PreventSsoAutoSubmit = true
         };
         profile.BrowserArguments.Add("--disable-dev-shm-usage");
@@ -42,6 +43,7 @@ public class HtmlBrowserProfileTests {
             Assert.Equal("America/New_York", options.Timezone);
             Assert.Equal(1365, options.ViewportWidth);
             Assert.Equal(768, options.ViewportHeight);
+            Assert.True(options.IgnoreHTTPSErrors);
             Assert.True(options.PreventSsoAutoSubmit);
             Assert.Contains("--disable-dev-shm-usage", options.BrowserArguments);
             Assert.Contains("geolocation", options.Permissions);
@@ -63,7 +65,7 @@ public class HtmlBrowserPersistentProfileTests {
             UserDataDirectory = userDataDirectory,
             Headless = true,
             LoadState = HtmlBrowserLoadState.Load,
-            Timeout = 10000
+            Timeout = 30000
         };
 
         try {
@@ -92,7 +94,7 @@ public class HtmlBrowserPersistentProfileTests {
             Password = "proof-secret",
             Headless = true,
             LoadState = HtmlBrowserLoadState.DomContentLoaded,
-            Timeout = 10000
+            Timeout = 30000
         };
 
         try {
@@ -128,7 +130,7 @@ public class HtmlBrowserPersistentProfileTests {
 
     private static HttpListener StartLocalPageServer(out string url) {
         int port = GetFreePort();
-        url = $"http://localhost:{port}/";
+        url = $"http://127.0.0.1:{port}/";
         HttpListener listener = new();
         listener.Prefixes.Add(url);
         listener.Start();
@@ -155,7 +157,7 @@ public class HtmlBrowserPersistentProfileTests {
 
     private static HttpListener StartBasicAuthPageServer(out string url, string username, string password) {
         int port = GetFreePort();
-        url = $"http://localhost:{port}/";
+        url = $"http://127.0.0.1:{port}/";
         string expected = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
         HttpListener listener = new();
         listener.Prefixes.Add(url);

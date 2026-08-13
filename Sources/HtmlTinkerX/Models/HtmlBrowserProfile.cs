@@ -40,6 +40,9 @@ public sealed class HtmlBrowserProfile {
     /// <summary>Enable Chromium sandboxing when supported by the selected browser.</summary>
     public bool? ChromiumSandbox { get; set; }
 
+    /// <summary>Whether browser contexts should ignore HTTPS certificate errors.</summary>
+    public bool? IgnoreHttpsErrors { get; set; }
+
     /// <summary>User agent string for the browser context.</summary>
     public string? UserAgent { get; set; }
 

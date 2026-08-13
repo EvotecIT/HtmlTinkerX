@@ -53,6 +53,9 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Run the browser without a visible window.</summary>
     public bool Headless { get; set; } = true;
 
+    /// <summary>Ignore HTTPS certificate errors in browser contexts. The default is <see langword="false"/>.</summary>
+    public bool IgnoreHTTPSErrors { get; set; }
+
     /// <summary>Delay Playwright actions by this number of milliseconds.</summary>
     public int SlowMo { get; set; }
 
@@ -246,6 +249,7 @@ public sealed class HtmlBrowserLaunchOptions {
         ApplyIfSet(profile.GeoLatitude, value => GeoLatitude = value);
         ApplyIfSet(profile.GeoLongitude, value => GeoLongitude = value);
         ApplyIfSet(profile.ChromiumSandbox, value => ChromiumSandbox = value);
+        ApplyIfSet(profile.IgnoreHttpsErrors, value => IgnoreHTTPSErrors = value);
         ApplyIfSet(profile.PreventSsoAutoSubmit, value => PreventSsoAutoSubmit = value);
 
         AddMissing(BrowserArguments, profile.BrowserArguments);

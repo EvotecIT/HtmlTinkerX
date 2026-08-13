@@ -108,6 +108,25 @@ public class HtmlBrowserInstallerTests
                 ? @"C:\Program Files\Google\Chrome\Application\chrome.exe"
                 : "/usr/bin/google-chrome"
         }));
+
+        HtmlBrowserLaunchOptions blank = new() {
+            BrowserChannel = " ",
+            BrowserExecutablePath = "\t",
+            Proxy = "  ",
+            UserAgent = " ",
+            Locale = "\t",
+            Timezone = "\r\n"
+        };
+        Assert.True(HtmlBrowser.ShouldInstallBundledRuntime(blank));
+        Assert.Null(HtmlBrowser.CreateLaunchOptions(blank).Channel);
+        Assert.Null(HtmlBrowser.CreateLaunchOptions(blank).ExecutablePath);
+        Assert.Null(HtmlBrowser.CreateLaunchOptions(blank).Proxy);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).Channel);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).ExecutablePath);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).Proxy);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).UserAgent);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).Locale);
+        Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).TimezoneId);
     }
 
     [Fact]

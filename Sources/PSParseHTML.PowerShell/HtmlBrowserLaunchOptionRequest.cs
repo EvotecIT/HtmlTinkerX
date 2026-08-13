@@ -29,6 +29,9 @@ internal sealed class HtmlBrowserLaunchOptionRequest {
     /// <summary>Show the browser instead of running headless.</summary>
     public SwitchParameter Visible { get; set; }
 
+    /// <summary>Ignore HTTPS certificate errors.</summary>
+    public SwitchParameter IgnoreHttpsErrors { get; set; }
+
     /// <summary>Delay Playwright actions by the specified milliseconds.</summary>
     public int SlowMo { get; set; }
 

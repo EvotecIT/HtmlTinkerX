@@ -161,7 +161,7 @@ public sealed class CmdletStartHtmlBrowserVideoCapture : AsyncPSCmdlet {
                 };
                 break;
             case ParameterSetFile:
-                target = new System.Uri(Path!.ToFullPath()).AbsoluteUri;
+                target = HtmlBrowser.CreateLocalFileUri(Path!).AbsoluteUri;
                 break;
             default:
                 target = Url;
