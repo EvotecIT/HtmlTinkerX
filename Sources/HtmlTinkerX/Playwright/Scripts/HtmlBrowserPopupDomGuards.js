@@ -12,6 +12,7 @@
     const installedRangePrototypes = new WeakSet();
     const installedSelectionPrototypes = new WeakSet();
     const installedActivationPrototypes = new WeakSet();
+    const installedActivationEventPrototypes = new WeakSet();
     const installedImagePrototypes = new WeakSet();
     const installedMediaPrototypes = new WeakSet();
     const installedFormPrototypes = new WeakSet();
@@ -22,6 +23,7 @@
     const buttonForm = getOwnPropertyDescriptor(HTMLButtonElement.prototype, 'form')?.get;
     const inputType = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'type')?.get;
     const inputForm = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'form')?.get;
+    const eventType = getOwnPropertyDescriptor(Event.prototype, 'type')?.get;
     const submitterState = value => {
         try {
             const type = reflectApply(buttonType, value, []);
@@ -85,6 +87,24 @@
             value(...args) {
                 const stage = activationStates.get(this);
                 return stage == null ? reflectApply(click, this, args) : stage(click, args);
+            }
+        });
+    };
+    const installActivationEventRoute = prototype => {
+        if (prototype == null || installedActivationEventPrototypes.has(prototype)) return;
+        installedActivationEventPrototypes.add(prototype);
+        const dispatchEvent = prototype.dispatchEvent;
+        if (typeof dispatchEvent !== 'function') return;
+        defineProperty(prototype, 'dispatchEvent', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const stage = activationStates.get(this);
+                let type = null;
+                try { type = reflectApply(eventType, args[0], []); } catch { }
+                return stage == null || type !== 'click'
+                    ? reflectApply(dispatchEvent, this, args)
+                    : stage(dispatchEvent, args, true);
             }
         });
     };
@@ -155,6 +175,8 @@
         installSelectionRoutes(popup.Selection?.prototype);
         installActivationRoute(HTMLElement.prototype);
         installActivationRoute(popup.HTMLElement?.prototype);
+        installActivationEventRoute(EventTarget.prototype);
+        installActivationEventRoute(popup.EventTarget?.prototype);
         installImageDecodeRoute(HTMLImageElement.prototype);
         installImageDecodeRoute(popup.HTMLImageElement?.prototype);
         installMediaPlayRoute(HTMLMediaElement.prototype);
@@ -183,7 +205,7 @@
         };
         return {
             constructorFor,
-            guardRealm(target) { installParserRoute(target); installRangeRoutes(target?.Range?.prototype); installSelectionRoutes(target?.Selection?.prototype); installFormRoutes(target?.HTMLFormElement?.prototype); },
+            guardRealm(target) { installParserRoute(target); installRangeRoutes(target?.Range?.prototype); installSelectionRoutes(target?.Selection?.prototype); installActivationEventRoute(target?.EventTarget?.prototype); installFormRoutes(target?.HTMLFormElement?.prototype); },
             guardRange(range) {
                 if (range != null) rangeStates.set(range, guardCreatedTree);
                 return range;
@@ -196,7 +218,8 @@
                 const link = element?.localName === 'a' || element?.localName === 'area';
                 if (!link && element?.localName !== 'button' && element?.localName !== 'input') return;
                 installActivationRoute(element.ownerDocument?.defaultView?.HTMLElement?.prototype);
-                activationStates.set(element, (click, args) => {
+                installActivationEventRoute(element.ownerDocument?.defaultView?.EventTarget?.prototype);
+                activationStates.set(element, (click, args, queuedResult) => {
                     const state = link ? null : submitterState(element);
                     if (!link && !state.valid) return reflectApply(click, element, args);
                     runWhenReady(() => {
@@ -214,7 +237,7 @@
                             if (formParent == null) form.remove(); else formParent.insertBefore(form, formNext);
                         }
                     });
-                    return undefined;
+                    return queuedResult;
                 });
             },
             guardImageDecode(element) {

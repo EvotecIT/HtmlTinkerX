@@ -4,6 +4,7 @@
         const insertionStates = new WeakMap();
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
+        const textPropertyGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
         const attrStates = new WeakMap();
         const attrPrototypes = new WeakSet();
@@ -21,6 +22,26 @@
                     set(value) { const state = attrStates.get(this); if (state) state.set(stringValue(value)); else descriptor.set.call(this, value); }
                 });
             }
+        };
+        const installText = (prototype, name) => {
+            if (!prototype) return;
+            let guarded = textPropertyGuards.get(prototype);
+            if (!guarded) textPropertyGuards.set(prototype, guarded = new Set());
+            if (guarded.has(name)) return;
+            const text = getOwnPropertyDescriptor(prototype, name);
+            if (!text?.get || !text?.set) return;
+            guarded.add(name);
+            defineProperty(prototype, name, {
+                ...text,
+                get() {
+                    const staged = states.get(this)?.textContent();
+                    return staged?.handled ? staged.value : text.get.call(this);
+                },
+                set(value) {
+                    if (states.get(this)?.setTextContent(value)) return;
+                    return text.set.call(this, value);
+                }
+            });
         };
         const install = prototype => {
             if (!prototype || prototypes.has(prototype)) return;
@@ -62,21 +83,7 @@
                     }
                 });
             }
-            for (const name of ['text', 'innerText']) {
-                const text = getOwnPropertyDescriptor(prototype, name);
-                if (!text?.get || !text?.set) continue;
-                defineProperty(prototype, name, {
-                    ...text,
-                    get() {
-                        const staged = states.get(this)?.textContent();
-                        return staged?.handled ? staged.value : text.get.call(this);
-                    },
-                    set(value) {
-                        if (states.get(this)?.setTextContent(value)) return;
-                        return text.set.call(this, value);
-                    }
-                });
-            }
+            for (const name of ['text', 'innerText']) installText(prototype, name);
             const insertAdjacentHTML = prototype.insertAdjacentHTML;
             if (typeof insertAdjacentHTML === 'function') {
                 defineProperty(prototype, 'insertAdjacentHTML', {
@@ -443,6 +450,7 @@
             installFrame,
             installAttr,
             installProperty,
+            installText,
             guardLegacyHandler,
             guardInsertionTarget(target, guard) { insertionStates.set(target, guard); },
             releaseInsertionTarget(target) { insertionStates.delete(target); },

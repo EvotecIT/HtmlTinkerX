@@ -73,6 +73,7 @@
     delete globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
     const installPopupRealmAttributeGuards = target => {
         attributeGuards.install(target.Element?.prototype);
+        attributeGuards.installText(target.HTMLScriptElement?.prototype, 'text'); attributeGuards.installText(target.HTMLElement?.prototype, 'innerText');
         attributeGuards.installNamedNodeMap(target.NamedNodeMap?.prototype); attributeGuards.installNode(target.Node?.prototype); attributeGuards.installAttr(target.Attr?.prototype);
         attributeGuards.installFrame(target.HTMLIFrameElement?.prototype); attributeGuards.installFrame(target.HTMLFrameElement?.prototype);
     };

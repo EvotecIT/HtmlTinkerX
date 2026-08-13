@@ -514,24 +514,31 @@
                 const stagingSheet = stagingElement.sheet;
                 if (stagingSheet == null) return null;
                 let stagedText = initialText;
+                let mutated = false;
+                let sourceParsed = false;
                 sheetStates.set(element, () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet);
                 sheetMutationStates.set(stagingSheet, (name, args, method) => {
                     const result = reflectApply(method, stagingSheet, args);
+                    mutated = true;
                     touch();
-                    if (name === 'replace') return result.then(value => { stagedText = ''; return value; });
-                    if (name !== 'insertRule') stagedText = '';
+                    if (name === 'replace') return result.then(value => { stagedText = ''; sourceParsed = true; return value; });
+                    if (name === 'replaceSync') { stagedText = ''; sourceParsed = true; }
                     return result;
                 });
                 const guard = {
                     set text(value) {
                         stagedText = toDomString(value);
                         stagingElement.textContent = stagedText;
+                        sourceParsed = stagingSheet.cssRules.length > 0;
+                        mutated = false;
                         touch();
                     },
                     release() {
                         sheetStates.delete(element);
                         sheetMutationStates.delete(stagingSheet);
                         const rules = arrayFrom(stagingSheet.cssRules, rule => rule.cssText).join('\n');
+                        if (!mutated) return stagedText;
+                        if (sourceParsed) return rules;
                         return [stagedText, rules].filter(value => value.length > 0).join('\n');
                     }
                 };
