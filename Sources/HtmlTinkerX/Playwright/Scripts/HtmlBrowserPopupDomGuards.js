@@ -1,6 +1,7 @@
 (() => {
     const defineProperty = Object.defineProperty;
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const getPrototypeOf = Object.getPrototypeOf;
     const reflectApply = Reflect.apply;
     const reflectConstruct = Reflect.construct;
     const rangeStates = new WeakMap();
@@ -13,6 +14,10 @@
     const installedSelectionPrototypes = new WeakSet();
     const installedActivationPrototypes = new WeakSet();
     const installedActivationEventPrototypes = new WeakSet();
+    const installedCancellationPrototypes = new WeakSet();
+    const cancellationStates = new WeakMap();
+    const nativePreventDefault = new WeakMap();
+    const nativeDefaultPrevented = new WeakMap();
     const installedImagePrototypes = new WeakSet();
     const installedMediaPrototypes = new WeakSet();
     const installedFormPrototypes = new WeakSet();
@@ -24,6 +29,9 @@
     const inputType = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'type')?.get;
     const inputForm = getOwnPropertyDescriptor(HTMLInputElement.prototype, 'form')?.get;
     const eventType = getOwnPropertyDescriptor(Event.prototype, 'type')?.get;
+    const eventCancelable = getOwnPropertyDescriptor(Event.prototype, 'cancelable')?.get;
+    const formAttributes = ['accept-charset', 'action', 'enctype', 'id', 'method', 'name', 'novalidate', 'rel', 'target'];
+    const submitterAttributes = ['form', 'formaction', 'formenctype', 'formmethod', 'formnovalidate', 'formtarget', 'name', 'type', 'value'];
     const submitterState = value => {
         try {
             const type = reflectApply(buttonType, value, []);
@@ -108,6 +116,82 @@
             }
         });
     };
+    const installCancellationRoute = prototype => {
+        if (prototype == null || installedCancellationPrototypes.has(prototype)) return;
+        const preventDefault = prototype.preventDefault;
+        const defaultPrevented = getOwnPropertyDescriptor(prototype, 'defaultPrevented');
+        if (typeof preventDefault !== 'function' || typeof defaultPrevented?.get !== 'function') return;
+        installedCancellationPrototypes.add(prototype);
+        nativePreventDefault.set(prototype, preventDefault);
+        nativeDefaultPrevented.set(prototype, defaultPrevented.get);
+        defineProperty(prototype, 'preventDefault', {
+            configurable: false,
+            writable: false,
+            value(...args) {
+                const state = cancellationStates.get(this);
+                if (state != null) state.cancelled = true;
+                return reflectApply(preventDefault, this, args);
+            }
+        });
+        defineProperty(prototype, 'defaultPrevented', {
+            ...defaultPrevented,
+            configurable: false,
+            get() { return cancellationStates.get(this)?.cancelled ?? defaultPrevented.get.call(this); }
+        });
+    };
+    const dispatchWithoutActivation = (target, dispatch, args) => {
+        const event = args[0];
+        let prototype = getPrototypeOf(event);
+        while (prototype != null && !nativePreventDefault.has(prototype)) prototype = getPrototypeOf(prototype);
+        const preventDefault = nativePreventDefault.get(prototype);
+        const defaultPrevented = nativeDefaultPrevented.get(prototype);
+        let cancelable = false;
+        try { cancelable = reflectApply(eventCancelable, event, []); } catch { }
+        if (!cancelable || preventDefault == null || defaultPrevented == null) return null;
+        const state = { cancelled: reflectApply(defaultPrevented, event, []) };
+        cancellationStates.set(event, state);
+        reflectApply(preventDefault, event, []);
+        reflectApply(dispatch, target, args);
+        return !state.cancelled;
+    };
+    const snapshotAttributes = (element, names) => names.map(name => [name, element.hasAttribute(name), element.getAttribute(name)]);
+    const applyAttributes = (element, snapshot) => {
+        for (const [name, present, value] of snapshot) {
+            if (present) element.setAttribute(name, value);
+            else element.removeAttribute(name);
+        }
+    };
+    const restorePosition = (element, parent, next) => {
+        if (parent == null) { element.remove(); return; }
+        parent.insertBefore(element, next?.parentNode === parent ? next : null);
+    };
+    const snapshotSubmission = (form, submitter, invoke) => {
+        const formSnapshot = snapshotAttributes(form, formAttributes);
+        const submitterSnapshot = submitter == null ? null : snapshotAttributes(submitter, submitterAttributes);
+        return () => {
+            const formCurrent = snapshotAttributes(form, formAttributes);
+            const submitterCurrent = submitter == null ? null : snapshotAttributes(submitter, submitterAttributes);
+            const formParent = form.parentNode;
+            const formNext = form.nextSibling;
+            const submitterParent = submitter?.parentNode ?? null;
+            const submitterNext = submitter?.nextSibling ?? null;
+            applyAttributes(form, formSnapshot);
+            if (!form.isConnected) (form.ownerDocument.body || form.ownerDocument.documentElement).appendChild(form);
+            if (submitter != null) {
+                applyAttributes(submitter, submitterSnapshot);
+                if (submitter.form !== form) form.appendChild(submitter);
+            }
+            try { invoke(); }
+            finally {
+                if (submitter != null) {
+                    applyAttributes(submitter, submitterCurrent);
+                    restorePosition(submitter, submitterParent, submitterNext);
+                }
+                applyAttributes(form, formCurrent);
+                restorePosition(form, formParent, formNext);
+            }
+        };
+    };
     const installImageDecodeRoute = prototype => {
         if (prototype == null || installedImagePrototypes.has(prototype)) return;
         installedImagePrototypes.add(prototype);
@@ -177,6 +261,8 @@
         installActivationRoute(popup.HTMLElement?.prototype);
         installActivationEventRoute(EventTarget.prototype);
         installActivationEventRoute(popup.EventTarget?.prototype);
+        installCancellationRoute(Event.prototype);
+        installCancellationRoute(popup.Event?.prototype);
         installImageDecodeRoute(HTMLImageElement.prototype);
         installImageDecodeRoute(popup.HTMLImageElement?.prototype);
         installMediaPlayRoute(HTMLMediaElement.prototype);
@@ -222,6 +308,22 @@
                 activationStates.set(element, (click, args, queuedResult) => {
                     const state = link ? null : submitterState(element);
                     if (!link && !state.valid) return reflectApply(click, element, args);
+                    if (queuedResult) {
+                        const result = dispatchWithoutActivation(element, click, args);
+                        if (result == null) {
+                            runWhenReady(() => reflectApply(click, element, args));
+                            return true;
+                        }
+                        if (!result) return false;
+                        if (link) {
+                            const clone = element.cloneNode(true);
+                            runWhenReady(() => clone.click());
+                        } else if (state.form != null) {
+                            const form = state.form;
+                            runWhenReady(snapshotSubmission(form, element, () => form.requestSubmit(element)));
+                        }
+                        return true;
+                    }
                     runWhenReady(() => {
                         if (link || state.form == null) { reflectApply(click, element, args); return; }
                         const form = state.form;
@@ -271,7 +373,8 @@
                         if (state.form !== element) throw new popup.DOMException('The specified element is not owned by this form element', 'NotFoundError');
                         normalized.push(submitter);
                     }
-                    runWhenReady(() => reflectApply(method, element, normalized));
+                    const submitter = normalized[0] ?? null;
+                    runWhenReady(snapshotSubmission(element, submitter, () => reflectApply(method, element, normalized)));
                     return undefined;
                 });
             }

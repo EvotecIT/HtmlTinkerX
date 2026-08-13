@@ -73,9 +73,14 @@
     delete globalThis.__htmlTinkerXCreatePopupAnimatedAttributeGuard;
     const installPopupRealmAttributeGuards = target => {
         attributeGuards.install(target.Element?.prototype);
+        attributeGuards.install(target.Document?.prototype);
+        attributeGuards.install(target.DocumentFragment?.prototype);
         attributeGuards.installText(target.HTMLScriptElement?.prototype, 'text'); attributeGuards.installText(target.HTMLElement?.prototype, 'innerText');
         attributeGuards.installNamedNodeMap(target.NamedNodeMap?.prototype); attributeGuards.installNode(target.Node?.prototype); attributeGuards.installAttr(target.Attr?.prototype);
         attributeGuards.installFrame(target.HTMLIFrameElement?.prototype); attributeGuards.installFrame(target.HTMLFrameElement?.prototype);
+        attributeGuards.installFactories(target.HTMLTableElement?.prototype, ['createCaption', 'createTBody', 'createTFoot', 'createTHead', 'insertRow']);
+        attributeGuards.installFactories(target.HTMLTableSectionElement?.prototype, ['insertRow']);
+        attributeGuards.installFactories(target.HTMLTableRowElement?.prototype, ['insertCell']);
     };
     installPopupRealmAttributeGuards(globalThis);
     const createXhrStager = globalThis.__htmlTinkerXCreatePopupXhrStager;

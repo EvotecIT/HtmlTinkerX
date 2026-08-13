@@ -5,6 +5,7 @@
         const prototypes = new WeakSet();
         const propertyGuards = new WeakMap();
         const textPropertyGuards = new WeakMap();
+        const factoryGuards = new WeakMap();
         const legacyHandlers = new WeakMap();
         const attrStates = new WeakMap();
         const attrPrototypes = new WeakSet();
@@ -96,6 +97,17 @@
                     }
                 });
             }
+            const insertAdjacentText = prototype.insertAdjacentText;
+            if (typeof insertAdjacentText === 'function') {
+                defineProperty(prototype, 'insertAdjacentText', {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const staged = states.get(this)?.insertAdjacentText(args);
+                        return staged?.handled ? staged.value : reflectApply(insertAdjacentText, this, args);
+                    }
+                });
+            }
             const setHTMLUnsafe = prototype.setHTMLUnsafe;
             if (typeof setHTMLUnsafe === 'function') {
                 defineProperty(prototype, 'setHTMLUnsafe', {
@@ -132,6 +144,25 @@
                     value(...args) {
                         (states.get(this)?.guardInsertion ?? insertionStates.get(this))?.(name, args);
                         return reflectApply(method, this, args);
+                    }
+                });
+            }
+        };
+        const installFactories = (prototype, names) => {
+            if (!prototype) return;
+            let guarded = factoryGuards.get(prototype);
+            if (!guarded) factoryGuards.set(prototype, guarded = new Set());
+            for (const name of names) {
+                if (guarded.has(name)) continue;
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                guarded.add(name);
+                defineProperty(prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        const result = reflectApply(method, this, args);
+                        return states.get(this)?.guardResult(result) ?? result;
                     }
                 });
             }
@@ -250,6 +281,10 @@
                 document,
                 window,
                 clone(value) { return typeof guardClone === 'function' ? guardClone(value) : value; },
+                guardResult(value) {
+                    if (!isReleased() && typeof guardTree === 'function') guardTree(value);
+                    return value;
+                },
                 guardInsertion(method, args) {
                     if (isReleased() || typeof guardTree !== 'function') return;
                     if (method === 'insertAdjacentElement') {
@@ -273,6 +308,14 @@
                     if (isReleased() || textState == null) return false;
                     textState.set(stringValue(value));
                     return true;
+                },
+                insertAdjacentText(args) {
+                    if (isReleased() || textState == null || args.length < 2) return { handled: false };
+                    const position = stringValue(args[0]).toLowerCase();
+                    if (position !== 'afterbegin' && position !== 'beforeend') return { handled: false };
+                    const value = stringValue(args[1]);
+                    textState.set(position === 'afterbegin' ? value + textState.get() : textState.get() + value);
+                    return { handled: true, value: undefined };
                 },
                 copy(target) {
                     for (const [name, value] of values) target.setAttribute(name, value);
@@ -448,6 +491,7 @@
             installNamedNodeMap,
             installNode,
             installFrame,
+            installFactories,
             installAttr,
             installProperty,
             installText,
