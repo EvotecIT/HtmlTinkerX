@@ -66,22 +66,33 @@
         const documentElement = getOwnPropertyDescriptor(popup.Document.prototype, 'documentElement').get;
         const nodeType = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get;
         const nodeName = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeName').get;
+        const nodeValue = getOwnPropertyDescriptor(popup.Node.prototype, 'nodeValue');
         const elementGetAttribute = popup.Element.prototype.getAttribute;
         const elementHasAttribute = popup.Element.prototype.hasAttribute;
         const elementSetAttribute = popup.Element.prototype.setAttribute;
         const markerAttribute = 'data-htmltinkerx-staged-resource';
         const writtenNodes = new weakSet();
         const writtenChildCounts = new weakMap();
+        const writtenText = new weakMap();
         const compatible = (existing, desired) => reflectApply(nodeType, existing, []) === reflectApply(nodeType, desired, [])
             && reflectApply(nodeName, existing, []) === reflectApply(nodeName, desired, []);
         const rememberWriteTree = node => {
             writtenNodes.add(node);
             const children = arrayFrom(reflectApply(childNodes, node, []));
             writtenChildCounts.set(node, children.length);
+            if (reflectApply(nodeType, node, []) === 3) writtenText.set(node, nodeValue.get.call(node) || '');
             for (const child of children) rememberWriteTree(child);
         };
         const mergeWriteTrees = (existing, desired, reused) => {
             reused.add(existing);
+            if (reflectApply(nodeType, existing, []) === 3) {
+                const previous = writtenText.get(existing) || '';
+                const desiredText = nodeValue.get.call(desired) || '';
+                const current = nodeValue.get.call(existing) || '';
+                nodeValue.set.call(existing, desiredText.startsWith(previous) ? current + desiredText.slice(previous.length) : desiredText);
+                writtenText.set(existing, desiredText);
+                return;
+            }
             if (existing instanceof popup.Element
                 && desired instanceof popup.Element
                 && reflectApply(elementHasAttribute, desired, [markerAttribute])) {

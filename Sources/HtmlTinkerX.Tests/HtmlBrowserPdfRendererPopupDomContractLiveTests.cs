@@ -234,6 +234,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             clickForm.append(clickButton);
             clickPopup.document.body.append(clickForm);
             clickButton.click();
+            clickButton.remove();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(

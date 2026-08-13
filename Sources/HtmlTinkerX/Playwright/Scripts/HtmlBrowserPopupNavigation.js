@@ -143,8 +143,7 @@
         let documentWrittenSynchronously = false;
         const documentWriteParts = [];
         const queued = [];
-        const guardedResources = createResourceQueue();
-        const guardedElements = new WeakSet();
+        const guardedResources = createResourceQueue(); const guardedElements = new WeakSet(); const guardedReleaseActions = new WeakMap();
         const requestAttributes = new Map([
             ['src', 'src'], ['srcset', 'srcset'], ['href', 'href'], ['action', 'action'],
             ['poster', 'poster'], ['data', 'data'], ['formaction', 'formAction'], ['background', 'background']
@@ -276,7 +275,7 @@
             const values = new Map(initialValues); const namespacedValues = new Map();
             const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null; const stagedTextNodes = stagesScriptText ? popup.document.createElement('script') : null; if (stagedTextNodes != null) { nativeSetAttribute.call(stagedTextNodes, 'type', 'application/x-htmltinkerx-staged'); popupTextContent.set.call(stagedTextNodes, stagedText); }
             if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
-            let released = false, releaseResource; const touchResource = () => guardedResources.touch(releaseResource); const styleGuard = transportGuards.createStyleGuard(element, values, () => released); const sheetGuard = transportGuards.createStyleSheetGuard(element, stagedText, () => released);
+            let released = false, releaseResource; const touchResource = () => guardedResources.touch(releaseResource); const styleGuard = transportGuards.createStyleGuard(element, values, () => released, touchResource); const sheetGuard = transportGuards.createStyleSheetGuard(element, stagedText, () => released, touchResource);
             const state = attributeGuards.createState(
                 element,
                 values,
@@ -288,7 +287,7 @@
                 clone => guardClonedTree(element, clone),
                 value => guardCreatedTree(value),
                 attribute => { if (attribute === 'style') styleGuard?.synchronize(); },
-                stagesStyleText || stagesScriptText ? { get: () => stagedTextNodes == null ? stagedText : popupTextContent.get.call(stagedTextNodes), set: value => { stagedText = value; if (stagedTextNodes != null) popupTextContent.set.call(stagedTextNodes, value); if (sheetGuard != null) sheetGuard.text = value; }, target: stagedTextNodes } : null, touchResource);
+                stagesStyleText || stagesScriptText ? { get: () => stagedTextNodes == null ? stagedText : popupTextContent.get.call(stagedTextNodes), set: value => { stagedText = value; if (stagedTextNodes != null) popupTextContent.set.call(stagedTextNodes, value); if (sheetGuard != null) sheetGuard.text = value; touchResource(); }, target: stagedTextNodes } : null, touchResource);
             if (styleGuard != null) nativeDefineProperty(element, 'style', {
                 configurable: false,
                 enumerable: true,
@@ -360,7 +359,7 @@
                     applyAttributes(element); if (stagesStyleText) popupTextContent.set.call(element, sheetGuard?.release() ?? stagedText);
                     else if (stagesScriptText) popupTextContent.set.call(element, stagedText);
                 }
-            }; guardedResources.push(releaseResource);
+            }; guardedReleaseActions.set(element, releaseResource); guardedResources.push(releaseResource);
         };
         const stageElementMarkup = createMarkupStager({
             popup,
@@ -375,7 +374,8 @@
             guardedResources
         });
         const guardCreatedElement = element => { if (ready) return element;
-            if (!isNodeValue(element) || nativeReflectApply(popupNodeType, element, []) !== 1 || guardedElements.has(element)) return element;
+            if (!isNodeValue(element) || nativeReflectApply(popupNodeType, element, []) !== 1) return element;
+            if (guardedElements.has(element)) { const action = guardedReleaseActions.get(element); if (action != null) guardedResources.push(action); return element; }
             const values = [];
             for (const attribute of Array.from(element.attributes)) {
                 const name = attribute.name.toLowerCase();
@@ -477,7 +477,7 @@
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
                 element.removeAttribute('data-htmltinkerx-staged-resource');
-                if (reusedWriteNodes.has(element)) continue;
+                if (reusedWriteNodes.has(element)) { if (styleText !== null) guardedResources.push(() => { element.textContent = styleText; }); continue; }
                 guardDeferredAttributes(element, values);
                 if (styleText !== null) {
                     guardedResources.push(() => { element.textContent = styleText; });
@@ -536,13 +536,12 @@
             transportGuards.guardReturnedNodes(value, guardCreatedTree);
             return value;
         };
-        const stagedObject = resolve => {
-            const value = resolve();
-            if (value === nativeLocation) return locationFacade;
-            if (value === popup) return popupFacade;
+        const stagedObject = resolve => { const value = resolve();
+            if (value === nativeLocation) return locationFacade; if (value === popup) return popupFacade;
             if (!value || !isNodeValue(value)) return value;
             if (!isDocumentValue(value)) return stageReturnedValue(value);
             const facade = new Proxy({}, {
+                getPrototypeOf() { return nativeGetPrototypeOf(resolve()); },
                 get(_, property) {
                     const target = resolve();
                     const member = nativeReflectGet(target, property, target);
@@ -557,7 +556,7 @@
                             const current = resolve();
                             const result = nativeReflectApply(nativeReflectGet(current, property, current), current, args);
                             documentWriteParts.length = 0;
-                            guardedResources.length = 0;
+                            guardedResources.clear();
                             documentWriteQueued = false;
                             documentCloseQueued = false;
                             documentWrittenSynchronously = false;

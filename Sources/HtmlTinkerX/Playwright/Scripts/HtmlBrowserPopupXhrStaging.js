@@ -59,6 +59,7 @@
             const opened = targetWindow.XMLHttpRequest.OPENED;
             const pendingSends = new weakMap();
             const domException = targetWindow.DOMException;
+            const constructor = targetWindow.XMLHttpRequest;
             const cancelPending = request => {
                 const pending = pendingSends.get(request);
                 if (pending == null) return false;
@@ -69,12 +70,13 @@
             const throwInvalidState = () => { throw new domException('The object is in an invalid state.', 'InvalidStateError'); };
             const operations = {
                 open(request, args) {
-                    cancelPending(request);
                     if (args.length >= 3 && args[2] !== undefined && !args[2]) {
                         throw new domException('Synchronous XMLHttpRequest is not supported while popup requests are staged.', 'NotSupportedError');
                     }
                     const normalized = args.slice();
                     if (normalized.length > 1) normalized[1] = normalizeUrl(normalized[1], targetWindow.document);
+                    reflectApply(nativeOpen, reflectConstruct(constructor, []), normalized);
+                    cancelPending(request);
                     return reflectApply(nativeOpen, request, normalized);
                 },
                 send(request, args) {
@@ -108,7 +110,6 @@
             installRoutes(prototype, [
                 ['open', nativeOpen], ['send', nativeSend], ['abort', nativeAbort], ['setRequestHeader', nativeSetRequestHeader]
             ], nativeWithCredentials);
-            const constructor = targetWindow.XMLHttpRequest;
             const staged = new proxy(constructor, {
                 construct(target, args) {
                     const request = reflectConstruct(target, args);

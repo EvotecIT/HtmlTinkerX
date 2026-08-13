@@ -197,8 +197,23 @@
                 if (!link && element?.localName !== 'button' && element?.localName !== 'input') return;
                 installActivationRoute(element.ownerDocument?.defaultView?.HTMLElement?.prototype);
                 activationStates.set(element, (click, args) => {
-                    if (!link && !submitterState(element).valid) return reflectApply(click, element, args);
-                    runWhenReady(() => reflectApply(click, element, args));
+                    const state = link ? null : submitterState(element);
+                    if (!link && !state.valid) return reflectApply(click, element, args);
+                    runWhenReady(() => {
+                        if (link || state.form == null) { reflectApply(click, element, args); return; }
+                        const form = state.form;
+                        const formParent = form.parentNode;
+                        const formNext = form.nextSibling;
+                        const submitterParent = element.parentNode;
+                        const submitterNext = element.nextSibling;
+                        if (!form.isConnected) (form.ownerDocument.body || form.ownerDocument.documentElement).appendChild(form);
+                        if (element.form !== form) form.appendChild(element);
+                        try { reflectApply(click, element, args); }
+                        finally {
+                            if (submitterParent == null) element.remove(); else submitterParent.insertBefore(element, submitterNext);
+                            if (formParent == null) form.remove(); else formParent.insertBefore(form, formNext);
+                        }
+                    });
                     return undefined;
                 });
             },

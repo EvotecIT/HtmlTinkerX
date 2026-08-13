@@ -389,6 +389,32 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task InvalidReplacementXhrOpenPreservesTheEarlierQueuedSend() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            const request = new popup.XMLHttpRequest();
+            request.open('GET', '{server.BlankPopupResourceUrl}?source=xhr-preserved-after-invalid-open');
+            request.send();
+            let rejected = false;
+            try {{ request.open('GET', 'http://['); }} catch {{ rejected = true; }}
+            if (!rejected) throw new Error('invalid replacement open accepted');
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        Assert.Equal(1, server.BlankPopupSourceRequests("xhr-preserved-after-invalid-open"));
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task BlankPopupLocationValueOfRemainsBehindHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(

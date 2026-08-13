@@ -15,6 +15,7 @@
     const nativeSendBeacon = navigatorPrototype.sendBeacon;
     const nodeClone = Node.prototype.cloneNode;
     const objectValue = Object;
+    const objectCreate = Object.create;
     const defineProperty = Object.defineProperty;
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
     const nativeRequestUrl = getOwnPropertyDescriptor(Request.prototype, 'url').get;
@@ -412,7 +413,7 @@
                     });
                 }
             },
-            createStyleGuard(element, values, isReleased) {
+            createStyleGuard(element, values, isReleased, touch = () => { }) {
                 const prototype = getPrototypeOf(element);
                 const descriptor = installStyleRoute(prototype) ?? styleDescriptor;
                 if (descriptor == null || typeof descriptor.get !== 'function') return null;
@@ -434,9 +435,11 @@
                     }
                 };
                 const synchronizeToAttributes = () => {
+                    const previous = values.get('style') ?? '';
                     lastText = staged.cssText;
                     if (lastText.length === 0) values.delete('style');
                     else values.set('style', lastText);
+                    if (previous !== lastText) touch();
                 };
                 const facade = new Proxy(staged, {
                     get(_, property) {
@@ -460,16 +463,40 @@
                 });
                 styleStates.set(element, () => isReleased() ? descriptor.get.call(element) : facade);
                 const stagedAttributeStyleMap = stagedElement.attributeStyleMap;
-                attributeStyleMapStates.set(element, () => isReleased() && attributeStyleMapDescriptor?.get
+                const currentAttributeStyleMap = () => isReleased() && attributeStyleMapDescriptor?.get
                     ? attributeStyleMapDescriptor.get.call(element)
-                    : stagedAttributeStyleMap);
+                    : stagedAttributeStyleMap;
+                const invokeAttributeStyleMap = (property, args) => {
+                    const current = currentAttributeStyleMap();
+                    const result = reflectApply(reflectGet(current, property, current), current, args);
+                    if (!isReleased() && (property === 'append' || property === 'clear' || property === 'delete' || property === 'set')) synchronizeToAttributes();
+                    return result;
+                };
+                const attributeStyleMapPrototype = objectCreate(getPrototypeOf(stagedAttributeStyleMap));
+                for (const property of ['append', 'clear', 'delete', 'entries', 'forEach', 'get', 'getAll', 'has', 'keys', 'set', 'values']) {
+                    if (typeof stagedAttributeStyleMap[property] !== 'function') continue;
+                    defineProperty(attributeStyleMapPrototype, property, { configurable: false, value(...args) { return invokeAttributeStyleMap(property, args); } });
+                }
+                defineProperty(attributeStyleMapPrototype, iterator, { configurable: false, value(...args) { return invokeAttributeStyleMap(iterator, args); } });
+                defineProperty(attributeStyleMapPrototype, 'size', { configurable: false, get() { return currentAttributeStyleMap().size; } });
+                const attributeStyleMapFacade = new Proxy({}, {
+                    get(_, property) {
+                        const current = currentAttributeStyleMap();
+                        const value = reflectGet(current, property, current);
+                        return typeof value === 'function' ? (...args) => invokeAttributeStyleMap(property, args) : value;
+                    },
+                    set(_, property, value) {
+                        const current = currentAttributeStyleMap();
+                        const result = reflectSet(current, property, value, current);
+                        if (!isReleased()) synchronizeToAttributes();
+                        return result;
+                    },
+                    getPrototypeOf() { return attributeStyleMapPrototype; }
+                });
+                attributeStyleMapStates.set(element, () => attributeStyleMapFacade);
                 return {
                     facade,
-                    get attributeStyleMapFacade() {
-                        return isReleased() && typeof attributeStyleMapDescriptor?.get === 'function'
-                            ? attributeStyleMapDescriptor.get.call(element)
-                            : stagedAttributeStyleMap;
-                    },
+                    attributeStyleMapFacade,
                     synchronize: synchronizeFromAttributes,
                     release() {
                         synchronizeFromAttributes();
@@ -479,7 +506,7 @@
                     }
                 };
             },
-            createStyleSheetGuard(element, initialText, isReleased) {
+            createStyleSheetGuard(element, initialText, isReleased, touch = () => { }) {
                 if (element.localName !== 'style' || sheetDescriptor?.get == null) return null;
                 const stagingDocument = popup.document.implementation.createHTMLDocument('');
                 const stagingElement = stagingDocument.createElement('style');
@@ -490,6 +517,7 @@
                 sheetStates.set(element, () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet);
                 sheetMutationStates.set(stagingSheet, (name, args, method) => {
                     const result = reflectApply(method, stagingSheet, args);
+                    touch();
                     if (name === 'replace') return result.then(value => { stagedText = ''; return value; });
                     if (name !== 'insertRule') stagedText = '';
                     return result;
@@ -498,6 +526,7 @@
                     set text(value) {
                         stagedText = toDomString(value);
                         stagingElement.textContent = stagedText;
+                        touch();
                     },
                     release() {
                         sheetStates.delete(element);

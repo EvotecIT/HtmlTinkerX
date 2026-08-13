@@ -309,12 +309,18 @@
                         attribute.value = value;
                         attrStates.set(attribute, {
                             get: () => {
-                                if (isReleased()) { attrStates.delete(attribute); return attribute.value; }
+                                if (isReleased()) return namespace == null || namespace.length === 0
+                                    ? element.getAttribute(qualified) ?? ''
+                                    : element.getAttributeNS(namespace, name) ?? '';
                                 if (namespace == null || namespace.length === 0) return values.get(name) ?? '';
                                 return namespacedValues.get(`${namespace}\0${qualified}`)?.value ?? '';
                             },
                             set: next => {
-                                if (isReleased()) { attrStates.delete(attribute); attribute.value = next; return; }
+                                if (isReleased()) {
+                                    if (namespace == null || namespace.length === 0) element.setAttribute(qualified, next);
+                                    else element.setAttributeNS(namespace, qualified, next);
+                                    return;
+                                }
                                 if (namespace == null || namespace.length === 0) values.set(name, next);
                                 else namespacedValues.set(`${namespace}\0${qualified}`, { namespace, qualified, value: next });
                                 touch();
