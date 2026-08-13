@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/EvotecIT/PSPublishModule/master/Schemas/project.build.schema.json",
+  "$schema": "https://raw.githubusercontent.com/EvotecIT/PSPublishModule/main/Schemas/project.build.schema.json",
   "RootPath": "..\\Sources",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
@@ -26,14 +26,5 @@
   "PublishSource": "https://api.nuget.org/v3/index.json",
   "PublishApiKeyFilePath": "C:\\Support\\Important\\NugetOrgEvotec.txt",
   "SkipDuplicate": true,
-  "PublishFailFast": true,
-  "GitHubAccessTokenFilePath": "C:\\Support\\Important\\GithubAPI.txt",
-  "GitHubUsername": "EvotecIT",
-  "GitHubRepositoryName": "HtmlTinkerX",
-  "GitHubIsPreRelease": false,
-  "GitHubIncludeProjectNameInTag": true,
-  "GitHubGenerateReleaseNotes": true,
-  "GitHubReleaseMode": "Single",
-  "GitHubPrimaryProject": "HtmlTinkerX",
-  "GitHubTagTemplate": "{Project}-v{Version}"
+  "PublishFailFast": true
 }
