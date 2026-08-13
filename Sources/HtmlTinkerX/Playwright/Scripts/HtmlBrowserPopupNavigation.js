@@ -140,7 +140,7 @@
         const popupInnerHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'innerHTML'); const popupOuterHtml = nativeGetOwnPropertyDescriptor(popup.Element.prototype, 'outerHTML');
         const popupTextContent = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'textContent'); const popupNodeType = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'nodeType').get; const popupOwnerDocument = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'ownerDocument').get; const popupIsConnected = nativeGetOwnPropertyDescriptor(popup.Node.prototype, 'isConnected').get; const popupCloneNode = popup.Node.prototype.cloneNode; const popupReplaceChild = popup.Node.prototype.replaceChild; const popupFragmentQuerySelectorAll = popup.DocumentFragment.prototype.querySelectorAll;
         const isNodeValue = value => { if (!value || typeof value !== 'object') return false; try { nativeReflectApply(popupNodeType, value, []); return true; } catch { return false; } };
-        const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML; const popupSetHtmlUnsafe = popup.Element.prototype.setHTMLUnsafe;
+        const popupInsertAdjacentHtml = popup.Element.prototype.insertAdjacentHTML; const popupSetHtml = popup.Element.prototype.setHTML; const popupSetHtmlUnsafe = popup.Element.prototype.setHTMLUnsafe;
         const createHtmlDocument = popup.DOMImplementation.prototype.createHTMLDocument;
         installPopupRealmAttributeGuards(popup);
         let ready = false;
@@ -276,10 +276,10 @@
             || attribute.startsWith('on')
             || ((element.localName === 'iframe' || element.localName === 'frame') && attribute === 'srcdoc')
             || (element.localName === 'meta' && attribute === 'content');
-        let domGuards; const guardDeferredAttributes = (element, initialValues) => { const elementDocument = () => nativeReflectApply(popupOwnerDocument, element, []);
+        let domGuards; const guardDeferredAttributes = (element, initialValues, initialNamespacedValues = []) => { const elementDocument = () => nativeReflectApply(popupOwnerDocument, element, []);
             if (guardedElements.has(element)) return;
             guardedElements.add(element); domGuards?.guardActivation(element); domGuards?.guardImageDecode(element); domGuards?.guardMediaPlayback(element); domGuards?.guardFormSubmission(element);
-            const values = new Map(initialValues); const namespacedValues = new Map();
+            const values = new Map(initialValues); const namespacedValues = new Map(); for (const value of initialNamespacedValues) namespacedValues.set(`${value.namespace}\0${value.qualified}`, value);
             const stagesStyleText = element.localName === 'style'; const stagesScriptText = element.localName === 'script' && nativeGetAttribute.call(element, 'type') !== 'application/x-htmltinkerx-staged'; let stagedText = stagesStyleText || stagesScriptText ? popupTextContent.get.call(element) : null; const stagedTextNodes = stagesScriptText ? popup.document.createElement('script') : null; if (stagedTextNodes != null) { nativeSetAttribute.call(stagedTextNodes, 'type', 'application/x-htmltinkerx-staged'); popupTextContent.set.call(stagedTextNodes, stagedText); }
             if (stagesStyleText || stagesScriptText) popupTextContent.set.call(element, '');
             let released = false, releaseResource; const touchResource = () => guardedResources.touch(releaseResource); const styleGuard = transportGuards.createStyleGuard(element, values, () => released, touchResource); const sheetGuard = transportGuards.createStyleSheetGuard(element, stagedText, () => released, touchResource);
@@ -374,6 +374,7 @@
             innerHtml: popupInnerHtml,
             outerHtml: popupOuterHtml,
             insertAdjacentHtml: popupInsertAdjacentHtml,
+            setHtml: popupSetHtml,
             setHtmlUnsafe: popupSetHtmlUnsafe,
             reflectApply: nativeReflectApply,
             stringValue: nativeString,
@@ -384,14 +385,14 @@
         const guardCreatedElement = element => { if (ready) return element;
             if (!isNodeValue(element) || nativeReflectApply(popupNodeType, element, []) !== 1) return element;
             if (guardedElements.has(element)) { const action = guardedReleaseActions.get(element); if (action != null) guardedResources.push(action); return element; }
-            const values = [];
+            const values = []; const namespacedValues = [];
             for (const attribute of Array.from(element.attributes)) {
-                const name = attribute.name.toLowerCase();
+                const name = attribute.localName.toLowerCase();
                 if (!shouldDeferAttribute(element, name)) continue;
-                values.push([name, attribute.value]);
-                element.removeAttribute(attribute.name);
+                if (attribute.namespaceURI == null) values.push([attribute.name.toLowerCase(), attribute.value]); else namespacedValues.push({ namespace: attribute.namespaceURI, qualified: attribute.name, value: attribute.value });
+                if (attribute.namespaceURI == null) element.removeAttribute(attribute.name); else element.removeAttributeNS(attribute.namespaceURI, attribute.localName);
             }
-            guardDeferredAttributes(element, values);
+            guardDeferredAttributes(element, values, namespacedValues);
             return element;
         };
         const shouldTraverseShadow = element => nativeReflectApply(popupOwnerDocument, element, []) !== popup.document || !nativeReflectApply(popupIsConnected, element, []);
@@ -440,24 +441,24 @@
                         text: element.textContent
                     }
                     : null;
-                const values = [];
+                const values = []; const namespacedValues = [];
                 if (script !== null) {
                     for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
                     element.setAttribute('type', 'application/x-htmltinkerx-staged');
                     element.textContent = '';
                 } else {
                     for (const attribute of Array.from(element.attributes)) {
-                        const name = attribute.name.toLowerCase();
+                        const name = attribute.localName.toLowerCase();
                         if (!shouldDeferAttribute(element, name)) continue;
-                        values.push([name, attribute.value]);
-                        element.removeAttribute(attribute.name);
+                        if (attribute.namespaceURI == null) values.push([attribute.name.toLowerCase(), attribute.value]); else namespacedValues.push({ namespace: attribute.namespaceURI, qualified: attribute.name, value: attribute.value });
+                        if (attribute.namespaceURI == null) element.removeAttribute(attribute.name); else element.removeAttributeNS(attribute.namespaceURI, attribute.localName);
                     }
                 }
                 const styleText = element.localName === 'style' ? element.textContent : null;
                 if (styleText !== null) element.textContent = '';
                 const marker = `htmltinkerx-${Date.now()}-${markerIndex++}-${Math.random().toString(36).slice(2)}`;
                 element.setAttribute('data-htmltinkerx-staged-resource', marker);
-                descriptors.push({ marker, values, styleText, script });
+                descriptors.push({ marker, values, namespacedValues, styleText, script });
             }
             let desiredRoot = null;
             if (previousRoot == null) {
@@ -470,12 +471,12 @@
                 desiredRoot = stagedDocument.documentElement;
             }
             const reusedWriteNodes = stageElementMarkup.preserveWrittenNodes(nativeDocument, previousRoot, desiredRoot);
-            for (const { marker, values, styleText, script } of descriptors) {
+            for (const { marker, values, namespacedValues, styleText, script } of descriptors) {
                 const element = nativeDocument.querySelector(`[data-htmltinkerx-staged-resource="${marker}"]`);
                 if (!element) continue;
                 element.removeAttribute('data-htmltinkerx-staged-resource');
                 if (reusedWriteNodes.has(element)) { if (styleText !== null) guardedResources.push(() => { element.textContent = styleText; }); continue; }
-                guardDeferredAttributes(element, values);
+                guardDeferredAttributes(element, values, namespacedValues);
                 if (styleText !== null) {
                     guardedResources.push(() => { element.textContent = styleText; });
                 }

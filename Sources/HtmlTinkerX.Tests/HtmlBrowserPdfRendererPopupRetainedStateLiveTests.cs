@@ -20,21 +20,27 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const styled = popup.document.createElement('div');
             popup.document.body.append(styled);
             const map = styled.attributeStyleMap;
+            const style = popup.document.createElement('style');
+            popup.document.head.append(style);
+            const sheet = style.sheet;
             popup.setTimeout(() => {{
                 attribute.value = '{server.BlankPopupResourceUrl}?source=retained-attr-live';
                 map.set('background-image', 'url({server.BlankPopupResourceUrl}?source=retained-typed-om)');
+                if (sheet !== style.sheet) throw new Error('stylesheet facade identity lost');
+                sheet.insertRule('@import url({server.BlankPopupResourceUrl}?source=retained-sheet-direct);');
             }}, 0);
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 2000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupSourceRequests("retained-attr-live"));
         Assert.Equal(1, server.BlankPopupSourceRequests("retained-typed-om"));
+        Assert.Equal(1, server.BlankPopupSourceRequests("retained-sheet-direct"));
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
 

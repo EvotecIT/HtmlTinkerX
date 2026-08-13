@@ -110,6 +110,7 @@
             if (typeof target?.ShadowRoot !== 'function' || shadowRealmStates.has(target)) return;
             const attachShadow = target.Element.prototype.attachShadow;
             const innerHtml = getOwnPropertyDescriptor(target.ShadowRoot.prototype, 'innerHTML');
+            const setHtml = target.ShadowRoot.prototype.setHTML;
             const setHtmlUnsafe = target.ShadowRoot.prototype.setHTMLUnsafe;
             const nodeType = getOwnPropertyDescriptor(target.Node.prototype, 'nodeType').get;
             const elementQuerySelectorAll = target.Element.prototype.querySelectorAll;
@@ -141,32 +142,39 @@
                 adoptedOwner = getPrototypeOf(adoptedOwner);
             }
             const states = new weakMap();
-            const stageMarkup = (root, markup, method = 'innerHTML') => {
+            const stageMarkup = (root, markup, method = 'innerHTML', methodArgs = [markup]) => {
                 const template = target.document.createElement('template');
                 template.innerHTML = stringValue(markup);
                 const descriptors = [];
                 let markerIndex = 0;
                 for (const descendant of elementsOf(templateContent.call(template))) {
                     const values = [];
+                    const namespacedValues = [];
                     for (const attribute of arrayFrom(descendant.attributes)) {
-                        const name = attribute.name.toLowerCase();
+                        const name = attribute.localName.toLowerCase();
                         if (!shouldDeferAttribute(descendant, name)) continue;
-                        values.push([name, attribute.value]);
-                        descendant.removeAttribute(attribute.name);
+                        if (attribute.namespaceURI == null) values.push([attribute.name.toLowerCase(), attribute.value]);
+                        else namespacedValues.push({ namespace: attribute.namespaceURI, qualified: attribute.name, value: attribute.value });
+                        if (attribute.namespaceURI == null) descendant.removeAttribute(attribute.name);
+                        else descendant.removeAttributeNS(attribute.namespaceURI, attribute.localName);
                     }
                     const styleText = descendant.localName === 'style' ? descendant.textContent : null;
                     if (styleText !== null) descendant.textContent = '';
                     const marker = `htmltinkerx-shadow-${Date.now()}-${markerIndex++}-${Math.random().toString(36).slice(2)}`;
                     descendant.setAttribute('data-htmltinkerx-staged-resource', marker);
-                    descriptors.push({ marker, values, styleText });
+                    descriptors.push({ marker, values, namespacedValues, styleText });
                 }
-                if (method === 'setHTMLUnsafe') reflectApply(setHtmlUnsafe, root, [template.innerHTML]);
+                if (method === 'setHTML' || method === 'setHTMLUnsafe') {
+                    const invocationArgs = arrayFrom(methodArgs);
+                    invocationArgs[0] = template.innerHTML;
+                    reflectApply(method === 'setHTML' ? setHtml : setHtmlUnsafe, root, invocationArgs);
+                }
                 else innerHtml.set.call(root, template.innerHTML);
-                for (const { marker, values, styleText } of descriptors) {
+                for (const { marker, values, namespacedValues, styleText } of descriptors) {
                     const descendant = findMarker(root, marker);
                     if (!descendant) continue;
                     descendant.removeAttribute('data-htmltinkerx-staged-resource');
-                    guardDeferredAttributes(descendant, values);
+                    guardDeferredAttributes(descendant, values, namespacedValues);
                     if (styleText !== null) guardedResources.push(() => { descendant.textContent = styleText; });
                 }
             };
@@ -181,18 +189,20 @@
                     }
                 });
             }
-            if (typeof setHtmlUnsafe === 'function') defineProperty(target.ShadowRoot.prototype, 'setHTMLUnsafe', {
-                configurable: false,
-                writable: false,
-                value(...args) {
-                    if (args.length === 0) return reflectApply(setHtmlUnsafe, this, args);
-                    if (states.has(this) && !isReady()) {
-                        stageMarkup(this, args[0], 'setHTMLUnsafe');
-                        return undefined;
+            for (const [name, method] of [['setHTML', setHtml], ['setHTMLUnsafe', setHtmlUnsafe]]) {
+                if (typeof method === 'function') defineProperty(target.ShadowRoot.prototype, name, {
+                    configurable: false,
+                    writable: false,
+                    value(...args) {
+                        if (args.length === 0) return reflectApply(method, this, args);
+                        if (states.has(this) && !isReady()) {
+                            stageMarkup(this, args[0], name, args);
+                            return undefined;
+                        }
+                        return reflectApply(method, this, args);
                     }
-                    return reflectApply(setHtmlUnsafe, this, args);
-                }
-            });
+                });
+            }
             if (adopted?.get && adopted?.set && adopted.configurable !== false) {
                 defineProperty(target.ShadowRoot.prototype, 'adoptedStyleSheets', {
                     ...adopted,

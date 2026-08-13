@@ -516,15 +516,27 @@
                 let stagedText = initialText;
                 let mutated = false;
                 let sourceParsed = false;
-                sheetStates.set(element, () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet);
-                sheetMutationStates.set(stagingSheet, (name, args, method) => {
-                    const result = reflectApply(method, stagingSheet, args);
-                    mutated = true;
-                    touch();
-                    if (name === 'replace') return result.then(value => { stagedText = ''; sourceParsed = true; return value; });
-                    if (name === 'replaceSync') { stagedText = ''; sourceParsed = true; }
+                const currentSheet = () => isReleased() ? sheetDescriptor.get.call(element) : stagingSheet;
+                const routeMutation = (name, args, method) => {
+                    const result = reflectApply(method, currentSheet(), args);
+                    if (!isReleased()) {
+                        mutated = true;
+                        touch();
+                        if (name === 'replace') return result.then(value => { stagedText = ''; sourceParsed = true; return value; });
+                        if (name === 'replaceSync') { stagedText = ''; sourceParsed = true; }
+                    }
                     return result;
+                };
+                const facade = new Proxy(objectCreate(getPrototypeOf(stagingSheet)), {
+                    get(_, property) {
+                        const current = currentSheet();
+                        const value = reflectGet(current, property, current);
+                        return typeof value === 'function' ? (...args) => reflectApply(value, current, args) : value;
+                    },
+                    set(_, property, value) { const current = currentSheet(); return reflectSet(current, property, value, current); }
                 });
+                sheetStates.set(element, () => facade);
+                sheetMutationStates.set(stagingSheet, routeMutation);
                 const guard = {
                     set text(value) {
                         stagedText = toDomString(value);
@@ -534,7 +546,6 @@
                         touch();
                     },
                     release() {
-                        sheetStates.delete(element);
                         sheetMutationStates.delete(stagingSheet);
                         const rules = arrayFrom(stagingSheet.cssRules, rule => rule.cssText).join('\n');
                         if (!mutated) return stagedText;

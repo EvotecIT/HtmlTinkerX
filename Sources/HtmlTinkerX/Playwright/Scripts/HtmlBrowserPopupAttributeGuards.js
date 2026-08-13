@@ -108,16 +108,17 @@
                     }
                 });
             }
-            const setHTMLUnsafe = prototype.setHTMLUnsafe;
-            if (typeof setHTMLUnsafe === 'function') {
-                defineProperty(prototype, 'setHTMLUnsafe', {
+            for (const name of ['setHTML', 'setHTMLUnsafe']) {
+                const method = prototype[name];
+                if (typeof method !== 'function') continue;
+                defineProperty(prototype, name, {
                     configurable: false,
                     writable: false,
                     value(...args) {
-                        if (args.length === 0) return reflectApply(setHTMLUnsafe, this, args);
+                        if (args.length === 0) return reflectApply(method, this, args);
                         const state = states.get(this);
-                        if (state?.markup('setHTMLUnsafe', args)) return;
-                        return reflectApply(setHTMLUnsafe, this, args);
+                        if (state?.markup(name, args)) return;
+                        return reflectApply(method, this, args);
                     }
                 });
             }

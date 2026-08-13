@@ -11,6 +11,7 @@
         innerHtml,
         outerHtml,
         insertAdjacentHtml,
+        setHtml,
         setHtmlUnsafe,
         reflectApply,
         stringValue,
@@ -54,24 +55,29 @@
             let markerIndex = 0;
             for (const descendant of elementsOf(templateContent.call(template))) {
                 const values = [];
+                const namespacedValues = [];
                 for (const attribute of arrayFrom(descendant.attributes)) {
-                    const name = attribute.name.toLowerCase();
+                    const name = attribute.localName.toLowerCase();
                     if (!shouldDeferAttribute(descendant, name)) continue;
-                    values.push([name, attribute.value]);
-                    descendant.removeAttribute(attribute.name);
+                    if (attribute.namespaceURI == null) values.push([attribute.name.toLowerCase(), attribute.value]);
+                    else namespacedValues.push({ namespace: attribute.namespaceURI, qualified: attribute.name, value: attribute.value });
+                    if (attribute.namespaceURI == null) descendant.removeAttribute(attribute.name);
+                    else descendant.removeAttributeNS(attribute.namespaceURI, attribute.localName);
                 }
                 const styleText = descendant.localName === 'style' ? descendant.textContent : null;
                 if (styleText !== null) descendant.textContent = '';
                 const marker = 'htmltinkerx-fragment-' + Date.now() + '-' + markerIndex++ + '-' + Math.random().toString(36).slice(2);
                 descendant.setAttribute('data-htmltinkerx-staged-resource', marker);
-                descriptors.push({ marker, values, styleText });
+                descriptors.push({ marker, values, namespacedValues, styleText });
             }
             let searchRoot;
             if (method === 'innerHTML') {
                 innerHtml.set.call(element, template.innerHTML);
                 searchRoot = element;
-            } else if (method === 'setHTMLUnsafe') {
-                reflectApply(setHtmlUnsafe, element, [template.innerHTML]);
+            } else if (method === 'setHTML' || method === 'setHTMLUnsafe') {
+                const invocationArgs = arrayFrom(args);
+                invocationArgs[0] = template.innerHTML;
+                reflectApply(method === 'setHTML' ? setHtml : setHtmlUnsafe, element, invocationArgs);
                 searchRoot = element;
             } else if (method === 'outerHTML') {
                 searchRoot = element.parentNode;
@@ -80,11 +86,11 @@
                 searchRoot = element.parentNode || element;
                 reflectApply(insertAdjacentHtml, element, [args[0], template.innerHTML]);
             }
-            if (searchRoot != null) for (const { marker, values, styleText } of descriptors) {
+            if (searchRoot != null) for (const { marker, values, namespacedValues, styleText } of descriptors) {
                 const descendant = findMarker(searchRoot, marker);
                 if (!descendant) continue;
                 descendant.removeAttribute('data-htmltinkerx-staged-resource');
-                guardDeferredAttributes(descendant, values);
+                guardDeferredAttributes(descendant, values, namespacedValues);
                 if (styleText !== null) guardedResources.push(() => { descendant.textContent = styleText; });
             }
             return true;

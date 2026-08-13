@@ -318,6 +318,45 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task SanitizedAndNamespacedMarkupWaitForHeaderInterception() {
+        await using LoopbackPopupServer server = new();
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
+        string script = $@"const popup = window.open('', '_blank');
+            if (typeof popup.Element.prototype.setHTML === 'function') popup.document.body.setHTML(`<img src='{server.BlankPopupResourceUrl}?source=sanitized-element'>`);
+            const shadowHost = popup.document.createElement('div');
+            popup.document.body.append(shadowHost);
+            const shadow = shadowHost.attachShadow({{ mode: 'open' }});
+            if (typeof popup.ShadowRoot.prototype.setHTML === 'function') shadow.setHTML(`<img src='{server.BlankPopupResourceUrl}?source=sanitized-shadow'>`);
+            const frame = popup.document.createElement('iframe');
+            popup.document.body.append(frame);
+            if (typeof frame.contentWindow.Element.prototype.setHTML === 'function') frame.contentDocument.body.setHTML(`<img src='{server.BlankPopupResourceUrl}?source=sanitized-child'>`);
+            const namespacedHost = popup.document.createElement('div');
+            popup.document.body.append(namespacedHost);
+            namespacedHost.innerHTML = `<svg xmlns:xlink='http://www.w3.org/1999/xlink'><image xlink:href='{server.BlankPopupResourceUrl}?source=xlink-element'/></svg>`;
+            const namespacedShadowHost = popup.document.createElement('div');
+            popup.document.body.append(namespacedShadowHost);
+            namespacedShadowHost.attachShadow({{ mode: 'open' }}).innerHTML = `<svg xmlns:xlink='http://www.w3.org/1999/xlink'><image xlink:href='{server.BlankPopupResourceUrl}?source=xlink-shadow'/></svg>`;
+            const written = window.open('', '_blank');
+            written.document.write(`<svg xmlns:xlink='http://www.w3.org/1999/xlink'><image xlink:href='{server.BlankPopupResourceUrl}?source=xlink-write'/></svg>`);
+            true";
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1500),
+            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+            beforeCaptureScript: script));
+
+        Assert.NotEmpty(result.PdfBytes);
+        foreach (string source in new[] { "xlink-element", "xlink-shadow", "xlink-write" }) {
+            Assert.Equal(1, server.BlankPopupSourceRequests(source));
+        }
+        foreach (string source in new[] { "sanitized-element", "sanitized-shadow", "sanitized-child" }) Assert.InRange(server.BlankPopupSourceRequests(source), 0, 1);
+        Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
+    }
+
+    [Fact]
     public async Task AdoptedNodesParsedResourcesAndCookiesWaitForHeaderInterception() {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
