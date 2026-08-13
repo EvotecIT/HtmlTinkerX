@@ -11,7 +11,7 @@ Creates a reusable browser profile for rendered web automation sessions.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-New-HtmlBrowserProfile [[-Name] <string>] [-Path <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-Locale <string>] [-Timezone <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-UserAgent <string>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <Int32>] [-PreventSsoAutoSubmit] [-BrowserArgument <string[]>] [-Permission <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+New-HtmlBrowserProfile [[-Name] <string>] [-Path <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-IgnoreHttpsErrors] [-Locale <string>] [-Timezone <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-UserAgent <string>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <Int32>] [-PreventSsoAutoSubmit] [-BrowserArgument <string[]>] [-Permission <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -146,6 +146,22 @@ Chrome DevTools Protocol endpoint URL for attaching to an already-running Chromi
 Type: String
 Parameter Sets: __AllParameterSets
 Aliases: CdpEndpoint, RemoteDebuggingUrl
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IgnoreHttpsErrors
+Ignore HTTPS certificate errors when the profile is used.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
 Possible values:
 
 Required: False

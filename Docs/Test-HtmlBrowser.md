@@ -11,12 +11,12 @@ Tests a URL or local HTML file for network errors, console errors, and performan
 ## SYNTAX
 ### Url
 ```powershell
-Test-HtmlBrowser [-Url] <string> [-Engine <HtmlBrowserEngine>] [-Timeout <int>] [-Headless] [-Proxy <string>] [-ProxyCredential <pscredential>] [-PerformanceOnly] [-ErrorsOnly] [-CssResource <string>] [<CommonParameters>]
+Test-HtmlBrowser [-Url] <string> [-Engine <HtmlBrowserEngine>] [-Timeout <int>] [-Headless] [-Proxy <string>] [-ProxyCredential <pscredential>] [-IgnoreHttpsErrors] [-PerformanceOnly] [-ErrorsOnly] [-CssResource <string>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Test-HtmlBrowser [-Path] <string> [-Engine <HtmlBrowserEngine>] [-Timeout <int>] [-Headless] [-Proxy <string>] [-ProxyCredential <pscredential>] [-PerformanceOnly] [-ErrorsOnly] [-CssResource <string>] [<CommonParameters>]
+Test-HtmlBrowser [-Path] <string> [-Engine <HtmlBrowserEngine>] [-Timeout <int>] [-Headless] [-Proxy <string>] [-ProxyCredential <pscredential>] [-IgnoreHttpsErrors] [-PerformanceOnly] [-ErrorsOnly] [-CssResource <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -82,6 +82,22 @@ Accept wildcard characters: False
 
 ### -Headless
 Enable headless mode.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IgnoreHttpsErrors
+Ignore HTTPS certificate errors.
 
 ```yaml
 Type: SwitchParameter

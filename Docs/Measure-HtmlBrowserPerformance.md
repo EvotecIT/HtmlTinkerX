@@ -11,12 +11,12 @@ Measures page load performance for a URL or local HTML file.
 ## SYNTAX
 ### Url (Default)
 ```powershell
-Measure-HtmlBrowserPerformance [-Url] <string> [-Engine <HtmlBrowserEngine>] [-Headless] [-Timeout <int>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Measure-HtmlBrowserPerformance [-Url] <string> [-Engine <HtmlBrowserEngine>] [-Headless] [-Timeout <int>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-IgnoreHttpsErrors] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Measure-HtmlBrowserPerformance [-Path] <string> [-Engine <HtmlBrowserEngine>] [-Headless] [-Timeout <int>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Measure-HtmlBrowserPerformance [-Path] <string> [-Engine <HtmlBrowserEngine>] [-Headless] [-Timeout <int>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-IgnoreHttpsErrors] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -50,6 +50,22 @@ Accept wildcard characters: False
 
 ### -Headless
 Enable headless mode.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IgnoreHttpsErrors
+Ignore HTTPS certificate errors.
 
 ```yaml
 Type: SwitchParameter

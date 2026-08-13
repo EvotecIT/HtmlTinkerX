@@ -2,7 +2,7 @@
 Module Name: PSParseHTML
 Module Guid: f0387960-7034-4918-a1e1-d5847cbf90df
 Download Help Link: https://github.com/EvotecIT/HtmlTinkerX
-Help Version: 2.2.2
+Help Version: 3.0.0
 Locale: en-US
 ---
 # PSParseHTML Module

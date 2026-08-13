@@ -16,12 +16,12 @@ Save-HtmlBrowserPdf [[-Session] <HtmlBrowserSession>] [-OutFile] <string> [-Slow
 
 ### Default
 ```powershell
-Save-HtmlBrowserPdf [-Url] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Save-HtmlBrowserPdf [-Url] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-IgnoreHttpsErrors] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Save-HtmlBrowserPdf [-Path] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Save-HtmlBrowserPdf [-Path] <string> [-OutFile] <string> [-Browser <HtmlBrowserEngine>] [-Clean] [-ProfilePath <string>] [-Scenario <HtmlBrowserScenario>] [-UserDataDirectory <string>] [-StatePath <string>] [-BrowserChannel <string>] [-Visible] [-IgnoreHttpsErrors] [-Proxy <string>] [-ProxyCredential <pscredential>] [-SlowMo <int>] [-LoadState <HtmlBrowserLoadState>] [-Timeout <int>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-Open] [-Delay <int>] [-Selector <string>] [-MaskSelector <string[]>] [-MaskSensitiveElement] [-MaskColor <string>] [-Landscape] [-PrintBackground] [-Format <PdfPageFormat>] [-Width <string>] [-Height <string>] [-MarginTop <string>] [-MarginRight <string>] [-MarginBottom <string>] [-MarginLeft <string>] [-PageRanges <string>] [-Scale <Single>] [-DisplayHeaderFooter] [-HeaderTemplate <string>] [-FooterTemplate <string>] [-PreferCssPageSize] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -226,6 +226,22 @@ Paper height (e.g. 11in).
 ```yaml
 Type: String
 Parameter Sets: Session, Default, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IgnoreHttpsErrors
+Ignore HTTPS certificate errors for a trusted URL or file source.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Default, File
 Aliases: None
 Possible values:
 
