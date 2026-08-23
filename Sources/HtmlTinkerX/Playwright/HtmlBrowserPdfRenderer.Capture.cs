@@ -361,7 +361,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
             StorageStatePath = _options.StorageStatePath,
             UserAgent = _options.UserAgent,
             Locale = _options.Locale,
-            TimezoneId = _options.Timezone
+            TimezoneId = _options.Timezone,
+            DeviceScaleFactor = _options.DeviceScaleFactor,
+            IsMobile = _options.IsMobile,
+            HasTouch = _options.HasTouch
         };
         if (_options.ViewportWidth.HasValue && _options.ViewportHeight.HasValue) {
             options.ViewportSize = new ViewportSize { Width = _options.ViewportWidth.Value, Height = _options.ViewportHeight.Value };

@@ -290,6 +290,27 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
 
     [Fact]
+    public async Task DeviceEmulationIsAppliedToTheLivePdfCaptureContext() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            userAgent: "OfficeIMO-Mobile-Proof/1.0",
+            viewportWidth: 390,
+            viewportHeight: 844,
+            deviceScaleFactor: 2F,
+            isMobile: true,
+            hasTouch: true));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml("<html><head><meta name='viewport' content='width=device-width'></head><body><p id='proof'></p></body></html>"),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "#proof[data-ready='true']"),
+            beforeCaptureScript: "const p=document.querySelector('#proof'); p.textContent=`vw=${innerWidth};vh=${innerHeight};dpr=${devicePixelRatio};touch=${navigator.maxTouchPoints>0};ua=${navigator.userAgent.includes('OfficeIMO-Mobile-Proof')}`; p.dataset.ready='true';");
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "vw=390;vh=844;dpr=2;touch=true;ua=true");
+        Assert.Empty(result.Diagnostics.Warnings);
+    }
+
+    [Fact]
     public async Task FileCaptureResolvesSiblingResourcesWithinSelectedDirectory() {
         string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-PdfFile-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);

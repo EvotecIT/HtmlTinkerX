@@ -29,6 +29,9 @@ public sealed class HtmlBrowserPdfRendererOptions {
         string? timezone = null,
         int? viewportWidth = 1440,
         int? viewportHeight = 900,
+        float? deviceScaleFactor = null,
+        bool? isMobile = null,
+        bool? hasTouch = null,
         HtmlBrowserNetworkPolicy? networkPolicy = null,
         TimeSpan? setupTimeout = null) {
         if (browser != HtmlBrowserEngine.Chromium) {
@@ -43,6 +46,12 @@ public sealed class HtmlBrowserPdfRendererOptions {
         if (setupTimeout.HasValue && setupTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(setupTimeout));
         if (viewportWidth.HasValue != viewportHeight.HasValue) throw new ArgumentException("Viewport width and height must be provided together.");
         if (viewportWidth <= 0 || viewportHeight <= 0) throw new ArgumentOutOfRangeException(nameof(viewportWidth));
+        if (deviceScaleFactor.HasValue
+            && (deviceScaleFactor.Value <= 0F
+                || float.IsNaN(deviceScaleFactor.Value)
+                || float.IsInfinity(deviceScaleFactor.Value))) {
+            throw new ArgumentOutOfRangeException(nameof(deviceScaleFactor));
+        }
         if (string.IsNullOrWhiteSpace(proxy)
             && (!string.IsNullOrWhiteSpace(proxyUsername) || !string.IsNullOrWhiteSpace(proxyPassword))) {
             throw new ArgumentException("Proxy credentials require a caller-supplied proxy server.", nameof(proxy));
@@ -70,6 +79,9 @@ public sealed class HtmlBrowserPdfRendererOptions {
         Timezone = NormalizeOptional(timezone);
         ViewportWidth = viewportWidth;
         ViewportHeight = viewportHeight;
+        DeviceScaleFactor = deviceScaleFactor;
+        IsMobile = isMobile;
+        HasTouch = hasTouch;
         NetworkPolicy = networkPolicy ?? HtmlBrowserNetworkPolicy.PublicNetworkOnly;
     }
 
@@ -117,6 +129,12 @@ public sealed class HtmlBrowserPdfRendererOptions {
     public int? ViewportWidth { get; }
     /// <summary>Gets the context viewport height.</summary>
     public int? ViewportHeight { get; }
+    /// <summary>Gets the browser-context device pixel ratio.</summary>
+    public float? DeviceScaleFactor { get; }
+    /// <summary>Gets whether the browser context emulates mobile layout behavior.</summary>
+    public bool? IsMobile { get; }
+    /// <summary>Gets whether the browser context exposes touch input.</summary>
+    public bool? HasTouch { get; }
     /// <summary>Gets the resource access policy enforced for every capture.</summary>
     public HtmlBrowserNetworkPolicy NetworkPolicy { get; }
 

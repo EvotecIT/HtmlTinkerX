@@ -233,6 +233,29 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task RendererOptionsApplyBoundedDeviceEmulationToEveryIsolatedContext() {
+        HtmlBrowserPdfRendererOptions options = new(
+            viewportWidth: 390,
+            viewportHeight: 844,
+            deviceScaleFactor: 3F,
+            isMobile: true,
+            hasTouch: true,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed());
+        await using HtmlBrowserPdfRenderer renderer = new(options);
+
+        BrowserNewContextOptions context = renderer.CreateContextOptions(
+            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromHtml("<p>device</p>")));
+
+        Assert.Equal(390, context.ViewportSize!.Width);
+        Assert.Equal(844, context.ViewportSize.Height);
+        Assert.Equal(3F, context.DeviceScaleFactor);
+        Assert.True(context.IsMobile);
+        Assert.True(context.HasTouch);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(deviceScaleFactor: 0F));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(deviceScaleFactor: float.NaN));
+    }
+
+    [Fact]
     public void ManagedPolicyProxyDisablesTrafficThatCanBypassHttpConnect() {
         HtmlBrowserLaunchOptions protectedLaunch = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
         HtmlBrowserLaunchOptions unrestrictedLaunch = new HtmlBrowserPdfRendererOptions(
