@@ -294,6 +294,18 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task OfflinePolicyAllowsInMemorySourcesButBlocksEveryNetworkScheme() {
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.Offline,
+            _ => throw new InvalidOperationException("Offline policy must not resolve DNS."));
+
+        Assert.True(await evaluator.IsAllowedAsync("about:blank", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("data:text/plain,offline", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("https://example.com/report", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("wss://example.com/events", null, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SelectedFileDirectoryAllowsSiblingResourcesButNotTraversal() {
         string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-PdfPolicy-" + Guid.NewGuid().ToString("N"));
         string sibling = Path.Combine(root, "assets", "style.css");

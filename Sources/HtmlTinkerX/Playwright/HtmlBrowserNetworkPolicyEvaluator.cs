@@ -78,7 +78,8 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     }
 
     private bool IsNetworkUriAllowedByTrustedProxy(Uri uri) {
-        if (!_policy.AllowPrivateNetworks
+        if (!_policy.AllowNetworkAccess
+            || !_policy.AllowPrivateNetworks
             || _policy.AllowedHosts.Count > 0
             || _policy.DeniedHosts.Count > 0) return false;
         return _policy.AllowUriCredentials || string.IsNullOrEmpty(uri.UserInfo);
@@ -88,6 +89,7 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         (await ResolveAllowedAddressesAsync(uri, cancellationToken).ConfigureAwait(false)).Length > 0;
 
     internal async Task<IPAddress[]> ResolveAllowedAddressesAsync(Uri uri, CancellationToken cancellationToken) {
+        if (!_policy.AllowNetworkAccess) return Array.Empty<IPAddress>();
         if (!_policy.AllowUriCredentials && !string.IsNullOrEmpty(uri.UserInfo)) return Array.Empty<IPAddress>();
 
         string host = uri.IdnHost.TrimEnd('.').ToLowerInvariant();
