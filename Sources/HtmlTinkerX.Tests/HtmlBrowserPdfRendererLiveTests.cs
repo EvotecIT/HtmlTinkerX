@@ -318,16 +318,19 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: HtmlBrowserNetworkPolicy.Offline));
         HtmlBrowserPdfRequest request = new(
             HtmlBrowserPdfSource.FromHtml(
-                "<html><body><img src='/blocked.png'><p id='proof'>offline origin</p></body></html>",
+                "<html><body><img src='/blocked.png'><p id='proof'>network proof 123</p><script>fetch(location.href).then(() => document.querySelector('#proof').dataset.failed = 'true').catch(() => document.querySelector('#proof').dataset.ready = 'true');</script></body></html>",
                 new Uri("https://offline.example/report")),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "#proof"));
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "#proof[data-ready='true']"),
+            headers: new System.Collections.Generic.Dictionary<string, string> { ["X-Render-Token"] = "offline" });
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
 
-        AssertPdfContains(result.PdfBytes, "offline origin");
+        AssertPdfContains(result.PdfBytes, "network proof 123");
         Assert.True(result.Diagnostics.BlockedRequestCount > 0);
         Assert.Contains(result.Diagnostics.BlockedRequests, value =>
             value.StartsWith("https://offline.example/blocked.png", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics.BlockedRequests, value =>
+            value.StartsWith("https://offline.example/report", StringComparison.Ordinal));
     }
 
     [Fact]

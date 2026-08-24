@@ -63,6 +63,17 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task LocallyFulfilledHtmlStillRejectsUriCredentialsByDefault() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            networkPolicy: HtmlBrowserNetworkPolicy.Offline));
+        HtmlBrowserPdfRequest request = new(HtmlBrowserPdfSource.FromHtml(
+            "<p>credential boundary</p>",
+            new Uri("https://user:secret@offline.example/report")));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => renderer.CaptureAsync(request));
+    }
+
+    [Fact]
     public void PublicNetworkEnforcementRejectsCallerProxyWhoseDnsCannotBeBound() {
         Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(
             new HtmlBrowserPdfRendererOptions(proxy: "http://proxy.example:8080")));

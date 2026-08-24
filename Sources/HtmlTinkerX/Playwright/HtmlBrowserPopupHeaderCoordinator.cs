@@ -108,6 +108,9 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
 
     private async Task AttachAsync(IPage page) {
         HtmlBrowserScopedHeaderInterceptor interceptor;
+        Func<string, bool, Task<bool>>? popupRequestAllowed = _requestAllowed == null
+            ? null
+            : (url, _) => _requestAllowed(url);
         try {
             interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
                 _context,
@@ -117,7 +120,7 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
                 _cancellationToken,
                 _cleanupTimedOut,
                 _cleanupTimeout,
-                _requestAllowed,
+                popupRequestAllowed,
                 _requestBlocked).ConfigureAwait(false);
         } catch (Exception) when (page.IsClosed) {
             return;
