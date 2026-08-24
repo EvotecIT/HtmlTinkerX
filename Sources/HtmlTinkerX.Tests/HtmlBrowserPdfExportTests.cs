@@ -191,7 +191,7 @@ public class HtmlBrowserPdfExportTests {
             new Uri("https://example.test"),
             new Dictionary<string, string>(),
             CancellationToken.None,
-            requestAllowed: _ => Task.FromResult(false),
+            requestAllowed: (_, _) => Task.FromResult(false),
             requestBlocked: (_, topLevel) => {
                 blockedDocuments.Add(topLevel);
                 if (blockedDocuments.Count == 2) callbacksCompleted.TrySetResult(true);

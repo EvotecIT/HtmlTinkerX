@@ -14,7 +14,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
-public sealed class HtmlBrowserPdfRendererContractTests {
+public sealed partial class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public void ChromiumCookieExpirationRetainsUnixSecondPrecision() {
         const long expiration = 4102444801;
@@ -233,6 +233,30 @@ public sealed class HtmlBrowserPdfRendererContractTests {
     }
 
     [Fact]
+    public async Task RendererOptionsApplyBoundedDeviceEmulationToEveryIsolatedContext() {
+        HtmlBrowserPdfRendererOptions options = new(
+            new HtmlBrowserPdfDeviceEmulation(
+                deviceScaleFactor: 3F,
+                isMobile: true,
+                hasTouch: true),
+            viewportWidth: 390,
+            viewportHeight: 844,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed());
+        await using HtmlBrowserPdfRenderer renderer = new(options);
+
+        BrowserNewContextOptions context = renderer.CreateContextOptions(
+            new HtmlBrowserPdfRequest(HtmlBrowserPdfSource.FromHtml("<p>device</p>")));
+
+        Assert.Equal(390, context.ViewportSize!.Width);
+        Assert.Equal(844, context.ViewportSize.Height);
+        Assert.Equal(3F, context.DeviceScaleFactor);
+        Assert.True(context.IsMobile);
+        Assert.True(context.HasTouch);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfDeviceEmulation(deviceScaleFactor: 0F));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfDeviceEmulation(deviceScaleFactor: float.NaN));
+    }
+
+    [Fact]
     public void ManagedPolicyProxyDisablesTrafficThatCanBypassHttpConnect() {
         HtmlBrowserLaunchOptions protectedLaunch = new HtmlBrowserPdfRendererOptions().CreateLaunchOptions();
         HtmlBrowserLaunchOptions unrestrictedLaunch = new HtmlBrowserPdfRendererOptions(
@@ -268,6 +292,18 @@ public sealed class HtmlBrowserPdfRendererContractTests {
 
         Assert.False(await publicOnly.IsAllowedAsync("http://127.0.0.1/report", null, CancellationToken.None));
         Assert.True(await allowListed.IsAllowedAsync("http://127.0.0.1/report", null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task OfflinePolicyAllowsInMemorySourcesButBlocksEveryNetworkScheme() {
+        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+            HtmlBrowserNetworkPolicy.Offline,
+            _ => throw new InvalidOperationException("Offline policy must not resolve DNS."));
+
+        Assert.True(await evaluator.IsAllowedAsync("about:blank", null, CancellationToken.None));
+        Assert.True(await evaluator.IsAllowedAsync("data:text/plain,offline", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("https://example.com/report", null, CancellationToken.None));
+        Assert.False(await evaluator.IsAllowedAsync("wss://example.com/events", null, CancellationToken.None));
     }
 
     [Fact]
@@ -951,45 +987,4 @@ public sealed class HtmlBrowserPdfRendererContractTests {
             new Uri("file://server/share/report.html")));
     }
 
-    [Fact]
-    public void PublicNetworkEnforcementRejectsCallerProxyWhoseDnsCannotBeBound() {
-        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(new HtmlBrowserPdfRendererOptions(proxy: "http://proxy.example:8080")));
-    }
-
-    [Fact]
-    public async Task TrustedCallerProxyCanResolveHostsUnavailableToTheRenderer() {
-        int resolverCalls = 0;
-        HtmlBrowserNetworkPolicyEvaluator evaluator = new(
-            new HtmlBrowserNetworkPolicy(allowPrivateNetworks: true),
-            _ => {
-                Interlocked.Increment(ref resolverCalls);
-                throw new SocketException((int)SocketError.HostNotFound);
-            });
-
-        bool allowed = await evaluator.IsAllowedAsync(
-            "http://renderer.proxy-only.invalid/report",
-            selectedFileDirectory: null,
-            deferNetworkResolutionToProxy: true,
-            CancellationToken.None);
-
-        Assert.True(allowed);
-        Assert.Equal(0, resolverCalls);
-    }
-
-    [Fact]
-    public void HostRulesRejectCallerProxyBecauseWebSocketTunnelsCannotBeEnforced() {
-        HtmlBrowserNetworkPolicy policy = new(
-            allowPrivateNetworks: true,
-            deniedHosts: new[] { "internal.example" });
-
-        Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(new HtmlBrowserPdfRendererOptions(
-            proxy: "http://proxy.example:8080",
-            networkPolicy: policy)));
-    }
-
-    [Fact]
-    public void BrowserSessionsAndPooledRendererValidateHttpsByDefault() {
-        Assert.False(new HtmlBrowserLaunchOptions().IgnoreHTTPSErrors);
-        Assert.False(new HtmlBrowserPdfRendererOptions().IgnoreHttpsErrors);
-    }
 }

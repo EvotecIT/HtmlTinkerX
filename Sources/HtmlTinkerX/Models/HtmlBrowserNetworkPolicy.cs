@@ -19,12 +19,34 @@ public sealed class HtmlBrowserNetworkPolicy {
         IEnumerable<string>? deniedHosts = null,
         IEnumerable<string>? allowedFileDirectories = null,
         int blockedRequestDiagnosticLimit = 32,
-        IEnumerable<string>? nat64Prefixes = null) {
+        IEnumerable<string>? nat64Prefixes = null)
+        : this(
+            allowPrivateNetworks,
+            allowFileAccess,
+            allowUriCredentials,
+            allowedHosts,
+            deniedHosts,
+            allowedFileDirectories,
+            blockedRequestDiagnosticLimit,
+            nat64Prefixes,
+            allowNetworkAccess: true) { }
+
+    private HtmlBrowserNetworkPolicy(
+        bool allowPrivateNetworks,
+        bool allowFileAccess,
+        bool allowUriCredentials,
+        IEnumerable<string>? allowedHosts,
+        IEnumerable<string>? deniedHosts,
+        IEnumerable<string>? allowedFileDirectories,
+        int blockedRequestDiagnosticLimit,
+        IEnumerable<string>? nat64Prefixes,
+        bool allowNetworkAccess) {
         if (blockedRequestDiagnosticLimit < 0) {
             throw new ArgumentOutOfRangeException(nameof(blockedRequestDiagnosticLimit));
         }
 
         AllowPrivateNetworks = allowPrivateNetworks;
+        AllowNetworkAccess = allowNetworkAccess;
         AllowFileAccess = allowFileAccess;
         AllowUriCredentials = allowUriCredentials;
         AllowedHosts = SnapshotHosts(allowedHosts);
@@ -48,11 +70,25 @@ public sealed class HtmlBrowserNetworkPolicy {
     /// <summary>Gets a public-network-only policy suitable for service boundaries.</summary>
     public static HtmlBrowserNetworkPolicy PublicNetworkOnly { get; } = new();
 
+    /// <summary>Gets a policy that blocks every HTTP(S) and WebSocket request while retaining in-memory sources.</summary>
+    public static HtmlBrowserNetworkPolicy Offline { get; } = new(
+        allowPrivateNetworks: false,
+        allowFileAccess: false,
+        allowUriCredentials: false,
+        allowedHosts: null,
+        deniedHosts: null,
+        allowedFileDirectories: null,
+        blockedRequestDiagnosticLimit: 32,
+        nat64Prefixes: null,
+        allowNetworkAccess: false);
+
     /// <summary>Creates a policy that permits private network targets while retaining URI/file checks.</summary>
     public static HtmlBrowserNetworkPolicy CreatePrivateNetworkAllowed() => new(allowPrivateNetworks: true);
 
     /// <summary>Gets whether private, loopback, link-local, and otherwise non-public IP addresses are allowed.</summary>
     public bool AllowPrivateNetworks { get; }
+    /// <summary>Gets whether HTTP(S) and WebSocket requests are allowed at all.</summary>
+    public bool AllowNetworkAccess { get; }
     /// <summary>Gets whether local file resources outside the explicitly selected input file directory are allowed.</summary>
     public bool AllowFileAccess { get; }
     /// <summary>Gets whether user information embedded in a URI is allowed.</summary>

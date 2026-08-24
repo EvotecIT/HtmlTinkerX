@@ -186,7 +186,19 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 RecordBlockedRequest(route.Request.Url);
                 await route.AbortAsync("blockedbyclient").ConfigureAwait(false);
             };
-            Func<string, Task<bool>> headerPolicy = url => policy.IsAllowedAsync(
+            Uri? locallyFulfilledDocumentUri = request.Source.Kind == HtmlBrowserPdfSourceKind.Html
+                && request.Source.SecurityOrigin != null
+                    ? request.Source.HtmlDocumentUri
+                    : null;
+            Func<string, bool, Task<bool>> headerPolicy = (url, topLevelDocument) =>
+                topLevelDocument && IsSameDocumentUrl(locallyFulfilledDocumentUri, url)
+                    ? Task.FromResult(true)
+                    : policy.IsAllowedAsync(
+                        url,
+                        selectedFileDirectory,
+                        _options.ProxyOwnsNetworkResolution,
+                        cancellationToken);
+            Func<string, Task<bool>> popupHeaderPolicy = url => policy.IsAllowedAsync(
                 url,
                 selectedFileDirectory,
                 _options.ProxyOwnsNetworkResolution,
@@ -239,7 +251,7 @@ public sealed partial class HtmlBrowserPdfRenderer {
                         request.Headers,
                         cancellationToken,
                         slot.MarkBroken,
-                        requestAllowed: headerPolicy,
+                        requestAllowed: popupHeaderPolicy,
                         requestBlocked: (url, _) => RecordBlockedRequest(url));
                 if (popupCoordinator != null) {
                     await ExecuteCancellablePageOperationAsync(
@@ -361,7 +373,10 @@ public sealed partial class HtmlBrowserPdfRenderer {
             StorageStatePath = _options.StorageStatePath,
             UserAgent = _options.UserAgent,
             Locale = _options.Locale,
-            TimezoneId = _options.Timezone
+            TimezoneId = _options.Timezone,
+            DeviceScaleFactor = _options.DeviceScaleFactor,
+            IsMobile = _options.IsMobile,
+            HasTouch = _options.HasTouch
         };
         if (_options.ViewportWidth.HasValue && _options.ViewportHeight.HasValue) {
             options.ViewportSize = new ViewportSize { Width = _options.ViewportWidth.Value, Height = _options.ViewportHeight.Value };
@@ -390,10 +405,22 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new FileNotFoundException("HTML input file was not found.", source.FilePath);
             }
         }
-        if (target != null && !await policy.IsAllowedAsync(target, fileDirectory, deferNetworkResolutionToProxy, cancellationToken).ConfigureAwait(false)) {
-            throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target)}'.");
+        if (target != null) {
+            bool locallyFulfilledHttpDocument = source.Kind == HtmlBrowserPdfSourceKind.Html
+                && source.SecurityOrigin != null;
+            bool allowed = locallyFulfilledHttpDocument
+                ? policy.AreUriCredentialsAllowed(new Uri(target))
+                : await policy.IsAllowedAsync(target, fileDirectory, deferNetworkResolutionToProxy, cancellationToken).ConfigureAwait(false);
+            if (!allowed) {
+                throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target)}'.");
+            }
         }
     }
+
+    private static bool IsSameDocumentUrl(Uri? expected, string candidate) =>
+        expected != null
+        && Uri.TryCreate(candidate, UriKind.Absolute, out Uri? candidateUri)
+        && expected.Equals(candidateUri);
 
     private static async Task LoadSourceAsync(IPage page, HtmlBrowserPdfSource source, int timeout, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();

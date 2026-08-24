@@ -30,7 +30,60 @@ public sealed class HtmlBrowserPdfRendererOptions {
         int? viewportWidth = 1440,
         int? viewportHeight = 900,
         HtmlBrowserNetworkPolicy? networkPolicy = null,
+        TimeSpan? setupTimeout = null)
+        : this(
+            new HtmlBrowserPdfDeviceEmulation(),
+            browser,
+            minimumBrowserInstances,
+            maximumBrowserInstances,
+            maximumQueuedCaptures,
+            maximumRendersPerBrowser,
+            maximumBrowserAge,
+            headless,
+            ignoreHttpsErrors,
+            browserChannel,
+            browserExecutablePath,
+            browserArguments,
+            chromiumSandbox,
+            proxy,
+            proxyUsername,
+            proxyPassword,
+            storageStatePath,
+            userAgent,
+            locale,
+            timezone,
+            viewportWidth,
+            viewportHeight,
+            networkPolicy,
+            setupTimeout) { }
+
+    /// <summary>Initializes renderer options with explicit browser device emulation.</summary>
+    public HtmlBrowserPdfRendererOptions(
+        HtmlBrowserPdfDeviceEmulation deviceEmulation,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        int minimumBrowserInstances = 0,
+        int maximumBrowserInstances = 2,
+        int maximumQueuedCaptures = 32,
+        int maximumRendersPerBrowser = 250,
+        TimeSpan? maximumBrowserAge = null,
+        bool headless = true,
+        bool ignoreHttpsErrors = false,
+        string? browserChannel = null,
+        string? browserExecutablePath = null,
+        IEnumerable<string>? browserArguments = null,
+        bool? chromiumSandbox = null,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null,
+        string? storageStatePath = null,
+        string? userAgent = null,
+        string? locale = null,
+        string? timezone = null,
+        int? viewportWidth = 1440,
+        int? viewportHeight = 900,
+        HtmlBrowserNetworkPolicy? networkPolicy = null,
         TimeSpan? setupTimeout = null) {
+        if (deviceEmulation == null) throw new ArgumentNullException(nameof(deviceEmulation));
         if (browser != HtmlBrowserEngine.Chromium) {
             throw new NotSupportedException("Browser PDF capture is supported only by Chromium. Firefox and WebKit requests must use a non-PDF browser capability.");
         }
@@ -70,6 +123,9 @@ public sealed class HtmlBrowserPdfRendererOptions {
         Timezone = NormalizeOptional(timezone);
         ViewportWidth = viewportWidth;
         ViewportHeight = viewportHeight;
+        DeviceScaleFactor = deviceEmulation.DeviceScaleFactor;
+        IsMobile = deviceEmulation.IsMobile;
+        HasTouch = deviceEmulation.HasTouch;
         NetworkPolicy = networkPolicy ?? HtmlBrowserNetworkPolicy.PublicNetworkOnly;
     }
 
@@ -117,17 +173,25 @@ public sealed class HtmlBrowserPdfRendererOptions {
     public int? ViewportWidth { get; }
     /// <summary>Gets the context viewport height.</summary>
     public int? ViewportHeight { get; }
+    /// <summary>Gets the browser-context device pixel ratio.</summary>
+    public float? DeviceScaleFactor { get; }
+    /// <summary>Gets whether the browser context emulates mobile layout behavior.</summary>
+    public bool? IsMobile { get; }
+    /// <summary>Gets whether the browser context exposes touch input.</summary>
+    public bool? HasTouch { get; }
     /// <summary>Gets the resource access policy enforced for every capture.</summary>
     public HtmlBrowserNetworkPolicy NetworkPolicy { get; }
 
     internal bool RequiresManagedPolicyProxy =>
         string.IsNullOrWhiteSpace(Proxy)
-        && (!NetworkPolicy.AllowPrivateNetworks
+        && (!NetworkPolicy.AllowNetworkAccess
+            || !NetworkPolicy.AllowPrivateNetworks
             || NetworkPolicy.AllowedHosts.Count > 0
             || NetworkPolicy.DeniedHosts.Count > 0);
 
     internal bool ProxyOwnsNetworkResolution =>
         !string.IsNullOrWhiteSpace(Proxy)
+        && NetworkPolicy.AllowNetworkAccess
         && NetworkPolicy.AllowPrivateNetworks
         && NetworkPolicy.AllowedHosts.Count == 0
         && NetworkPolicy.DeniedHosts.Count == 0;

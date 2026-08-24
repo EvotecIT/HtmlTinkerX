@@ -25,7 +25,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly EventHandler<JsonElement?> _targetDetachedHandler;
     private readonly TimeSpan _cleanupTimeout;
     private readonly Action _cleanupTimedOut;
-    private readonly Func<string, Task<bool>>? _requestAllowed;
+    private readonly Func<string, bool, Task<bool>>? _requestAllowed;
     private readonly Action<string, bool>? _requestBlocked;
     private readonly string? _mainFrameId;
     private Exception? _failure;
@@ -39,7 +39,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         IReadOnlyDictionary<string, string> captureHeaders,
         TimeSpan? cleanupTimeout = null,
         Action? cleanupTimedOut = null,
-        Func<string, Task<bool>>? requestAllowed = null,
+        Func<string, bool, Task<bool>>? requestAllowed = null,
         Action<string, bool>? requestBlocked = null,
         string? mainFrameId = null) {
         _session = session;
@@ -64,7 +64,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         CancellationToken cancellationToken,
         Action? cleanupTimedOut = null,
         TimeSpan? cleanupTimeout = null,
-        Func<string, Task<bool>>? requestAllowed = null,
+        Func<string, bool, Task<bool>>? requestAllowed = null,
         Action<string, bool>? requestBlocked = null) {
         cancellationToken.ThrowIfCancellationRequested();
         ICDPSession session = await context.NewCDPSessionAsync(page).ConfigureAwait(false);
@@ -257,12 +257,12 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try {
             JsonElement request = payload.GetProperty("request");
             string url = request.GetProperty("url").GetString()!;
-            if (_requestAllowed != null && !await _requestAllowed(url).ConfigureAwait(false)) {
-                bool documentRequest = payload.TryGetProperty("resourceType", out JsonElement resourceType)
-                    && string.Equals(resourceType.GetString(), "Document", StringComparison.OrdinalIgnoreCase);
-                bool topLevelDocument = documentRequest
-                    && payload.TryGetProperty("frameId", out JsonElement frameId)
-                    && string.Equals(frameId.GetString(), _mainFrameId, StringComparison.Ordinal);
+            bool documentRequest = payload.TryGetProperty("resourceType", out JsonElement resourceType)
+                && string.Equals(resourceType.GetString(), "Document", StringComparison.OrdinalIgnoreCase);
+            bool topLevelDocument = documentRequest
+                && payload.TryGetProperty("frameId", out JsonElement frameId)
+                && string.Equals(frameId.GetString(), _mainFrameId, StringComparison.Ordinal);
+            if (_requestAllowed != null && !await _requestAllowed(url, topLevelDocument).ConfigureAwait(false)) {
                 _requestBlocked?.Invoke(url, topLevelDocument);
                 if (documentRequest) {
                     await SendCommandAsync(workerSessionPath, "Fetch.fulfillRequest", new Dictionary<string, object> {

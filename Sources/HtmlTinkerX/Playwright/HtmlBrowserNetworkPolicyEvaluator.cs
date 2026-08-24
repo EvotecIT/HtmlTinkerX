@@ -78,17 +78,19 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     }
 
     private bool IsNetworkUriAllowedByTrustedProxy(Uri uri) {
-        if (!_policy.AllowPrivateNetworks
+        if (!_policy.AllowNetworkAccess
+            || !_policy.AllowPrivateNetworks
             || _policy.AllowedHosts.Count > 0
             || _policy.DeniedHosts.Count > 0) return false;
-        return _policy.AllowUriCredentials || string.IsNullOrEmpty(uri.UserInfo);
+        return AreUriCredentialsAllowed(uri);
     }
 
     private async Task<bool> IsNetworkUriAllowedAsync(Uri uri, CancellationToken cancellationToken) =>
         (await ResolveAllowedAddressesAsync(uri, cancellationToken).ConfigureAwait(false)).Length > 0;
 
     internal async Task<IPAddress[]> ResolveAllowedAddressesAsync(Uri uri, CancellationToken cancellationToken) {
-        if (!_policy.AllowUriCredentials && !string.IsNullOrEmpty(uri.UserInfo)) return Array.Empty<IPAddress>();
+        if (!_policy.AllowNetworkAccess) return Array.Empty<IPAddress>();
+        if (!AreUriCredentialsAllowed(uri)) return Array.Empty<IPAddress>();
 
         string host = uri.IdnHost.TrimEnd('.').ToLowerInvariant();
         if (MatchesHost(host, _policy.DeniedHosts)) return Array.Empty<IPAddress>();
@@ -125,6 +127,9 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
             ? addresses
             : Array.Empty<IPAddress>();
     }
+
+    internal bool AreUriCredentialsAllowed(Uri uri) =>
+        _policy.AllowUriCredentials || string.IsNullOrEmpty(uri.UserInfo);
 
     private DnsCacheEntry GetOrRefreshDnsEntry(string host) {
         lock (_dnsSync) {
