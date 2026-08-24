@@ -393,7 +393,11 @@ public sealed partial class HtmlBrowserPdfRenderer {
                 throw new FileNotFoundException("HTML input file was not found.", source.FilePath);
             }
         }
-        if (target != null && !await policy.IsAllowedAsync(target, fileDirectory, deferNetworkResolutionToProxy, cancellationToken).ConfigureAwait(false)) {
+        bool locallyFulfilledHttpDocument = source.Kind == HtmlBrowserPdfSourceKind.Html
+            && source.SecurityOrigin != null;
+        if (target != null
+            && !locallyFulfilledHttpDocument
+            && !await policy.IsAllowedAsync(target, fileDirectory, deferNetworkResolutionToProxy, cancellationToken).ConfigureAwait(false)) {
             throw new UnauthorizedAccessException($"Browser resource policy blocked the capture source '{SanitizeUri(target)}'.");
         }
     }

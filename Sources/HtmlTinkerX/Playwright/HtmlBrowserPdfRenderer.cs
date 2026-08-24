@@ -42,8 +42,9 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     public HtmlBrowserPdfRenderer(HtmlBrowserPdfRendererOptions? options = null) {
         _options = options ?? new HtmlBrowserPdfRendererOptions();
         _networkPolicy = new HtmlBrowserNetworkPolicyEvaluator(_options.NetworkPolicy);
-        if (!_options.NetworkPolicy.AllowPrivateNetworks && !string.IsNullOrWhiteSpace(_options.Proxy)) {
-            throw new ArgumentException("A caller-supplied proxy cannot be combined with public-network-only enforcement because HtmlTinkerX cannot bind the proxy's DNS decision to the remote socket. Enable private-network access explicitly when the trusted proxy owns that boundary.", nameof(options));
+        if ((!_options.NetworkPolicy.AllowNetworkAccess || !_options.NetworkPolicy.AllowPrivateNetworks)
+            && !string.IsNullOrWhiteSpace(_options.Proxy)) {
+            throw new ArgumentException("A caller-supplied proxy cannot be combined with offline or public-network-only enforcement because HtmlTinkerX cannot enforce that boundary through the caller's proxy. Enable private-network access explicitly only when the trusted proxy owns network enforcement.", nameof(options));
         }
         if (!string.IsNullOrWhiteSpace(_options.Proxy)
             && (_options.NetworkPolicy.AllowedHosts.Count > 0 || _options.NetworkPolicy.DeniedHosts.Count > 0)) {

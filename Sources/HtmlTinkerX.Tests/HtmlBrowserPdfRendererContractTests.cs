@@ -235,11 +235,12 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public async Task RendererOptionsApplyBoundedDeviceEmulationToEveryIsolatedContext() {
         HtmlBrowserPdfRendererOptions options = new(
+            new HtmlBrowserPdfDeviceEmulation(
+                deviceScaleFactor: 3F,
+                isMobile: true,
+                hasTouch: true),
             viewportWidth: 390,
             viewportHeight: 844,
-            deviceScaleFactor: 3F,
-            isMobile: true,
-            hasTouch: true,
             networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed());
         await using HtmlBrowserPdfRenderer renderer = new(options);
 
@@ -251,8 +252,8 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(3F, context.DeviceScaleFactor);
         Assert.True(context.IsMobile);
         Assert.True(context.HasTouch);
-        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(deviceScaleFactor: 0F));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfRendererOptions(deviceScaleFactor: float.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfDeviceEmulation(deviceScaleFactor: 0F));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HtmlBrowserPdfDeviceEmulation(deviceScaleFactor: float.NaN));
     }
 
     [Fact]

@@ -292,13 +292,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task DeviceEmulationIsAppliedToTheLivePdfCaptureContext() {
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            new HtmlBrowserPdfDeviceEmulation(
+                deviceScaleFactor: 2F,
+                isMobile: true,
+                hasTouch: true),
             maximumBrowserInstances: 1,
             userAgent: "OfficeIMO-Mobile-Proof/1.0",
             viewportWidth: 390,
-            viewportHeight: 844,
-            deviceScaleFactor: 2F,
-            isMobile: true,
-            hasTouch: true));
+            viewportHeight: 844));
         HtmlBrowserPdfRequest request = new(
             HtmlBrowserPdfSource.FromHtml("<html><head><meta name='viewport' content='width=device-width'></head><body><p id='proof'></p></body></html>"),
             readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "#proof[data-ready='true']"),
@@ -308,6 +309,25 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         AssertPdfContains(result.PdfBytes, "vw=390;vh=844;dpr=2;touch=true;ua=true");
         Assert.Empty(result.Diagnostics.Warnings);
+    }
+
+    [Fact]
+    public async Task OfflinePolicyFulfillsAnInMemoryDocumentAtItsHttpOriginButBlocksResources() {
+        await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.Offline));
+        HtmlBrowserPdfRequest request = new(
+            HtmlBrowserPdfSource.FromHtml(
+                "<html><body><img src='/blocked.png'><p id='proof'>offline origin</p></body></html>",
+                new Uri("https://offline.example/report")),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, selector: "#proof"));
+
+        HtmlBrowserPdfResult result = await renderer.CaptureAsync(request);
+
+        AssertPdfContains(result.PdfBytes, "offline origin");
+        Assert.True(result.Diagnostics.BlockedRequestCount > 0);
+        Assert.Contains(result.Diagnostics.BlockedRequests, value =>
+            value.StartsWith("https://offline.example/blocked.png", StringComparison.Ordinal));
     }
 
     [Fact]

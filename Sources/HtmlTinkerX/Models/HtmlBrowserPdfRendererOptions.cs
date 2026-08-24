@@ -29,11 +29,61 @@ public sealed class HtmlBrowserPdfRendererOptions {
         string? timezone = null,
         int? viewportWidth = 1440,
         int? viewportHeight = 900,
-        float? deviceScaleFactor = null,
-        bool? isMobile = null,
-        bool? hasTouch = null,
+        HtmlBrowserNetworkPolicy? networkPolicy = null,
+        TimeSpan? setupTimeout = null)
+        : this(
+            new HtmlBrowserPdfDeviceEmulation(),
+            browser,
+            minimumBrowserInstances,
+            maximumBrowserInstances,
+            maximumQueuedCaptures,
+            maximumRendersPerBrowser,
+            maximumBrowserAge,
+            headless,
+            ignoreHttpsErrors,
+            browserChannel,
+            browserExecutablePath,
+            browserArguments,
+            chromiumSandbox,
+            proxy,
+            proxyUsername,
+            proxyPassword,
+            storageStatePath,
+            userAgent,
+            locale,
+            timezone,
+            viewportWidth,
+            viewportHeight,
+            networkPolicy,
+            setupTimeout) { }
+
+    /// <summary>Initializes renderer options with explicit browser device emulation.</summary>
+    public HtmlBrowserPdfRendererOptions(
+        HtmlBrowserPdfDeviceEmulation deviceEmulation,
+        HtmlBrowserEngine browser = HtmlBrowserEngine.Chromium,
+        int minimumBrowserInstances = 0,
+        int maximumBrowserInstances = 2,
+        int maximumQueuedCaptures = 32,
+        int maximumRendersPerBrowser = 250,
+        TimeSpan? maximumBrowserAge = null,
+        bool headless = true,
+        bool ignoreHttpsErrors = false,
+        string? browserChannel = null,
+        string? browserExecutablePath = null,
+        IEnumerable<string>? browserArguments = null,
+        bool? chromiumSandbox = null,
+        string? proxy = null,
+        string? proxyUsername = null,
+        string? proxyPassword = null,
+        string? storageStatePath = null,
+        string? userAgent = null,
+        string? locale = null,
+        string? timezone = null,
+        int? viewportWidth = 1440,
+        int? viewportHeight = 900,
         HtmlBrowserNetworkPolicy? networkPolicy = null,
         TimeSpan? setupTimeout = null) {
+        if (deviceEmulation == null) throw new ArgumentNullException(nameof(deviceEmulation));
         if (browser != HtmlBrowserEngine.Chromium) {
             throw new NotSupportedException("Browser PDF capture is supported only by Chromium. Firefox and WebKit requests must use a non-PDF browser capability.");
         }
@@ -46,12 +96,6 @@ public sealed class HtmlBrowserPdfRendererOptions {
         if (setupTimeout.HasValue && setupTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(setupTimeout));
         if (viewportWidth.HasValue != viewportHeight.HasValue) throw new ArgumentException("Viewport width and height must be provided together.");
         if (viewportWidth <= 0 || viewportHeight <= 0) throw new ArgumentOutOfRangeException(nameof(viewportWidth));
-        if (deviceScaleFactor.HasValue
-            && (deviceScaleFactor.Value <= 0F
-                || float.IsNaN(deviceScaleFactor.Value)
-                || float.IsInfinity(deviceScaleFactor.Value))) {
-            throw new ArgumentOutOfRangeException(nameof(deviceScaleFactor));
-        }
         if (string.IsNullOrWhiteSpace(proxy)
             && (!string.IsNullOrWhiteSpace(proxyUsername) || !string.IsNullOrWhiteSpace(proxyPassword))) {
             throw new ArgumentException("Proxy credentials require a caller-supplied proxy server.", nameof(proxy));
@@ -79,9 +123,9 @@ public sealed class HtmlBrowserPdfRendererOptions {
         Timezone = NormalizeOptional(timezone);
         ViewportWidth = viewportWidth;
         ViewportHeight = viewportHeight;
-        DeviceScaleFactor = deviceScaleFactor;
-        IsMobile = isMobile;
-        HasTouch = hasTouch;
+        DeviceScaleFactor = deviceEmulation.DeviceScaleFactor;
+        IsMobile = deviceEmulation.IsMobile;
+        HasTouch = deviceEmulation.HasTouch;
         NetworkPolicy = networkPolicy ?? HtmlBrowserNetworkPolicy.PublicNetworkOnly;
     }
 
@@ -140,12 +184,14 @@ public sealed class HtmlBrowserPdfRendererOptions {
 
     internal bool RequiresManagedPolicyProxy =>
         string.IsNullOrWhiteSpace(Proxy)
-        && (!NetworkPolicy.AllowPrivateNetworks
+        && (!NetworkPolicy.AllowNetworkAccess
+            || !NetworkPolicy.AllowPrivateNetworks
             || NetworkPolicy.AllowedHosts.Count > 0
             || NetworkPolicy.DeniedHosts.Count > 0);
 
     internal bool ProxyOwnsNetworkResolution =>
         !string.IsNullOrWhiteSpace(Proxy)
+        && NetworkPolicy.AllowNetworkAccess
         && NetworkPolicy.AllowPrivateNetworks
         && NetworkPolicy.AllowedHosts.Count == 0
         && NetworkPolicy.DeniedHosts.Count == 0;
