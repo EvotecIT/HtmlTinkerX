@@ -18,7 +18,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoVersion>3.2.3</OfficeImoVersion>
+        <OfficeImoVersion>3.2.4</OfficeImoVersion>
         <ChartForgeXVersion>1.6.0</ChartForgeXVersion>
     </PropertyGroup>
 
