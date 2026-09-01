@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using OfficeIMO.Markdown;
 using OfficeIMO.Markdown.Html;
 
@@ -282,6 +283,16 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Force Playwright runtime cleanup and reinstall before a rendered crawl.</summary>
     public bool CleanBrowserInstall { get; set; }
 
+    /// <summary>
+    /// Optional observer invoked for each successfully prepared rendered page while the browser session is still positioned on it.
+    /// </summary>
+    /// <remarks>
+    /// This runtime hook is intentionally excluded from JSON serialization. It lets adapters export browser-backed evidence
+    /// without repeating navigation or moving product-specific persistence concerns into HtmlTinkerX.
+    /// </remarks>
+    [JsonIgnore]
+    public IHtmlCrawlRenderedPageObserver? RenderedPageObserver { get; set; }
+
     /// <summary>Optional include patterns using * wildcards.</summary>
     public IList<string> IncludePatterns { get; set; } = new List<string>();
 
@@ -437,6 +448,7 @@ public sealed class HtmlCrawlOptions {
             Browser = Browser,
             Headless = Headless,
             CleanBrowserInstall = CleanBrowserInstall,
+            RenderedPageObserver = RenderedPageObserver,
             IncludePatterns = new List<string>(IncludePatterns),
             ExcludePatterns = new List<string>(ExcludePatterns),
             SitemapUrls = new List<string>(SitemapUrls),
