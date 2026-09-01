@@ -23,11 +23,44 @@ public static partial class HtmlBrowser {
     /// <param name="options">Evidence capture options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Manifest-like result describing the exported artifacts.</returns>
-    public static async Task<HtmlBrowserEvidenceResult> ExportEvidenceAsync(
+    public static Task<HtmlBrowserEvidenceResult> ExportEvidenceAsync(
         HtmlBrowserSession session,
         string outFolder,
         HtmlBrowserEvidenceOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        ExportEvidenceCoreAsync(session, outFolder, networkLog: null, options, cancellationToken);
+
+    /// <summary>
+    /// Exports evidence from a rendered crawl page using its page-scoped network log.
+    /// </summary>
+    /// <param name="context">Rendered crawl page and its prepared browser session.</param>
+    /// <param name="outFolder">Output folder for evidence artifacts.</param>
+    /// <param name="options">Evidence capture options.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Manifest-like result describing the exported artifacts.</returns>
+    public static Task<HtmlBrowserEvidenceResult> ExportRenderedPageEvidenceAsync(
+        HtmlCrawlRenderedPageContext context,
+        string outFolder,
+        HtmlBrowserEvidenceOptions? options = null,
         CancellationToken cancellationToken = default) {
+        if (context == null) {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        return ExportEvidenceCoreAsync(
+            context.Session,
+            outFolder,
+            context.NetworkLog,
+            options,
+            cancellationToken);
+    }
+
+    private static async Task<HtmlBrowserEvidenceResult> ExportEvidenceCoreAsync(
+        HtmlBrowserSession session,
+        string outFolder,
+        IReadOnlyList<HtmlNetworkEntry>? networkLog,
+        HtmlBrowserEvidenceOptions? options,
+        CancellationToken cancellationToken) {
         if (session == null) {
             throw new ArgumentNullException(nameof(session));
         }
@@ -105,7 +138,8 @@ public static partial class HtmlBrowser {
 
         if (options.NetworkSummary) {
             string path = Path.Combine(fullFolder, "network-summary.json");
-            string json = JsonSerializer.Serialize(CreateNetworkSummary(session.NetworkLog, options.RedactSensitiveValues), CreateJsonOptions());
+            IEnumerable<HtmlNetworkEntry> effectiveNetworkLog = networkLog ?? session.NetworkLog;
+            string json = JsonSerializer.Serialize(CreateNetworkSummary(effectiveNetworkLog, options.RedactSensitiveValues), CreateJsonOptions());
             await WriteTextAsync(path, json, cancellationToken).ConfigureAwait(false);
             AddArtifact(result, fullFolder, "NetworkSummary", path, "application/json; charset=utf-8");
         }

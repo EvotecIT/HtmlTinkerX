@@ -3,6 +3,7 @@ using Microsoft.Playwright;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,62 @@ namespace HtmlTinkerX.Tests;
 /// Tests capturing network log entries with <see cref="HtmlBrowser"/>.
 /// </summary>
 public class HtmlBrowserNetworkLogTests {
+    [Fact]
+    public async Task ExportEvidenceAsync_NullOptionsCallRemainsSourceCompatible() {
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            HtmlBrowser.ExportEvidenceAsync(null!, "unused", null));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            HtmlBrowser.ExportEvidenceAsync(null!, "unused", null, default));
+    }
+
+    [Fact]
+    public async Task ExportEvidenceAsync_UsesExplicitNetworkScope() {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+        page.SetupGet(p => p.Url).Returns("https://current.example.com/");
+        page.Setup(p => p.TitleAsync()).ReturnsAsync("Current page");
+
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+        Mock<IRequest> previousRequest = CreateRequest("https://previous.example.com/");
+        Mock<IRequest> currentRequest = CreateRequest("https://current.example.com/");
+        page.Raise(p => p.Request += null!, page.Object, previousRequest.Object);
+        page.Raise(p => p.Request += null!, page.Object, currentRequest.Object);
+
+        string outputPath = Path.Combine(Path.GetTempPath(), "HtmlTinkerXTests", Guid.NewGuid().ToString("N"));
+        try {
+            HtmlNetworkEntry currentEntry = session.NetworkLog.Last();
+            HtmlCrawlRenderedPageContext renderedPage = new(
+                session,
+                new HtmlCrawlPage { Url = page.Object.Url, Rendered = true },
+                new[] { currentEntry });
+            await HtmlBrowser.ExportRenderedPageEvidenceAsync(
+                renderedPage,
+                outputPath,
+                new HtmlBrowserEvidenceOptions {
+                    Screenshot = false,
+                    FullPageScreenshot = false,
+                    Pdf = false,
+                    Html = false,
+                    VisibleText = false,
+                    Markdown = false,
+                    NetworkSummary = true,
+                    SsoHandoffSummary = false,
+                    Manifest = false
+                });
+
+            string networkSummary = File.ReadAllText(Path.Combine(outputPath, "network-summary.json"));
+            Assert.Contains("current.example.com", networkSummary, StringComparison.Ordinal);
+            Assert.DoesNotContain("previous.example.com", networkSummary, StringComparison.Ordinal);
+        } finally {
+            await session.DisposeAsync();
+            if (Directory.Exists(outputPath)) {
+                Directory.Delete(outputPath, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task GetNetworkLog_ReturnsCapturedEntries() {
         var playwright = new Mock<IPlaywright>();

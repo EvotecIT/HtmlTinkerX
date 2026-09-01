@@ -113,6 +113,7 @@ public static partial class HtmlCrawler {
     private sealed class FetchedPageData {
         public HtmlCrawlPage Page { get; set; } = null!;
         public string? RawHtml { get; set; }
+        public IReadOnlyList<HtmlNetworkEntry> RenderedNetworkLog { get; set; } = Array.Empty<HtmlNetworkEntry>();
     }
 
     private sealed class CrawlArtifactPaths {

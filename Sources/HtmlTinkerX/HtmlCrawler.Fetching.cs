@@ -85,9 +85,9 @@ public static partial class HtmlCrawler {
             Started = DateTimeOffset.UtcNow
         };
 
+        int networkLogStart = session.NetworkLog.Count();
         try {
             cancellationToken.ThrowIfCancellationRequested();
-            int networkLogStart = session.NetworkLog.Count();
             IResponse? response = await session.Page.GotoAsync(request.Uri.AbsoluteUri, new PageGotoOptions {
                 Timeout = options.Timeout,
                 WaitUntil = WaitUntilState.NetworkIdle
@@ -123,17 +123,20 @@ public static partial class HtmlCrawler {
                 page.Error = $"Skipped content type '{page.ContentType ?? "unknown"}'.";
                 return new FetchedPageData {
                     Page = page,
-                    RawHtml = fullHtml
+                    RawHtml = fullHtml,
+                    RenderedNetworkLog = session.NetworkLog.Skip(networkLogStart).ToArray()
                 };
             }
 
             string? title = await session.Page.TitleAsync().ConfigureAwait(false);
             PopulatePageFromHtml(page, fullHtml, request.Uri, options, structuredSchema, title);
             Uri runtimeDiagnosticsUri = TryGetAbsoluteUri(session.Page.Url, out Uri? renderedUri) ? renderedUri! : request.Uri;
-            MergeOfflineDependencyDiagnostics(page.OfflineDependencyDiagnostics, DetectRenderedNetworkDependencyDiagnostics(session.NetworkLog.Skip(networkLogStart), runtimeDiagnosticsUri));
+            HtmlNetworkEntry[] renderedNetworkLog = session.NetworkLog.Skip(networkLogStart).ToArray();
+            MergeOfflineDependencyDiagnostics(page.OfflineDependencyDiagnostics, DetectRenderedNetworkDependencyDiagnostics(renderedNetworkLog, runtimeDiagnosticsUri));
             return new FetchedPageData {
                 Page = page,
-                RawHtml = fullHtml
+                RawHtml = fullHtml,
+                RenderedNetworkLog = renderedNetworkLog
             };
         } catch (Exception ex) {
             page.Status = HtmlCrawlPageStatus.Failed;
@@ -143,7 +146,8 @@ public static partial class HtmlCrawler {
         }
 
         return new FetchedPageData {
-            Page = page
+            Page = page,
+            RenderedNetworkLog = session.NetworkLog.Skip(networkLogStart).ToArray()
         };
     }
 

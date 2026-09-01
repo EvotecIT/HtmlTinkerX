@@ -175,14 +175,15 @@ public static partial class HtmlCrawler {
                 }
 
                 HtmlCrawlPage page;
+                FetchedPageData fetchedPage;
                 if (resolvedOptions.Render) {
-                    FetchedPageData fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
+                    fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
-                    FetchedPageData fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
+                    fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
                         ProfileSelectionDecision inferredProfileDecision = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
@@ -233,6 +234,11 @@ public static partial class HtmlCrawler {
                         await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
                     }
                     continue;
+                }
+
+                if (page.Status == HtmlCrawlPageStatus.Success && page.Rendered && resolvedOptions.RenderedPageObserver != null) {
+                    HtmlCrawlRenderedPageContext observerContext = new(session!, page, fetchedPage.RenderedNetworkLog);
+                    await resolvedOptions.RenderedPageObserver.ObserveAsync(observerContext, cancellationToken).ConfigureAwait(false);
                 }
 
                 result.Pages.Add(page);

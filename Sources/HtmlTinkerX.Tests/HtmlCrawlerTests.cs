@@ -27,7 +27,8 @@ public partial class HtmlCrawlerTests {
                 UsernameSelector = "#user",
                 PasswordSelector = "#password",
                 SubmitSelector = "button[type=submit]"
-            }
+            },
+            RenderedPageObserver = new RecordingRenderedPageObserver()
         };
         options.Headers["X-Test"] = "one";
         options.IncludePatterns.Add("*docs*");
@@ -75,6 +76,13 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(HtmlCrawlHiddenContentMode.IncludeHidden, clone.HiddenContentMode);
         Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.Preserve, clone.ListingCardMetadataMode);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
+        Assert.Same(options.RenderedPageObserver, clone.RenderedPageObserver);
+
+        string json = JsonSerializer.Serialize(options);
+        HtmlCrawlOptions? deserialized = JsonSerializer.Deserialize<HtmlCrawlOptions>(json);
+        Assert.DoesNotContain("RenderedPageObserver", json, System.StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(deserialized);
+        Assert.Null(deserialized!.RenderedPageObserver);
     }
 
     [Fact]
@@ -319,7 +327,11 @@ public partial class HtmlCrawlerTests {
         return port;
     }
 
-    private static HttpListener StartServer(Dictionary<string, string> responses, out string rootUrl, string host = "localhost") {
+    private static HttpListener StartServer(
+        Dictionary<string, string> responses,
+        out string rootUrl,
+        string host = "localhost",
+        System.Action<string>? onRequest = null) {
         HttpListener listener = new();
         StartListenerWithFreePort(listener, out rootUrl, host);
 
@@ -328,6 +340,7 @@ public partial class HtmlCrawlerTests {
                 while (listener.IsListening) {
                     HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
                     string key = context.Request.RawUrl ?? "/";
+                    onRequest?.Invoke(key);
                     if (responses.TryGetValue(key, out string? html)) {
                         byte[] data = Encoding.UTF8.GetBytes(html);
                         context.Response.ContentType = "text/html; charset=utf-8";
