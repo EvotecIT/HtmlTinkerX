@@ -28,7 +28,7 @@
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
         <PackageReference Include="AngleSharp.Io" Version="1.1.0" />
         <PackageReference Include="AngleSharp.Js" Version="1.0.1" />
-        <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+        <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
         <PackageReference Include="Jint" Version="4.16.1" />
         <PackageReference Include="NUglify" Version="1.22.4" />
         <PackageReference Include="PreMailer.Net" Version="2.7.3" />
