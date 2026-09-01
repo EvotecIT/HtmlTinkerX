@@ -19,6 +19,8 @@ public class HtmlBrowserNetworkLogTests {
     public async Task ExportEvidenceAsync_NullOptionsCallRemainsSourceCompatible() {
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             HtmlBrowser.ExportEvidenceAsync(null!, "unused", null));
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            HtmlBrowser.ExportEvidenceAsync(null!, "unused", null, default));
     }
 
     [Fact]
@@ -39,8 +41,12 @@ public class HtmlBrowserNetworkLogTests {
         string outputPath = Path.Combine(Path.GetTempPath(), "HtmlTinkerXTests", Guid.NewGuid().ToString("N"));
         try {
             HtmlNetworkEntry currentEntry = session.NetworkLog.Last();
-            await HtmlBrowser.ExportEvidenceAsync(
+            HtmlCrawlRenderedPageContext renderedPage = new(
                 session,
+                new HtmlCrawlPage { Url = page.Object.Url, Rendered = true },
+                new[] { currentEntry });
+            await HtmlBrowser.ExportRenderedPageEvidenceAsync(
+                renderedPage,
                 outputPath,
                 new HtmlBrowserEvidenceOptions {
                     Screenshot = false,
@@ -52,8 +58,7 @@ public class HtmlBrowserNetworkLogTests {
                     NetworkSummary = true,
                     SsoHandoffSummary = false,
                     Manifest = false
-                },
-                new[] { currentEntry });
+                });
 
             string networkSummary = File.ReadAllText(Path.Combine(outputPath, "network-summary.json"));
             Assert.Contains("current.example.com", networkSummary, StringComparison.Ordinal);

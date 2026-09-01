@@ -31,25 +31,28 @@ public static partial class HtmlBrowser {
         ExportEvidenceCoreAsync(session, outFolder, networkLog: null, options, cancellationToken);
 
     /// <summary>
-    /// Exports evidence from an already loaded browser session using an explicitly scoped network log.
+    /// Exports evidence from a rendered crawl page using its page-scoped network log.
     /// </summary>
-    /// <param name="session">Browser session containing the page to capture.</param>
+    /// <param name="context">Rendered crawl page and its prepared browser session.</param>
     /// <param name="outFolder">Output folder for evidence artifacts.</param>
     /// <param name="options">Evidence capture options.</param>
-    /// <param name="networkLog">Network entries to include when a network summary is requested.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Manifest-like result describing the exported artifacts.</returns>
-    public static Task<HtmlBrowserEvidenceResult> ExportEvidenceAsync(
-        HtmlBrowserSession session,
+    public static Task<HtmlBrowserEvidenceResult> ExportRenderedPageEvidenceAsync(
+        HtmlCrawlRenderedPageContext context,
         string outFolder,
-        HtmlBrowserEvidenceOptions? options,
-        IReadOnlyList<HtmlNetworkEntry> networkLog,
+        HtmlBrowserEvidenceOptions? options = null,
         CancellationToken cancellationToken = default) {
-        if (networkLog == null) {
-            throw new ArgumentNullException(nameof(networkLog));
+        if (context == null) {
+            throw new ArgumentNullException(nameof(context));
         }
 
-        return ExportEvidenceCoreAsync(session, outFolder, networkLog, options, cancellationToken);
+        return ExportEvidenceCoreAsync(
+            context.Session,
+            outFolder,
+            context.NetworkLog,
+            options,
+            cancellationToken);
     }
 
     private static async Task<HtmlBrowserEvidenceResult> ExportEvidenceCoreAsync(
