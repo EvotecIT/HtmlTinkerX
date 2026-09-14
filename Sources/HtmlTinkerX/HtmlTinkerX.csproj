@@ -18,16 +18,16 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoVersion>3.3.0</OfficeImoVersion>
+        <OfficeImoVersion>3.4.0</OfficeImoVersion>
         <ChartForgeXVersion>1.7.0</ChartForgeXVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.7.3" />
-        <PackageReference Include="AngleSharp.Css" Version="1.0.2" />
+        <PackageReference Include="AngleSharp" Version="1.8.0" />
+        <PackageReference Include="AngleSharp.Css" Version="1.1.0" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
         <PackageReference Include="AngleSharp.Io" Version="1.1.0" />
-        <PackageReference Include="AngleSharp.Js" Version="1.0.1" />
+        <PackageReference Include="AngleSharp.Js" Version="1.1.0" />
         <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
         <PackageReference Include="Jint" Version="4.16.1" />
         <PackageReference Include="NUglify" Version="1.22.4" />
