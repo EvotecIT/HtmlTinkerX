@@ -18,18 +18,18 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoVersion>3.4.2</OfficeImoVersion>
+        <OfficeImoVersion>3.4.3</OfficeImoVersion>
         <ChartForgeXVersion>1.7.0</ChartForgeXVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.8.0" />
-        <PackageReference Include="AngleSharp.Css" Version="1.1.0" />
+        <PackageReference Include="AngleSharp" Version="1.8.1" />
+        <PackageReference Include="AngleSharp.Css" Version="1.1.2" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
         <PackageReference Include="AngleSharp.Io" Version="1.1.0" />
         <PackageReference Include="AngleSharp.Js" Version="1.1.0" />
         <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
-        <PackageReference Include="Jint" Version="4.16.1" />
+        <PackageReference Include="Jint" Version="4.16.2" />
         <PackageReference Include="NUglify" Version="1.23.0" />
         <PackageReference Include="PreMailer.Net" Version="2.7.4" />
         <PackageReference Include="System.IO.Compression" Version="4.3.0" Condition=" '$(TargetFramework)' == 'net472' " />
