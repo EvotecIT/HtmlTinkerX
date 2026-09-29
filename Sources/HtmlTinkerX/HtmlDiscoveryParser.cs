@@ -103,8 +103,10 @@ public static class HtmlDiscoveryParser {
                 Title = title,
                 Url = link,
                 Summary = FirstNonEmpty(ElementValue(item, "description"), ElementValue(item, "summary")),
-                Published = TryParseDate(FirstNonEmpty(ElementValue(item, "pubDate"), ElementValue(item, "published"))),
-                Updated = TryParseDate(ElementValue(item, "updated")),
+                // Many feeds (WordPress, RSS 1.0/RDF, Jamf) date items only with Dublin Core: dc:date, dcterms:created, dcterms:modified.
+                Published = TryParseDate(FirstNonEmpty(ElementValue(item, "pubDate"), ElementValue(item, "published"),
+                    ElementValue(item, DublinCore, "date"), ElementValue(item, DublinCoreTerms, "created"), ElementValue(item, DublinCoreTerms, "date"))),
+                Updated = TryParseDate(FirstNonEmpty(ElementValue(item, "updated"), ElementValue(item, DublinCoreTerms, "modified"))),
                 SourceFeedUrl = sourceFeedUrl
             });
         }
@@ -120,8 +122,9 @@ public static class HtmlDiscoveryParser {
                 Title = ElementValue(entry, "title"),
                 Url = link,
                 Summary = FirstNonEmpty(ElementValue(entry, "summary"), ElementValue(entry, "content")),
-                Published = TryParseDate(ElementValue(entry, "published")),
-                Updated = TryParseDate(ElementValue(entry, "updated")),
+                // Atom 0.3 feeds use issued and modified.
+                Published = TryParseDate(FirstNonEmpty(ElementValue(entry, "published"), ElementValue(entry, "issued"), ElementValue(entry, DublinCore, "date"))),
+                Updated = TryParseDate(FirstNonEmpty(ElementValue(entry, "updated"), ElementValue(entry, "modified"))),
                 SourceFeedUrl = sourceFeedUrl
             });
         }
@@ -139,6 +142,13 @@ public static class HtmlDiscoveryParser {
 
         return alternate?.Attribute("href")?.Value ?? string.Empty;
     }
+
+    private static readonly XNamespace DublinCore = "http://purl.org/dc/elements/1.1/";
+    private static readonly XNamespace DublinCoreTerms = "http://purl.org/dc/terms/";
+
+    /// <summary>The trimmed value of the first child with this exact namespace and local name, or empty.</summary>
+    private static string ElementValue(XElement parent, XNamespace ns, string localName) =>
+        parent.Element(ns + localName)?.Value?.Trim() ?? string.Empty;
 
     private static string ElementValue(XElement parent, string localName) {
         XElement? element = parent.Elements().FirstOrDefault(child => string.Equals(child.Name.LocalName, localName, StringComparison.OrdinalIgnoreCase));
