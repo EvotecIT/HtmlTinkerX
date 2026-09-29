@@ -113,4 +113,57 @@ public class HtmlDiscoveryParserTests {
         Assert.Equal("https://example.org/feed/", item.SourceFeedUrl);
         Assert.NotNull(item.Published);
     }
+
+    [Fact]
+    public void ParseSyndicationItems_ReadsDublinCoreDatesWhenRssHasNoPubDate() {
+        const string xml = """
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/">
+  <channel>
+    <item>
+      <title>Day-one support</title>
+      <link>https://example.org/blog/1</link>
+      <dc:date>2026-09-22T20:55:00+00:00</dc:date>
+      <dcterms:modified>2026-09-23T08:00:00+00:00</dcterms:modified>
+    </item>
+    <item>
+      <title>Only created</title>
+      <link>https://example.org/blog/2</link>
+      <dcterms:created>2026-09-20T10:00:00Z</dcterms:created>
+    </item>
+    <item>
+      <title>Unrelated date element</title>
+      <link>https://example.org/blog/3</link>
+      <date>2026-01-01</date>
+    </item>
+  </channel>
+</rss>
+""";
+
+        IReadOnlyList<HtmlSyndicationItem> items = HtmlDiscoveryParser.ParseSyndicationItems(xml);
+
+        Assert.Equal(new DateTimeOffset(2026, 9, 22, 20, 55, 0, TimeSpan.Zero), items[0].Published);
+        Assert.Equal(new DateTimeOffset(2026, 9, 23, 8, 0, 0, TimeSpan.Zero), items[0].Updated);
+        Assert.Equal(new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero), items[1].Published);
+        // A bare date element outside the Dublin Core namespaces is not trusted as a publication date.
+        Assert.Null(items[2].Published);
+    }
+
+    [Fact]
+    public void ParseSyndicationItems_ReadsAtom03IssuedAndModified() {
+        const string xml = """
+<feed xmlns="http://purl.org/atom/ns#">
+  <entry>
+    <title>Old-style entry</title>
+    <link rel="alternate" href="https://example.org/entry/1" />
+    <issued>2026-09-01T12:00:00Z</issued>
+    <modified>2026-09-02T12:00:00Z</modified>
+  </entry>
+</feed>
+""";
+
+        HtmlSyndicationItem item = Assert.Single(HtmlDiscoveryParser.ParseSyndicationItems(xml));
+
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero), item.Published);
+        Assert.Equal(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero), item.Updated);
+    }
 }
