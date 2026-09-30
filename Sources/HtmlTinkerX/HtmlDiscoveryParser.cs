@@ -72,7 +72,13 @@ public static class HtmlDiscoveryParser {
     /// <summary>
     /// Extracts normalized items from an RSS or Atom feed document.
     /// </summary>
-    public static IReadOnlyList<HtmlSyndicationItem> ParseSyndicationItems(string xml, Uri? baseUri = null, string? sourceFeedUrl = null) {
+    public static IReadOnlyList<HtmlSyndicationItem> ParseSyndicationItems(string xml, Uri? baseUri = null, string? sourceFeedUrl = null) =>
+        ParseSyndicationFeed(xml, baseUri, sourceFeedUrl).Items;
+
+    /// <summary>
+    /// Extracts an RSS or Atom feed document: its channel-level title, link and last-updated time, and its normalized items.
+    /// </summary>
+    public static HtmlSyndicationFeed ParseSyndicationFeed(string xml, Uri? baseUri = null, string? sourceFeedUrl = null) {
         if (xml == null) {
             throw new ArgumentNullException(nameof(xml));
         }
@@ -80,14 +86,30 @@ public static class HtmlDiscoveryParser {
         XDocument document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
         XElement? root = document.Root;
         if (root == null) {
-            return Array.Empty<HtmlSyndicationItem>();
+            return new HtmlSyndicationFeed { SourceFeedUrl = sourceFeedUrl };
         }
 
         if (string.Equals(root.Name.LocalName, "feed", StringComparison.OrdinalIgnoreCase)) {
-            return ParseAtomItems(root, baseUri, sourceFeedUrl);
+            return new HtmlSyndicationFeed {
+                Title = ElementValue(root, "title"),
+                Url = ResolveUrl(GetAtomLink(root), baseUri),
+                // Atom 0.3 feeds use modified.
+                Updated = TryParseDate(FirstNonEmpty(ElementValue(root, "updated"), ElementValue(root, "modified"))),
+                SourceFeedUrl = sourceFeedUrl,
+                Items = ParseAtomItems(root, baseUri, sourceFeedUrl)
+            };
         }
 
-        return ParseRssItems(document, baseUri, sourceFeedUrl);
+        XElement? channel = document.Descendants().FirstOrDefault(static element => string.Equals(element.Name.LocalName, "channel", StringComparison.OrdinalIgnoreCase));
+        return new HtmlSyndicationFeed {
+            Title = channel == null ? string.Empty : ElementValue(channel, channel.Name.Namespace, "title"),
+            // The channel's own link, not an atom:link rel="self" that many RSS 2.0 feeds also carry.
+            Url = channel == null ? string.Empty : ResolveUrl(ElementValue(channel, channel.Name.Namespace, "link"), baseUri),
+            Updated = channel == null ? null : TryParseDate(FirstNonEmpty(ElementValue(channel, "lastBuildDate"), ElementValue(channel, "pubDate"),
+                ElementValue(channel, DublinCore, "date"))),
+            SourceFeedUrl = sourceFeedUrl,
+            Items = ParseRssItems(document, baseUri, sourceFeedUrl)
+        };
     }
 
     private static IReadOnlyList<HtmlSyndicationItem> ParseRssItems(XDocument document, Uri? baseUri, string? sourceFeedUrl) {
@@ -99,6 +121,8 @@ public static class HtmlDiscoveryParser {
                 link = ResolveUrl(ElementValue(item, "guid"), baseUri);
             }
 
+            XElement? guid = FirstChild(item, "guid");
+            string? id = EmptyToNull(guid?.Value);
             items.Add(new HtmlSyndicationItem {
                 Title = title,
                 Url = link,
@@ -107,7 +131,12 @@ public static class HtmlDiscoveryParser {
                 Published = TryParseDate(FirstNonEmpty(ElementValue(item, "pubDate"), ElementValue(item, "published"),
                     ElementValue(item, DublinCore, "date"), ElementValue(item, DublinCoreTerms, "created"), ElementValue(item, DublinCoreTerms, "date"))),
                 Updated = TryParseDate(FirstNonEmpty(ElementValue(item, "updated"), ElementValue(item, DublinCoreTerms, "modified"))),
-                SourceFeedUrl = sourceFeedUrl
+                SourceFeedUrl = sourceFeedUrl,
+                Id = id,
+                // RSS 2.0: a guid is a permalink unless isPermaLink="false".
+                IdIsPermaLink = id != null && !string.Equals(guid!.Attribute("isPermaLink")?.Value?.Trim(), "false", StringComparison.OrdinalIgnoreCase),
+                Categories = ParseCategories(item),
+                Content = EmptyToNull(ElementValue(item, ContentModule, "encoded"))
             });
         }
 
@@ -125,11 +154,44 @@ public static class HtmlDiscoveryParser {
                 // Atom 0.3 feeds use issued and modified.
                 Published = TryParseDate(FirstNonEmpty(ElementValue(entry, "published"), ElementValue(entry, "issued"), ElementValue(entry, DublinCore, "date"))),
                 Updated = TryParseDate(FirstNonEmpty(ElementValue(entry, "updated"), ElementValue(entry, "modified"))),
-                SourceFeedUrl = sourceFeedUrl
+                SourceFeedUrl = sourceFeedUrl,
+                Id = EmptyToNull(ElementValue(entry, "id")),
+                IdIsPermaLink = false,
+                Categories = ParseCategories(entry),
+                Content = AtomContent(FirstChild(entry, "content"))
             });
         }
 
         return items;
+    }
+
+    /// <summary>RSS category text or the Atom category term (label when there is no term), trimmed, in order, without duplicates.</summary>
+    private static IReadOnlyList<string> ParseCategories(XElement parent) {
+        List<string> categories = new();
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (XElement category in parent.Elements().Where(static element => string.Equals(element.Name.LocalName, "category", StringComparison.OrdinalIgnoreCase))) {
+            string value = FirstNonEmpty(category.Value, category.Attribute("term")?.Value ?? string.Empty, category.Attribute("label")?.Value ?? string.Empty);
+            if (value.Length > 0 && seen.Add(value)) {
+                categories.Add(value);
+            }
+        }
+
+        return categories.Count == 0 ? Array.Empty<string>() : categories.ToArray();
+    }
+
+    /// <summary>The Atom content as the feed wrote it: text or HTML (unescaped once by XML), or the inner markup of an xhtml div.</summary>
+    private static string? AtomContent(XElement? content) {
+        if (content == null) {
+            return null;
+        }
+
+        if (string.Equals(content.Attribute("type")?.Value?.Trim(), "xhtml", StringComparison.OrdinalIgnoreCase)) {
+            XElement? wrapper = content.Elements().FirstOrDefault(static element => string.Equals(element.Name.LocalName, "div", StringComparison.OrdinalIgnoreCase));
+            IEnumerable<XNode> nodes = wrapper?.Nodes() ?? content.Nodes();
+            return EmptyToNull(string.Concat(nodes.Select(static node => node.ToString(SaveOptions.DisableFormatting))));
+        }
+
+        return EmptyToNull(content.Value);
     }
 
     private static string GetAtomLink(XElement entry) {
@@ -145,15 +207,20 @@ public static class HtmlDiscoveryParser {
 
     private static readonly XNamespace DublinCore = "http://purl.org/dc/elements/1.1/";
     private static readonly XNamespace DublinCoreTerms = "http://purl.org/dc/terms/";
+    private static readonly XNamespace ContentModule = "http://purl.org/rss/1.0/modules/content/";
 
     /// <summary>The trimmed value of the first child with this exact namespace and local name, or empty.</summary>
     private static string ElementValue(XElement parent, XNamespace ns, string localName) =>
         parent.Element(ns + localName)?.Value?.Trim() ?? string.Empty;
 
-    private static string ElementValue(XElement parent, string localName) {
-        XElement? element = parent.Elements().FirstOrDefault(child => string.Equals(child.Name.LocalName, localName, StringComparison.OrdinalIgnoreCase));
-        return element?.Value?.Trim() ?? string.Empty;
-    }
+    private static string ElementValue(XElement parent, string localName) =>
+        FirstChild(parent, localName)?.Value?.Trim() ?? string.Empty;
+
+    private static XElement? FirstChild(XElement parent, string localName) =>
+        parent.Elements().FirstOrDefault(child => string.Equals(child.Name.LocalName, localName, StringComparison.OrdinalIgnoreCase));
+
+    private static string? EmptyToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
 
     private static string FirstNonEmpty(params string[] values) {
         foreach (string value in values) {
@@ -196,6 +263,11 @@ public static class HtmlDiscoveryParser {
         }
 
         if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed)) {
+            return parsed;
+        }
+
+        // RFC 822 zone names (PDT, UTC) and a wrong weekday defeat the general parser.
+        if (HtmlDateParser.TryParse(value, out parsed)) {
             return parsed;
         }
 
