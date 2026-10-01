@@ -126,6 +126,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     if (rules.length !== 2 || rules.filter(rule => rule.includes('color: red')).length !== 1) throw new Error('base:' + rules.length);
                     if (window.__htmlTinkerXLegacyStyleElement?.sheet?.cssRules?.length !== 1) throw new Error('legacy:' + window.__htmlTinkerXLegacyStyleElement?.sheet?.cssRules?.length);
                     if (window.__htmlTinkerXDisabledStyleElement?.sheet?.disabled !== true) throw new Error('disabled:' + window.__htmlTinkerXDisabledStyleElement?.sheet?.disabled);
+                    const popup = window.__htmlTinkerXStyleElement.ownerDocument.defaultView;
+                    popup.document.body.getBoundingClientRect();
+                    const resources = popup.performance.getEntriesByType('resource');
+                    if (!['stylesheet-initial', 'stylesheet-inserted', 'stylesheet-legacy'].every(source =>
+                        resources.some(resource => resource.name.endsWith('?source=' + source)))) return false;
                     document.querySelector('#result').textContent = 'stylesheet restored once';
                     return true;
                 }",

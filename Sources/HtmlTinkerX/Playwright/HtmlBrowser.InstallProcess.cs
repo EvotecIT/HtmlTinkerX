@@ -24,7 +24,8 @@ public static partial class HtmlBrowser {
             }
 
             var start = new ProcessStartInfo {
-                FileName = Path.Combine(driver, "node", PlatformId, NodeExecutable),
+                FileName = Environment.GetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH")
+                    ?? Path.Combine(driver, "node", PlatformId, NodeExecutable),
                 Arguments = string.Join(" ", new[] { "--require", preload, Path.Combine(driver, "package", "cli.js") }
                     .Concat(arguments).Select(QuoteInstallerArgument)),
                 UseShellExecute = false,

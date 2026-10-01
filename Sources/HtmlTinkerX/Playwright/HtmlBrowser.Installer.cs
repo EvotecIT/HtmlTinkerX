@@ -268,7 +268,9 @@ public static partial class HtmlBrowser {
 
             // A repaired driver provides the manifest needed to identify an already-installed exact runtime.
             if (!IsBrowserRuntimeInstalled(engine)) {
-                InstallRuntime(engine);
+                // Installation can block in the CLI even when all preceding awaits completed synchronously.
+                // Yield so session cancellation can return while this serialized shared-cache operation completes.
+                await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
             }
         } finally {
             InstallationSemaphore.Release();
@@ -289,7 +291,7 @@ public static partial class HtmlBrowser {
             } else {
                 EnsureDriverSearchPath();
             }
-            InstallRuntime(engine);
+            await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
         } finally {
             InstallationSemaphore.Release();
         }
