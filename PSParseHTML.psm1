@@ -407,9 +407,61 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                         'AddExportedCmdlet',
                         [System.Reflection.BindingFlags]'Instance, NonPublic'
                     )
-                    if ($null -ne $AddExportedCmdlet) {
+                    $PowerForgeOuterModule = $ExecutionContext.SessionState.Module
+                    $PowerForgeIsModuleWrapper = $false
+                    if ($null -ne $PowerForgeOuterModule -and
+                        -not [string]::IsNullOrWhiteSpace($PowerForgeOuterModule.Path) -and
+                        -not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+                        try {
+                            [StringComparison] $PowerForgePathComparison = & {
+                                param([string] $PowerForgeProbePath)
+
+                                # Case behavior belongs to the containing filesystem. Windows can opt individual
+                                # directories into case sensitivity, while macOS volumes may be case-insensitive.
+                                # Inspect existing names without requiring write access; ambiguity fails closed.
+                                try {
+                                    $PowerForgeProbeDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($PowerForgeProbePath))
+                                    $PowerForgeNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+                                    foreach ($PowerForgeEntry in [IO.Directory]::EnumerateFileSystemEntries($PowerForgeProbeDirectory)) {
+                                        [void] $PowerForgeNames.Add([IO.Path]::GetFileName($PowerForgeEntry))
+                                    }
+
+                                    foreach ($PowerForgeName in $PowerForgeNames) {
+                                        foreach ($PowerForgeAlternateName in @($PowerForgeName.ToUpperInvariant(), $PowerForgeName.ToLowerInvariant())) {
+                                            if ([string]::Equals($PowerForgeName, $PowerForgeAlternateName, [StringComparison]::Ordinal) -or
+                                                $PowerForgeNames.Contains($PowerForgeAlternateName)) {
+                                                continue
+                                            }
+
+                                            $PowerForgeAlternatePath = [IO.Path]::Combine($PowerForgeProbeDirectory, $PowerForgeAlternateName)
+                                            if ([IO.File]::Exists($PowerForgeAlternatePath) -or [IO.Directory]::Exists($PowerForgeAlternatePath)) {
+                                                return [StringComparison]::OrdinalIgnoreCase
+                                            }
+
+                                            return [StringComparison]::Ordinal
+                                        }
+                                    }
+                                } catch {
+                                    # Ordinal comparison prevents an uncertain probe from exporting into a caller.
+                                }
+
+                                return [StringComparison]::Ordinal
+                            } $PSCommandPath
+                            $PowerForgeIsModuleWrapper = [string]::Equals(
+                                [IO.Path]::GetFullPath($PowerForgeOuterModule.Path),
+                                [IO.Path]::GetFullPath($PSCommandPath),
+                                $PowerForgePathComparison
+                            )
+                        } catch {
+                            $PowerForgeIsModuleWrapper = $false
+                        }
+                    }
+                    if (-not $PowerForgeIsModuleWrapper) {
+                        # A Script/ScriptPacked entry point, including one dot-sourced by another module, must not mutate
+                        # that caller's export table. The imported inner module's commands remain available to this script.
+                    } elseif ($null -ne $AddExportedCmdlet) {
                         foreach ($Cmd in $PowerForgeDevelopmentInnerModule.ExportedCmdlets.Values) {
-                            $AddExportedCmdlet.Invoke($ExecutionContext.SessionState.Module, @(, $Cmd)) | Out-Null
+                            $AddExportedCmdlet.Invoke($PowerForgeOuterModule, @(, $Cmd)) | Out-Null
                         }
                         $AddExportedAlias = [System.Management.Automation.PSModuleInfo].GetMethod(
                             'AddExportedAlias',
@@ -427,7 +479,7 @@ namespace PSParseHTML.DevelopmentModuleLoadContext
                                     Set-Alias -Name $Alias.Name -Value $AliasTarget -Scope Local -Force -ErrorAction Stop
                                     $ExportedAlias = $ExecutionContext.SessionState.InvokeCommand.GetCommand($Alias.Name, [System.Management.Automation.CommandTypes]::Alias)
                                     if ($null -ne $ExportedAlias) {
-                                        $AddExportedAlias.Invoke($ExecutionContext.SessionState.Module, @(, $ExportedAlias)) | Out-Null
+                                        $AddExportedAlias.Invoke($PowerForgeOuterModule, @(, $ExportedAlias)) | Out-Null
                                     } else {
                                         Write-Warning -Message "Alias '$($Alias.Name)' from PSParseHTML.PowerShell was created but could not be resolved for export."
                                     }
