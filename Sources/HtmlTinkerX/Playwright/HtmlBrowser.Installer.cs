@@ -25,7 +25,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
     /// </summary>
-    internal static Action<string[]> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
+    internal static Action<string[]> PlaywrightInstaller { get; set; } = RunPlaywrightInstaller;
 
     /// <summary>
     /// Factory used to create <see cref="HttpClient"/> instances. Exposed for unit testing.
@@ -268,7 +268,9 @@ public static partial class HtmlBrowser {
 
             // A repaired driver provides the manifest needed to identify an already-installed exact runtime.
             if (!IsBrowserRuntimeInstalled(engine)) {
-                InstallRuntime(engine);
+                // Installation can block in the CLI even when all preceding awaits completed synchronously.
+                // Yield so session cancellation can return while this serialized shared-cache operation completes.
+                await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
             }
         } finally {
             InstallationSemaphore.Release();
@@ -289,7 +291,7 @@ public static partial class HtmlBrowser {
             } else {
                 EnsureDriverSearchPath();
             }
-            InstallRuntime(engine);
+            await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
         } finally {
             InstallationSemaphore.Release();
         }

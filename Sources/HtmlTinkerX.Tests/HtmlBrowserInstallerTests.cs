@@ -17,6 +17,99 @@ namespace HtmlTinkerX.Tests;
 public class HtmlBrowserInstallerTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OpenSessionAsync_CancellationReturnsWhileFirstInstallationIsRunning(bool persistent)
+    {
+        string cache = Path.Combine(Path.GetTempPath(), "htmltinkerx-cancel-" + Guid.NewGuid().ToString("N"));
+        string? originalBrowsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriver = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
+        var originalFactory = HtmlBrowser.PlaywrightFactory;
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", cache);
+        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+        HtmlBrowser.PlaywrightInstaller = _ => {
+            entered.TrySetResult(true);
+            if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Test installer was not released.");
+        };
+        HtmlBrowser.PlaywrightFactory = () => throw new InvalidOperationException("Cancellation must prevent a late browser launch.");
+        Task<HtmlBrowserSession> opening = Task.Run(() => HtmlBrowser.OpenSessionAsync("about:blank",
+            new HtmlBrowserLaunchOptions { UserDataDirectory = persistent ? Path.Combine(cache, "profile") : null },
+            cancellation.Token));
+        try
+        {
+            Assert.Same(entered.Task, await Task.WhenAny(entered.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+            cancellation.Cancel();
+            Assert.Same(opening, await Task.WhenAny(opening, Task.Delay(TimeSpan.FromSeconds(2))));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => { await opening; });
+        }
+        finally
+        {
+            release.Set();
+            try { await opening; } catch { }
+            // Join the installation semaphore before restoring the shared test hooks and environment.
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            HtmlBrowser.PlaywrightInstaller = originalInstaller;
+            HtmlBrowser.PlaywrightFactory = originalFactory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsers);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriver);
+            if (Directory.Exists(cache)) Directory.Delete(cache, true);
+        }
+    }
+
+    [Fact]
+    public void PlaywrightInstaller_HonorsConfiguredNodeExecutable()
+    {
+        string? originalNode = Environment.GetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "unavailable node"));
+            Assert.Throws<System.ComponentModel.Win32Exception>(() =>
+                HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "chromium" }));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH", originalNode);
+        }
+    }
+
+    [Fact]
+    public void PlaywrightInstaller_RunsOfficialBrowserPlanWithoutDownloading()
+    {
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "chromium" });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+        }
+    }
+
+    [Fact]
+    public void PlaywrightInstaller_ReportsCliFailureInsteadOfClaimingSuccess()
+    {
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                HtmlBrowser.PlaywrightInstaller(new[] { "install", "--htmltinkerx-invalid-option" }));
+            Assert.Contains("exit code 1", failure.Message);
+            Assert.Contains("--htmltinkerx-invalid-option", failure.Message);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+        }
+    }
+
+    [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
     public void HasDriverLayout_RejectsIncompleteBundledAssets(bool hasHealthyNode, bool hasPackageContent)
