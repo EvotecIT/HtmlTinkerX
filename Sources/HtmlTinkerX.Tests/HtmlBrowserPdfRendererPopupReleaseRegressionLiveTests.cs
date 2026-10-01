@@ -90,6 +90,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
+            popup.document.body.style.minHeight = '32px';
             const style = popup.document.createElement('style');
             style.textContent = 'body {{ color: red; background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-initial); }}';
             popup.document.head.append(style);
@@ -101,6 +102,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             legacyStyle.sheet.removeRule(1);
             const legacyTarget = popup.document.createElement('div');
             legacyTarget.id = 'legacy-css-target';
+            legacyTarget.textContent = 'Legacy stylesheet background';
             popup.document.body.append(legacyTarget);
             const disabledStyle = popup.document.createElement('style');
             disabledStyle.textContent = '#disabled-css-target {{ background-image: url({server.BlankPopupResourceUrl}?source=stylesheet-disabled); }}';
@@ -108,6 +110,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             disabledStyle.sheet.disabled = true;
             const disabledTarget = popup.document.createElement('div');
             disabledTarget.id = 'disabled-css-target';
+            disabledTarget.textContent = 'Disabled stylesheet background';
             popup.document.body.append(disabledTarget);
             window.__htmlTinkerXStyleElement = style;
             window.__htmlTinkerXLegacyStyleElement = legacyStyle;

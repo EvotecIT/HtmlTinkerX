@@ -16,6 +16,39 @@ namespace HtmlTinkerX.Tests;
 [Collection("Playwright collection")]
 public class HtmlBrowserInstallerTests
 {
+    [Fact]
+    public void PlaywrightInstaller_RunsOfficialBrowserPlanWithoutDownloading()
+    {
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "chromium" });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+        }
+    }
+
+    [Fact]
+    public void PlaywrightInstaller_ReportsCliFailureInsteadOfClaimingSuccess()
+    {
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                HtmlBrowser.PlaywrightInstaller(new[] { "install", "--htmltinkerx-invalid-option" }));
+            Assert.Contains("exit code 1", failure.Message);
+            Assert.Contains("--htmltinkerx-invalid-option", failure.Message);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+        }
+    }
+
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]

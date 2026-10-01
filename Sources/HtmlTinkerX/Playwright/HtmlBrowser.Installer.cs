@@ -25,7 +25,7 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Delegate used to execute Playwright CLI commands. Exposed for unit testing.
     /// </summary>
-    internal static Action<string[]> PlaywrightInstaller { get; set; } = static args => Microsoft.Playwright.Program.Main(args);
+    internal static Action<string[]> PlaywrightInstaller { get; set; } = RunPlaywrightInstaller;
 
     /// <summary>
     /// Factory used to create <see cref="HttpClient"/> instances. Exposed for unit testing.

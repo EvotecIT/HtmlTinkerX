@@ -57,6 +57,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserInstallNetwork.cjs"
+                          LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserInstallNetwork.cjs" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupNavigation.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserPopupNavigation.js" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupContextRegistry.js"
