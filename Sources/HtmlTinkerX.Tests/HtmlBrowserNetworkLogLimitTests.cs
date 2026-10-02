@@ -9,6 +9,34 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserNetworkLogLimitTests {
+    [Theory]
+    [InlineData(null)]
+    [InlineData(1)]
+    [InlineData(0)]
+    public async Task NetworkLog_CapturesResponsesForRequestsStartedBeforeSubscription(int? limit) {
+        var page = new Mock<IPage>();
+        await using HtmlBrowserSession session = new(new Mock<IPlaywright>().Object, null,
+            new Mock<IBrowserContext>().Object, page.Object);
+        session.NetworkLogLimit = limit;
+        var request = new Mock<IRequest>();
+        request.SetupGet(r => r.Url).Returns("https://example.org/in-flight");
+        request.SetupGet(r => r.Method).Returns("GET");
+        request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        request.SetupGet(r => r.ResourceType).Returns("fetch");
+        var response = new Mock<IResponse>();
+        response.SetupGet(r => r.Request).Returns(request.Object);
+        response.SetupGet(r => r.Status).Returns(200);
+        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        response.Setup(r => r.TextAsync()).ReturnsAsync("body");
+        long cursor = session.NetworkLogPosition;
+        page.Raise(p => p.Response += null!, page.Object, response.Object);
+        if (limit == 0) { Assert.Empty(session.NetworkLog); return; }
+        HtmlNetworkEntry entry = Assert.Single(session.GetNetworkLogSince(cursor));
+        Assert.Equal(System.Net.HttpStatusCode.OK, entry.Status);
+        await session.CaptureResponseBodiesAsync(128, new HashSet<HtmlNetworkResourceType> { entry.ResourceType }, default);
+        Assert.Equal("body", entry.ResponseBody);
+    }
+
     [Fact]
     public async Task NetworkLogLimit_TrimsOldEntries() {
         var playwright = new Mock<IPlaywright>();

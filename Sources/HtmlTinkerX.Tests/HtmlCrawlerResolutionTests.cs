@@ -23,30 +23,53 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(HtmlCrawlRenderMode.Static, page.RenderMode);
     }
 
-    [Fact]
-    public async Task CrawlAsync_OfflineAssetsUseDocumentBaseBeforeCanonicalRewriting() {
+    [Theory]
+    [InlineData("/media/", HtmlCrawlContentMode.Focused)]
+    [InlineData("media/", HtmlCrawlContentMode.Focused)]
+    [InlineData("/media/", HtmlCrawlContentMode.Raw)]
+    [InlineData("media/", HtmlCrawlContentMode.Raw)]
+    public async Task CrawlAsync_OfflineAssetsUseDocumentBaseBeforeCanonicalRewriting(string documentBase, HtmlCrawlContentMode mode) {
         ConcurrentQueue<string> requests = new();
         using HttpListener server = StartFlexibleServer(async context => {
             string path = context.Request.Url!.AbsolutePath;
             requests.Enqueue(path);
             if (path == "/requested") context.Response.Redirect("/actual/page");
             else await RespondAsync(context, path == "/actual/page"
-                ? "<head><base href='/media/'><link rel='canonical' href='/canonical/page'></head><main><p>Content</p><img src='image.png'></main>"
+                ? $"<head><base href='{documentBase}'><link rel='canonical' href='/canonical/page'></head><main><p>Content</p><img src='image.png'></main>"
                 : "image", path == "/actual/page" ? "text/html" : "image/png");
         }, out string root);
         string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try {
             HtmlCrawlOptions options = StaticOptions(1);
             options.OutputPath = output; options.DownloadAssets = true; options.UseCanonicalUrls = true;
+            options.ContentMode = mode;
             HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root + "requested", options);
             HtmlCrawlPage page = Assert.Single(result.Pages);
             Assert.Equal(root + "canonical/page", page.Url);
-            Assert.Equal(root + "media/", page.ResolutionBaseUrl);
+            string expectedBase = root + (documentBase.StartsWith("/") ? "media/" : "actual/media/");
+            Assert.Equal(expectedBase, page.ResolutionBaseUrl);
             HtmlCrawlAsset asset = Assert.Single(result.Assets);
-            Assert.Equal(root + "media/image.png", asset.Url);
+            Assert.Equal(expectedBase + "image.png", asset.Url);
             Assert.Contains(Path.GetFileName(asset.FilePath!), File.ReadAllText(page.HtmlPath!));
             Assert.DoesNotContain("/canonical/image.png", requests);
         } finally { if (Directory.Exists(output)) Directory.Delete(output, true); }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_InferredProfileResolvesRelativeBaseOnceAfterRedirect() {
+        using HttpListener server = StartFlexibleServer(async context => {
+            if (context.Request.Url!.AbsolutePath == "/requested") context.Response.Redirect("/actual/page");
+            else await RespondAsync(context, "<head><meta name='generator' content='WordPress 6.8'><base href='media/'>" +
+                "<link rel='canonical' href='canonical'></head><main><p>Content</p><a href='child'>Child</a><img src='image.png'></main>");
+        }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1); options.AutoProfile = true;
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root + "requested", options);
+        HtmlCrawlPage page = Assert.Single(result.Pages);
+        Assert.NotNull(result.AppliedProfileName);
+        Assert.Equal(root + "actual/media/", page.ResolutionBaseUrl);
+        Assert.Contains(root + "actual/media/child", page.Links);
+        Assert.Contains(root + "actual/media/image.png", page.AssetUrls);
+        Assert.Equal(root + "actual/media/canonical", page.CanonicalUrl);
     }
 
     [Fact]

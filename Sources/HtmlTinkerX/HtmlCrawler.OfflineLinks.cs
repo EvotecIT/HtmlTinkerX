@@ -170,7 +170,8 @@ public static partial class HtmlCrawler {
         string pageHtmlPath,
         IEnumerable<HtmlCrawlAsset> assets,
         IDictionary<string, string> localPageMap,
-        HtmlCrawlOptions options) {
+        HtmlCrawlOptions options,
+        bool baseAlreadyResolved) {
         if (string.IsNullOrWhiteSpace(html)
             || string.IsNullOrWhiteSpace(pageUrl)
             || string.IsNullOrWhiteSpace(pageHtmlPath)) {
@@ -187,7 +188,7 @@ public static partial class HtmlCrawler {
 
         if (LooksLikeFullHtmlDocument(html)) {
             IDocument document = HtmlParser.ParseWithAngleSharp(html);
-            Uri effectiveBaseUri = GetDocumentBaseUri(document, pageUri);
+            Uri effectiveBaseUri = baseAlreadyResolved ? pageUri : GetDocumentBaseUri(document, pageUri);
             RewriteStoredReferencesInContainer(document, effectiveBaseUri, pageHtmlPath, assetMap, localPageMap, options);
             RemoveBaseElements(document);
             return document.DocumentElement?.OuterHtml ?? html;
@@ -199,7 +200,7 @@ public static partial class HtmlCrawler {
             return html;
         }
 
-        Uri effectiveFragmentBaseUri = GetDocumentBaseUri(fragmentDocument, pageUri);
+        Uri effectiveFragmentBaseUri = baseAlreadyResolved ? pageUri : GetDocumentBaseUri(fragmentDocument, pageUri);
         RewriteStoredReferencesInContainer(wrapper, effectiveFragmentBaseUri, pageHtmlPath, assetMap, localPageMap, options);
         RemoveBaseElements(wrapper);
         return wrapper.InnerHtml;

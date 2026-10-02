@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,6 +71,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     private readonly bool _closePageOnDispose;
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
     private readonly ConcurrentDictionary<IRequest, IResponse> _responses = new();
+    private readonly ConditionalWeakTable<IRequest, object> _observedRequests = new();
     private ConcurrentQueue<IRequest>? _order;
     private object? _networkSync;
     private Task? _disposeTask;
@@ -173,30 +175,19 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         };
 
         Page.Request += (_, req) => {
-            HtmlNetworkEntry entry = new() {
-                Url = req.Url,
-                Method = HtmlEnumParser.ParseHttpMethod(req.Method),
-                RequestHeaders = new Dictionary<string, string>(req.Headers),
-                ResourceType = HtmlEnumParser.ParseNetworkResourceType(req.ResourceType),
-                Started = System.DateTimeOffset.UtcNow
-            };
-
             lock (NetworkSync) {
-                entry.CaptureSequence = ++_networkSequence;
-                _networkBySequence[entry.CaptureSequence] = entry;
-                _network[req] = entry;
-                RequestOrder.Enqueue(req);
-                if (NetworkLogLimit.HasValue) {
-                    TrimNetworkLog(NetworkLogLimit.Value);
-                }
+                CaptureRequest(req);
             }
         };
 
         Page.Response += (_, res) => {
             lock (NetworkSync) {
-                // A late response must not re-admit a request already evicted by the limit.
                 if (!_network.TryGetValue(res.Request, out HtmlNetworkEntry? entry)) {
-                    return;
+                    // Existing pages can have requests in flight before event subscription.
+                    // Weak identities distinguish those from evicted requests without retaining them.
+                    if (_observedRequests.TryGetValue(res.Request, out _)) return;
+                    CaptureRequest(res.Request);
+                    if (!_network.TryGetValue(res.Request, out entry)) return;
                 }
                 entry.Status = (System.Net.HttpStatusCode)res.Status;
                 entry.ResponseHeaders = new Dictionary<string, string>(res.Headers);
@@ -217,6 +208,23 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 entry.FailureText = req.Failure;
             }
         };
+    }
+
+    // Called under NetworkSync by both request-start and pre-subscription response events.
+    private void CaptureRequest(IRequest request) {
+        _observedRequests.GetValue(request, static _ => new object());
+        HtmlNetworkEntry entry = new() {
+            Url = request.Url,
+            Method = HtmlEnumParser.ParseHttpMethod(request.Method),
+            RequestHeaders = new Dictionary<string, string>(request.Headers),
+            ResourceType = HtmlEnumParser.ParseNetworkResourceType(request.ResourceType),
+            Started = DateTimeOffset.UtcNow,
+            CaptureSequence = ++_networkSequence
+        };
+        _networkBySequence[entry.CaptureSequence] = entry;
+        _network[request] = entry;
+        RequestOrder.Enqueue(request);
+        if (NetworkLogLimit.HasValue) TrimNetworkLog(NetworkLogLimit.Value);
     }
 
     internal async Task CaptureResponseBodiesAsync(int maxBytes, ISet<HtmlNetworkResourceType> resourceTypes, CancellationToken cancellationToken, bool redactSensitiveValues = false) {

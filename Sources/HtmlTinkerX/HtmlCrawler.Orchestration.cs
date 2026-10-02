@@ -212,7 +212,7 @@ public static partial class HtmlCrawler {
                             result.AppliedProfileReasonCode = inferredProfileDecision.ReasonCode;
                             result.AppliedProfileReason = inferredProfileDecision.Reason;
                             if (!string.IsNullOrWhiteSpace(fetchedPage.RawHtml)) {
-                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, new Uri(page.ResolutionBaseUrl ?? page.Url), resolvedOptions, structuredSchema);
+                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, new Uri(page.Url), resolvedOptions, structuredSchema);
                             }
                         }
                     }

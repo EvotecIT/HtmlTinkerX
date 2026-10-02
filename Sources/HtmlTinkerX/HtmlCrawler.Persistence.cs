@@ -106,7 +106,7 @@ public static partial class HtmlCrawler {
 
             if (!string.IsNullOrEmpty(page.Html)) {
                 string htmlToWrite = ShouldRewriteStoredHtml(options)
-                    ? RewriteStoredHtmlToLocalPaths(page.Html, page.ResolutionBaseUrl ?? page.Url, page.HtmlPath!, result.Assets, localPageMap, options!)
+                    ? RewriteStoredHtmlToLocalPaths(page.Html, page.ResolutionBaseUrl ?? page.Url, page.HtmlPath!, result.Assets, localPageMap, options!, page.ResolutionBaseUrl != null)
                     : page.Html;
                 await WriteTextAsync(page.HtmlPath!, htmlToWrite, cancellationToken).ConfigureAwait(false);
             }
