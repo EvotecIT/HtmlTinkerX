@@ -21,18 +21,20 @@ public static partial class HtmlCrawler {
         transport.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
         foreach (var header in options.Headers) headers[header.Key] = header.Value;
         if (!string.IsNullOrEmpty(options.UserAgent)) headers["User-Agent"] = options.UserAgent!;
+        headers.TryGetValue("User-Agent", out string? userAgent);
+        headers.Remove("User-Agent");
         if (!string.IsNullOrEmpty(options.Username) && options.Password != null) {
             headers["Authorization"] = new AuthenticationHeaderValue("Basic",
                 Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"))).ToString();
         }
-        return new HttpClient(new CrawlHttpHandler(transport, startUri, options, headers)) {
+        return new HttpClient(new CrawlHttpHandler(transport, startUri, options, headers, userAgent)) {
             Timeout = TimeSpan.FromMilliseconds(options.Timeout)
         };
     }
 
     private sealed class CrawlHttpHandler(
         HttpClient transport, Uri startUri, HtmlCrawlOptions options,
-        IReadOnlyDictionary<string, string> scopedHeaders) : HttpMessageHandler {
+        IReadOnlyDictionary<string, string> scopedHeaders, string? userAgent) : HttpMessageHandler {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             Uri uri = request.RequestUri!;
             for (int hop = 0; ; hop++) {
@@ -40,6 +42,7 @@ public static partial class HtmlCrawler {
                     throw new HttpRequestException($"Request destination '{uri}' is outside the crawl scope.");
                 }
                 using HttpRequestMessage outgoing = new(request.Method, uri);
+                if (!string.IsNullOrEmpty(userAgent)) outgoing.Headers.TryAddWithoutValidation("User-Agent", userAgent);
                 if (HtmlUriUtility.HasSameOrigin(startUri, uri)) {
                     foreach (var header in scopedHeaders) outgoing.Headers.TryAddWithoutValidation(header.Key, header.Value);
                     foreach (var header in request.Headers) {

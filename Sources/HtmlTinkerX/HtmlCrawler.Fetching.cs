@@ -42,6 +42,7 @@ public static partial class HtmlCrawler {
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = (int)response.StatusCode;
             page.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
+            if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             response.EnsureSuccessStatusCode();
 
             byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
@@ -99,12 +100,7 @@ public static partial class HtmlCrawler {
             page.ContentType = TryGetResponseContentType(response);
             Uri responseUri = TryGetAbsoluteUri(session.Page.Url, out Uri? finalUri) ? finalUri! : request.Uri;
             page.Url = NormalizeUrl(responseUri, options);
-            if (options.CrawlOrigin != null && !IsCrawlHostAllowed(responseUri, options.CrawlOrigin, options)) {
-                page.Status = HtmlCrawlPageStatus.Skipped;
-                page.SkipReason = HtmlCrawlSkipReason.OutsideHost;
-                page.Error = "The rendered navigation finished outside the crawl scope.";
-                return new FetchedPageData { Page = page };
-            }
+            if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             if (response != null && !response.Ok) {
                 page.Status = HtmlCrawlPageStatus.Failed;
                 page.Error = $"HTTP request failed with status {response.Status}.";
@@ -245,6 +241,17 @@ public static partial class HtmlCrawler {
         } catch {
             return false;
         }
+    }
+
+    private static bool TrySkipFinalPageDestination(HtmlCrawlPage page, Uri requestedUri, Uri uri, HtmlCrawlOptions options) {
+        // The explicit seed is fetched for discovery; follow-up candidates already passed scope validation.
+        if (Uri.Compare(requestedUri, uri, UriComponents.HttpRequestUrl, UriFormat.UriEscaped, StringComparison.Ordinal) == 0) return false;
+        HtmlCrawlSkipReason reason = GetSkipReasonForCandidate(uri, options.CrawlOrigin ?? uri, options);
+        if (reason == HtmlCrawlSkipReason.None) return false;
+        page.Status = HtmlCrawlPageStatus.Skipped;
+        page.SkipReason = reason;
+        page.Error = $"The final page destination is outside the crawl scope: {reason}.";
+        return true;
     }
 
     private static void PopulatePageFromHtml(HtmlCrawlPage page, string html, Uri requestUri, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, string? titleOverride = null) {

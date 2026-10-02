@@ -122,7 +122,12 @@ public static partial class HtmlCrawler {
             bool anchored = rule.Path.EndsWith("$", StringComparison.Ordinal);
             string pattern = anchored ? rule.Path.Substring(0, rule.Path.Length - 1) : rule.Path;
             string expression = "^" + Regex.Escape(pattern).Replace("\\*", ".*") + (anchored ? "$" : string.Empty);
-            if (!Regex.IsMatch(target, expression, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) continue;
+            try {
+                if (!Regex.IsMatch(target, expression, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) continue;
+            } catch (RegexMatchTimeoutException) {
+                // Permission cannot be established safely for this candidate; keep the crawl running.
+                return false;
+            }
             int length = pattern.Replace("*", string.Empty).Length;
             if (length > bestLength || (length == bestLength && rule.Allow)) {
                 bestLength = length;

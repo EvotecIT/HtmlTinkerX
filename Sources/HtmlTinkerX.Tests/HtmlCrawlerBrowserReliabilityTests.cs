@@ -40,28 +40,31 @@ public partial class HtmlCrawlerTests {
     [InlineData(HtmlBrowserEngine.WebKit)]
     public async Task CrawlAsync_RenderedHeadersAndAuthenticationRemainAtStartingOrigin(HtmlBrowserEngine browser) {
         ConcurrentQueue<(string Path, string? Authorization, string? Secret)> external = new();
-        using HttpListener other = StartFlexibleServer(context => {
+        using HttpListener other = StartFlexibleServer(async context => {
             external.Enqueue((context.Request.RawUrl!, context.Request.Headers["Authorization"], context.Request.Headers["X-Crawl-Secret"]));
             context.Response.StatusCode = 401;
-            context.Response.Headers["WWW-Authenticate"] = "Basic realm=\"external\"";
-            return Task.CompletedTask;
-        }, out string otherRoot);
+            context.Response.AddHeader("WWW-Authenticate", "Basic realm=\"external\"");
+            await RespondAsync(context, "Authentication required", "text/plain");
+        }, out string otherRoot, "127.0.0.1");
         ConcurrentQueue<(string Path, string? Authorization, string? Secret)> trusted = new();
         using HttpListener server = StartFlexibleServer(async context => {
             string path = context.Request.Url!.AbsolutePath;
             trusted.Enqueue((path, context.Request.Headers["Authorization"], context.Request.Headers["X-Crawl-Secret"]));
             if (context.Request.Headers["Authorization"] == null) {
                 context.Response.StatusCode = 401;
-                context.Response.Headers["WWW-Authenticate"] = "Basic realm=\"trusted\"";
+                context.Response.AddHeader("WWW-Authenticate", "Basic realm=\"trusted\"");
+                await RespondAsync(context, "Authentication required", "text/plain");
             } else if (path == "/redirect") {
+                context.Response.ContentLength64 = 0;
                 context.Response.Redirect("/actual/page");
             } else if (path == "/redirect-asset") {
+                context.Response.ContentLength64 = 0;
                 context.Response.Redirect(otherRoot + "redirected");
             } else {
                 await RespondAsync(context, $"<main><p>Rendered content</p><a href='child'>Child</a>"
                     + $"<img src='{otherRoot}direct'><img src='/redirect-asset'></main>");
             }
-        }, out string root);
+        }, out string root, "127.0.0.1");
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true; options.Browser = browser;
         options.Username = "test-user"; options.Password = "test-password";

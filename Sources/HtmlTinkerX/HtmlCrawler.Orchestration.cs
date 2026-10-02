@@ -158,7 +158,9 @@ public static partial class HtmlCrawler {
             using HttpClient client = CreateClient(resolvedOptions, startUri);
 
 
-            if (result.PageCount == 0 && result.PendingPages.Count == 0) {
+            int fetchedCount = result.Pages.Count + result.SkippedPages.Count(page => page.StatusCode.HasValue
+                || page.SkipReason == HtmlCrawlSkipReason.DuplicateContent || page.SkipReason == HtmlCrawlSkipReason.UnsupportedContentType);
+            if (fetchedCount == 0 && result.PendingPages.Count == 0) {
                 EnqueuePage(startUri, null, 0, pending, queued, resolvedOptions);
             }
 
@@ -167,8 +169,6 @@ public static partial class HtmlCrawler {
                 await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
             }
 
-            int fetchedCount = result.Pages.Count + result.SkippedPages.Count(page =>
-                page.SkipReason == HtmlCrawlSkipReason.DuplicateContent || page.SkipReason == HtmlCrawlSkipReason.UnsupportedContentType);
             int previousDelay = 0;
             while (pending.Count > 0 && fetchedCount < resolvedOptions.MaxPages) {
                 cancellationToken.ThrowIfCancellationRequested();

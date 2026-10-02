@@ -34,8 +34,14 @@ public static partial class HtmlCrawler {
             if (!_previousInspected) {
                 _previousInspected = true;
                 if (File.Exists(_paths.ManifestPath)) {
-                    string previousJson = await ReadCheckpointTextAsync(_paths.ManifestPath, token).ConfigureAwait(false);
-                    _previous = ParseCheckpoint(previousJson);
+                    try {
+                        string previousJson = await ReadCheckpointTextAsync(_paths.ManifestPath, token).ConfigureAwait(false);
+                        _previous = ParseCheckpoint(previousJson);
+                    } catch (Exception ex) when (ex is JsonException || ex is InvalidOperationException || ex is FormatException
+                        || ex is IOException || ex is UnauthorizedAccessException) {
+                        // Prior metadata is used only for cleanup. Resume validation happens before this writer.
+                        _previous = null;
+                    }
                 }
             }
             result.PendingPages = SnapshotPendingPages(pending);
