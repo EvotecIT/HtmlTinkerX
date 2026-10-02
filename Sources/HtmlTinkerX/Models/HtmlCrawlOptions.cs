@@ -9,6 +9,8 @@ namespace HtmlTinkerX;
 /// Configures an offline crawl run.
 /// </summary>
 public sealed class HtmlCrawlOptions {
+    internal System.Uri? CrawlOrigin { get; set; }
+
     private readonly HashSet<string> _explicitScenarioOptions = new(System.StringComparer.Ordinal);
     private bool _applyingScenarioDefaults;
     private bool _useCanonicalUrls;

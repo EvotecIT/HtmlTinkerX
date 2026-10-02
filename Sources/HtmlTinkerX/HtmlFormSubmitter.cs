@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -101,8 +102,8 @@ public static class HtmlFormSubmitter {
                 string[] existing = builder.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (string pair in existing) {
                     string[] kv = pair.Split(new[] { '=' }, 2);
-                    string key = Uri.UnescapeDataString(kv[0]);
-                    string value = kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : string.Empty;
+                    string key = WebUtility.UrlDecode(kv[0]);
+                    string value = kv.Length > 1 ? WebUtility.UrlDecode(kv[1]) : string.Empty;
                     parameters.Add(new KeyValuePair<string, string>(key, value));
                 }
             }

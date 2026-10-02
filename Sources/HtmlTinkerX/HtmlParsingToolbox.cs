@@ -38,43 +38,47 @@ public static class HtmlParsingToolbox {
             throw new ArgumentNullException(nameof(html));
         }
 
+        return SelectDataDocument(HtmlParser.ParseWithAngleSharp(html), kinds, baseUri);
+    }
+
+    internal static IReadOnlyList<HtmlDataItem> SelectDataDocument(IDocument document, IReadOnlyCollection<string>? kinds = null, Uri? baseUri = null) {
         HashSet<string>? filter = CreateKindFilter(kinds);
         List<HtmlDataItem> items = new();
-        Uri? effectiveBaseUri = GetEffectiveBaseUri(html, baseUri);
+        Uri? effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
 
         if (Includes(filter, "JsonLd")) {
-            foreach (HtmlJsonLdItem item in HtmlJsonLdParser.Parse(html)) {
+            foreach (HtmlJsonLdItem item in HtmlJsonLdParser.ParseDocument(document)) {
                 Add(items, "JsonLd", FirstNonEmpty(item.Type, item.Id, "@jsonld"), item.Type, item.Id, item.RawJson, item.RawJson, $"script:nth-of-type({item.ScriptIndex + 1})", "Script", item.ScriptIndex);
             }
         }
 
         if (Includes(filter, "AppState")) {
-            foreach (HtmlAppStateEntry item in HtmlAppStateParser.Parse(html)) {
+            foreach (HtmlAppStateEntry item in HtmlAppStateParser.ParseDocument(document)) {
                 Add(items, "AppState", item.Name, item.Framework, null, item.RawJson, item.RawJson, $"script:nth-of-type({item.ScriptIndex + 1})", item.SourceKind, item.ScriptIndex);
             }
         }
 
         if (Includes(filter, "ScriptData")) {
-            foreach (HtmlScriptDataItem item in HtmlScriptDataParser.Parse(html)) {
+            foreach (HtmlScriptDataItem item in HtmlScriptDataParser.ParseDocument(document)) {
                 Add(items, "ScriptData", FirstNonEmpty(item.Id, item.Type, "script-data"), item.Type, item.Id, item.RawJson, item.RawJson, item.Selector, item.SourceKind, item.ScriptIndex);
             }
         }
 
         if (Includes(filter, "HeadLink")) {
-            foreach (HtmlHeadLink item in HtmlHeadLinkParser.Parse(html, baseUri, effectiveBaseUri)) {
+            foreach (HtmlHeadLink item in HtmlHeadLinkParser.ParseDocument(document, baseUri, effectiveBaseUri)) {
                 Add(items, "HeadLink", FirstNonEmpty(item.Rel, item.Name, item.Property, item.Element), item.Type, null, FirstNonEmpty(item.Url, item.Href, item.Content), FirstNonEmpty(item.Href, item.Content, item.Url), item.Selector, item.Element, item.Index);
             }
         }
 
         if (Includes(filter, "Meta")) {
-            foreach (HtmlMetaTag item in HtmlParser.ParseMetaTags(html)) {
+            foreach (HtmlMetaTag item in HtmlParserFromMeta.ParseMetaTagsDocument(document)) {
                 string attribute = FirstNonEmpty(item.SourceAttribute, "name");
                 Add(items, "Meta", item.Name, null, null, item.Content, item.Content, CreateAttributeSelector("meta", attribute, item.Name), "Meta", null);
             }
         }
 
         if (Includes(filter, "OpenGraph")) {
-            foreach (OpenGraphProperty property in HtmlParser.ParseOpenGraph(html).Properties) {
+            foreach (OpenGraphProperty property in HtmlParserFromOpenGraph.ParseOpenGraphDocument(document).Properties) {
                 foreach (string value in property.Values) {
                     string resolved = IsUrlValuedOpenGraphName(property.Name)
                         ? ResolveUrlValue(value, effectiveBaseUri)
@@ -85,19 +89,19 @@ public static class HtmlParsingToolbox {
         }
 
         if (Includes(filter, "Microdata")) {
-            foreach (HtmlMicrodataItem item in HtmlParser.ParseMicrodataItems(html)) {
+            foreach (HtmlMicrodataItem item in HtmlParserFromMicrodata.ParseMicrodataDocument(document)) {
                 Add(items, "Microdata", FirstNonEmpty(item.Type, item.Id, "microdata"), item.Type, item.Id, item.Properties, SerializeValue(item.Properties), "[itemscope]", "Microdata", null);
             }
         }
 
         if (Includes(filter, "Token")) {
-            foreach (HtmlToken item in HtmlTokenParser.Parse(html)) {
+            foreach (HtmlToken item in HtmlTokenParser.ParseDocument(document)) {
                 Add(items, "Token", item.Name, null, null, item.Value, item.Value, item.Selector, item.Source, item.Index);
             }
         }
 
         if (Includes(filter, "Form")) {
-            foreach (HtmlFormResult form in HtmlParser.ParseFormsWithAngleSharp(html)) {
+            foreach (HtmlFormResult form in HtmlParserFromForm.ParseFormsDocument(document)) {
                 string formName = FirstNonEmpty(form.Metadata.Id, $"form[{form.Metadata.FormIndex}]");
                 string actionTarget = ResolveFormActionValue(form.Metadata.Action, effectiveBaseUri, baseUri);
                 Add(items, "Form", formName, form.Metadata.Method.ToString().ToUpperInvariant(), form.Metadata.Id, CreateFormFieldSignatures(form.Fields), actionTarget, CreateFormSelector(form.Metadata), "Form", form.Metadata.FormIndex);
@@ -105,13 +109,13 @@ public static class HtmlParsingToolbox {
         }
 
         if (Includes(filter, "Link")) {
-            foreach (HtmlDiscoveredLink link in HtmlDiscoveryParser.ParseLinks(html, effectiveBaseUri)) {
+            foreach (HtmlDiscoveredLink link in HtmlDiscoveryParser.ParseLinksDocument(document, effectiveBaseUri)) {
                 Add(items, "Link", FirstNonEmpty(link.Text, link.Title, link.Url), null, null, link.Url, link.Href, "a[href]", "Anchor", null);
             }
         }
 
         if (Includes(filter, "Asset")) {
-            foreach (HtmlAssetReference asset in HtmlWorkflowParser.SelectAssets(html, baseUri)) {
+            foreach (HtmlAssetReference asset in HtmlWorkflowParser.SelectAssetsDocument(document, baseUri)) {
                 Add(items, "Asset", asset.Kind, asset.Type, null, FirstNonEmpty(asset.ResolvedUrl, asset.Url, asset.Content), FirstNonEmpty(asset.Url, asset.Content), asset.Element, asset.Attribute, asset.Index);
             }
         }
@@ -586,7 +590,10 @@ public static class HtmlParsingToolbox {
         value.StartsWith("form[", StringComparison.OrdinalIgnoreCase) && value.EndsWith("]", StringComparison.Ordinal);
 
     private static Uri? GetEffectiveBaseUri(string html, Uri? baseUri) {
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return GetEffectiveBaseUri(HtmlParser.ParseWithAngleSharp(html), baseUri);
+    }
+
+    private static Uri? GetEffectiveBaseUri(IDocument document, Uri? baseUri) {
         Uri? effectiveBaseUri = HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
         if (effectiveBaseUri != null) {
             return effectiveBaseUri;

@@ -228,11 +228,13 @@ public static partial class HtmlBrowser {
             contextOptions,
             options,
             setStorageState: false);
+        if (options.BlockServiceWorkers) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
 
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions.HttpCredentials = new HttpCredentials {
                 Username = options.Username!,
-                Password = options.Password!
+                Password = options.Password!,
+                Origin = options.HttpCredentialOrigin
             };
         }
 
@@ -274,7 +276,8 @@ public static partial class HtmlBrowser {
             contextOptions = new BrowserNewContextOptions {
                 HttpCredentials = new HttpCredentials {
                     Username = options.Username!,
-                    Password = options.Password!
+                    Password = options.Password!,
+                Origin = options.HttpCredentialOrigin
                 }
             };
         }
@@ -283,6 +286,7 @@ public static partial class HtmlBrowser {
         contextOptions.IgnoreHTTPSErrors = options.IgnoreHTTPSErrors;
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
+        if (options.BlockServiceWorkers) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
 
         Task<IBrowserContext> contextCreation = browserInstance.NewContextAsync(contextOptions);
         IBrowserContext context;

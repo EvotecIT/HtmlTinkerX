@@ -44,6 +44,49 @@ public class HtmlBrowserNetworkLogLimitTests {
     }
 
     [Fact]
+    public async Task NetworkLogLimit_LateResponseCannotResurrectEvictedRequests() {
+        var page = new Mock<IPage>();
+        await using HtmlBrowserSession session = new(new Mock<IPlaywright>().Object, null,
+            new Mock<IBrowserContext>().Object, page.Object);
+        session.NetworkLogLimit = 1;
+        var requests = Enumerable.Range(0, 2).Select(index => {
+            var request = new Mock<IRequest>();
+            request.SetupGet(r => r.Url).Returns($"https://example.org/{index}");
+            request.SetupGet(r => r.Method).Returns("GET");
+            request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+            return request;
+        }).ToArray();
+        foreach (var request in requests) page.Raise(p => p.Request += null!, page.Object, request.Object);
+        var response = new Mock<IResponse>();
+        response.SetupGet(r => r.Request).Returns(requests[0].Object);
+        response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+        page.Raise(p => p.Response += null!, page.Object, response.Object);
+        Assert.Equal("https://example.org/1", Assert.Single(session.NetworkLog).Url);
+        session.NetworkLogLimit = 0;
+        Assert.Empty(session.NetworkLog);
+    }
+
+    [Fact]
+    public async Task NetworkLogCursor_ReturnsNewRequestsWhenTheBoundedLogIsFull() {
+        var page = new Mock<IPage>();
+        await using HtmlBrowserSession session = new(new Mock<IPlaywright>().Object, null,
+            new Mock<IBrowserContext>().Object, page.Object);
+        session.NetworkLogLimit = 1;
+        var requests = Enumerable.Range(0, 2).Select(index => {
+            var request = new Mock<IRequest>();
+            request.SetupGet(r => r.Url).Returns($"https://example.org/{index}");
+            request.SetupGet(r => r.Method).Returns("GET");
+            request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
+            return request;
+        }).ToArray();
+        page.Raise(p => p.Request += null!, page.Object, requests[0].Object);
+        long cursor = session.NetworkLogPosition;
+        page.Raise(p => p.Request += null!, page.Object, requests[1].Object);
+        Assert.Equal("https://example.org/1", Assert.Single(session.GetNetworkLogSince(cursor)).Url);
+        Assert.Empty(session.GetNetworkLogSince(session.NetworkLogPosition));
+    }
+
+    [Fact]
     public async Task NetworkLogLimit_Null_KeepsAllEntries() {
         var playwright = new Mock<IPlaywright>();
         var browser = new Mock<IBrowser>();

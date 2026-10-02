@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,11 +73,20 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     private ConcurrentQueue<IRequest>? _order;
     private object? _networkSync;
     private Task? _disposeTask;
+    private bool _pageClosed;
+    private bool _contextClosed;
+    private bool _videoSaved;
+    private bool _browserClosed;
+    private bool _playwrightDisposed;
     private object? _disposeSync;
     private ConcurrentQueue<IRequest> RequestOrder => LazyInitializer.EnsureInitialized(ref _order, () => new ConcurrentQueue<IRequest>())!;
     private object NetworkSync => LazyInitializer.EnsureInitialized(ref _networkSync, () => new object())!;
     private object DisposeSync => LazyInitializer.EnsureInitialized(ref _disposeSync, () => new object())!;
     private readonly ConcurrentQueue<HtmlConsoleEntry> _console = new();
+    private readonly Dictionary<long, HtmlNetworkEntry> _networkBySequence = new();
+    private long _firstNetworkSequence = 1;
+    private long _networkSequence;
+    internal long NetworkLogPosition => Interlocked.Read(ref _networkSequence);
     private int? _networkLogLimit;
     /// <summary>
     /// Gets or sets the maximum number of network log entries to keep.
@@ -93,37 +103,28 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         }
     }
     /// <summary>Captured network log entries.</summary>
-    public IEnumerable<HtmlNetworkEntry> NetworkLog {
-        get {
-            ConcurrentDictionary<IRequest, HtmlNetworkEntry>? network = _network;
-            if (network is null) {
-                return Array.Empty<HtmlNetworkEntry>();
-            }
+    public IEnumerable<HtmlNetworkEntry> NetworkLog => GetNetworkLogSince(-1);
 
-            List<IRequest> orderedRequests = new List<IRequest>();
-            List<HtmlNetworkEntry> orderedEntries = new List<HtmlNetworkEntry>();
-
-            lock (NetworkSync) {
-                ConcurrentQueue<IRequest> requestOrder = RequestOrder;
-
-                while (requestOrder.TryDequeue(out IRequest? request)) {
-                    orderedRequests.Add(request);
+    internal IReadOnlyList<HtmlNetworkEntry> GetNetworkLogSince(long position) {
+        if (_network == null) return Array.Empty<HtmlNetworkEntry>();
+        List<HtmlNetworkEntry> entries = new();
+        lock (NetworkSync) {
+            if (position >= 0) {
+                for (long sequence = Math.Max(position + 1, _firstNetworkSequence); sequence <= _networkSequence; sequence++) {
+                    if (_networkBySequence.TryGetValue(sequence, out HtmlNetworkEntry? entry)) entries.Add(entry);
                 }
-
-                if (orderedRequests.Count == 0) {
-                    orderedEntries.AddRange(network.Values);
-                } else {
-                    foreach (IRequest request in orderedRequests) {
-                        requestOrder.Enqueue(request);
-                        if (network.TryGetValue(request, out HtmlNetworkEntry? entry)) {
-                            orderedEntries.Add(entry);
-                        }
-                    }
+                return entries;
+            }
+            foreach (IRequest request in RequestOrder.ToArray()) {
+                if (_network.TryGetValue(request, out HtmlNetworkEntry? entry) && entry.CaptureSequence > position) {
+                    entries.Add(entry);
                 }
             }
-
-            return orderedEntries;
+            if (RequestOrder.IsEmpty) {
+                entries.AddRange(_network.Values.Where(entry => entry.CaptureSequence > position));
+            }
         }
+        return entries;
     }
     /// <summary>Captured console log entries.</summary>
     public IEnumerable<HtmlConsoleEntry> ConsoleLog => _console;
@@ -181,6 +182,8 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             };
 
             lock (NetworkSync) {
+                entry.CaptureSequence = ++_networkSequence;
+                _networkBySequence[entry.CaptureSequence] = entry;
                 _network[req] = entry;
                 RequestOrder.Enqueue(req);
                 if (NetworkLogLimit.HasValue) {
@@ -190,17 +193,16 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         };
 
         Page.Response += (_, res) => {
-            HtmlNetworkEntry entry = _network.GetOrAdd(res.Request, r => new HtmlNetworkEntry {
-                Url = r.Url,
-                Method = HtmlEnumParser.ParseHttpMethod(r.Method),
-                RequestHeaders = new Dictionary<string, string>(r.Headers),
-                ResourceType = HtmlEnumParser.ParseNetworkResourceType(r.ResourceType),
-                Started = System.DateTimeOffset.UtcNow
-            });
-            entry.Status = (System.Net.HttpStatusCode)res.Status;
-            entry.ResponseHeaders = new Dictionary<string, string>(res.Headers);
-            entry.ResponseReceived = System.DateTimeOffset.UtcNow;
-            _responses[res.Request] = res;
+            lock (NetworkSync) {
+                // A late response must not re-admit a request already evicted by the limit.
+                if (!_network.TryGetValue(res.Request, out HtmlNetworkEntry? entry)) {
+                    return;
+                }
+                entry.Status = (System.Net.HttpStatusCode)res.Status;
+                entry.ResponseHeaders = new Dictionary<string, string>(res.Headers);
+                entry.ResponseReceived = System.DateTimeOffset.UtcNow;
+                _responses[res.Request] = res;
+            }
         };
 
         Page.RequestFinished += (_, req) => {
@@ -315,7 +317,10 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     private void TrimNetworkLog(int limit) {
         ConcurrentQueue<IRequest> requestOrder = RequestOrder;
         while (requestOrder.Count > limit && requestOrder.TryDequeue(out IRequest? oldReq)) {
-            _network?.TryRemove(oldReq, out _);
+            if (_network != null && _network.TryRemove(oldReq, out HtmlNetworkEntry? oldEntry)) {
+                _networkBySequence.Remove(oldEntry.CaptureSequence);
+                _firstNetworkSequence = Math.Max(_firstNetworkSequence, oldEntry.CaptureSequence + 1);
+            }
             _responses.TryRemove(oldReq, out _);
         }
     }
@@ -333,38 +338,80 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     }
 
     private async Task DisposeCoreAsync() {
-        if (_closePageOnDispose && Page != null && !Page.IsClosed) {
+        List<Exception> errors = new();
+        bool browserAttempted = false;
+        if (!_pageClosed && _closePageOnDispose && Page != null && !Page.IsClosed) {
             try {
                 await Page.CloseAsync().ConfigureAwait(false);
+                _pageClosed = true;
             } catch (PlaywrightException) {
-                // CDP-attached browsers can be closed by the user outside this session.
+                // An attached browser may already have been closed by its owner.
+                _pageClosed = true;
+            } catch (Exception ex) {
+                errors.Add(ex);
             }
         }
 
-        if (_closeContextOnDispose && Context != null) {
-            await Context.CloseAsync().ConfigureAwait(false);
-        }
-
-        if (Video != null && !string.IsNullOrEmpty(VideoPath)) {
-            string fullPath = VideoPath!.ToFullPath();
-            await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
+        if (!_contextClosed && _closeContextOnDispose && Context != null) {
             try {
-                string tempPath = await Video.PathAsync().ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(tempPath) &&
-                    !string.Equals(tempPath, fullPath, System.StringComparison.OrdinalIgnoreCase) &&
-                    System.IO.File.Exists(tempPath)) {
-                    System.IO.File.Delete(tempPath);
-                }
-            } catch {
-                // Ignore cleanup errors
+                await Context.CloseAsync().ConfigureAwait(false);
+                _contextClosed = true;
+            } catch (Exception ex) {
+                errors.Add(ex);
             }
         }
 
-        if (_closeBrowserOnDispose && Browser != null) {
-            await Browser.CloseAsync().ConfigureAwait(false);
+        // Closing the browser also releases a context whose close operation failed.
+        // Do that before saving video in the failure path, so SaveAs cannot wait on it.
+        if (errors.Count > 0) {
+            await CloseBrowserAsync().ConfigureAwait(false);
         }
-        if (Playwright != null) {
-            Playwright.Dispose();
+        if (!_videoSaved && Video != null && !string.IsNullOrEmpty(VideoPath)
+            && (!_closeContextOnDispose || _contextClosed || _browserClosed)) {
+            try {
+                string fullPath = VideoPath!.ToFullPath();
+                await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
+                _videoSaved = true;
+                try {
+                    string tempPath = await Video.PathAsync().ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(tempPath) &&
+                        !string.Equals(tempPath, fullPath, StringComparison.OrdinalIgnoreCase) &&
+                        System.IO.File.Exists(tempPath)) {
+                        System.IO.File.Delete(tempPath);
+                    }
+                } catch {
+                    // Saving succeeded; deleting the recording's temporary copy is best effort.
+                }
+            } catch (Exception ex) {
+                errors.Add(ex);
+            }
+        }
+        await CloseBrowserAsync().ConfigureAwait(false);
+        if (!_playwrightDisposed && Playwright != null) {
+            try {
+                Playwright.Dispose();
+                _playwrightDisposed = true;
+            } catch (Exception ex) {
+                errors.Add(ex);
+            }
+        }
+        if (errors.Count == 1) {
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        }
+        if (errors.Count > 1) {
+            throw new AggregateException("Browser session cleanup failed.", errors);
+        }
+
+        async Task CloseBrowserAsync() {
+            if (!browserAttempted && !_browserClosed && _closeBrowserOnDispose && Browser != null) {
+                browserAttempted = true;
+                try {
+                    await Browser.CloseAsync().ConfigureAwait(false);
+                    _browserClosed = true;
+                } catch (Exception ex) {
+                    errors.Add(ex);
+                }
+            }
         }
     }
 }

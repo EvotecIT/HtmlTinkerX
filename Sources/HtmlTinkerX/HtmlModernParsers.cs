@@ -128,7 +128,10 @@ public static class HtmlJsonLdParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static IReadOnlyList<HtmlJsonLdItem> ParseDocument(IDocument document) {
         List<HtmlJsonLdItem> items = new();
         int scriptIndex = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {
@@ -231,7 +234,10 @@ public static class HtmlAppStateParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static IReadOnlyList<HtmlAppStateEntry> ParseDocument(IDocument document) {
         List<HtmlAppStateEntry> entries = new();
         int scriptIndex = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {
@@ -356,7 +362,10 @@ public static class HtmlHeadLinkParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseDocument(HtmlParser.ParseWithAngleSharp(html), baseUri, effectiveBaseUriOverride);
+    }
+
+    internal static IReadOnlyList<HtmlHeadLink> ParseDocument(IDocument document, Uri? baseUri = null, Uri? effectiveBaseUriOverride = null) {
         IElement scope = document.Head ?? document.DocumentElement;
         Uri? effectiveBaseUri = effectiveBaseUriOverride ?? HtmlModernParserUtilities.GetEffectiveBaseUri(document, baseUri);
         List<HtmlHeadLink> links = new();
@@ -469,7 +478,10 @@ public static class HtmlTokenParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseDocument(HtmlParser.ParseWithAngleSharp(html), names);
+    }
+
+    internal static IReadOnlyList<HtmlToken> ParseDocument(IDocument document, string[]? names = null) {
         List<HtmlToken> tokens = new();
         foreach (IElement element in document.QuerySelectorAll("input[name], meta[name], meta[property], [data-token], [nonce]")) {
             string name = element.GetAttribute("name")
@@ -709,6 +721,7 @@ public static class HtmlRobotsParser {
         List<HtmlRobotsRule> rules = new();
         List<string> currentAgents = new();
         int groupIndex = -1;
+        bool groupHasDirectives = false;
         string[] lines = content.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         for (int index = 0; index < lines.Length; index++) {
             string line = StripComment(lines[index]).Trim();
@@ -724,9 +737,10 @@ public static class HtmlRobotsParser {
             string directive = line.Substring(0, colon).Trim();
             string value = line.Substring(colon + 1).Trim();
             if (directive.Equals("User-agent", StringComparison.OrdinalIgnoreCase)) {
-                if (currentAgents.Count == 0 || rules.Any(rule => rule.GroupIndex == groupIndex && !rule.Directive.Equals("User-agent", StringComparison.OrdinalIgnoreCase))) {
+                if (currentAgents.Count == 0 || groupHasDirectives) {
                     groupIndex++;
                     currentAgents.Clear();
+                    groupHasDirectives = false;
                 }
 
                 currentAgents.Add(value);
@@ -739,6 +753,7 @@ public static class HtmlRobotsParser {
                 continue;
             }
 
+            groupHasDirectives = true;
             IEnumerable<string> agents = currentAgents.Count == 0 ? new[] { string.Empty } : currentAgents;
             foreach (string agent in agents) {
                 rules.Add(CreateRobotsRule(rules.Count, Math.Max(groupIndex, 0), directive, value, agent, index + 1, baseUri));

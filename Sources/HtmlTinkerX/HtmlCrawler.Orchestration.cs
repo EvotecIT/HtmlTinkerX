@@ -60,14 +60,22 @@ public static partial class HtmlCrawler {
             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
         }
         ValidateOptions(resolvedOptions);
+        resolvedOptions.CrawlOrigin = startUri;
 
+        CrawlRenderSession? renderSession = null;
+        CrawlCheckpointWriter? checkpointWriter = null;
+        async Task<HtmlBrowserSession> GetRenderSessionAsync() {
+            renderSession ??= await CreateRenderSessionAsync(resolvedOptions, startUri, cancellationToken).ConfigureAwait(false);
+            return renderSession.Session;
+        }
         try {
             string persistencePath = resolvedOptions.OutputPath ?? resolvedOptions.ResumePath ?? string.Empty;
             bool persistSnapshots = !string.IsNullOrEmpty(persistencePath);
+            if (persistSnapshots) checkpointWriter = new CrawlCheckpointWriter(persistencePath);
             HtmlCrawlResult result;
             if (!string.IsNullOrEmpty(resolvedOptions.ResumePath)) {
                 result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken).ConfigureAwait(false);
-                if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.OrdinalIgnoreCase)) {
+                if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.Ordinal)) {
                     throw new InvalidOperationException($"Resume data was created for '{result.StartUrl}', but the current crawl starts from '{startUri.AbsoluteUri}'.");
                 }
             } else {
@@ -107,15 +115,18 @@ public static partial class HtmlCrawler {
             result.ListingCardMetadataMode = resolvedOptions.ListingCardMetadataMode;
 
             Queue<CrawlRequest> pending = new();
-            HashSet<string> queued = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> queued = new(StringComparer.Ordinal);
+            HashSet<string> visited = new(StringComparer.Ordinal);
             Dictionary<string, RobotsDocument?> robotsCache = new(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, string> contentFingerprints = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> downloadedAssets = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> downloadedAssets = new(StringComparer.Ordinal);
 
             foreach (HtmlCrawlPage page in result.Pages) {
                 if (!string.IsNullOrEmpty(page.Url)) {
                     visited.Add(page.Url);
+                }
+                if (!string.IsNullOrWhiteSpace(page.RequestedUrl) && TryResolveAbsoluteUri(startUri, page.RequestedUrl!, out Uri? requestedUri)) {
+                    visited.Add(NormalizeUrl(requestedUri!, resolvedOptions));
                 }
 
                 if (!string.IsNullOrWhiteSpace(page.ContentFingerprint) && !string.IsNullOrWhiteSpace(page.Url) && !contentFingerprints.ContainsKey(page.ContentFingerprint!)) {
@@ -133,6 +144,9 @@ public static partial class HtmlCrawler {
                 if (!string.IsNullOrEmpty(page.Url)) {
                     visited.Add(page.Url);
                 }
+                if (!string.IsNullOrWhiteSpace(page.RequestedUrl) && TryResolveAbsoluteUri(startUri, page.RequestedUrl!, out Uri? requestedUri)) {
+                    visited.Add(NormalizeUrl(requestedUri!, resolvedOptions));
+                }
             }
 
             foreach (HtmlCrawlPendingItem item in result.PendingPages) {
@@ -141,10 +155,8 @@ public static partial class HtmlCrawler {
                 }
             }
 
-            using HttpClient client = CreateClient(resolvedOptions);
-            await using HtmlBrowserSession? session = (resolvedOptions.Render || resolvedOptions.AutoRender)
-                ? await CreateRenderSessionAsync(resolvedOptions, cancellationToken).ConfigureAwait(false)
-                : null;
+            using HttpClient client = CreateClient(resolvedOptions, startUri);
+
 
             if (result.PageCount == 0 && result.PendingPages.Count == 0) {
                 EnqueuePage(startUri, null, 0, pending, queued, resolvedOptions);
@@ -152,10 +164,13 @@ public static partial class HtmlCrawler {
 
             await DiscoverSitemapCandidatesAsync(startUri, client, resolvedOptions, robotsCache, result, pending, queued, visited, cancellationToken).ConfigureAwait(false);
             if (persistSnapshots) {
-                await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
             }
 
-            while (pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
+            int fetchedCount = result.Pages.Count + result.SkippedPages.Count(page =>
+                page.SkipReason == HtmlCrawlSkipReason.DuplicateContent || page.SkipReason == HtmlCrawlSkipReason.UnsupportedContentType);
+            int previousDelay = 0;
+            while (pending.Count > 0 && fetchedCount < resolvedOptions.MaxPages) {
                 cancellationToken.ThrowIfCancellationRequested();
                 CrawlRequest next = pending.Dequeue();
                 string normalizedUrl = NormalizeUrl(next.Uri, resolvedOptions);
@@ -168,16 +183,19 @@ public static partial class HtmlCrawler {
                     if (robots != null && !IsAllowedByRobots(robots, next.Uri)) {
                         result.SkippedPages.Add(CreateSkippedPage(next, HtmlCrawlSkipReason.DisallowedByRobots));
                         if (persistSnapshots) {
-                            await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                            await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                         }
                         continue;
                     }
                 }
 
+                if (previousDelay > 0) await Task.Delay(previousDelay, cancellationToken).ConfigureAwait(false);
+                previousDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                fetchedCount++;
                 HtmlCrawlPage page;
                 FetchedPageData fetchedPage;
                 if (resolvedOptions.Render) {
-                    fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
+                    fetchedPage = await FetchRenderedPageAsync(await GetRenderSessionAsync().ConfigureAwait(false), next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
@@ -194,7 +212,7 @@ public static partial class HtmlCrawler {
                             result.AppliedProfileReasonCode = inferredProfileDecision.ReasonCode;
                             result.AppliedProfileReason = inferredProfileDecision.Reason;
                             if (!string.IsNullOrWhiteSpace(fetchedPage.RawHtml)) {
-                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, next.Uri, resolvedOptions, structuredSchema);
+                                PopulatePageFromHtml(page, fetchedPage.RawHtml!, new Uri(page.ResolutionBaseUrl ?? page.Url), resolvedOptions, structuredSchema);
                             }
                         }
                     }
@@ -204,7 +222,7 @@ public static partial class HtmlCrawler {
                         page.RenderReasonCode = decision.ReasonCode;
                         page.RenderReason = decision.Reason;
                         if (decision.ShouldRender) {
-                            fetchedPage = await FetchRenderedPageAsync(session!, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
+                            fetchedPage = await FetchRenderedPageAsync(await GetRenderSessionAsync().ConfigureAwait(false), next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                             page = fetchedPage.Page;
                             page.RenderMode = HtmlCrawlRenderMode.AutoRendered;
                             page.RenderReasonCode = decision.ReasonCode;
@@ -216,12 +234,14 @@ public static partial class HtmlCrawler {
                     }
                 }
 
+                renderSession?.ThrowIfFaulted();
+                visited.Add(page.Url);
                 ApplyRunMetadata(page, result);
 
                 if (page.Status == HtmlCrawlPageStatus.Skipped) {
                     result.SkippedPages.Add(page);
                     if (persistSnapshots) {
-                        await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                        await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                     }
                     continue;
                 }
@@ -231,13 +251,13 @@ public static partial class HtmlCrawler {
                 if (TrySkipDuplicateContent(page, resolvedOptions, contentFingerprints, out HtmlCrawlPage? duplicatePage)) {
                     result.SkippedPages.Add(duplicatePage!);
                     if (persistSnapshots) {
-                        await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                        await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                     }
                     continue;
                 }
 
                 if (page.Status == HtmlCrawlPageStatus.Success && page.Rendered && resolvedOptions.RenderedPageObserver != null) {
-                    HtmlCrawlRenderedPageContext observerContext = new(session!, page, fetchedPage.RenderedNetworkLog);
+                    HtmlCrawlRenderedPageContext observerContext = new(renderSession!.Session, page, fetchedPage.RenderedNetworkLog);
                     await resolvedOptions.RenderedPageObserver.ObserveAsync(observerContext, cancellationToken).ConfigureAwait(false);
                 }
 
@@ -255,13 +275,9 @@ public static partial class HtmlCrawler {
                     }
                 }
 
-                int crawlDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
-                if (crawlDelay > 0 && pending.Count > 0 && result.Pages.Count < resolvedOptions.MaxPages) {
-                    await Task.Delay(crawlDelay, cancellationToken).ConfigureAwait(false);
-                }
 
                 if (persistSnapshots) {
-                    await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                    await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -270,10 +286,16 @@ public static partial class HtmlCrawler {
             UpdateDerivedResultData(result);
             if (persistSnapshots) {
                 await PersistSnapshotAsync(result, persistencePath, pending, cancellationToken, resolvedOptions).ConfigureAwait(false);
+                checkpointWriter!.RemoveAfterFinalExport();
             }
             return result;
         } finally {
-            resolvedOptions.ClearSensitiveData();
+            checkpointWriter?.RemoveUnpublished();
+            try {
+                if (renderSession != null) await renderSession.DisposeAsync().ConfigureAwait(false);
+            } finally {
+                resolvedOptions.ClearSensitiveData();
+            }
         }
     }
 
@@ -319,76 +341,6 @@ public static partial class HtmlCrawler {
         }
     }
 
-    private static HttpClient CreateClient(HtmlCrawlOptions options) {
-        NetworkCredential? proxyCredential = null;
-        if (!string.IsNullOrEmpty(options.ProxyUsername) || !string.IsNullOrEmpty(options.ProxyPassword)) {
-            proxyCredential = new NetworkCredential(options.ProxyUsername, options.ProxyPassword);
-        }
-
-        HttpClient client = HtmlHttpClientFactory.Create(options.Proxy, proxyCredential);
-        client.Timeout = TimeSpan.FromMilliseconds(options.Timeout);
-
-        if (!string.IsNullOrEmpty(options.UserAgent)) {
-            client.DefaultRequestHeaders.UserAgent.Clear();
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(options.UserAgent);
-        }
-
-        foreach (var header in options.Headers) {
-            client.DefaultRequestHeaders.Remove(header.Key);
-            client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
-        }
-
-        if (!string.IsNullOrEmpty(options.Username) && options.Password != null) {
-            string basicToken = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"));
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicToken);
-        }
-
-        return client;
-    }
-
-    private static async Task<HtmlBrowserSession> CreateRenderSessionAsync(HtmlCrawlOptions options, CancellationToken cancellationToken) {
-        string bootstrapUrl = "about:blank";
-        HtmlBrowserSession session = !string.IsNullOrEmpty(options.StorageStatePath)
-            ? await HtmlBrowser.ImportSessionAsync(
-                bootstrapUrl,
-                options.StorageStatePath!,
-                browser: options.Browser,
-                clean: options.CleanBrowserInstall,
-                headless: options.Headless,
-                userAgent: options.UserAgent,
-                proxy: options.Proxy,
-                proxyUsername: options.ProxyUsername,
-                proxyPassword: options.ProxyPassword,
-                timeout: options.Timeout,
-                cancellationToken: cancellationToken).ConfigureAwait(false)
-            : await HtmlBrowser.OpenSessionAsync(
-                bootstrapUrl,
-                browser: options.Browser,
-                clean: options.CleanBrowserInstall,
-                username: options.Username,
-                password: options.Password,
-                formLogin: options.FormLogin,
-                headless: options.Headless,
-                userAgent: options.UserAgent,
-                proxy: options.Proxy,
-                proxyUsername: options.ProxyUsername,
-                proxyPassword: options.ProxyPassword,
-                timeout: options.Timeout,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-        session.Page.SetDefaultTimeout(options.Timeout);
-
-        if (options.Headers.Count > 0) {
-            await session.Context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>(options.Headers, StringComparer.OrdinalIgnoreCase)).ConfigureAwait(false);
-        }
-
-        foreach (string pattern in options.BlockResourcePatterns) {
-            await HtmlBrowser.RegisterRouteAsync(session, pattern, route => route.AbortAsync(), cancellationToken).ConfigureAwait(false);
-        }
-
-        return session;
-    }
-
     private static async Task DiscoverSitemapCandidatesAsync(
         Uri startUri,
         HttpClient client,
@@ -403,7 +355,7 @@ public static partial class HtmlCrawler {
             return;
         }
 
-        HashSet<string> initialSitemaps = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> initialSitemaps = new(StringComparer.Ordinal);
         foreach (string sitemap in options.SitemapUrls) {
             if (TryResolveAbsoluteUri(startUri, sitemap, out Uri? resolved)) {
                 initialSitemaps.Add(NormalizeUrl(resolved!, options));
@@ -426,7 +378,7 @@ public static partial class HtmlCrawler {
         }
 
         Queue<Uri> sitemapQueue = new();
-        HashSet<string> processedSitemaps = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> processedSitemaps = new(StringComparer.Ordinal);
         foreach (string sitemap in initialSitemaps) {
             if (Uri.TryCreate(sitemap, UriKind.Absolute, out Uri? sitemapUri) && processedSitemaps.Add(sitemap)) {
                 sitemapQueue.Enqueue(sitemapUri);
@@ -440,11 +392,14 @@ public static partial class HtmlCrawler {
         while (sitemapQueue.Count > 0) {
             cancellationToken.ThrowIfCancellationRequested();
             Uri sitemapUri = sitemapQueue.Dequeue();
+            if (!IsCrawlHostAllowed(sitemapUri, startUri, options)) continue;
             result.SitemapUrls.Add(sitemapUri.AbsoluteUri);
 
             string xml;
             try {
-                xml = await HtmlUtilities.GetStringWithProperEncodingAsync(client, sitemapUri.AbsoluteUri, sitemapFetchOptions, cancellationToken).ConfigureAwait(false);
+                HtmlHttpTextResult sitemapResponse = await HtmlUtilities.GetTextWithProperEncodingAsync(client, sitemapUri.AbsoluteUri, sitemapFetchOptions, cancellationToken).ConfigureAwait(false);
+                xml = sitemapResponse.Content;
+                sitemapUri = sitemapResponse.FinalUri ?? sitemapUri;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch {
@@ -482,7 +437,8 @@ public static partial class HtmlCrawler {
             }
 
             foreach (string location in document.Descendants().Where(x => x.Name.LocalName == "loc").Select(x => x.Value.Trim())) {
-                QueueCandidate(location, sitemapUri.AbsoluteUri, 0, startUri, options, pending, queued, visited, result);
+                string candidate = Uri.TryCreate(sitemapUri, location, out Uri? resolvedLocation) ? resolvedLocation.AbsoluteUri : location;
+                QueueCandidate(candidate, sitemapUri.AbsoluteUri, 0, startUri, options, pending, queued, visited, result);
             }
         }
     }
@@ -538,7 +494,7 @@ public static partial class HtmlCrawler {
 
         string pathPrefix = NormalizePathPrefix(options.PathPrefix);
         if (!string.IsNullOrEmpty(pathPrefix) &&
-            !candidate.AbsolutePath.StartsWith(pathPrefix, StringComparison.OrdinalIgnoreCase)) {
+            !candidate.AbsolutePath.StartsWith(pathPrefix, StringComparison.Ordinal)) {
             return HtmlCrawlSkipReason.OutsidePathScope;
         }
 
@@ -556,196 +512,6 @@ public static partial class HtmlCrawler {
         }
 
         return HtmlCrawlSkipReason.None;
-    }
-
-    private static async Task<RobotsDocument?> GetRobotsDocumentAsync(
-        Uri uri,
-        HttpClient client,
-        HtmlCrawlOptions options,
-        IDictionary<string, RobotsDocument?> cache,
-        CancellationToken cancellationToken) {
-        string hostKey = GetHostKey(uri);
-        if (cache.TryGetValue(hostKey, out RobotsDocument? cached)) {
-            return cached;
-        }
-
-        Uri robotsUri = new UriBuilder(uri.Scheme, uri.Host, uri.Port) {
-            Path = "/robots.txt"
-        }.Uri;
-
-        try {
-            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
-            CancellationToken requestToken = requestTimeout.Token;
-            using HttpResponseMessage response = await client.GetAsync(robotsUri, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) {
-                cache[hostKey] = new RobotsDocument();
-                return cache[hostKey];
-            }
-
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
-            string text = Encoding.UTF8.GetString(bytes);
-            RobotsDocument robots = ParseRobots(text, options.RobotsUserAgent);
-            cache[hostKey] = robots;
-            return robots;
-        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
-            throw;
-        } catch {
-            cache[hostKey] = new RobotsDocument();
-            return cache[hostKey];
-        }
-    }
-
-    private static RobotsDocument ParseRobots(string content, string crawlerUserAgent) {
-        List<RobotsGroup> groups = new();
-        List<string> sitemapUrls = new();
-        RobotsGroup currentGroup = new();
-        bool currentGroupHasDirectives = false;
-
-        foreach (string rawLine in content.Replace("\r", string.Empty).Split('\n')) {
-            string line = StripComment(rawLine).Trim();
-            if (string.IsNullOrWhiteSpace(line)) {
-                continue;
-            }
-
-            int separatorIndex = line.IndexOf(':');
-            if (separatorIndex <= 0) {
-                continue;
-            }
-
-            string key = line.Substring(0, separatorIndex).Trim();
-            string value = line.Substring(separatorIndex + 1).Trim();
-
-            if (key.Equals("User-agent", StringComparison.OrdinalIgnoreCase)) {
-                if (currentGroup.UserAgents.Count > 0 && currentGroupHasDirectives) {
-                    groups.Add(currentGroup);
-                    currentGroup = new RobotsGroup();
-                    currentGroupHasDirectives = false;
-                }
-
-                currentGroup.UserAgents.Add(value);
-                continue;
-            }
-
-            if (key.Equals("Sitemap", StringComparison.OrdinalIgnoreCase)) {
-                sitemapUrls.Add(value);
-                continue;
-            }
-
-            if (currentGroup.UserAgents.Count == 0) {
-                currentGroup.UserAgents.Add("*");
-            }
-
-            if (key.Equals("Allow", StringComparison.OrdinalIgnoreCase) || key.Equals("Disallow", StringComparison.OrdinalIgnoreCase)) {
-                if (!string.IsNullOrEmpty(value)) {
-                    currentGroup.Rules.Add(new RobotsRule {
-                        Allow = key.Equals("Allow", StringComparison.OrdinalIgnoreCase),
-                        Path = value
-                    });
-                }
-                currentGroupHasDirectives = true;
-                continue;
-            }
-
-            if (key.Equals("Crawl-delay", StringComparison.OrdinalIgnoreCase) && double.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double delaySeconds)) {
-                currentGroup.CrawlDelayMs = (int)Math.Round(delaySeconds * 1000);
-                currentGroupHasDirectives = true;
-            }
-        }
-
-        if (currentGroup.UserAgents.Count > 0 || currentGroupHasDirectives) {
-            groups.Add(currentGroup);
-        }
-
-        RobotsGroup? selected = SelectRobotsGroup(groups, crawlerUserAgent);
-        RobotsDocument document = new();
-        document.SitemapUrls.AddRange(sitemapUrls);
-        if (selected != null) {
-            document.Rules.AddRange(selected.Rules);
-            document.CrawlDelayMs = selected.CrawlDelayMs;
-        }
-
-        return document;
-    }
-
-    private static RobotsGroup? SelectRobotsGroup(IEnumerable<RobotsGroup> groups, string crawlerUserAgent) {
-        RobotsGroup? wildcard = null;
-        RobotsGroup? bestMatch = null;
-        int bestLength = -1;
-
-        foreach (RobotsGroup group in groups) {
-            foreach (string token in group.UserAgents) {
-                if (token == "*") {
-                    wildcard ??= group;
-                    continue;
-                }
-
-                if (UserAgentMatches(crawlerUserAgent, token) && token.Length > bestLength) {
-                    bestMatch = group;
-                    bestLength = token.Length;
-                }
-            }
-        }
-
-        return bestMatch ?? wildcard;
-    }
-
-    private static bool UserAgentMatches(string crawlerUserAgent, string token) {
-        if (token == "*") {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(crawlerUserAgent)) {
-            return false;
-        }
-
-        return crawlerUserAgent.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0;
-    }
-
-    private static string StripComment(string line) {
-        int commentIndex = line.IndexOf('#');
-        return commentIndex >= 0 ? line.Substring(0, commentIndex) : line;
-    }
-
-    private static bool IsAllowedByRobots(RobotsDocument robots, Uri uri) {
-        if (robots.Rules.Count == 0) {
-            return true;
-        }
-
-        string target = string.IsNullOrEmpty(uri.PathAndQuery) ? "/" : uri.PathAndQuery;
-        int bestLength = -1;
-        bool allowed = true;
-
-        foreach (RobotsRule rule in robots.Rules) {
-            if (string.IsNullOrEmpty(rule.Path) || !target.StartsWith(rule.Path, StringComparison.OrdinalIgnoreCase)) {
-                continue;
-            }
-
-            if (rule.Path.Length > bestLength || (rule.Path.Length == bestLength && rule.Allow)) {
-                bestLength = rule.Path.Length;
-                allowed = rule.Allow;
-            }
-        }
-
-        return allowed;
-    }
-
-    private static async Task<int> GetEffectiveDelayAsync(
-        Uri currentUri,
-        HttpClient client,
-        HtmlCrawlOptions options,
-        IDictionary<string, RobotsDocument?> cache,
-        CancellationToken cancellationToken) {
-        int delay = options.DelayMs;
-        if (!options.RespectRobotsTxt) {
-            return delay;
-        }
-
-        RobotsDocument? robots = await GetRobotsDocumentAsync(currentUri, client, options, cache, cancellationToken).ConfigureAwait(false);
-        if (robots?.CrawlDelayMs is int robotsDelay) {
-            return Math.Max(delay, robotsDelay);
-        }
-
-        return delay;
     }
 
 }

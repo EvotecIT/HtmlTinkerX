@@ -142,12 +142,6 @@ public static partial class HtmlCrawler {
         public int? CrawlDelayMs { get; set; }
     }
 
-    private sealed class RobotsGroup {
-        public List<string> UserAgents { get; } = new();
-        public List<RobotsRule> Rules { get; } = new();
-        public int? CrawlDelayMs { get; set; }
-    }
-
     private sealed class RobotsRule {
         public bool Allow { get; set; }
         public string Path { get; set; } = string.Empty;

@@ -154,7 +154,12 @@ public static partial class HtmlDomExtraction {
             throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be greater than zero.");
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return DiscoverSelectorsDocument(HtmlParser.ParseWithAngleSharp(html), query, baseUri, minimumRepeatCount, limit, commandSource);
+    }
+
+    internal static IReadOnlyList<HtmlDomSelectorCandidate> DiscoverSelectorsDocument(
+        IDocument document, string? query = null, Uri? baseUri = null,
+        int minimumRepeatCount = 2, int limit = 10, HtmlDomCommandSource? commandSource = null) {
         Uri? effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
         string normalizedQuery = NormalizeWhitespace(query);
         HashSet<string> selectors = new(StringComparer.Ordinal);
@@ -178,7 +183,7 @@ public static partial class HtmlDomExtraction {
                 continue;
             }
 
-            if (items.Length < minimumRepeatCount || items.Length > 250) {
+            if (items.Length < minimumRepeatCount) {
                 continue;
             }
 
@@ -186,7 +191,7 @@ public static partial class HtmlDomExtraction {
                 continue;
             }
 
-            HtmlDomSelectorFieldCandidate[] fields = DiscoverFields(items, effectiveBaseUri);
+            HtmlDomSelectorFieldCandidate[] fields = DiscoverFields(items.Take(250).ToArray(), effectiveBaseUri);
             if (fields.Length < 2) {
                 continue;
             }

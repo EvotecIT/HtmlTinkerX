@@ -35,10 +35,11 @@ public static class HtmlPageReader {
         HtmlSemanticBlock[] blocks = FlattenBlocks(semantic.Sections.SelectMany(static section => section.Blocks)).ToArray();
         HtmlReadableTextResult readableText = HtmlParserToText.ExtractReadableText(html);
         Uri? effectiveBaseUri = content.BaseUri ?? conversionOptions.BaseUri;
-        IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: effectiveBaseUri);
+        var document = HtmlParser.ParseWithAngleSharp(html);
+        IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectDataDocument(document, baseUri: effectiveBaseUri);
         IReadOnlyList<HtmlPageCollection> collections = effective.IncludeCollections
-            ? HtmlDomExtraction.DiscoverCollections(
-                html,
+            ? HtmlDomExtraction.DiscoverCollectionsDocument(
+                document,
                 effective.CollectionHint,
                 effectiveBaseUri,
                 effective.MinimumRepeatCount,

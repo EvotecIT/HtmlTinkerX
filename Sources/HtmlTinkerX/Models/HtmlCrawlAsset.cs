@@ -9,6 +9,9 @@ public sealed class HtmlCrawlAsset {
     /// <summary>Resolved asset URL.</summary>
     public string Url { get; set; } = string.Empty;
 
+    /// <summary>Final response URL after HTTP redirects, when downloaded.</summary>
+    public string? FinalUrl { get; set; }
+
     /// <summary>Page URL that referenced this asset.</summary>
     public string? PageUrl { get; set; }
 

@@ -324,17 +324,35 @@ public static class HtmlUtilities {
             await CopyBoundedStreamAsync(contentStream, fileStream, maximumBytes, requestToken).ConfigureAwait(false);
 
             fileStream.Close();
-            if (File.Exists(filePath)) {
-                File.Replace(temporaryPath, filePath, null);
-            } else {
-                File.Move(temporaryPath, filePath);
-            }
+            requestToken.ThrowIfCancellationRequested();
+            CommitTemporaryFile(temporaryPath, filePath);
         } catch {
             if (File.Exists(temporaryPath)) {
                 File.Delete(temporaryPath);
             }
             throw;
         }
+    }
+
+    internal static async Task WriteBytesAtomicallyAsync(string path, byte[] bytes, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        string fullPath = EnsureDirectoryExists(path);
+        string temporaryPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try {
+            using (FileStream stream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)) {
+                await stream.WriteAsync(bytes, 0, bytes.Length, cancellationToken).ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            CommitTemporaryFile(temporaryPath, fullPath);
+        } finally {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
+    }
+
+    private static void CommitTemporaryFile(string temporaryPath, string filePath) {
+        if (File.Exists(filePath)) File.Replace(temporaryPath, filePath, null);
+        else File.Move(temporaryPath, filePath);
     }
 
     internal static CancellationTokenSource CreateRequestTimeoutTokenSource(HttpClient client, CancellationToken cancellationToken) {

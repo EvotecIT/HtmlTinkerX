@@ -110,7 +110,10 @@ public static class HtmlScriptDataParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static IReadOnlyList<HtmlScriptDataItem> ParseDocument(IDocument document) {
         List<HtmlScriptDataItem> items = new();
         int scriptIndex = 0;
         foreach (IElement script in document.QuerySelectorAll("script")) {

@@ -37,7 +37,7 @@ public static class HtmlPageWorkbench {
         cancellationToken.ThrowIfCancellationRequested();
         string staticMarkdown = HtmlParserToMarkdown.ConvertToMarkdown(html, staticEffectiveBaseUri?.AbsoluteUri);
         cancellationToken.ThrowIfCancellationRequested();
-        IReadOnlyList<HtmlDataItem> staticData = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
+        IReadOnlyList<HtmlDataItem> staticData = HtmlParsingToolbox.SelectDataDocument(staticDocument, baseUri: baseUri);
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<HtmlJavaScriptConfigItem> staticJavaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);
         cancellationToken.ThrowIfCancellationRequested();
@@ -59,7 +59,7 @@ public static class HtmlPageWorkbench {
             ? null
             : HtmlModernParserUtilities.GetEffectiveBaseUri(renderedDocument, renderedBaseUri);
         IReadOnlyList<HtmlDataItem> renderedData = hasRenderedSnapshot
-            ? NormalizeList(renderedSnapshot!.Data, () => HtmlParsingToolbox.SelectData(renderedSnapshot.Html, baseUri: renderedBaseUri))
+            ? NormalizeList(renderedSnapshot!.Data, () => HtmlParsingToolbox.SelectDataDocument(renderedDocument!, baseUri: renderedBaseUri))
             : Array.Empty<HtmlDataItem>();
         IReadOnlyList<HtmlInteractionSurfaceItem> renderedInteractionSurface = hasRenderedSnapshot
             ? await GetRenderedInteractionSurfaceAsync(renderedSnapshot!, renderedBaseUri, effectiveOptions, client, cancellationToken).ConfigureAwait(false)
@@ -71,7 +71,9 @@ public static class HtmlPageWorkbench {
             ? renderedSnapshot!.ReadableText ?? HtmlParserToText.ExtractReadableText(renderedSnapshot.Html)
             : staticReadableText;
         string markdown = hasRenderedSnapshot
-            ? FirstNonEmpty(renderedSnapshot!.Markdown, HtmlParserToMarkdown.ConvertToMarkdown(renderedSnapshot.Html, renderedEffectiveBaseUri?.AbsoluteUri))
+            ? !string.IsNullOrWhiteSpace(renderedSnapshot!.Markdown)
+                ? renderedSnapshot.Markdown
+                : HtmlParserToMarkdown.ConvertToMarkdown(renderedSnapshot.Html, renderedEffectiveBaseUri?.AbsoluteUri)
             : staticMarkdown;
         IReadOnlyList<HtmlDataItem> data = hasRenderedSnapshot ? renderedData : staticData;
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = hasRenderedSnapshot ? renderedJavaScriptConfig : staticJavaScriptConfig;

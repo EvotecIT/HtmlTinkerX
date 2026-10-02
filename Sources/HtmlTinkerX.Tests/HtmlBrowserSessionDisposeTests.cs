@@ -80,11 +80,35 @@ public class HtmlBrowserSessionDisposeTests {
         HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => session.DisposeAsync().AsTask());
+        // One failing owner must not prevent release of the remaining owned resources.
+        playwright.Verify(p => p.Dispose(), Times.Once);
+        browser.Verify(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Once);
         await session.DisposeAsync();
 
         playwright.Verify(p => p.Dispose(), Times.Once);
         browser.Verify(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Once);
         context.Verify(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()), Times.Exactly(2));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DisposeAsync_ReleasesDriverWhenVideoOrBrowserCleanupFails(bool videoFails) {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()))
+            .Returns(videoFails ? Task.CompletedTask : Task.FromException(new InvalidOperationException("browser failed")));
+        var context = new Mock<IBrowserContext>();
+        context.Setup(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>())).Returns(Task.CompletedTask);
+        var video = new Mock<IVideo>();
+        video.Setup(v => v.SaveAsAsync(It.IsAny<string>())).ThrowsAsync(new InvalidOperationException("video failed"));
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, new Mock<IPage>().Object,
+            videoFails ? video.Object : null, videoFails ? "video.webm" : null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.DisposeAsync().AsTask());
+        context.Verify(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()), Times.Once);
+        browser.Verify(b => b.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Once);
+        playwright.Verify(p => p.Dispose(), Times.Once);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ namespace HtmlTinkerX;
 /// Represents a single network request and response.
 /// </summary>
 public sealed class HtmlNetworkEntry {
+    internal long CaptureSequence { get; set; }
     /// <summary>Request URL.</summary>
     public string Url { get; set; } = string.Empty;
 

@@ -25,7 +25,7 @@ public static partial class HtmlCrawler {
     private static List<string> ExtractLinks(string html, Uri baseUri, HtmlCrawlOptions options) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         Uri effectiveBaseUri = GetDocumentBaseUri(document, baseUri);
-        HashSet<string> links = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> links = new(StringComparer.Ordinal);
 
         foreach (IElement anchor in document.QuerySelectorAll("a[href]")) {
             string? href = anchor.GetAttribute("href");
@@ -57,7 +57,7 @@ public static partial class HtmlCrawler {
     private static List<string> ExtractAssetUrls(string html, Uri baseUri, HtmlCrawlOptions options) {
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         Uri effectiveBaseUri = GetDocumentBaseUri(document, baseUri);
-        HashSet<string> assets = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> assets = new(StringComparer.Ordinal);
 
         CollectAssetUrlsFromContainer(document, effectiveBaseUri, options, assets);
         foreach (IElement noscript in document.QuerySelectorAll("noscript")) {
@@ -136,7 +136,7 @@ public static partial class HtmlCrawler {
     }
 
     private static Dictionary<string, string> BuildLocalPageMap(IEnumerable<HtmlCrawlPage> pages) {
-        Dictionary<string, string> pageMap = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> pageMap = new(StringComparer.Ordinal);
         foreach (HtmlCrawlPage page in pages) {
             if (string.IsNullOrWhiteSpace(page.HtmlPath)) {
                 continue;
@@ -179,8 +179,8 @@ public static partial class HtmlCrawler {
 
         Dictionary<string, string> assetMap = assets
             .Where(asset => !string.IsNullOrWhiteSpace(asset.Url) && !string.IsNullOrWhiteSpace(asset.FilePath) && string.IsNullOrWhiteSpace(asset.Error))
-            .GroupBy(asset => asset.Url, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.OrdinalIgnoreCase);
+            .GroupBy(asset => asset.Url, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.Ordinal);
         if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out Uri? pageUri)) {
             return html;
         }
@@ -612,7 +612,7 @@ public static partial class HtmlCrawler {
     }
 
     private static bool IsAssetUrlAllowed(Uri assetUri, Uri pageUri, HtmlCrawlOptions options) {
-        if (options.RestrictToHost && !IsHostInScope(assetUri.Host, pageUri.Host, options.IncludeSubdomains)) {
+        if (options.RestrictToHost && !IsHostInScope(assetUri.Host, (options.CrawlOrigin ?? pageUri).Host, options.IncludeSubdomains)) {
             return false;
         }
 

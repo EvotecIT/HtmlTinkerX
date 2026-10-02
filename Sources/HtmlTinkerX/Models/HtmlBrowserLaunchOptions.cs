@@ -29,6 +29,9 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Force re-download of browser runtimes before launch.</summary>
     public bool Clean { get; set; }
 
+    internal string? HttpCredentialOrigin { get; set; }
+    internal bool BlockServiceWorkers { get; set; }
+
     /// <summary>Username for HTTP authentication or form login.</summary>
     public string? Username { get; set; }
 

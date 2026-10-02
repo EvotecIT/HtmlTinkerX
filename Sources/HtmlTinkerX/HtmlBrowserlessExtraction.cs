@@ -320,8 +320,9 @@ public static class HtmlBrowserlessExtraction {
                 request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
 
-            using HttpResponseMessage response = await effectiveClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            string content = await ReadResponseContentBoundedAsync(response, options.MaxResponseBytes, warnings, cancellationToken).ConfigureAwait(false);
+            using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(effectiveClient, cancellationToken);
+            using HttpResponseMessage response = await effectiveClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestTimeout.Token).ConfigureAwait(false);
+            (string content, bool truncated) = await ReadResponseContentBoundedAsync(response, options.MaxResponseBytes, warnings, requestTimeout.Token).ConfigureAwait(false);
 
             string contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
             requests.Add(new HtmlBrowserlessExtractionRequest {
@@ -329,13 +330,15 @@ public static class HtmlBrowserlessExtraction {
                 Url = source.ResolvedUrl,
                 StatusCode = (int)response.StatusCode,
                 ContentType = contentType,
-                Success = response.IsSuccessStatusCode
+                Success = response.IsSuccessStatusCode && !truncated
             });
 
-            IReadOnlyList<HtmlBrowserlessExtractionItem> items = ExtractItemsFromResponse(source, content, contentType);
+            IReadOnlyList<HtmlBrowserlessExtractionItem> items = truncated
+                ? Array.Empty<HtmlBrowserlessExtractionItem>()
+                : ExtractItemsFromResponse(source, content, contentType);
             return new HtmlBrowserlessExtractionResult {
                 Source = source,
-                Success = response.IsSuccessStatusCode && items.Count > 0,
+                Success = response.IsSuccessStatusCode && !truncated && items.Count > 0,
                 Items = items,
                 Requests = requests,
                 RawContent = options.IncludeRawContent ? content : string.Empty,
@@ -343,9 +346,9 @@ public static class HtmlBrowserlessExtraction {
                 Evidence = Combine(source.Evidence, $"Fetched endpoint directly and extracted {items.Count} item(s)."),
                 Warnings = warnings
             };
-        } catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested) {
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
-        } catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException || ex is InvalidOperationException) {
+        } catch (Exception ex) when (ex is HttpRequestException || ex is OperationCanceledException || ex is IOException || ex is InvalidOperationException) {
             requests.Add(new HtmlBrowserlessExtractionRequest {
                 Method = "GET",
                 Url = source.ResolvedUrl,
@@ -416,19 +419,19 @@ public static class HtmlBrowserlessExtraction {
             : EndpointOriginState.External;
     }
 
-    private static async Task<string> ReadResponseContentBoundedAsync(HttpResponseMessage response, int maxBytes, List<string> warnings, CancellationToken cancellationToken) {
+    private static async Task<(string Content, bool Truncated)> ReadResponseContentBoundedAsync(HttpResponseMessage response, int maxBytes, List<string> warnings, CancellationToken cancellationToken) {
         if (maxBytes <= 0) {
-            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+            return (await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false), false);
         }
 
         using Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        byte[] buffer = new byte[Math.Min(8192, maxBytes + 1)];
+        byte[] buffer = new byte[(int)Math.Min(8192L, (long)maxBytes + 1)];
         using MemoryStream memory = new(capacity: Math.Min(maxBytes, 8192));
         bool truncated = false;
         while (true) {
             cancellationToken.ThrowIfCancellationRequested();
             int allowed = maxBytes - (int)memory.Length;
-            int readSize = allowed > 0 ? Math.Min(buffer.Length, allowed + 1) : 1;
+            int readSize = allowed > 0 ? (int)Math.Min(buffer.Length, (long)allowed + 1) : 1;
             int read = await stream.ReadAsync(buffer, 0, readSize, cancellationToken).ConfigureAwait(false);
             if (read == 0) {
                 break;
@@ -450,7 +453,7 @@ public static class HtmlBrowserlessExtraction {
         }
 
         Encoding encoding = GetResponseEncoding(response) ?? Encoding.UTF8;
-        return encoding.GetString(memory.ToArray());
+        return (encoding.GetString(memory.ToArray()), truncated);
     }
 
     private static Encoding? GetResponseEncoding(HttpResponseMessage response) {

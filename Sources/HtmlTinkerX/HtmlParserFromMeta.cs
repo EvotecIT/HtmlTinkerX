@@ -26,7 +26,10 @@ public static partial class HtmlParserFromMeta {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseMetaTagsDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static List<HtmlMetaTag> ParseMetaTagsDocument(IDocument document) {
         var nodes = document.QuerySelectorAll("meta");
         List<HtmlMetaTag> result = new();
         foreach (var node in nodes) {

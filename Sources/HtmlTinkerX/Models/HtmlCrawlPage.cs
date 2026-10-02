@@ -14,6 +14,9 @@ public sealed class HtmlCrawlPage {
     /// <summary>Original URL requested before any canonical rewrite.</summary>
     public string? RequestedUrl { get; set; }
 
+    /// <summary>Document base used to resolve links and assets, before canonical URL rewriting.</summary>
+    public string? ResolutionBaseUrl { get; set; }
+
     /// <summary>URL that discovered this page.</summary>
     public string? ParentUrl { get; set; }
 

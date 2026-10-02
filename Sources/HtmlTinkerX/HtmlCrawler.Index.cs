@@ -830,23 +830,11 @@ public static partial class HtmlCrawler {
         return options;
     }
 
-    private static async Task WriteTextAsync(string path, string content, CancellationToken cancellationToken) {
-        string fullPath = HtmlUtilities.EnsureDirectoryExists(path);
-#if NETSTANDARD2_0 || NETFRAMEWORK
-        await Task.Run(() => File.WriteAllText(fullPath, content), cancellationToken).ConfigureAwait(false);
-#else
-        await File.WriteAllTextAsync(fullPath, content, cancellationToken).ConfigureAwait(false);
-#endif
-    }
+    private static Task WriteTextAsync(string path, string content, CancellationToken cancellationToken) =>
+        HtmlUtilities.WriteBytesAtomicallyAsync(path, new UTF8Encoding(false).GetBytes(content), cancellationToken);
 
-    private static async Task WriteBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken) {
-        string fullPath = HtmlUtilities.EnsureDirectoryExists(path);
-#if NETSTANDARD2_0 || NETFRAMEWORK
-        await Task.Run(() => File.WriteAllBytes(fullPath, bytes), cancellationToken).ConfigureAwait(false);
-#else
-        await File.WriteAllBytesAsync(fullPath, bytes, cancellationToken).ConfigureAwait(false);
-#endif
-    }
+    private static Task WriteBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken) =>
+        HtmlUtilities.WriteBytesAtomicallyAsync(path, bytes, cancellationToken);
 
     private static string EscapeCsv(string? value) {
         if (string.IsNullOrEmpty(value)) {

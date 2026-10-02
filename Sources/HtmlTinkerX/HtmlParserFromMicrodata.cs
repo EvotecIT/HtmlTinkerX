@@ -26,7 +26,10 @@ public static partial class HtmlParserFromMicrodata {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseMicrodataDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static List<HtmlMicrodataItem> ParseMicrodataDocument(IDocument document) {
         return MicrodataParser.ExtractItems(document);
     }
 
