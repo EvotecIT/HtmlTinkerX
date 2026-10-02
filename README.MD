@@ -576,7 +576,7 @@ Get-HtmlCrawlProfile -Path '.\crawl-profiles.json' -Name 'custom-docs'
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
 
-Crawler credentials and custom headers are sent only to the starting origin (scheme, host, and port), including across redirects, assets, and sitemaps. Allowing external URLs or subdomains does not share those credentials. Rendering with custom headers requires Chromium; Firefox and WebKit still support rendering without custom headers and origin-scoped HTTP authentication. `AutoRender` launches a browser only when a page needs it.
+Crawler credentials and custom headers are sent only to the starting origin (scheme, host, and port), including across redirects, assets, and sitemaps. The `User-Agent` header identifies the crawler on every allowed destination. Allowing external URLs or subdomains does not share those credentials. Rendering with custom headers requires Chromium; Firefox and WebKit still support rendering without custom headers and origin-scoped HTTP authentication. `AutoRender` launches a browser only when a page needs it.
 
 `MaxPages` counts fetched page candidates, including duplicate and unsupported responses. `DelayMs` also applies between those requests. URL paths and query values retain their case, and relative links and assets resolve against the response URL and any HTML `<base>` element.
 
