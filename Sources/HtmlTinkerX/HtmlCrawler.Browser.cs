@@ -13,6 +13,11 @@ public static partial class HtmlCrawler {
             throw new NotSupportedException("Rendered crawls with custom HTTP headers require Chromium so headers can remain scoped to the starting origin across redirects. Use Chromium, static HTTP crawling, or render without custom headers.");
         }
         bool imported = !string.IsNullOrEmpty(options.StorageStatePath);
+        Dictionary<string, string> headers = new(options.Headers, StringComparer.OrdinalIgnoreCase);
+        if (!imported && options.FormLogin == null && options.Browser == HtmlBrowserEngine.Chromium
+            && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
+            headers["Authorization"] = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"));
+        }
         HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", new HtmlBrowserLaunchOptions {
             Browser = options.Browser, Clean = options.CleanBrowserInstall, Headless = options.Headless,
             Username = imported || (options.FormLogin == null && options.Browser == HtmlBrowserEngine.Chromium) ? null : options.Username,
@@ -20,16 +25,11 @@ public static partial class HtmlCrawler {
             FormLogin = imported ? null : options.FormLogin, StorageStatePath = options.StorageStatePath,
             UserAgent = options.UserAgent, Proxy = options.Proxy, ProxyUsername = options.ProxyUsername,
             ProxyPassword = options.ProxyPassword, Timeout = options.Timeout,
-            HttpCredentialOrigin = origin.GetLeftPart(UriPartial.Authority), BlockServiceWorkers = options.Headers.Count > 0
+            HttpCredentialOrigin = origin.GetLeftPart(UriPartial.Authority), BlockServiceWorkers = headers.Count > 0
         }, cancellationToken).ConfigureAwait(false);
         CrawlRenderSession owner = new(session);
         try {
             session.Page.SetDefaultTimeout(options.Timeout);
-            Dictionary<string, string> headers = new(options.Headers, StringComparer.OrdinalIgnoreCase);
-            if (!imported && options.FormLogin == null && options.Browser == HtmlBrowserEngine.Chromium
-                && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
-                headers["Authorization"] = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"));
-            }
             if (options.Browser == HtmlBrowserEngine.Chromium && (headers.Count > 0 || options.RestrictToHost)) {
                 owner.Headers = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(session.Context, session.Page,
                     origin, headers, cancellationToken, requestAllowed: (url, topLevel) => Task.FromResult(

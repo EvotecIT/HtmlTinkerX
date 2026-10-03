@@ -26,7 +26,9 @@ public static partial class HtmlCrawler {
         private int _pages;
         private int _skipped;
         private int _assets;
-        private bool _published;
+        private int _publishedPages;
+        private int _publishedSkipped;
+        private int _publishedAssets;
         private CrawlCheckpoint? _previous;
         private bool _previousInspected;
 
@@ -79,7 +81,9 @@ public static partial class HtmlCrawler {
                 StoredPageCount = _pages, StoredSkippedCount = _skipped, StoredAssetCount = _assets
             };
             await WriteTextAsync(_paths.ManifestPath, JsonSerializer.Serialize(checkpoint, CreateJsonOptions()), token).ConfigureAwait(false);
-            _published = true;
+            _publishedPages = _pages;
+            _publishedSkipped = _skipped;
+            _publishedAssets = _assets;
             if (_previous != null) {
                 RemoveCheckpointFiles(_paths.ManifestPath, _previous);
                 _previous = null;
@@ -90,7 +94,9 @@ public static partial class HtmlCrawler {
             Generation = _generation, StoredPageCount = _pages, StoredSkippedCount = _skipped, StoredAssetCount = _assets
         });
 
-        public void RemoveUnpublished() { if (!_published) RemoveAfterFinalExport(); }
+        public void RemoveUnpublished() => RemoveCheckpointFiles(_paths.ManifestPath, new CrawlCheckpoint {
+            Generation = _generation, StoredPageCount = _pages, StoredSkippedCount = _skipped, StoredAssetCount = _assets
+        }, _publishedPages, _publishedSkipped, _publishedAssets);
     }
 
     private static CrawlCheckpoint? ParseCheckpoint(string json) {
@@ -131,13 +137,13 @@ public static partial class HtmlCrawler {
 #endif
     }
 
-    private static void RemoveCheckpointFiles(string manifestPath, CrawlCheckpoint checkpoint) {
+    private static void RemoveCheckpointFiles(string manifestPath, CrawlCheckpoint checkpoint, int firstPage = 0, int firstSkipped = 0, int firstAsset = 0) {
         string directory = CheckpointDirectory(manifestPath, checkpoint.Generation);
         try {
-            for (int index = 0; index < checkpoint.StoredPageCount; index++) File.Delete(RecordPath(directory, "page", index));
-            for (int index = 0; index < checkpoint.StoredSkippedCount; index++) File.Delete(RecordPath(directory, "skipped", index));
-            for (int index = 0; index < checkpoint.StoredAssetCount; index++) File.Delete(RecordPath(directory, "asset", index));
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: false);
+            for (int index = firstPage; index < checkpoint.StoredPageCount; index++) File.Delete(RecordPath(directory, "page", index));
+            for (int index = firstSkipped; index < checkpoint.StoredSkippedCount; index++) File.Delete(RecordPath(directory, "skipped", index));
+            for (int index = firstAsset; index < checkpoint.StoredAssetCount; index++) File.Delete(RecordPath(directory, "asset", index));
+            if (Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any()) Directory.Delete(directory, recursive: false);
             string parent = manifestPath + ".state";
             if (Directory.Exists(parent) && !Directory.EnumerateFileSystemEntries(parent).Any()) Directory.Delete(parent);
         } catch (IOException) {

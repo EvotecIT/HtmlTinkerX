@@ -69,13 +69,17 @@ public partial class HtmlCrawlerTests {
         using HttpListener other = StartFlexibleServer(context => RespondAsync(context, "<main>External</main>"), out string otherRoot, "127.0.0.1");
         using HttpListener server = StartFlexibleServer(async context => {
             string path = context.Request.Url!.AbsolutePath; requests.Enqueue(path);
-            if (path == "/escape") context.Response.Redirect(otherRoot);
+            if (path == "/escape") {
+                context.Response.ContentLength64 = 0;
+                context.Response.Redirect(otherRoot);
+            }
             else await RespondAsync(context, "<main>Root<a href='/escape'>Escape</a><a href='/remaining'>Remaining</a></main>");
         }, out string root);
         string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try {
             HtmlCrawlOptions options = StaticOptions(2); options.Render = true; options.Browser = HtmlBrowserEngine.Firefox; options.OutputPath = output;
             HtmlCrawlResult first = await HtmlCrawler.CrawlAsync(root, options);
+            Assert.True(first.SkippedPages.Count == 1, string.Join(";", first.Pages.Select(page => $"{page.Url}: {page.Status} {page.Error}")));
             Assert.Equal(HtmlCrawlSkipReason.OutsideHost, Assert.Single(first.SkippedPages).SkipReason);
             Assert.Single(first.PendingPages);
             int count = requests.Count;
