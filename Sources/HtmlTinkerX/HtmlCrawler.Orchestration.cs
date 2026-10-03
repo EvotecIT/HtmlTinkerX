@@ -281,6 +281,7 @@ public static partial class HtmlCrawler {
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             result.PendingPages = SnapshotPendingPages(pending);
             result.Finished = DateTimeOffset.UtcNow;
             UpdateDerivedResultData(result);

@@ -76,7 +76,12 @@ public static partial class HtmlCrawler {
         };
     }
 
-    private static async Task<FetchedPageData> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) {
+    private static Task<FetchedPageData> FetchRenderedPageAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) =>
+        HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+            () => FetchRenderedDocumentAsync(session, request, options, structuredSchema, cancellationToken),
+            () => session.Context.CloseAsync(), cancellationToken);
+
+    private static async Task<FetchedPageData> FetchRenderedDocumentAsync(HtmlBrowserSession session, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -89,6 +94,11 @@ public static partial class HtmlCrawler {
         };
 
         long networkLogStart = session.NetworkLogPosition;
+        IResponse? documentResponse = null;
+        EventHandler<IResponse> captureDocumentResponse = (_, response) => {
+            if (response.Request.IsNavigationRequest && ReferenceEquals(response.Frame, session.Page.MainFrame)) documentResponse = response;
+        };
+        session.Page.Response += captureDocumentResponse;
         try {
             cancellationToken.ThrowIfCancellationRequested();
             IResponse? response = await session.Page.GotoAsync(request.Uri.AbsoluteUri, new PageGotoOptions {
@@ -127,9 +137,23 @@ public static partial class HtmlCrawler {
                 await MarkRenderedHiddenElementsAsync(session.Page).ConfigureAwait(false);
             }
 
-            string fullHtml = await session.Page.ContentAsync().ConfigureAwait(false);
+            // Capture the DOM, URL and title together: interactions and delayed scripts can navigate.
+            JsonElement snapshot = await session.Page.EvaluateAsync<JsonElement>("() => ({ url: location.href, title: document.title, "
+                + "html: (document.doctype ? new XMLSerializer().serializeToString(document.doctype) : '') + document.documentElement.outerHTML })").ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            string fullHtml = snapshot.GetProperty("html").GetString()!;
+            string title = snapshot.GetProperty("title").GetString()!;
+            responseUri = new Uri(snapshot.GetProperty("url").GetString()!);
+            response = documentResponse ?? response;
+            page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
+            if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
+            if (response != null && !response.Ok) {
+                page.Status = HtmlCrawlPageStatus.Failed;
+                page.Error = $"HTTP request failed with status {response.Status}.";
+                return new FetchedPageData { Page = page };
+            }
 
             if (!IsAllowedPageContent(page.ContentType, fullHtml, options)) {
                 page.Status = HtmlCrawlPageStatus.Skipped;
@@ -142,7 +166,6 @@ public static partial class HtmlCrawler {
                 };
             }
 
-            string? title = await session.Page.TitleAsync().ConfigureAwait(false);
             PopulatePageFromHtml(page, fullHtml, responseUri, options, structuredSchema, title);
             Uri runtimeDiagnosticsUri = TryGetAbsoluteUri(session.Page.Url, out Uri? renderedUri) ? renderedUri! : request.Uri;
             HtmlNetworkEntry[] renderedNetworkLog = session.GetNetworkLogSince(networkLogStart).ToArray();
@@ -158,6 +181,7 @@ public static partial class HtmlCrawler {
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
         } finally {
+            session.Page.Response -= captureDocumentResponse;
             page.Finished = DateTimeOffset.UtcNow;
         }
 
@@ -219,6 +243,7 @@ public static partial class HtmlCrawler {
             }
             return true;
         } catch {
+            cancellationToken.ThrowIfCancellationRequested();
             return false;
         }
     }
@@ -239,6 +264,7 @@ public static partial class HtmlCrawler {
             }
             return true;
         } catch {
+            cancellationToken.ThrowIfCancellationRequested();
             return false;
         }
     }
