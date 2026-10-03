@@ -54,6 +54,8 @@ public static partial class HtmlCrawler {
         json = await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
 #endif
 
+        CrawlCheckpoint? checkpoint = ParseCheckpoint(json);
+        if (checkpoint != null) return await LoadCheckpointAsync(checkpoint, manifestPath, cancellationToken).ConfigureAwait(false);
         JsonSerializerOptions options = CreateJsonOptions();
         HtmlCrawlResult? result = JsonSerializer.Deserialize<HtmlCrawlResult>(json, options);
         if (result == null) {
@@ -83,55 +85,20 @@ public static partial class HtmlCrawler {
 
         CrawlArtifactPaths artifactPaths = ResolveArtifactPaths(path);
         result.PendingPages = pendingItems.ToList();
-        result.ManifestPath = artifactPaths.ManifestPath;
-        result.PagesDirectoryPath = artifactPaths.PagesDirectory;
-        result.AssetsDirectoryPath = artifactPaths.AssetsDirectory;
-        result.PagesJsonlPath = artifactPaths.PagesJsonlPath;
-        result.PagesCsvPath = artifactPaths.PagesCsvPath;
-        result.SkippedPagesJsonlPath = artifactPaths.SkippedPagesJsonlPath;
-        result.SkippedAssetsJsonlPath = artifactPaths.SkippedAssetsJsonlPath;
-        result.LinksJsonlPath = artifactPaths.LinksJsonlPath;
-        result.AssetsJsonlPath = artifactPaths.AssetsJsonlPath;
-        result.StructuredJsonPagesJsonlPath = artifactPaths.StructuredJsonPagesJsonlPath;
-        result.OpenApiLikePath = artifactPaths.OpenApiLikeJsonPath;
-        result.OpenApiPath = artifactPaths.OpenApiJsonPath;
-        result.ChunksJsonlPath = artifactPaths.ChunksJsonlPath;
-        result.GraphJsonPath = artifactPaths.GraphJsonPath;
-        result.SummaryPath = artifactPaths.SummaryJsonPath;
-        result.SummaryTextPath = artifactPaths.SummaryTextPath;
-        result.IndexHtmlPath = artifactPaths.IndexHtmlPath;
+        SetArtifactPaths(result, artifactPaths);
         UpdateDerivedResultData(result);
 
         for (int i = 0; i < result.Pages.Count; i++) {
             cancellationToken.ThrowIfCancellationRequested();
             HtmlCrawlPage page = result.Pages[i];
-            string prefix = (i + 1).ToString("D4");
-            string slug = BuildPageSlug(page, prefix);
-
-            if (!string.IsNullOrEmpty(page.Html)) {
-                page.HtmlPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.html");
-            }
-
-            if (!string.IsNullOrEmpty(page.Text)) {
-                page.TextPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.txt");
-            }
-
-            if (!string.IsNullOrEmpty(page.Markdown)) {
-                page.MarkdownPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.md");
-            }
-
-            if (page.StructuredJson != null) {
-                page.StructuredJsonPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.structured.json");
-            }
-
-            page.ManifestPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.json");
+            SetPageArtifactPaths(page, i, artifactPaths);
         }
 
         Dictionary<string, string> localPageMap = BuildLocalPageMap(result.Pages);
         Dictionary<string, string> assetMap = result.Assets
             .Where(asset => !string.IsNullOrWhiteSpace(asset.Url) && !string.IsNullOrWhiteSpace(asset.FilePath) && string.IsNullOrWhiteSpace(asset.Error))
-            .GroupBy(asset => asset.Url, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.OrdinalIgnoreCase);
+            .GroupBy(asset => asset.Url, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.Ordinal);
 
         for (int i = 0; i < result.Pages.Count; i++) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -139,7 +106,7 @@ public static partial class HtmlCrawler {
 
             if (!string.IsNullOrEmpty(page.Html)) {
                 string htmlToWrite = ShouldRewriteStoredHtml(options)
-                    ? RewriteStoredHtmlToLocalPaths(page.Html, page.Url, page.HtmlPath!, result.Assets, localPageMap, options!)
+                    ? RewriteStoredHtmlToLocalPaths(page.Html, page.ResolutionBaseUrl ?? page.Url, page.HtmlPath!, result.Assets, localPageMap, options!, page.ResolutionBaseUrl != null)
                     : page.Html;
                 await WriteTextAsync(page.HtmlPath!, htmlToWrite, cancellationToken).ConfigureAwait(false);
             }
@@ -378,7 +345,7 @@ public static partial class HtmlCrawler {
         StringBuilder linksJsonl = new();
         foreach (HtmlCrawlPage page in result.Pages.Where(page => !string.IsNullOrWhiteSpace(page.Url))) {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (string link in page.Links.Where(link => !string.IsNullOrWhiteSpace(link)).Distinct(StringComparer.OrdinalIgnoreCase)) {
+            foreach (string link in page.Links.Where(link => !string.IsNullOrWhiteSpace(link)).Distinct(StringComparer.Ordinal)) {
                 linksJsonl.AppendLine(JsonSerializer.Serialize(new {
                     SourceUrl = page.Url,
                     TargetUrl = link,
@@ -475,6 +442,49 @@ public static partial class HtmlCrawler {
 
         string json = JsonSerializer.Serialize(result, CreateJsonOptions());
         await WriteTextAsync(artifactPaths.ManifestPath, json, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void SetArtifactPaths(HtmlCrawlResult result, CrawlArtifactPaths artifactPaths) {
+        result.ManifestPath = artifactPaths.ManifestPath;
+        result.PagesDirectoryPath = artifactPaths.PagesDirectory;
+        result.AssetsDirectoryPath = artifactPaths.AssetsDirectory;
+        result.PagesJsonlPath = artifactPaths.PagesJsonlPath;
+        result.PagesCsvPath = artifactPaths.PagesCsvPath;
+        result.SkippedPagesJsonlPath = artifactPaths.SkippedPagesJsonlPath;
+        result.SkippedAssetsJsonlPath = artifactPaths.SkippedAssetsJsonlPath;
+        result.LinksJsonlPath = artifactPaths.LinksJsonlPath;
+        result.AssetsJsonlPath = artifactPaths.AssetsJsonlPath;
+        result.StructuredJsonPagesJsonlPath = artifactPaths.StructuredJsonPagesJsonlPath;
+        result.OpenApiLikePath = artifactPaths.OpenApiLikeJsonPath;
+        result.OpenApiPath = artifactPaths.OpenApiJsonPath;
+        result.ChunksJsonlPath = artifactPaths.ChunksJsonlPath;
+        result.GraphJsonPath = artifactPaths.GraphJsonPath;
+        result.SummaryPath = artifactPaths.SummaryJsonPath;
+        result.SummaryTextPath = artifactPaths.SummaryTextPath;
+        result.IndexHtmlPath = artifactPaths.IndexHtmlPath;
+    }
+
+    private static void SetPageArtifactPaths(HtmlCrawlPage page, int index, CrawlArtifactPaths artifactPaths) {
+        string prefix = (index + 1).ToString("D4");
+        string slug = BuildPageSlug(page, prefix);
+
+        if (!string.IsNullOrEmpty(page.Html)) {
+            page.HtmlPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.html");
+        }
+
+        if (!string.IsNullOrEmpty(page.Text)) {
+            page.TextPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.txt");
+        }
+
+        if (!string.IsNullOrEmpty(page.Markdown)) {
+            page.MarkdownPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.md");
+        }
+
+        if (page.StructuredJson != null) {
+            page.StructuredJsonPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.structured.json");
+        }
+
+        page.ManifestPath = CombinePathWithinDirectory(artifactPaths.PagesDirectory, $"{slug}.json");
     }
 
     private static List<HtmlCrawlPendingItem> SnapshotPendingPages(IEnumerable<CrawlRequest> pending) {

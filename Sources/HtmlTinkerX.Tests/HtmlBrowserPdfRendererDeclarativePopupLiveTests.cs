@@ -407,20 +407,30 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Fact]
     public async Task CrossOriginPopupRedirectBackToCaptureOriginReceivesScopedHeaders() {
         await using LoopbackPopupServer server = new();
+        await using LoopbackPopupServer redirectServer = new(popupRedirectTarget: server.HeaderUrl.Replace("/header-main", "/header-popup"));
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
-            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1", "localhost" })));
+            networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
 
-        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
-            HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(
-                skipLoadState: true,
-                function: "() => document.querySelector('#result').textContent === 'popup authorized'",
-                timeout: 20000),
-            headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
-            beforeCaptureScript: $"window.open('{server.CrossOriginRedirectUrl}', '_blank'); true"));
+        HtmlBrowserPdfResult result;
+        try {
+            result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+                HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
+                readiness: new HtmlBrowserPdfReadiness(
+                    skipLoadState: true,
+                    function: "() => document.querySelector('#result').textContent === 'popup authorized'",
+                    timeout: 20000),
+                headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
+                beforeCaptureScript: $"window.open('{redirectServer.CrossOriginRedirectUrl}', '_blank'); true"));
+        } catch (TimeoutException ex) {
+            throw new TimeoutException($"Popup redirect readiness failed: redirect requests={redirectServer.RedirectRequestCount}, "
+                + $"redirect token={redirectServer.LastRedirectToken ?? "missing"}, popup token={server.LastPopupToken ?? "missing"}, "
+                + $"protected token={server.LastProtectedToken ?? "missing"}.", ex);
+        }
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.True(redirectServer.RedirectRequestCount > 0);
+        Assert.Null(redirectServer.LastRedirectToken);
         Assert.Equal("popup-token", server.LastPopupToken);
         Assert.Equal("popup-token", server.LastProtectedToken);
     }

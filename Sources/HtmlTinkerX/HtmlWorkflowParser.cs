@@ -54,7 +54,10 @@ public static class HtmlWorkflowParser {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return SelectAssetsDocument(HtmlParser.ParseWithAngleSharp(html), baseUri, includeInline);
+    }
+
+    internal static IReadOnlyList<HtmlAssetReference> SelectAssetsDocument(IDocument document, Uri? baseUri = null, bool includeInline = true) {
         Uri? effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
         List<HtmlAssetReference> assets = new();
         int index = 0;

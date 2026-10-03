@@ -23,6 +23,10 @@ public static class HtmlDiscoveryParser {
 
         AngleSharpHtmlParser parser = new();
         using AngleSharp.Html.Dom.IHtmlDocument document = parser.ParseDocument(html);
+        return ParseLinksDocument(document, baseUri, maxContextLength);
+    }
+
+    internal static IReadOnlyList<HtmlDiscoveredLink> ParseLinksDocument(IDocument document, Uri? baseUri = null, int maxContextLength = 300) {
         return document.QuerySelectorAll("a[href]")
             .Select(anchor => {
                 string href = anchor.GetAttribute("href") ?? string.Empty;

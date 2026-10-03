@@ -27,7 +27,10 @@ public static partial class HtmlParserFromOpenGraph {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseOpenGraphDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static HtmlOpenGraph ParseOpenGraphDocument(IDocument document) {
         var nodes = document.QuerySelectorAll("meta[property^='og:']");
         HtmlOpenGraph result = new();
         foreach (var node in nodes) {

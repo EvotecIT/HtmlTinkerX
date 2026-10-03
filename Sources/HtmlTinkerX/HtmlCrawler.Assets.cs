@@ -30,7 +30,7 @@ public static partial class HtmlCrawler {
         ISet<string> downloadedAssets,
         string? assetsDirectory,
         CancellationToken cancellationToken) {
-        Queue<string> pending = new(page.AssetUrls.Distinct(StringComparer.OrdinalIgnoreCase));
+        Queue<string> pending = new(page.AssetUrls.Distinct(StringComparer.Ordinal));
         while (pending.Count > 0) {
             cancellationToken.ThrowIfCancellationRequested();
             string assetUrl = pending.Dequeue();
@@ -69,6 +69,7 @@ public static partial class HtmlCrawler {
             using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
             CancellationToken requestToken = requestTimeout.Token;
             using HttpResponseMessage response = await client.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
+            asset.FinalUrl = response.RequestMessage?.RequestUri?.AbsoluteUri ?? assetUrl;
             asset.StatusCode = (int)response.StatusCode;
             asset.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
             response.EnsureSuccessStatusCode();
@@ -102,15 +103,15 @@ public static partial class HtmlCrawler {
 
         Dictionary<string, string> assetMap = assets
             .Where(asset => !string.IsNullOrWhiteSpace(asset.Url) && !string.IsNullOrWhiteSpace(asset.FilePath) && string.IsNullOrWhiteSpace(asset.Error))
-            .GroupBy(asset => asset.Url, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.OrdinalIgnoreCase);
+            .GroupBy(asset => asset.Url, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.Ordinal);
         if (assetMap.Count == 0) {
             return;
         }
 
         foreach (HtmlCrawlAsset asset in assets.Where(IsCssAsset)) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(asset.FilePath) || !File.Exists(asset.FilePath) || !Uri.TryCreate(asset.Url, UriKind.Absolute, out Uri? assetUri)) {
+            if (string.IsNullOrWhiteSpace(asset.FilePath) || !File.Exists(asset.FilePath) || !Uri.TryCreate(asset.FinalUrl ?? asset.Url, UriKind.Absolute, out Uri? assetUri)) {
                 continue;
             }
 
@@ -151,12 +152,12 @@ public static partial class HtmlCrawler {
             || !string.IsNullOrWhiteSpace(asset.Error)
             || string.IsNullOrWhiteSpace(asset.FilePath)
             || !File.Exists(asset.FilePath)
-            || !Uri.TryCreate(asset.Url, UriKind.Absolute, out Uri? assetUri)) {
+            || !Uri.TryCreate(asset.FinalUrl ?? asset.Url, UriKind.Absolute, out Uri? assetUri)) {
             return false;
         }
 
         string css = File.ReadAllText(asset.FilePath);
-        HashSet<string> discovered = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> discovered = new(StringComparer.Ordinal);
         foreach (string cssUrl in ExtractCssUrls(css)) {
             AddAssetCandidate(cssUrl, assetUri!, options, discovered);
         }

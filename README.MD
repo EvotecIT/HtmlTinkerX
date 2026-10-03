@@ -576,7 +576,14 @@ Get-HtmlCrawlProfile -Path '.\crawl-profiles.json' -Name 'custom-docs'
 $resumed = Invoke-HTMLCrawl -Url 'https://example.com/docs' -ResumePath '.\crawl-output' -OutPath '.\crawl-output'
 ```
 
-Persisted crawl artifacts now include:
+Crawler credentials and custom headers are sent only to the starting origin (scheme, host, and port), including across redirects, assets, and sitemaps. The `User-Agent` header identifies the crawler on every allowed destination. Allowing external URLs or subdomains does not share those credentials. Rendering with custom headers requires Chromium; Firefox and WebKit still support rendering without custom headers and origin-scoped HTTP authentication. Chromium crawls using scoped headers, including Basic authentication, block service workers. `AutoRender` launches a browser only when a page needs it.
+
+`MaxPages` counts fetched page candidates, including duplicate and unsupported responses. `DelayMs` also applies between those requests. URL paths and query values retain their case, and relative links and assets resolve against the response URL and any HTML `<base>` element.
+
+An active crawl writes an atomic checkpoint to `crawl-result.json` and stores completed records under `crawl-result.json.state/`. Keep both together when moving an interrupted crawl. `ResumePath` and `HtmlCrawler.LoadResultAsync` read these checkpoints as well as existing full manifests. Global datasets, the offline index, and final link rewriting are generated once when the crawl finishes; its final manifest is self-contained and the checkpoint records are removed.
+
+Completed crawl artifacts include:
+
 - `crawl-result.json` for the manifest and resume state
 - `index.html` as a browsable offline entry point into the saved dataset
 - `pages/` with per-page `.html`, `.txt`, optional `.md`, and `.json` sidecar manifests, including extraction metadata such as content mode, selection reason, and selected element hints

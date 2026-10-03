@@ -230,6 +230,7 @@ public class HtmlBrowserInstallerTests
             return;
         }
 
+        string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -255,7 +256,7 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
-            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", null);
+            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
@@ -269,6 +270,7 @@ public class HtmlBrowserInstallerTests
             return;
         }
 
+        string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -294,7 +296,7 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
-            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", null);
+            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }

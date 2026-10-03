@@ -26,7 +26,10 @@ public static partial class HtmlParserFromForm {
             throw new ArgumentNullException(nameof(html));
         }
 
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        return ParseFormsDocument(HtmlParser.ParseWithAngleSharp(html));
+    }
+
+    internal static List<HtmlFormResult> ParseFormsDocument(IDocument document) {
         var forms = document.QuerySelectorAll("form");
         List<HtmlFormResult> results = new();
         int index = 0;

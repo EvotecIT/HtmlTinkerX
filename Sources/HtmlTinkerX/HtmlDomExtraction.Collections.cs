@@ -32,14 +32,19 @@ public static partial class HtmlDomExtraction {
             throw new ArgumentOutOfRangeException(nameof(limit), "Collection limit must be between 1 and 100.");
         }
 
+        return DiscoverCollectionsDocument(HtmlParser.ParseWithAngleSharp(html), query, baseUri, minimumRepeatCount, limit);
+    }
+
+    internal static IReadOnlyList<HtmlPageCollection> DiscoverCollectionsDocument(
+        IDocument document, string? query = null, Uri? baseUri = null,
+        int minimumRepeatCount = 2, int limit = 5) {
         int candidateLimit = Math.Max(limit * 4, 20);
-        IReadOnlyList<HtmlDomSelectorCandidate> candidates = DiscoverSelectors(
-            html,
+        IReadOnlyList<HtmlDomSelectorCandidate> candidates = DiscoverSelectorsDocument(
+            document,
             query,
             baseUri,
             minimumRepeatCount,
             candidateLimit);
-        IDocument document = HtmlParser.ParseWithAngleSharp(html);
         Uri? effectiveBaseUri = GetEffectiveBaseUri(document, baseUri);
         HashSet<string> seenItemSets = new(StringComparer.Ordinal);
         HashSet<string> seenValueSets = new(StringComparer.Ordinal);

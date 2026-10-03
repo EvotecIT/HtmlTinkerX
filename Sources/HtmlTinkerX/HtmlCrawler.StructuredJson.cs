@@ -344,12 +344,12 @@ public static partial class HtmlCrawler {
         List<HtmlCrawlPage> pageList = pages
             .Where(page => !string.IsNullOrWhiteSpace(page.Url))
             .OrderBy(page => page.Depth)
-            .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(page => page.Url, StringComparer.Ordinal)
             .ToList();
         List<HtmlCrawlPage> skippedPageList = skippedPages
             .Where(page => !string.IsNullOrWhiteSpace(page.Url))
             .OrderBy(page => page.Depth)
-            .ThenBy(page => page.Url, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(page => page.Url, StringComparer.Ordinal)
             .ToList();
         List<HtmlCrawlPage> skippedGraphPages = skippedPageList
             .Where(page => !IsExternalSkipReason(page.SkipReason))
@@ -357,20 +357,20 @@ public static partial class HtmlCrawler {
         List<HtmlCrawlPage> externalGraphPages = skippedPageList
             .Where(page => IsExternalSkipReason(page.SkipReason))
             .ToList();
-        HashSet<string> fetchedUrls = new(pageList.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
-        HashSet<string> skippedUrls = new(skippedGraphPages.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
-        HashSet<string> externalSkippedUrls = new(externalGraphPages.Select(page => page.Url), StringComparer.OrdinalIgnoreCase);
-        HashSet<string> edgeKeys = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> fetchedUrls = new(pageList.Select(page => page.Url), StringComparer.Ordinal);
+        HashSet<string> skippedUrls = new(skippedGraphPages.Select(page => page.Url), StringComparer.Ordinal);
+        HashSet<string> externalSkippedUrls = new(externalGraphPages.Select(page => page.Url), StringComparer.Ordinal);
+        HashSet<string> edgeKeys = new(StringComparer.Ordinal);
         List<GraphEdgeRecord> edges = new();
-        Dictionary<string, int> incomingTotal = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, int> outgoingTotal = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, int> outgoingInternal = new(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> externalUrls = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> incomingTotal = new(StringComparer.Ordinal);
+        Dictionary<string, int> outgoingTotal = new(StringComparer.Ordinal);
+        Dictionary<string, int> outgoingInternal = new(StringComparer.Ordinal);
+        HashSet<string> externalUrls = new(StringComparer.Ordinal);
 
         foreach (HtmlCrawlPage page in pageList) {
             IEnumerable<string> pageLinks = page.Links
                 .Where(link => !string.IsNullOrWhiteSpace(link))
-                .Distinct(StringComparer.OrdinalIgnoreCase);
+                .Distinct(StringComparer.Ordinal);
 
             foreach (string link in pageLinks) {
                 string edgeKey = page.Url + "->" + link;
@@ -461,7 +461,7 @@ public static partial class HtmlCrawler {
 
         nodes.AddRange(externalUrls
             .Where(url => !externalSkippedUrls.Contains(url))
-            .OrderBy(url => url, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(url => url, StringComparer.Ordinal)
             .Select(url => new GraphNodeRecord {
                 Url = url,
                 Depth = -1,
@@ -476,29 +476,29 @@ public static partial class HtmlCrawler {
         int skippedNodeCount = nodes.Count(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase));
         int externalNodeCount = nodes.Count(node => string.Equals(node.Category, "External", StringComparison.OrdinalIgnoreCase));
         Dictionary<string, int> nodeCategories = nodes
-            .GroupBy(node => node.Category, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(node => node.Category, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         Dictionary<string, int> edgeRelations = edges
-            .GroupBy(edge => edge.Relation, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(edge => edge.Relation, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         Dictionary<string, int> skippedNodeReasons = nodes
             .Where(node => string.Equals(node.Category, "Skipped", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(node.SkipReason))
-            .GroupBy(node => node.SkipReason!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(node => node.SkipReason!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         Dictionary<string, int> offlineReadinessCounts = nodes
-            .GroupBy(node => node.OfflineReadinessGrade, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(node => node.OfflineReadinessGrade, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         Dictionary<string, int> offlineSeverityCounts = nodes
-            .GroupBy(node => node.HighestOfflineRiskSeverity, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(node => node.HighestOfflineRiskSeverity, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         Dictionary<string, int> offlineDependencyKindCounts = nodes
             .SelectMany(node => string.IsNullOrWhiteSpace(node.OfflineDependencyKindsSummary)
                 ? Array.Empty<string>()
                 : node.OfflineDependencyKindsSummary.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(kind => kind.Trim())
                     .Where(kind => !string.IsNullOrWhiteSpace(kind)))
-            .GroupBy(kind => kind, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(kind => kind, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         int offlineRiskNodeCount = nodes.Count(node => node.OfflineDependencyDiagnosticCount > 0);
         int highOfflineRiskNodeCount = nodes.Count(node => string.Equals(node.HighestOfflineRiskSeverity, "high", StringComparison.OrdinalIgnoreCase));
 
@@ -518,12 +518,12 @@ public static partial class HtmlCrawler {
                 EdgeRelations = edgeRelations,
                 SkippedNodeReasons = skippedNodeReasons
             },
-            Nodes = nodes.OrderBy(node => node.Category, StringComparer.OrdinalIgnoreCase)
+            Nodes = nodes.OrderBy(node => node.Category, StringComparer.Ordinal)
                 .ThenBy(node => node.Depth)
-                .ThenBy(node => node.Url, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(node => node.Url, StringComparer.Ordinal)
                 .ToArray(),
-            Edges = edges.OrderBy(edge => edge.SourceUrl, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(edge => edge.TargetUrl, StringComparer.OrdinalIgnoreCase)
+            Edges = edges.OrderBy(edge => edge.SourceUrl, StringComparer.Ordinal)
+                .ThenBy(edge => edge.TargetUrl, StringComparer.Ordinal)
                 .Select(edge => new {
                     edge.SourceUrl,
                     edge.TargetUrl,

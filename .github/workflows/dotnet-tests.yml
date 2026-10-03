@@ -121,6 +121,8 @@ jobs:
   test-ubuntu:
     name: 'Ubuntu'
     runs-on: ubuntu-latest
+    env:
+      HTMLTINKERX_PLAYWRIGHT_WITH_DEPS: '1'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
