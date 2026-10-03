@@ -607,6 +607,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public async Task TimedOutDnsLookupsAreGloballyBoundedWithoutCachingGateSaturation() {
         TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using SemaphoreSlim lookupGate = new(32, 32);
         int calls = 0;
         ConcurrentDictionary<string, byte> startedHosts = new(StringComparer.OrdinalIgnoreCase);
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
@@ -617,7 +618,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
                 return pendingLookup.Task;
             },
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50),
-            dnsLookupGate: new SemaphoreSlim(32, 32));
+            dnsLookupGate: lookupGate);
         Task<bool>[] lookups = Enumerable.Range(0, 64)
             .Select(index => evaluator.IsAllowedAsync($"https://bounded-{index}.example/report", null, CancellationToken.None))
             .ToArray();
@@ -631,13 +632,12 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
             .First(host => !startedHosts.ContainsKey(host));
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
 
-        bool recovered = false;
-        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
-        while (!recovered && DateTime.UtcNow < deadline) {
-            recovered = await evaluator.IsAllowedAsync($"https://{saturatedHost}/report", null, CancellationToken.None);
-            if (!recovered) await Task.Delay(10);
-        }
-        Assert.True(recovered);
+        // Resolver continuations release their permits asynchronously. Observe that boundary
+        // before retrying, rather than measuring thread-pool scheduling speed on the CI host.
+        using CancellationTokenSource drainDeadline = new(TimeSpan.FromSeconds(10));
+        for (int index = 0; index < 32; index++) await lookupGate.WaitAsync(drainDeadline.Token);
+        lookupGate.Release(32);
+        Assert.True(await evaluator.IsAllowedAsync($"https://{saturatedHost}/report", null, CancellationToken.None));
     }
 
     [Theory]

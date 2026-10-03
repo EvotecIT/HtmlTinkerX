@@ -571,6 +571,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private readonly CancellationTokenSource _cancellation = new();
         private readonly System.Collections.Concurrent.ConcurrentBag<Task> _clients = new();
         private readonly Task _serverTask;
+        private readonly string _popupRedirectTarget;
+        private string? _lastRedirectToken;
+        private int _redirectRequestCount;
         private string? _lastPopupToken;
         private string? _lastProtectedToken;
         private string? _lastPopupReferer;
@@ -590,12 +593,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private int _popupRequestCount;
         private readonly ConcurrentDictionary<string, (int Count, string Cookie)> _blankPopupSources = new(StringComparer.Ordinal);
         private readonly string _namedContextInitialUrl;
-        internal LoopbackPopupServer(string? namedContextInitialUrl = null) {
+        internal LoopbackPopupServer(string? namedContextInitialUrl = null, string? popupRedirectTarget = null) {
             _namedContextInitialUrl = namedContextInitialUrl ?? "/existing-context-initial";
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             HeaderUrl = $"http://127.0.0.1:{port}/header-main";
-            CrossOriginRedirectUrl = $"http://localhost:{port}/redirect-to-header-popup";
+            CrossOriginRedirectUrl = $"http://127.0.0.1:{port}/redirect-to-header-popup";
+            _popupRedirectTarget = popupRedirectTarget ?? HeaderUrl.Replace("/header-main", "/header-popup");
             BlankPopupResourceUrl = $"http://127.0.0.1:{port}/blank-popup-resource";
             NestedPopupUrl = $"http://127.0.0.1:{port}/nested-main";
             NoOpenerHeaderUrl = $"http://127.0.0.1:{port}/header-noopener-main";
@@ -623,6 +627,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
         internal string HeaderUrl { get; }
         internal string CrossOriginRedirectUrl { get; }
+        internal string? LastRedirectToken => Volatile.Read(ref _lastRedirectToken);
+        internal int RedirectRequestCount => Volatile.Read(ref _redirectRequestCount);
         internal string BlankPopupResourceUrl { get; }
         internal string NestedPopupUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
@@ -689,8 +695,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     string status = "200 OK";
                     string locationHeader = string.Empty;
                     if (requestTarget.StartsWith("/redirect-to-header-popup", StringComparison.Ordinal)) {
+                        Interlocked.Increment(ref _redirectRequestCount);
+                        Volatile.Write(ref _lastRedirectToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         status = "302 Found";
-                        locationHeader = $"Location: {HeaderUrl.Replace("/header-main", "/header-popup")}\r\n";
+                        locationHeader = $"Location: {_popupRedirectTarget}\r\n";
                         body = string.Empty;
                     } else if (requestTarget.StartsWith("/nested-parent", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
