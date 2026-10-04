@@ -61,8 +61,8 @@ public static class HtmlScriptRunner {
         var deadline = new OperationDeadlineConstraint();
         deadline.Begin(policy.ExecutionTimeout, operationCancellation.Token);
         var jsOptions = new JsScriptingOptions {
-            ConfigureEngine = engine => engine.Constraint(deadline)
-                .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes)
+            EngineCreator = engineOptions => new Engine(engineOptions.Constraint(deadline)
+                .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes))
         };
         // An inert page uses the same native service for the explicitly requested script only.
         var explicitService = policy.ExecutePageScripts ? null : new JsScriptingService(jsOptions);

@@ -3,6 +3,7 @@ using AngleSharp.Dom;
 using AngleSharp.Js;
 using Jint.Runtime;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -92,6 +93,35 @@ public class HtmlScriptRunnerBudgetTests {
             HtmlScriptRunner.RunAsync<object>(inline ? "<script>" + loop + "</script>" : "<html></html>",
                 inline ? "1" : loop, options, cancellation.Token));
         Assert.Equal(cancellation.Token, exception.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RunAsync_OperationBudgetInterruptsNativeRegex(bool inline, bool cancel) {
+        const string regex = "var subject = 'a'.repeat(40) + '!'; /^(a+)+$/.test(subject)";
+        await HtmlScriptRunner.RunAsync<int>("<html></html>", "1");
+        using var cancellation = new CancellationTokenSource();
+        var options = new HtmlScriptRunOptions {
+            ExecutionTimeout = cancel ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(100),
+            MaximumStatements = int.MaxValue
+        };
+        if (cancel) cancellation.CancelAfter(100);
+        var elapsed = Stopwatch.StartNew();
+        Func<Task<object?>> run = () => HtmlScriptRunner.RunAsync<object>(
+            inline ? "<script>" + regex + "</script>" : "<html></html>",
+            inline ? "1" : regex, options, cancellation.Token);
+
+        if (cancel) {
+            OperationCanceledException failure = await Assert.ThrowsAsync<OperationCanceledException>(run);
+            Assert.Equal(cancellation.Token, failure.CancellationToken);
+        } else {
+            await Assert.ThrowsAsync<TimeoutException>(run);
+        }
+        // The old native matcher waited for its own ten-second timeout instead.
+        Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(5), $"Operation took {elapsed.Elapsed}.");
     }
 
     [Fact]
