@@ -60,7 +60,7 @@ public static class HtmlScriptRunner {
         if (policy.ExecutionTimeout != Timeout.InfiniteTimeSpan) operationCancellation.CancelAfter(policy.ExecutionTimeout);
         var deadline = new OperationDeadlineConstraint();
         deadline.Begin(policy.ExecutionTimeout, operationCancellation.Token);
-        var configuration = Configuration.Default.With(new EngineCreator(engineOptions =>
+        var configuration = Configuration.Default.With(new EngineCreator((window, engineOptions) =>
             new Engine(engineOptions.Constraint(deadline)
                 .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes))));
         // An inert page uses the same native service for the explicitly requested script only.
