@@ -1,6 +1,7 @@
 namespace HtmlTinkerX;
 
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 /// <summary>
 /// Portable browserless extraction recipe produced from a discovered data source.
@@ -12,7 +13,7 @@ public sealed class HtmlBrowserlessExtractionRecipe {
     /// <summary>Original page URL used during discovery, when known.</summary>
     public string PageUrl { get; set; } = string.Empty;
 
-    /// <summary>Source kind, such as AppState, JsonLd, ScriptData, or ApiEndpoint.</summary>
+    /// <summary>Source kind, such as AppState, JsonLd, ScriptData, ApiEndpoint, or Dom.</summary>
     public string SourceKind { get; set; } = string.Empty;
 
     /// <summary>Source name.</summary>
@@ -47,4 +48,20 @@ public sealed class HtmlBrowserlessExtractionRecipe {
 
     /// <summary>Raw payload for static sources when explicitly included.</summary>
     public string RawContent { get; set; } = string.Empty;
+
+    /// <summary>
+    /// DOM field rules evaluated relative to Selector when SourceKind is Dom. Saved types use
+    /// portable primitive names or the full name of a non-generic enum available to the importing process.
+    /// Defaults support scalar values and enums; arbitrary CLR objects cannot be saved.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, HtmlDomFieldDefinition>? DomProperties { get; set; }
+
+    /// <summary>Optional minimum number of items required by a DOM recipe.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MinimumItemCount { get; set; }
+
+    /// <summary>Optional maximum number of items accepted by a DOM recipe.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaximumItemCount { get; set; }
 }

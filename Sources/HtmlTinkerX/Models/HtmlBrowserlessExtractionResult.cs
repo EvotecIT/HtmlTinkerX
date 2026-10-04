@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace HtmlTinkerX;
 
@@ -33,4 +34,8 @@ public sealed class HtmlBrowserlessExtractionResult {
 
     /// <summary>Warnings that should be reviewed before automating the extraction.</summary>
     public IReadOnlyList<string> Warnings { get; set; } = Array.Empty<string>();
+
+    /// <summary>Field provenance and quality checks when a DOM recipe is evaluated.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HtmlDomExtractionReport? DomReport { get; set; }
 }

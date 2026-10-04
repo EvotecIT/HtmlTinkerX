@@ -149,7 +149,7 @@ Cmdlet that saves cookies and storage state of a browser session to disk.
 Cmdlet that saves cookies and storage state of a browser session to disk.
 
 ### [Export-HtmlExtractionRecipe](Export-HtmlExtractionRecipe.md)
-Saves a browserless extraction recipe created from a discovered data source.
+Saves a browserless extraction recipe from a discovered data source or DOM field rules.
 
 ### [Export-HtmlOutline](Export-HtmlOutline.md)
 Exports a hierarchical outline of headings in HTML content to a JSON file.

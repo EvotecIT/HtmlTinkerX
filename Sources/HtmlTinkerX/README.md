@@ -154,6 +154,63 @@ $report.Fields
 The report describes the current extraction and declared rules. It does not
 automatically learn a site's expected shape or change a saved recipe.
 
+## Reuse DOM rules and detect changed datasets
+
+Save selectors, field types, defaults, and acceptable counts as a browserless
+recipe. Evaluate it against fresh HTML and inspect the quality report before
+accepting the records:
+
+```csharp
+var recipe = HtmlBrowserlessExtraction.CreateDomRecipe(
+    ".product-card",
+    new Dictionary<string, HtmlDomFieldDefinition> {
+        ["Name"] = new() { Selector = ".product-title", Required = true },
+        ["Price"] = new() {
+            Selector = ".product-price", DataType = typeof(decimal),
+            MaximumValueCount = 1
+        }
+    },
+    new HtmlDomExtractionReportOptions { MinimumItemCount = 1 });
+
+string json = HtmlBrowserlessExtraction.SerializeRecipe(recipe);
+var saved = HtmlBrowserlessExtraction.DeserializeRecipe(json);
+var result = HtmlBrowserlessExtraction.ExtractDomRecipe(saved, currentHtml);
+
+Console.WriteLine(result.Success);
+foreach (var diagnostic in result.DomReport!.Fields) {
+    if (!diagnostic.IsValid) {
+        Console.WriteLine($"Item {diagnostic.ItemIndex}, {diagnostic.PropertyName}: {diagnostic.Status}");
+    }
+}
+```
+
+The existing PowerShell recipe commands use the same rules:
+
+```powershell
+Export-HtmlExtractionRecipe -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
+} -MinimumItemCount 1 -Path .\products.json
+
+$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml
+$result.Success
+$result.DomReport.Fields
+```
+
+DOM recipes require current HTML and perform no implicit HTTP fetch. Success
+requires at least one item and all declared quality checks. Missing required
+fields, invalid values, duplicate matches, and item counts outside the saved
+bounds make the result unsuccessful while preserving valid neighboring fields.
+The recipe keeps its selectors and declared bounds; it does not learn a new page
+shape or silently revise the rules. `-IncludeRawContent` on invocation explicitly
+retains the supplied HTML.
+
+Types use portable primitive names and non-generic enum full names instead of assembly
+versions. An enum must be available in the importing process, and its full name
+must be unambiguous among loaded assemblies. Defaults retain scalar or enum types;
+arbitrary CLR object defaults cannot be saved. App-state and endpoint recipes keep
+their existing workflows.
+
 ## Audit generated or supplied HTML
 
 `HtmlDocumentAudit` provides one reusable contract for static output checks. It reports duplicate IDs, missing document metadata, image alternatives, control names and labels, unsafe URL schemes, and heading-order problems.

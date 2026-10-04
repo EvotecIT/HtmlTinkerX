@@ -14102,14 +14102,14 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       <command:verb>Export</command:verb>
       <command:noun>HtmlExtractionRecipe</command:noun>
       <maml:description>
-        <maml:para>Saves a browserless extraction recipe created from a discovered data source.</maml:para>
+        <maml:para>Saves a browserless extraction recipe from a discovered data source or DOM field rules.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Saves a browserless extraction recipe created from a discovered data source.</maml:para>
+      <maml:para>Saves a browserless extraction recipe from a discovered data source or DOM field rules.</maml:para>
     </maml:description>
     <command:syntax>
-      <command:syntaxItem parameterSetName="__AllParameterSets">
+      <command:syntaxItem parameterSetName="Source">
         <maml:name>Export-HtmlExtractionRecipe</maml:name>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="0" aliases="None">
           <maml:name>DataSource</maml:name>
@@ -14160,8 +14160,107 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Dom">
+        <maml:name>Export-HtmlExtractionRecipe</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BaseUrl</maml:name>
+          <maml:description>
+            <maml:para>Page URL used to resolve relative field URLs when the recipe is evaluated.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ItemSelector</maml:name>
+          <maml:description>
+            <maml:para>CSS selector matching repeated DOM items.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum acceptable number of items when a DOM recipe is evaluated.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MinimumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Minimum acceptable number of items when a DOM recipe is evaluated.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PassThru</maml:name>
+          <maml:description>
+            <maml:para>Writes the recipe path to the pipeline.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="OutFile">
+          <maml:name>Path</maml:name>
+          <maml:description>
+            <maml:para>Destination JSON recipe path.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Property</maml:name>
+          <maml:description>
+            <maml:para>DOM property-to-selector map using the same field rules as Select-HtmlData.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">IDictionary</command:parameterValue>
+          <dev:type>
+            <maml:name>IDictionary</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BaseUrl</maml:name>
+        <maml:description>
+          <maml:para>Page URL used to resolve relative field URLs when the recipe is evaluated.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Uri</command:parameterValue>
+        <dev:type>
+          <maml:name>Uri</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="0" aliases="None">
         <maml:name>DataSource</maml:name>
         <maml:description>
@@ -14182,6 +14281,42 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
           <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>ItemSelector</maml:name>
+        <maml:description>
+          <maml:para>CSS selector matching repeated DOM items.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumItemCount</maml:name>
+        <maml:description>
+          <maml:para>Maximum acceptable number of items when a DOM recipe is evaluated.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MinimumItemCount</maml:name>
+        <maml:description>
+          <maml:para>Minimum acceptable number of items when a DOM recipe is evaluated.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -14210,6 +14345,18 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Property</maml:name>
+        <maml:description>
+          <maml:para>DOM property-to-selector map using the same field rules as Select-HtmlData.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">IDictionary</command:parameterValue>
+        <dev:type>
+          <maml:name>IDictionary</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
     </command:parameters>
     <command:inputTypes>
       <command:inputType>
@@ -14234,6 +14381,16 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       <command:example>
         <maml:title>Export a recipe for the first direct source</maml:title>
         <dev:code>Find-HtmlDataSource -Content $html -DirectOnly | Select-Object -First 1 | Export-HtmlExtractionRecipe -Path .\recipe.json</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Save DOM fields and expected counts for reuse on current HTML</maml:title>
+        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product-card' -Property @{&#xD;
+    Name = @{ Selector = '.product-title'; Required = $true }&#xD;
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }&#xD;
+} -MinimumItemCount 1 -Path .\products.json</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -32072,6 +32229,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Current HTML to evaluate with a DOM recipe. DOM recipes require Content and perform no HTTP fetch.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>IncludeRawContent</maml:name>
           <maml:description>
             <maml:para>Includes raw payload or response content in the result.</maml:para>
@@ -32154,6 +32323,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Current HTML to evaluate with a DOM recipe. DOM recipes require Content and perform no HTTP fetch.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -32246,6 +32427,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>Current HTML to evaluate with a DOM recipe. DOM recipes require Content and perform no HTTP fetch.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>IncludeRawContent</maml:name>
         <maml:description>
           <maml:para>Includes raw payload or response content in the result.</maml:para>
@@ -32329,6 +32522,15 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
       <command:example>
         <maml:title>Run a recipe from disk</maml:title>
         <dev:code>Invoke-HtmlExtractionRecipe -Path .\recipe.json -AllowHttpFetch</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Check fresh HTML against saved DOM fields and counts</maml:title>
+        <dev:code>$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html&#xD;
+$result.Success&#xD;
+$result.DomReport.Fields</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

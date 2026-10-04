@@ -13,6 +13,14 @@ namespace PSParseHTML.PowerShell;
 ///   <summary>Run a recipe from disk</summary>
 ///   <code>Invoke-HtmlExtractionRecipe -Path .\recipe.json -AllowHttpFetch</code>
 /// </example>
+/// <example>
+///   <summary>Check fresh HTML against saved DOM fields and counts</summary>
+///   <code>
+/// $result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html
+/// $result.Success
+/// $result.DomReport.Fields
+///   </code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlExtractionRecipe", DefaultParameterSetName = ParameterSetRecipe)]
 [OutputType(typeof(HtmlBrowserlessExtractionResult))]
 public sealed class CmdletInvokeHtmlExtractionRecipe : AsyncPSCmdlet {
@@ -27,6 +35,11 @@ public sealed class CmdletInvokeHtmlExtractionRecipe : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetPath, Position = 0)]
     [Alias("File")]
     public string? Path { get; set; }
+
+    /// <summary>Current HTML to evaluate with a DOM recipe. DOM recipes require Content and perform no HTTP fetch.</summary>
+    [Parameter]
+    [AllowEmptyString]
+    public string? Content { get; set; }
 
     /// <summary>Allows direct HTTP GET extraction for endpoint recipes.</summary>
     [Parameter]
@@ -54,8 +67,12 @@ public sealed class CmdletInvokeHtmlExtractionRecipe : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
         HtmlBrowserlessExtractionRecipe recipe = await GetRecipeAsync().ConfigureAwait(false);
+        if (Content != null) {
+            WriteObject(HtmlBrowserlessExtraction.ExtractDomRecipe(recipe, Content, IncludeRawContent.IsPresent));
+            return;
+        }
+        ValidateProxy(Proxy, ProxyCredential);
         using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
         HtmlBrowserlessExtractionResult result = await HtmlBrowserlessExtraction.ExtractRecipeAsync(
             recipe,
