@@ -52,6 +52,28 @@ public class HtmlSelectorCmdletTests {
         Assert.Equal("fallback", Assert.Single(result).BaseObject);
     }
 
+    [Theory]
+    [InlineData("Select-HtmlAttributeValue", typeof(CmdletSelectHtmlAttributeValue), "  &amp;  ")]
+    [InlineData("Select-HtmlInnerText", typeof(CmdletSelectHtmlInnerText), "&")]
+    public void PresentAttributeValuesKeepTheRequestedTextBehavior(string commandName, Type commandType, string expected) {
+        var attribute = new HtmlDocument().CreateAttribute("title", "  &amp;  ");
+
+        using var runspace = CreateRunspace(commandName, commandType);
+        using var command = PowerShell.Create();
+        command.Runspace = runspace;
+        command.AddCommand(commandName)
+            .AddParameter("InputObject", attribute)
+            .AddParameter("DefaultValue", "fallback");
+        if (commandType == typeof(CmdletSelectHtmlInnerText)) {
+            command.AddParameter("DeEntitize", true);
+        }
+
+        var result = command.Invoke();
+
+        Assert.Empty(command.Streams.Error);
+        Assert.Equal(expected, Assert.Single(result).BaseObject);
+    }
+
     private static Runspace CreateRunspace(string commandName, Type commandType) {
         var state = InitialSessionState.Create();
         state.Commands.Add(new SessionStateCmdletEntry(commandName, commandType, null));
