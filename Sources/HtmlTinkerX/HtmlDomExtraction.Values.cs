@@ -5,7 +5,45 @@ using System.Linq;
 namespace HtmlTinkerX;
 
 public static partial class HtmlDomExtraction {
+    private static object? ConvertFieldValues(
+        object?[] values, HtmlDomFieldDefinition definition, string propertyName, int itemIndex) {
+        HtmlDomFieldStatus? violation = GetFieldCountViolation(values.Length, definition);
+        if (violation.HasValue) {
+            string message = violation == HtmlDomFieldStatus.RequiredMissing
+                ? $"Required property '{propertyName}' did not match item {itemIndex} using selector '{definition.Selector}'."
+                : $"Property '{propertyName}' on item {itemIndex} has {values.Length} values, outside its declared count bounds.";
+            throw new InvalidOperationException(message);
+        }
+
+        if (values.Length == 0) {
+            return definition.All
+                ? Array.Empty<object?>()
+                : ConvertFieldValue(definition.DefaultValue, definition, propertyName, itemIndex);
+        }
+
+        return definition.All
+            ? values.Select(value => ConvertFieldValue(value, definition, propertyName, itemIndex)).ToArray()
+            : ConvertFieldValue(values[0], definition, propertyName, itemIndex);
+    }
+
+    private static HtmlDomFieldStatus? GetFieldCountViolation(int count, HtmlDomFieldDefinition definition) =>
+        definition.Required && count == 0 ? HtmlDomFieldStatus.RequiredMissing
+        : definition.MinimumValueCount.HasValue && count < definition.MinimumValueCount.Value ? HtmlDomFieldStatus.TooFewValues
+        : definition.MaximumValueCount.HasValue && count > definition.MaximumValueCount.Value ? HtmlDomFieldStatus.TooManyValues
+        : null;
+
+    private static void ValidateCountBounds(int? minimum, int? maximum, string name) {
+        if (minimum < 0 || maximum < 0 || (minimum.HasValue && maximum.HasValue && minimum > maximum)) {
+            throw new ArgumentException($"Count bounds for '{name}' must be non-negative and minimum cannot exceed maximum.");
+        }
+    }
+
     private static void ValidateFieldConversion(HtmlDomFieldDefinition definition, string propertyName) {
+        if (string.IsNullOrWhiteSpace(definition.Attribute)
+            && !string.Equals(definition.ValueKind, "Text", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(definition.ValueKind, "Html", StringComparison.OrdinalIgnoreCase)) {
+            throw new ArgumentException($"Property '{propertyName}' must use Text or Html as its value kind.", nameof(definition.ValueKind));
+        }
         Type? type = GetFieldDataType(definition);
         if (type != null && type != typeof(string) && type != typeof(int) && type != typeof(long)
             && type != typeof(decimal) && type != typeof(bool) && type != typeof(DateTimeOffset)

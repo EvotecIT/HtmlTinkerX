@@ -108,6 +108,52 @@ Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
 }
 ```
 
+## Inspect extraction quality and count changes
+
+`HtmlDomExtraction.ExtractReport` keeps valid fields when another field is missing
+or cannot be converted. Each field diagnostic records the item index, selector,
+attribute, type, culture, and observed match and value counts. Diagnostics omit
+the raw input of failed fields.
+
+```csharp
+HtmlDomExtractionReport report = HtmlDomExtraction.ExtractReport(
+    html, ".product-card", fields,
+    new HtmlDomExtractionReportOptions { MinimumItemCount = 1 });
+
+if (!report.IsValid) {
+    foreach (HtmlDomFieldDiagnostic diagnostic in report.Fields.Where(item => !item.IsValid)) {
+        Console.WriteLine($"Item {diagnostic.ItemIndex}, {diagnostic.PropertyName}: {diagnostic.Error}");
+    }
+}
+```
+
+Inspect `IsValid` before accepting `Records`: fields with data errors contain
+null, while other fields and items remain available. Optional missing fields
+remain valid; `DefaultedFieldCount` and `MissingFieldCount` make those outcomes
+visible. Invalid field definitions and selectors still raise an error.
+
+Use `MinimumItemCount` and `MaximumItemCount` to declare the expected dataset
+size. Without these bounds, an empty dataset violates no item-count rule. Set
+`MinimumValueCount` or `MaximumValueCount` on a field to detect missing or
+duplicate values before selecting the first value or returning all values.
+Value counts exclude absent attributes and, with `TreatEmptyAsMissing`, blank
+values. These field bounds also apply to ordinary `Extract` calls.
+
+PowerShell returns one report with the same records and diagnostics:
+
+```powershell
+$report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
+} -AsExtractionReport -MinimumItemCount 1
+
+$report.IsValid
+$report.Fields
+```
+
+The report describes the current extraction and declared rules. It does not
+automatically learn a site's expected shape or change a saved recipe.
+
 ## Audit generated or supplied HTML
 
 `HtmlDocumentAudit` provides one reusable contract for static output checks. It reports duplicate IDs, missing document metadata, image alternatives, control names and labels, unsafe URL schemes, and heading-order problems.

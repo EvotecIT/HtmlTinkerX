@@ -102,6 +102,7 @@ public static partial class HtmlDomExtraction {
             HtmlDomFieldDefinition definition = property.Value
                 ?? throw new ArgumentException($"Property '{property.Key}' has no field definition.", nameof(properties));
             ValidateFieldConversion(definition, property.Key);
+            ValidateCountBounds(definition.MinimumValueCount, definition.MaximumValueCount, property.Key);
         }
 
         IHtmlCollection<IElement> items;
@@ -243,6 +244,12 @@ public static partial class HtmlDomExtraction {
         string propertyName,
         int itemIndex,
         Uri? baseUri) {
+        object?[] values = ReadFieldValues(item, definition, propertyName, baseUri, out _);
+        return ConvertFieldValues(values, definition, propertyName, itemIndex);
+    }
+
+    private static object?[] ReadFieldValues(
+        IElement item, HtmlDomFieldDefinition definition, string propertyName, Uri? baseUri, out int matchCount) {
         IElement[] matches;
         try {
             matches = string.IsNullOrWhiteSpace(definition.Selector)
@@ -255,26 +262,12 @@ public static partial class HtmlDomExtraction {
                 exception);
         }
 
-        object?[] values = matches
+        matchCount = matches.Length;
+        return matches
             .Select(match => ReadElementValue(match, definition, baseUri))
             .Where(value => value != null
                 && (!definition.TreatEmptyAsMissing || !string.IsNullOrWhiteSpace(value as string)))
             .ToArray();
-
-        if (values.Length == 0) {
-            if (definition.Required) {
-                throw new InvalidOperationException(
-                    $"Required property '{propertyName}' did not match item {itemIndex} using selector '{definition.Selector}'.");
-            }
-
-            return definition.All
-                ? Array.Empty<object?>()
-                : ConvertFieldValue(definition.DefaultValue, definition, propertyName, itemIndex);
-        }
-
-        return definition.All
-            ? values.Select(value => ConvertFieldValue(value, definition, propertyName, itemIndex)).ToArray()
-            : ConvertFieldValue(values[0], definition, propertyName, itemIndex);
     }
 
     private static object? ReadElementValue(IElement element, HtmlDomFieldDefinition definition, Uri? baseUri) {

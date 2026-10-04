@@ -11,22 +11,22 @@ Selects normalized structured data, links, assets, tokens, forms, and app state 
 ## SYNTAX
 ### Node (Default)
 ```powershell
-Select-HtmlData [-HtmlNode] <Object> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-BaseUrl <uri>] [<CommonParameters>]
+Select-HtmlData [-HtmlNode] <Object> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-AsExtractionReport] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-BaseUrl <uri>] [<CommonParameters>]
 ```
 
 ### Content
 ```powershell
-Select-HtmlData -Content <string> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-BaseUrl <uri>] [<CommonParameters>]
+Select-HtmlData -Content <string> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-AsExtractionReport] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-BaseUrl <uri>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Select-HtmlData -Path <string> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-BaseUrl <uri>] [<CommonParameters>]
+Select-HtmlData -Path <string> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-AsExtractionReport] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-BaseUrl <uri>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Select-HtmlData -Url <uri> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-BaseUrl <uri>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
+Select-HtmlData -Url <uri> [-Kind <string[]>] [-ItemSelector <string>] [-Property <IDictionary>] [-AsExtractionReport] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-BaseUrl <uri>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -72,7 +72,35 @@ Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
 
 Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.
 
+### EXAMPLE 6
+```powershell
+$report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
+} -AsExtractionReport -MinimumItemCount 1
+$report.IsValid
+$report.Fields
+```
+
+Missing required fields, invalid values, and count changes are reported. Inspect IsValid before accepting Records; fields with data errors contain null.
+
 ## PARAMETERS
+
+### -AsExtractionReport
+Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Node, Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -BaseUrl
 Base URL used to resolve relative links and assets. Defaults to Url when downloading.
@@ -170,6 +198,38 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -MaximumItemCount
+Maximum acceptable item count in an extraction report. Requires AsExtractionReport.
+
+```yaml
+Type: Int32
+Parameter Sets: Node, Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MinimumItemCount
+Minimum acceptable item count in an extraction report. Requires AsExtractionReport.
+
+```yaml
+Type: Int32
+Parameter Sets: Node, Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Path
 Path to an HTML file.
 
@@ -189,7 +249,8 @@ Accept wildcard characters: False
 ### -Property
 Property-to-selector map used with ItemSelector.
 String values read trimmed text. Hashtable values can specify Selector, Attribute,
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.
@@ -283,6 +344,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 - `HtmlTinkerX.HtmlDataItem`
 - `System.Management.Automation.PSObject`
+- `HtmlTinkerX.HtmlDomExtractionReport`
 
 ## RELATED LINKS
 

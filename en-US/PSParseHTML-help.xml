@@ -45884,6 +45884,18 @@ Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-mai
       <command:syntaxItem parameterSetName="Node">
         <maml:name>Select-HtmlData</maml:name>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AsExtractionReport</maml:name>
+          <maml:description>
+            <maml:para>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BaseUrl</maml:name>
           <maml:description>
             <maml:para>Base URL used to resolve relative links and assets. Defaults to Url when downloading.</maml:para>
@@ -45931,12 +45943,37 @@ Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-mai
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MinimumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
+MinimumValueCount, or MaximumValueCount.&#xD;
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
@@ -45951,6 +45988,18 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Content">
         <maml:name>Select-HtmlData</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AsExtractionReport</maml:name>
+          <maml:description>
+            <maml:para>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BaseUrl</maml:name>
           <maml:description>
@@ -45999,12 +46048,37 @@ Required fields throw when missing. Invalid typed values report the property and
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MinimumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
+MinimumValueCount, or MaximumValueCount.&#xD;
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
@@ -46019,6 +46093,18 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="File">
         <maml:name>Select-HtmlData</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AsExtractionReport</maml:name>
+          <maml:description>
+            <maml:para>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BaseUrl</maml:name>
           <maml:description>
@@ -46055,6 +46141,30 @@ Required fields throw when missing. Invalid typed values report the property and
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MinimumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="File">
           <maml:name>Path</maml:name>
           <maml:description>
@@ -46072,7 +46182,8 @@ Required fields throw when missing. Invalid typed values report the property and
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
+MinimumValueCount, or MaximumValueCount.&#xD;
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
@@ -46087,6 +46198,18 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Url">
         <maml:name>Select-HtmlData</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AsExtractionReport</maml:name>
+          <maml:description>
+            <maml:para>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BaseUrl</maml:name>
           <maml:description>
@@ -46135,12 +46258,37 @@ Required fields throw when missing. Invalid typed values report the property and
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MinimumItemCount</maml:name>
+          <maml:description>
+            <maml:para>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
+MinimumValueCount, or MaximumValueCount.&#xD;
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
@@ -46203,6 +46351,18 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AsExtractionReport</maml:name>
+        <maml:description>
+          <maml:para>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BaseUrl</maml:name>
         <maml:description>
@@ -46275,6 +46435,30 @@ Required fields throw when missing. Invalid typed values report the property and
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumItemCount</maml:name>
+        <maml:description>
+          <maml:para>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MinimumItemCount</maml:name>
+        <maml:description>
+          <maml:para>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="File">
         <maml:name>Path</maml:name>
         <maml:description>
@@ -46292,7 +46476,8 @@ Required fields throw when missing. Invalid typed values report the property and
         <maml:description>
           <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
+MinimumValueCount, or MaximumValueCount.&#xD;
 DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
 Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
@@ -46376,6 +46561,11 @@ Required fields throw when missing. Invalid typed values report the property and
           <maml:name>System.Management.Automation.PSObject</maml:name>
         </dev:type>
       </command:returnValue>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>HtmlTinkerX.HtmlDomExtractionReport</maml:name>
+        </dev:type>
+      </command:returnValue>
     </command:returnValues>
     <maml:alertSet>
       <maml:alert>
@@ -46423,6 +46613,18 @@ Required fields throw when missing. Invalid typed values report the property and
 }</dev:code>
         <dev:remarks>
           <maml:para>Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Inspect extraction quality and require a non-empty dataset</maml:title>
+        <dev:code>$report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{&#xD;
+    Name = @{ Selector = '.product-title'; Required = $true }&#xD;
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }&#xD;
+} -AsExtractionReport -MinimumItemCount 1&#xD;
+$report.IsValid&#xD;
+$report.Fields</dev:code>
+        <dev:remarks>
+          <maml:para>Missing required fields, invalid values, and count changes are reported. Inspect IsValid before accepting Records; fields with data errors contain null.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

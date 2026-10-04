@@ -31,6 +31,12 @@ public sealed class HtmlDomFieldDefinition {
     /// <summary>Treat empty or whitespace-only values as missing when applying Required and DefaultValue.</summary>
     public bool TreatEmptyAsMissing { get; set; }
 
+    /// <summary>Optional minimum number of non-missing values before selecting the first or all values.</summary>
+    public int? MinimumValueCount { get; set; }
+
+    /// <summary>Optional maximum number of non-missing values before selecting the first or all values.</summary>
+    public int? MaximumValueCount { get; set; }
+
     /// <summary>Return every matching value instead of only the first.</summary>
     public bool All { get; set; }
 
