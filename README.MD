@@ -759,7 +759,9 @@ after decoding, including files with a Unicode BOM.
 The equivalent .NET overload accepts `HtmlScriptRunOptions` and a cancellation token. It
 closes its owned browsing context on success or failure. The existing overload taking an
 `IBrowsingContext` retains the caller's services, execution policy, and lifetime; configure
-Jint constraints through `JsScriptingOptions.ConfigureEngine` before creating that context.
+Jint constraints through `JsScriptingOptions.EngineCreator` before creating that context.
+The factory receives AngleSharp's Jint options; add constraints to those options and return
+a new `Jint.Engine` so the DOM bindings remain configured for each window.
 
 #### Browser Extraction Mode
 
