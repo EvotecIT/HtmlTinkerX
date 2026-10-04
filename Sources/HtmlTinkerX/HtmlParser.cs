@@ -780,6 +780,16 @@ public static partial class HtmlParser {
             throw new ArgumentNullException(nameof(names));
         }
 
+        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < names.Count; i++) {
+            reserved.Add(string.IsNullOrEmpty(names[i]) ? i.ToString(System.Globalization.CultureInfo.InvariantCulture) : names[i]);
+        }
+        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < names.Count; i++) {
+            if (string.IsNullOrEmpty(names[i])) {
+                emitted.Add(i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
         Dictionary<string, int> counters = new(StringComparer.OrdinalIgnoreCase);
 
         for (int i = 0; i < names.Count; i++) {
@@ -787,16 +797,20 @@ public static partial class HtmlParser {
             if (string.IsNullOrEmpty(name)) {
                 continue;
             }
-
-            if (counters.TryGetValue(name, out int count)) {
-                count++;
-                counters[name] = count;
-                string unique = name + count;
-                LoggingMessages.Logger.WriteWarning($"Duplicate header '{name}' detected. Renaming to '{unique}'.");
-                names[i] = unique;
-            } else {
-                counters[name] = 0;
+            if (emitted.Add(name)) {
+                names[i] = name;
+                continue;
             }
+            counters.TryGetValue(name, out int count);
+            string unique;
+            do {
+                count++;
+                unique = name + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            } while (!reserved.Add(unique));
+            counters[name] = count;
+            emitted.Add(unique);
+            LoggingMessages.Logger.WriteWarning($"Duplicate header '{name}' detected. Renaming to '{unique}'.");
+            names[i] = unique;
         }
     }
 

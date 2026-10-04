@@ -68,11 +68,28 @@ public static partial class HtmlParserFromTable {
         string? emptyValuePlaceholder,
         HtmlCellTextFormat cellTextFormat,
         bool includeLinkUrls) {
+        return ParseTablesWithHtmlAgilityPackDetailed(html, reverseTable, replaceContent, replaceHeaders, allProperties, skipFooter, cleanHeaders, emptyValuePlaceholder, cellTextFormat, includeLinkUrls, null);
+    }
+
+    /// <summary>Parses tables with explicit per-operation allocation limits.</summary>
+    public static List<HtmlTableResult> ParseTablesWithHtmlAgilityPackDetailed(
+        string html,
+        bool reverseTable,
+        IDictionary<string, string>? replaceContent,
+        IDictionary<string, string>? replaceHeaders,
+        bool allProperties,
+        bool skipFooter,
+        bool cleanHeaders,
+        string? emptyValuePlaceholder,
+        HtmlCellTextFormat cellTextFormat,
+        bool includeLinkUrls,
+        HtmlTableParseLimits? limits) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
         replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
         replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
+        var budget = (limits ?? new HtmlTableParseLimits()).CreateBudget();
 
         HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
@@ -105,9 +122,8 @@ public static partial class HtmlParserFromTable {
             var containsDisplaySpaceNone = style.IndexOf("display: none", StringComparison.OrdinalIgnoreCase) >= 0;
             metadata.IsVisible = !(containsDisplayNone || containsDisplaySpaceNone);
 
-            var rows = skipFooter ?
-                table.SelectNodes(".//tr[not(ancestor::tfoot)]") :
-                table.SelectNodes(".//tr");
+            var rows = GetTableRows(table, skipFooter);
+            budget.AddRows(rows?.Count ?? 0);
             metadata.RowCount = rows?.Count ?? 0;
 
             if (rows == null || rows.Count == 0) {
@@ -141,20 +157,33 @@ public static partial class HtmlParserFromTable {
                     if (string.IsNullOrEmpty(header)) {
                         header = (++index).ToString();
                     }
+                    if (!obj.ContainsKey(header)) {
+                        budget.CheckColumns((long)obj.Count + linkValues.Count + 1);
+                        budget.AddCells(1, 1);
+                    }
                     obj[header] = value;
                     if (includeLinkUrls && cells.Count > 1) {
                         string? linkUrl = ExtractLinkUrls(cells[1]);
                         if (!string.IsNullOrWhiteSpace(linkUrl)) {
                             var used = new HashSet<string>(obj.Keys.Concat(linkValues.Keys), StringComparer.OrdinalIgnoreCase);
                             string linkHeader = CreateUniqueLinkHeaderName(header, index, used);
+                            budget.CheckColumns((long)obj.Count + linkValues.Count + 1);
+                            budget.AddCells(1, 1);
                             linkValues[linkHeader] = linkUrl;
                         }
                     }
                 }
 
                 if (obj.Count > 0) {
+                    var used = new HashSet<string>(obj.Keys, StringComparer.OrdinalIgnoreCase);
                     foreach (var linkValue in linkValues) {
-                        obj[linkValue.Key] = linkValue.Value;
+                        string candidate = linkValue.Key;
+                        int suffix = 2;
+                        while (!used.Add(candidate)) {
+                            candidate = linkValue.Key + suffix.ToString(CultureInfo.InvariantCulture);
+                            suffix++;
+                        }
+                        obj[candidate] = linkValue.Value;
                     }
 
                     result.Data = new List<Dictionary<string, string?>> { obj };
@@ -167,7 +196,7 @@ public static partial class HtmlParserFromTable {
 
             int headerRowIndex = 0;
             bool hasHeader = false;
-            HtmlNode? headerRow = SelectBestHeaderRow(rows);
+            HtmlNode? headerRow = SelectBestHeaderRow(rows, budget);
             if (headerRow != null) {
                 headerRowIndex = rows.IndexOf(headerRow);
                 hasHeader = headerRow.SelectNodes("th")?.Count > 0;
@@ -216,16 +245,10 @@ public static partial class HtmlParserFromTable {
                     if (cleanHeaders) {
                         header = HtmlParser.CleanHeaderName(header);
                     }
-                    int colspan = 1;
-                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
-                        colspan = cs;
-                    }
-                    for (int c = 0; c < colspan; c++) {
-                        headers.Add(header);
-                    }
+                    AddHeader(headers, header, ReadColumnSpan(cell.GetAttributeValue("colspan", "1")), budget);
                 }
             } else {
-                int columnCount = SumColSpans(headerCells);
+                int columnCount = SumColSpans(headerCells, budget);
                 for (int i = 0; i < columnCount; i++) {
                     headers.Add($"Column{i + 1}");
                 }
@@ -236,20 +259,27 @@ public static partial class HtmlParserFromTable {
             metadata.ColumnCount = headers.Count;
 
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            budget.AddCells(rows.Count - startIndex, headers.Count);
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpanLinks = new();
             var linkHeaderNames = includeLinkUrls ? BuildLinkHeaderNames(headers) : null;
             int categoryIndex = headers.FindIndex(h => h.Equals("Category", StringComparison.OrdinalIgnoreCase));
             int severityIndex = headers.FindIndex(h => h.Equals("Severity", StringComparison.OrdinalIgnoreCase));
-            foreach (var row in OrderDataRows(rows, startIndex)) {
+            var orderedRows = OrderDataRows(rows, startIndex).ToArray();
+            var remainingRows = GetRemainingGroupRows(orderedRows, row => row.ParentNode);
+            object? previousGroup = null;
+            for (int rowIndex = 0; rowIndex < orderedRows.Length; rowIndex++) {
+                var row = orderedRows[rowIndex];
+                if (!ReferenceEquals(previousGroup, row.ParentNode)) {
+                    rowSpans.Clear();
+                    rowSpanLinks.Clear();
+                    previousGroup = row.ParentNode;
+                }
                 if (row == null) {
                     continue;
                 }
                 var cells = row.SelectNodes("th|td");
-                if (cells == null) {
-                    continue;
-                }
                 string?[] rowValues = new string?[headers.Count];
                 Dictionary<string, string?> linkValues = new(StringComparer.OrdinalIgnoreCase);
                 int col = 0;
@@ -264,7 +294,7 @@ public static partial class HtmlParserFromTable {
                         }
                         if (linkHeaderNames != null && rowSpanLinks.TryGetValue(col, out var linkSpan)) {
                             if (!string.IsNullOrWhiteSpace(linkSpan.Value)) {
-                                linkValues[linkHeaderNames[col]] = linkSpan.Value;
+                                SetLinkValue(linkValues, linkHeaderNames[col], linkSpan.Value, headers.Count, budget);
                             }
                             if (--linkSpan.Remaining == 0) {
                                 rowSpanLinks.Remove(col);
@@ -276,8 +306,8 @@ public static partial class HtmlParserFromTable {
                         continue;
                     }
 
-                    if (cellIndex < cells.Count) {
-                        var cell = cells[cellIndex++];
+                    if (cellIndex < (cells?.Count ?? 0)) {
+                        var cell = cells![cellIndex++];
                         string value = FormatCellText(cell, cellTextFormat);
                         string? linkUrl = linkHeaderNames != null ? ExtractLinkUrls(cell) : null;
                         if (replaceContent != null) {
@@ -288,18 +318,12 @@ public static partial class HtmlParserFromTable {
                         if (string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(emptyValuePlaceholder)) {
                             value = emptyValuePlaceholder ?? string.Empty;
                         }
-                        int colspan = 1;
-                        int rowspan = 1;
-                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs2)) {
-                            colspan = cs2;
-                        }
-                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs2)) {
-                            rowspan = rs2;
-                        }
+                        int colspan = ReadColumnSpan(cell.GetAttributeValue("colspan", "1"));
+                        int rowspan = ReadRowSpan(cell.GetAttributeValue("rowspan", "1"), remainingRows[rowIndex]);
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
                             rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                             if (linkHeaderNames != null && !string.IsNullOrWhiteSpace(linkUrl)) {
-                                linkValues[linkHeaderNames[col]] = linkUrl;
+                                SetLinkValue(linkValues, linkHeaderNames[col], linkUrl!, headers.Count, budget);
                             }
                             if (rowspan > 1) {
                                 rowSpans[col] = (rowValues[col], rowspan - 1);
@@ -331,7 +355,7 @@ public static partial class HtmlParserFromTable {
                         if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
                             val = label;
                         }
-                        dict["Category"] = val;
+                        dict[headers[categoryIndex]] = val;
                     }
                 }
                 if (severityIndex >= 0) {
@@ -341,14 +365,14 @@ public static partial class HtmlParserFromTable {
                         if (dataValueLookup != null && dataValueLookup.TryGetValue(key, out var label)) {
                             val = label;
                         }
-                        dict["Severity"] = val;
+                        dict[headers[severityIndex]] = val;
                     }
                 }
-                if (dict.TryGetValue("Category", out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
-                    dict["Category"] = FillFromDataAttributes("Category", catVal, row, dataValueLookup);
+                if (categoryIndex >= 0 && dict.TryGetValue(headers[categoryIndex], out var catVal) && string.IsNullOrWhiteSpace(catVal)) {
+                    dict[headers[categoryIndex]] = FillFromDataAttributes(headers[categoryIndex], catVal, row, dataValueLookup);
                 }
-                if (dict.TryGetValue("Severity", out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
-                    dict["Severity"] = FillFromDataAttributes("Severity", sevVal, row, dataValueLookup);
+                if (severityIndex >= 0 && dict.TryGetValue(headers[severityIndex], out var sevVal) && string.IsNullOrWhiteSpace(sevVal)) {
+                    dict[headers[severityIndex]] = FillFromDataAttributes(headers[severityIndex], sevVal, row, dataValueLookup);
                 }
                 if (dict.Count > 0) {
                     tableRows.Add(dict);
@@ -356,7 +380,7 @@ public static partial class HtmlParserFromTable {
             }
 
             if (tableRows.Count > 0) {
-                AppendUsedLinkHeaders(metadata.Headers, tableRows, linkHeaderNames);
+                AppendUsedLinkHeaders(metadata.Headers, tableRows, linkHeaderNames, budget);
                 metadata.ColumnCount = metadata.Headers.Count;
                 result.Data = tableRows;
                 results.Add(result);
@@ -381,11 +405,23 @@ public static partial class HtmlParserFromTable {
         IDictionary<string, string>? replaceContent = null,
        IDictionary<string, string>? replaceHeaders = null,
         bool allProperties = false) {
+        return ParseTablesWithHtmlAgilityPack(html, reverseTable, replaceContent, replaceHeaders, allProperties, null);
+    }
+
+    /// <summary>Parses table data with explicit per-operation allocation limits.</summary>
+    public static List<List<Dictionary<string, string?>>> ParseTablesWithHtmlAgilityPack(
+        string html,
+        bool reverseTable,
+        IDictionary<string, string>? replaceContent,
+        IDictionary<string, string>? replaceHeaders,
+        bool allProperties,
+        HtmlTableParseLimits? limits) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
         replaceContent = replaceContent != null ? new Dictionary<string, string>(replaceContent, StringComparer.OrdinalIgnoreCase) : null;
         replaceHeaders = replaceHeaders != null ? new Dictionary<string, string>(replaceHeaders, StringComparer.OrdinalIgnoreCase) : null;
+        var budget = (limits ?? new HtmlTableParseLimits()).CreateBudget();
 
         HtmlDocument doc = HtmlParser.ParseWithHtmlAgilityPack(html);
         var tables = doc.DocumentNode.SelectNodes("//table");
@@ -395,7 +431,8 @@ public static partial class HtmlParserFromTable {
         }
 
         foreach (var table in tables) {
-            var rows = table.SelectNodes(".//tr");
+            var rows = GetTableRows(table);
+            budget.AddRows(rows?.Count ?? 0);
             if (rows == null || rows.Count == 0) {
                 continue;
             }
@@ -424,6 +461,10 @@ public static partial class HtmlParserFromTable {
                     }
                     if (string.IsNullOrEmpty(header)) {
                         header = (++index).ToString();
+                    }
+                    if (!obj.ContainsKey(header)) {
+                        budget.CheckColumns((long)obj.Count + 1);
+                        budget.AddCells(1, 1);
                     }
                     obj[header] = value;
                 }
@@ -462,32 +503,33 @@ public static partial class HtmlParserFromTable {
                             header = ReplaceCaseInsensitive(header, kv.Key, kv.Value);
                         }
                     }
-                    int colspan = 1;
-                    if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs)) {
-                        colspan = cs;
-                    }
-                    for (int c = 0; c < colspan; c++) {
-                        headers.Add(header);
-                    }
+                    AddHeader(headers, header, ReadColumnSpan(cell.GetAttributeValue("colspan", "1")), budget);
                 }
             } else {
-                int columnCount = SumColSpans(headerCells);
+                int columnCount = SumColSpans(headerCells, budget);
                 for (int i = 0; i < columnCount; i++) {
                     headers.Add($"Column{i + 1}");
                 }
             }
 
+            HtmlParser.EnsureUniqueNames(headers);
             int startIndex = hasHeader ? headerRowIndex + 1 : 0;
+            budget.AddCells(rows.Count - startIndex, headers.Count);
             List<Dictionary<string, string?>> tableRows = new();
             Dictionary<int, (string? Value, int Remaining)> rowSpans = new();
-            foreach (var row in rows.Skip(startIndex)) {
+            var orderedRows = rows.Cast<HtmlNode>().Skip(startIndex).ToArray();
+            var remainingRows = GetRemainingGroupRows(orderedRows, row => row.ParentNode);
+            object? previousGroup = null;
+            for (int rowIndex = 0; rowIndex < orderedRows.Length; rowIndex++) {
+                var row = orderedRows[rowIndex];
+                if (!ReferenceEquals(previousGroup, row.ParentNode)) {
+                    rowSpans.Clear();
+                    previousGroup = row.ParentNode;
+                }
                 if (row == null) {
                     continue;
                 }
                 var cells = row.SelectNodes("th|td");
-                if (cells == null) {
-                    continue;
-                }
                 string?[] rowValues = new string?[headers.Count];
                 int col = 0;
                 int cellIndex = 0;
@@ -503,22 +545,16 @@ public static partial class HtmlParserFromTable {
                         continue;
                     }
 
-                    if (cellIndex < cells.Count) {
-                        var cell = cells[cellIndex++];
+                    if (cellIndex < (cells?.Count ?? 0)) {
+                        var cell = cells![cellIndex++];
                         string value = FormatCellText(cell, HtmlCellTextFormat.Compact);
                         if (replaceContent != null) {
                             foreach (var kv in replaceContent) {
                                 value = ReplaceCaseInsensitive(value, kv.Key, kv.Value);
                             }
                         }
-                        int colspan = 1;
-                        int rowspan = 1;
-                        if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs2)) {
-                            colspan = cs2;
-                        }
-                        if (int.TryParse(cell.GetAttributeValue("rowspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rs2)) {
-                            rowspan = rs2;
-                        }
+                        int colspan = ReadColumnSpan(cell.GetAttributeValue("colspan", "1"));
+                        int rowspan = ReadRowSpan(cell.GetAttributeValue("rowspan", "1"), remainingRows[rowIndex]);
                         for (int c = 0; c < colspan && col < headers.Count; c++, col++) {
                             rowValues[col] = FillFromDataAttributes(headers[col], value, row, dataValueLookup);
                             if (rowspan > 1) {
