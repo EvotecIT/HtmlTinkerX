@@ -1,19 +1,16 @@
-name: Test PowerShell (7)
+name: Test PowerShell
 
-# This workflow is disabled but ready for use
-# To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
-# on:
-#   workflow_dispatch:  # Manual trigger only
 on:
   push:
+    branches:
+      - v2-speedygonzales
     paths-ignore:
       - '*.md'
       - 'Docs/**'
       - 'Examples/**'
       - '.gitignore'
   pull_request:
-    branches:
-      - v2-speedygonzales
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -84,8 +81,21 @@ jobs:
 
   test-windows-ps7:
     needs: refresh-psd1
-    name: 'Windows PowerShell 7'
+    name: 'Windows PowerShell ${{ matrix.version }}'
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '5.1'
+            shell: powershell
+            framework: net472
+          - version: '7'
+            shell: pwsh
+            framework: net8.0
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     env:
       PSPARSEHTML_USE_DEVELOPMENT_BINARIES: 'true'
       PSPARSEHTML_DEVELOPMENT_CONFIGURATION: Debug
@@ -108,7 +118,6 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Install PowerShell modules
-        shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
           if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
@@ -117,13 +126,10 @@ jobs:
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
 
-      - name: Build .NET solution
-        run: |
-          dotnet restore Sources/HtmlTinkerX.sln
-          dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      - name: Build PowerShell module
+        run: dotnet build Sources/PSParseHTML.PowerShell/PSParseHTML.PowerShell.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }}
 
       - name: Run PowerShell tests
-        shell: pwsh
         run: .\PSParseHTML.Tests.ps1
         timeout-minutes: 10
 

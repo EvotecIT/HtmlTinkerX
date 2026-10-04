@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 Complete-HtmlRoute -Route $route -Options @{
                     Status = 200
                     ContentType = 'text/plain; charset=utf-8'
-                    Body = 'éx'
+                    Body = ([string][char]0x00E9) + 'x'
                 }
             }
 
@@ -735,7 +735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
 
             $entry = $session.NetworkLog | Where-Object { $_.Url -like '*/api/utf8' } | Select-Object -First 1
-            $entry.ResponseBody | Should -Be 'é'
+            $entry.ResponseBody | Should -Be ([string][char]0x00E9)
             $entry.ResponseBodyTruncated | Should -BeTrue
         } finally {
             Close-HtmlBrowserSession -Session $session

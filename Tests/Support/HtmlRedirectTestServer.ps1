@@ -14,19 +14,19 @@ public sealed class HtmlRedirectTestServer : IDisposable {
 
     public HtmlRedirectTestServer() {
         int port;
-        using (var tcp = new TcpListener(IPAddress.Parse("127.0.0.1"), 0)) {
-            tcp.Start();
-            port = ((IPEndPoint)tcp.LocalEndpoint).Port;
-        }
+        var tcp = new TcpListener(IPAddress.Parse("127.0.0.1"), 0);
+        tcp.Start();
+        port = ((IPEndPoint)tcp.LocalEndpoint).Port;
+        tcp.Stop();
 
         Url = "http://127.0.0.1:" + port.ToString(CultureInfo.InvariantCulture) + "/";
         listener = new HttpListener();
         listener.Prefixes.Add(Url);
         listener.Start();
-        _ = Task.Run(RunAsync);
+        Task.Run(new Func<Task>(RunAsync));
     }
 
-    public string Url { get; }
+    public string Url { get; private set; }
 
     public void Dispose() {
         cancellation.Cancel();
@@ -45,7 +45,7 @@ public sealed class HtmlRedirectTestServer : IDisposable {
                 break;
             }
 
-            _ = Task.Run(() => HandleAsync(context));
+            Task requestTask = Task.Run(new Func<Task>(() => HandleAsync(context)));
         }
     }
 
