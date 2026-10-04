@@ -10,7 +10,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Helper methods for working with file paths.
 /// </summary>
-public static class HtmlUtilities {
+public static partial class HtmlUtilities {
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TagWhitespaceRegex = new(@">\s+<", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex MetaCharsetRegex = new(
