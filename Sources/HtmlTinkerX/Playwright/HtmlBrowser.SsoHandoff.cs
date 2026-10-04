@@ -168,7 +168,7 @@ public static partial class HtmlBrowser {
         string pageUrlRaw = GetJsonString(document.RootElement, "url") ?? session.Page.Url;
         string pageUrl = RedactSsoUrlValues(pageUrlRaw);
         string title = GetJsonString(document.RootElement, "title") ?? string.Empty;
-        HtmlBrowserSsoHandoff? urlHandoff = BuildUrlSsoHandoff(pageUrlRaw, pageUrl, title, options);
+        HtmlBrowserSsoHandoff? urlHandoff = BuildUrlSsoHandoff(document.RootElement, pageUrl, title, options);
         if (urlHandoff != null) {
             handoffs.Add(urlHandoff);
         }
@@ -202,25 +202,20 @@ public static partial class HtmlBrowser {
         return handoffs;
     }
 
-    private static HtmlBrowserSsoHandoff? BuildUrlSsoHandoff(string pageUrlRaw, string pageUrl, string title, HtmlBrowserSsoHandoffOptions options) {
-        if (string.IsNullOrWhiteSpace(pageUrlRaw) || !Uri.TryCreate(pageUrlRaw, UriKind.Absolute, out Uri? uri)) {
-            return null;
-        }
-
-        List<HtmlBrowserSsoField> fields = ReadUrlSsoFields(uri, options);
+    private static HtmlBrowserSsoHandoff? BuildUrlSsoHandoff(JsonElement location, string pageUrl, string title, HtmlBrowserSsoHandoffOptions options) {
+        List<HtmlBrowserSsoField> fields = ReadUrlSsoFields(location, options);
         HtmlBrowserSsoHandoffKind kind = ClassifySsoHandoff(fields);
         if (kind == HtmlBrowserSsoHandoffKind.Unknown && !fields.Any(static field => string.Equals(field.Name, "error", StringComparison.OrdinalIgnoreCase))) {
             return null;
         }
 
-        string action = uri.GetLeftPart(UriPartial.Path);
         return new HtmlBrowserSsoHandoff {
             Index = -1,
             Kind = kind,
             PageUrl = pageUrl,
             Title = title,
             FormSelector = "location",
-            Action = action,
+            Action = RedactSsoAction(GetJsonString(location, "action") ?? string.Empty, options),
             Method = "GET",
             AutoSubmitPrevented = false,
             ContainsSensitiveValues = fields.Any(static field => field.IsSensitive),
@@ -231,10 +226,10 @@ public static partial class HtmlBrowser {
         };
     }
 
-    private static List<HtmlBrowserSsoField> ReadUrlSsoFields(Uri uri, HtmlBrowserSsoHandoffOptions options) {
+    private static List<HtmlBrowserSsoField> ReadUrlSsoFields(JsonElement location, HtmlBrowserSsoHandoffOptions options) {
         List<HtmlBrowserSsoField> fields = new();
-        AddUrlFields(fields, uri.Query, "url-query", options);
-        AddFragmentUrlFields(fields, uri.Fragment, options);
+        AddUrlFields(fields, GetJsonString(location, "query") ?? string.Empty, "url-query", options);
+        AddFragmentUrlFields(fields, GetJsonString(location, "fragment") ?? string.Empty, options);
         return fields
             .Where(static field => IsKnownSsoHandoffField(field.Name))
             .ToList();
@@ -480,8 +475,14 @@ public static partial class HtmlBrowser {
                 }))
         }));
 
+        const action = new URL(location.href);
+        action.search = '';
+        action.hash = '';
         return JSON.stringify({
             url: location.href,
+            query: location.search,
+            fragment: location.hash,
+            action: action.href,
             title: document.title || '',
             forms
         });

@@ -172,6 +172,7 @@ Describe 'Browser SSO handoff inspection' {
         $handoff[0].Kind | Should -Be 'OAuth2'
         $handoff[0].FormSelector | Should -Be 'location'
         $handoff[0].Method | Should -Be 'GET'
+        $handoff[0].Action | Should -Be ([System.Uri]::new($pagePath).AbsoluteUri)
         $handoff[0].PageUrl | Should -Not -Match 'secret-auth-code'
         $handoff[0].PageUrl | Should -Not -Match 'secret-state'
         $handoff[0].FormData['code'] | Should -Be '<redacted>'
@@ -203,6 +204,7 @@ Describe 'Browser SSO handoff inspection' {
         $handoff[0].FormData['accessToken'] | Should -Be '<redacted>'
         $handoff[0].FormData['sessionState'] | Should -Be '<redacted>'
         $handoff[0].FormData['idToken'] | Should -Be '<redacted>'
+        $handoff[0].Action | Should -Be ([System.Uri]::new($pagePath).AbsoluteUri)
 
         $analysis = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -Analyze -LoadState DomContentLoaded)
         $analysis.Count | Should -Be 1
