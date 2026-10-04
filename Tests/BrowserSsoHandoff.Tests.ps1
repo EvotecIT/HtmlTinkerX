@@ -213,6 +213,38 @@ Describe 'Browser SSO handoff inspection' {
         ($analysis[0] | ConvertTo-Json -Depth 10) | Should -Not -Match 'access-secret|session-secret|id-secret'
     }
 
+    It 'preserves safe URL handoffs over <Scheme>' -TestCases @(
+        @{ Scheme = 'http' }
+        @{ Scheme = 'https' }
+    ) {
+        param($Scheme)
+
+        $session = Start-HtmlBrowserSession -Url 'about:blank'
+        try {
+            Register-HtmlRoute -Session $session -Pattern '**/*' -ScriptBlock {
+                param($route)
+                Complete-HtmlRoute -Route $route -Options @{
+                    Status = 200
+                    ContentType = 'text/html'
+                    Body = '<!doctype html><html><body><main>Signed in</main></body></html>'
+                }
+            }
+            $callback = "${Scheme}://callback.example.invalid/complete"
+            Invoke-HtmlNavigation -Session $session -Url "$callback`?code=code-secret&state=state-secret#id_token=id-secret"
+
+            $handoff = @(Get-HtmlBrowserSsoHandoff -Session $session)
+            $handoff.Count | Should -Be 1
+            $handoff[0].Kind | Should -Be 'OpenIdConnect'
+            $handoff[0].Action | Should -Be $callback
+            $handoff[0].FormData['code'] | Should -Be '<redacted>'
+            $handoff[0].FormData['state'] | Should -Be '<redacted>'
+            $handoff[0].FormData['id_token'] | Should -Be '<redacted>'
+            ($handoff[0] | ConvertTo-Json -Depth 8) | Should -Not -Match 'code-secret|state-secret|id-secret'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
+    }
+
     It 'detects OAuth handoffs from SPA hash-route query fragments' {
         $pagePath = Join-Path $TestDrive 'oauth-hash-callback.html'
         Set-Content -LiteralPath $pagePath -Encoding UTF8 -Value '<!doctype html><html><head><title>OAuth Hash Callback</title></head><body><main>Signed in</main></body></html>'
