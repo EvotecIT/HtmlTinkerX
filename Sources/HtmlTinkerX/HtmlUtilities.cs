@@ -95,29 +95,14 @@ public static class HtmlUtilities {
     }
 
     /// <summary>
-    /// Downloads content from a URL with proper encoding detection.
+    /// Downloads content using the default 16 MiB response limit and HTML encoding detection.
     /// </summary>
     /// <param name="client">HttpClient to use for the request.</param>
     /// <param name="url">URL to download from.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
-    public static async Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) {
-        if (client == null) {
-            throw new ArgumentNullException(nameof(client));
-        }
-        if (url == null) {
-            throw new ArgumentNullException(nameof(url));
-        }
-
-        using CancellationTokenSource requestTimeout = CreateRequestTimeoutTokenSource(client, cancellationToken);
-        CancellationToken requestToken = requestTimeout.Token;
-        using HttpRequestMessage request = new(HttpMethod.Get, url);
-        using HttpResponseMessage response = await client
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
-            .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        return await ReadResponseContentWithProperEncodingAsync(response, requestToken).ConfigureAwait(false);
-    }
+    public static Task<string> GetStringWithProperEncodingAsync(HttpClient client, string url, CancellationToken cancellationToken = default) =>
+        GetStringWithProperEncodingAsync(client, url, fetchOptions: null, cancellationToken);
 
     /// <summary>
     /// Downloads bounded content from a URL with proper encoding detection.
@@ -175,19 +160,13 @@ public static class HtmlUtilities {
     }
 
     /// <summary>
-    /// Reads an HTTP response body with header, BOM, and HTML meta charset detection.
+    /// Reads an HTTP response using the default 16 MiB limit and BOM, header, and HTML meta charset detection.
     /// </summary>
     /// <param name="response">HTTP response to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Content as a string with proper encoding.</returns>
-    public static async Task<string> ReadResponseContentWithProperEncodingAsync(HttpResponseMessage response, CancellationToken cancellationToken = default) {
-        if (response == null) {
-            throw new ArgumentNullException(nameof(response));
-        }
-
-        byte[] bytes = await ReadUnboundedContentAsync(response.Content, cancellationToken).ConfigureAwait(false);
-        return DecodeResponseContent(response, bytes);
-    }
+    public static Task<string> ReadResponseContentWithProperEncodingAsync(HttpResponseMessage response, CancellationToken cancellationToken = default) =>
+        ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken);
 
     /// <summary>
     /// Reads a bounded HTTP response body with header, BOM, and HTML meta charset detection.
@@ -211,24 +190,11 @@ public static class HtmlUtilities {
         }
 
         byte[] bytes = await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
-        return DecodeResponseContent(response, bytes);
+        return DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
     }
 
-    private static string DecodeResponseContent(HttpResponseMessage response, byte[] bytes) {
-
-        // Try to get encoding from Content-Type header
-        var contentType = response.Content.Headers.ContentType;
-        if (contentType?.CharSet != null) {
-            try {
-                string charset = contentType.CharSet.Trim().Trim('"').Trim('\'');
-                var encoding = GetEncodingWithCodePagesFallback(charset);
-                return encoding.GetString(bytes);
-            } catch {
-                // If the specified encoding is not supported, fall through to detection
-            }
-        }
-
-        // Try to detect encoding from byte order mark (BOM)
+    internal static string DecodeHtmlResponse(byte[] bytes, string? charset) {
+        // HTML's BOM sniffing precedes transport and meta charset declarations.
         if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
             return System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         }
@@ -237,6 +203,15 @@ public static class HtmlUtilities {
         }
         if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
             return System.Text.Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+        }
+
+        if (!string.IsNullOrWhiteSpace(charset)) {
+            try {
+                var encoding = GetEncodingWithCodePagesFallback(charset!.Trim().Trim('"').Trim('\''));
+                return encoding.GetString(bytes);
+            } catch (ArgumentException) {
+                // An unsupported transport label falls through to HTML detection.
+            }
         }
 
         // Try to detect encoding from HTML meta tag
@@ -254,23 +229,6 @@ public static class HtmlUtilities {
 
         // Default to UTF-8 if no encoding could be determined
         return System.Text.Encoding.UTF8.GetString(bytes);
-    }
-
-    private static async Task<byte[]> ReadUnboundedContentAsync(HttpContent content, CancellationToken cancellationToken) {
-        using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
-        using MemoryStream buffer = new();
-        byte[] chunk = new byte[81920];
-
-        while (true) {
-            int bytesRead = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
-            if (bytesRead == 0) {
-                break;
-            }
-
-            await buffer.WriteAsync(chunk, 0, bytesRead, cancellationToken).ConfigureAwait(false);
-        }
-
-        return buffer.ToArray();
     }
 
     internal static async Task<byte[]> ReadResponseBytesAsync(

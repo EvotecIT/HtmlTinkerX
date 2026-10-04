@@ -46,7 +46,7 @@ public static partial class HtmlCrawler {
             response.EnsureSuccessStatusCode();
 
             byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
-            string html = DecodeResponse(bytes, response.Content.Headers.ContentType?.CharSet);
+            string html = HtmlUtilities.DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
             if (!IsAllowedPageContent(page.ContentType, html, options)) {
                 page.Status = HtmlCrawlPageStatus.Skipped;
                 page.SkipReason = HtmlCrawlSkipReason.UnsupportedContentType;

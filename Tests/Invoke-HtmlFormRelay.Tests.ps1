@@ -40,7 +40,7 @@ public sealed class HtmlRelayTestServer : IDisposable {
         while (!cancellation.IsCancellationRequested) {
             try {
                 HttpListenerContext context = await listener.GetContextAsync().ConfigureAwait(false);
-                _ = Task.Run(() => HandleAsync(context));
+                await HandleAsync(context).ConfigureAwait(false);
             } catch (HttpListenerException) {
                 return;
             } catch (ObjectDisposedException) {

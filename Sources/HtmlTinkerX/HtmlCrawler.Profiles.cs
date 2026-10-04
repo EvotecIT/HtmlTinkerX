@@ -405,39 +405,4 @@ public static partial class HtmlCrawler {
         return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
     }
 
-    private static string DecodeResponse(byte[] bytes, string? charset) {
-        if (!string.IsNullOrEmpty(charset)) {
-            try {
-                string normalizedCharset = charset!.Trim().Trim('"').Trim('\'');
-                return Encoding.GetEncoding(normalizedCharset).GetString(bytes);
-            } catch {
-            }
-        }
-
-        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
-            return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
-        }
-        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
-            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
-        }
-        if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
-            return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
-        }
-
-        string asciiContent = Encoding.ASCII.GetString(bytes);
-        Match metaMatch = Regex.Match(
-            asciiContent,
-            @"<meta[^>]+charset\s*=\s*[""']?(?<charset>[^""'>\s]+)",
-            RegexOptions.IgnoreCase);
-
-        if (metaMatch.Success) {
-            try {
-                return Encoding.GetEncoding(metaMatch.Groups["charset"].Value).GetString(bytes);
-            } catch {
-            }
-        }
-
-        return Encoding.UTF8.GetString(bytes);
-    }
-
 }

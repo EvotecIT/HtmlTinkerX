@@ -43,6 +43,23 @@ Dependency guardrails, including the ChartForgeX-backed screenshot image-process
 - HTML, CSS, JavaScript, and email formatting or optimization
 - .NET Framework 4.7.2, .NET 8, and .NET 10
 
+## HTTP response controls
+
+The shared HTML response reader, HTTP form submissions, hidden-form relays,
+and remote stylesheet downloads default to a 16 MiB response limit. The limit
+applies to declared lengths and streamed bodies. HTML decoding uses a BOM
+before the HTTP charset, followed by an HTML meta charset and UTF-8 fallback.
+
+For larger trusted responses, set `MaximumResponseBytes` on
+`Submit-HtmlForm` or `Invoke-HtmlFormRelay`, or pass `HtmlHttpFetchOptions`
+to the .NET overloads. Relay and PreMailer options also accept `FetchOptions`.
+Existing .NET overloads use the same bounded default.
+
+`Submit-HtmlForm -Timeout` covers the complete HTTP submission, including the
+response body, in milliseconds; zero disables that deadline. Stopping the
+PowerShell pipeline cancels the request. .NET callers can reuse an `HttpClient`
+and supply a cancellation token; its timeout also covers response body reads.
+
 ## PowerShell and C# entry points
 
 The PowerShell commands are thin surfaces over HtmlTinkerX. The generated

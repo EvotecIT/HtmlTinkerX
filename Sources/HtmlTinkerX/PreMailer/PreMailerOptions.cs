@@ -49,6 +49,9 @@ public class PreMailerOptions {
     /// </summary>
     public HttpClient? HttpClient { get; set; }
 
+    /// <summary>Byte limit for each downloaded stylesheet. Null uses the default 16 MiB response limit.</summary>
+    public HtmlHttpFetchOptions? FetchOptions { get; set; }
+
     // Analytics configuration
     /// <summary>Add Google Analytics tags.</summary>
     public bool AddAnalyticsTags { get; set; }

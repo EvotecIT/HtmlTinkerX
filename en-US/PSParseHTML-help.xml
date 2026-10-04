@@ -32232,6 +32232,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Maximum bytes in the initial and each relay response. Default: 16 MiB.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxRelayCount</maml:name>
           <maml:description>
             <maml:para>Maximum number of relay forms to submit.</maml:para>
@@ -32331,6 +32343,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Maximum bytes in the initial and each relay response. Default: 16 MiB.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxRelayCount</maml:name>
           <maml:description>
             <maml:para>Maximum number of relay forms to submit.</maml:para>
@@ -32401,6 +32425,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <command:parameterValue required="true" variableLength="false">Uri</command:parameterValue>
           <dev:type>
             <maml:name>Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Maximum bytes in the initial and each relay response. Default: 16 MiB.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -32500,6 +32536,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
         <dev:type>
           <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumResponseBytes</maml:name>
+        <maml:description>
+          <maml:para>Maximum bytes in the initial and each relay response. Default: 16 MiB.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -55310,6 +55358,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
             <maml:para>Proxy server address for HTTP submission.</maml:para>
@@ -55336,7 +55396,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Timeout</maml:name>
           <maml:description>
-            <maml:para>Timeout for Playwright operations.</maml:para>
+            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -55423,7 +55483,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Timeout</maml:name>
           <maml:description>
-            <maml:para>Timeout for Playwright operations.</maml:para>
+            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -55467,6 +55527,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameterValue required="true" variableLength="false">PSObject</command:parameterValue>
         <dev:type>
           <maml:name>PSObject</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumResponseBytes</maml:name>
+        <maml:description>
+          <maml:para>Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -55534,7 +55606,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Timeout</maml:name>
         <maml:description>
-          <maml:para>Timeout for Playwright operations.</maml:para>
+          <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
