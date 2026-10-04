@@ -33,7 +33,7 @@ public sealed class CmdletSelectHtmlInnerText : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
         object value = HtmlPipelineInput.Unwrap(InputObject);
-        string text = value switch {
+        string text = (value switch {
             IElement element => element.TextContent,
             IDocument angleDocument => angleDocument.DocumentElement?.TextContent ?? string.Empty,
             HtmlNode node => node.InnerText,
@@ -41,7 +41,7 @@ public sealed class CmdletSelectHtmlInnerText : AsyncPSCmdlet {
             HtmlAttribute attribute => attribute.Value,
             string content => content.Contains("<") ? HtmlPipelineInput.ToHtmlNode(content).InnerText : content,
             _ => value.ToString() ?? string.Empty
-        };
+        }) ?? string.Empty;
 
         if (DeEntitize.IsPresent) {
             text = HtmlEntity.DeEntitize(text) ?? text;
