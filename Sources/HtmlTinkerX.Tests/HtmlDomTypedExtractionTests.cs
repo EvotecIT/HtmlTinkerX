@@ -113,6 +113,19 @@ public class HtmlDomTypedExtractionTests {
     }
 
     [Fact]
+    public void Extract_TypedStringAndEnumDefaultsFollowTheDeclaredContract() {
+        Assert.Equal("12", Read("", new() {
+            Selector = ".missing", DataType = typeof(string), DefaultValue = 12
+        }));
+        Assert.Equal(DayOfWeek.Monday, Read("", new() {
+            Selector = ".missing", DataType = typeof(DayOfWeek), DefaultValue = DayOfWeek.Monday
+        }));
+        Assert.Throws<FormatException>(() => Read("", new() {
+            Selector = ".missing", DataType = typeof(DayOfWeek), DefaultValue = (DayOfWeek)99
+        }));
+    }
+
+    [Fact]
     public void Extract_ValidatesConversionConfigurationEvenWhenNoItemsMatch() {
         Dictionary<string, HtmlDomFieldDefinition> fields = new() {
             ["Value"] = new() { DataType = typeof(Uri) }
