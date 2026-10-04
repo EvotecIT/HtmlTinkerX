@@ -40,6 +40,9 @@ internal static class HtmlDomPropertyMapConverter {
             Selector = GetString(map, "Selector") ?? string.Empty,
             Attribute = GetString(map, "Attribute"),
             ValueKind = GetString(map, "ValueKind") ?? GetString(map, "Value") ?? "Text",
+            DataType = GetDataType(map, propertyName),
+            Culture = GetString(map, "Culture"),
+            TreatEmptyAsMissing = GetBoolean(map, "TreatEmptyAsMissing"),
             All = GetBoolean(map, "All"),
             Required = GetBoolean(map, "Required"),
             ResolveUrl = GetBoolean(map, "ResolveUrl")
@@ -47,7 +50,9 @@ internal static class HtmlDomPropertyMapConverter {
 
         if (TryGetValue(map, "DefaultValue", out object? defaultValue)
             || TryGetValue(map, "Default", out defaultValue)) {
-            definition.DefaultValue = defaultValue;
+            definition.DefaultValue = definition.DataType == null || defaultValue == null
+                ? defaultValue
+                : HtmlPipelineInput.Unwrap(defaultValue);
         }
 
         if (string.IsNullOrWhiteSpace(definition.Selector)
@@ -57,6 +62,18 @@ internal static class HtmlDomPropertyMapConverter {
         }
 
         return definition;
+    }
+
+    private static Type? GetDataType(IDictionary map, string propertyName) {
+        if (!TryGetValue(map, "DataType", out object? value) || value == null) {
+            return null;
+        }
+
+        if (HtmlPipelineInput.Unwrap(value) is Type type) {
+            return type;
+        }
+
+        throw new PSArgumentException($"DataType for property '{propertyName}' must be a .NET type, such as [decimal].");
     }
 
     private static string? GetString(IDictionary map, string name) =>

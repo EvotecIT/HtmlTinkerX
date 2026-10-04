@@ -64,6 +64,50 @@ IDocument document = HtmlParser.ParseWithAngleSharp("""
 string title = document.QuerySelector("h1")?.TextContent ?? string.Empty;
 ```
 
+## Extract typed fields from repeated items
+
+Use `HtmlDomExtraction.Extract` when you know the selectors for a repeated card
+or row. `DataType` converts the selected text or attribute into a value that can
+be used directly in calculations, filtering, or comparisons.
+
+```csharp
+var fields = new Dictionary<string, HtmlDomFieldDefinition> {
+    ["Name"] = new() {
+        Selector = ".product-title", Required = true, TreatEmptyAsMissing = true
+    },
+    ["Price"] = new() {
+        Selector = ".product-price", DataType = typeof(decimal), Culture = "pl-PL"
+    }
+};
+
+IReadOnlyList<HtmlDomExtractionRecord> products = HtmlDomExtraction.Extract(
+    html, ".product-card", fields);
+decimal price = (decimal)products[0].Values["Price"]!;
+```
+
+The supported types are `string`, `int`, `long`, `decimal`, `bool`,
+`DateTimeOffset`, and enums, including nullable value types. Numeric and date
+conversion uses invariant culture unless `Culture` supplies a culture name.
+Boolean values accept `true` or `false`; enums accept declared member names,
+ignoring case. Dates without an offset use UTC and explicit offsets are preserved.
+
+`All = true` returns an array of converted values. An optional missing field uses
+`DefaultValue`, converted with the same rules, or returns null. Missing fields
+with `All = true` return an empty array. `Required = true` raises an error for a
+missing field even if a default is supplied. Set `TreatEmptyAsMissing = true` to
+apply that policy to empty or whitespace-only values too.
+
+Invalid values raise `FormatException` with the property name, item index, and
+requested type. The error does not include the extracted value. PowerShell uses
+the same rules through `Select-HtmlData`:
+
+```powershell
+Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true; TreatEmptyAsMissing = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; Culture = 'pl-PL' }
+}
+```
+
 ## Audit generated or supplied HTML
 
 `HtmlDocumentAudit` provides one reusable contract for static output checks. It reports duplicate IDs, missing document metadata, image alternatives, control names and labels, unsafe URL schemes, and heading-order problems.
