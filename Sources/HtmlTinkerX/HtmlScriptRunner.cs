@@ -60,13 +60,12 @@ public static class HtmlScriptRunner {
         if (policy.ExecutionTimeout != Timeout.InfiniteTimeSpan) operationCancellation.CancelAfter(policy.ExecutionTimeout);
         var deadline = new OperationDeadlineConstraint();
         deadline.Begin(policy.ExecutionTimeout, operationCancellation.Token);
-        var jsOptions = new JsScriptingOptions {
-            EngineCreator = engineOptions => new Engine(engineOptions.Constraint(deadline)
-                .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes))
-        };
+        var configuration = Configuration.Default.With(new EngineCreator(engineOptions =>
+            new Engine(engineOptions.Constraint(deadline)
+                .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes))));
         // An inert page uses the same native service for the explicitly requested script only.
-        var explicitService = policy.ExecutePageScripts ? null : new JsScriptingService(jsOptions);
-        var configuration = policy.ExecutePageScripts ? Configuration.Default.WithJs(jsOptions) : Configuration.Default;
+        var explicitService = policy.ExecutePageScripts ? null : new JsScriptingService();
+        if (policy.ExecutePageScripts) configuration = configuration.WithJs();
         using var context = BrowsingContext.New(configuration);
         Exception? pageBudgetFailure = null;
         context.AddEventListener("error", (_, eventArgs) => {
@@ -112,7 +111,7 @@ public static class HtmlScriptRunner {
     /// configuration must include AngleSharp.Js. Registering loaders or AngleSharp.Io
     /// requesters can allow scripts to perform I/O.
     /// This overload retains the caller's execution policy and does not dispose the context.
-    /// Configure Jint constraints through JsScriptingOptions before creating that context.
+    /// Configure Jint constraints through an EngineCreator service before creating that context.
     /// </param>
     /// <returns>Value returned by the script.</returns>
     public static async Task<T?> RunAsync<T>(string html, string script, IBrowsingContext context) {
