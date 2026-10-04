@@ -84,7 +84,7 @@ public class HtmlHttpResponsePolicyTests {
     [InlineData("get")]
     [InlineData("post")]
     [InlineData("relay")]
-    public async Task Consumers_PreserveCancellationAndTimeoutAfterHeaders(string consumer) {
+    public async Task Consumers_CancelStalledStreamsThatIgnoreReadTokens(string consumer) {
         foreach (bool callerCancellation in new[] { false, true }) {
             using var stream = new BlockingStream();
             using var handler = new ResponseHandler(() => new StreamContent(stream));
@@ -95,7 +95,7 @@ public class HtmlHttpResponsePolicyTests {
             if (callerCancellation) cancellation.Cancel();
             Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
-            Assert.True(stream.CancellationObserved);
+            Assert.True(stream.Disposed);
         }
     }
 
@@ -115,9 +115,77 @@ public class HtmlHttpResponsePolicyTests {
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = createContent(), RequestMessage = request });
     }
 
+    [Fact]
+    public async Task BrowserlessExtraction_CancelsStalledBodyAndPreservesTimeoutFailureResult() {
+        foreach (bool callerCancellation in new[] { false, true }) {
+            using var stream = new BlockingStream();
+            using var handler = new ResponseHandler(() => new StreamContent(stream));
+            using var client = new HttpClient(handler) { Timeout = callerCancellation ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(100) };
+            using var cancellation = new CancellationTokenSource();
+            var source = new HtmlBrowserlessDataSource {
+                Kind = "ApiEndpoint", Method = "GET", PageUrl = Url,
+                ResolvedUrl = Url, RequiresHttpFetch = true, CanExtractDirectly = true
+            };
+            Task<HtmlBrowserlessExtractionResult> reading = HtmlBrowserlessExtraction.ExtractAsync(source,
+                new HtmlBrowserlessExtractionOptions { AllowHttpFetch = true }, client, cancellation.Token);
+            Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+            if (callerCancellation) cancellation.Cancel();
+            Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
+            if (callerCancellation) {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
+            } else {
+                var result = await reading;
+                Assert.False(result.Success);
+                Assert.False(Assert.Single(result.Requests).Success);
+            }
+            Assert.True(stream.Disposed);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadToFile_AbortsStalledBodyWithoutReplacingExistingFile() {
+        string folder = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-http-policy-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, "existing.html");
+        File.WriteAllText(path, "original");
+        try {
+            using var stream = new BlockingStream();
+            using var handler = new ResponseHandler(() => new StreamContent(stream));
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(100) };
+            Task downloading = HtmlUtilities.DownloadToFileAsync(client, new Uri(Url), path, null, default);
+            Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+            Assert.Same(downloading, await Task.WhenAny(downloading, Task.Delay(2000)));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => downloading);
+            Assert.True(stream.Disposed);
+            Assert.Equal("original", File.ReadAllText(path));
+            Assert.Equal(path, Assert.Single(Directory.GetFiles(folder)));
+        } finally { Directory.Delete(folder, recursive: true); }
+    }
+
+#if !NETFRAMEWORK
+    [Theory]
+    [InlineData("url")]
+    [InlineData("get")]
+    [InlineData("post")]
+    [InlineData("relay")]
+    public async Task UnsupportedTransportEncoding_FallsBackToMetaOrUtf8(string consumer) {
+        foreach (bool includeMeta in new[] { false, true }) {
+            string html = (includeMeta ? "<meta charset='utf-8'>" : "") + "<p>Zażółć</p>";
+            using var handler = new ResponseHandler(() => {
+                var content = new ByteArrayContent(Encoding.UTF8.GetBytes(html));
+                content.Headers.ContentType = MediaTypeHeaderValue.Parse("text/html; charset=utf-7");
+                return content;
+            });
+            using var client = new HttpClient(handler);
+            Assert.Equal(html, await ReadAsync(consumer, client, null));
+        }
+    }
+#endif
+
     private sealed class BlockingStream : Stream {
         internal TaskCompletionSource<bool> Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal bool CancellationObserved { get; private set; }
+        private readonly TaskCompletionSource<int> closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal bool Disposed { get; private set; }
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
@@ -130,13 +198,13 @@ public class HtmlHttpResponsePolicyTests {
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) {
             Entered.TrySetResult(true);
-            try {
-                await Task.Delay(Timeout.Infinite, cancellationToken);
-                return 0;
-            } catch (OperationCanceledException) {
-                CancellationObserved = true;
-                throw;
-            }
+            // Model Framework transports that cannot cancel an already-started read.
+            return await closed.Task;
+        }
+        protected override void Dispose(bool disposing) {
+            Disposed = true;
+            closed.TrySetException(new ObjectDisposedException(nameof(BlockingStream)));
+            base.Dispose(disposing);
         }
     }
 }

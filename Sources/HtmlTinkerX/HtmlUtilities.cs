@@ -17,7 +17,10 @@ public static class HtmlUtilities {
         @"<meta[^>]+charset\s*=\s*[""']?(?<charset>[^""'>\s]+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 #if !NETFRAMEWORK
-    private static int CodePagesEncodingProviderRegistered;
+    private static readonly Lazy<bool> CodePagesEncodingProviderRegistration = new(() => {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        return true;
+    });
 #endif
 
     /// <summary>
@@ -209,7 +212,7 @@ public static class HtmlUtilities {
             try {
                 var encoding = GetEncodingWithCodePagesFallback(charset!.Trim().Trim('"').Trim('\''));
                 return encoding.GetString(bytes);
-            } catch (ArgumentException) {
+            } catch (Exception exception) when (exception is ArgumentException || exception is NotSupportedException) {
                 // An unsupported transport label falls through to HTML detection.
             }
         }
@@ -326,11 +329,12 @@ public static class HtmlUtilities {
     }
 
     private static async Task CopyBoundedStreamAsync(Stream source, Stream destination, int maximumBytes, CancellationToken cancellationToken) {
+        using CancellationTokenRegistration cancellationRegistration = RegisterResponseStreamCancellation(source, cancellationToken);
         byte[] chunk = new byte[81920];
         int totalBytes = 0;
 
         while (true) {
-            int bytesRead = await source.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+            int bytesRead = await ReadResponseStreamAsync(source, chunk, chunk.Length, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0) {
                 break;
             }
@@ -344,12 +348,36 @@ public static class HtmlUtilities {
         }
     }
 
+    internal static CancellationTokenRegistration RegisterResponseStreamCancellation(Stream stream, CancellationToken cancellationToken) =>
+        cancellationToken.Register(state => {
+            // Framework HTTP streams do not abort an in-flight BeginRead when its token is canceled.
+            try {
+                ((Stream)state!).Dispose();
+            } catch (IOException) {
+                // Disposal may race the transport closing the response.
+            } catch (ObjectDisposedException) {
+                // The completed response can already have closed its stream.
+            }
+        }, stream);
+
+    internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        try {
+            int read = await stream.ReadAsync(buffer, 0, count, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return read;
+        } catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
+            (exception is IOException || exception is ObjectDisposedException || exception is HttpRequestException)) {
+            throw new OperationCanceledException("The HTTP response read was canceled.", exception, cancellationToken);
+        }
+    }
+
     private static InvalidDataException CreateResponseTooLargeException(int maximumBytes, long? actualBytes) {
         string actual = actualBytes.HasValue ? $" The response reported or supplied {actualBytes.Value} bytes." : string.Empty;
         return new InvalidDataException($"The HTTP response exceeded the configured {maximumBytes}-byte limit.{actual}");
     }
 
-    private static System.Text.Encoding GetEncodingWithCodePagesFallback(string charset) {
+    internal static System.Text.Encoding GetEncodingWithCodePagesFallback(string charset) {
         try {
             return System.Text.Encoding.GetEncoding(charset);
         } catch (ArgumentException) {
@@ -360,9 +388,7 @@ public static class HtmlUtilities {
 
     private static void EnsureCodePagesEncodingProvider() {
 #if !NETFRAMEWORK
-        if (Interlocked.Exchange(ref CodePagesEncodingProviderRegistered, 1) == 0) {
-            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-        }
+        _ = CodePagesEncodingProviderRegistration.Value;
 #endif
     }
 

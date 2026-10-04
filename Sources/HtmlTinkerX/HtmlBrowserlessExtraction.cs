@@ -425,6 +425,7 @@ public static class HtmlBrowserlessExtraction {
         }
 
         using Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using CancellationTokenRegistration cancellationRegistration = HtmlUtilities.RegisterResponseStreamCancellation(stream, cancellationToken);
         byte[] buffer = new byte[(int)Math.Min(8192L, (long)maxBytes + 1)];
         using MemoryStream memory = new(capacity: Math.Min(maxBytes, 8192));
         bool truncated = false;
@@ -432,7 +433,7 @@ public static class HtmlBrowserlessExtraction {
             cancellationToken.ThrowIfCancellationRequested();
             int allowed = maxBytes - (int)memory.Length;
             int readSize = allowed > 0 ? (int)Math.Min(buffer.Length, (long)allowed + 1) : 1;
-            int read = await stream.ReadAsync(buffer, 0, readSize, cancellationToken).ConfigureAwait(false);
+            int read = await HtmlUtilities.ReadResponseStreamAsync(stream, buffer, readSize, cancellationToken).ConfigureAwait(false);
             if (read == 0) {
                 break;
             }
@@ -463,8 +464,8 @@ public static class HtmlBrowserlessExtraction {
         }
 
         try {
-            return Encoding.GetEncoding(charset!.Trim('"'));
-        } catch (ArgumentException) {
+            return HtmlUtilities.GetEncodingWithCodePagesFallback(charset!.Trim('"'));
+        } catch (Exception exception) when (exception is ArgumentException || exception is NotSupportedException) {
             return null;
         }
     }
