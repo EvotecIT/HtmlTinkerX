@@ -47,6 +47,11 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int MaxRelayCount { get; set; } = 5;
 
+    /// <summary>Maximum bytes in the initial and each relay response. Default: 16 MiB.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
+
     /// <summary>Allow relay form actions to post to another host.</summary>
     [Parameter]
     public SwitchParameter AllowCrossHost { get; set; }
@@ -77,7 +82,8 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
             new HtmlFormRelayOptions {
                 MaxRelayCount = MaxRelayCount,
                 AllowCrossHost = AllowCrossHost.IsPresent,
-                AllowedHosts = AllowedHost
+                AllowedHosts = AllowedHost,
+                FetchOptions = new HtmlHttpFetchOptions { MaximumResponseBytes = MaximumResponseBytes }
             },
             CancelToken).ConfigureAwait(false);
 
@@ -91,7 +97,7 @@ public sealed class CmdletInvokeHtmlFormRelay : AsyncPSCmdlet {
             using HttpResponseMessage response = await client.GetAsync(Url, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             initialResponseUri = response.RequestMessage?.RequestUri ?? Url;
-            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: null, cancellationToken: requestToken).ConfigureAwait(false);
+            return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions: new HtmlHttpFetchOptions { MaximumResponseBytes = MaximumResponseBytes }, cancellationToken: requestToken).ConfigureAwait(false);
         }
 
         if (ParameterSetName == ParameterSetPath) {

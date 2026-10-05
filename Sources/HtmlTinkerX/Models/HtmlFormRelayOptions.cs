@@ -14,4 +14,7 @@ public sealed class HtmlFormRelayOptions {
 
     /// <summary>Optional host allow-list for cross-host relay actions.</summary>
     public IReadOnlyCollection<string> AllowedHosts { get; set; } = new List<string>();
+
+    /// <summary>Byte limits for each relay response. Null uses the default 16 MiB limit.</summary>
+    public HtmlHttpFetchOptions? FetchOptions { get; set; }
 }

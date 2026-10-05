@@ -53,6 +53,7 @@ public class PreMailerClient {
     /// Processes the HTML synchronously and returns the result.
     /// </summary>
     public PreMailerResult MoveCssInline() {
+        Options.FetchOptions?.GetValidatedMaximumResponseBytes();
         try {
             StringBuilder cssContent = new();
             if (!string.IsNullOrEmpty(Options.Css)) {
@@ -132,6 +133,7 @@ public class PreMailerClient {
         if (cancellationToken.IsCancellationRequested) {
             return await Task.FromCanceled<PreMailerResult>(cancellationToken).ConfigureAwait(false);
         }
+        Options.FetchOptions?.GetValidatedMaximumResponseBytes();
         try {
             StringBuilder cssContent = new();
             if (!string.IsNullOrEmpty(Options.Css)) {
@@ -214,7 +216,7 @@ public class PreMailerClient {
                 downloadedCss = HtmlUtilities.ReadFileChecked(NormalizeFileUriPath(uri));
             } else {
                 downloadedCss = HtmlUtilities
-                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri)
+                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri, Options.FetchOptions)
                     .GetAwaiter().GetResult();
             }
 
@@ -234,7 +236,7 @@ public class PreMailerClient {
                 downloadedCss = await HtmlUtilities.ReadFileCheckedAsync(NormalizeFileUriPath(uri), cancellationToken).ConfigureAwait(false);
             } else {
                 downloadedCss = await HtmlUtilities
-                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri, cancellationToken)
+                    .GetStringWithProperEncodingAsync(Options.HttpClient ?? HtmlHttpClientFactory.Shared, uri.AbsoluteUri, Options.FetchOptions, cancellationToken)
                     .ConfigureAwait(false);
             }
 

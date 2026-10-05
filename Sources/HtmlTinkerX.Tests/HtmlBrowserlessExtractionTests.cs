@@ -300,9 +300,11 @@ public class HtmlBrowserlessExtractionTests {
 
     private sealed class TextHandler : HttpMessageHandler {
         private readonly string content;
+        private readonly string? charset;
 
-        public TextHandler(string content) {
+        public TextHandler(string content, string? charset = null) {
             this.content = content;
+            this.charset = charset;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
@@ -310,7 +312,23 @@ public class HtmlBrowserlessExtractionTests {
                 Content = new StringContent(content)
             };
             response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+            response.Content.Headers.ContentType.CharSet = charset;
             return Task.FromResult(response);
         }
     }
+
+#if !NETFRAMEWORK
+    [Fact]
+    public async Task ExtractAsync_UnsupportedTransportCharsetFallsBackToUtf8() {
+        using HttpClient client = new(new TextHandler("Zażółć", "utf-7"));
+        var source = new HtmlBrowserlessDataSource {
+            Kind = "ApiEndpoint", Method = "GET", PageUrl = "https://example.org/",
+            ResolvedUrl = "https://example.org/data", RequiresHttpFetch = true, CanExtractDirectly = true
+        };
+        var result = await HtmlBrowserlessExtraction.ExtractAsync(source,
+            new HtmlBrowserlessExtractionOptions { AllowHttpFetch = true, IncludeRawContent = true }, client);
+        Assert.True(result.Success);
+        Assert.Equal("Zażółć", result.RawContent);
+    }
+#endif
 }

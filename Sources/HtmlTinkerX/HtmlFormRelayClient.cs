@@ -39,17 +39,20 @@ public static class HtmlFormRelayClient {
         if (effectiveOptions.MaxRelayCount < 1) {
             throw new ArgumentOutOfRangeException(nameof(options), "MaxRelayCount must be at least 1.");
         }
+        effectiveOptions.FetchOptions?.GetValidatedMaximumResponseBytes();
 
         using HttpClient? ownedClient = client == null
             ? HtmlHttpClientFactory.Create(out _, allowAutoRedirect: false)
             : null;
         HttpClient http = client ?? ownedClient!;
+        using CancellationTokenSource deadline = HtmlUtilities.CreateRequestTimeoutTokenSource(http, cancellationToken);
+        CancellationToken requestToken = deadline.Token;
         string currentHtml = html;
         Uri currentUri = responseUri;
         List<HtmlFormRelayStep> steps = new();
 
         for (int index = 0; index < effectiveOptions.MaxRelayCount; index++) {
-            cancellationToken.ThrowIfCancellationRequested();
+            requestToken.ThrowIfCancellationRequested();
             if (!HtmlFormRelayParser.TryParse(currentHtml, currentUri, out HtmlFormRelayRequest? request) || request == null) {
                 return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.NoRelayForm, steps);
             }
@@ -63,7 +66,7 @@ public static class HtmlFormRelayClient {
                 return CreateResult(currentHtml, currentUri, HtmlFormRelayStopReason.CrossHostBlocked, steps);
             }
 
-            using HttpResponseMessage response = await SendAsync(http, request, cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await SendAsync(http, request, requestToken).ConfigureAwait(false);
             step.StatusCode = (int)response.StatusCode;
             Uri nextUri = GetNextUri(response, request.ActionUri);
             step.ResponseUrl = RedactUrl(nextUri.AbsoluteUri);
@@ -79,7 +82,7 @@ public static class HtmlFormRelayClient {
             steps.Add(step);
 
             currentUri = nextUri;
-            currentHtml = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, cancellationToken).ConfigureAwait(false);
+            currentHtml = await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, effectiveOptions.FetchOptions, requestToken).ConfigureAwait(false);
         }
 
         if (!HtmlFormRelayParser.TryParse(currentHtml, currentUri, out _)) {
@@ -114,13 +117,13 @@ public static class HtmlFormRelayClient {
         || options.AllowedHosts.Any(host => string.Equals(host, actionUri.Host, StringComparison.OrdinalIgnoreCase));
 
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HtmlFormRelayRequest request, CancellationToken cancellationToken) {
+        using HttpRequestMessage message = new(request.Method == FormMethod.Get ? HttpMethod.Get : HttpMethod.Post, request.ActionUri);
         if (request.Method == FormMethod.Get) {
-            Uri uri = await BuildGetUriAsync(request.ActionUri, GetSubmittedFields(request)).ConfigureAwait(false);
-            return await client.GetAsync(uri, cancellationToken).ConfigureAwait(false);
+            message.RequestUri = await BuildGetUriAsync(request.ActionUri, GetSubmittedFields(request)).ConfigureAwait(false);
+        } else {
+            message.Content = new FormUrlEncodedContent(GetSubmittedFields(request));
         }
-
-        using FormUrlEncodedContent content = new(GetSubmittedFields(request));
-        return await client.PostAsync(request.ActionUri, content, cancellationToken).ConfigureAwait(false);
+        return await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
     }
 
     private static IEnumerable<KeyValuePair<string, string>> GetSubmittedFields(HtmlFormRelayRequest request) =>

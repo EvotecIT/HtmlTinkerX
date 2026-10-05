@@ -84,7 +84,18 @@ public static class HtmlFormSubmitter {
     /// <param name="client">Optional HttpClient instance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Response body as string.</returns>
-    public static async Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) {
+    public static Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client = null, CancellationToken cancellationToken = default) =>
+        SubmitAsync(actionUrl, method, fields, client, fetchOptions: null, cancellationToken);
+
+    /// <summary>Submits an HTTP form and reads its response with explicit byte limits and HTML decoding.</summary>
+    /// <param name="actionUrl">Form action URL.</param>
+    /// <param name="method">Submission method.</param>
+    /// <param name="fields">Field values keyed by name.</param>
+    /// <param name="client">Optional reusable HTTP client.</param>
+    /// <param name="fetchOptions">Response byte policy; null uses the default 16 MiB limit.</param>
+    /// <param name="cancellationToken">Cancellation covering request headers and the response body.</param>
+    /// <returns>Decoded HTML response.</returns>
+    public static async Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client, HtmlHttpFetchOptions? fetchOptions, CancellationToken cancellationToken) {
         if (actionUrl == null) {
             throw new ArgumentNullException(nameof(actionUrl));
         }
@@ -93,8 +104,12 @@ public static class HtmlFormSubmitter {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        fetchOptions?.GetValidatedMaximumResponseBytes();
 
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
+        using CancellationTokenSource deadline = HtmlUtilities.CreateRequestTimeoutTokenSource(http, cancellationToken);
+        CancellationToken requestToken = deadline.Token;
+        using HttpRequestMessage request = new(method == FormMethod.Get ? HttpMethod.Get : HttpMethod.Post, actionUrl);
         if (method == FormMethod.Get) {
             var builder = new UriBuilder(actionUrl);
             var parameters = new List<KeyValuePair<string, string>>();
@@ -112,14 +127,12 @@ public static class HtmlFormSubmitter {
             }
             using var queryContent = new FormUrlEncodedContent(parameters);
             builder.Query = await queryContent.ReadAsStringAsync().ConfigureAwait(false);
-            using HttpResponseMessage response = await http.GetAsync(builder.Uri, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            request.RequestUri = builder.Uri;
         } else {
-            using var content = new FormUrlEncodedContent(fields);
-            using HttpResponseMessage response = await http.PostAsync(actionUrl, content, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            request.Content = new FormUrlEncodedContent(fields);
         }
+        using HttpResponseMessage response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await HtmlUtilities.ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
     }
 }

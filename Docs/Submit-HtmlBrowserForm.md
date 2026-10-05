@@ -11,7 +11,7 @@ Cmdlet that submits an HTML form using Playwright or HTTP requests.
 ## SYNTAX
 ### Http (Default)
 ```powershell
-Submit-HtmlBrowserForm [-Form] <psobject> [-FieldValue] <hashtable> [-Proxy <string>] [-ProxyCredential <pscredential>] [-Timeout <int>] [<CommonParameters>]
+Submit-HtmlBrowserForm [-Form] <psobject> [-FieldValue] <hashtable> [-Proxy <string>] [-ProxyCredential <pscredential>] [-Timeout <int>] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ### Session
@@ -77,6 +77,22 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
+Accept wildcard characters: False
+```
+
+### -MaximumResponseBytes
+Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.
+
+```yaml
+Type: Int32
+Parameter Sets: Http
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -161,7 +177,7 @@ Accept wildcard characters: False
 ```
 
 ### -Timeout
-Timeout for Playwright operations.
+Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.
 
 ```yaml
 Type: Int32

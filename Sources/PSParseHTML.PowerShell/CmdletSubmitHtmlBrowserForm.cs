@@ -40,10 +40,15 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetHttp)]
     public PSCredential? ProxyCredential { get; set; }
 
-    /// <summary>Timeout for Playwright operations.</summary>
+    /// <summary>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
+
+    /// <summary>Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.</summary>
+    [Parameter(ParameterSetName = ParameterSetHttp)]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
 
     /// <summary>Return session object when using Playwright.</summary>
     [Parameter(ParameterSetName = ParameterSetSession)]
@@ -98,7 +103,8 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
             }
         } else {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            string result = await HtmlFormSubmitter.SubmitAsync(action, method, fields, client).ConfigureAwait(false);
+            client.Timeout = Timeout == 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(Timeout);
+            string result = await HtmlFormSubmitter.SubmitAsync(action, method, fields, client, new HtmlHttpFetchOptions { MaximumResponseBytes = MaximumResponseBytes }, CancelToken).ConfigureAwait(false);
             WriteObject(result);
         }
     }

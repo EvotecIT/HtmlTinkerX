@@ -11,17 +11,17 @@ Follows deterministic hidden-form relay pages without launching a browser.
 ## SYNTAX
 ### Url (Default)
 ```powershell
-Invoke-HtmlFormRelay [-Url] <uri> [-MaxRelayCount <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Invoke-HtmlFormRelay [-Url] <uri> [-MaxRelayCount <int>] [-MaximumResponseBytes <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Content
 ```powershell
-Invoke-HtmlFormRelay [-Content] <string> -BaseUrl <uri> [-MaxRelayCount <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Invoke-HtmlFormRelay [-Content] <string> -BaseUrl <uri> [-MaxRelayCount <int>] [-MaximumResponseBytes <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Invoke-HtmlFormRelay [-Path] <string> -BaseUrl <uri> [-MaxRelayCount <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Invoke-HtmlFormRelay [-Path] <string> -BaseUrl <uri> [-MaxRelayCount <int>] [-MaximumResponseBytes <int>] [-AllowCrossHost] [-AllowedHost <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -98,6 +98,22 @@ Required: True
 Position: 0
 Default value: None
 Accept pipeline input: True (ByValue)
+Accept wildcard characters: False
+```
+
+### -MaximumResponseBytes
+Maximum bytes in the initial and each relay response. Default: 16 MiB.
+
+```yaml
+Type: Int32
+Parameter Sets: Url, Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
