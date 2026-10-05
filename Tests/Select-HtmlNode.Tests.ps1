@@ -1,6 +1,35 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1" -Force
 
 Describe 'HTML selector cmdlets' {
+    It 'returns one empty value for an attribute without a value' {
+        $document = [HtmlAgilityPack.HtmlDocument]::new()
+        $attribute = $document.CreateAttribute('empty')
+
+        $values = @($attribute | Select-HtmlAttributeValue -DefaultValue 'fallback' -ErrorAction Stop)
+        $values.Count | Should -Be 1
+        $values[0] | Should -Be ''
+    }
+
+    It 'uses the requested default for a valueless attribute treated as missing' {
+        $document = [HtmlAgilityPack.HtmlDocument]::new()
+        $attribute = $document.CreateAttribute('empty')
+
+        ($attribute | Select-HtmlAttributeValue -TreatEmptyAsMissing -DefaultValue 'fallback' -ErrorAction Stop) | Should -Be 'fallback'
+    }
+
+    It 'normalizes valueless attribute text before applying text options' -TestCases @(
+        @{ Options = @{}; Expected = '' }
+        @{ Options = @{ NoTrim = $true; DeEntitize = $true; DefaultValue = 'fallback' }; Expected = 'fallback' }
+    ) {
+        param($Options, $Expected)
+        $document = [HtmlAgilityPack.HtmlDocument]::new()
+        $attribute = $document.CreateAttribute('empty')
+
+        $values = @($attribute | Select-HtmlInnerText @Options -ErrorAction Stop)
+        $values.Count | Should -Be 1
+        $values[0] | Should -Be $Expected
+    }
+
     BeforeAll {
         $script:Html = @'
 <!doctype html>

@@ -82,7 +82,8 @@ public sealed class CmdletSelectHtmlAttributeValue : AsyncPSCmdlet {
         return NormalizeValue(propertyValue.ToString() ?? string.Empty);
     }
 
-    private string NormalizeValue(string value) {
+    private string NormalizeValue(string? value) {
+        value ??= string.Empty;
         return TreatEmptyAsMissing.IsPresent && value.Length == 0 ? DefaultValue : value;
     }
 }
