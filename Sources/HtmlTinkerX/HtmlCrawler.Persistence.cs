@@ -37,7 +37,10 @@ public static partial class HtmlCrawler {
     /// <param name="path">Directory or manifest path.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The deserialized crawl result.</returns>
-    public static async Task<HtmlCrawlResult> LoadResultAsync(string path, CancellationToken cancellationToken = default) {
+    public static Task<HtmlCrawlResult> LoadResultAsync(string path, CancellationToken cancellationToken = default) =>
+        LoadResultAsync(path, cancellationToken, retainPageContent: true);
+
+    private static async Task<HtmlCrawlResult> LoadResultAsync(string path, CancellationToken cancellationToken, bool retainPageContent) {
         if (path == null) {
             throw new ArgumentNullException(nameof(path));
         }
@@ -55,7 +58,7 @@ public static partial class HtmlCrawler {
 #endif
 
         CrawlCheckpoint? checkpoint = ParseCheckpoint(json);
-        if (checkpoint != null) return await LoadCheckpointAsync(checkpoint, manifestPath, cancellationToken).ConfigureAwait(false);
+        if (checkpoint != null) return await LoadCheckpointAsync(checkpoint, manifestPath, cancellationToken, retainPageContent).ConfigureAwait(false);
         JsonSerializerOptions options = CreateSnapshotJsonOptions();
         HtmlCrawlResult? result = JsonSerializer.Deserialize<HtmlCrawlResult>(json, options);
         if (result == null) {
@@ -91,6 +94,7 @@ public static partial class HtmlCrawler {
         for (int i = 0; i < result.Pages.Count; i++) {
             cancellationToken.ThrowIfCancellationRequested();
             HtmlCrawlPage page = result.Pages[i];
+            using PageContentLease content = new(page);
             SetPageArtifactPaths(page, i, artifactPaths);
         }
 
@@ -100,9 +104,17 @@ public static partial class HtmlCrawler {
             .GroupBy(asset => asset.Url, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().FilePath!, StringComparer.Ordinal);
 
+        List<(HtmlCrawlPage Page, string Path)> storedContents = new();
         for (int i = 0; i < result.Pages.Count; i++) {
             cancellationToken.ThrowIfCancellationRequested();
             HtmlCrawlPage page = result.Pages[i];
+            using PageContentLease content = new(page);
+
+            if (content.WasStored || options?.RetainPageContent == false) {
+                string contentPath = Path.ChangeExtension(page.ManifestPath!, "content.json");
+                await WriteJsonAtomicallyAsync(contentPath, GetStoredPageContent(page), CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
+                storedContents.Add((page, contentPath));
+            }
 
             if (!string.IsNullOrEmpty(page.Html)) {
                 string htmlToWrite = ShouldRewriteStoredHtml(options)
@@ -127,6 +139,17 @@ public static partial class HtmlCrawler {
         }
 
         await RewriteDownloadedCssAssetsAsync(result.Assets, options, cancellationToken).ConfigureAwait(false);
+
+        for (int i = 0; i < result.SkippedPages.Count; i++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            HtmlCrawlPage page = result.SkippedPages[i];
+            using PageContentLease content = new(page);
+            if (content.WasStored || (options?.RetainPageContent == false && HasPageContent(page))) {
+                string contentPath = Path.Combine(artifactPaths.PagesDirectory, $"skipped-{i:D8}.content.json");
+                await WriteJsonAtomicallyAsync(contentPath, GetStoredPageContent(page), CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
+                storedContents.Add((page, contentPath));
+            }
+        }
 
         await ExportPageRecordsAsync(result, artifactPaths, cancellationToken).ConfigureAwait(false);
         await ExportSkippedPageRecordsAsync(result.SkippedPages.Where(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath), artifactPaths.SkippedPagesJsonlPath, cancellationToken).ConfigureAwait(false);
@@ -156,6 +179,7 @@ public static partial class HtmlCrawler {
         await WriteTextAsync(artifactPaths.IndexHtmlPath, BuildIndexHtml(result, summary, artifactPaths.IndexHtmlPath), cancellationToken).ConfigureAwait(false);
 
         await WriteJsonAtomicallyAsync(artifactPaths.ManifestPath, result, CreateSnapshotJsonOptions(), cancellationToken).ConfigureAwait(false);
+        foreach ((HtmlCrawlPage page, string contentPath) in storedContents) ReleasePageContent(page, contentPath);
     }
 
     private static void SetArtifactPaths(HtmlCrawlResult result, CrawlArtifactPaths artifactPaths) {

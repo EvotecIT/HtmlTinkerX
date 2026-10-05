@@ -132,6 +132,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? OutPath { get; set; }
 
+    /// <summary>Release HTML, text, Markdown and HTTP cache bodies after saving each page. Requires OutPath or ResumePath; exports remain complete.</summary>
+    [Parameter]
+    public SwitchParameter ReleasePageContent { get; set; }
+
     /// <summary>Optional directory or manifest file used to resume a previous crawl.</summary>
     [Parameter]
     public string? ResumePath { get; set; }
@@ -452,6 +456,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             RespectRobotsTxt = !IgnoreRobotsTxt.IsPresent,
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutPath?.ToFullPath(),
+            RetainPageContent = !ReleasePageContent.IsPresent,
             ResumePath = ResumePath?.ToFullPath(),
             RefreshPath = RefreshPath?.ToFullPath(),
             CacheResponses = CacheResponses.IsPresent,

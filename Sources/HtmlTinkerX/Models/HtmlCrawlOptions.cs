@@ -115,6 +115,13 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional directory or manifest path used to persist crawl progress.</summary>
     public string? OutputPath { get; set; }
 
+    /// <summary>
+    /// Keeps HTML, text, Markdown and cached response bodies in returned pages. When false,
+    /// requires OutputPath or ResumePath and releases these bodies after saving each page.
+    /// Exports remain complete; saving the returned result requires its saved content files.
+    /// </summary>
+    public bool RetainPageContent { get; set; } = true;
+
     /// <summary>Optional directory or manifest path used to resume a previous crawl.</summary>
     public string? ResumePath { get; set; }
 
@@ -427,6 +434,7 @@ public sealed class HtmlCrawlOptions {
             RespectRobotsTxt = RespectRobotsTxt,
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutputPath,
+            RetainPageContent = RetainPageContent,
             ResumePath = ResumePath,
             RefreshPath = RefreshPath,
             CacheResponses = CacheResponses,
