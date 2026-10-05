@@ -143,7 +143,7 @@ public class HtmlHttpResponsePolicyTests {
     }
 
     [Fact]
-    public async Task DownloadToFile_AbortsStalledBodyWithoutReplacingExistingFile() {
+    public async Task DownloadToFile_CancelsStalledBodyWithoutReplacingExistingFile() {
         string folder = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-http-policy-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, "existing.html");
@@ -151,9 +151,11 @@ public class HtmlHttpResponsePolicyTests {
         try {
             using var stream = new BlockingStream();
             using var handler = new ResponseHandler(() => new StreamContent(stream));
-            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(100) };
-            Task downloading = HtmlUtilities.DownloadToFileAsync(client, new Uri(Url), path, null, default);
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+            using var cancellation = new CancellationTokenSource();
+            Task downloading = HtmlUtilities.DownloadToFileAsync(client, new Uri(Url), path, null, cancellation.Token);
             Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+            cancellation.Cancel();
             Assert.Same(downloading, await Task.WhenAny(downloading, Task.Delay(2000)));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => downloading);
             Assert.True(stream.Disposed);
