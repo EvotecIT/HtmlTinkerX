@@ -11,7 +11,7 @@ Crawls a site offline and returns extracted pages with optional browser renderin
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-MaxDepth <int>] [-MaxPages <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ReleasePageContent] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-MaxDepth <int>] [-MaxPages <int>] [-MaxConcurrentPageRequests <int>] [-MaxConcurrentPageRequestsPerOrigin <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ReleasePageContent] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -34,6 +34,12 @@ Invoke-HtmlCrawl -Url https://example.com/app -Render -WaitForSelector main -Sto
 ### EXAMPLE 3
 ```powershell
 Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success
+```
+
+
+### EXAMPLE 4
+```powershell
+Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2
 ```
 
 
@@ -879,6 +885,38 @@ Type: HtmlMarkdownProfile
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values: Portable, OfficeIMO
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxConcurrentPageRequests
+The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.
+
+```yaml
+Type: Int32
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxConcurrentPageRequestsPerOrigin
+The default is one. An origin is the scheme, host and port. Its response slot remains held until the body closes. DelayMs, robots delays and enabled Retry-After waits apply to request starts within that origin.
+
+```yaml
+Type: Int32
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
 
 Required: False
 Position: named

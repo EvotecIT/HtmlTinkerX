@@ -341,8 +341,7 @@ public static class HtmlUtilities {
 
         while (true) {
             cancellationToken.ThrowIfCancellationRequested();
-            int readSize = responseBudget?.GetReadSize(chunk.Length) ?? chunk.Length;
-            int bytesRead = await ReadResponseStreamAsync(source, chunk, readSize, cancellationToken, responseBudget).ConfigureAwait(false);
+            int bytesRead = await ReadResponseStreamAsync(source, chunk, chunk.Length, cancellationToken, responseBudget).ConfigureAwait(false);
             if (bytesRead == 0) {
                 break;
             }
@@ -370,7 +369,9 @@ public static class HtmlUtilities {
 
     internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken, HtmlCrawlResponseBudget? responseBudget = null) {
         cancellationToken.ThrowIfCancellationRequested();
+        if (responseBudget != null) await responseBudget.EnterReadAsync(cancellationToken).ConfigureAwait(false);
         try {
+            count = responseBudget?.GetReadSize(count) ?? count;
             int read = await stream.ReadAsync(buffer, 0, count, cancellationToken).ConfigureAwait(false);
             responseBudget?.RecordBytes(read);
             cancellationToken.ThrowIfCancellationRequested();
@@ -379,6 +380,8 @@ public static class HtmlUtilities {
         } catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
             (exception is IOException || exception is ObjectDisposedException || exception is HttpRequestException)) {
             throw new OperationCanceledException("The HTTP response read was canceled.", exception, cancellationToken);
+        } finally {
+            responseBudget?.ExitRead();
         }
     }
 

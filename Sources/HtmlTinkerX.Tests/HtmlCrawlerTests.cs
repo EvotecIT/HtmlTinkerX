@@ -21,6 +21,8 @@ public partial class HtmlCrawlerTests {
             ProxyPassword = "proxy-secret",
             MaximumPageResponseBytes = 2048,
             MaximumAssetResponseBytes = 4096,
+            MaxConcurrentPageRequests = 4,
+            MaxConcurrentPageRequestsPerOrigin = 2,
             CacheResponses = true,
             RefreshPath = "previous-crawl",
             StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs,
@@ -73,6 +75,8 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(HtmlCrawlStructuredJsonPreset.Docs, clone.StructuredJsonPreset);
         Assert.Equal(2048, clone.MaximumPageResponseBytes);
         Assert.Equal(4096, clone.MaximumAssetResponseBytes);
+        Assert.Equal(4, clone.MaxConcurrentPageRequests);
+        Assert.Equal(2, clone.MaxConcurrentPageRequestsPerOrigin);
         Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown, options.MarkdownImageMode);
         Assert.Equal(HtmlCrawlHiddenContentMode.RespectHidden, options.HiddenContentMode);
         Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards, options.ListingCardMetadataMode);

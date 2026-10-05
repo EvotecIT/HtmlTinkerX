@@ -21,6 +21,9 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success</code>
 /// </example>
+/// <example>
+/// <code>Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2</code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlCrawl")]
 [OutputType(typeof(HtmlCrawlResult), typeof(HtmlCrawlPage))]
 public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
@@ -44,6 +47,18 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
     public int MaxPages { get; set; } = 25;
+
+    /// <summary>Maximum concurrent static page downloads. Requires Render, AutoRender and AutoProfile to be disabled.</summary>
+    /// <para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</para>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaxConcurrentPageRequests { get; set; } = 1;
+
+    /// <summary>Maximum concurrent static page responses per origin, including redirected destinations.</summary>
+    /// <para>The default is one. An origin is the scheme, host and port. Its response slot remains held until the body closes. DelayMs, robots delays and enabled Retry-After waits apply to request starts within that origin.</para>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaxConcurrentPageRequestsPerOrigin { get; set; } = 1;
 
     /// <summary>Maximum number of bytes accepted for a page or sitemap response.</summary>
     [Parameter]
@@ -439,6 +454,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
         HtmlCrawlOptions options = new() {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
+            MaxConcurrentPageRequests = MaxConcurrentPageRequests,
+            MaxConcurrentPageRequestsPerOrigin = MaxConcurrentPageRequestsPerOrigin,
             MaximumPageResponseBytes = MaximumPageResponseBytes,
             MaximumAssetResponseBytes = MaximumAssetResponseBytes,
             MaximumTotalPageResponseBytes = MaximumTotalPageResponseBytes,

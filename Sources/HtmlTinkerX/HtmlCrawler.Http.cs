@@ -65,10 +65,26 @@ public static partial class HtmlCrawler {
                         pageRequest.CacheValidated = true;
                     }
                 }
-                HttpResponseMessage response = await transport.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                HtmlCrawlRequestScheduler? scheduler = request is CrawlHttpRequest ? options.PageRequestScheduler : null;
+                IDisposable? originLease = scheduler == null ? null : await scheduler.EnterAsync(uri, cancellationToken).ConfigureAwait(false);
+                HttpResponseMessage response;
+                try {
+                    response = await transport.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    if (originLease != null) {
+                        response.Content = new HtmlCrawlScheduledContent(response.Content, originLease);
+                        originLease = null;
+                    }
+                } finally {
+                    originLease?.Dispose();
+                }
                 int status = (int)response.StatusCode;
+                if (options.HttpRetryCount > 0 && IsTransientHttpStatus(status)) {
+                    // A terminal response can still ask other queued pages to wait.
+                    scheduler?.Defer(uri, GetServerRetryDelay(response) ?? TimeSpan.Zero);
+                }
                 if (request.Method == HttpMethod.Get && retries < options.HttpRetryCount && IsTransientHttpStatus(status)) {
                     TimeSpan delay = GetHttpRetryDelay(response, retries);
+                    scheduler?.Defer(uri, delay);
                     // Keep the failure when the server's minimum wait exceeds the whole request budget.
                     if (delay.TotalMilliseconds >= options.Timeout) return response;
                     response.Dispose();
@@ -81,6 +97,7 @@ public static partial class HtmlCrawler {
                     return response;
                 }
                 TimeSpan redirectDelay = options.HttpRetryCount > 0 ? GetServerRetryDelay(response) ?? TimeSpan.Zero : TimeSpan.Zero;
+                scheduler?.Defer(uri, redirectDelay);
                 if (redirectDelay.TotalMilliseconds >= options.Timeout) return response;
                 response.Dispose();
                 if (redirects++ >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");

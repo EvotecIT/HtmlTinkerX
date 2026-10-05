@@ -70,6 +70,9 @@ public static partial class HtmlCrawler {
 
         CrawlRenderSession? renderSession = null;
         CrawlCheckpointWriter? checkpointWriter = null;
+        CrawlPrefetchWindow? prefetchWindow = null;
+        HtmlCrawlRequestScheduler? requestScheduler = null;
+        SemaphoreSlim? robotsAccess = null;
         async Task<HtmlBrowserSession> GetRenderSessionAsync() {
             renderSession ??= await CreateRenderSessionAsync(resolvedOptions, startUri, cancellationToken).ConfigureAwait(false);
             return renderSession.Session;
@@ -163,6 +166,21 @@ public static partial class HtmlCrawler {
             }
 
             using HttpClient client = CreateClient(resolvedOptions, startUri);
+            if (resolvedOptions.MaxConcurrentPageRequests > 1) {
+                robotsAccess = new SemaphoreSlim(1, 1);
+                prefetchWindow = new CrawlPrefetchWindow(cancellationToken);
+                requestScheduler = new HtmlCrawlRequestScheduler(resolvedOptions.MaxConcurrentPageRequestsPerOrigin, async (uri, token) => {
+                    await robotsAccess.WaitAsync(token).ConfigureAwait(false);
+                    try { return await GetEffectiveDelayAsync(uri, client, resolvedOptions, robotsCache, token).ConfigureAwait(false); }
+                    finally { robotsAccess.Release(); }
+                });
+                resolvedOptions.PageRequestScheduler = requestScheduler;
+            }
+            async Task<RobotsDocument?> ReadRobotsAsync(Uri uri) {
+                if (robotsAccess != null) await robotsAccess.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try { return await GetRobotsDocumentAsync(uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false); }
+                finally { robotsAccess?.Release(); }
+            }
 
 
             int fetchedCount = result.Pages.Count + result.SkippedPages.Count(page => page.StatusCode.HasValue
@@ -177,16 +195,35 @@ public static partial class HtmlCrawler {
             }
 
             int previousDelay = 0;
-            while (pending.Count > 0 && fetchedCount < resolvedOptions.MaxPages) {
+            while (pending.Count > 0 && (fetchedCount < resolvedOptions.MaxPages || prefetchWindow?.Count > 0)) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (prefetchWindow != null && prefetchWindow.Count == 0) {
+                    int windowSize = Math.Min(resolvedOptions.MaxConcurrentPageRequests, resolvedOptions.MaxPages - fetchedCount);
+                    foreach (CrawlRequest candidate in pending.Take(windowSize)) {
+                        string key = NormalizeUrl(candidate.Uri, resolvedOptions);
+                        if (visited.Contains(key)) continue;
+                        if (resolvedOptions.RespectRobotsTxt) {
+                            RobotsDocument? candidateRobots = await ReadRobotsAsync(candidate.Uri).ConfigureAwait(false);
+                            if (candidateRobots != null && !IsAllowedByRobots(candidateRobots, candidate.Uri)) continue;
+                        }
+                        refreshPages.TryGetValue(candidate.Uri.AbsoluteUri, out HtmlCrawlPage? cached);
+                        prefetchWindow.Add(key, candidate, client, resolvedOptions, structuredSchema, cached);
+                    }
+                }
                 CrawlRequest next = pending.Dequeue();
                 string normalizedUrl = NormalizeUrl(next.Uri, resolvedOptions);
+                Task<FetchedPageData>? prefetched = null;
+                prefetchWindow?.TryTake(normalizedUrl, out prefetched);
                 if (!visited.Add(normalizedUrl)) {
+                    if (prefetched != null) {
+                        fetchedCount++;
+                        await prefetched.ConfigureAwait(false);
+                    }
                     continue;
                 }
 
                 if (resolvedOptions.RespectRobotsTxt) {
-                    RobotsDocument? robots = await GetRobotsDocumentAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                    RobotsDocument? robots = await ReadRobotsAsync(next.Uri).ConfigureAwait(false);
                     if (robots != null && !IsAllowedByRobots(robots, next.Uri)) {
                         result.SkippedPages.Add(CreateSkippedPage(next, HtmlCrawlSkipReason.DisallowedByRobots));
                         if (persistSnapshots) {
@@ -196,8 +233,10 @@ public static partial class HtmlCrawler {
                     }
                 }
 
-                if (previousDelay > 0) await Task.Delay(previousDelay, cancellationToken).ConfigureAwait(false);
-                previousDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                if (prefetchWindow == null) {
+                    if (previousDelay > 0) await Task.Delay(previousDelay, cancellationToken).ConfigureAwait(false);
+                    previousDelay = await GetEffectiveDelayAsync(next.Uri, client, resolvedOptions, robotsCache, cancellationToken).ConfigureAwait(false);
+                }
                 fetchedCount++;
                 HtmlCrawlPage page;
                 FetchedPageData fetchedPage;
@@ -209,7 +248,12 @@ public static partial class HtmlCrawler {
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
                     refreshPages.TryGetValue(next.Uri.AbsoluteUri, out HtmlCrawlPage? cachedPage);
-                    fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken, cachedPage).ConfigureAwait(false);
+                    fetchedPage = prefetched == null
+                        ? await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken, cachedPage).ConfigureAwait(false)
+                        : await prefetched.ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    resolvedOptions.PageResponseBudget?.ThrowIfExceeded();
+                    if (prefetched != null) PopulatePrefetchedPage(fetchedPage, resolvedOptions, structuredSchema);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
                         ProfileSelectionDecision inferredProfileDecision = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
@@ -291,6 +335,7 @@ public static partial class HtmlCrawler {
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            resolvedOptions.PageResponseBudget?.ThrowIfExceeded();
             result.PendingPages = SnapshotPendingPages(pending);
             result.Finished = DateTimeOffset.UtcNow;
             UpdateDerivedResultData(result);
@@ -299,7 +344,12 @@ public static partial class HtmlCrawler {
                 checkpointWriter!.RemoveAfterFinalExport();
             }
             return result;
+        } catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException(error.Message, error, cancellationToken);
         } finally {
+            if (prefetchWindow != null) await prefetchWindow.StopAsync().ConfigureAwait(false);
+            requestScheduler?.Dispose();
+            robotsAccess?.Dispose();
             checkpointWriter?.RemoveUnpublished();
             try {
                 if (renderSession != null) await renderSession.DisposeAsync().ConfigureAwait(false);
@@ -328,6 +378,15 @@ public static partial class HtmlCrawler {
         }
         if (options.MaxPages <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.MaxPages), "MaxPages must be greater than zero.");
+        }
+        if (options.MaxConcurrentPageRequests <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.MaxConcurrentPageRequests), "MaxConcurrentPageRequests must be greater than zero.");
+        }
+        if (options.MaxConcurrentPageRequestsPerOrigin <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.MaxConcurrentPageRequestsPerOrigin), "MaxConcurrentPageRequestsPerOrigin must be greater than zero.");
+        }
+        if (options.MaxConcurrentPageRequests > 1 && (options.Render || options.AutoRender || options.AutoProfile)) {
+            throw new ArgumentException("Concurrent page downloads require static mode without Render, AutoRender or AutoProfile.", nameof(options.MaxConcurrentPageRequests));
         }
         if (options.MaximumPageResponseBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.MaximumPageResponseBytes), "MaximumPageResponseBytes must be greater than zero.");
