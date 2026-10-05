@@ -11,7 +11,9 @@ namespace HtmlTinkerX;
 internal sealed class HtmlReadableTextAnalysis {
     internal static readonly Regex AttachmentPattern = new(@"\b(attachment|attachments|download|downloads|file|files|pdf|docx|xlsx|pptx|zip|zalacznik|zalaczniki|załącznik|załączniki)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     internal static readonly Regex BoilerplatePattern = new(@"\b(nav|navbar|menu|breadcrumb|breadcrumbs|footer|header|sidebar|search|cookie|cookies|social|share|pagination|strona główna|wyszukaj|hamburger|drukuj|metryczka)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    internal static readonly Regex CookiePattern = new(@"\b(cookie|cookies|consent|privacy|gdpr|rodo|plików cookies|pliki cookies)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    // The longer Polish phrases contain the same standalone "cookies" signal. Keeping only
+    // standalone signals prevents a phrase in a preceding subtree from consuming this subtree's match.
+    internal static readonly Regex CookiePattern = new(@"\b(cookie|cookies|consent|privacy|gdpr|rodo)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly Dictionary<IElement, Metrics> _elements = new();
     private readonly string _text;
     private readonly KeywordIndex _attachments;

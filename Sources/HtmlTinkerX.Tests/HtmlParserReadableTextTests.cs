@@ -4,6 +4,22 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlParserReadableTextTests {
     [Theory]
+    [InlineData("pliki")]
+    [InlineData("plików")]
+    public void ExtractReadableText_RemovesConsentSignalWhenPhraseStartsInAnotherSubtree(string prefix) {
+        string html = "<span>" + prefix + " </span><div id='target'>cookies alpha beta gamma delta epsilon zeta eta theta iota kappa lambda</div>"
+            + "<article id='real'>real article alpha beta gamma delta epsilon zeta eta theta iota kappa</article>";
+
+        foreach (string? preferredSelector in new string?[] { null, "#target" }) {
+            var result = HtmlParserToText.ExtractReadableText(html, preferredSelector);
+            Assert.Equal("article#real", result.SelectorHint);
+            Assert.Equal("real article alpha beta gamma delta epsilon zeta eta theta iota kappa", result.Text);
+            Assert.Equal(72, result.Score);
+            Assert.Equal(1, result.CandidateCount);
+        }
+    }
+
+    [Theory]
     [InlineData("alpha<b>beta</b><em>'</em><span>gamma</span> delta", 2)]
     [InlineData("alpha<b>---</b><span>beta</span>", 1)]
     [InlineData("<b>---</b><span>beta</span>", 1)]
