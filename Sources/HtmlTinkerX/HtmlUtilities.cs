@@ -338,13 +338,13 @@ public static class HtmlUtilities {
         int totalBytes = 0;
 
         while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
             int readSize = responseBudget?.GetReadSize(chunk.Length) ?? chunk.Length;
-            int bytesRead = await ReadResponseStreamAsync(source, chunk, readSize, cancellationToken).ConfigureAwait(false);
+            int bytesRead = await ReadResponseStreamAsync(source, chunk, readSize, cancellationToken, responseBudget).ConfigureAwait(false);
             if (bytesRead == 0) {
                 break;
             }
 
-            responseBudget?.RecordBytes(bytesRead);
             totalBytes = checked(totalBytes + bytesRead);
             if (totalBytes > maximumBytes) {
                 throw CreateResponseTooLargeException(maximumBytes, totalBytes);
@@ -366,11 +366,13 @@ public static class HtmlUtilities {
             }
         }, stream);
 
-    internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken) {
+    internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken, HtmlCrawlResponseBudget? responseBudget = null) {
         cancellationToken.ThrowIfCancellationRequested();
         try {
             int read = await stream.ReadAsync(buffer, 0, count, cancellationToken).ConfigureAwait(false);
+            responseBudget?.RecordBytes(read);
             cancellationToken.ThrowIfCancellationRequested();
+            responseBudget?.ThrowIfExceeded();
             return read;
         } catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
             (exception is IOException || exception is ObjectDisposedException || exception is HttpRequestException)) {

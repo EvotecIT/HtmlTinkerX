@@ -2,13 +2,41 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    [Theory]
+    [InlineData(5)]
+    [InlineData(9)]
+    public async Task ReadResponseBytes_ChargesCompletedReadsWhenTheRequestDeadlineWins(int completedBytes) {
+        HtmlCrawlResponseBudget budget = new(nameof(HtmlCrawlOptions.MaximumTotalPageResponseBytes), 8);
+        using CancellationTokenSource requestDeadline = new();
+        using HttpResponseMessage first = new() {
+            Content = new StreamContent(new CancelAfterReadStream(new byte[completedBytes], requestDeadline))
+        };
+        OperationCanceledException canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            HtmlUtilities.ReadResponseBytesAsync(first, 16, requestDeadline.Token, budget));
+        Assert.Equal(requestDeadline.Token, canceled.CancellationToken);
+        using HttpResponseMessage second = new() { Content = new StreamContent(new MemoryStream(new byte[4])) };
+        HtmlCrawlBudgetExceededException exceeded = await Assert.ThrowsAsync<HtmlCrawlBudgetExceededException>(() =>
+            HtmlUtilities.ReadResponseBytesAsync(second, 16, CancellationToken.None, budget));
+        Assert.Equal(9, exceeded.ResponseBytesRead);
+    }
+
+    private sealed class CancelAfterReadStream(byte[] bytes, CancellationTokenSource requestDeadline) : MemoryStream(bytes) {
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) {
+            int read = Read(buffer, offset, count);
+            requestDeadline.Cancel();
+            return Task.FromResult(read);
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_TotalPageBudgetAllowsExactBoundaryAndResetsWhenOptionsAreReused() {
         const string rootBody = "<main>First</main><a href='/child'>Next</a>";
