@@ -299,6 +299,7 @@ public static partial class HtmlCrawler {
     }
 
     private static PageSearchMetadata BuildPageSearchMetadata(HtmlCrawlPage page) {
+        using PageContentLease content = new(page);
         return BuildPageSearchMetadata(page.Html, page.Text, page.Markdown);
     }
 
@@ -544,6 +545,7 @@ public static partial class HtmlCrawler {
         int nextChunkId = 1;
 
         foreach (HtmlCrawlPage page in pages.Where(page => page.Status == HtmlCrawlPageStatus.Success)) {
+            using PageContentLease content = new(page);
             PageSearchMetadata searchMetadata = BuildPageSearchMetadata(page);
             List<string> pageChunks = BuildPageChunkTexts(page.Text, page.Markdown, page.Html);
             int chunkIndex = 1;

@@ -66,6 +66,9 @@ public sealed class HtmlCrawlPage {
     [JsonIgnore]
     internal HtmlCrawlHttpCacheEntry? HttpCache { get; set; }
 
+    [JsonIgnore]
+    internal string? StoredContentPath { get; set; }
+
     /// <summary>Page title when available.</summary>
     public string? Title { get; set; }
 
