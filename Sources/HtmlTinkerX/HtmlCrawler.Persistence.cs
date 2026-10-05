@@ -111,7 +111,7 @@ public static partial class HtmlCrawler {
             using PageContentLease content = new(page);
 
             if (content.WasStored || options?.RetainPageContent == false) {
-                string contentPath = Path.ChangeExtension(page.ManifestPath!, "content.json");
+                string contentPath = GetContentSidecarPath(page, artifactPaths.PagesDirectory);
                 await WriteJsonAtomicallyAsync(contentPath, GetStoredPageContent(page), CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
                 storedContents.Add((page, contentPath));
             }
@@ -145,7 +145,7 @@ public static partial class HtmlCrawler {
             HtmlCrawlPage page = result.SkippedPages[i];
             using PageContentLease content = new(page);
             if (content.WasStored || (options?.RetainPageContent == false && HasPageContent(page))) {
-                string contentPath = Path.Combine(artifactPaths.PagesDirectory, $"skipped-{i:D8}.content.json");
+                string contentPath = GetContentSidecarPath(page, artifactPaths.PagesDirectory);
                 await WriteJsonAtomicallyAsync(contentPath, GetStoredPageContent(page), CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
                 storedContents.Add((page, contentPath));
             }
