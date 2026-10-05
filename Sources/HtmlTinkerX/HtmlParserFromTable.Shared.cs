@@ -15,9 +15,9 @@ namespace HtmlTinkerX;
 /// Provides specialized functionality for parsing HTML tables.
 /// </summary>
 public static partial class HtmlParserFromTable {
-    private static IElement? SelectBestHeaderRow(IElement table, IElement[] allRows) {
+    private static IElement? SelectBestHeaderRow(IElement table, IElement[] allRows, TableParseBudget? budget = null) {
         // Look at thead rows first – prefer the one with the largest effective column span, then most cells, then the last occurrence.
-        var theadRows = table.QuerySelectorAll("thead tr").ToArray();
+        var theadRows = allRows.Where(row => row.ParentElement?.LocalName == "thead").ToArray();
         if (theadRows.Length == 0) {
             return null;
         }
@@ -25,8 +25,8 @@ public static partial class HtmlParserFromTable {
         return theadRows
             .Select((r, idx) => new {
                 Row = r,
-                EffectiveCols = SumColSpans(r.QuerySelectorAll("th,td")),
-                CellCount = r.QuerySelectorAll("th,td").Length,
+                EffectiveCols = SumColSpans(GetRowCells(r), budget),
+                CellCount = GetRowCells(r).Length,
                 Index = idx
             })
             .OrderByDescending(x => x.EffectiveCols)
@@ -35,7 +35,7 @@ public static partial class HtmlParserFromTable {
             .First().Row;
     }
 
-    private static HtmlNode? SelectBestHeaderRow(HtmlNodeCollection rows) {
+    private static HtmlNode? SelectBestHeaderRow(HtmlNodeCollection rows, TableParseBudget? budget = null) {
         if (rows == null || rows.Count == 0) {
             return null;
         }
@@ -49,7 +49,7 @@ public static partial class HtmlParserFromTable {
         return candidates
             .Select((r, idx) => new {
                 Row = r,
-                EffectiveCols = SumColSpans(r.SelectNodes("th|td")),
+                EffectiveCols = SumColSpans(r.SelectNodes("th|td"), budget),
                 CellCount = r.SelectNodes("th|td")?.Count ?? 0,
                 Index = idx
             })
@@ -217,29 +217,27 @@ public static partial class HtmlParserFromTable {
         return current;
     }
 
-    private static int SumColSpans(IEnumerable<IElement> cells) {
+    private static int SumColSpans(IEnumerable<IElement> cells, TableParseBudget? budget = null) {
+        budget ??= new HtmlTableParseLimits().CreateBudget();
         int total = 0;
         foreach (var cell in cells) {
-            if (int.TryParse(cell.GetAttribute("colspan"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs) && cs > 0) {
-                total += cs;
-            } else {
-                total += 1;
-            }
+            int span = ReadColumnSpan(cell.GetAttribute("colspan"));
+            budget.CheckColumns((long)total + span);
+            total += span;
         }
         return total;
     }
 
-    private static int SumColSpans(HtmlNodeCollection? cells) {
+    private static int SumColSpans(HtmlNodeCollection? cells, TableParseBudget? budget = null) {
+        budget ??= new HtmlTableParseLimits().CreateBudget();
         if (cells == null) {
             return 0;
         }
         int total = 0;
         foreach (var cell in cells) {
-            if (int.TryParse(cell.GetAttributeValue("colspan", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cs) && cs > 0) {
-                total += cs;
-            } else {
-                total += 1;
-            }
+            int span = ReadColumnSpan(cell.GetAttributeValue("colspan", "1"));
+            budget.CheckColumns((long)total + span);
+            total += span;
         }
         return total;
     }
@@ -292,7 +290,8 @@ public static partial class HtmlParserFromTable {
     private static void AppendUsedLinkHeaders(
         IList<string> headers,
         IEnumerable<Dictionary<string, string?>> rows,
-        IReadOnlyDictionary<int, string>? linkHeaderNames) {
+        IReadOnlyDictionary<int, string>? linkHeaderNames,
+        TableParseBudget budget) {
         if (linkHeaderNames == null) {
             return;
         }
@@ -304,6 +303,8 @@ public static partial class HtmlParserFromTable {
             }
 
             if (rowList.Any(row => row.TryGetValue(linkHeader, out string? value) && !string.IsNullOrWhiteSpace(value))) {
+                budget.CheckColumns((long)headers.Count + 1);
+                budget.AddCells(rowList.Count(row => !row.ContainsKey(linkHeader)), 1);
                 headers.Add(linkHeader);
                 foreach (Dictionary<string, string?> row in rowList) {
                     if (!row.ContainsKey(linkHeader)) {

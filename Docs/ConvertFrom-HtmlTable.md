@@ -11,17 +11,17 @@ Converts HTML tables into PowerShell objects.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-ConvertFrom-HtmlTable -Content <string> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+ConvertFrom-HtmlTable -Content <string> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-MaximumColumns <int>] [-MaximumRows <int>] [-MaximumExpandedCells <long>] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-ConvertFrom-HtmlTable -Path <string> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+ConvertFrom-HtmlTable -Path <string> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-MaximumColumns <int>] [-MaximumRows <int>] [-MaximumExpandedCells <long>] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-ConvertFrom-HtmlTable -Url <uri> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+ConvertFrom-HtmlTable -Url <uri> [-ReplaceContent <IDictionary>] [-ReplaceHeaders <IDictionary>] [-Engine <HtmlParserEngine>] [-ReverseTable] [-IncludeMetadata] [-AsDataTable] [-AsDataSet] [-TableName <string>] [-DataSetName <string>] [-InferTypes] [-IncludeLinkUrls] [-MaximumColumns <int>] [-MaximumRows <int>] [-MaximumExpandedCells <long>] [-TableIndex <int[]>] [-TableId <string>] [-TableClass <string>] [-Caption <string>] [-Header <string>] [-AllProperties] [-EmptyValuePlaceholder <string>] [-CleanHeaders] [-SkipFooter] [-CellTextFormat <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -257,6 +257,54 @@ Infer simple .NET column types when returning DataTable/DataSet output.
 
 ```yaml
 Type: SwitchParameter
+Parameter Sets: Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumColumns
+Maximum output columns per table, including companion link columns. Default: 10000.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumExpandedCells
+Maximum expanded result cells across all tables. Default: 1000000. Raise explicitly for trusted large tables.
+
+```yaml
+Type: Int64
+Parameter Sets: Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumRows
+Maximum source rows across all tables, including headers. Default: 100000.
+
+```yaml
+Type: Int32
 Parameter Sets: Content, File, Url
 Aliases: None
 Possible values:

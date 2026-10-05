@@ -636,7 +636,7 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 
 ### HTML/CSS/JavaScript Processing
 - **Convert-HTMLToText** - Convert markup to plain text
-- **ConvertFrom-HtmlTable** - Extract table elements into objects (supports rowspan/colspan)
+- **ConvertFrom-HtmlTable** - Extract table elements into objects (supports rowspan/colspan). Nested tables keep their own rows and cells. Spans follow HTML limits, and `rowspan="0"` extends to the end of its row group. Parsing defaults to at most 10,000 columns per table, 100,000 source rows across tables, and 1,000,000 expanded result cells. Use `-MaximumColumns`, `-MaximumRows`, and `-MaximumExpandedCells` to set explicit limits for trusted larger tables; oversized results raise an error. .NET callers can pass `HtmlTableParseLimits` to the table parsing overloads.
 - **ConvertFrom-HTMLAttributes** - Extract elements by tag, class, id or name
 - **ConvertFrom-HTML** - Parse full documents or fragments
 - **ConvertFrom-HtmlForm** - Extract form data and structure

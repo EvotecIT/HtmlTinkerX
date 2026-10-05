@@ -87,6 +87,21 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeLinkUrls { get; set; }
 
+    /// <summary>Maximum output columns per table, including companion link columns. Default: 10000.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumColumns { get; set; } = HtmlTableParseLimits.DefaultMaximumColumns;
+
+    /// <summary>Maximum source rows across all tables, including headers. Default: 100000.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaximumRows { get; set; } = HtmlTableParseLimits.DefaultMaximumRows;
+
+    /// <summary>Maximum expanded result cells across all tables. Default: 1000000. Raise explicitly for trusted large tables.</summary>
+    [Parameter]
+    [ValidateRange(1L, long.MaxValue)]
+    public long MaximumExpandedCells { get; set; } = HtmlTableParseLimits.DefaultMaximumExpandedCells;
+
     /// <summary>Zero-based table indexes to include.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
@@ -198,30 +213,20 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     }
 
     private async Task<List<HtmlTableResult>> GetTablesDetailedAsync() {
+        string content = Content;
         if (ParameterSetName == ParameterSetUrl) {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                string content = (await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false)).DocumentElement.OuterHtml;
-                return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
-            }
-
-            var doc = await HtmlParser.ParseUrlWithHtmlAgilityPackAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
-            return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(doc.DocumentNode.OuterHtml, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
+            content = await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: new HtmlHttpFetchOptions(), cancellationToken: CancelToken).ConfigureAwait(false);
         }
-
-        if (ParameterSetName == ParameterSetFile) {
-            if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-                return HtmlParser.ParseFileTablesWithAngleSharpDetailed(Path.ToFullPath(), Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
-            }
-
-            return HtmlParser.ParseFileTablesWithHtmlAgilityPackDetailed(Path.ToFullPath(), ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
+        else if (ParameterSetName == ParameterSetFile) {
+            content = await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath(), CancelToken).ConfigureAwait(false);
         }
-
+        CancelToken.ThrowIfCancellationRequested();
+        var limits = new HtmlTableParseLimits { MaximumColumns = MaximumColumns, MaximumRows = MaximumRows, MaximumExpandedCells = MaximumExpandedCells };
         if (Engine == HtmlParserEngine.AngleSharp && !ReverseTable.IsPresent) {
-            return HtmlParser.ParseTablesWithAngleSharpDetailed(Content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
+            return HtmlParser.ParseTablesWithAngleSharpDetailed(content, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent, limits);
         }
-
-        return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(Content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent);
+        return HtmlParser.ParseTablesWithHtmlAgilityPackDetailed(content, ReverseTable.IsPresent, Cast(ReplaceContent), Cast(ReplaceHeaders), AllProperties.IsPresent, SkipFooter.IsPresent, CleanHeaders.IsPresent, EmptyValuePlaceholder, GetCellTextFormat(), IncludeLinkUrls.IsPresent, limits);
     }
 
     private bool HasTableSelection() =>
