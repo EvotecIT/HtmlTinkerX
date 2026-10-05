@@ -30,6 +30,7 @@ jobs:
     name: 'Windows'
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         framework: [net8.0, net10.0, net472]
     steps:
@@ -81,7 +82,7 @@ jobs:
 
           $trxFiles | ForEach-Object {
             try {
-              Select-Xml -Path $_.FullName -XPath "//UnitTestResult[@outcome='Failed']" |
+              Select-Xml -Path $_.FullName -XPath "//*[local-name()='UnitTestResult'][@outcome='Failed']" |
                 ForEach-Object {
                   $name = $_.Node.testName
                   $msg = $_.Node.Output.ErrorInfo.Message ?? "No error message available"
@@ -161,7 +162,7 @@ jobs:
 
           $trxFiles | ForEach-Object {
             try {
-              Select-Xml -Path $_.FullName -XPath "//UnitTestResult[@outcome='Failed']" |
+              Select-Xml -Path $_.FullName -XPath "//*[local-name()='UnitTestResult'][@outcome='Failed']" |
                 ForEach-Object {
                   $name = $_.Node.testName
                   $msg = $_.Node.Output.ErrorInfo.Message ?? "No error message available"
@@ -232,7 +233,7 @@ jobs:
 
           $trxFiles | ForEach-Object {
             try {
-              Select-Xml -Path $_.FullName -XPath "//UnitTestResult[@outcome='Failed']" |
+              Select-Xml -Path $_.FullName -XPath "//*[local-name()='UnitTestResult'][@outcome='Failed']" |
                 ForEach-Object {
                   $name = $_.Node.testName
                   $msg = $_.Node.Output.ErrorInfo.Message ?? "No error message available"
