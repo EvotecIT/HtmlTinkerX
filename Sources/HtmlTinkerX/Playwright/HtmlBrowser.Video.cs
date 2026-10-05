@@ -86,9 +86,10 @@ public static partial class HtmlBrowser {
         double? geoLongitude = null,
         string? timezone = null,
         CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         string temp = Path.GetTempFileName();
         try {
-            await session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = temp }).ConfigureAwait(false);
+            await ExportSessionAsync(session, temp, cancellationToken).ConfigureAwait(false);
             string url = session.Page.Url;
             if (session.Browser == null) {
                 throw new InvalidOperationException("Cannot start video capture from a session whose browser instance is not exposed by Playwright. Start a new video session from a URL or file path instead.");

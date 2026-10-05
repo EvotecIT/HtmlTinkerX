@@ -301,7 +301,9 @@ public static class HtmlUtilities {
 
     internal static async Task WriteAtomicallyAsync(string path, Func<Stream, CancellationToken, Task> write, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        string fullPath = EnsureDirectoryExists(path);
+        string fullPath = ResolvePath(path);
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
         string temporaryPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try {
             using (FileStream stream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)) {
