@@ -42,6 +42,9 @@ public static partial class HtmlCrawler {
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = (int)response.StatusCode;
             page.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
+            SetResponseMetadata(page, responseUri.AbsoluteUri,
+                response.Headers.TryGetValues("ETag", out IEnumerable<string>? tags) ? string.Join(", ", tags) : null,
+                response.Content.Headers.TryGetValues("Last-Modified", out IEnumerable<string>? dates) ? string.Join(", ", dates) : null);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             response.EnsureSuccessStatusCode();
 
@@ -108,6 +111,7 @@ public static partial class HtmlCrawler {
 
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
+            SetRenderedResponseMetadata(page, response);
             Uri responseUri = TryGetAbsoluteUri(session.Page.Url, out Uri? finalUri) ? finalUri! : request.Uri;
             page.Url = NormalizeUrl(responseUri, options);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
@@ -148,6 +152,7 @@ public static partial class HtmlCrawler {
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
+            SetRenderedResponseMetadata(page, response);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             if (response != null && !response.Ok) {
                 page.Status = HtmlCrawlPageStatus.Failed;

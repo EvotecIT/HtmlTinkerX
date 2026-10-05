@@ -130,7 +130,7 @@ public static partial class HtmlCrawler {
 
         StringBuilder pagesJsonl = new();
         StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,OfflineReadinessGrade,HighestOfflineRiskSeverity,OfflineDependencyDiagnosticCount,OfflineDependencyKindsSummary,Error");
+        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,OfflineReadinessGrade,HighestOfflineRiskSeverity,OfflineDependencyDiagnosticCount,OfflineDependencyKindsSummary,Error,ResponseUrl,EntityTag,LastModified");
         foreach (HtmlCrawlPage page in result.Pages) {
             cancellationToken.ThrowIfCancellationRequested();
             pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
@@ -210,7 +210,10 @@ public static partial class HtmlCrawler {
                 page.OfflineDependencyKinds,
                 page.OfflineDependencyKindsSummary,
                 OfflineDependencyDiagnostics = page.OfflineDependencyDiagnostics,
-                page.Error
+                page.Error,
+                page.ResponseUrl,
+                page.EntityTag,
+                page.LastModified
             }));
 
             pagesCsv.AppendLine(string.Join(",",
@@ -288,7 +291,10 @@ public static partial class HtmlCrawler {
                 EscapeCsv(page.HighestOfflineRiskSeverity),
                 EscapeCsv(page.OfflineDependencyDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 EscapeCsv(page.OfflineDependencyKindsSummary),
-                EscapeCsv(page.Error)));
+                EscapeCsv(page.Error),
+                EscapeCsv(page.ResponseUrl),
+                EscapeCsv(page.EntityTag),
+                EscapeCsv(page.LastModified?.ToString("O", System.Globalization.CultureInfo.InvariantCulture))));
         }
 
         List<HtmlCrawlPage> skippedContentPages = result.SkippedPages
@@ -310,6 +316,9 @@ public static partial class HtmlCrawler {
                 page.Status,
                 page.SkipReason,
                 page.ContentType,
+                page.ResponseUrl,
+                page.EntityTag,
+                page.LastModified,
                 page.ContentFingerprint,
                 page.DuplicateOfUrl,
                 page.OfflineReadinessGrade,
@@ -332,6 +341,9 @@ public static partial class HtmlCrawler {
                 page.Status,
                 page.SkipReason,
                 page.ContentType,
+                page.ResponseUrl,
+                page.EntityTag,
+                page.LastModified,
                 page.ContentFingerprint,
                 page.DuplicateOfUrl,
                 page.OfflineReadinessGrade,

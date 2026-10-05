@@ -599,6 +599,8 @@ Crawler credentials and custom headers are sent only to the starting origin (sch
 
 An active crawl writes an atomic checkpoint to `crawl-result.json` and stores completed records under `crawl-result.json.state/`. Keep both together when moving an interrupted crawl. `ResumePath` and `HtmlCrawler.LoadResultAsync` read these checkpoints as well as existing full manifests. Global datasets, the offline index, and final link rewriting are generated once when the crawl finishes; its final manifest is self-contained and the checkpoint records are removed.
 
+Each page records the HTTP document's `ResponseUrl`, `EntityTag`, and `LastModified` when available. `ResponseUrl` preserves the final response address before HTML base resolution, canonical rewriting, or tracking-query normalization. Static and rendered crawls use the response that supplied the extracted document; rendered interactions that navigate update these values. The fields are retained in saved manifests and page JSONL/CSV exports.
+
 Completed crawl artifacts include:
 
 - `crawl-result.json` for the manifest and resume state

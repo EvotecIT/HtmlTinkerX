@@ -44,6 +44,15 @@ public sealed class HtmlCrawlPage {
     /// <summary>Response content type when available.</summary>
     public string? ContentType { get; set; }
 
+    /// <summary>Final HTTP document response address, before HTML base or canonical URL changes.</summary>
+    public string? ResponseUrl { get; set; }
+
+    /// <summary>Valid HTTP entity tag returned for the document, including its quotes and optional weak prefix.</summary>
+    public string? EntityTag { get; set; }
+
+    /// <summary>Last-Modified response date returned for the document, when valid and available.</summary>
+    public DateTimeOffset? LastModified { get; set; }
+
     /// <summary>Page title when available.</summary>
     public string? Title { get; set; }
 
