@@ -295,13 +295,16 @@ public static class HtmlUtilities {
         }
     }
 
-    internal static async Task WriteBytesAtomicallyAsync(string path, byte[] bytes, CancellationToken cancellationToken) {
+    internal static Task WriteBytesAtomicallyAsync(string path, byte[] bytes, CancellationToken cancellationToken) =>
+        WriteAtomicallyAsync(path, (stream, token) => stream.WriteAsync(bytes, 0, bytes.Length, token), cancellationToken);
+
+    internal static async Task WriteAtomicallyAsync(string path, Func<Stream, CancellationToken, Task> write, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         string fullPath = EnsureDirectoryExists(path);
         string temporaryPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try {
             using (FileStream stream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)) {
-                await stream.WriteAsync(bytes, 0, bytes.Length, cancellationToken).ConfigureAwait(false);
+                await write(stream, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
             cancellationToken.ThrowIfCancellationRequested();

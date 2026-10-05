@@ -120,7 +120,7 @@ public static partial class HtmlCrawler {
             }
 
             if (page.StructuredJson != null) {
-                await WriteTextAsync(page.StructuredJsonPath!, JsonSerializer.Serialize(page.StructuredJson, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
+                await WriteJsonAtomicallyAsync(page.StructuredJsonPath!, page.StructuredJson, CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
             }
 
             await WriteTextAsync(page.ManifestPath!, BuildPageManifestJson(page, result.Assets, localPageMap, assetMap), cancellationToken).ConfigureAwait(false);
@@ -128,314 +128,15 @@ public static partial class HtmlCrawler {
 
         await RewriteDownloadedCssAssetsAsync(result.Assets, options, cancellationToken).ConfigureAwait(false);
 
-        StringBuilder pagesJsonl = new();
-        StringBuilder pagesCsv = new();
-        pagesCsv.AppendLine("Url,RequestedUrl,CanonicalUrl,ParentUrl,Depth,Status,StatusCode,ContentType,Title,HtmlPath,TextPath,MarkdownPath,StructuredJsonPath,ManifestPath,ContentFingerprint,DuplicateOfUrl,Rendered,RenderMode,RenderReasonCode,RenderReason,AppliedScenario,AppliedProfileName,AppliedProfileReasonCode,AppliedProfileReason,ContentModeUsed,ContentSelectionReasonCode,ContentSelectionReason,ContentElementTag,ContentElementId,ContentElementClasses,ContentElementSelectorHint,ContentSelectionScore,ReaderCandidateCount,ReaderRootElementSelectorHint,ContentComparisonCount,BestContentComparisonMode,BestContentComparisonReasonCode,BestContentComparisonWordCount,RunnerUpContentComparisonMode,BestContentComparisonWordDelta,ContentComparisonDeltaSummary,ContentComparisonPreviewSummary,Started,Finished,DurationMs,LinkCount,AssetCount,InteractionCount,StructuredTableCount,StructuredListCount,StructuredFormCount,StructuredMicrodataCount,StructuredMetaTagCount,StructuredCodeBlockCount,StructuredCodeSampleCount,StructuredApiEndpointCount,StructuredAuthenticatedApiEndpointCount,StructuredRateLimitedApiEndpointCount,StructuredApiErrorResponseCount,StructuredBreadcrumbCount,StructuredFaqCount,StructuredSpecTableCount,StructuredCalloutCount,StructuredPrimaryActionCount,StructuredHeaderCount,StructuredNavigationCount,StructuredMainCount,StructuredArticleCount,StructuredAsideCount,StructuredFooterCount,OfflineReadinessGrade,HighestOfflineRiskSeverity,OfflineDependencyDiagnosticCount,OfflineDependencyKindsSummary,Error,ResponseUrl,EntityTag,LastModified,ResponseContentHash,ResponseRevalidated,ResponseChanged");
-        foreach (HtmlCrawlPage page in result.Pages) {
-            cancellationToken.ThrowIfCancellationRequested();
-            pagesJsonl.AppendLine(JsonSerializer.Serialize(new {
-                page.Url,
-                page.RequestedUrl,
-                page.CanonicalUrl,
-                page.ParentUrl,
-                page.Depth,
-                page.Status,
-                page.StatusCode,
-                page.ContentType,
-                page.Title,
-                page.HtmlPath,
-                page.TextPath,
-                page.MarkdownPath,
-                page.StructuredJsonPath,
-                page.ManifestPath,
-                page.ContentFingerprint,
-                page.DuplicateOfUrl,
-                page.Rendered,
-                page.RenderMode,
-                page.RenderReasonCode,
-                page.RenderReason,
-                page.AppliedScenario,
-                page.AppliedProfileName,
-                page.AppliedProfileReasonCode,
-                page.AppliedProfileReason,
-                page.ContentModeUsed,
-                page.ContentSelectionReasonCode,
-                page.ContentSelectionReason,
-                page.ContentElementTag,
-                page.ContentElementId,
-                page.ContentElementClasses,
-                page.ContentElementSelectorHint,
-                page.ContentSelectionScore,
-                page.ReaderCandidateCount,
-                page.ReaderRootElementSelectorHint,
-                ContentComparisonCount = page.ContentComparisons.Count,
-                page.BestContentComparisonMode,
-                page.BestContentComparisonReasonCode,
-                page.BestContentComparisonWordCount,
-                page.RunnerUpContentComparisonMode,
-                page.BestContentComparisonWordDelta,
-                page.ContentComparisonDeltaSummary,
-                page.ContentComparisonPreviewSummary,
-                page.AppliedInteractions,
-                page.Started,
-                page.Finished,
-                DurationMs = (long)page.Duration.TotalMilliseconds,
-                LinkCount = page.Links.Count,
-                AssetCount = page.AssetUrls.Count,
-                StructuredTableCount = page.StructuredJson?.Tables.Count ?? 0,
-                StructuredListCount = page.StructuredJson?.Lists.Count ?? 0,
-                StructuredFormCount = page.StructuredJson?.Forms.Count ?? 0,
-                StructuredMicrodataCount = page.StructuredJson?.MicrodataItems.Count ?? 0,
-                StructuredMetaTagCount = page.StructuredJson?.MetaTags.Count ?? 0,
-                StructuredCodeBlockCount = page.StructuredJson?.CodeBlocks.Count ?? 0,
-                StructuredCodeSampleCount = page.StructuredJson?.CodeSamples.Count ?? 0,
-                StructuredApiEndpointCount = page.StructuredJson?.ApiEndpoints.Count ?? 0,
-                StructuredAuthenticatedApiEndpointCount = GetStructuredAuthenticatedApiEndpointCount(page.StructuredJson),
-                StructuredRateLimitedApiEndpointCount = GetStructuredRateLimitedApiEndpointCount(page.StructuredJson),
-                StructuredApiErrorResponseCount = GetStructuredApiErrorResponseCount(page.StructuredJson),
-                StructuredBreadcrumbCount = page.StructuredJson?.Breadcrumbs.Count ?? 0,
-                StructuredFaqCount = page.StructuredJson?.FaqItems.Count ?? 0,
-                StructuredSpecTableCount = page.StructuredJson?.SpecTables.Count ?? 0,
-                StructuredCalloutCount = page.StructuredJson?.Callouts.Count ?? 0,
-                StructuredPrimaryActionCount = page.StructuredJson?.PrimaryActions.Count ?? 0,
-                StructuredHeaderCount = page.StructuredJson?.Layout.HeaderCount ?? 0,
-                StructuredNavigationCount = page.StructuredJson?.Layout.NavigationCount ?? 0,
-                StructuredMainCount = page.StructuredJson?.Layout.MainCount ?? 0,
-                StructuredArticleCount = page.StructuredJson?.Layout.ArticleCount ?? 0,
-                StructuredAsideCount = page.StructuredJson?.Layout.AsideCount ?? 0,
-                StructuredFooterCount = page.StructuredJson?.Layout.FooterCount ?? 0,
-                page.OfflineReadinessGrade,
-                page.HighestOfflineRiskSeverity,
-                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
-                page.OfflineDependencyKinds,
-                page.OfflineDependencyKindsSummary,
-                OfflineDependencyDiagnostics = page.OfflineDependencyDiagnostics,
-                page.Error,
-                page.ResponseUrl,
-                page.EntityTag,
-                page.LastModified,
-                page.ResponseContentHash,
-                page.ResponseRevalidated,
-                page.ResponseChanged
-            }));
-
-            pagesCsv.AppendLine(string.Join(",",
-                EscapeCsv(page.Url),
-                EscapeCsv(page.RequestedUrl),
-                EscapeCsv(page.CanonicalUrl),
-                EscapeCsv(page.ParentUrl),
-                EscapeCsv(page.Depth.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.Status.ToString()),
-                EscapeCsv(page.StatusCode?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.ContentType),
-                EscapeCsv(page.Title),
-                EscapeCsv(page.HtmlPath),
-                EscapeCsv(page.TextPath),
-                EscapeCsv(page.MarkdownPath),
-                EscapeCsv(page.StructuredJsonPath),
-                EscapeCsv(page.ManifestPath),
-                EscapeCsv(page.ContentFingerprint),
-                EscapeCsv(page.DuplicateOfUrl),
-                EscapeCsv(page.Rendered.ToString()),
-                EscapeCsv(page.RenderMode.ToString()),
-                EscapeCsv(page.RenderReasonCode.ToString()),
-                EscapeCsv(page.RenderReason),
-                EscapeCsv(page.AppliedScenario.ToString()),
-                EscapeCsv(page.AppliedProfileName),
-                EscapeCsv(page.AppliedProfileReasonCode.ToString()),
-                EscapeCsv(page.AppliedProfileReason),
-                EscapeCsv(page.ContentModeUsed.ToString()),
-                EscapeCsv(page.ContentSelectionReasonCode.ToString()),
-                EscapeCsv(page.ContentSelectionReason),
-                EscapeCsv(page.ContentElementTag),
-                EscapeCsv(page.ContentElementId),
-                EscapeCsv(string.Join("|", page.ContentElementClasses)),
-                EscapeCsv(page.ContentElementSelectorHint),
-                EscapeCsv(page.ContentSelectionScore?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.ReaderCandidateCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.ReaderRootElementSelectorHint),
-                EscapeCsv(page.ContentComparisons.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.BestContentComparisonMode?.ToString()),
-                EscapeCsv(page.BestContentComparisonReasonCode?.ToString()),
-                EscapeCsv(page.BestContentComparisonWordCount?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.RunnerUpContentComparisonMode?.ToString()),
-                EscapeCsv(page.BestContentComparisonWordDelta?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.ContentComparisonDeltaSummary),
-                EscapeCsv(page.ContentComparisonPreviewSummary),
-                EscapeCsv(page.Started.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.Finished.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(((long)page.Duration.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.Links.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.AssetUrls.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.AppliedInteractions.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Tables.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Lists.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Forms.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.MicrodataItems.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.MetaTags.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.CodeBlocks.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.CodeSamples.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.ApiEndpoints.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(GetStructuredAuthenticatedApiEndpointCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(GetStructuredRateLimitedApiEndpointCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(GetStructuredApiErrorResponseCount(page.StructuredJson).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Breadcrumbs.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.FaqItems.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.SpecTables.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Callouts.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.PrimaryActions.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.HeaderCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.NavigationCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.MainCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.ArticleCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.AsideCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv((page.StructuredJson?.Layout.FooterCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.OfflineReadinessGrade),
-                EscapeCsv(page.HighestOfflineRiskSeverity),
-                EscapeCsv(page.OfflineDependencyDiagnosticCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.OfflineDependencyKindsSummary),
-                EscapeCsv(page.Error),
-                EscapeCsv(page.ResponseUrl),
-                EscapeCsv(page.EntityTag),
-                EscapeCsv(page.LastModified?.ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
-                EscapeCsv(page.ResponseContentHash),
-                EscapeCsv(page.ResponseRevalidated.ToString()),
-                EscapeCsv(page.ResponseChanged?.ToString())));
-        }
-
-        List<HtmlCrawlPage> skippedContentPages = result.SkippedPages
-            .Where(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath)
-            .ToList();
-        List<HtmlCrawlPage> skippedAssetPages = result.SkippedPages
-            .Where(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath)
-            .ToList();
-
-        StringBuilder skippedPagesJsonl = new();
-        foreach (HtmlCrawlPage page in skippedContentPages) {
-            cancellationToken.ThrowIfCancellationRequested();
-            skippedPagesJsonl.AppendLine(JsonSerializer.Serialize(new {
-                page.Url,
-                page.RequestedUrl,
-                page.CanonicalUrl,
-                page.ParentUrl,
-                page.Depth,
-                page.Status,
-                page.SkipReason,
-                page.ContentType,
-                page.ResponseUrl,
-                page.EntityTag,
-                page.LastModified,
-                page.ResponseContentHash,
-                page.ResponseRevalidated,
-                page.ResponseChanged,
-                page.ContentFingerprint,
-                page.DuplicateOfUrl,
-                page.OfflineReadinessGrade,
-                page.HighestOfflineRiskSeverity,
-                page.OfflineDependencyDiagnosticCount,
-                page.OfflineDependencyKindsSummary,
-                page.Error
-            }));
-        }
-
-        StringBuilder skippedAssetsJsonl = new();
-        foreach (HtmlCrawlPage page in skippedAssetPages) {
-            cancellationToken.ThrowIfCancellationRequested();
-            skippedAssetsJsonl.AppendLine(JsonSerializer.Serialize(new {
-                page.Url,
-                page.RequestedUrl,
-                page.CanonicalUrl,
-                page.ParentUrl,
-                page.Depth,
-                page.Status,
-                page.SkipReason,
-                page.ContentType,
-                page.ResponseUrl,
-                page.EntityTag,
-                page.LastModified,
-                page.ResponseContentHash,
-                page.ResponseRevalidated,
-                page.ResponseChanged,
-                page.ContentFingerprint,
-                page.DuplicateOfUrl,
-                page.OfflineReadinessGrade,
-                page.HighestOfflineRiskSeverity,
-                page.OfflineDependencyDiagnosticCount,
-                page.OfflineDependencyKindsSummary,
-                page.Error
-            }));
-        }
-
-        StringBuilder linksJsonl = new();
-        foreach (HtmlCrawlPage page in result.Pages.Where(page => !string.IsNullOrWhiteSpace(page.Url))) {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (string link in page.Links.Where(link => !string.IsNullOrWhiteSpace(link)).Distinct(StringComparer.Ordinal)) {
-                linksJsonl.AppendLine(JsonSerializer.Serialize(new {
-                    SourceUrl = page.Url,
-                    TargetUrl = link,
-                    page.Depth,
-                    page.Rendered
-                }));
-            }
-        }
-
-        StringBuilder assetsJsonl = new();
-        foreach (HtmlCrawlAsset asset in result.Assets) {
-            cancellationToken.ThrowIfCancellationRequested();
-            assetsJsonl.AppendLine(JsonSerializer.Serialize(new {
-                asset.Url,
-                asset.PageUrl,
-                asset.Source,
-                asset.ContentType,
-                asset.StatusCode,
-                asset.FilePath,
-                asset.ContentLength,
-                asset.Error,
-                asset.Started,
-                asset.Finished,
-                DurationMs = (long)asset.Duration.TotalMilliseconds
-            }));
-        }
-
-        StringBuilder structuredPagesJsonl = new();
-        foreach (HtmlCrawlPage page in result.Pages.Where(page => page.StructuredJson != null)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            structuredPagesJsonl.AppendLine(JsonSerializer.Serialize(new {
-                page.Url,
-                page.Title,
-                page.Depth,
-                page.StructuredJsonPath,
-                page.StructuredJson
-            }, CreateJsonOptions()));
-        }
-
+        await ExportPageRecordsAsync(result, artifactPaths, cancellationToken).ConfigureAwait(false);
+        await ExportSkippedPageRecordsAsync(result.SkippedPages.Where(page => page.SkipReason != HtmlCrawlSkipReason.AssetPath), artifactPaths.SkippedPagesJsonlPath, cancellationToken).ConfigureAwait(false);
+        await ExportSkippedPageRecordsAsync(result.SkippedPages.Where(page => page.SkipReason == HtmlCrawlSkipReason.AssetPath), artifactPaths.SkippedAssetsJsonlPath, cancellationToken).ConfigureAwait(false);
+        await ExportLinkRecordsAsync(result, artifactPaths.LinksJsonlPath, cancellationToken).ConfigureAwait(false);
+        await ExportAssetRecordsAsync(result, artifactPaths.AssetsJsonlPath, cancellationToken).ConfigureAwait(false);
+        await ExportStructuredPageRecordsAsync(result, artifactPaths.StructuredJsonPagesJsonlPath, cancellationToken).ConfigureAwait(false);
         List<PageChunkRecord> chunkRecords = BuildChunkRecords(result.Pages);
         result.ChunkCount = chunkRecords.Count;
-        StringBuilder chunksJsonl = new();
-        foreach (PageChunkRecord chunk in chunkRecords) {
-            cancellationToken.ThrowIfCancellationRequested();
-            chunksJsonl.AppendLine(JsonSerializer.Serialize(new {
-                chunk.ChunkId,
-                chunk.Url,
-                chunk.Title,
-                chunk.Depth,
-                chunk.ChunkIndex,
-                chunk.WordCount,
-                chunk.CharacterCount,
-                chunk.Summary,
-                chunk.Headings,
-                chunk.Keywords,
-                chunk.Text,
-                HtmlPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.HtmlPath),
-                TextPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.TextPath),
-                ManifestPath = BuildRelativeOptionalPath(artifactPaths.ChunksJsonlPath, chunk.ManifestPath),
-                chunk.OfflineReadinessGrade,
-                chunk.HighestOfflineRiskSeverity,
-                chunk.OfflineDependencyDiagnosticCount,
-                chunk.OfflineDependencyKindsSummary,
-                chunk.Fingerprint
-            }));
-        }
+        await ExportChunkRecordsAsync(chunkRecords, artifactPaths.ChunksJsonlPath, cancellationToken).ConfigureAwait(false);
 
         (object graphDocument, int graphNodeCount, int graphEdgeCount, int fetchedNodeCount, int skippedNodeCount, int externalNodeCount, Dictionary<string, int> nodeCategories, Dictionary<string, int> edgeRelations, Dictionary<string, int> skippedNodeReasons) =
             BuildGraphDocument(result.Pages, result.SkippedPages, artifactPaths.GraphJsonPath);
@@ -449,23 +150,14 @@ public static partial class HtmlCrawler {
         result.GraphSkippedNodeReasons = skippedNodeReasons;
 
         HtmlCrawlSummary summary = result.Summary;
-        await WriteTextAsync(artifactPaths.PagesJsonlPath, pagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.PagesCsvPath, pagesCsv.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.SkippedPagesJsonlPath, skippedPagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.SkippedAssetsJsonlPath, skippedAssetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.LinksJsonlPath, linksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.AssetsJsonlPath, assetsJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.StructuredJsonPagesJsonlPath, structuredPagesJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.OpenApiLikeJsonPath, JsonSerializer.Serialize(result.OpenApiLike, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.OpenApiJsonPath, JsonSerializer.Serialize(result.OpenApiDocument, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.ChunksJsonlPath, chunksJsonl.ToString(), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.GraphJsonPath, JsonSerializer.Serialize(graphDocument, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(artifactPaths.SummaryJsonPath, JsonSerializer.Serialize(summary, CreateJsonOptions()), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAtomicallyAsync(artifactPaths.OpenApiLikeJsonPath, result.OpenApiLike, CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAtomicallyAsync(artifactPaths.OpenApiJsonPath, result.OpenApiDocument, CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAtomicallyAsync(artifactPaths.GraphJsonPath, graphDocument, CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
+        await WriteJsonAtomicallyAsync(artifactPaths.SummaryJsonPath, summary, CreateJsonOptions(), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.SummaryTextPath, summary.ToReportText(result.SitemapUrls), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.IndexHtmlPath, BuildIndexHtml(result, summary, artifactPaths.IndexHtmlPath), cancellationToken).ConfigureAwait(false);
 
-        string json = JsonSerializer.Serialize(result, CreateSnapshotJsonOptions());
-        await WriteTextAsync(artifactPaths.ManifestPath, json, cancellationToken).ConfigureAwait(false);
+        await WriteJsonAtomicallyAsync(artifactPaths.ManifestPath, result, CreateSnapshotJsonOptions(), cancellationToken).ConfigureAwait(false);
     }
 
     private static void SetArtifactPaths(HtmlCrawlResult result, CrawlArtifactPaths artifactPaths) {
