@@ -10,6 +10,37 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    [Fact]
+    public async Task CrawlAsync_PageObserverCanKeepContentWhileResultReleasesIt() {
+        using var server = StartServer(new Dictionary<string, string> {
+            ["/"] = "<main>Observed content</main>"
+        }, out string root);
+        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var observed = new List<HtmlCrawlPage>();
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.OutputPath = outputPath;
+        options.RetainPageContent = false;
+        options.IncludeMarkdown = true;
+        options.PageObserver = new DelegatePageObserver((page, token) => {
+            observed.Add(page.CreateSnapshot());
+            return Task.CompletedTask;
+        });
+        try {
+            HtmlCrawlPage original = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+            HtmlCrawlPage snapshot = Assert.Single(observed);
+            Assert.NotSame(original, snapshot);
+            Assert.Empty(original.Html);
+            Assert.Empty(original.Text);
+            Assert.Empty(original.Markdown);
+            Assert.Equal(original.ContentFingerprint, snapshot.ContentFingerprint);
+            Assert.Contains("Observed content", snapshot.Html);
+            Assert.Contains("Observed content", snapshot.Text);
+            Assert.Contains("Observed content", snapshot.Markdown);
+        } finally {
+            if (Directory.Exists(outputPath)) Directory.Delete(outputPath, true);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
