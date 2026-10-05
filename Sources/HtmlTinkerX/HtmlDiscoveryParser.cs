@@ -59,17 +59,36 @@ public static class HtmlDiscoveryParser {
     /// Extracts URLs from a sitemap urlset or sitemap index document.
     /// </summary>
     public static IReadOnlyList<string> ParseSitemapUrls(string xml, Uri? baseUri = null) {
+        return ParseSitemapEntries(xml, baseUri)
+            .Select(static entry => entry.Url)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Reads page and child-sitemap locations with their optional modification dates.
+    /// Entries retain document order; callers can prioritize recent entries before applying a crawl limit.
+    /// Extension locations such as image URLs are excluded. Missing or invalid dates remain null.
+    /// </summary>
+    public static IReadOnlyList<HtmlSitemapEntry> ParseSitemapEntries(string xml, Uri? baseUri = null) {
         if (xml == null) {
             throw new ArgumentNullException(nameof(xml));
         }
 
         XDocument document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
-        return document
-            .Descendants()
-            .Where(static element => string.Equals(element.Name.LocalName, "loc", StringComparison.OrdinalIgnoreCase))
-            .Select(element => ResolveUrl(element.Value, baseUri))
-            .Where(static url => !string.IsNullOrWhiteSpace(url))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        XElement? root = document.Root;
+        if (root == null || (root.Name.LocalName != "urlset" && root.Name.LocalName != "sitemapindex")) {
+            return Array.Empty<HtmlSitemapEntry>();
+        }
+        bool isIndex = root.Name.LocalName == "sitemapindex";
+        XNamespace ns = root.Name.Namespace;
+        return root.Elements(ns + (isIndex ? "sitemap" : "url"))
+            .Select(element => new HtmlSitemapEntry {
+                Url = ResolveUrl(element.Element(ns + "loc")?.Value ?? string.Empty, baseUri),
+                LastModified = TryParseDate(element.Element(ns + "lastmod")?.Value ?? string.Empty),
+                IsSitemap = isIndex
+            })
+            .Where(static entry => !string.IsNullOrWhiteSpace(entry.Url))
             .ToArray();
     }
 
