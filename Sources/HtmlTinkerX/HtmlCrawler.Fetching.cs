@@ -98,16 +98,37 @@ public static partial class HtmlCrawler {
 
         long networkLogStart = session.NetworkLogPosition;
         IResponse? documentResponse = null;
+        IResponse? pendingDocumentResponse = null;
         EventHandler<IResponse> captureDocumentResponse = (_, response) => {
-            if (response.Request.IsNavigationRequest && ReferenceEquals(response.Frame, session.Page.MainFrame)) documentResponse = response;
+            if (!response.Request.IsNavigationRequest || !ReferenceEquals(response.Frame, session.Page.MainFrame)
+                || response.Status == 204 || response.Status == 205) return;
+            response.Headers.TryGetValue("content-disposition", out string? disposition);
+            if (ContentDispositionHeaderValue.TryParse(disposition, out ContentDispositionHeaderValue? parsed)
+                && string.Equals(parsed.DispositionType, "attachment", StringComparison.OrdinalIgnoreCase)) return;
+            pendingDocumentResponse = response;
+        };
+        EventHandler<IFrame> commitDocumentResponse = (_, frame) => {
+            if (pendingDocumentResponse != null && ReferenceEquals(frame, session.Page.MainFrame)
+                && TryGetAbsoluteUri(frame.Url, out Uri? frameUri)
+                && TryGetAbsoluteUri(pendingDocumentResponse.Url, out Uri? pendingUri)
+                && string.Equals(frameUri!.GetLeftPart(UriPartial.Query), pendingUri!.GetLeftPart(UriPartial.Query), StringComparison.Ordinal)) {
+                documentResponse = pendingDocumentResponse;
+                pendingDocumentResponse = null;
+            }
+        };
+        EventHandler<IRequest> discardFailedResponse = (_, failed) => {
+            if (ReferenceEquals(pendingDocumentResponse?.Request, failed)) pendingDocumentResponse = null;
         };
         session.Page.Response += captureDocumentResponse;
+        session.Page.FrameNavigated += commitDocumentResponse;
+        session.Page.RequestFailed += discardFailedResponse;
         try {
             cancellationToken.ThrowIfCancellationRequested();
             IResponse? response = await session.Page.GotoAsync(request.Uri.AbsoluteUri, new PageGotoOptions {
                 Timeout = options.Timeout,
                 WaitUntil = WaitUntilState.NetworkIdle
             }).ConfigureAwait(false);
+            documentResponse ??= response;
 
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
@@ -187,6 +208,8 @@ public static partial class HtmlCrawler {
             page.Error = ex.Message;
         } finally {
             session.Page.Response -= captureDocumentResponse;
+            session.Page.FrameNavigated -= commitDocumentResponse;
+            session.Page.RequestFailed -= discardFailedResponse;
             page.Finished = DateTimeOffset.UtcNow;
         }
 

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -50,6 +51,11 @@ public partial class HtmlCrawlerTests {
             Assert.Equal(tag, record.RootElement.GetProperty("EntityTag").GetString());
             Assert.Equal(modified, record.RootElement.GetProperty("LastModified").GetDateTimeOffset());
             Assert.EndsWith(",ResponseUrl,EntityTag,LastModified", File.ReadAllLines(result.PagesCsvPath!)[0]);
+            Assert.Contains("\"" + tag.Replace("\"", "\"\"") + "\"", File.ReadAllLines(result.PagesCsvPath!)[1]);
+            using JsonDocument sidecar = JsonDocument.Parse(File.ReadAllText(page.ManifestPath!));
+            Assert.Equal(page.ResponseUrl, sidecar.RootElement.GetProperty("ResponseUrl").GetString());
+            Assert.Equal(tag, sidecar.RootElement.GetProperty("EntityTag").GetString());
+            Assert.Equal(modified, sidecar.RootElement.GetProperty("LastModified").GetDateTimeOffset());
         } finally {
             if (Directory.Exists(output)) Directory.Delete(output, true);
         }
@@ -84,7 +90,7 @@ public partial class HtmlCrawlerTests {
             context.Response.Headers["ETag"] = final ? "W/\"final\"" : "\"initial\"";
             context.Response.Headers["Last-Modified"] = modified.AddDays(final ? 0 : -1).ToString("R", CultureInfo.InvariantCulture);
             await RespondAsync(context, final ? "<main>Final document</main>"
-                : "<main>Initial document</main><button id='continue' onclick=\"location.href='/document?version=2'\">Continue</button>");
+                : "<main>Initial document</main><button id='continue' onclick=\"location.href='/document?version=2#section'\">Continue</button>");
         }, out string root);
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
@@ -119,6 +125,125 @@ public partial class HtmlCrawlerTests {
             Assert.Equal(root, record.RootElement.GetProperty("ResponseUrl").GetString());
             Assert.Equal(page.EntityTag, record.RootElement.GetProperty("EntityTag").GetString());
         } finally {
+            if (Directory.Exists(output)) Directory.Delete(output, true);
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_DuplicateContentRetainsItsOwnResponseValidators() {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        DateTimeOffset modified = new(2026, 10, 3, 12, 0, 0, TimeSpan.Zero);
+        using HttpListener server = StartFlexibleServer(async context => {
+            bool duplicate = context.Request.Url!.AbsolutePath == "/duplicate";
+            context.Response.Headers["ETag"] = duplicate ? "\"duplicate\"" : "\"initial\"";
+            context.Response.Headers["Last-Modified"] = modified.ToString("R", CultureInfo.InvariantCulture);
+            await RespondAsync(context, duplicate ? "<main>Same document</main>"
+                : "<main>Same document</main><a href='/duplicate'></a>");
+        }, out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(2);
+            options.DeduplicatePages = true;
+            options.OutputPath = output;
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
+            HtmlCrawlPage page = Assert.Single(result.SkippedPages);
+            Assert.Equal(HtmlCrawlSkipReason.DuplicateContent, page.SkipReason);
+            Assert.Equal(root + "duplicate", page.ResponseUrl);
+            Assert.Equal("\"duplicate\"", page.EntityTag);
+            Assert.Equal(modified, page.LastModified);
+            HtmlCrawlPage loaded = Assert.Single((await HtmlCrawler.LoadResultAsync(output)).SkippedPages);
+            Assert.Equal(page.ResponseUrl, loaded.ResponseUrl);
+            Assert.Equal(page.EntityTag, loaded.EntityTag);
+            Assert.Equal(modified, loaded.LastModified);
+            using JsonDocument record = JsonDocument.Parse(File.ReadAllText(result.SkippedPagesJsonlPath!));
+            Assert.Equal(page.ResponseUrl, record.RootElement.GetProperty("ResponseUrl").GetString());
+            Assert.Equal(page.EntityTag, record.RootElement.GetProperty("EntityTag").GetString());
+        } finally {
+            if (Directory.Exists(output)) Directory.Delete(output, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium, 204)]
+    [InlineData(HtmlBrowserEngine.Firefox, 204)]
+    [InlineData(HtmlBrowserEngine.WebKit, 204)]
+    [InlineData(HtmlBrowserEngine.Chromium, 205)]
+    [InlineData(HtmlBrowserEngine.Chromium, 200)]
+    public async Task CrawlAsync_RenderedNonCommittingResponseKeepsTheActiveDocumentMetadata(HtmlBrowserEngine browser, int status) {
+        using HttpListener server = StartFlexibleServer(async context => {
+            bool other = context.Request.Url!.AbsolutePath == "/other";
+            context.Response.Headers["ETag"] = other ? "\"other\"" : "\"initial\"";
+            if (other) {
+                context.Response.StatusCode = status;
+                if (status == 200) {
+                    context.Response.Headers["Content-Disposition"] = "attachment; filename=document.txt";
+                    await RespondAsync(context, "Download body", "application/octet-stream");
+                }
+            } else {
+                await RespondAsync(context, "<main>Initial document</main><a id='continue' href='/other'>Continue</a>");
+            }
+        }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.Render = true;
+        options.Browser = browser;
+        options.ClickSelectors.Add("#continue");
+        HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+        Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+        Assert.Contains("Initial document", page.Text);
+        Assert.Equal(root, page.ResponseUrl);
+        Assert.Equal("\"initial\"", page.EntityTag);
+        Assert.Equal(200, page.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium)]
+    [InlineData(HtmlBrowserEngine.Firefox)]
+    [InlineData(HtmlBrowserEngine.WebKit)]
+    public async Task CrawlAsync_RenderedHistoryNavigationPreservesTheHttpDocumentIdentity(HtmlBrowserEngine browser) {
+        using HttpListener server = StartFlexibleServer(async context => {
+            context.Response.Headers["ETag"] = "\"initial\"";
+            await RespondAsync(context, "<main>Initial document</main><button id='continue' onclick=\"history.pushState({}, '', '/client-route')\">Continue</button>");
+        }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.Render = true;
+        options.Browser = browser;
+        options.ClickSelectors.Add("#continue");
+        HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+        Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+        Assert.Equal(root + "client-route", page.Url);
+        Assert.Equal(root, page.ResponseUrl);
+        Assert.Equal("\"initial\"", page.EntityTag);
+    }
+
+    [Fact]
+    public async Task CrawlAsync_InterruptedCheckpointPreservesDuplicateResponseMetadata() {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        TaskCompletionSource<bool> waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenSource cancellation = new();
+        using HttpListener server = StartFlexibleServer(async context => {
+            string path = context.Request.Url!.AbsolutePath;
+            if (path == "/waiting") {
+                waiting.TrySetResult(true);
+                await release.Task;
+            }
+            context.Response.Headers["ETag"] = path == "/duplicate" ? "\"duplicate\"" : "\"initial\"";
+            await RespondAsync(context, path == "/" ? "<main>Same body</main><a href='/duplicate'></a><a href='/waiting'></a>"
+                : "<main>Same body</main>");
+        }, out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(3);
+            options.OutputPath = output;
+            options.DeduplicatePages = true;
+            Task<HtmlCrawlResult> crawl = HtmlCrawler.CrawlAsync(root, options, cancellation.Token);
+            Assert.Same(waiting.Task, await Task.WhenAny(waiting.Task, Task.Delay(TimeSpan.FromSeconds(10))));
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await crawl);
+            HtmlCrawlPage duplicate = Assert.Single((await HtmlCrawler.LoadResultAsync(output)).SkippedPages);
+            Assert.Equal(root + "duplicate", duplicate.ResponseUrl);
+            Assert.Equal("\"duplicate\"", duplicate.EntityTag);
+        } finally {
+            cancellation.Cancel();
+            release.TrySetResult(true);
             if (Directory.Exists(output)) Directory.Delete(output, true);
         }
     }
