@@ -42,6 +42,9 @@ public static partial class HtmlCrawler {
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = (int)response.StatusCode;
             page.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
+            SetResponseMetadata(page, responseUri.GetLeftPart(UriPartial.Query),
+                response.Headers.TryGetValues("ETag", out IEnumerable<string>? tags) ? string.Join(", ", tags) : null,
+                response.Content.Headers.TryGetValues("Last-Modified", out IEnumerable<string>? dates) ? string.Join(", ", dates) : null);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             response.EnsureSuccessStatusCode();
 
@@ -95,19 +98,50 @@ public static partial class HtmlCrawler {
 
         long networkLogStart = session.NetworkLogPosition;
         IResponse? documentResponse = null;
+        IResponse? pendingDocumentResponse = null;
+        Dictionary<string, IResponse> committedResponses = new(StringComparer.Ordinal);
+        string DocumentKey(Uri uri) => uri.GetLeftPart(UriPartial.Query);
         EventHandler<IResponse> captureDocumentResponse = (_, response) => {
-            if (response.Request.IsNavigationRequest && ReferenceEquals(response.Frame, session.Page.MainFrame)) documentResponse = response;
+            if (!response.Request.IsNavigationRequest || !ReferenceEquals(response.Frame, session.Page.MainFrame)) return;
+            pendingDocumentResponse = null;
+            if (response.Status == 204 || response.Status == 205) return;
+            if ((response.Status == 301 || response.Status == 302 || response.Status == 303 || response.Status == 307 || response.Status == 308)
+                && response.Headers.TryGetValue("location", out string? location) && !string.IsNullOrWhiteSpace(location)) return;
+            response.Headers.TryGetValue("content-disposition", out string? disposition);
+            if (ContentDispositionHeaderValue.TryParse(disposition, out ContentDispositionHeaderValue? parsed)
+                && string.Equals(parsed.DispositionType, "attachment", StringComparison.OrdinalIgnoreCase)) return;
+            pendingDocumentResponse = response;
+        };
+        EventHandler<IFrame> commitDocumentResponse = (_, frame) => {
+            if (pendingDocumentResponse != null && ReferenceEquals(frame, session.Page.MainFrame)
+                && TryGetAbsoluteUri(frame.Url, out Uri? frameUri)
+                && TryGetAbsoluteUri(pendingDocumentResponse.Url, out Uri? pendingUri)
+                && string.Equals(DocumentKey(frameUri!), DocumentKey(pendingUri!), StringComparison.Ordinal)) {
+                documentResponse = pendingDocumentResponse;
+                committedResponses[DocumentKey(pendingUri!)] = pendingDocumentResponse;
+                pendingDocumentResponse = null;
+            }
+        };
+        EventHandler<IRequest> discardFailedResponse = (_, failed) => {
+            if (ReferenceEquals(pendingDocumentResponse?.Request, failed)) pendingDocumentResponse = null;
         };
         session.Page.Response += captureDocumentResponse;
+        session.Page.FrameNavigated += commitDocumentResponse;
+        session.Page.RequestFailed += discardFailedResponse;
         try {
             cancellationToken.ThrowIfCancellationRequested();
             IResponse? response = await session.Page.GotoAsync(request.Uri.AbsoluteUri, new PageGotoOptions {
                 Timeout = options.Timeout,
                 WaitUntil = WaitUntilState.NetworkIdle
             }).ConfigureAwait(false);
+            documentResponse ??= response;
+            if (response != null && TryGetAbsoluteUri(response.Url, out Uri? initialResponseUri)) {
+                committedResponses[DocumentKey(initialResponseUri!)] = response;
+            }
 
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
+            SetRenderedResponseMetadata(page, response);
             Uri responseUri = TryGetAbsoluteUri(session.Page.Url, out Uri? finalUri) ? finalUri! : request.Uri;
             page.Url = NormalizeUrl(responseUri, options);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
@@ -139,15 +173,24 @@ public static partial class HtmlCrawler {
 
             // Capture the DOM, URL and title together: interactions and delayed scripts can navigate.
             JsonElement snapshot = await session.Page.EvaluateAsync<JsonElement>("() => ({ url: location.href, title: document.title, "
+                + "documentUrl: performance.getEntriesByType('navigation')[0]?.name ?? null, "
                 + "html: (document.doctype ? new XMLSerializer().serializeToString(document.doctype) : '') + document.documentElement.outerHTML })").ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             string fullHtml = snapshot.GetProperty("html").GetString()!;
             string title = snapshot.GetProperty("title").GetString()!;
             responseUri = new Uri(snapshot.GetProperty("url").GetString()!);
-            response = documentResponse ?? response;
+            string? documentUrl = snapshot.GetProperty("documentUrl").GetString();
+            if (TryGetAbsoluteUri(documentUrl, out Uri? documentUri)) {
+                committedResponses.TryGetValue(DocumentKey(documentUri!), out response);
+            } else {
+                response = string.IsNullOrEmpty(documentUrl)
+                    && (responseUri.Scheme == Uri.UriSchemeHttp || responseUri.Scheme == Uri.UriSchemeHttps)
+                    ? documentResponse ?? response : null;
+            }
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
+            SetRenderedResponseMetadata(page, response);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
             if (response != null && !response.Ok) {
                 page.Status = HtmlCrawlPageStatus.Failed;
@@ -182,6 +225,8 @@ public static partial class HtmlCrawler {
             page.Error = ex.Message;
         } finally {
             session.Page.Response -= captureDocumentResponse;
+            session.Page.FrameNavigated -= commitDocumentResponse;
+            session.Page.RequestFailed -= discardFailedResponse;
             page.Finished = DateTimeOffset.UtcNow;
         }
 
