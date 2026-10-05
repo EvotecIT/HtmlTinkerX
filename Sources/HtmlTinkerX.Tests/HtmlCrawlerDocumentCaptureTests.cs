@@ -30,6 +30,28 @@ public sealed class HtmlCrawlerDocumentCaptureTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_DocumentCaptureSkipsANonHttpReplacementWithoutEvaluatingIt() {
+        using var fixture = new CaptureFixture();
+        fixture.Options.Timeout = 100;
+        fixture.Page.Setup(value => value.EvaluateAsync<JsonElement>(It.IsAny<string>(), It.IsAny<object>()))
+            .Callback(() => fixture.Page.SetupGet(value => value.Url).Returns("about:blank"))
+            .ThrowsAsync(new PlaywrightException("Execution context was destroyed, most likely because of a navigation"));
+
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(CaptureFixture.Url, fixture.Options);
+
+        Assert.Empty(result.Pages);
+        HtmlCrawlPage page = Assert.Single(result.SkippedPages);
+        Assert.Equal(HtmlCrawlSkipReason.InvalidUrl, page.SkipReason);
+        Assert.Equal("about:blank", page.Url);
+        Assert.Null(page.ResponseUrl);
+        Assert.Null(page.EntityTag);
+        Assert.Null(page.LastModified);
+        Assert.Null(page.StatusCode);
+        Assert.Null(page.ContentType);
+        fixture.Page.Verify(value => value.EvaluateAsync<JsonElement>(It.IsAny<string>(), It.IsAny<object>()), Times.Once);
+    }
+
+    [Fact]
     public async Task CrawlAsync_DocumentCaptureDoesNotRetryAnUnrelatedScriptFailure() {
         using var fixture = new CaptureFixture();
         fixture.Page.Setup(page => page.EvaluateAsync<JsonElement>(It.IsAny<string>(), It.IsAny<object>()))

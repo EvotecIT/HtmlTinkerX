@@ -19,6 +19,12 @@ public static partial class HtmlCrawler {
         CancellationToken token = deadline.Token;
         try {
             while (true) {
+                token.ThrowIfCancellationRequested();
+                if (Uri.TryCreate(page.Url, UriKind.Absolute, out Uri? destination)
+                    && destination.Scheme != Uri.UriSchemeHttp && destination.Scheme != Uri.UriSchemeHttps) {
+                    // The crawl skips this committed destination; its DOM is no longer needed.
+                    return JsonSerializer.SerializeToElement(new { url = destination.AbsoluteUri, title = string.Empty, documentUrl = (string?)null, html = string.Empty });
+                }
                 try {
                     return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                         () => page.EvaluateAsync<JsonElement>(CaptureRenderedDocumentScript, options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden),
