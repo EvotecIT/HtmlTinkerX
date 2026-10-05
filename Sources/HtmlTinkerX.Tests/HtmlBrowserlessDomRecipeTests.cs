@@ -118,6 +118,17 @@ public class HtmlBrowserlessDomRecipeTests {
         Assert.Throws<JsonException>(() => HtmlBrowserlessExtraction.DeserializeRecipe(json));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Import_RejectsEnumsNestedInOpenGenericTypes(bool asDefault) {
+        string typeName = JsonSerializer.Serialize("enum:" + typeof(GenericContainer<>.State).FullName);
+        string definition = asDefault ? "\"defaultValue\":\"One\",\"defaultValueType\":" + typeName
+            : "\"dataType\":" + typeName;
+        string json = "{\"sourceKind\":\"Dom\",\"selector\":\"article\",\"domProperties\":{\"Value\":{\"selector\":\"b\"," + definition + "}}}";
+        Assert.Throws<JsonException>(() => HtmlBrowserlessExtraction.DeserializeRecipe(json));
+    }
+
     [Fact]
     public void Import_RejectsCaseCollisionsRatherThanOverwritingARecordField() {
         const string json = "{\"sourceKind\":\"Dom\",\"selector\":\"article\",\"domProperties\":{\"Name\":{\"selector\":\"b\"},\"name\":{\"selector\":\"span\"}}}";
@@ -162,4 +173,8 @@ public class HtmlBrowserlessDomRecipeTests {
             ["Name"] = new() { Selector = "span", Required = true },
             ["Price"] = new() { Selector = "b", DataType = typeof(decimal), Required = true, MaximumValueCount = 1 }
         }, new HtmlDomExtractionReportOptions { MinimumItemCount = 1, MaximumItemCount = 1 });
+
+    private sealed class GenericContainer<T> {
+        public enum State { One }
+    }
 }

@@ -60,7 +60,7 @@ internal sealed class HtmlDomRecipeFieldConverter : JsonConverter<HtmlDomFieldDe
             }
             Type[] candidates = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(assembly => assembly.GetType(fullName, throwOnError: false))
-                .Where(type => type?.IsEnum == true).Cast<Type>().Distinct().ToArray();
+                .Where(type => type?.IsEnum == true && !type.IsGenericType).Cast<Type>().Distinct().ToArray();
             if (candidates.Length == 1) {
                 return candidates[0];
             }
