@@ -42,7 +42,7 @@ public static partial class HtmlCrawler {
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = (int)response.StatusCode;
             page.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
-            SetResponseMetadata(page, responseUri.AbsoluteUri,
+            SetResponseMetadata(page, responseUri.GetLeftPart(UriPartial.Query),
                 response.Headers.TryGetValues("ETag", out IEnumerable<string>? tags) ? string.Join(", ", tags) : null,
                 response.Content.Headers.TryGetValues("Last-Modified", out IEnumerable<string>? dates) ? string.Join(", ", dates) : null);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };

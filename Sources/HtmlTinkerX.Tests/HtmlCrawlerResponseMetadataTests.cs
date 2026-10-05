@@ -20,7 +20,7 @@ public partial class HtmlCrawlerTests {
         using HttpListener server = StartFlexibleServer(async context => {
             if (context.Request.Url!.AbsolutePath == "/source") {
                 context.Response.StatusCode = 302;
-                context.Response.RedirectLocation = "/document?utm_source=one&version=2";
+                context.Response.RedirectLocation = "/document?utm_source=one&version=2#section";
                 context.Response.Headers["ETag"] = "\"redirect\"";
                 return;
             }
