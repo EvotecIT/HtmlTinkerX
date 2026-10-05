@@ -54,13 +54,13 @@ public sealed class HtmlCrawlPage {
     /// <summary>Last-Modified response date returned for the document, when valid and available.</summary>
     public DateTimeOffset? LastModified { get; set; }
 
-    /// <summary>SHA-256 of the static HTTP response body bytes, when available.</summary>
+    /// <summary>SHA-256 of the downloaded static HTTP body bytes, retained when that body is revalidated.</summary>
     public string? ResponseContentHash { get; set; }
 
     /// <summary>Whether this run reused a stored HTTP body after a 304 response.</summary>
     public bool ResponseRevalidated { get; set; }
 
-    /// <summary>Whether the static HTTP response body differs from the previous refresh record; null when no comparable body is available.</summary>
+    /// <summary>Whether the static response changed relative to the previous refresh record. Full responses compare body bytes; successful revalidation reports false. Null when no comparison is available.</summary>
     public bool? ResponseChanged { get; set; }
 
     [JsonInclude]

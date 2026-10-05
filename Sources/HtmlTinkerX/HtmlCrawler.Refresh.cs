@@ -70,7 +70,8 @@ public static partial class HtmlCrawler {
         requestHeaders != null && !response.Headers.Contains("Set-Cookie")
         && (!response.Headers.Contains("Cache-Control") || response.Headers.CacheControl != null)
         && response.Headers.CacheControl?.NoStore != true
-        && response.Headers.Vary.All(name => CacheHeaderNames.Contains(name));
+        && (!response.Headers.TryGetValues("Vary", out IEnumerable<string>? vary)
+            || vary.SelectMany(value => value.Split(',')).All(name => CacheHeaderNames.Contains(name.Trim())));
 
     private static string ComputeResponseHash(byte[] bytes) {
         using SHA256 hash = SHA256.Create();
