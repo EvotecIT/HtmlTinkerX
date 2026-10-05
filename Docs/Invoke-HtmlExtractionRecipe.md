@@ -11,12 +11,12 @@ Executes a browserless extraction recipe.
 ## SYNTAX
 ### Recipe (Default)
 ```powershell
-Invoke-HtmlExtractionRecipe [-Recipe] <HtmlBrowserlessExtractionRecipe> [-AllowHttpFetch] [-AllowMediumRiskEndpoint] [-AllowExternalEndpoint] [-IncludeRawContent] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Invoke-HtmlExtractionRecipe [-Recipe] <HtmlBrowserlessExtractionRecipe> [-Content <string>] [-AllowHttpFetch] [-AllowMediumRiskEndpoint] [-AllowExternalEndpoint] [-IncludeRawContent] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Invoke-HtmlExtractionRecipe [-Path] <string> [-AllowHttpFetch] [-AllowMediumRiskEndpoint] [-AllowExternalEndpoint] [-IncludeRawContent] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Invoke-HtmlExtractionRecipe [-Path] <string> [-Content <string>] [-AllowHttpFetch] [-AllowMediumRiskEndpoint] [-AllowExternalEndpoint] [-IncludeRawContent] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -27,6 +27,14 @@ Executes a browserless extraction recipe.
 ### EXAMPLE 1
 ```powershell
 Invoke-HtmlExtractionRecipe -Path .\recipe.json -AllowHttpFetch
+```
+
+
+### EXAMPLE 2
+```powershell
+$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html
+$result.Success
+$result.DomReport.Fields
 ```
 
 
@@ -69,6 +77,22 @@ Allows medium-risk endpoint recipes when HTTP fetch is enabled.
 
 ```yaml
 Type: SwitchParameter
+Parameter Sets: Recipe, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Content
+Current HTML to evaluate with a DOM recipe. DOM recipes require Content and perform no HTTP fetch.
+
+```yaml
+Type: String
 Parameter Sets: Recipe, Path
 Aliases: None
 Possible values:

@@ -13,7 +13,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Browserless-first discovery, extraction, and recipe helpers built on the existing HtmlTinkerX parsers.
 /// </summary>
-public static class HtmlBrowserlessExtraction {
+public static partial class HtmlBrowserlessExtraction {
     private static readonly string[] DirectDataKinds = {
         "JsonLd",
         "AppState",
@@ -153,6 +153,7 @@ public static class HtmlBrowserlessExtraction {
             throw new ArgumentNullException(nameof(recipe));
         }
 
+        ValidateDomRecipe(recipe);
         return JsonSerializer.Serialize(recipe, CreateJsonSerializerOptions());
     }
 
@@ -164,8 +165,10 @@ public static class HtmlBrowserlessExtraction {
             throw new ArgumentException("Recipe JSON cannot be empty.", nameof(json));
         }
 
-        return JsonSerializer.Deserialize<HtmlBrowserlessExtractionRecipe>(json, CreateJsonSerializerOptions())
+        HtmlBrowserlessExtractionRecipe recipe = JsonSerializer.Deserialize<HtmlBrowserlessExtractionRecipe>(json, CreateJsonSerializerOptions())
             ?? throw new InvalidDataException("Recipe JSON did not contain a browserless extraction recipe.");
+        ValidateDomRecipe(recipe);
+        return recipe;
     }
 
     /// <summary>
@@ -180,6 +183,9 @@ public static class HtmlBrowserlessExtraction {
             throw new ArgumentNullException(nameof(recipe));
         }
 
+        if (IsDomRecipe(recipe)) {
+            throw new ArgumentException("DOM recipes require current HTML. Use ExtractDomRecipe with the HTML to evaluate.", nameof(recipe));
+        }
         HtmlBrowserlessDataSource source = CreateSourceFromRecipe(recipe);
         return ExtractAsync(source, options, client, cancellationToken);
     }
@@ -653,6 +659,7 @@ public static class HtmlBrowserlessExtraction {
     private static HtmlBrowserlessDataSource CreateSourceFromRecipe(HtmlBrowserlessExtractionRecipe recipe) {
         bool isEndpoint = recipe.SourceKind.Equals("ApiEndpoint", StringComparison.OrdinalIgnoreCase)
             || recipe.SourceKind.Equals("ObservedApiEndpoint", StringComparison.OrdinalIgnoreCase);
+        bool isDom = IsDomRecipe(recipe);
         bool hasRawContent = !string.IsNullOrWhiteSpace(recipe.RawContent);
         return new HtmlBrowserlessDataSource {
             Kind = recipe.SourceKind,
@@ -670,9 +677,9 @@ public static class HtmlBrowserlessExtraction {
             Selector = recipe.Selector,
             RawContent = recipe.RawContent,
             RequiresHttpFetch = isEndpoint && !hasRawContent,
-            CanExtractDirectly = isEndpoint || hasRawContent,
+            CanExtractDirectly = isEndpoint || hasRawContent || isDom,
             Evidence = new[] { "Source recreated from browserless extraction recipe." },
-            Warnings = isEndpoint || hasRawContent
+            Warnings = isEndpoint || hasRawContent || isDom
                 ? Array.Empty<string>()
                 : new[] { "Static recipes require RawContent or rediscovery from the original page." }
         };
@@ -683,12 +690,15 @@ public static class HtmlBrowserlessExtraction {
         return trimmed.StartsWith("{", StringComparison.Ordinal) || trimmed.StartsWith("[", StringComparison.Ordinal);
     }
 
-    private static JsonSerializerOptions CreateJsonSerializerOptions() =>
-        new() {
+    private static JsonSerializerOptions CreateJsonSerializerOptions() {
+        JsonSerializerOptions options = new() {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
             WriteIndented = true
         };
+        options.Converters.Add(new HtmlDomRecipeFieldConverter());
+        return options;
+    }
 
     private static IReadOnlyList<string> Combine(IReadOnlyList<string> source, string value) =>
         source.Concat(new[] { value }).ToArray();
