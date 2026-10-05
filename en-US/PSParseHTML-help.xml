@@ -30738,6 +30738,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <maml:name>MaxConcurrentPageRequests</maml:name>
           <maml:description>
             <maml:para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</maml:para>
+            <maml:para>CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -31925,6 +31926,7 @@ Pipeline output does not acknowledge completion of downstream processing. Export
         <maml:name>MaxConcurrentPageRequests</maml:name>
         <maml:description>
           <maml:para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</maml:para>
+          <maml:para>CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>

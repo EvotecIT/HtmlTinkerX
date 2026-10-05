@@ -50,6 +50,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
 
     /// <summary>Maximum concurrent static page downloads. Requires Render, AutoRender and AutoProfile to be disabled.</summary>
     /// <para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</para>
+    /// <para>CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.</para>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
     public int MaxConcurrentPageRequests { get; set; } = 1;

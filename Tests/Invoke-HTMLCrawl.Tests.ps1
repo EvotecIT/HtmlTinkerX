@@ -24,6 +24,10 @@ Describe 'Invoke-HTMLCrawl' {
         { Invoke-HtmlCrawl -Url 'https://example.test/' -MaxConcurrentPageRequests 2 -Render -ErrorAction Stop } | Should -Throw '*static mode*'
     }
 
+    It 'rejects concurrent response caching through the public command' {
+        { Invoke-HtmlCrawl -Url 'https://example.test/' -MaxConcurrentPageRequests 2 -CacheResponses -ErrorAction Stop } | Should -Throw '*ordered cookie state*'
+    }
+
     BeforeAll {
         if (-not ('PesterTestHttpServer' -as [type])) {
             Add-Type -TypeDefinition @"

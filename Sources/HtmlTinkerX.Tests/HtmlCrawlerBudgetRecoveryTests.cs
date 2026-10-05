@@ -60,7 +60,7 @@ public partial class HtmlCrawlerTests {
             Type requestType = crawler.GetNestedType("CrawlRequest", BindingFlags.NonPublic)!;
             object request = Activator.CreateInstance(requestType, nonPublic: true)!;
             requestType.GetProperty("Uri")!.SetValue(request, uri);
-            arguments = new object?[] { client, request, options, new Dictionary<string, HtmlCrawlJsonSchemaField>(), cancellationToken, null };
+            arguments = new object?[] { client, request, options, new Dictionary<string, HtmlCrawlJsonSchemaField>(), cancellationToken, null, false };
         } else {
             Type robotsType = crawler.GetNestedType("RobotsDocument", BindingFlags.NonPublic)!;
             object robotsCache = Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(typeof(string), robotsType))!;

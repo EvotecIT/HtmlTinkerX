@@ -896,6 +896,8 @@ Accept wildcard characters: False
 ### -MaxConcurrentPageRequests
 The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.
 
+CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.
+
 ```yaml
 Type: Int32
 Parameter Sets: __AllParameterSets

@@ -41,6 +41,7 @@ public sealed class HtmlCrawlOptions {
     /// Extraction and checkpoint publication remain in discovery order. Parallel downloading requires static mode
     /// without Render, AutoRender or AutoProfile. Prefetched requests count toward MaxPages even if an earlier page later makes
     /// their URL redundant. Keep one for sites whose requests depend on preceding cookie or session changes.
+    /// Response caching and RefreshPath require one so cache decisions follow ordered cookie state.
     /// </remarks>
     public int MaxConcurrentPageRequests { get; set; } = 1;
 

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -120,5 +121,17 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(2, Volatile.Read(ref children));
         Assert.Equal(0, Volatile.Read(ref unusedRequests));
         Assert.Contains(result.PendingPages, page => page.Url.EndsWith("/unused", StringComparison.Ordinal));
+        string output = Path.Combine(Path.GetTempPath(), "HtmlCrawlerConcurrencyResume", Guid.NewGuid().ToString("N"));
+        try {
+            await HtmlCrawler.SaveResultAsync(result, output);
+            HtmlCrawlOptions resume = options.Clone();
+            resume.ResumePath = output;
+            HtmlCrawlResult resumed = await HtmlCrawler.CrawlAsync(server.Url, resume);
+            Assert.Equal(0, Volatile.Read(ref unusedRequests));
+            Assert.Equal(2, resumed.Pages.Count);
+            Assert.Contains(resumed.PendingPages, page => page.Url.EndsWith("/unused", StringComparison.Ordinal));
+        } finally {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
     }
 }

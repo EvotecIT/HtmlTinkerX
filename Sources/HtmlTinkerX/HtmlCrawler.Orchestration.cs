@@ -212,12 +212,21 @@ public static partial class HtmlCrawler {
                 }
                 CrawlRequest next = pending.Dequeue();
                 string normalizedUrl = NormalizeUrl(next.Uri, resolvedOptions);
-                Task<FetchedPageData>? prefetched = null;
-                prefetchWindow?.TryTake(normalizedUrl, out prefetched);
                 if (!visited.Add(normalizedUrl)) {
-                    if (prefetched != null) {
+                    if (prefetchWindow != null && prefetchWindow.TryTake(normalizedUrl, out Task<FetchedPageData>? duplicateDownload)) {
                         fetchedCount++;
-                        await prefetched.ConfigureAwait(false);
+                        HtmlCrawlPage duplicate = (await duplicateDownload!.ConfigureAwait(false)).Page;
+                        ApplyRunMetadata(duplicate, result);
+                        if (duplicate.Status == HtmlCrawlPageStatus.Failed) {
+                            result.Pages.Add(duplicate);
+                        } else {
+                            duplicate.Status = HtmlCrawlPageStatus.Skipped;
+                            duplicate.SkipReason = HtmlCrawlSkipReason.Duplicate;
+                            duplicate.Error = "The URL was visited while its download was in progress.";
+                            duplicate.HttpCache = null;
+                            result.SkippedPages.Add(duplicate);
+                        }
+                        if (persistSnapshots) await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                     }
                     continue;
                 }
@@ -248,6 +257,8 @@ public static partial class HtmlCrawler {
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
                     refreshPages.TryGetValue(next.Uri.AbsoluteUri, out HtmlCrawlPage? cachedPage);
+                    Task<FetchedPageData>? prefetched = null;
+                    prefetchWindow?.TryTake(normalizedUrl, out prefetched);
                     fetchedPage = prefetched == null
                         ? await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken, cachedPage).ConfigureAwait(false)
                         : await prefetched.ConfigureAwait(false);
@@ -387,6 +398,9 @@ public static partial class HtmlCrawler {
         }
         if (options.MaxConcurrentPageRequests > 1 && (options.Render || options.AutoRender || options.AutoProfile)) {
             throw new ArgumentException("Concurrent page downloads require static mode without Render, AutoRender or AutoProfile.", nameof(options.MaxConcurrentPageRequests));
+        }
+        if (options.MaxConcurrentPageRequests > 1 && (options.CacheResponses || !string.IsNullOrWhiteSpace(options.RefreshPath))) {
+            throw new ArgumentException("Response caching and refresh require MaxConcurrentPageRequests to be one so cache decisions use ordered cookie state.", nameof(options.MaxConcurrentPageRequests));
         }
         if (options.MaximumPageResponseBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.MaximumPageResponseBytes), "MaximumPageResponseBytes must be greater than zero.");
