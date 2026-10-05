@@ -88,7 +88,14 @@ public static partial class HtmlCrawler {
         }
         foreach (HtmlCrawlPage page in previous.Pages.Concat(previous.SkippedPages)) {
             token.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(page.RequestedUrl)) pages[page.RequestedUrl!] = page;
+            if (string.IsNullOrWhiteSpace(page.RequestedUrl)) continue;
+            // A discovery skip can share a URL with a fetched seed. Preserve the
+            // stored body or fingerprint instead of replacing it with that skip.
+            if (!pages.TryGetValue(page.RequestedUrl!, out HtmlCrawlPage? existing)
+                || (existing.HttpCache == null && (page.HttpCache != null
+                    || (string.IsNullOrEmpty(existing.ResponseContentHash) && !string.IsNullOrEmpty(page.ResponseContentHash))))) {
+                pages[page.RequestedUrl!] = page;
+            }
         }
         return pages;
     }

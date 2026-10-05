@@ -9,6 +9,46 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CrawlAsync_RefreshPreservesFetchedResponsesWhenDiscoverySkipsTheSameUrl(bool pathRestricted) {
+        string source = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        int rootDownloads = 0;
+        using HttpListener server = StartFlexibleServer(async context => {
+            bool seed = context.Request.Url!.AbsolutePath == "/";
+            string tag = seed ? "\"root\"" : "\"child\"";
+            context.Response.Headers["ETag"] = tag;
+            if (context.Request.Headers["If-None-Match"] == tag) context.Response.StatusCode = 304;
+            else {
+                if (seed) rootDownloads++;
+                await RespondAsync(context, seed ? "<main>Root body</main><a href='/'></a><a href='/docs/page'></a>"
+                    : "<main>Child body</main><a href='/'></a>");
+            }
+        }, out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(2);
+            options.CacheResponses = true;
+            options.OutputPath = source;
+            if (pathRestricted) options.PathPrefix = "/docs";
+            else options.IncludePatterns.Add("*docs*");
+            HtmlCrawlResult initial = await HtmlCrawler.CrawlAsync(root, options);
+            Assert.Contains(initial.SkippedPages, page => page.RequestedUrl == root && page.ResponseContentHash == null);
+            options.RefreshPath = source;
+            options.OutputPath = null;
+            HtmlCrawlResult refreshed = await HtmlCrawler.CrawlAsync(root, options);
+            Assert.Equal(2, refreshed.Pages.Count);
+            Assert.All(refreshed.Pages, page => {
+                Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+                Assert.True(page.ResponseRevalidated);
+                Assert.False(page.ResponseChanged);
+            });
+            Assert.Equal(1, rootDownloads);
+        } finally {
+            if (Directory.Exists(source)) Directory.Delete(source, true);
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_RefreshLoadsOriginalBodiesFromAnInterruptedCheckpoint() {
         string source = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
