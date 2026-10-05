@@ -492,7 +492,8 @@ public static partial class HtmlBrowser {
     private static async Task<HtmlBrowserSession> CreatePageAsync(
         string url,
         HtmlBrowserLaunchOptions options,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        bool skipInitialNavigation = false) {
         if (!string.IsNullOrWhiteSpace(options.UserDataDirectory) && !string.IsNullOrWhiteSpace(options.StorageStatePath)) {
             throw new ArgumentException("Use either UserDataDirectory for a persistent profile or StorageStatePath for imported context state, not both.");
         }
@@ -597,7 +598,7 @@ public static partial class HtmlBrowser {
                 AbortOwnershipAsync,
                 cancellationToken).ConfigureAwait(false);
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                () => NavigateAsync(page!, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken),
+                () => NavigateAsync(page!, url, options.FormLogin, options.Username, options.Password, options.LoadState, options.Timeout, cancellationToken, skipInitialNavigation),
                 AbortOwnershipAsync,
                 cancellationToken).ConfigureAwait(false);
             if (options.ManualLogin) {
@@ -665,6 +666,10 @@ public static partial class HtmlBrowser {
         || options.GeoLongitude.HasValue
         || !string.IsNullOrWhiteSpace(options.Timezone)
         || options.Permissions.Count > 0;
+
+    /// <summary>Creates a session for installing routes before its first destination. Configured form login still runs.</summary>
+    internal static Task<HtmlBrowserSession> OpenSessionForNavigationAsync(HtmlBrowserLaunchOptions options, CancellationToken cancellationToken) =>
+        CreatePageAsync("about:blank", options, cancellationToken, skipInitialNavigation: true);
 
     /// <summary>
     /// Creates a new <see cref="HtmlBrowserSession"/> using reusable launch options and navigates to the specified URL.

@@ -18,7 +18,7 @@ public static partial class HtmlCrawler {
             && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             headers["Authorization"] = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"));
         }
-        HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", new HtmlBrowserLaunchOptions {
+        HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions {
             Browser = options.Browser, Clean = options.CleanBrowserInstall, Headless = options.Headless,
             Username = imported || (options.FormLogin == null && options.Browser == HtmlBrowserEngine.Chromium) ? null : options.Username,
             Password = imported || (options.FormLogin == null && options.Browser == HtmlBrowserEngine.Chromium) ? null : options.Password,
