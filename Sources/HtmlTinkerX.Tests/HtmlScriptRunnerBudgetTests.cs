@@ -128,7 +128,8 @@ public class HtmlScriptRunnerBudgetTests {
     public async Task RunAsync_InlineAndRequestedScriptShareOneOperationDeadline() {
         const string work = "var until = Date.now() + 100; while (Date.now() < until) {}";
         var options = new HtmlScriptRunOptions {
-            ExecutionTimeout = TimeSpan.FromMilliseconds(150), MaximumStatements = int.MaxValue
+            ExecutionTimeout = TimeSpan.FromMilliseconds(150), MaximumStatements = int.MaxValue,
+            MaximumMemoryBytes = long.MaxValue
         };
 
         await Assert.ThrowsAsync<TimeoutException>(() => HtmlScriptRunner.RunAsync<object>(
