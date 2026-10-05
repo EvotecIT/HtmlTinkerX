@@ -39,6 +39,9 @@ jobs:
       - name: Setup PowerShell modules
         shell: pwsh
         run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -ErrorAction Stop
+          }
           Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
 
       - name: Refresh module manifest
@@ -108,6 +111,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -ErrorAction Stop
+          }
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
 
@@ -147,6 +153,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -ErrorAction Stop
+          }
           Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
@@ -204,6 +213,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -ErrorAction Stop
+          }
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
 
@@ -255,6 +267,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -ErrorAction Stop
+          }
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
 
