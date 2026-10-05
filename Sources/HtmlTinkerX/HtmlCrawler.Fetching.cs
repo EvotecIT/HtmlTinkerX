@@ -99,9 +99,14 @@ public static partial class HtmlCrawler {
         long networkLogStart = session.NetworkLogPosition;
         IResponse? documentResponse = null;
         IResponse? pendingDocumentResponse = null;
+        Dictionary<string, IResponse> committedResponses = new(StringComparer.Ordinal);
+        string DocumentKey(Uri uri) => uri.GetLeftPart(UriPartial.Query);
         EventHandler<IResponse> captureDocumentResponse = (_, response) => {
-            if (!response.Request.IsNavigationRequest || !ReferenceEquals(response.Frame, session.Page.MainFrame)
-                || response.Status == 204 || response.Status == 205) return;
+            if (!response.Request.IsNavigationRequest || !ReferenceEquals(response.Frame, session.Page.MainFrame)) return;
+            pendingDocumentResponse = null;
+            if (response.Status == 204 || response.Status == 205) return;
+            if ((response.Status == 301 || response.Status == 302 || response.Status == 303 || response.Status == 307 || response.Status == 308)
+                && response.Headers.TryGetValue("location", out string? location) && !string.IsNullOrWhiteSpace(location)) return;
             response.Headers.TryGetValue("content-disposition", out string? disposition);
             if (ContentDispositionHeaderValue.TryParse(disposition, out ContentDispositionHeaderValue? parsed)
                 && string.Equals(parsed.DispositionType, "attachment", StringComparison.OrdinalIgnoreCase)) return;
@@ -111,8 +116,9 @@ public static partial class HtmlCrawler {
             if (pendingDocumentResponse != null && ReferenceEquals(frame, session.Page.MainFrame)
                 && TryGetAbsoluteUri(frame.Url, out Uri? frameUri)
                 && TryGetAbsoluteUri(pendingDocumentResponse.Url, out Uri? pendingUri)
-                && string.Equals(frameUri!.GetLeftPart(UriPartial.Query), pendingUri!.GetLeftPart(UriPartial.Query), StringComparison.Ordinal)) {
+                && string.Equals(DocumentKey(frameUri!), DocumentKey(pendingUri!), StringComparison.Ordinal)) {
                 documentResponse = pendingDocumentResponse;
+                committedResponses[DocumentKey(pendingUri!)] = pendingDocumentResponse;
                 pendingDocumentResponse = null;
             }
         };
@@ -129,6 +135,9 @@ public static partial class HtmlCrawler {
                 WaitUntil = WaitUntilState.NetworkIdle
             }).ConfigureAwait(false);
             documentResponse ??= response;
+            if (response != null && TryGetAbsoluteUri(response.Url, out Uri? initialResponseUri)) {
+                committedResponses[DocumentKey(initialResponseUri!)] = response;
+            }
 
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);
@@ -164,12 +173,17 @@ public static partial class HtmlCrawler {
 
             // Capture the DOM, URL and title together: interactions and delayed scripts can navigate.
             JsonElement snapshot = await session.Page.EvaluateAsync<JsonElement>("() => ({ url: location.href, title: document.title, "
+                + "documentUrl: performance.getEntriesByType('navigation')[0]?.name ?? null, "
                 + "html: (document.doctype ? new XMLSerializer().serializeToString(document.doctype) : '') + document.documentElement.outerHTML })").ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             string fullHtml = snapshot.GetProperty("html").GetString()!;
             string title = snapshot.GetProperty("title").GetString()!;
             responseUri = new Uri(snapshot.GetProperty("url").GetString()!);
-            response = documentResponse ?? response;
+            if (TryGetAbsoluteUri(snapshot.GetProperty("documentUrl").GetString(), out Uri? documentUri)) {
+                committedResponses.TryGetValue(DocumentKey(documentUri!), out response);
+            } else {
+                response = documentResponse ?? response;
+            }
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = response?.Status;
             page.ContentType = TryGetResponseContentType(response);

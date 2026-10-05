@@ -247,4 +247,61 @@ public partial class HtmlCrawlerTests {
             if (Directory.Exists(output)) Directory.Delete(output, true);
         }
     }
+
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium)]
+    [InlineData(HtmlBrowserEngine.Firefox)]
+    [InlineData(HtmlBrowserEngine.WebKit)]
+    public async Task CrawlAsync_RenderedRedirectToNoContentCannotBecomeAHistoryDocument(HtmlBrowserEngine browser) {
+        using HttpListener server = StartFlexibleServer(async context => {
+            string path = context.Request.Url!.AbsolutePath;
+            context.Response.Headers["ETag"] = path == "/" ? "\"initial\"" : "\"other\"";
+            if (path == "/redirect") {
+                context.Response.StatusCode = 302;
+                context.Response.RedirectLocation = "/no-content";
+            } else if (path == "/no-content") {
+                context.Response.StatusCode = 204;
+            } else {
+                await RespondAsync(context, "<main>Initial document</main><a id='continue' href='/redirect'>Continue</a>"
+                    + "<button id='history' onclick=\"history.pushState({}, '', '/redirect')\">History</button>");
+            }
+        }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.Render = true;
+        options.Browser = browser;
+        options.ClickSelectors.Add("#continue");
+        options.ClickSelectors.Add("#history");
+        HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+        Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+        Assert.Equal(root + "redirect", page.Url);
+        Assert.Equal(root, page.ResponseUrl);
+        Assert.Equal("\"initial\"", page.EntityTag);
+        Assert.Equal(200, page.StatusCode);
+        Assert.Contains("Initial document", page.Text);
+    }
+
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium)]
+    [InlineData(HtmlBrowserEngine.Firefox)]
+    [InlineData(HtmlBrowserEngine.WebKit)]
+    public async Task CrawlAsync_RenderedInitialRedirectRetainsTheFinalDocumentResponseValidators(HtmlBrowserEngine browser) {
+        using HttpListener server = StartFlexibleServer(async context => {
+            if (context.Request.Url!.AbsolutePath == "/") {
+                context.Response.StatusCode = 302;
+                context.Response.RedirectLocation = "/document?version=two#section";
+                context.Response.Headers["ETag"] = "\"redirect\"";
+            } else {
+                context.Response.Headers["ETag"] = "\"final\"";
+                await RespondAsync(context, "<main>Final document</main>");
+            }
+        }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.Render = true;
+        options.Browser = browser;
+        HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+        Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+        Assert.Equal(root + "document?version=two", page.ResponseUrl);
+        Assert.Equal("\"final\"", page.EntityTag);
+        Assert.Equal(200, page.StatusCode);
+    }
 }

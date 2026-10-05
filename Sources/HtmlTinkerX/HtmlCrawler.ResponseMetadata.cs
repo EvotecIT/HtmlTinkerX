@@ -7,6 +7,9 @@ namespace HtmlTinkerX;
 
 public static partial class HtmlCrawler {
     private static void SetRenderedResponseMetadata(HtmlCrawlPage page, IResponse? response) {
+        page.ResponseUrl = null;
+        page.EntityTag = null;
+        page.LastModified = null;
         if (response != null) {
             response.Headers.TryGetValue("etag", out string? tag);
             response.Headers.TryGetValue("last-modified", out string? date);
