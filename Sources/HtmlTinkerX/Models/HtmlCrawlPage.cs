@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace HtmlTinkerX;
 
@@ -52,6 +53,19 @@ public sealed class HtmlCrawlPage {
 
     /// <summary>Last-Modified response date returned for the document, when valid and available.</summary>
     public DateTimeOffset? LastModified { get; set; }
+
+    /// <summary>SHA-256 of the static HTTP response body bytes, when available.</summary>
+    public string? ResponseContentHash { get; set; }
+
+    /// <summary>Whether this run reused a stored HTTP body after a 304 response.</summary>
+    public bool ResponseRevalidated { get; set; }
+
+    /// <summary>Whether the static HTTP response body differs from the previous refresh record; null when no comparable body is available.</summary>
+    public bool? ResponseChanged { get; set; }
+
+    [JsonInclude]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    internal HtmlCrawlHttpCacheEntry? HttpCache { get; set; }
 
     /// <summary>Page title when available.</summary>
     public string? Title { get; set; }

@@ -22,7 +22,7 @@ using System.Xml.Linq;
 namespace HtmlTinkerX;
 
 public static partial class HtmlCrawler {
-    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken) {
+    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken, HtmlCrawlPage? cachedPage = null) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -37,7 +37,8 @@ public static partial class HtmlCrawler {
         try {
             using CancellationTokenSource requestTimeout = HtmlUtilities.CreateRequestTimeoutTokenSource(client, cancellationToken);
             CancellationToken requestToken = requestTimeout.Token;
-            using HttpResponseMessage response = await client.GetAsync(request.Uri, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
+            using CrawlHttpRequest message = new(request.Uri, cachedPage);
+            using HttpResponseMessage response = await SendPageRequestAsync(client, message, requestToken).ConfigureAwait(false);
             Uri responseUri = response.RequestMessage?.RequestUri ?? request.Uri;
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = (int)response.StatusCode;
@@ -46,10 +47,26 @@ public static partial class HtmlCrawler {
                 response.Headers.TryGetValues("ETag", out IEnumerable<string>? tags) ? string.Join(", ", tags) : null,
                 response.Content.Headers.TryGetValues("Last-Modified", out IEnumerable<string>? dates) ? string.Join(", ", dates) : null);
             if (TrySkipFinalPageDestination(page, request.Uri, responseUri, options)) return new FetchedPageData { Page = page };
-            response.EnsureSuccessStatusCode();
-
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
-            string html = HtmlUtilities.DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
+            string html;
+            int byteLength;
+            if (CanReuseValidatedResponse(message, response)) {
+                html = cachedPage!.HttpCache!.Html;
+                byteLength = cachedPage.HttpCache.ByteLength;
+                page.ContentType ??= cachedPage.ContentType;
+                page.EntityTag ??= cachedPage.EntityTag;
+                page.LastModified ??= cachedPage.LastModified;
+                page.ResponseContentHash = cachedPage.ResponseContentHash;
+                page.ResponseRevalidated = true;
+                page.ResponseChanged = false;
+            } else {
+                response.EnsureSuccessStatusCode();
+                byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
+                byteLength = bytes.Length;
+                html = HtmlUtilities.DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
+                page.ResponseContentHash = ComputeResponseHash(bytes);
+                page.ResponseChanged = string.IsNullOrEmpty(cachedPage?.ResponseContentHash) ? null
+                    : !string.Equals(page.ResponseContentHash, cachedPage.ResponseContentHash, StringComparison.Ordinal);
+            }
             if (!IsAllowedPageContent(page.ContentType, html, options)) {
                 page.Status = HtmlCrawlPageStatus.Skipped;
                 page.SkipReason = HtmlCrawlSkipReason.UnsupportedContentType;
@@ -61,6 +78,12 @@ public static partial class HtmlCrawler {
             }
 
             PopulatePageFromHtml(page, html, responseUri, options, structuredSchema);
+            if (options.CacheResponses && (response.StatusCode == HttpStatusCode.OK || page.ResponseRevalidated)
+                && CanStoreResponse(response, message.CacheRequestHeaders)) {
+                page.HttpCache = new HtmlCrawlHttpCacheEntry {
+                    Html = html, ByteLength = byteLength, RequestHeaders = message.CacheRequestHeaders!
+                };
+            }
             return new FetchedPageData {
                 Page = page,
                 RawHtml = html

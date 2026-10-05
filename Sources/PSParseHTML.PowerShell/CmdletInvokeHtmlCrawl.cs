@@ -117,6 +117,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [Parameter]
     public string? ResumePath { get; set; }
 
+    /// <summary>Saved crawl to revisit using eligible static HTTP response validators.</summary>
+    [Parameter]
+    public string? RefreshPath { get; set; }
+
+    /// <summary>Retains eligible original HTTP HTML in the manifest for subsequent refreshes.</summary>
+    [Parameter]
+    public SwitchParameter CacheResponses { get; set; }
+
     /// <summary>Optional built-in crawl profile name used to preconfigure crawl behavior.</summary>
     [Parameter]
     public string? Profile { get; set; }
@@ -419,6 +427,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutPath?.ToFullPath(),
             ResumePath = ResumePath?.ToFullPath(),
+            RefreshPath = RefreshPath?.ToFullPath(),
+            CacheResponses = CacheResponses.IsPresent,
             ProfileName = Profile,
             ProfilePath = ProfilePath?.ToFullPath(),
             AutoProfile = AutoProfile.IsPresent,
