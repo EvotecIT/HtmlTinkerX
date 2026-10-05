@@ -81,7 +81,7 @@ public sealed class PesterPageStreamServer : IDisposable {
             $pages[0].Text | Should -Match 'Home'
             $pages[0].Markdown | Should -Match 'Home'
             $pages[1].Status.ToString() | Should -Be 'Failed'
-            $saved = [HtmlTinkerX.HtmlCrawler]::LoadResultAsync($outputPath).GetAwaiter().GetResult()
+            $saved = Get-Content -LiteralPath (Join-Path $outputPath 'crawl-result.json') -Raw | ConvertFrom-Json
             $saved.Pages[0].Text | Should -Match 'Home'
         } finally { $server.Dispose() }
     }
