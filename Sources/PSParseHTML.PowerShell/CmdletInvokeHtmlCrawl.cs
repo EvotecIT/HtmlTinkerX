@@ -29,7 +29,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Writes each newly fetched page to the pipeline instead of returning the final crawl result.
-    /// Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.</summary>
+    /// Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.
+    /// Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</summary>
     [Parameter]
     public SwitchParameter StreamPages { get; set; }
 

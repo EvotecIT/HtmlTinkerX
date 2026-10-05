@@ -1281,6 +1281,24 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -StreamPages
+Writes each newly fetched page to the pipeline instead of returning the final crawl result.
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.
+Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -StructuredJsonPreset
 Optional built-in structured JSON preset used to flatten common page types.
 
