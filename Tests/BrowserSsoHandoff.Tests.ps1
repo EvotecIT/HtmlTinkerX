@@ -172,6 +172,7 @@ Describe 'Browser SSO handoff inspection' {
         $handoff[0].Kind | Should -Be 'OAuth2'
         $handoff[0].FormSelector | Should -Be 'location'
         $handoff[0].Method | Should -Be 'GET'
+        $handoff[0].Action | Should -Be ([System.Uri]::new($pagePath).AbsoluteUri)
         $handoff[0].PageUrl | Should -Not -Match 'secret-auth-code'
         $handoff[0].PageUrl | Should -Not -Match 'secret-state'
         $handoff[0].FormData['code'] | Should -Be '<redacted>'
@@ -203,12 +204,45 @@ Describe 'Browser SSO handoff inspection' {
         $handoff[0].FormData['accessToken'] | Should -Be '<redacted>'
         $handoff[0].FormData['sessionState'] | Should -Be '<redacted>'
         $handoff[0].FormData['idToken'] | Should -Be '<redacted>'
+        $handoff[0].Action | Should -Be ([System.Uri]::new($pagePath).AbsoluteUri)
 
         $analysis = @(Get-HtmlBrowserSsoHandoff -Url $callbackUrl -Analyze -LoadState DomContentLoaded)
         $analysis.Count | Should -Be 1
         $analysis[0].ContainsRedactedValues | Should -BeTrue
         $analysis[0].HasProtocolArtifact | Should -BeTrue
         ($analysis[0] | ConvertTo-Json -Depth 10) | Should -Not -Match 'access-secret|session-secret|id-secret'
+    }
+
+    It 'preserves safe URL handoffs over <Scheme>' -TestCases @(
+        @{ Scheme = 'http' }
+        @{ Scheme = 'https' }
+    ) {
+        param($Scheme)
+
+        $session = Start-HtmlBrowserSession -Url 'about:blank'
+        try {
+            Register-HtmlRoute -Session $session -Pattern '**/*' -ScriptBlock {
+                param($route)
+                Complete-HtmlRoute -Route $route -Options @{
+                    Status = 200
+                    ContentType = 'text/html'
+                    Body = '<!doctype html><html><body><main>Signed in</main></body></html>'
+                }
+            }
+            $callback = "${Scheme}://callback.example.invalid/complete"
+            Invoke-HtmlNavigation -Session $session -Url "$callback`?code=code-secret&state=state-secret#id_token=id-secret"
+
+            $handoff = @(Get-HtmlBrowserSsoHandoff -Session $session)
+            $handoff.Count | Should -Be 1
+            $handoff[0].Kind | Should -Be 'OpenIdConnect'
+            $handoff[0].Action | Should -Be $callback
+            $handoff[0].FormData['code'] | Should -Be '<redacted>'
+            $handoff[0].FormData['state'] | Should -Be '<redacted>'
+            $handoff[0].FormData['id_token'] | Should -Be '<redacted>'
+            ($handoff[0] | ConvertTo-Json -Depth 8) | Should -Not -Match 'code-secret|state-secret|id-secret'
+        } finally {
+            Close-HtmlBrowserSession -Session $session
+        }
     }
 
     It 'detects OAuth handoffs from SPA hash-route query fragments' {
