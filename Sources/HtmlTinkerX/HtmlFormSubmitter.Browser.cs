@@ -66,6 +66,8 @@ public static partial class HtmlFormSubmitter {
             }
             token.ThrowIfCancellationRequested();
             await RequestBrowserFormSubmissionAsync(page, form, timeout, token).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException(cancellationToken);
         } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && deadline.IsCancellationRequested) {
             throw new TimeoutException($"Browser form submission exceeded its {timeout} ms timeout.");
         }
@@ -160,27 +162,58 @@ public static partial class HtmlFormSubmitter {
     }
 
     private static async Task RequestBrowserFormSubmissionAsync(IPage page, ILocator form, int timeout, CancellationToken token) {
+        string documentMarker = "__htmlTinkerXForm_" + Guid.NewGuid().ToString("N");
         TaskCompletionSource<bool> navigation = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        void OnNavigated(object? sender, IFrame frame) {
-            if (frame == page.MainFrame) navigation.TrySetResult(true);
+        int observing = 1;
+        int armed = 0;
+        _ = navigation.Task.ContinueWith(static completed => _ = completed.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        async Task CheckDocumentAsync() {
+            if (Volatile.Read(ref armed) == 0) return;
+            try {
+                bool current = await page.EvaluateAsync<bool>("marker => document[marker] === true", documentMarker)
+                    .WaitWithCancellationAsync(token).ConfigureAwait(false);
+                if (!current) navigation.TrySetResult(true);
+            } catch (PlaywrightException ex) when (!page.IsClosed && ex.Message.Contains("Execution context was destroyed", StringComparison.Ordinal)) {
+                // The new document's DOMContentLoaded event checks again after its context is ready.
+            } catch (Exception ex) {
+                if (Volatile.Read(ref observing) != 0) navigation.TrySetException(ex);
+            }
         }
+        void OnNavigated(object? sender, IFrame frame) {
+            if (frame == page.MainFrame) _ = CheckDocumentAsync();
+        }
+        void OnContentLoaded(object? sender, IPage loadedPage) => _ = CheckDocumentAsync();
         void OnFailed(object? sender, IRequest request) {
             if (request.IsNavigationRequest && request.Frame == page.MainFrame) {
                 navigation.TrySetException(new PlaywrightException($"Form navigation failed: {request.Failure}"));
             }
         }
         page.FrameNavigated += OnNavigated;
+        page.DOMContentLoaded += OnContentLoaded;
         page.RequestFailed += OnFailed;
         try {
+            await form.EvaluateAsync("(form, marker) => { Object.defineProperty(form.ownerDocument, marker, { value: true, configurable: true }); }", documentMarker)
+                .WaitWithCancellationAsync(token).ConfigureAwait(false);
+            Volatile.Write(ref armed, 1);
             bool[] submission = await form.EvaluateAsync<bool[]>(BrowserSubmitScript.Value).WaitWithCancellationAsync(token).ConfigureAwait(false);
             if (!submission[0] || !submission[1]) return;
             await navigation.Task.WaitWithCancellationAsync(token).ConfigureAwait(false);
             await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded, new PageWaitForLoadStateOptions { Timeout = timeout })
                 .WaitWithCancellationAsync(token).ConfigureAwait(false);
         } finally {
+            Volatile.Write(ref observing, 0);
             page.FrameNavigated -= OnNavigated;
+            page.DOMContentLoaded -= OnContentLoaded;
             page.RequestFailed -= OnFailed;
             if (navigation.Task.IsFaulted) _ = navigation.Task.Exception;
+            if (!page.IsClosed) {
+                try {
+                    await page.EvaluateAsync("marker => { delete document[marker]; }", documentMarker)
+                        .WaitWithCancellationAsync(token).ConfigureAwait(false);
+                } catch (PlaywrightException ex) when (ex.Message.Contains("Execution context was destroyed", StringComparison.Ordinal)) {
+                    // The discarded document owns the marker and no longer needs cleanup.
+                }
+            }
         }
     }
 }

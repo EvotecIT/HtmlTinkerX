@@ -90,6 +90,38 @@ public sealed class HtmlFormBrowserSubmissionTests {
         Assert.Equal("Received", await session.Page.Locator("h1").InnerTextAsync());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Submission_PropagationStopsAndHistoryChangesDoNotCompleteNativeNavigation(bool stopsPropagation) {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        TaskCompletionSource<bool> received = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await session.Page.RouteAsync("https://forms.test/**", async route => {
+            if (route.Request.Url.Contains("/receive")) {
+                received.TrySetResult(true);
+                await release.Task;
+                await route.FulfillAsync(new RouteFulfillOptions { ContentType = "text/html", Body = "<h1>Received</h1>" });
+            } else {
+                string handler = stopsPropagation ? string.Empty : " onsubmit=\"history.replaceState({}, '', '#submitting')\"";
+                string listener = stopsPropagation ? "<script>document.addEventListener('submit', event => event.stopPropagation(), true)</script>" : string.Empty;
+                await route.FulfillAsync(new RouteFulfillOptions { ContentType = "text/html", Body = "<form action='/receive' method='post'" + handler + "><input name='q' value='old'></form>" + listener });
+            }
+        });
+        await session.Page.GotoAsync("https://forms.test/start");
+        Task submission = HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string> { ["q"] = "new" }, 5000);
+        try {
+            Assert.Same(received.Task, await Task.WhenAny(received.Task, Task.Delay(5000)));
+            Task guard = Task.Delay(150);
+            Assert.Same(guard, await Task.WhenAny(submission, guard));
+        } finally {
+            release.TrySetResult(true);
+            await submission;
+            await session.Page.UnrouteAllAsync();
+        }
+        Assert.Equal("Received", await session.Page.Locator("h1").InnerTextAsync());
+    }
+
     [Fact]
     public async Task Submission_CancellationAndTimeoutCoverTheWholeOperation() {
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
@@ -108,6 +140,35 @@ public sealed class HtmlFormBrowserSubmissionTests {
             + "<script>setTimeout(() => document.querySelector('form').innerHTML='<input name=\"q\" value=\"old\">', 200)</script>");
         await HtmlFormSubmitter.SubmitAsync(session.Page, "form", fields, 5000);
         Assert.Equal("new", await session.Page.EvaluateAsync<string>("() => window.submitted"));
+    }
+
+    [Fact]
+    public async Task Submission_CancellationWhileNavigatingPreservesCallerTokenAndPage() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        TaskCompletionSource<bool> received = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await session.Page.RouteAsync("https://forms.test/receive", async route => {
+            received.TrySetResult(true);
+            await release.Task;
+            await route.FulfillAsync(new RouteFulfillOptions { ContentType = "text/html", Body = "<h1>Received</h1>" });
+        });
+        await session.Page.SetContentAsync("<form action='https://forms.test/receive' method='post'><input name='q' value='old'></form>");
+        using CancellationTokenSource stopping = new();
+        Task pending = HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string> { ["q"] = "new" }, 5000, stopping.Token);
+        try {
+            Assert.Same(received.Task, await Task.WhenAny(received.Task, Task.Delay(5000)));
+            stopping.Cancel();
+            OperationCanceledException error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+            Assert.Equal(stopping.Token, error.CancellationToken);
+            Assert.False(session.Page.IsClosed);
+        } finally {
+            release.TrySetResult(true);
+            await session.Page.Locator("h1").WaitForAsync();
+            await session.Page.UnrouteAllAsync();
+        }
+        await session.Page.SetContentAsync("<form onsubmit=\"event.preventDefault(); window.submitted=new FormData(this).get('q')\"><input name='q'></form>");
+        await HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string> { ["q"] = "reused" }, 5000);
+        Assert.Equal("reused", await session.Page.EvaluateAsync<string>("() => window.submitted"));
     }
 
     private sealed class ControlCase {
