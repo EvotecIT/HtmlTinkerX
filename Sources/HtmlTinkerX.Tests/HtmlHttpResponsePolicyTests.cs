@@ -91,8 +91,10 @@ public class HtmlHttpResponsePolicyTests {
             using var client = new HttpClient(handler) { Timeout = callerCancellation ? TimeSpan.FromSeconds(5) : TimeSpan.FromMilliseconds(100) };
             using var cancellation = new CancellationTokenSource();
             Task<string> reading = ReadAsync(consumer, client, null, cancellation.Token);
-            Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
-            if (callerCancellation) cancellation.Cancel();
+            if (callerCancellation) {
+                Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+                cancellation.Cancel();
+            }
             Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
             Assert.True(stream.Disposed);
@@ -128,8 +130,10 @@ public class HtmlHttpResponsePolicyTests {
             };
             Task<HtmlBrowserlessExtractionResult> reading = HtmlBrowserlessExtraction.ExtractAsync(source,
                 new HtmlBrowserlessExtractionOptions { AllowHttpFetch = true }, client, cancellation.Token);
-            Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
-            if (callerCancellation) cancellation.Cancel();
+            if (callerCancellation) {
+                Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+                cancellation.Cancel();
+            }
             Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
             if (callerCancellation) {
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
@@ -201,7 +205,7 @@ public class HtmlHttpResponsePolicyTests {
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) {
             Entered.TrySetResult(true);
             // Model Framework transports that cannot cancel an already-started read.
-            return await closed.Task;
+            return await closed.Task.ConfigureAwait(false);
         }
         protected override void Dispose(bool disposing) {
             Disposed = true;
