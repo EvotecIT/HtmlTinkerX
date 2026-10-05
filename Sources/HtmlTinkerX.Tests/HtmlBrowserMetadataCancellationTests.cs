@@ -30,6 +30,7 @@ public class HtmlBrowserMetadataCancellationTests {
     [InlineData("SsoScript")]
     public async Task PageMetadata_CancellationReturnsWhileDriverReadIsPending(string scenario) {
         Mock<IPage> page = new();
+        Mock<IBrowser> browser = new();
         Mock<IBrowserContext> context = new();
         Mock<ILocator> locator = new();
         TaskCompletionSource<bool> readStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -65,7 +66,7 @@ public class HtmlBrowserMetadataCancellationTests {
             page.Setup(value => value.EvaluateAsync<string>(It.IsAny<string>(), It.IsAny<object?>())).Callback(() => readStarted.TrySetResult(true)).Returns(pendingText.Task);
         }
 
-        await using HtmlBrowserSession session = new(new Mock<IPlaywright>().Object, new Mock<IBrowser>().Object, context.Object, page.Object);
+        await using HtmlBrowserSession session = new(new Mock<IPlaywright>().Object, browser.Object, context.Object, page.Object);
         using CancellationTokenSource cancellation = new();
         string outputPath = Path.Combine(Path.GetTempPath(), "HtmlTinkerXTests", Guid.NewGuid().ToString("N"));
         Task operation = StartRead(scenario, session, outputPath, cancellation.Token);
@@ -75,8 +76,13 @@ public class HtmlBrowserMetadataCancellationTests {
             Assert.Same(operation, await Task.WhenAny(operation, Task.Delay(TimeSpan.FromSeconds(2))));
             OperationCanceledException exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
             Assert.Equal(cancellation.Token, exception.CancellationToken);
-            Assert.False(pendingText.Task.IsCompleted);
+            Task pendingRead = scenario == "DiagnosticsCookies" ? pendingCookies.Task
+                : scenario == "DiagnosticsStorage" ? pendingKeys.Task : pendingText.Task;
+            Assert.False(pendingRead.IsCompleted);
             page.Verify(value => value.CloseAsync(It.IsAny<PageCloseOptions?>()), Times.Never);
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions?>()), Times.Never);
+            browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions?>()), Times.Never);
+            Assert.False(session.SuppressRecipeRecording);
         } finally {
             pendingText.TrySetResult("{}");
             pendingCookies.TrySetResult(Array.Empty<BrowserContextCookiesResult>());
