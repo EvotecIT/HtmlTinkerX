@@ -140,7 +140,7 @@ public static partial class HtmlBrowser {
         string pageUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(session.Page.Url ?? string.Empty);
         string title = string.Empty;
         try {
-            title = await session.Page.TitleAsync().ConfigureAwait(false);
+            title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         } catch (Exception ex) when (!(ex is OperationCanceledException)) {
             title = string.Empty;
         }
@@ -161,7 +161,7 @@ public static partial class HtmlBrowser {
         HtmlBrowserSsoHandoffOptions options,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        string json = await session.Page.EvaluateAsync<string>(SsoHandoffScript).ConfigureAwait(false);
+        string json = await session.Page.EvaluateAsync<string>(SsoHandoffScript).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         List<HtmlBrowserSsoHandoff> handoffs = new();
 
         using JsonDocument document = JsonDocument.Parse(json);

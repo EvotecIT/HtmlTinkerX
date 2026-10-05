@@ -69,6 +69,7 @@ public static partial class HtmlBrowser {
             throw new ArgumentException("Evidence output folder is required.", nameof(outFolder));
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         options ??= new HtmlBrowserEvidenceOptions();
         string fullFolder = outFolder.ToFullPath();
         Directory.CreateDirectory(fullFolder);
@@ -79,7 +80,7 @@ public static partial class HtmlBrowser {
             OutFolder = fullFolder,
             Url = RedactEvidenceUrl(session.Page.Url, options.RedactSensitiveValues),
             FinalUrl = RedactEvidenceUrl(session.Page.Url, options.RedactSensitiveValues),
-            Title = await session.Page.TitleAsync().ConfigureAwait(false),
+            Title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false),
             CapturedAtUtc = DateTimeOffset.UtcNow,
             UserDataDirectory = session.UserDataDirectory,
             IsPersistent = session.IsPersistent,

@@ -944,10 +944,10 @@ public static partial class HtmlBrowser {
         if (string.IsNullOrEmpty(selector)) {
             if (asText) {
                 cancellationToken.ThrowIfCancellationRequested();
-                return await page.InnerTextAsync("html").ConfigureAwait(false);
+                return await page.InnerTextAsync("html").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            return await page.ContentAsync().ConfigureAwait(false);
+            return await page.ContentAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var locator = page.Locator(selector!);
@@ -957,12 +957,12 @@ public static partial class HtmlBrowser {
         }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         if (asText) {
-            return await locator.InnerTextAsync().ConfigureAwait(false);
+            return await locator.InnerTextAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
         if (innerHtml) {
-            return await locator.InnerHTMLAsync().ConfigureAwait(false);
+            return await locator.InnerHTMLAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         }
-        return await locator.EvaluateAsync<string>("el => el.outerHTML").ConfigureAwait(false);
+        return await locator.EvaluateAsync<string>("el => el.outerHTML").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
