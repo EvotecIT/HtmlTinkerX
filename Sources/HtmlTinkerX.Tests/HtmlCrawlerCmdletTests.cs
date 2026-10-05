@@ -1,15 +1,56 @@
 #if !NETFRAMEWORK
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
+using System.Threading.Tasks;
 using PSParseHTML.PowerShell;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvokeHtmlCrawl_StreamedPagesKeepTheirContentAfterPersistence(bool releaseContent) {
+        using HttpListener server = StartServer(new Dictionary<string, string> {
+            ["/"] = "<main>Streamed content</main>"
+        }, out string root);
+        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try {
+            InitialSessionState state = InitialSessionState.Create();
+            state.Commands.Add(new SessionStateCmdletEntry("Invoke-HtmlCrawl", typeof(CmdletInvokeHtmlCrawl), null));
+            using Runspace runspace = RunspaceFactory.CreateRunspace(state);
+            runspace.Open();
+            using PowerShell command = PowerShell.Create();
+            command.Runspace = runspace;
+            command.AddCommand("Invoke-HtmlCrawl")
+                .AddParameter("Url", root)
+                .AddParameter("MaxPages", 1)
+                .AddParameter("NoSitemaps", true)
+                .AddParameter("IgnoreRobotsTxt", true)
+                .AddParameter("OutPath", outputPath)
+                .AddParameter("IncludeHtml", true)
+                .AddParameter("IncludeMarkdown", true)
+                .AddParameter("StreamPages", true)
+                .AddParameter("ReleasePageContent", releaseContent);
+
+            var output = command.Invoke();
+            Assert.Empty(command.Streams.Error);
+            HtmlCrawlPage page = Assert.IsType<HtmlCrawlPage>(Assert.Single(output).BaseObject);
+            Assert.Contains("Streamed content", page.Html);
+            Assert.Contains("Streamed content", page.Text);
+            Assert.Contains("Streamed content", page.Markdown);
+            HtmlCrawlPage savedPage = Assert.Single((await HtmlCrawler.LoadResultAsync(outputPath)).Pages);
+            Assert.Contains("Streamed content", savedPage.Text);
+        } finally {
+            if (Directory.Exists(outputPath)) Directory.Delete(outputPath, true);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

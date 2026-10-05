@@ -290,3 +290,7 @@ This option reduces retained page bodies. Page metadata, structured data and
 chunk fingerprints still grow with the crawl. Loading an existing final manifest
 or a source for conditional refresh still loads its content before crawling;
 this option does not limit total process memory.
+
+With `-StreamPages -ReleasePageContent`, emitted pages keep their selected HTML,
+text and Markdown while the crawler's retained page records release those bodies.
+The awaited C# observer also receives the content before it is released.

@@ -251,6 +251,18 @@ public sealed class HtmlCrawlPage {
     /// <summary>Total fetch duration.</summary>
     public TimeSpan Duration => Finished - Started;
 
+    /// <summary>Creates a shallow copy of the page's current properties.</summary>
+    /// <remarks>
+    /// The copy keeps the current content strings when the crawler releases them from the original page.
+    /// Collections and structured data are shared. This does not reload content that was already released.
+    /// </remarks>
+    /// <returns>A copy that can be retained independently of the original page's content lifetime.</returns>
+    public HtmlCrawlPage CreateSnapshot() {
+        HtmlCrawlPage snapshot = (HtmlCrawlPage)MemberwiseClone();
+        snapshot.StoredContentId = null;
+        return snapshot;
+    }
+
     private static string ResolveOfflineSeverity(HtmlCrawlOfflineDependencyDiagnostic diagnostic) {
         string inferredSeverity = HtmlCrawler.GetOfflineDependencySeverity(diagnostic?.Kind);
         string explicitSeverity = string.IsNullOrWhiteSpace(diagnostic?.Severity) ? inferredSeverity : diagnostic!.Severity!;

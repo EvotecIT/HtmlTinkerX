@@ -29,7 +29,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     public string Url { get; set; } = string.Empty;
 
     /// <summary>Writes each newly fetched page to the pipeline instead of returning the final crawl result.
-    /// Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.
+    /// Includes failed pages; skips candidates and pages loaded from a resume checkpoint.
+    /// With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.
     /// Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</summary>
     [Parameter]
     public SwitchParameter StreamPages { get; set; }
@@ -586,7 +587,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
 
         try {
             using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
-            if (StreamPages.IsPresent) options.PageObserver = new PipelinePageObserver(page => WriteObject(page));
+            if (StreamPages.IsPresent) {
+                options.PageObserver = new PipelinePageObserver(page =>
+                    WriteObject(ReleasePageContent.IsPresent ? page.CreateSnapshot() : page));
+            }
             HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(Url, options, linkedCts.Token).ConfigureAwait(false);
             if (!StreamPages.IsPresent) WriteObject(result);
         } finally {
