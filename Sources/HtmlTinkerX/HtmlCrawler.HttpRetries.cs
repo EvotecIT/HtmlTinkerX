@@ -1,5 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
 
@@ -18,5 +21,16 @@ public static partial class HtmlCrawler {
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
         return null;
+    }
+
+    private static async Task WaitForHttpRetryDelayAsync(TimeSpan delay, CancellationToken token) {
+        token.ThrowIfCancellationRequested();
+        Stopwatch elapsed = Stopwatch.StartNew();
+        TimeSpan remaining = delay;
+        while (remaining > TimeSpan.Zero) {
+            // Timers can wake slightly early. Keep the minimum delay before another request.
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), token).ConfigureAwait(false);
+            remaining = delay - elapsed.Elapsed;
+        }
     }
 }

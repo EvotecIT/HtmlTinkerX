@@ -72,7 +72,7 @@ public static partial class HtmlCrawler {
                     // Keep the failure when the server's minimum wait exceeds the whole request budget.
                     if (delay.TotalMilliseconds >= options.Timeout) return response;
                     response.Dispose();
-                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                    await WaitForHttpRetryDelayAsync(delay, cancellationToken).ConfigureAwait(false);
                     retries++;
                     continue;
                 }
@@ -84,7 +84,7 @@ public static partial class HtmlCrawler {
                 if (redirectDelay.TotalMilliseconds >= options.Timeout) return response;
                 response.Dispose();
                 if (redirects++ >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");
-                if (redirectDelay > TimeSpan.Zero) await Task.Delay(redirectDelay, cancellationToken).ConfigureAwait(false);
+                if (redirectDelay > TimeSpan.Zero) await WaitForHttpRetryDelayAsync(redirectDelay, cancellationToken).ConfigureAwait(false);
                 uri = location.IsAbsoluteUri ? location : new Uri(uri, location);
             }
         }

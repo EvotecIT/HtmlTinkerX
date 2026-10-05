@@ -115,8 +115,10 @@ public partial class HtmlCrawlerTests {
 
         Assert.Equal(HtmlCrawlPageStatus.Success, page.Status);
         Assert.Equal(3, arrivals.Count);
-        Assert.True((arrivals[1] - arrivals[0]) / (double)Stopwatch.Frequency >= 0.25);
-        Assert.True((arrivals[2] - arrivals[1]) / (double)Stopwatch.Frequency >= 0.5);
+        double firstDelay = (arrivals[1] - arrivals[0]) / (double)Stopwatch.Frequency;
+        double secondDelay = (arrivals[2] - arrivals[1]) / (double)Stopwatch.Frequency;
+        Assert.True(firstDelay >= 0.25, $"First retry arrived after {firstDelay * 1000:F3} ms, before the 250 ms backoff.");
+        Assert.True(secondDelay >= 0.5, $"Second retry arrived after {secondDelay * 1000:F3} ms, before the 500 ms backoff.");
     }
 
     [Fact]
@@ -312,13 +314,17 @@ public partial class HtmlCrawlerTests {
     public async Task CrawlAsync_HttpRetryHonorsRetryAfterOnRedirects() {
         DateTimeOffset earliest = default;
         DateTimeOffset followed = default;
+        long firstArrival = 0;
+        long finalArrival = 0;
         using HttpListener server = StartFlexibleServer(async context => {
             if (context.Request.Url!.AbsolutePath == "/") {
+                firstArrival = Stopwatch.GetTimestamp();
                 earliest = DateTimeOffset.UtcNow.AddSeconds(1);
                 context.Response.StatusCode = 302;
                 context.Response.RedirectLocation = "/final";
                 context.Response.Headers["Retry-After"] = "1";
             } else {
+                finalArrival = Stopwatch.GetTimestamp();
                 followed = DateTimeOffset.UtcNow;
                 await RespondAsync(context, "<main>Final page</main>");
             }
@@ -330,7 +336,7 @@ public partial class HtmlCrawlerTests {
 
         Assert.Equal(HtmlCrawlPageStatus.Success, page.Status);
         Assert.Contains("Final page", page.Text);
-        Assert.True(followed >= earliest);
+        Assert.True(followed >= earliest, $"Redirect followed at {followed:O}, before {earliest:O}; monotonic elapsed {(finalArrival - firstArrival) / (double)Stopwatch.Frequency * 1000:F3} ms.");
     }
 
     [Theory]
