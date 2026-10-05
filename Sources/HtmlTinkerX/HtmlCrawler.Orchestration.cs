@@ -61,6 +61,8 @@ public static partial class HtmlCrawler {
         }
         ValidateOptions(resolvedOptions);
         resolvedOptions.CrawlOrigin = startUri;
+        Dictionary<string, HtmlCrawlPage> refreshPages = await LoadRefreshPagesAsync(startUri, resolvedOptions, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(resolvedOptions.RefreshPath)) resolvedOptions.CacheResponses = true;
 
         CrawlRenderSession? renderSession = null;
         CrawlCheckpointWriter? checkpointWriter = null;
@@ -201,7 +203,8 @@ public static partial class HtmlCrawler {
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
                     page.RenderReason = "Rendered because browser mode was explicitly requested.";
                 } else {
-                    fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
+                    refreshPages.TryGetValue(next.Uri.AbsoluteUri, out HtmlCrawlPage? cachedPage);
+                    fetchedPage = await FetchHttpPageAsync(client, next, resolvedOptions, structuredSchema, cancellationToken, cachedPage).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     if (appliedProfile == null && string.IsNullOrWhiteSpace(resolvedOptions.ProfileName) && resolvedOptions.AutoProfile) {
                         ProfileSelectionDecision inferredProfileDecision = InferAutoProfile(startUri, fetchedPage.RawHtml, page, customProfiles);
@@ -301,6 +304,16 @@ public static partial class HtmlCrawler {
     }
 
     private static void ValidateOptions(HtmlCrawlOptions options) {
+        if (!string.IsNullOrWhiteSpace(options.RefreshPath)) {
+            if (!string.IsNullOrWhiteSpace(options.ResumePath)) {
+                throw new ArgumentException("RefreshPath and ResumePath select different workflows and cannot be combined.", nameof(options.RefreshPath));
+            }
+            StringComparison pathComparison = Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!string.IsNullOrWhiteSpace(options.OutputPath)
+                && string.Equals(ResolveManifestPath(options.OutputPath!), ResolveManifestPath(options.RefreshPath!), pathComparison)) {
+                throw new ArgumentException("A refresh requires a different output manifest so an interrupted run preserves its source.", nameof(options.OutputPath));
+            }
+        }
         if (options.MaxDepth < 0) {
             throw new ArgumentOutOfRangeException(nameof(options.MaxDepth), "MaxDepth must be zero or greater.");
         }

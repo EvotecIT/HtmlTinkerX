@@ -50,7 +50,7 @@ public partial class HtmlCrawlerTests {
             Assert.Equal(page.ResponseUrl, record.RootElement.GetProperty("ResponseUrl").GetString());
             Assert.Equal(tag, record.RootElement.GetProperty("EntityTag").GetString());
             Assert.Equal(modified, record.RootElement.GetProperty("LastModified").GetDateTimeOffset());
-            Assert.EndsWith(",ResponseUrl,EntityTag,LastModified", File.ReadAllLines(result.PagesCsvPath!)[0]);
+            Assert.Contains(",ResponseUrl,EntityTag,LastModified,", File.ReadAllLines(result.PagesCsvPath!)[0]);
             Assert.Contains("\"" + tag.Replace("\"", "\"\"") + "\"", File.ReadAllLines(result.PagesCsvPath!)[1]);
             using JsonDocument sidecar = JsonDocument.Parse(File.ReadAllText(page.ManifestPath!));
             Assert.Equal(page.ResponseUrl, sidecar.RootElement.GetProperty("ResponseUrl").GetString());

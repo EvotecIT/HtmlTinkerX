@@ -103,6 +103,12 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Optional directory or manifest path used to resume a previous crawl.</summary>
     public string? ResumePath { get; set; }
 
+    /// <summary>Saved crawl to refresh from the starting URL. Eligible static responses are revalidated; completed pages are visited again.</summary>
+    public string? RefreshPath { get; set; }
+
+    /// <summary>Retains eligible static HTTP response bodies in saved manifests for conditional refresh. This includes the original HTML before content selection.</summary>
+    public bool CacheResponses { get; set; }
+
     /// <summary>Optional built-in profile name used to preconfigure crawl behavior.</summary>
     public string? ProfileName { get; set; }
 
@@ -395,6 +401,8 @@ public sealed class HtmlCrawlOptions {
             RobotsUserAgent = RobotsUserAgent,
             OutputPath = OutputPath,
             ResumePath = ResumePath,
+            RefreshPath = RefreshPath,
+            CacheResponses = CacheResponses,
             ProfileName = ProfileName,
             ProfilePath = ProfilePath,
             AutoProfile = AutoProfile,

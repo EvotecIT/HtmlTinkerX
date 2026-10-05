@@ -80,7 +80,7 @@ public static partial class HtmlCrawler {
                 Generation = _generation, Result = header,
                 StoredPageCount = _pages, StoredSkippedCount = _skipped, StoredAssetCount = _assets
             };
-            await WriteTextAsync(_paths.ManifestPath, JsonSerializer.Serialize(checkpoint, CreateJsonOptions()), token).ConfigureAwait(false);
+            await WriteTextAsync(_paths.ManifestPath, JsonSerializer.Serialize(checkpoint, CreateSnapshotJsonOptions()), token).ConfigureAwait(false);
             _publishedPages = _pages;
             _publishedSkipped = _skipped;
             _publishedAssets = _assets;
@@ -103,7 +103,7 @@ public static partial class HtmlCrawler {
         using JsonDocument document = JsonDocument.Parse(json);
         if (!document.RootElement.TryGetProperty(nameof(CrawlCheckpoint.CheckpointVersion), out JsonElement version)) return null;
         if (version.GetInt32() != 1) throw new InvalidOperationException("Unsupported crawl checkpoint version.");
-        CrawlCheckpoint checkpoint = JsonSerializer.Deserialize<CrawlCheckpoint>(json, CreateJsonOptions())!;
+        CrawlCheckpoint checkpoint = JsonSerializer.Deserialize<CrawlCheckpoint>(json, CreateSnapshotJsonOptions())!;
         if (!Guid.TryParseExact(checkpoint.Generation, "N", out _) || checkpoint.Result == null
             || checkpoint.StoredPageCount < 0 || checkpoint.StoredSkippedCount < 0 || checkpoint.StoredAssetCount < 0) {
             throw new InvalidOperationException("Invalid crawl checkpoint metadata.");
@@ -125,9 +125,9 @@ public static partial class HtmlCrawler {
         Path.Combine(manifestPath + ".state", generation);
     private static string RecordPath(string directory, string kind, int index) => Path.Combine(directory, $"{kind}-{index:D8}.json");
     private static Task WriteRecordAsync<T>(string directory, string kind, int index, T value, CancellationToken token) =>
-        WriteTextAsync(RecordPath(directory, kind, index), JsonSerializer.Serialize(value, CreateJsonOptions()), token);
+        WriteTextAsync(RecordPath(directory, kind, index), JsonSerializer.Serialize(value, CreateSnapshotJsonOptions()), token);
     private static async Task<T> ReadRecordAsync<T>(string directory, string kind, int index, CancellationToken token) =>
-        JsonSerializer.Deserialize<T>(await ReadCheckpointTextAsync(RecordPath(directory, kind, index), token).ConfigureAwait(false), CreateJsonOptions())
+        JsonSerializer.Deserialize<T>(await ReadCheckpointTextAsync(RecordPath(directory, kind, index), token).ConfigureAwait(false), CreateSnapshotJsonOptions())
         ?? throw new InvalidOperationException("Invalid crawl checkpoint record.");
     private static async Task<string> ReadCheckpointTextAsync(string path, CancellationToken token) {
 #if NETFRAMEWORK || NETSTANDARD2_0

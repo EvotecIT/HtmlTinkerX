@@ -14,7 +14,7 @@ public static partial class HtmlCrawler {
     private static HttpClient CreateClient(HtmlCrawlOptions options, Uri startUri) {
         NetworkCredential? proxyCredential = string.IsNullOrEmpty(options.ProxyUsername) && string.IsNullOrEmpty(options.ProxyPassword)
             ? null : new NetworkCredential(options.ProxyUsername, options.ProxyPassword);
-        HttpClient transport = HtmlHttpClientFactory.Create(options.Proxy, proxyCredential, allowAutoRedirect: false);
+        HttpClient transport = HtmlHttpClientFactory.Create(out CookieContainer cookies, options.Proxy, proxyCredential, allowAutoRedirect: false);
         Dictionary<string, string> headers = transport.DefaultRequestHeaders.ToDictionary(
             header => header.Key, header => string.Join(", ", header.Value), StringComparer.OrdinalIgnoreCase);
         transport.DefaultRequestHeaders.Clear();
@@ -27,14 +27,14 @@ public static partial class HtmlCrawler {
             headers["Authorization"] = new AuthenticationHeaderValue("Basic",
                 Convert.ToBase64String(Encoding.UTF8.GetBytes($"{options.Username}:{options.Password}"))).ToString();
         }
-        return new HttpClient(new CrawlHttpHandler(transport, startUri, options, headers, userAgent)) {
+        return new HttpClient(new CrawlHttpHandler(transport, startUri, options, headers, userAgent, cookies)) {
             Timeout = TimeSpan.FromMilliseconds(options.Timeout)
         };
     }
 
     private sealed class CrawlHttpHandler(
         HttpClient transport, Uri startUri, HtmlCrawlOptions options,
-        IReadOnlyDictionary<string, string> scopedHeaders, string? userAgent) : HttpMessageHandler {
+        IReadOnlyDictionary<string, string> scopedHeaders, string? userAgent, CookieContainer cookies) : HttpMessageHandler {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             Uri uri = request.RequestUri!;
             for (int hop = 0; ; hop++) {
@@ -48,6 +48,19 @@ public static partial class HtmlCrawler {
                     foreach (var header in request.Headers) {
                         outgoing.Headers.Remove(header.Key);
                         outgoing.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+                if (request is CrawlHttpRequest pageRequest) {
+                    pageRequest.CacheValidated = false;
+                    pageRequest.CacheRequestHeaders = GetCacheRequestHeaders(outgoing, cookies.GetCookieHeader(uri));
+                    if (CanValidateCachedPage(pageRequest.CachedPage, uri, options, pageRequest.CacheRequestHeaders)) {
+                        HtmlCrawlPage cached = pageRequest.CachedPage!;
+                        if (EntityTagHeaderValue.TryParse(cached.EntityTag, out EntityTagHeaderValue? tag) && tag.Tag != "*") {
+                            outgoing.Headers.IfNoneMatch.Add(tag);
+                        } else {
+                            outgoing.Headers.IfModifiedSince = cached.LastModified;
+                        }
+                        pageRequest.CacheValidated = true;
                     }
                 }
                 HttpResponseMessage response = await transport.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);

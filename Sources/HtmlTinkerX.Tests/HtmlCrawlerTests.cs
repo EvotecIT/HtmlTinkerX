@@ -21,6 +21,8 @@ public partial class HtmlCrawlerTests {
             ProxyPassword = "proxy-secret",
             MaximumPageResponseBytes = 2048,
             MaximumAssetResponseBytes = 4096,
+            CacheResponses = true,
+            RefreshPath = "previous-crawl",
             StructuredJsonPreset = HtmlCrawlStructuredJsonPreset.Docs,
             FormLogin = new HtmlFormLogin {
                 LoginUrl = "https://example.com/login",
@@ -38,6 +40,8 @@ public partial class HtmlCrawlerTests {
         options.DismissTexts.Add("Accept");
 
         HtmlCrawlOptions clone = options.Clone();
+        Assert.True(clone.CacheResponses);
+        Assert.Equal("previous-crawl", clone.RefreshPath);
         clone.Headers["X-Test"] = "two";
         clone.IncludePatterns.Add("*blog*");
         clone.ClickSelectors.Add(".expand");

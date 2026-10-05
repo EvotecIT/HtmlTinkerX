@@ -21,7 +21,9 @@ public partial class HtmlCrawlerTests {
         options.Browser = browser;
         options.ClickSelectors.Add("#continue");
         options.WaitAfterLoadMs = 100;
-        HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).SkippedPages);
+        HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
+        Assert.All(result.Pages, page => Assert.True(page.Status != HtmlCrawlPageStatus.Failed, page.Error));
+        HtmlCrawlPage page = Assert.Single(result.SkippedPages);
         Assert.Equal(HtmlCrawlSkipReason.InvalidUrl, page.SkipReason);
         Assert.Equal("about:blank", page.Url);
         Assert.Null(page.ResponseUrl);

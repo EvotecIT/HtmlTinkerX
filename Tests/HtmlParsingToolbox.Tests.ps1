@@ -391,6 +391,11 @@ window.AppSettings = { feature: true };
     }
 
     It 'keeps configured HTTP defaults when page credentials are used' {
+        $originalTimeout = [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout
+        $originalHeaders = @{}
+        foreach ($header in [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.GetEnumerator()) {
+            $originalHeaders[$header.Key] = $header.Value
+        }
         try {
             [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = [TimeSpan]::FromSeconds(7)
             [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders['X-Toolbox-Test'] = 'Yes'
@@ -404,8 +409,11 @@ window.AppSettings = { feature: true };
             if ($client) {
                 $client.Dispose()
             }
-            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.Remove('X-Toolbox-Test') | Out-Null
-            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = [TimeSpan]::FromSeconds(100)
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultTimeout = $originalTimeout
+            [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders.Clear()
+            foreach ($header in $originalHeaders.GetEnumerator()) {
+                [HtmlTinkerX.HtmlHttpClientFactory]::DefaultHeaders[$header.Key] = $header.Value
+            }
             [HtmlTinkerX.HtmlHttpClientFactory]::ResetShared()
         }
     }

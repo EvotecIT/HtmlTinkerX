@@ -601,6 +601,17 @@ An active crawl writes an atomic checkpoint to `crawl-result.json` and stores co
 
 Each page records the HTTP document's `ResponseUrl`, `EntityTag`, and `LastModified` when available. `ResponseUrl` preserves the final response address before HTML base resolution, canonical rewriting, or tracking-query normalization. Static and rendered crawls use the response that supplied the extracted document; rendered interactions that navigate update these values. The fields are retained in saved manifests and page JSONL/CSV exports.
 
+To revisit a saved crawl, use `RefreshPath`. A refresh starts a new traversal from the starting URL and applies the current extraction settings. `ResumePath` continues unfinished work instead. Use a different output manifest when saving a refresh so cancellation or a failed request leaves the source crawl available.
+
+```powershell
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -CacheResponses -OutPath './crawl-original'
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -RefreshPath './crawl-original' -OutPath './crawl-refreshed'
+```
+
+`CacheResponses` retains eligible original static HTTP HTML in the manifest, before content selection, so a validated body can be extracted again with a different selector or profile. A refresh retains eligible bodies for another refresh. This adds storage and includes content outside the selected region. Browser pages are rendered again. Responses with `no-store`, `Vary: *`, session cookies, authorization, or custom request headers are fetched in full; their original bodies are not added to the reusable cache. Changes to accepted request negotiation headers also cause a full fetch. Validators are sent only to their matching final response URL, including through redirects.
+
+Static pages report `ResponseContentHash` for downloaded body bytes, `ResponseRevalidated` when a 304 response validated the stored body, and nullable `ResponseChanged` for comparison with the source record. Full responses compare body hashes; revalidated responses report unchanged and retain the stored body's hash. Missing older hashes or browser rendering leave the comparison unavailable. A failed refresh request is reported as failed; it does not return the old content as a successful page.
+
 Completed crawl artifacts include:
 
 - `crawl-result.json` for the manifest and resume state
