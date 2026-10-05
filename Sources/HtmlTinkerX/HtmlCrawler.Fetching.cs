@@ -65,7 +65,7 @@ public static partial class HtmlCrawler {
                 html = HtmlUtilities.DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
                 page.ResponseContentHash = ComputeResponseHash(bytes);
                 page.ResponseChanged = string.IsNullOrEmpty(cachedPage?.ResponseContentHash) ? null
-                    : !string.Equals(page.ResponseContentHash, cachedPage.ResponseContentHash, StringComparison.Ordinal);
+                    : !string.Equals(page.ResponseContentHash, cachedPage!.ResponseContentHash, StringComparison.Ordinal);
             }
             if (!IsAllowedPageContent(page.ContentType, html, options)) {
                 page.Status = HtmlCrawlPageStatus.Skipped;

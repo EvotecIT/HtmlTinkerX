@@ -28,7 +28,7 @@ public sealed class PesterRefreshHttpServer : IDisposable {
         Url = "http://localhost:" + number + "/";
         _listener.Prefixes.Add(Url);
         _listener.Start();
-        _server = Task.Run(ListenAsync);
+        _server = Task.Run(new Func<Task>(ListenAsync));
     }
 
     private async Task ListenAsync() {
@@ -66,11 +66,11 @@ public sealed class PesterRefreshHttpServer : IDisposable {
         $source = Join-Path $TestDrive 'source'
         $destination = Join-Path $TestDrive 'refreshed'
         try {
-            $original = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -RespectRobotsTxt:$false -UseSitemaps:$false -Selector main -CacheResponses -OutputPath $source
+            $original = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -Selector main -CacheResponses -OutPath $source
             $original.Pages[0].Text | Should -Match 'Main body'
             $manifest = Get-Content -LiteralPath (Join-Path $source 'crawl-result.json') -Raw
 
-            $result = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -RespectRobotsTxt:$false -UseSitemaps:$false -Selector '#alternate' -RefreshPath $source -OutputPath $destination
+            $result = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -Selector '#alternate' -RefreshPath $source -OutPath $destination
             $result.Pages.Count | Should -Be 1
             $page = $result.Pages[0]
             $page.Status.ToString() | Should -Be 'Success'

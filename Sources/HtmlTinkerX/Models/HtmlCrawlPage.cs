@@ -63,8 +63,7 @@ public sealed class HtmlCrawlPage {
     /// <summary>Whether the static response changed relative to the previous refresh record. Full responses compare body bytes; successful revalidation reports false. Null when no comparison is available.</summary>
     public bool? ResponseChanged { get; set; }
 
-    [JsonInclude]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnore]
     internal HtmlCrawlHttpCacheEntry? HttpCache { get; set; }
 
     /// <summary>Page title when available.</summary>

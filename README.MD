@@ -604,8 +604,8 @@ Each page records the HTTP document's `ResponseUrl`, `EntityTag`, and `LastModif
 To revisit a saved crawl, use `RefreshPath`. A refresh starts a new traversal from the starting URL and applies the current extraction settings. `ResumePath` continues unfinished work instead. Use a different output manifest when saving a refresh so cancellation or a failed request leaves the source crawl available.
 
 ```powershell
-Invoke-HtmlCrawl -Url 'https://example.com/docs/' -CacheResponses -OutputPath './crawl-original'
-Invoke-HtmlCrawl -Url 'https://example.com/docs/' -RefreshPath './crawl-original' -OutputPath './crawl-refreshed'
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -CacheResponses -OutPath './crawl-original'
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -RefreshPath './crawl-original' -OutPath './crawl-refreshed'
 ```
 
 `CacheResponses` retains eligible original static HTTP HTML in the manifest, before content selection, so a validated body can be extracted again with a different selector or profile. A refresh retains eligible bodies for another refresh. This adds storage and includes content outside the selected region. Browser pages are rendered again. Responses with `no-store`, `Vary: *`, session cookies, authorization, or custom request headers are fetched in full; their original bodies are not added to the reusable cache. Changes to accepted request negotiation headers also cause a full fetch. Validators are sent only to their matching final response URL, including through redirects.

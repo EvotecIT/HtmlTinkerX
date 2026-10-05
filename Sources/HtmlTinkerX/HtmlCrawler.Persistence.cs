@@ -56,7 +56,7 @@ public static partial class HtmlCrawler {
 
         CrawlCheckpoint? checkpoint = ParseCheckpoint(json);
         if (checkpoint != null) return await LoadCheckpointAsync(checkpoint, manifestPath, cancellationToken).ConfigureAwait(false);
-        JsonSerializerOptions options = CreateJsonOptions();
+        JsonSerializerOptions options = CreateSnapshotJsonOptions();
         HtmlCrawlResult? result = JsonSerializer.Deserialize<HtmlCrawlResult>(json, options);
         if (result == null) {
             throw new InvalidOperationException($"Unable to deserialize crawl result from '{manifestPath}'.");
@@ -464,7 +464,7 @@ public static partial class HtmlCrawler {
         await WriteTextAsync(artifactPaths.SummaryTextPath, summary.ToReportText(result.SitemapUrls), cancellationToken).ConfigureAwait(false);
         await WriteTextAsync(artifactPaths.IndexHtmlPath, BuildIndexHtml(result, summary, artifactPaths.IndexHtmlPath), cancellationToken).ConfigureAwait(false);
 
-        string json = JsonSerializer.Serialize(result, CreateJsonOptions());
+        string json = JsonSerializer.Serialize(result, CreateSnapshotJsonOptions());
         await WriteTextAsync(artifactPaths.ManifestPath, json, cancellationToken).ConfigureAwait(false);
     }
 

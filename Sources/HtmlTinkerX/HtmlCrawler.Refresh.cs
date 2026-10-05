@@ -33,7 +33,7 @@ public static partial class HtmlCrawler {
         Dictionary<string, string>? headers) {
         HtmlCrawlHttpCacheEntry? entry = cached?.HttpCache;
         if (entry == null || headers == null || entry.RequestHeaders == null || entry.Html == null
-            || cached!.Rendered || !string.Equals(cached.ResponseUrl, uri.AbsoluteUri, StringComparison.Ordinal)
+            || cached!.Rendered || !string.Equals(cached.ResponseUrl, uri.GetLeftPart(UriPartial.Query), StringComparison.Ordinal)
             || entry.ByteLength < 0 || entry.ByteLength > options.MaximumPageResponseBytes
             || entry.Html.Length > options.MaximumPageResponseBytes
             || headers.Count != entry.RequestHeaders.Count

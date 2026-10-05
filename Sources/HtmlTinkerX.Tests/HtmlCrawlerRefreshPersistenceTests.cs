@@ -2,12 +2,54 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    [Fact]
+    public async Task CrawlAsync_RefreshLoadsOriginalBodiesFromAnInterruptedCheckpoint() {
+        string source = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        TaskCompletionSource<bool> waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenSource cancellation = new();
+        using HttpListener server = StartFlexibleServer(async context => {
+            if (context.Request.Url!.AbsolutePath == "/waiting") {
+                waiting.TrySetResult(true);
+                await release.Task;
+            }
+            context.Response.Headers["ETag"] = "\"root\"";
+            if (context.Request.Headers["If-None-Match"] == "\"root\"") context.Response.StatusCode = 304;
+            else await RespondAsync(context, "<main>Main body</main><section id='alternate'>Alternate body</section><a href='/waiting'></a>");
+        }, out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(2);
+            options.CacheResponses = true;
+            options.Selector = "main";
+            options.OutputPath = source;
+            Task<HtmlCrawlResult> crawl = HtmlCrawler.CrawlAsync(root, options, cancellation.Token);
+            Assert.Same(waiting.Task, await Task.WhenAny(waiting.Task, Task.Delay(TimeSpan.FromSeconds(10))));
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await crawl);
+            release.TrySetResult(true);
+            options.RefreshPath = source;
+            options.OutputPath = null;
+            options.MaxPages = 1;
+            options.Selector = "#alternate";
+            HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
+            Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
+            Assert.True(page.ResponseRevalidated);
+            Assert.Contains("Alternate body", page.Text);
+            Assert.DoesNotContain("Main body", page.Text);
+        } finally {
+            cancellation.Cancel();
+            release.TrySetResult(true);
+            if (Directory.Exists(source)) Directory.Delete(source, true);
+        }
+    }
+
     [Fact]
     public async Task CrawlAsync_RefreshStopsRetainingABodyWhenValidationReturnsNoStore() {
         string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
