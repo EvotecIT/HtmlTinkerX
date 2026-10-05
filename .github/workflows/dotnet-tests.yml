@@ -136,15 +136,18 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore Sources/HtmlTinkerX.sln
 
-      - name: Build solution
-        run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      - name: Build modern test targets and examples
+        run: |
+          dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework net8.0 --no-restore
+          dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework net10.0 --no-restore
+          dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
         timeout-minutes: 10
 
       - name: Summarize failing tests
@@ -207,15 +210,18 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore Sources/HtmlTinkerX.sln
 
-      - name: Build solution
-        run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      - name: Build modern test targets and examples
+        run: |
+          dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework net8.0 --no-restore
+          dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework net10.0 --no-restore
+          dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
         timeout-minutes: 10
 
       - name: Summarize failing tests
