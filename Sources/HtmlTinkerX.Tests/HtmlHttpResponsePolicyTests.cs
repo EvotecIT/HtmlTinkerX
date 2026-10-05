@@ -18,17 +18,17 @@ public class HtmlHttpResponsePolicyTests {
 
     private static async Task<string> ReadAsync(string consumer, HttpClient client, HtmlHttpFetchOptions? options, CancellationToken token = default) {
         if (consumer == "url") {
-            return options == null ? await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url, token)
-                : await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url, options, token);
+            return options == null ? await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url, token).ConfigureAwait(false)
+                : await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url, options, token).ConfigureAwait(false);
         }
         if (consumer == "relay") {
-            var result = await HtmlFormRelayClient.FollowAsync(Relay, new Uri(Url), client, new HtmlFormRelayOptions { FetchOptions = options }, token);
+            var result = await HtmlFormRelayClient.FollowAsync(Relay, new Uri(Url), client, new HtmlFormRelayOptions { FetchOptions = options }, token).ConfigureAwait(false);
             return result.FinalContent;
         }
         var fields = new Dictionary<string, string> { ["field"] = "value" };
         FormMethod method = consumer == "get" ? FormMethod.Get : FormMethod.Post;
-        return options == null ? await HtmlFormSubmitter.SubmitAsync(Url, method, fields, client, token)
-            : await HtmlFormSubmitter.SubmitAsync(Url, method, fields, client, options, token);
+        return options == null ? await HtmlFormSubmitter.SubmitAsync(Url, method, fields, client, token).ConfigureAwait(false)
+            : await HtmlFormSubmitter.SubmitAsync(Url, method, fields, client, options, token).ConfigureAwait(false);
     }
 
     [Theory]
@@ -80,25 +80,27 @@ public class HtmlHttpResponsePolicyTests {
     }
 
     [Theory]
-    [InlineData("url")]
-    [InlineData("get")]
-    [InlineData("post")]
-    [InlineData("relay")]
-    public async Task Consumers_CancelStalledStreamsThatIgnoreReadTokens(string consumer) {
-        foreach (bool callerCancellation in new[] { false, true }) {
-            using var stream = new BlockingStream();
-            using var handler = new ResponseHandler(() => new StreamContent(stream));
-            using var client = new HttpClient(handler) { Timeout = callerCancellation ? TimeSpan.FromSeconds(5) : TimeSpan.FromMilliseconds(100) };
-            using var cancellation = new CancellationTokenSource();
-            Task<string> reading = ReadAsync(consumer, client, null, cancellation.Token);
-            if (callerCancellation) {
-                Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
-                cancellation.Cancel();
-            }
-            Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
-            Assert.True(stream.Disposed);
+    [InlineData("url", false)]
+    [InlineData("url", true)]
+    [InlineData("get", false)]
+    [InlineData("get", true)]
+    [InlineData("post", false)]
+    [InlineData("post", true)]
+    [InlineData("relay", false)]
+    [InlineData("relay", true)]
+    public async Task Consumers_CancelStalledStreamsThatIgnoreReadTokens(string consumer, bool callerCancellation) {
+        using var stream = new BlockingStream();
+        using var handler = new ResponseHandler(() => new StreamContent(stream));
+        using var client = new HttpClient(handler) { Timeout = callerCancellation ? TimeSpan.FromSeconds(5) : TimeSpan.FromMilliseconds(100) };
+        using var cancellation = new CancellationTokenSource();
+        Task<string> reading = ReadAsync(consumer, client, null, cancellation.Token);
+        if (callerCancellation) {
+            Assert.Same(stream.Entered.Task, await Task.WhenAny(stream.Entered.Task, Task.Delay(2000)));
+            cancellation.Cancel();
         }
+        Assert.Same(reading, await Task.WhenAny(reading, Task.Delay(2000)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
+        Assert.True(stream.Disposed);
     }
 
     [Fact]
