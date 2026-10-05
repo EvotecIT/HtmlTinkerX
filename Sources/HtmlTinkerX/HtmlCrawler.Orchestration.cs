@@ -339,6 +339,9 @@ public static partial class HtmlCrawler {
         if (options.Timeout <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.Timeout), "Timeout must be greater than zero.");
         }
+        if (options.HttpRetryCount < 0 || options.HttpRetryCount > 10) {
+            throw new ArgumentOutOfRangeException(nameof(options.HttpRetryCount), "HttpRetryCount must be between zero and ten.");
+        }
         if (options.DelayMs < 0) {
             throw new ArgumentOutOfRangeException(nameof(options.DelayMs), "DelayMs must be zero or greater.");
         }

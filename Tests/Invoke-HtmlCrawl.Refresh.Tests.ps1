@@ -16,11 +16,17 @@ public sealed class PesterRefreshHttpServer : IDisposable {
     private readonly Task _server;
     private int _downloads;
     private int _validations;
+    private int _requests;
+    private readonly bool _transientOnce;
     public string Url { get; private set; }
     public int Downloads { get { return Volatile.Read(ref _downloads); } }
     public int Validations { get { return Volatile.Read(ref _validations); } }
+    public int Requests { get { return Volatile.Read(ref _requests); } }
 
-    public PesterRefreshHttpServer() {
+    public PesterRefreshHttpServer() : this(false) { }
+
+    public PesterRefreshHttpServer(bool transientOnce) {
+        _transientOnce = transientOnce;
         var port = new TcpListener(IPAddress.Loopback, 0);
         port.Start();
         int number = ((IPEndPoint)port.LocalEndpoint).Port;
@@ -36,6 +42,11 @@ public sealed class PesterRefreshHttpServer : IDisposable {
             while (_listener.IsListening) {
                 var context = await _listener.GetContextAsync();
                 try {
+                    if (Interlocked.Increment(ref _requests) == 1 && _transientOnce) {
+                        context.Response.StatusCode = 503;
+                        context.Response.Headers["Retry-After"] = "0";
+                        continue;
+                    }
                     context.Response.Headers["ETag"] = "W/\"original\"";
                     if (context.Request.Headers["If-None-Match"] == "W/\"original\"") {
                         Interlocked.Increment(ref _validations);
@@ -56,8 +67,22 @@ public sealed class PesterRefreshHttpServer : IDisposable {
         _listener.Close();
         _server.GetAwaiter().GetResult();
     }
+
 }
 "@
+        }
+    }
+
+    It 'retries a transient response through the public command' {
+        $server = [PesterRefreshHttpServer]::new($true)
+        try {
+            $result = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -HttpRetryCount 1
+            $result.Pages.Count | Should -Be 1
+            $result.Pages[0].Status.ToString() | Should -Be 'Success'
+            $result.Pages[0].Text | Should -Match 'Main body'
+            $server.Requests | Should -Be 2
+        } finally {
+            $server.Dispose()
         }
     }
 

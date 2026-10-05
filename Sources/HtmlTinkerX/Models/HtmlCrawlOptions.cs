@@ -270,6 +270,10 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Per-page timeout in milliseconds.</summary>
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Maximum additional attempts (0–10) for static GET responses with status 408, 429, 500, 502, 503, or 504. Defaults to zero.</summary>
+    /// <remarks>Retries honor Retry-After, or use exponential backoff starting at 250 ms and capped at 30 seconds. All attempts and waits share the request timeout.</remarks>
+    public int HttpRetryCount { get; set; }
+
     /// <summary>Optional user agent used for HTTP and browser requests.</summary>
     public string? UserAgent { get; set; }
 
@@ -458,6 +462,7 @@ public sealed class HtmlCrawlOptions {
             AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,
+            HttpRetryCount = HttpRetryCount,
             UserAgent = UserAgent,
             Headers = new Dictionary<string, string>(Headers, System.StringComparer.OrdinalIgnoreCase),
             Proxy = Proxy,
