@@ -18,12 +18,20 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>Invoke-HtmlCrawl -Url https://example.com/app -Render -WaitForSelector main -StorageStatePath .\state.json</code>
 /// </example>
+/// <example>
+/// <code>Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success</code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlCrawl")]
-[OutputType(typeof(HtmlCrawlResult))]
+[OutputType(typeof(HtmlCrawlResult), typeof(HtmlCrawlPage))]
 public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Starting URL for the crawl.</summary>
     [Parameter(Mandatory = true, Position = 0)]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Writes each newly fetched page to the pipeline instead of returning the final crawl result.
+    /// Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.</summary>
+    [Parameter]
+    public SwitchParameter StreamPages { get; set; }
 
     /// <summary>Maximum depth to follow links from the starting page.</summary>
     [Parameter]
@@ -572,8 +580,9 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
 
         try {
             using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+            if (StreamPages.IsPresent) options.PageObserver = new PipelinePageObserver(page => WriteObject(page));
             HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(Url, options, linkedCts.Token).ConfigureAwait(false);
-            WriteObject(result);
+            if (!StreamPages.IsPresent) WriteObject(result);
         } finally {
             options.ClearSensitiveData();
             pass = null;
@@ -581,6 +590,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Password = null;
             Credential = null;
             ProxyCredential = null;
+        }
+    }
+
+    private sealed class PipelinePageObserver : IHtmlCrawlPageObserver {
+        private readonly System.Action<HtmlCrawlPage> _write;
+        public PipelinePageObserver(System.Action<HtmlCrawlPage> write) => _write = write;
+        public Task ObserveAsync(HtmlCrawlPage page, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            _write(page);
+            return Task.CompletedTask;
         }
     }
 
