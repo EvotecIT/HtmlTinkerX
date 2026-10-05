@@ -46,6 +46,9 @@ Describe 'Browser action failure evidence' {
         }
         try {
             $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded -CancellationToken $startupCancellation.Token
+        } catch {
+            Write-Warning ($_.Exception.ToString())
+            throw
         } finally {
             $startupCancellation.Dispose()
             $env:DEBUG = $previousDebug
