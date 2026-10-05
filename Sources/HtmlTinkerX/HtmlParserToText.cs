@@ -46,8 +46,7 @@ public static class HtmlParserToText {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        RemoveNoise(document);
-        var analysis = new HtmlReadableTextAnalysis(document);
+        HtmlReadableTextAnalysis analysis = RemoveNoise(document);
 
         if (!string.IsNullOrWhiteSpace(preferredSelector)) {
             IElement? preferred = document.QuerySelector(preferredSelector!);
@@ -214,7 +213,7 @@ public static class HtmlParserToText {
                 || combined.Contains("main", StringComparison.Ordinal));
     }
 
-    private static void RemoveNoise(IDocument container) {
+    private static HtmlReadableTextAnalysis RemoveNoise(IDocument container) {
         foreach (IElement element in container.QuerySelectorAll("script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.skip-link,.skip-link-screen-reader-text").ToArray()) {
             element.Remove();
         }
@@ -226,11 +225,14 @@ public static class HtmlParserToText {
         }
 
         var analysis = new HtmlReadableTextAnalysis(container);
+        bool removedConsentElement = false;
         foreach (IElement element in container.QuerySelectorAll("div,section,aside,dialog").ToArray()) {
             if (LooksLikeCookieOrConsentBanner(element, analysis)) {
                 element.Remove();
+                removedConsentElement = true;
             }
         }
+        return removedConsentElement ? new HtmlReadableTextAnalysis(container) : analysis;
     }
 
     private static bool ShouldRemoveHiddenElement(IElement element) {

@@ -3,6 +3,19 @@ using HtmlTinkerX;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlParserReadableTextTests {
+    [Fact]
+    public void ExtractReadableText_ScoresAncestorAfterRemovingConsentChild() {
+        const string html = "<main id='article-content'><div class='cookie'><a href='/privacy'>Privacy cookie choices</a></div>"
+            + "<p>alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu</p></main>";
+
+        var result = HtmlParserToText.ExtractReadableText(html, "#article-content");
+
+        Assert.Equal("alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu", result.Text);
+        Assert.Equal("main#article-content", result.SelectorHint);
+        Assert.Equal(570, result.Score);
+        Assert.Equal(1, result.CandidateCount);
+    }
+
     [Theory]
     [InlineData("pliki")]
     [InlineData("plików")]
