@@ -231,6 +231,8 @@ public class HtmlBrowserInstallerTests
         }
 
         string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -254,8 +256,8 @@ public class HtmlBrowserInstallerTests
         finally
         {
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
@@ -271,6 +273,8 @@ public class HtmlBrowserInstallerTests
         }
 
         string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -294,8 +298,8 @@ public class HtmlBrowserInstallerTests
         finally
         {
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
@@ -596,6 +600,8 @@ public class HtmlBrowserInstallerTests
     [Fact]
     public async Task EnsureInstalledAsync_ReinstallsCorruptedDriver()
     {
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -640,8 +646,8 @@ public class HtmlBrowserInstallerTests
         {
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
@@ -650,6 +656,8 @@ public class HtmlBrowserInstallerTests
     [Fact]
     public async Task EnsureInstalledAsync_RepairsEmptyRuntimeDirectories()
     {
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -705,8 +713,8 @@ public class HtmlBrowserInstallerTests
         {
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
@@ -715,6 +723,8 @@ public class HtmlBrowserInstallerTests
     [Fact]
     public async Task RepairInstallationAsync_ReinstallsDriverAndRuntime()
     {
+        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
@@ -751,8 +761,8 @@ public class HtmlBrowserInstallerTests
         {
             HtmlBrowser.PlaywrightInstaller = originalInstaller;
             HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", null);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
         }
