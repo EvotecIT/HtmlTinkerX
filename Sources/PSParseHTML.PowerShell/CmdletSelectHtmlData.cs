@@ -43,8 +43,20 @@ namespace PSParseHTML.PowerShell;
 ///   </code>
 ///   <para>Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.</para>
 /// </example>
+/// <example>
+///   <summary>Inspect extraction quality and require a non-empty dataset</summary>
+///   <code>
+/// $report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+///     Name = @{ Selector = '.product-title'; Required = $true }
+///     Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
+/// } -AsExtractionReport -MinimumItemCount 1
+/// $report.IsValid
+/// $report.Fields
+///   </code>
+///   <para>Missing required fields, invalid values, and count changes are reported. Inspect IsValid before accepting Records; fields with data errors contain null.</para>
+/// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlData", DefaultParameterSetName = ParameterSetNode)]
-[OutputType(typeof(HtmlDataItem), typeof(PSObject))]
+[OutputType(typeof(HtmlDataItem), typeof(PSObject), typeof(HtmlDomExtractionReport))]
 public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
@@ -85,7 +97,8 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
     /// <summary>
     /// Property-to-selector map used with <see cref="ItemSelector"/>.
     /// String values read trimmed text. Hashtable values can specify Selector, Attribute,
-    /// ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.
+    /// ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+    /// MinimumValueCount, or MaximumValueCount.
     /// DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
     /// Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
     /// Required fields throw when missing. Invalid typed values report the property and item index.
@@ -93,6 +106,20 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
     [Parameter]
     [Alias("Properties", "Field", "Fields")]
     public IDictionary? Property { get; set; }
+
+    /// <summary>Return a single extraction report with records, selector provenance, and field quality checks. Requires ItemSelector and Property.</summary>
+    [Parameter]
+    public SwitchParameter AsExtractionReport { get; set; }
+
+    /// <summary>Minimum acceptable item count in an extraction report. Requires AsExtractionReport.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int? MinimumItemCount { get; set; }
+
+    /// <summary>Maximum acceptable item count in an extraction report. Requires AsExtractionReport.</summary>
+    [Parameter]
+    [ValidateRange(0, int.MaxValue)]
+    public int? MaximumItemCount { get; set; }
 
     /// <summary>Base URL used to resolve relative links and assets. Defaults to Url when downloading.</summary>
     [Parameter]
@@ -117,6 +144,12 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        if (!AsExtractionReport && (MinimumItemCount.HasValue || MaximumItemCount.HasValue)) {
+            throw new PSArgumentException("Item-count bounds require AsExtractionReport.");
+        }
+        if (AsExtractionReport && (string.IsNullOrWhiteSpace(ItemSelector) || Property == null)) {
+            throw new PSArgumentException("AsExtractionReport requires ItemSelector and Property.");
+        }
         ValidateProxy(Proxy, ProxyCredential);
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? _effectiveUrl ?? Url : null);
@@ -132,6 +165,13 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
 
             IReadOnlyDictionary<string, HtmlDomFieldDefinition> definitions =
                 HtmlDomPropertyMapConverter.Convert(Property);
+            if (AsExtractionReport) {
+                WriteObject(HtmlDomExtraction.ExtractReport(html, ItemSelector!, definitions,
+                    new HtmlDomExtractionReportOptions {
+                        MinimumItemCount = MinimumItemCount, MaximumItemCount = MaximumItemCount
+                    }, baseUri));
+                return;
+            }
             foreach (HtmlDomExtractionRecord record in HtmlDomExtraction.Extract(
                 html,
                 ItemSelector!,

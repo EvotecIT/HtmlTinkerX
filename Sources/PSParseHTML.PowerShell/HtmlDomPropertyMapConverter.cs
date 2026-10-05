@@ -43,6 +43,8 @@ internal static class HtmlDomPropertyMapConverter {
             DataType = GetDataType(map, propertyName),
             Culture = GetString(map, "Culture"),
             TreatEmptyAsMissing = GetBoolean(map, "TreatEmptyAsMissing"),
+            MinimumValueCount = GetCount(map, "MinimumValueCount", propertyName),
+            MaximumValueCount = GetCount(map, "MaximumValueCount", propertyName),
             All = GetBoolean(map, "All"),
             Required = GetBoolean(map, "Required"),
             ResolveUrl = GetBoolean(map, "ResolveUrl")
@@ -62,6 +64,16 @@ internal static class HtmlDomPropertyMapConverter {
         }
 
         return definition;
+    }
+
+    private static int? GetCount(IDictionary map, string name, string propertyName) {
+        if (!TryGetValue(map, name, out object? value) || value == null) {
+            return null;
+        }
+        if (HtmlPipelineInput.Unwrap(value) is int count && count >= 0) {
+            return count;
+        }
+        throw new PSArgumentException($"{name} for property '{propertyName}' must be a non-negative integer.");
     }
 
     private static Type? GetDataType(IDictionary map, string propertyName) {
