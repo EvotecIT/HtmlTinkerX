@@ -30,6 +30,15 @@ public sealed class HtmlPageReaderOptions {
     /// <summary>Whether repeated collections should be inferred.</summary>
     public bool IncludeCollections { get; set; } = true;
 
+    /// <summary>Whether to compute readable text and its title fallback. Disabled results contain an empty readable-text projection.</summary>
+    public bool IncludeReadableText { get; set; } = true;
+
+    /// <summary>Whether to convert the semantic document to Markdown. Disabled results contain an empty Markdown string.</summary>
+    public bool IncludeMarkdown { get; set; } = true;
+
+    /// <summary>Whether to discover normalized links, forms and assets. Semantic resources and collection inference are independent.</summary>
+    public bool IncludeWebData { get; set; } = true;
+
     /// <summary>Optional OfficeIMO.Html parsing and trust-policy options.</summary>
     public OfficeIMO.Html.HtmlConversionDocumentOptions? ConversionOptions { get; set; }
 }

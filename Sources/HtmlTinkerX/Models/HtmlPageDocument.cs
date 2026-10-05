@@ -29,10 +29,10 @@ public sealed class HtmlPageDocument {
     /// <summary>Original HTML supplied to the reader.</summary>
     public string Html => Content.SourceHtml;
 
-    /// <summary>Readable text projection.</summary>
+    /// <summary>Readable text projection. Empty when readable-text analysis is disabled.</summary>
     public HtmlReadableTextResult ReadableText { get; set; } = new();
 
-    /// <summary>Markdown projection for display, search, or language-model input.</summary>
+    /// <summary>Markdown projection for display, search, or language-model input. Empty when Markdown conversion is disabled.</summary>
     public string Markdown { get; set; } = string.Empty;
 
     /// <summary>Canonical OfficeIMO.Html conversion document.</summary>

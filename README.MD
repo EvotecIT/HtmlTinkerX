@@ -147,6 +147,21 @@ Markdown remains available as a projection:
 $page.Markdown
 ```
 
+If you only need semantic objects, skip the other projections:
+
+```powershell
+$page = Get-HtmlPage -Content $html -NoReadableText -NoMarkdown -NoWebData -NoCollections
+$page.Headings
+$page.Tables
+```
+
+All projections are included by default. Each switch skips its analysis and leaves
+the corresponding result empty. `-NoWebData` skips normalized links, forms and
+assets; OfficeIMO semantic resources remain available, and collection inference
+is controlled separately. `-NoReadableText` also skips its fallback for the page
+title. In C#, use `IncludeReadableText`, `IncludeMarkdown`, `IncludeWebData` and
+`IncludeCollections` on `HtmlPageReaderOptions`.
+
 For client-rendered pages, pass a snapshot captured by `Invoke-HtmlRendering`:
 
 ```powershell
