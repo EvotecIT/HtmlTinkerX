@@ -11,7 +11,7 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Helper methods for submitting HTML forms either using Playwright or direct HTTP requests.
 /// </summary>
-public static class HtmlFormSubmitter {
+public static partial class HtmlFormSubmitter {
     /// <summary>
     /// Fills form fields and submits using Playwright.
     /// </summary>
@@ -95,7 +95,28 @@ public static class HtmlFormSubmitter {
     /// <param name="fetchOptions">Response byte policy; null uses the default 16 MiB limit.</param>
     /// <param name="cancellationToken">Cancellation covering request headers and the response body.</param>
     /// <returns>Decoded HTML response.</returns>
-    public static async Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client, HtmlHttpFetchOptions? fetchOptions, CancellationToken cancellationToken) {
+    public static Task<string> SubmitAsync(string actionUrl, FormMethod method, IDictionary<string, string> fields, HttpClient? client, HtmlHttpFetchOptions? fetchOptions, CancellationToken cancellationToken) =>
+        SubmitAsync(actionUrl, method, (IEnumerable<KeyValuePair<string, string>>)fields, client, fetchOptions, cancellationToken);
+
+    /// <summary>Submits ordered HTTP form values, retaining repeated names.</summary>
+    /// <param name="actionUrl">Form action URL. GET submissions append fields to its existing query.</param>
+    /// <param name="method">Submission method.</param>
+    /// <param name="fields">Ordered named values; names may repeat.</param>
+    /// <param name="client">Optional reusable HTTP client, owned by the caller.</param>
+    /// <param name="cancellationToken">Cancellation covering request headers and the response body.</param>
+    /// <returns>Decoded HTML response.</returns>
+    public static Task<string> SubmitAsync(string actionUrl, FormMethod method, IEnumerable<KeyValuePair<string, string>> fields, HttpClient? client = null, CancellationToken cancellationToken = default) =>
+        SubmitAsync(actionUrl, method, fields, client, fetchOptions: null, cancellationToken);
+
+    /// <summary>Submits ordered HTTP form values with explicit response byte limits and HTML decoding.</summary>
+    /// <param name="actionUrl">Form action URL. GET submissions append fields to its existing query.</param>
+    /// <param name="method">Submission method.</param>
+    /// <param name="fields">Ordered named values; names may repeat.</param>
+    /// <param name="client">Optional reusable HTTP client, owned by the caller.</param>
+    /// <param name="fetchOptions">Response byte policy; null uses the default 16 MiB limit.</param>
+    /// <param name="cancellationToken">Cancellation covering request headers and the response body.</param>
+    /// <returns>Decoded HTML response.</returns>
+    public static async Task<string> SubmitAsync(string actionUrl, FormMethod method, IEnumerable<KeyValuePair<string, string>> fields, HttpClient? client, HtmlHttpFetchOptions? fetchOptions, CancellationToken cancellationToken) {
         if (actionUrl == null) {
             throw new ArgumentNullException(nameof(actionUrl));
         }

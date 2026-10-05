@@ -3853,6 +3853,45 @@ Include protocol and port if necessary.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
+      <command:syntaxItem parameterSetName="HttpClient">
+        <maml:name>ConvertFrom-HtmlForm</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HttpClient</maml:name>
+          <maml:description>
+            <maml:para>Reusable HTTP client for downloading the form. The caller retains ownership, cookies, and configuration.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">HttpClient</command:parameterValue>
+          <dev:type>
+            <maml:name>HttpClient</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>IncludeMetadata</maml:name>
+          <maml:description>
+            <maml:para>Include additional metadata like form index and CSS classes.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Uri">
+          <maml:name>Url</maml:name>
+          <maml:description>
+            <maml:para>URL of a page with forms.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
     </command:syntax>
     <command:parameters>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
@@ -3875,6 +3914,18 @@ Include protocol and port if necessary.</maml:para>
         <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
         <dev:type>
           <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>HttpClient</maml:name>
+        <maml:description>
+          <maml:para>Reusable HTTP client for downloading the form. The caller retains ownership, cookies, and configuration.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">HttpClient</command:parameterValue>
+        <dev:type>
+          <maml:name>HttpClient</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -3960,6 +4011,13 @@ Include protocol and port if necessary.</maml:para>
         <dev:code>ConvertFrom-HtmlForm -Content '&lt;form action="save"&gt;&lt;input name="tag" value="one"&gt;&lt;/form&gt;' -BaseUri https://example.com/settings/ -IncludeMetadata</dev:code>
         <dev:remarks>
           <maml:para>Returns the field inventory, ordered successful values, and resolved HTTP action.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>$form = ConvertFrom-HtmlForm -Url https://example.com/settings/ -HttpClient $client</dev:code>
+        <dev:remarks>
+          <maml:para>Downloads using a caller-owned, cookie-enabled client that can also submit the form.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -56298,12 +56356,12 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
     <command:syntax>
       <command:syntaxItem parameterSetName="Http">
         <maml:name>Submit-HtmlBrowserForm</maml:name>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
           <maml:name>FieldValue</maml:name>
           <maml:description>
-            <maml:para>Hashtable of field values keyed by name.</maml:para>
+            <maml:para>Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">Hashtable</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Hashtable</command:parameterValue>
           <dev:type>
             <maml:name>Hashtable</maml:name>
             <maml:uri />
@@ -56361,7 +56419,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Timeout</maml:name>
           <maml:description>
-            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
+            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -56388,7 +56446,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
           <maml:name>FieldValue</maml:name>
           <maml:description>
-            <maml:para>Hashtable of field values keyed by name.</maml:para>
+            <maml:para>Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.</maml:para>
           </maml:description>
           <command:parameterValue required="true" variableLength="false">Hashtable</command:parameterValue>
           <dev:type>
@@ -56448,7 +56506,70 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Timeout</maml:name>
           <maml:description>
-            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
+            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="HttpClient">
+        <maml:name>Submit-HtmlBrowserForm</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
+          <maml:name>FieldValue</maml:name>
+          <maml:description>
+            <maml:para>Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Hashtable</command:parameterValue>
+          <dev:type>
+            <maml:name>Hashtable</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="0" aliases="None">
+          <maml:name>Form</maml:name>
+          <maml:description>
+            <maml:para>Form object created by ConvertFrom-HtmlForm.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">PSObject</command:parameterValue>
+          <dev:type>
+            <maml:name>PSObject</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HttpClient</maml:name>
+          <maml:description>
+            <maml:para>Reusable HTTP client for submitting the form. The caller retains ownership, cookies, and configuration.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">HttpClient</command:parameterValue>
+          <dev:type>
+            <maml:name>HttpClient</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Timeout</maml:name>
+          <maml:description>
+            <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -56472,12 +56593,12 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
         <maml:name>FieldValue</maml:name>
         <maml:description>
-          <maml:para>Hashtable of field values keyed by name.</maml:para>
+          <maml:para>Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.</maml:para>
         </maml:description>
-        <command:parameterValue required="true" variableLength="false">Hashtable</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Hashtable</command:parameterValue>
         <dev:type>
           <maml:name>Hashtable</maml:name>
           <maml:uri />
@@ -56492,6 +56613,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameterValue required="true" variableLength="false">PSObject</command:parameterValue>
         <dev:type>
           <maml:name>PSObject</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>HttpClient</maml:name>
+        <maml:description>
+          <maml:para>Reusable HTTP client for submitting the form. The caller retains ownership, cookies, and configuration.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">HttpClient</command:parameterValue>
+        <dev:type>
+          <maml:name>HttpClient</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -56571,7 +56704,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Timeout</maml:name>
         <maml:description>
-          <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</maml:para>
+          <maml:para>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
@@ -56603,9 +56736,16 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Submit-HtmlBrowserForm -FailureEvidenceFolder 'Value'</dev:code>
+        <dev:code>Submit-HtmlBrowserForm -Form $form -FieldValue @{ tag = @('first', 'second') }</dev:code>
         <dev:remarks>
-          <maml:para></maml:para>
+          <maml:para>Retains successful defaults and replaces all values named tag with the two supplied values.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Submit-HtmlBrowserForm -Form $form -HttpClient $client -FieldValue @{ displayName = 'Ada' }</dev:code>
+        <dev:remarks>
+          <maml:para>Reuses the downloading client's cookies without changing or disposing that client.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

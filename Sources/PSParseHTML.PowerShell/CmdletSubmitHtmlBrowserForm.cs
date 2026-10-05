@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PSParseHTML.PowerShell;
@@ -13,20 +14,35 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that submits an HTML form using Playwright or HTTP requests.
 /// </summary>
+/// <example>
+/// <code>Submit-HtmlBrowserForm -Form $form -FieldValue @{ tag = @('first', 'second') }</code>
+/// <para>Retains successful defaults and replaces all values named tag with the two supplied values.</para>
+/// </example>
+/// <example>
+/// <code>Submit-HtmlBrowserForm -Form $form -HttpClient $client -FieldValue @{ displayName = 'Ada' }</code>
+/// <para>Reuses the downloading client's cookies without changing or disposing that client.</para>
+/// </example>
 [Cmdlet(VerbsLifecycle.Submit, "HtmlBrowserForm", DefaultParameterSetName = ParameterSetHttp)]
 [OutputType(typeof(string))]
 [Alias("Submit-HtmlForm")]
 public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     private const string ParameterSetSession = "Session";
     private const string ParameterSetHttp = "Http";
+    private const string ParameterSetClient = "HttpClient";
 
     /// <summary>Form object created by ConvertFrom-HtmlForm.</summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     public PSObject Form { get; set; } = null!;
 
-    /// <summary>Hashtable of field values keyed by name.</summary>
-    [Parameter(Mandatory = true, Position = 1)]
+    /// <summary>Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.</summary>
+    [Parameter(Mandatory = true, Position = 1, ParameterSetName = ParameterSetSession)]
+    [Parameter(Position = 1, ParameterSetName = ParameterSetHttp)]
+    [Parameter(Position = 1, ParameterSetName = ParameterSetClient)]
     public Hashtable FieldValue { get; set; } = new();
+
+    /// <summary>Reusable HTTP client for submitting the form. The caller retains ownership, cookies, and configuration.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClient)]
+    public HttpClient? HttpClient { get; set; }
 
     /// <summary>Existing browser session for Playwright submission.</summary>
     [Parameter(ParameterSetName = ParameterSetSession)]
@@ -40,13 +56,14 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
     [Parameter(ParameterSetName = ParameterSetHttp)]
     public PSCredential? ProxyCredential { get; set; }
 
-    /// <summary>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.</summary>
+    /// <summary>Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.</summary>
     [Parameter]
     [ValidateRange(0, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
     /// <summary>Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.</summary>
     [Parameter(ParameterSetName = ParameterSetHttp)]
+    [Parameter(ParameterSetName = ParameterSetClient)]
     [ValidateRange(1, int.MaxValue)]
     public int MaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
 
@@ -74,10 +91,9 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
             method = FormMethod.Post;
         }
 
-        Dictionary<string, string> fields = FieldValue.Cast<DictionaryEntry>()
-            .ToDictionary(d => (string)d.Key, d => d.Value?.ToString() ?? string.Empty);
-
         if (ParameterSetName == ParameterSetSession) {
+            Dictionary<string, string> fields = FieldValue.Cast<DictionaryEntry>()
+                .ToDictionary(d => (string)d.Key, d => d.Value?.ToString() ?? string.Empty);
             HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                 ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
@@ -102,9 +118,37 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
                 WriteObject(session);
             }
         } else {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            client.Timeout = Timeout == 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(Timeout);
-            string result = await HtmlFormSubmitter.SubmitAsync(action, method, fields, client, new HtmlHttpFetchOptions { MaximumResponseBytes = MaximumResponseBytes }, CancelToken).ConfigureAwait(false);
+            HtmlFormResult form = new() { Metadata = new() { Action = action, Method = method } };
+            string? resolvedAction = Form.Properties["ResolvedAction"]?.Value as string;
+            if (!string.IsNullOrEmpty(resolvedAction)) {
+                form.Metadata.ResolvedActionUri = new Uri(resolvedAction, UriKind.Absolute);
+            }
+            if (Form.Properties["SuccessfulFields"]?.Value is IEnumerable successfulFields) {
+                foreach (object value in successfulFields) {
+                    PSObject field = PSObject.AsPSObject(value);
+                    form.SuccessfulFields.Add(new KeyValuePair<string, string>(
+                        LanguagePrimitives.ConvertTo<string>(field.Properties["Key"]?.Value),
+                        LanguagePrimitives.ConvertTo<string>(field.Properties["Value"]?.Value) ?? string.Empty));
+                }
+            }
+            List<KeyValuePair<string, string>> overrides = new();
+            foreach (DictionaryEntry value in FieldValue) {
+                string name = LanguagePrimitives.ConvertTo<string>(value.Key);
+                IEnumerator? values = LanguagePrimitives.GetEnumerator(value.Value);
+                if (values == null) overrides.Add(new(name, LanguagePrimitives.ConvertTo<string>(value.Value) ?? string.Empty));
+                else {
+                    using IDisposable? enumeratorOwner = values as IDisposable;
+                    if (!values.MoveNext()) throw new PSArgumentException($"FieldValue '{name}' needs at least one value. Use an empty string to submit an empty value.");
+                    do overrides.Add(new(name, LanguagePrimitives.ConvertTo<string>(values.Current) ?? string.Empty));
+                    while (values.MoveNext());
+                }
+            }
+            using HttpClient? ownedClient = HttpClient == null ? HttpClientHelper.Create(Proxy, ProxyCredential) : null;
+            if (ownedClient != null) ownedClient.Timeout = Timeout == 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(Timeout);
+            using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(CancelToken);
+            if (Timeout > 0) deadline.CancelAfter(Timeout);
+            string result = await HtmlFormSubmitter.SubmitAsync(form, overrides, HttpClient ?? ownedClient!,
+                new HtmlHttpFetchOptions { MaximumResponseBytes = MaximumResponseBytes }, deadline.Token).ConfigureAwait(false);
             WriteObject(result);
         }
     }

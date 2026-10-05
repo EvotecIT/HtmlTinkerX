@@ -17,11 +17,16 @@ namespace PSParseHTML.PowerShell;
 /// <code>ConvertFrom-HtmlForm -Content '&lt;form action="save"&gt;&lt;input name="tag" value="one"&gt;&lt;/form&gt;' -BaseUri https://example.com/settings/ -IncludeMetadata</code>
 /// <para>Returns the field inventory, ordered successful values, and resolved HTTP action.</para>
 /// </example>
+/// <example>
+/// <code>$form = ConvertFrom-HtmlForm -Url https://example.com/settings/ -HttpClient $client</code>
+/// <para>Downloads using a caller-owned, cookie-enabled client that can also submit the form.</para>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlForm", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
+    private const string ParameterSetClient = "HttpClient";
 
     /// <summary>HTML content containing forms.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetContent, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
@@ -29,8 +34,13 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
 
     /// <summary>URL of a page with forms.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClient)]
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
+
+    /// <summary>Reusable HTTP client for downloading the form. The caller retains ownership, cookies, and configuration.</summary>
+    [Parameter(Mandatory = true, ParameterSetName = ParameterSetClient)]
+    public HttpClient? HttpClient { get; set; }
 
     /// <summary>Absolute document address used to resolve relative actions in supplied HTML.</summary>
     [Parameter(ParameterSetName = ParameterSetContent)]
@@ -41,20 +51,22 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
     public SwitchParameter IncludeMetadata { get; set; }
 
     /// <summary>Proxy server address for downloading when using <see cref="Url"/>.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetContent)]
     public string? Proxy { get; set; }
 
     /// <summary>Credentials for the proxy server.</summary>
-    [Parameter]
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [Parameter(ParameterSetName = ParameterSetContent)]
     public PSCredential? ProxyCredential { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
         List<HtmlFormResult> forms;
-        if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
-            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
+        if (ParameterSetName == ParameterSetUrl || ParameterSetName == ParameterSetClient) {
+            using HttpClient? ownedClient = HttpClient == null ? HttpClientHelper.Create(Proxy, ProxyCredential) : null;
+            forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), HttpClient ?? ownedClient!, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
             forms = HtmlParser.ParseFormsWithAngleSharp(Content, BaseUri);
         }

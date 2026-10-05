@@ -11,12 +11,17 @@ Cmdlet that submits an HTML form using Playwright or HTTP requests.
 ## SYNTAX
 ### Http (Default)
 ```powershell
-Submit-HtmlBrowserForm [-Form] <psobject> [-FieldValue] <hashtable> [-Proxy <string>] [-ProxyCredential <pscredential>] [-Timeout <int>] [-MaximumResponseBytes <int>] [<CommonParameters>]
+Submit-HtmlBrowserForm [-Form] <psobject> [[-FieldValue] <hashtable>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Timeout <int>] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ### Session
 ```powershell
 Submit-HtmlBrowserForm [-Form] <psobject> [-FieldValue] <hashtable> [-Session <HtmlBrowserSession>] [-Timeout <int>] [-PassThru] [-OnFailureEvidence] [-FailureEvidenceFolder <string>] [<CommonParameters>]
+```
+
+### HttpClient
+```powershell
+Submit-HtmlBrowserForm [-Form] <psobject> [[-FieldValue] <hashtable>] -HttpClient <HttpClient> [-Timeout <int>] [-MaximumResponseBytes <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -26,9 +31,17 @@ Cmdlet that submits an HTML form using Playwright or HTTP requests.
 
 ### EXAMPLE 1
 ```powershell
-Submit-HtmlBrowserForm -FailureEvidenceFolder 'Value'
+Submit-HtmlBrowserForm -Form $form -FieldValue @{ tag = @('first', 'second') }
 ```
 
+Retains successful defaults and replaces all values named tag with the two supplied values.
+
+### EXAMPLE 2
+```powershell
+Submit-HtmlBrowserForm -Form $form -HttpClient $client -FieldValue @{ displayName = 'Ada' }
+```
+
+Reuses the downloading client's cookies without changing or disposing that client.
 
 ## PARAMETERS
 
@@ -49,15 +62,15 @@ Accept wildcard characters: False
 ```
 
 ### -FieldValue
-Hashtable of field values keyed by name.
+Field overrides by name. HTTP submission retains other successful values; arrays supply repeated values.
 
 ```yaml
 Type: Hashtable
-Parameter Sets: Http, Session
+Parameter Sets: Http, Session, HttpClient
 Aliases: None
 Possible values:
 
-Required: True
+Required: False
 Position: 1
 Default value: None
 Accept pipeline input: False
@@ -69,7 +82,7 @@ Form object created by ConvertFrom-HtmlForm.
 
 ```yaml
 Type: PSObject
-Parameter Sets: Http, Session
+Parameter Sets: Http, Session, HttpClient
 Aliases: None
 Possible values:
 
@@ -80,12 +93,28 @@ Accept pipeline input: True (ByValue)
 Accept wildcard characters: False
 ```
 
+### -HttpClient
+Reusable HTTP client for submitting the form. The caller retains ownership, cookies, and configuration.
+
+```yaml
+Type: HttpClient
+Parameter Sets: HttpClient
+Aliases: None
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -MaximumResponseBytes
 Maximum HTTP response body bytes. Default: 16 MiB. Raise explicitly for trusted large responses.
 
 ```yaml
 Type: Int32
-Parameter Sets: Http
+Parameter Sets: Http, HttpClient
 Aliases: None
 Possible values:
 
@@ -177,11 +206,11 @@ Accept wildcard characters: False
 ```
 
 ### -Timeout
-Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables the timeout.
+Timeout in milliseconds for browser operations or the complete HTTP submission. Zero disables this timeout; a supplied HTTP client retains its own timeout.
 
 ```yaml
 Type: Int32
-Parameter Sets: Http, Session
+Parameter Sets: Http, Session, HttpClient
 Aliases: None
 Possible values:
 
