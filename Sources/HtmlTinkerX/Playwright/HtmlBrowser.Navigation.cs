@@ -18,7 +18,8 @@ public static partial class HtmlBrowser {
         string? password,
         HtmlBrowserLoadState loadState,
         int timeout,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        bool skipInitialNavigation = false) {
         if (formLogin != null) {
             cancellationToken.ThrowIfCancellationRequested();
             await page.GotoAsync(formLogin.LoginUrl, new PageGotoOptions {
@@ -36,6 +37,7 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (skipInitialNavigation) return;
         await page.GotoAsync(url, new PageGotoOptions {
             Timeout = timeout,
             WaitUntil = ToWaitUntilState(loadState)
