@@ -94,6 +94,16 @@ public static partial class HtmlDomExtraction {
         string itemSelector,
         IReadOnlyDictionary<string, HtmlDomFieldDefinition> properties,
         Uri? effectiveBaseUri) {
+        foreach (KeyValuePair<string, HtmlDomFieldDefinition> property in properties) {
+            if (string.IsNullOrWhiteSpace(property.Key)) {
+                throw new ArgumentException("Property names cannot be empty.", nameof(properties));
+            }
+
+            HtmlDomFieldDefinition definition = property.Value
+                ?? throw new ArgumentException($"Property '{property.Key}' has no field definition.", nameof(properties));
+            ValidateFieldConversion(definition, property.Key);
+        }
+
         IHtmlCollection<IElement> items;
         try {
             items = document.QuerySelectorAll(itemSelector);
@@ -106,13 +116,7 @@ public static partial class HtmlDomExtraction {
             IElement item = items[index];
             Dictionary<string, object?> values = new(StringComparer.OrdinalIgnoreCase);
             foreach (KeyValuePair<string, HtmlDomFieldDefinition> property in properties) {
-                if (string.IsNullOrWhiteSpace(property.Key)) {
-                    throw new ArgumentException("Property names cannot be empty.", nameof(properties));
-                }
-
-                HtmlDomFieldDefinition definition = property.Value
-                    ?? throw new ArgumentException($"Property '{property.Key}' has no field definition.", nameof(properties));
-                values[property.Key] = ExtractFieldValue(item, definition, property.Key, index, effectiveBaseUri);
+                values[property.Key] = ExtractFieldValue(item, property.Value, property.Key, index, effectiveBaseUri);
             }
 
             records.Add(new HtmlDomExtractionRecord {
@@ -253,7 +257,8 @@ public static partial class HtmlDomExtraction {
 
         object?[] values = matches
             .Select(match => ReadElementValue(match, definition, baseUri))
-            .Where(static value => value != null)
+            .Where(value => value != null
+                && (!definition.TreatEmptyAsMissing || !string.IsNullOrWhiteSpace(value as string)))
             .ToArray();
 
         if (values.Length == 0) {
@@ -264,10 +269,12 @@ public static partial class HtmlDomExtraction {
 
             return definition.All
                 ? Array.Empty<object?>()
-                : definition.DefaultValue;
+                : ConvertFieldValue(definition.DefaultValue, definition, propertyName, itemIndex);
         }
 
-        return definition.All ? values : values[0];
+        return definition.All
+            ? values.Select(value => ConvertFieldValue(value, definition, propertyName, itemIndex)).ToArray()
+            : ConvertFieldValue(values[0], definition, propertyName, itemIndex);
     }
 
     private static object? ReadElementValue(IElement element, HtmlDomFieldDefinition definition, Uri? baseUri) {

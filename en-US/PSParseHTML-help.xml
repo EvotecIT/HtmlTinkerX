@@ -45936,7 +45936,10 @@ Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-mai
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
           <dev:type>
@@ -46001,7 +46004,10 @@ ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
           <dev:type>
@@ -46066,7 +46072,10 @@ ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
           <dev:type>
@@ -46131,7 +46140,10 @@ ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
           <maml:description>
             <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
           <dev:type>
@@ -46280,7 +46292,10 @@ ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
         <maml:description>
           <maml:para>Property-to-selector map used with ItemSelector.&#xD;
 String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.&#xD;
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
         <dev:type>
@@ -46398,6 +46413,16 @@ ValueKind, All, Required, DefaultValue, or ResolveUrl.</maml:para>
 }</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Extract typed prices and require non-empty product names</maml:title>
+        <dev:code>Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{&#xD;
+    Name = @{ Selector = '.product-title'; Required = $true; TreatEmptyAsMissing = $true }&#xD;
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; Culture = 'pl-PL' }&#xD;
+}</dev:code>
+        <dev:remarks>
+          <maml:para>Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

@@ -62,6 +62,16 @@ Select-HtmlData -Url https://example.org/products -ItemSelector '.product-card' 
 ```
 
 
+### EXAMPLE 5
+```powershell
+Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true; TreatEmptyAsMissing = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; Culture = 'pl-PL' }
+}
+```
+
+Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.
+
 ## PARAMETERS
 
 ### -BaseUrl
@@ -179,7 +189,10 @@ Accept wildcard characters: False
 ### -Property
 Property-to-selector map used with ItemSelector.
 String values read trimmed text. Hashtable values can specify Selector, Attribute,
-ValueKind, All, Required, DefaultValue, or ResolveUrl.
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, or TreatEmptyAsMissing.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
+Required fields throw when missing. Invalid typed values report the property and item index.
 
 ```yaml
 Type: IDictionary
