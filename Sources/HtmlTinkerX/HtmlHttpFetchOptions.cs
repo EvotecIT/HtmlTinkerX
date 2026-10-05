@@ -6,6 +6,7 @@ namespace HtmlTinkerX;
 /// Controls bounded HTTP response handling for URL-based parsing operations.
 /// </summary>
 public sealed class HtmlHttpFetchOptions {
+    internal HtmlCrawlResponseBudget? ResponseBudget { get; set; }
     /// <summary>
     /// Default maximum response body size: 16 MiB.
     /// </summary>

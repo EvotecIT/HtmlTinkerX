@@ -10,6 +10,8 @@ namespace HtmlTinkerX;
 /// </summary>
 public sealed class HtmlCrawlOptions {
     internal System.Uri? CrawlOrigin { get; set; }
+    internal HtmlCrawlResponseBudget? PageResponseBudget { get; set; }
+    internal HtmlCrawlResponseBudget? AssetResponseBudget { get; set; }
 
     private readonly HashSet<string> _explicitScenarioOptions = new(System.StringComparer.Ordinal);
     private bool _applyingScenarioDefaults;
@@ -39,6 +41,19 @@ public sealed class HtmlCrawlOptions {
 
     /// <summary>Maximum size in bytes for each downloaded crawl asset.</summary>
     public int MaximumAssetResponseBytes { get; set; } = DefaultMaximumAssetResponseBytes;
+
+    /// <summary>Optional total HTTP body limit for static pages, robots.txt, and sitemaps in one crawl invocation.</summary>
+    /// <remarks>
+    /// Counts bytes as bodies are read, including bodies later rejected or discarded. Cached 304 responses and
+    /// unread redirect or error bodies do not consume this limit. Browser traffic and rendered HTML are excluded.
+    /// Exceeding the limit throws <see cref="HtmlCrawlBudgetExceededException"/>; the preceding checkpoint remains usable.
+    /// A resumed invocation receives a fresh budget. Null leaves the aggregate unlimited.
+    /// </remarks>
+    public long? MaximumTotalPageResponseBytes { get; set; }
+
+    /// <summary>Optional total HTTP body limit for downloaded assets, including nested CSS assets, in one crawl invocation.</summary>
+    /// <remarks>Uses the same accounting and checkpoint behavior as <see cref="MaximumTotalPageResponseBytes"/>.</remarks>
+    public long? MaximumTotalAssetResponseBytes { get; set; }
 
     /// <summary>When true, pages are rendered through Playwright before extraction.</summary>
     public bool Render { get; set; }
@@ -383,6 +398,8 @@ public sealed class HtmlCrawlOptions {
             MaxPages = MaxPages,
             MaximumPageResponseBytes = MaximumPageResponseBytes,
             MaximumAssetResponseBytes = MaximumAssetResponseBytes,
+            MaximumTotalPageResponseBytes = MaximumTotalPageResponseBytes,
+            MaximumTotalAssetResponseBytes = MaximumTotalAssetResponseBytes,
             Render = Render,
             AutoRender = AutoRender,
             RestrictToHost = RestrictToHost,

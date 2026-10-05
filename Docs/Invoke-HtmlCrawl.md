@@ -11,7 +11,7 @@ Crawls a site offline and returns extracted pages with optional browser renderin
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Invoke-HtmlCrawl [-Url] <string> [-MaxDepth <int>] [-MaxPages <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Invoke-HtmlCrawl [-Url] <string> [-MaxDepth <int>] [-MaxPages <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -902,6 +902,38 @@ Maximum number of bytes accepted for a page or sitemap response.
 
 ```yaml
 Type: Int32
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumTotalAssetResponseBytes
+Optional total HTTP body limit for downloaded assets, including nested CSS assets, in this invocation.
+
+```yaml
+Type: Int64
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumTotalPageResponseBytes
+Optional total HTTP body limit for static pages, robots.txt, and sitemaps in this invocation. Browser traffic is excluded.
+
+```yaml
+Type: Int64
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

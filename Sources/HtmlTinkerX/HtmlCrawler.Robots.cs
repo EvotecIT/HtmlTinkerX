@@ -33,11 +33,13 @@ public static partial class HtmlCrawler {
                 return cache[hostKey];
             }
 
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
+            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken, options.PageResponseBudget).ConfigureAwait(false);
             string text = Encoding.UTF8.GetString(bytes);
             RobotsDocument robots = ParseRobots(text, options.RobotsUserAgent);
             cache[hostKey] = robots;
             return robots;
+        } catch (HtmlCrawlBudgetExceededException) {
+            throw;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch {

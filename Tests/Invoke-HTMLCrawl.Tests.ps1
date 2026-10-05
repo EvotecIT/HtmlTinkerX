@@ -188,6 +188,37 @@ public sealed class PesterTestHttpServer : IDisposable {
         }
     }
 
+    It 'enforces aggregate page response bytes through the public command' {
+        $body = '<main>First</main><a href="/child">Next</a>'
+        $server = Start-TestHttpServer -Responses @{
+            '/' = $body
+            '/child' = '<main>Second</main>'
+        }
+        try {
+            $limit = [Text.Encoding]::UTF8.GetByteCount($body)
+            { Invoke-HtmlCrawl -Url $server.Prefix -MaxPages 2 -IgnoreRobotsTxt -NoSitemaps -MaximumTotalPageResponseBytes $limit -ErrorAction Stop } |
+                Should -Throw '*MaximumTotalPageResponseBytes*'
+            $result = Invoke-HtmlCrawl -Url $server.Prefix -MaxPages 2 -IgnoreRobotsTxt -NoSitemaps -MaximumTotalPageResponseBytes ([long][int]::MaxValue + 1)
+            $result.PageCount | Should -Be 2
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
+    It 'enforces aggregate asset response bytes through the public command' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = '<main>Page</main><img src="/first.png"><img src="/second.png">'
+            '/first.png' = @{Body = 'first'; ContentType = 'image/png'}
+            '/second.png' = @{Body = 'second'; ContentType = 'image/png'}
+        }
+        try {
+            { Invoke-HtmlCrawl -Url $server.Prefix -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -DownloadAssets -MaximumTotalAssetResponseBytes 5 -ErrorAction Stop } |
+                Should -Throw '*MaximumTotalAssetResponseBytes*'
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
     It 'Uses sitemap and skips robots-blocked pages' {
         $prefix = New-TestServerPrefix
         $server = Start-TestHttpServer -Prefix $prefix -Responses @{

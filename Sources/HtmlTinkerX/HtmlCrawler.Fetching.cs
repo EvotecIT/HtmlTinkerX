@@ -60,7 +60,7 @@ public static partial class HtmlCrawler {
                 page.ResponseChanged = false;
             } else {
                 response.EnsureSuccessStatusCode();
-                byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken).ConfigureAwait(false);
+                byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumPageResponseBytes, requestToken, options.PageResponseBudget).ConfigureAwait(false);
                 byteLength = bytes.Length;
                 html = HtmlUtilities.DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
                 page.ResponseContentHash = ComputeResponseHash(bytes);
@@ -88,6 +88,8 @@ public static partial class HtmlCrawler {
                 Page = page,
                 RawHtml = html
             };
+        } catch (HtmlCrawlBudgetExceededException) {
+            throw;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
