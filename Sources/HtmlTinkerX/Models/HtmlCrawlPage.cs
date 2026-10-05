@@ -254,12 +254,14 @@ public sealed class HtmlCrawlPage {
     /// <summary>Creates a shallow copy of the page's current properties.</summary>
     /// <remarks>
     /// The copy keeps the current content strings when the crawler releases them from the original page.
-    /// Collections and structured data are shared. This does not reload content that was already released.
+    /// Collections and structured data are shared. Released content is not reloaded,
+    /// and the copy does not depend on the source dataset for its content.
     /// </remarks>
     /// <returns>A copy that can be retained independently of the original page's content lifetime.</returns>
     public HtmlCrawlPage CreateSnapshot() {
         HtmlCrawlPage snapshot = (HtmlCrawlPage)MemberwiseClone();
         snapshot.StoredContentId = null;
+        snapshot.StoredContentPath = null;
         return snapshot;
     }
 

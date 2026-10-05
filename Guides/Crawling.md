@@ -293,4 +293,9 @@ this option does not limit total process memory.
 
 With `-StreamPages -ReleasePageContent`, emitted pages keep their selected HTML,
 text and Markdown while the crawler's retained page records release those bodies.
-The awaited C# observer also receives the content before it is released.
+The awaited C# observer also receives the content before it is released. Process
+it during the callback or call `page.CreateSnapshot()` to keep it afterward.
+The snapshot keeps the content available when it is created and shares the
+page's collections. It does not reload released bodies; load the saved result
+first if you need that content. Collecting streamed copies or queuing them for a
+slow consumer still uses memory.
