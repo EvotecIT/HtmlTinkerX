@@ -317,7 +317,7 @@ public static partial class HtmlCrawler {
     }
 
     internal static int GetChunkCountForSummary(IEnumerable<HtmlCrawlPage> pages) =>
-        BuildChunkRecords(pages).Count;
+        EnumerateChunkRecords(pages).Count();
 
     internal static int GetStructuredAuthenticatedApiEndpointCount(HtmlCrawlStructuredJson? structuredJson) =>
         structuredJson?.ApiEndpoints.Count(endpoint =>
@@ -539,8 +539,7 @@ public static partial class HtmlCrawler {
     private static bool IsExternalSkipReason(HtmlCrawlSkipReason reason) =>
         reason == HtmlCrawlSkipReason.OutsideHost;
 
-    private static List<PageChunkRecord> BuildChunkRecords(IEnumerable<HtmlCrawlPage> pages) {
-        List<PageChunkRecord> chunks = new();
+    private static IEnumerable<PageChunkRecord> EnumerateChunkRecords(IEnumerable<HtmlCrawlPage> pages) {
         HashSet<string> seenFingerprints = new(StringComparer.OrdinalIgnoreCase);
         int nextChunkId = 1;
 
@@ -554,32 +553,30 @@ public static partial class HtmlCrawler {
                     continue;
                 }
 
-                chunks.Add(new PageChunkRecord {
+                yield return new PageChunkRecord {
                     ChunkId = $"chunk-{nextChunkId:D5}",
                     Url = page.Url,
-                Title = page.Title,
-                Depth = page.Depth,
-                ChunkIndex = chunkIndex++,
-                WordCount = CountWords(chunkText),
-                CharacterCount = chunkText.Length,
+                    Title = page.Title,
+                    Depth = page.Depth,
+                    ChunkIndex = chunkIndex++,
+                    WordCount = CountWords(chunkText),
+                    CharacterCount = chunkText.Length,
                     Summary = BuildSummary(chunkText),
                     Headings = searchMetadata.Headings,
                     Keywords = ExtractKeywords(chunkText),
-                Text = chunkText,
-                HtmlPath = page.HtmlPath,
-                TextPath = page.TextPath,
-                ManifestPath = page.ManifestPath,
-                OfflineReadinessGrade = page.OfflineReadinessGrade,
-                HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
-                OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
-                OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
-                Fingerprint = fingerprint
-            });
+                    Text = chunkText,
+                    HtmlPath = page.HtmlPath,
+                    TextPath = page.TextPath,
+                    ManifestPath = page.ManifestPath,
+                    OfflineReadinessGrade = page.OfflineReadinessGrade,
+                    HighestOfflineRiskSeverity = page.HighestOfflineRiskSeverity,
+                    OfflineDependencyDiagnosticCount = page.OfflineDependencyDiagnosticCount,
+                    OfflineDependencyKindsSummary = page.OfflineDependencyKindsSummary,
+                    Fingerprint = fingerprint
+                };
                 nextChunkId++;
             }
         }
-
-        return chunks;
     }
 
     private static List<string> BuildPageChunkTexts(HtmlCrawlPage page) =>

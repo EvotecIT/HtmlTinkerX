@@ -134,9 +134,7 @@ public static partial class HtmlCrawler {
         await ExportLinkRecordsAsync(result, artifactPaths.LinksJsonlPath, cancellationToken).ConfigureAwait(false);
         await ExportAssetRecordsAsync(result, artifactPaths.AssetsJsonlPath, cancellationToken).ConfigureAwait(false);
         await ExportStructuredPageRecordsAsync(result, artifactPaths.StructuredJsonPagesJsonlPath, cancellationToken).ConfigureAwait(false);
-        List<PageChunkRecord> chunkRecords = BuildChunkRecords(result.Pages);
-        result.ChunkCount = chunkRecords.Count;
-        await ExportChunkRecordsAsync(chunkRecords, artifactPaths.ChunksJsonlPath, cancellationToken).ConfigureAwait(false);
+        result.ChunkCount = await ExportChunkRecordsAsync(EnumerateChunkRecords(result.Pages), artifactPaths.ChunksJsonlPath, cancellationToken).ConfigureAwait(false);
 
         (object graphDocument, int graphNodeCount, int graphEdgeCount, int fetchedNodeCount, int skippedNodeCount, int externalNodeCount, Dictionary<string, int> nodeCategories, Dictionary<string, int> edgeRelations, Dictionary<string, int> skippedNodeReasons) =
             BuildGraphDocument(result.Pages, result.SkippedPages, artifactPaths.GraphJsonPath);

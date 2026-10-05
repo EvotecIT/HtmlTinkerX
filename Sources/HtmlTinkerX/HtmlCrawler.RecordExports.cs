@@ -264,8 +264,9 @@ public static partial class HtmlCrawler {
             }
         }, cancellationToken);
 
-    private static Task ExportChunkRecordsAsync(IEnumerable<PageChunkRecord> chunkRecords, string path, CancellationToken cancellationToken) =>
-        WriteLinesAtomicallyAsync(path, async chunksJsonl => {
+    private static async Task<int> ExportChunkRecordsAsync(IEnumerable<PageChunkRecord> chunkRecords, string path, CancellationToken cancellationToken) {
+        int count = 0;
+        await WriteLinesAtomicallyAsync(path, async chunksJsonl => {
             foreach (PageChunkRecord chunk in chunkRecords) {
                 cancellationToken.ThrowIfCancellationRequested();
                 await chunksJsonl.WriteLineAsync(JsonSerializer.Serialize(new {
@@ -289,6 +290,9 @@ public static partial class HtmlCrawler {
                     chunk.OfflineDependencyKindsSummary,
                     chunk.Fingerprint
                 }));
+                count++;
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
+        return count;
+    }
 }
