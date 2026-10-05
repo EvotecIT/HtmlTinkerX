@@ -11,22 +11,22 @@ Reads an HTML page as headings, paragraphs, tables, links, resources, and inferr
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Get-HtmlPage [-Content] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [<CommonParameters>]
+Get-HtmlPage [-Content] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Get-HtmlPage [-Path] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [<CommonParameters>]
+Get-HtmlPage [-Path] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
+Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
 ```
 
 ### Snapshot
 ```powershell
-Get-HtmlPage [-RenderedSnapshot] <HtmlRenderedPageSnapshot> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [<CommonParameters>]
+Get-HtmlPage [-RenderedSnapshot] <HtmlRenderedPageSnapshot> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -146,6 +146,54 @@ Accept wildcard characters: False
 
 ### -NoCollections
 Skips repeated-collection inference.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Content, File, Url, Snapshot
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -NoMarkdown
+Skips Markdown conversion. Semantic content remains available.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Content, File, Url, Snapshot
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -NoReadableText
+Skips readable-text analysis and its title fallback. Semantic content remains available.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Content, File, Url, Snapshot
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -NoWebData
+Skips normalized links, forms and assets. Semantic resources and collection inference are independent.
 
 ```yaml
 Type: SwitchParameter

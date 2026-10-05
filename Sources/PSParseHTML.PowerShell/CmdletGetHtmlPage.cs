@@ -66,6 +66,18 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter NoCollections { get; set; }
 
+    /// <summary>Skips readable-text analysis and its title fallback. Semantic content remains available.</summary>
+    [Parameter]
+    public SwitchParameter NoReadableText { get; set; }
+
+    /// <summary>Skips Markdown conversion. Semantic content remains available.</summary>
+    [Parameter]
+    public SwitchParameter NoMarkdown { get; set; }
+
+    /// <summary>Skips normalized links, forms and assets. Semantic resources and collection inference are independent.</summary>
+    [Parameter]
+    public SwitchParameter NoWebData { get; set; }
+
     /// <summary>Rendered browser snapshot to read instead of the static source HTML.</summary>
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSnapshot, Position = 0)]
     public HtmlRenderedPageSnapshot? RenderedSnapshot { get; set; }
@@ -115,7 +127,10 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
                 CollectionHint = CollectionHint,
                 MinimumRepeatCount = MinimumRepeatCount,
                 CollectionLimit = CollectionLimit,
-                IncludeCollections = !NoCollections.IsPresent
+                IncludeCollections = !NoCollections.IsPresent,
+                IncludeReadableText = !NoReadableText.IsPresent,
+                IncludeMarkdown = !NoMarkdown.IsPresent,
+                IncludeWebData = !NoWebData.IsPresent
             });
 
         WriteObject(ProjectDocument(document));

@@ -33,13 +33,19 @@ public static class HtmlPageReader {
         HtmlConversionDocument content = HtmlConversionDocument.Parse(html, conversionOptions);
         HtmlSemanticDocument semantic = content.SemanticDocument;
         HtmlSemanticBlock[] blocks = FlattenBlocks(semantic.Sections.SelectMany(static section => section.Blocks)).ToArray();
-        HtmlReadableTextResult readableText = HtmlParserToText.ExtractReadableText(html);
+        HtmlReadableTextResult readableText = effective.IncludeReadableText
+            ? HtmlParserToText.ExtractReadableText(html)
+            : new HtmlReadableTextResult();
         Uri? effectiveBaseUri = content.BaseUri ?? conversionOptions.BaseUri;
-        var document = HtmlParser.ParseWithAngleSharp(html);
-        IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectDataDocument(document, baseUri: effectiveBaseUri);
+        var document = effective.IncludeWebData || effective.IncludeCollections
+            ? HtmlParser.ParseWithAngleSharp(html)
+            : null;
+        IReadOnlyList<HtmlDataItem> data = effective.IncludeWebData
+            ? HtmlParsingToolbox.SelectDataDocument(document!, baseUri: effectiveBaseUri)
+            : Array.Empty<HtmlDataItem>();
         IReadOnlyList<HtmlPageCollection> collections = effective.IncludeCollections
             ? HtmlDomExtraction.DiscoverCollectionsDocument(
-                document,
+                document!,
                 effective.CollectionHint,
                 effectiveBaseUri,
                 effective.MinimumRepeatCount,
@@ -54,7 +60,9 @@ public static class HtmlPageReader {
             Title = FirstNonEmpty(semantic.Title, readableText.Title),
             Content = content,
             ReadableText = readableText,
-            Markdown = HtmlMarkdownConverterAdapter.ConvertToMarkdown(content, effectiveBaseUri?.AbsoluteUri),
+            Markdown = effective.IncludeMarkdown
+                ? HtmlMarkdownConverterAdapter.ConvertToMarkdown(content, effectiveBaseUri?.AbsoluteUri)
+                : string.Empty,
             Blocks = blocks,
             Headings = blocks.Where(static block => block.Kind == HtmlSemanticBlockKind.Heading).ToArray(),
             Paragraphs = blocks.Where(static block => block.Kind == HtmlSemanticBlockKind.Paragraph).ToArray(),
