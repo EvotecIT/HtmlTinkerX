@@ -25,8 +25,10 @@ public class HtmlUtilitiesHttpTests {
     [Fact]
     public async Task ReadResponseContent_EnforcesLimitWhileStreamingUnknownLength() {
         using HttpResponseMessage response = new(HttpStatusCode.OK) {
-            Content = new StreamContent(new MemoryStream(new byte[11]))
+            Content = new StreamContent(new UnknownLengthReadStream(new byte[11]))
         };
+
+        Assert.Null(response.Content.Headers.ContentLength);
 
         InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             HtmlUtilities.ReadResponseContentWithProperEncodingAsync(

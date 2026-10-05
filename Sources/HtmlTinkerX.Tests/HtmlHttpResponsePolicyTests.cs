@@ -36,29 +36,35 @@ public class HtmlHttpResponsePolicyTests {
     [InlineData("get")]
     [InlineData("post")]
     [InlineData("relay")]
-    public async Task LegacyConsumers_RejectOversizeStreamingResponses(string consumer) {
-        byte[] bytes = new byte[HtmlHttpFetchOptions.DefaultMaximumResponseBytes + 1];
-        using var handler = new ResponseHandler(() => new StreamContent(new MemoryStream(bytes)));
+    public async Task LegacyConsumers_RejectOversizeDeclaredResponses(string consumer) {
+        using var handler = new ResponseHandler(() => {
+            var content = new ByteArrayContent(Array.Empty<byte>());
+            content.Headers.ContentLength = HtmlHttpFetchOptions.DefaultMaximumResponseBytes + 1L;
+            return content;
+        });
         using var client = new HttpClient(handler);
         await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(consumer, client, null));
     }
 
     [Theory]
-    [InlineData("url")]
-    [InlineData("get")]
-    [InlineData("post")]
-    [InlineData("relay")]
-    public async Task ConsumerLimits_RejectDeclaredAndChunkedBodiesAndAllowExplicitOverride(string consumer) {
-        foreach (bool declared in new[] { false, true }) {
-            using var handler = new ResponseHandler(() => {
-                HttpContent content = declared ? new ByteArrayContent(Encoding.UTF8.GetBytes("response"))
-                    : new StreamContent(new MemoryStream(Encoding.UTF8.GetBytes("response")));
-                return content;
-            });
-            using var client = new HttpClient(handler);
-            await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(consumer, client, new HtmlHttpFetchOptions { MaximumResponseBytes = 7 }));
-            Assert.Equal("response", await ReadAsync(consumer, client, new HtmlHttpFetchOptions { MaximumResponseBytes = 8 }));
-        }
+    [InlineData("url", false)]
+    [InlineData("url", true)]
+    [InlineData("get", false)]
+    [InlineData("get", true)]
+    [InlineData("post", false)]
+    [InlineData("post", true)]
+    [InlineData("relay", false)]
+    [InlineData("relay", true)]
+    public async Task ConsumerLimits_RejectDeclaredAndUnknownLengthBodiesAndAllowExplicitOverride(string consumer, bool declared) {
+        using var handler = new ResponseHandler(() => {
+            HttpContent content = declared ? new ByteArrayContent(Encoding.UTF8.GetBytes("response"))
+                : new StreamContent(new UnknownLengthReadStream(Encoding.UTF8.GetBytes("response")));
+            Assert.Equal(declared ? 8L : (long?)null, content.Headers.ContentLength);
+            return content;
+        });
+        using var client = new HttpClient(handler);
+        await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(consumer, client, new HtmlHttpFetchOptions { MaximumResponseBytes = 7 }));
+        Assert.Equal("response", await ReadAsync(consumer, client, new HtmlHttpFetchOptions { MaximumResponseBytes = 8 }));
     }
 
     [Theory]
