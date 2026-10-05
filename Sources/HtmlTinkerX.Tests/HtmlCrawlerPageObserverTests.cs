@@ -11,6 +11,34 @@ namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
     [Fact]
+    public async Task CrawlAsync_PageSnapshotAfterReleaseSavesItsCurrentContentWithoutTheSourceDataset() {
+        using var server = StartServer(new Dictionary<string, string> {
+            ["/"] = "<main>Previously released content</main>"
+        }, out string root);
+        string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        string snapshotPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.OutputPath = outputPath;
+        options.RetainPageContent = false;
+        try {
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
+            HtmlCrawlPage snapshot = Assert.Single(result.Pages).CreateSnapshot();
+            Assert.Empty(snapshot.Html);
+            Assert.Empty(snapshot.Text);
+            Directory.Delete(outputPath, true);
+            result.Pages.Clear();
+            result.Pages.Add(snapshot);
+            await HtmlCrawler.SaveResultAsync(result, snapshotPath);
+            HtmlCrawlPage saved = Assert.Single((await HtmlCrawler.LoadResultAsync(snapshotPath)).Pages);
+            Assert.Empty(saved.Html);
+            Assert.Empty(saved.Text);
+        } finally {
+            if (Directory.Exists(outputPath)) Directory.Delete(outputPath, true);
+            if (Directory.Exists(snapshotPath)) Directory.Delete(snapshotPath, true);
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_PageObserverCanKeepContentWhileResultReleasesIt() {
         using var server = StartServer(new Dictionary<string, string> {
             ["/"] = "<main>Observed content</main>"
