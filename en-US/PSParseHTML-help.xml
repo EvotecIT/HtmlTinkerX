@@ -31057,7 +31057,8 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <maml:name>StreamPages</maml:name>
           <maml:description>
             <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
-Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.&#xD;
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint.&#xD;
+With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.&#xD;
 Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
@@ -32219,7 +32220,8 @@ Pipeline output does not acknowledge completion of downstream processing. Export
         <maml:name>StreamPages</maml:name>
         <maml:description>
           <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
-Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.&#xD;
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint.&#xD;
+With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.&#xD;
 Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
