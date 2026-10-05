@@ -1,20 +1,14 @@
-# Build and Package Workflow
 name: Build & Package
 
-# This workflow is disabled but ready for use
-# To enable: change 'workflow_dispatch' to include 'push' and 'pull_request' triggers
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
 
-env:
-  DOTNET_VERSION: |
-    8.x
-    10.x
-  BUILD_CONFIGURATION: 'Release'
+permissions:
+  contents: read
 
 jobs:
   package:
-    name: 'Package Libraries'
+    name: Package module and library
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -23,48 +17,29 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-version: |
+            8.x
+            10.x
 
-      - name: Restore dependencies
-        run: dotnet restore Sources/HtmlTinkerX.sln
-
-      - name: Build release
-        run: dotnet build Sources/HtmlTinkerX.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
-
-      - name: Create libraries package
+      - name: Install packaging tools
         shell: pwsh
-        run: |
-          # Create libraries directory for .NET assemblies
-          if (-not (Test-Path "Libraries")) {
-              New-Item -Path "Libraries" -ItemType Directory -Force
-          }
+        run: Install-Module PSPublishModule -Repository PSGallery -Scope CurrentUser -Force -AllowClobber
 
-          # Copy built .NET assemblies to Libraries directory
-          $SourcePath = "Sources\PSParseHTML.PowerShell\bin\Release"
-          if (Test-Path $SourcePath) {
-              Copy-Item -Path "$SourcePath\*" -Destination "Libraries" -Recurse -Force
-              Write-Host "Copied .NET assemblies to Libraries directory"
-          }
+      - name: Build packages
+        shell: pwsh
+        run: .\Build\Build-Module.ps1 -RunMode Build -SignModule:$false
+        timeout-minutes: 15
 
-          # PowerShell module packaging would be handled separately by Manage-Module.ps1
-          Write-Host "PowerShell module packaging should be done via Build/Manage-Module.ps1"
-
-      - name: Upload libraries artifact
+      - name: Upload module package
         uses: actions/upload-artifact@v7
         with:
-          name: PSParseHTML-Libraries
-          path: Libraries/
+          name: PSParseHTML-Module
+          path: Artefacts/Packed/*.zip
+          if-no-files-found: error
 
-      - name: Create release assets (on tags)
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: pwsh
-        run: |
-          # Create a zip file for release
-          Compress-Archive -Path "Libraries\*" -DestinationPath "PSParseHTML-Libraries-${{ github.ref_name }}.zip"
-
-      - name: Upload to release (on tags)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload library packages
         uses: actions/upload-artifact@v7
         with:
-          name: PSParseHTML-Release-${{ github.ref_name }}
-          path: "PSParseHTML-Libraries-*.zip"
+          name: HtmlTinkerX-NuGet
+          path: Artefacts/ProjectBuild/**/*.nupkg
+          if-no-files-found: error
