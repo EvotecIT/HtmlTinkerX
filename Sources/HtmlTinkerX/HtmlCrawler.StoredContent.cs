@@ -64,4 +64,11 @@ public static partial class HtmlCrawler {
     private static StoredPageContent GetStoredPageContent(HtmlCrawlPage page) => new() {
         Html = page.Html, Text = page.Text, Markdown = page.Markdown, HttpCache = page.HttpCache
     };
+
+    private static string GetContentSidecarPath(HtmlCrawlPage page, string directory) {
+        // List order and titles are mutable. Keep each page's content identity stable
+        // so resaving cannot overwrite another page's still-referenced source.
+        page.StoredContentId ??= Guid.NewGuid().ToString("N");
+        return Path.Combine(directory, "content-" + page.StoredContentId + ".content.json");
+    }
 }

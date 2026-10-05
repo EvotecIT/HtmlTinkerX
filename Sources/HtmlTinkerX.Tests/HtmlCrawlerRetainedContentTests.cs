@@ -155,4 +155,52 @@ public partial class HtmlCrawlerTests {
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.GetProperty("Text").GetString();
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SaveResultAsync_ReleasedContentFollowsReorderedOrFilteredPagesInSameDirectory(bool filter) {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        using HttpListener server = StartFlexibleServer(context => RespondAsync(context,
+            "<head><title>Docs</title></head><main>" + (context.Request.Url!.AbsolutePath == "/" ? "First body<a href='/next'>Next</a>" : "Second body") + "</main>"), out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(2); options.OutputPath = output; options.RetainPageContent = false;
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
+            HtmlCrawlPage first = result.Pages[0]; HtmlCrawlPage second = result.Pages[1];
+            Assert.Equal(first.Title, second.Title);
+            if (filter) result.Pages.RemoveAt(0);
+            else { result.Pages[0] = second; result.Pages[1] = first; }
+            await HtmlCrawler.SaveResultAsync(result, output);
+            HtmlCrawlResult loaded = await HtmlCrawler.LoadResultAsync(output);
+            Assert.Contains("Second body", loaded.Pages[0].Text);
+            if (!filter) Assert.Contains("First body", loaded.Pages[1].Text);
+            Assert.All(result.Pages, page => Assert.Empty(page.Text));
+            await HtmlCrawler.SaveResultAsync(result, output);
+            Assert.Contains("Second body", (await HtmlCrawler.LoadResultAsync(output)).Pages[0].Text);
+        } finally { if (Directory.Exists(output)) Directory.Delete(output, true); }
+    }
+
+    [Fact]
+    public async Task SaveResultAsync_ReleasedContentKeepsReorderedSkippedCachesWithTheirUrls() {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        using HttpListener server = StartFlexibleServer(async context => {
+            string path = context.Request.Url!.AbsolutePath;
+            context.Response.Headers["ETag"] = "\"" + path + "\"";
+            await RespondAsync(context, path == "/" ? "<main>Root</main><a href='/one'></a><a href='/two'></a><a href='/three'></a>"
+                : "<main>Duplicate</main><script>marker-" + path.Substring(1) + "</script>");
+        }, out string root);
+        try {
+            HtmlCrawlOptions options = StaticOptions(4); options.OutputPath = output; options.RetainPageContent = false;
+            options.CacheResponses = true; options.DeduplicatePages = true; options.Selector = "main";
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
+            Assert.Equal(2, result.SkippedPages.Count);
+            HtmlCrawlPage first = result.SkippedPages[0]; result.SkippedPages[0] = result.SkippedPages[1]; result.SkippedPages[1] = first;
+            await HtmlCrawler.SaveResultAsync(result, output);
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath!));
+            foreach (JsonElement page in manifest.RootElement.GetProperty("SkippedPages").EnumerateArray()) {
+                string expectedMarker = "marker-" + new Uri(page.GetProperty("RequestedUrl").GetString()!).AbsolutePath.Substring(1);
+                Assert.Contains(expectedMarker, page.GetProperty("HttpCache").GetProperty("Html").GetString());
+            }
+        } finally { if (Directory.Exists(output)) Directory.Delete(output, true); }
+    }
 }

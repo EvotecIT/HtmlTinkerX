@@ -69,6 +69,9 @@ public sealed class HtmlCrawlPage {
     [JsonIgnore]
     internal string? StoredContentPath { get; set; }
 
+    [JsonIgnore]
+    internal string? StoredContentId { get; set; }
+
     /// <summary>Page title when available.</summary>
     public string? Title { get; set; }
 
