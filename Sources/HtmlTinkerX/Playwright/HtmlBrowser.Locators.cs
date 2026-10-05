@@ -41,7 +41,7 @@ public static partial class HtmlBrowser {
                 query = query ?? string.Empty,
                 visibleOnly,
                 limit
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         List<HtmlBrowserLocatorCandidate> candidates = new();
         using JsonDocument document = JsonDocument.Parse(json);
@@ -117,7 +117,7 @@ public static partial class HtmlBrowser {
                 selector,
                 limit,
                 nth
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         return selectors
             .Where(static item => !string.IsNullOrWhiteSpace(item))
