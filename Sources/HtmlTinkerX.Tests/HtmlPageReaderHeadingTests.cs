@@ -4,6 +4,25 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlPageReaderHeadingTests {
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Read_RetainsImageOnlyHeadingAndItsResource(bool analyses) {
+        HtmlPageDocument page = HtmlPageReader.Read(
+            "<main><h1 id='brand'><img src='https://example.org/logo.png' alt='Brand'></h1><p>Body</p></main>",
+            new HtmlPageReaderOptions {
+                IncludeReadableText = analyses, IncludeMarkdown = analyses,
+                IncludeWebData = analyses, IncludeCollections = analyses
+            });
+
+        HtmlSemanticBlock heading = Assert.Single(page.Headings);
+        Assert.Equal(1, heading.Level);
+        Assert.Equal("h1", heading.SourceLocation!.ElementName);
+        Assert.Equal("Brand", Assert.Single(heading.InlineResources).AlternateText);
+        Assert.Equal("Brand", Assert.Single(page.Resources).AlternateText);
+        Assert.Equal("Body", Assert.Single(page.Paragraphs).Text);
+    }
+
+    [Theory]
     [InlineData(1, true)]
     [InlineData(1, false)]
     [InlineData(2, true)]
