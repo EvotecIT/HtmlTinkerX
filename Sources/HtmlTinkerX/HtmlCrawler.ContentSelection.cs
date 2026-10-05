@@ -616,8 +616,7 @@ public static partial class HtmlCrawler {
                || normalizedStyle.Contains("content-visibility:hidden", StringComparison.Ordinal);
     }
 
-    internal static Task MarkRenderedHiddenElementsAsync(IPage page) {
-        return page.EvaluateAsync(
+    private const string MarkRenderedHiddenElementsScript =
             """
             () => {
                 const hiddenAttributeName = 'data-htmltinkerx-hidden';
@@ -664,8 +663,9 @@ public static partial class HtmlCrawler {
                     }
                 }
             }
-            """);
-    }
+            """;
+
+    internal static Task MarkRenderedHiddenElementsAsync(IPage page) => page.EvaluateAsync(MarkRenderedHiddenElementsScript);
 
     private static void StripBoilerplateElements(IParentNode container, HtmlCrawlOptions options) {
         foreach (IElement element in container.QuerySelectorAll(

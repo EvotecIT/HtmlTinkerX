@@ -190,14 +190,7 @@ public static partial class HtmlCrawler {
                 await AutoScrollPageAsync(session.Page, options, cancellationToken).ConfigureAwait(false);
             }
 
-            if (options.HiddenContentMode == HtmlCrawlHiddenContentMode.RespectHidden) {
-                await MarkRenderedHiddenElementsAsync(session.Page).ConfigureAwait(false);
-            }
-
-            // Capture the DOM, URL and title together: interactions and delayed scripts can navigate.
-            JsonElement snapshot = await session.Page.EvaluateAsync<JsonElement>("() => ({ url: location.href, title: document.title, "
-                + "documentUrl: performance.getEntriesByType('navigation')[0]?.name ?? null, "
-                + "html: (document.doctype ? new XMLSerializer().serializeToString(document.doctype) : '') + document.documentElement.outerHTML })").ConfigureAwait(false);
+            JsonElement snapshot = await CaptureRenderedDocumentAsync(session.Page, options, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             string fullHtml = snapshot.GetProperty("html").GetString()!;
             string title = snapshot.GetProperty("title").GetString()!;
