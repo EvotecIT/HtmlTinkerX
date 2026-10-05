@@ -87,6 +87,7 @@ public static partial class HtmlCrawler {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
+            options.AssetResponseBudget?.ThrowIfExceeded();
             asset.Error = ex.Message;
         } finally {
             asset.Finished = DateTimeOffset.UtcNow;

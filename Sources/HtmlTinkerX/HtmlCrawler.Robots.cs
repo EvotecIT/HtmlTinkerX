@@ -43,6 +43,7 @@ public static partial class HtmlCrawler {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch {
+            options.PageResponseBudget?.ThrowIfExceeded();
             cache[hostKey] = new RobotsDocument();
             return cache[hostKey];
         }

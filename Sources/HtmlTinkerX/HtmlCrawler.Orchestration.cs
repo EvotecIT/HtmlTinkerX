@@ -430,6 +430,7 @@ public static partial class HtmlCrawler {
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch {
+                options.PageResponseBudget?.ThrowIfExceeded();
                 continue;
             }
 

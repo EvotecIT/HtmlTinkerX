@@ -93,6 +93,7 @@ public static partial class HtmlCrawler {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
+            options.PageResponseBudget?.ThrowIfExceeded();
             page.Status = HtmlCrawlPageStatus.Failed;
             page.Error = ex.Message;
         } finally {
