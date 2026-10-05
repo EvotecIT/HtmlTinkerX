@@ -103,9 +103,13 @@ public static class HtmlLoginParser {
         return sb.ToString();
     }
 
-    private static string CssStringEscape(string value) =>
+    /// <summary>Escapes attribute values embedded in quoted CSS selector strings, including line breaks.</summary>
+    internal static string CssStringEscape(string value) =>
         value
             .Replace("\\", "\\\\")
             .Replace("\"", "\\\"")
-            .Replace("'", "\\'");
+            .Replace("'", "\\'")
+            .Replace("\r", "\\D ")
+            .Replace("\n", "\\A ")
+            .Replace("\f", "\\C ");
 }

@@ -195,7 +195,8 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static async Task WaitWithCancellationAsync(this Task task, CancellationToken cancellationToken) {
+    /// <summary>Stops waiting on cancellation and observes faults from a Playwright operation that finishes later.</summary>
+    internal static async Task WaitWithCancellationAsync(this Task task, CancellationToken cancellationToken) {
         if (!cancellationToken.CanBeCanceled || task.IsCompleted) {
             await task.ConfigureAwait(false);
             return;
@@ -212,7 +213,8 @@ public static partial class HtmlBrowser {
         await task.ConfigureAwait(false);
     }
 
-    private static async Task<T> WaitWithCancellationAsync<T>(this Task<T> task, CancellationToken cancellationToken) {
+    /// <summary>Waits for a Playwright result while preserving cancellation and late-fault observation.</summary>
+    internal static async Task<T> WaitWithCancellationAsync<T>(this Task<T> task, CancellationToken cancellationToken) {
         await ((Task)task).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         return await task.ConfigureAwait(false);
     }
