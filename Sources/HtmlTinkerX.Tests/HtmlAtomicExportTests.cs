@@ -8,6 +8,34 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlAtomicExportTests {
+    [Fact]
+    public async Task SaveResultAsync_LockedPageJsonlPreservesPreviousPageDatasets() {
+        if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
+        string directory = Path.Combine(Path.GetTempPath(), "HtmlAtomicExportTests", Guid.NewGuid().ToString("N"));
+        try {
+            HtmlCrawlResult result = new() {
+                StartUrl = "https://example.test/",
+                Pages = new[] { new HtmlCrawlPage { Url = "https://example.test/", Title = "Previous title" } }
+            };
+            await HtmlCrawler.SaveResultAsync(result, directory);
+            string jsonlPath = Path.Combine(directory, "pages.jsonl");
+            string csvPath = Path.Combine(directory, "pages.csv");
+            byte[] previousJsonl = File.ReadAllBytes(jsonlPath);
+            byte[] previousCsv = File.ReadAllBytes(csvPath);
+            byte[] previousManifest = File.ReadAllBytes(result.ManifestPath!);
+            result.Pages[0].Title = "Replacement title";
+            using (FileStream lockedJsonl = new(jsonlPath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                await Assert.ThrowsAnyAsync<IOException>(() => HtmlCrawler.SaveResultAsync(result, directory));
+                Assert.Equal(previousJsonl, File.ReadAllBytes(jsonlPath));
+                Assert.Equal(previousCsv, File.ReadAllBytes(csvPath));
+                Assert.Equal(previousManifest, File.ReadAllBytes(result.ManifestPath!));
+                Assert.Empty(Directory.GetFiles(directory, "*.tmp", SearchOption.AllDirectories));
+            }
+        } finally {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
