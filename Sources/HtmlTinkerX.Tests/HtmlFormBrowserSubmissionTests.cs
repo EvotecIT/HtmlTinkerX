@@ -142,6 +142,39 @@ public sealed class HtmlFormBrowserSubmissionTests {
         Assert.Equal("new", await session.Page.EvaluateAsync<string>("() => window.submitted"));
     }
 
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium)]
+    [InlineData(HtmlBrowserEngine.Firefox)]
+    [InlineData(HtmlBrowserEngine.WebKit)]
+    public async Task NativeSubmission_CompletesFragmentNavigationWithoutReplacingTheDocument(HtmlBrowserEngine browser) {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        int requests = 0;
+        await session.Page.RouteAsync("https://forms.test/**", async route => {
+            requests++;
+            await route.FulfillAsync(new RouteFulfillOptions { ContentType = "text/html", Body = "<form action='#received' method='get'><input name='q' value='old'></form><script>window.documentProof='original'</script>" });
+        });
+        await session.Page.GotoAsync("https://forms.test/start?q=old");
+        await HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string>(), 2000);
+        Assert.Equal("https://forms.test/start?q=old#received", session.Page.Url);
+        Assert.Equal(1, requests);
+        Assert.Equal("original", await session.Page.EvaluateAsync<string>("() => window.documentProof"));
+    }
+
+    [Fact]
+    public async Task FragmentSubmission_UsesTheNativeEntryListAfterFormDataHandlers() {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        int requests = 0;
+        await session.Page.RouteAsync("https://forms.test/**", async route => {
+            requests++;
+            await route.FulfillAsync(new RouteFulfillOptions { ContentType = "text/html; charset=utf-8", Body = "<form action='#received'><input name='q' value='old'></form><script>window.formDataCalls=0; document.querySelector('form').addEventListener('formdata', event => { window.formDataCalls++; event.formData.set('q', 'new €'); })</script>" });
+        });
+        await session.Page.GotoAsync("https://forms.test/start?q=new+%E2%82%AC");
+        await HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string>(), 5000);
+        Assert.Equal("https://forms.test/start?q=new+%E2%82%AC#received", session.Page.Url);
+        Assert.Equal(1, requests);
+        Assert.Equal(1, await session.Page.EvaluateAsync<int>("() => window.formDataCalls"));
+    }
+
     [Fact]
     public async Task Submission_CancellationWhileNavigatingPreservesCallerTokenAndPage() {
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");

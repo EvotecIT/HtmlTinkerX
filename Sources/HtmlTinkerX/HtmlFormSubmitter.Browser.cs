@@ -195,8 +195,14 @@ public static partial class HtmlFormSubmitter {
             await form.EvaluateAsync("(form, marker) => { Object.defineProperty(form.ownerDocument, marker, { value: true, configurable: true }); }", documentMarker)
                 .WaitWithCancellationAsync(token).ConfigureAwait(false);
             Volatile.Write(ref armed, 1);
-            bool[] submission = await form.EvaluateAsync<bool[]>(BrowserSubmitScript.Value).WaitWithCancellationAsync(token).ConfigureAwait(false);
-            if (!submission[0] || !submission[1]) return;
+            BrowserFormSubmission submission = await form.EvaluateAsync<BrowserFormSubmission>(BrowserSubmitScript.Value).WaitWithCancellationAsync(token).ConfigureAwait(false);
+            if (!submission.Submitted || !submission.NavigatesHere) return;
+            if (submission.SameDocumentUrl != null) {
+                await using IJSHandle location = await AwaitOwnedBrowserResultAsync(
+                    page.WaitForFunctionAsync("destination => location.href === destination", submission.SameDocumentUrl,
+                        new PageWaitForFunctionOptions { Timeout = timeout }), handle => handle.DisposeAsync().AsTask(), token).ConfigureAwait(false);
+                return;
+            }
             await navigation.Task.WaitWithCancellationAsync(token).ConfigureAwait(false);
             await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded, new PageWaitForLoadStateOptions { Timeout = timeout })
                 .WaitWithCancellationAsync(token).ConfigureAwait(false);
@@ -215,5 +221,11 @@ public static partial class HtmlFormSubmitter {
                 }
             }
         }
+    }
+
+    private sealed class BrowserFormSubmission {
+        public bool Submitted { get; set; }
+        public bool NavigatesHere { get; set; }
+        public string? SameDocumentUrl { get; set; }
     }
 }
