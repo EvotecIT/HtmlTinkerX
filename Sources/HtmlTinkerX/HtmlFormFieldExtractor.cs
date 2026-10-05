@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,7 +23,8 @@ public static partial class HtmlFormFieldExtractor {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        var fields = document.QuerySelectorAll("form input,form select,form textarea,form button");
+        var fields = document.QuerySelectorAll("input,select,textarea,button")
+            .Where(static field => HtmlFormControlUtilities.GetOwner(field) != null);
         List<HtmlFormField> results = new();
         foreach (var field in fields) {
             string? name = field.GetAttribute("name");
@@ -30,10 +32,9 @@ public static partial class HtmlFormFieldExtractor {
                 continue;
             }
             string nameValue = name;
-            string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
             results.Add(new HtmlFormField {
                 Name = nameValue,
-                Type = HtmlFormFieldUtilities.MapType(type),
+                Type = HtmlFormFieldUtilities.GetFieldType(field),
                 Value = HtmlFormFieldUtilities.GetSubmittedValue(field)
             });
         }

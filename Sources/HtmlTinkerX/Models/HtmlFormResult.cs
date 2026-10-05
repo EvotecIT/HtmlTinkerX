@@ -9,6 +9,12 @@ public class HtmlFormResult {
     /// <summary>Metadata about the form.</summary>
     public HtmlFormMetadata Metadata { get; set; } = new();
 
-    /// <summary>Fields contained in the form.</summary>
+    /// <summary>Named controls associated with the form, including disabled and external controls.</summary>
     public List<HtmlFormField> Fields { get; set; } = new();
+
+    /// <summary>
+    /// Successful named values in document order, retaining repeated names and selected options.
+    /// Disabled controls, unchecked checkboxes and radios, files, and submit buttons are omitted.
+    /// </summary>
+    public List<KeyValuePair<string, string>> SuccessfulFields { get; set; } = new();
 }

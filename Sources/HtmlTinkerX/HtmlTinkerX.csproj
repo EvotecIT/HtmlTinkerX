@@ -23,7 +23,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AngleSharp" Version="1.8.2" />
+        <PackageReference Include="AngleSharp" Version="1.8.4" />
         <PackageReference Include="AngleSharp.Css" Version="1.1.2" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
         <PackageReference Include="AngleSharp.Io" Version="1.1.0" />

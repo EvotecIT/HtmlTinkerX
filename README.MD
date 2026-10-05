@@ -244,6 +244,37 @@ request interception and saved state.
 - <a id="request-interception"></a>[Request Interception](Guides/BrowserSessions.md#request-interception)
 - <a id="state-management"></a>[State Management](Guides/BrowserSessions.md#state-management)
 
+## Form fields and submission values
+
+`ConvertFrom-HtmlForm` returns `Fields` as the inventory of named controls
+associated with each form, including disabled controls and controls linked by
+a `form` attribute. `SuccessfulFields` contains the ordered name/value pairs
+that are eligible for a submission without a submit button. Repeated names
+remain separate, and radio and select values use the document's current
+selection. File inputs and submit buttons are omitted from this value list.
+
+Supply `-BaseUri` when parsing HTML content to resolve a relative action:
+
+```powershell
+$html = '<form action="save"><input name="tag" value="one"><input name="tag" value="two"></form>'
+$form = ConvertFrom-HtmlForm -Content $html -BaseUri 'https://example.com/settings/' -IncludeMetadata
+$form.ResolvedAction       # https://example.com/settings/save
+$form.SuccessfulFields     # tag=one and tag=two as separate Key/Value pairs
+```
+
+`Action` preserves the original attribute. With `-IncludeMetadata`,
+`SourceUrl`, `FinalUrl`, and `BaseUrl` identify the requested document,
+redirect destination, and effective HTML base address. Non-HTTP actions
+remain visible in `Action` and have no resolved HTTP submission address.
+
+.NET callers use the same engine:
+
+```csharp
+var forms = HtmlParser.ParseFormsWithAngleSharp(html, new Uri("https://example.com/settings/"));
+var action = forms[0].Metadata.ResolvedActionUri;
+var values = forms[0].SuccessfulFields;
+```
+
 ## PowerShell and C# entry points
 
 The PowerShell commands are thin surfaces over HtmlTinkerX. The generated

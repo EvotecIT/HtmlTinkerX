@@ -3741,6 +3741,18 @@ Include protocol and port if necessary.</maml:para>
     <command:syntax>
       <command:syntaxItem parameterSetName="Content">
         <maml:name>ConvertFrom-HtmlForm</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BaseUri</maml:name>
+          <maml:description>
+            <maml:para>Absolute document address used to resolve relative actions in supplied HTML.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Uri</command:parameterValue>
+          <dev:type>
+            <maml:name>Uri</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue, ByPropertyName)" position="named" aliases="None">
           <maml:name>Content</maml:name>
           <maml:description>
@@ -3843,6 +3855,18 @@ Include protocol and port if necessary.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BaseUri</maml:name>
+        <maml:description>
+          <maml:para>Absolute document address used to resolve relative actions in supplied HTML.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Uri</command:parameterValue>
+        <dev:type>
+          <maml:name>Uri</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue, ByPropertyName)" position="named" aliases="None">
         <maml:name>Content</maml:name>
         <maml:description>
@@ -3929,6 +3953,13 @@ Include protocol and port if necessary.</maml:para>
         <dev:code>ConvertFrom-HtmlForm -Url https://example.com</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>ConvertFrom-HtmlForm -Content '&lt;form action="save"&gt;&lt;input name="tag" value="one"&gt;&lt;/form&gt;' -BaseUri https://example.com/settings/ -IncludeMetadata</dev:code>
+        <dev:remarks>
+          <maml:para>Returns the field inventory, ordered successful values, and resolved HTTP action.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

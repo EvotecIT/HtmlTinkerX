@@ -1,10 +1,14 @@
 using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
 using System;
 using System.Linq;
 
 namespace HtmlTinkerX;
 
 internal static class HtmlFormFieldUtilities {
+    public static HtmlFormFieldType GetFieldType(IElement field) =>
+        MapType(field is IHtmlInputElement input ? input.Type : field.GetAttribute("type") ?? field.LocalName);
+
     public static HtmlFormFieldType MapType(string? type) {
         return type?.ToLowerInvariant() switch {
             "text" => HtmlFormFieldType.Text,
@@ -21,31 +25,16 @@ internal static class HtmlFormFieldUtilities {
     }
 
     public static string GetSubmittedValue(IElement field) {
-        if (field.NodeName.Equals("select", StringComparison.OrdinalIgnoreCase)) {
-            IElement[] selectedOptions = field.QuerySelectorAll("option[selected]").ToArray();
-
-            if (selectedOptions.Length == 0) {
-                if (field.HasAttribute("multiple")) {
-                    return string.Empty;
-                }
-
-                IElement? firstOption = field.QuerySelector("option");
-                if (firstOption != null) {
-                    return GetOptionSubmittedValue(firstOption);
-                }
-            }
-
-            return string.Join(",", selectedOptions.Select(GetOptionSubmittedValue));
+        if (field is IHtmlSelectElement select) {
+            return string.Join(",", select.SelectedOptions.Select(static option => option.Value));
         }
 
         if (field.NodeName.Equals("textarea", StringComparison.OrdinalIgnoreCase)) {
             return field.TextContent ?? string.Empty;
         }
 
-        string type = field.GetAttribute("type") ?? string.Empty;
-        if (field.NodeName.Equals("input", StringComparison.OrdinalIgnoreCase)
-            && (type.Equals("checkbox", StringComparison.OrdinalIgnoreCase) || type.Equals("radio", StringComparison.OrdinalIgnoreCase))) {
-            if (!field.HasAttribute("checked")) {
+        if (field is IHtmlInputElement input && input.Type is "checkbox" or "radio") {
+            if (!input.IsChecked) {
                 return string.Empty;
             }
 
@@ -60,6 +49,4 @@ internal static class HtmlFormFieldUtilities {
         return field.TextContent ?? string.Empty;
     }
 
-    private static string GetOptionSubmittedValue(IElement option) =>
-        option.GetAttribute("value") ?? option.TextContent ?? string.Empty;
 }
