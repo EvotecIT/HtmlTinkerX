@@ -20,6 +20,9 @@ public sealed class HtmlPublicationDates {
     public static HtmlPublicationDates Parse(string html, Uri? pageUrl = null) => ParseDocument(HtmlParser.ParseWithAngleSharp(html), pageUrl);
 
     internal static HtmlPublicationDates ParseDocument(IDocument document, Uri? pageUrl) {
+        string? canonical = document.QuerySelectorAll("link[href]").FirstOrDefault(link =>
+            (link.GetAttribute("rel") ?? "").Split(' ').Any(rel => rel.Equals("canonical",StringComparison.OrdinalIgnoreCase)))?.GetAttribute("href");
+        if (!string.IsNullOrWhiteSpace(canonical) && Uri.TryCreate(pageUrl,canonical,out var canonicalUrl) && canonicalUrl.Scheme is "https" or "http") pageUrl = canonicalUrl;
         HtmlPublicationDates result = new();
         foreach (IElement meta in document.QuerySelectorAll("meta[content]")) {
             string name = (meta.GetAttribute("property") ?? meta.GetAttribute("name") ?? "").ToLowerInvariant();

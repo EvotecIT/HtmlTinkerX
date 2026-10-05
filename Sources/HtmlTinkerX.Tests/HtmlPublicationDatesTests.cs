@@ -5,6 +5,16 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlPublicationDatesTests {
     [Fact]
+    public void CanonicalPageIdentityPreservesDatesForLanguageQueryUrls() {
+        var dates = HtmlPublicationDates.Parse("""
+            <link rel="canonical" href="https://example.test/article?id=123">
+            <script type="application/ld+json">[{"@type":"Article","url":"https://example.test/article?id=456","datePublished":"1999-01-01"},
+            {"@type":"Article","url":"https://example.test/article?id=123","datePublished":"2026-01-02"}]</script>
+            """,new Uri("https://example.test/article?id=123&lang=PL"));
+        Assert.Equal(new DateTimeOffset(2026,1,2,0,0,0,TimeSpan.Zero),dates.Published);
+    }
+
+    [Fact]
     public void ArticleDateSurvivesOrganizationAndSiteMetadata() {
         var dates = HtmlPublicationDates.Parse("""
             <script type="application/ld+json">{"@type":"Organization","datePublished":"2000-01-01"}</script>
