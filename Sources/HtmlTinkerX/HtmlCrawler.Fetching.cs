@@ -179,10 +179,13 @@ public static partial class HtmlCrawler {
             string fullHtml = snapshot.GetProperty("html").GetString()!;
             string title = snapshot.GetProperty("title").GetString()!;
             responseUri = new Uri(snapshot.GetProperty("url").GetString()!);
-            if (TryGetAbsoluteUri(snapshot.GetProperty("documentUrl").GetString(), out Uri? documentUri)) {
+            string? documentUrl = snapshot.GetProperty("documentUrl").GetString();
+            if (TryGetAbsoluteUri(documentUrl, out Uri? documentUri)) {
                 committedResponses.TryGetValue(DocumentKey(documentUri!), out response);
             } else {
-                response = documentResponse ?? response;
+                response = string.IsNullOrEmpty(documentUrl)
+                    && (responseUri.Scheme == Uri.UriSchemeHttp || responseUri.Scheme == Uri.UriSchemeHttps)
+                    ? documentResponse ?? response : null;
             }
             page.Url = NormalizeUrl(responseUri, options);
             page.StatusCode = response?.Status;
