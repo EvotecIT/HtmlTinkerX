@@ -11,7 +11,7 @@ Crawls a site offline and returns extracted pages with optional browser renderin
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-MaxDepth <int>] [-MaxPages <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-MaxDepth <int>] [-MaxPages <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ReleasePageContent] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -1175,6 +1175,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -ReleasePageContent
+Release HTML, text, Markdown and HTTP cache bodies after saving each page. Requires OutPath or ResumePath; exports remain complete.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Render
 Render pages through Playwright before extraction.
 
@@ -1289,7 +1305,8 @@ Accept wildcard characters: False
 
 ### -StreamPages
 Writes each newly fetched page to the pipeline instead of returning the final crawl result.
-Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint.
+With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.
 Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.
 
 ```yaml
