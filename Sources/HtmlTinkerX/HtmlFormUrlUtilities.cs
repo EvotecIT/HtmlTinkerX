@@ -56,11 +56,20 @@ internal static class HtmlFormUrlUtilities {
         return char.IsLetter(value[0]);
     }
 
-    internal static Uri GetEffectiveBaseUri(IDocument document, Uri responseUri) {
+    internal static Uri? GetEffectiveBaseUri(IDocument document, Uri? responseUri) {
         string? href = document.QuerySelector("base[href]")?.GetAttribute("href");
-        return !string.IsNullOrWhiteSpace(href) && Uri.TryCreate(responseUri, href, out Uri? resolved)
-            ? resolved
-            : responseUri;
+        if (!string.IsNullOrWhiteSpace(href)) {
+            Uri? resolved;
+            bool parsed = responseUri == null
+                ? Uri.TryCreate(href, UriKind.Absolute, out resolved)
+                : Uri.TryCreate(responseUri, href, out resolved);
+            if (parsed && resolved != null
+                && !resolved.Scheme.Equals("data", StringComparison.OrdinalIgnoreCase)
+                && !resolved.Scheme.Equals("javascript", StringComparison.OrdinalIgnoreCase)) {
+                return resolved;
+            }
+        }
+        return responseUri;
     }
 
 }

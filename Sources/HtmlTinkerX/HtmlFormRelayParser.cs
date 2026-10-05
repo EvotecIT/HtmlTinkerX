@@ -65,7 +65,7 @@ public static class HtmlFormRelayParser {
 
             Uri effectiveBaseUri = string.IsNullOrWhiteSpace(form.Metadata.Action)
                 ? baseUri
-                : HtmlFormUrlUtilities.GetEffectiveBaseUri(document, baseUri);
+                : HtmlFormUrlUtilities.GetEffectiveBaseUri(document, baseUri) ?? baseUri;
             if (!HtmlFormUrlUtilities.TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
                 continue;
             }

@@ -121,6 +121,42 @@ public class HtmlFormContractTests {
         Assert.Null(form.Metadata.ResolvedActionUri);
     }
 
+    [Fact]
+    public void AbsoluteHtmlBaseResolvesRelativeActionsWithoutInventingSourceProvenance() {
+        var forms = HtmlParser.ParseFormsWithAngleSharp(
+            "<base href='https://example.test/forms/'><form action='save'></form><form></form>");
+
+        Assert.Null(forms[0].Metadata.SourceUri);
+        Assert.Null(forms[0].Metadata.FinalUri);
+        Assert.Equal(new Uri("https://example.test/forms/"), forms[0].Metadata.BaseUri);
+        Assert.Equal(new Uri("https://example.test/forms/save"), forms[0].Metadata.ResolvedActionUri);
+        Assert.Null(forms[1].Metadata.ResolvedActionUri);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,ignored")]
+    public void RejectedFirstHtmlBaseFallsBackToTheDocumentAddress(string href) {
+        var source = new Uri("https://example.test/account/page");
+        var form = Assert.Single(HtmlParser.ParseFormsWithAngleSharp(
+            "<base href='" + href + "'><base href='https://other.test/'><form action='save'></form>", source));
+
+        Assert.Equal(source, form.Metadata.BaseUri);
+        Assert.Equal(new Uri("https://example.test/account/save"), form.Metadata.ResolvedActionUri);
+    }
+
+    [Theory]
+    [InlineData("relative/")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,ignored")]
+    public void AnUnusableFirstBaseDoesNotInventAnUnknownDocumentAddress(string href) {
+        var form = Assert.Single(HtmlParser.ParseFormsWithAngleSharp(
+            "<base href='" + href + "'><base href='https://other.test/'><form action='save'></form>"));
+
+        Assert.Null(form.Metadata.BaseUri);
+        Assert.Null(form.Metadata.ResolvedActionUri);
+    }
+
     private sealed class RedirectedFormHandler : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             request.RequestUri = new Uri("https://example.test/account/page?token=1");

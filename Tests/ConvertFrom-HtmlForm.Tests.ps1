@@ -32,6 +32,23 @@ Describe 'ConvertFrom-HtmlForm' {
             Should -Be 'outside=yes,repeat=one,repeat=two,chosen=b'
     }
 
+    It 'Resolves an absolute HTML base without adding source metadata' {
+        $forms = ConvertFrom-HtmlForm -Content '<base href="https://example.test/forms/"><form action="save"></form><form></form>' -IncludeMetadata
+
+        $forms[0].BaseUrl | Should -Be 'https://example.test/forms/'
+        $forms[0].ResolvedAction | Should -Be 'https://example.test/forms/save'
+        $forms[0].SourceUrl | Should -BeNullOrEmpty
+        $forms[0].FinalUrl | Should -BeNullOrEmpty
+        $forms[1].ResolvedAction | Should -BeNullOrEmpty
+    }
+
+    It 'Ignores a rejected first HTML base when resolving a relative action' {
+        $form = ConvertFrom-HtmlForm -Content '<base href="javascript:alert(1)"><base href="https://other.test/"><form action="save"></form>' -BaseUri 'https://example.test/account/page' -IncludeMetadata
+
+        $form.BaseUrl | Should -Be 'https://example.test/account/page'
+        $form.ResolvedAction | Should -Be 'https://example.test/account/save'
+    }
+
     It 'Returns the current selected radio value in the public submission list' {
         $form = ConvertFrom-HtmlForm -Content '<form><input type="radio" name="choice" value="a" checked><input type="radio" name="choice" value="b" checked></form>'
 

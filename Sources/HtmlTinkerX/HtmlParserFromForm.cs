@@ -57,7 +57,7 @@ public static partial class HtmlParserFromForm {
             metadata.Action = form.GetAttribute("action") ?? string.Empty;
             metadata.SourceUri = sourceUri;
             metadata.FinalUri = finalUri;
-            metadata.BaseUri = finalUri == null ? null : HtmlFormUrlUtilities.GetEffectiveBaseUri(document, finalUri);
+            metadata.BaseUri = HtmlFormUrlUtilities.GetEffectiveBaseUri(document, finalUri);
             Uri? actionBase = string.IsNullOrWhiteSpace(metadata.Action) ? finalUri : metadata.BaseUri;
             if (actionBase != null && HtmlFormUrlUtilities.TryResolveAction(metadata.Action, actionBase, out Uri actionUri)) {
                 metadata.ResolvedActionUri = actionUri;

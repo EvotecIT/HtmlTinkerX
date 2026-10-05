@@ -252,6 +252,9 @@ a `form` attribute. `SuccessfulFields` contains the ordered name/value pairs
 that are eligible for a submission without a submit button. Repeated names
 remain separate, and radio and select values use the document's current
 selection. File inputs and submit buttons are omitted from this value list.
+This list extracts values from the parsed document. It does not apply a
+browser's input sanitization or synthesize `dirname` entries, and it does not
+encode a complete `FormData` body.
 
 Supply `-BaseUri` when parsing HTML content to resolve a relative action:
 

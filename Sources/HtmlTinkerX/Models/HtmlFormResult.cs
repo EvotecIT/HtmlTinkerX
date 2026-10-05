@@ -15,6 +15,7 @@ public class HtmlFormResult {
     /// <summary>
     /// Successful named values in document order, retaining repeated names and selected options.
     /// Disabled controls, unchecked checkboxes and radios, files, and submit buttons are omitted.
+    /// Values come from the parsed document; browser input sanitization and generated dirname entries are not applied.
     /// </summary>
     public List<KeyValuePair<string, string>> SuccessfulFields { get; set; } = new();
 }
