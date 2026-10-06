@@ -9,8 +9,7 @@ namespace HtmlTinkerX.Tests;
 /// </summary>
 public class HtmlBrowserTableTests {
     private static string GetHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "headless_table.html"));
+        var path = TestHelpers.GetDocumentPath("headless_table.html");
         return File.ReadAllText(path);
     }
 

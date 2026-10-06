@@ -6,8 +6,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlFormFieldExtractorTests {
     private static string GetSampleFormHtml() {
-        string baseDir = AppContext.BaseDirectory;
-        string path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "sample_form.html"));
+        string path = TestHelpers.GetDocumentPath("sample_form.html");
         return File.ReadAllText(path);
     }
 
