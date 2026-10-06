@@ -231,6 +231,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         if (maxBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "Response body capture size must be greater than zero.");
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         IReadOnlyList<(IRequest Request, HtmlNetworkEntry Entry)> entries;
         lock (NetworkSync) {
@@ -260,9 +261,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
                 Task cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 Task completed = await Task.WhenAny(readTask, timeoutTask, cancellationTask).ConfigureAwait(false);
-                if (ReferenceEquals(completed, cancellationTask)) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (ReferenceEquals(completed, timeoutTask)) {
                     item.Entry.ResponseBodyError = "Response body capture timed out.";

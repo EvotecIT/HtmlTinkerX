@@ -104,8 +104,10 @@ public class HtmlBrowserNetworkLogTests {
         await session.DisposeAsync();
     }
 
-    [Fact]
-    public async Task CaptureResponseBodiesAsync_CanceledToken_Throws() {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CaptureResponseBodiesAsync_CanceledToken_Throws(bool bodyCompleted) {
         var playwright = new Mock<IPlaywright>();
         var browser = new Mock<IBrowser>();
         var context = new Mock<IBrowserContext>();
@@ -117,27 +119,44 @@ public class HtmlBrowserNetworkLogTests {
         request.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
         request.SetupGet(r => r.ResourceType).Returns("fetch");
 
+        using CancellationTokenSource cts = new();
         var pendingBody = new TaskCompletionSource<string>();
         var response = new Mock<IResponse>();
         response.SetupGet(r => r.Request).Returns(request.Object);
         response.SetupGet(r => r.Status).Returns(200);
         response.SetupGet(r => r.Headers).Returns(new Dictionary<string, string>());
-        response.Setup(r => r.TextAsync()).Returns(pendingBody.Task);
+        response.Setup(r => r.TextAsync()).Returns(() => {
+            cts.Cancel();
+            return bodyCompleted ? Task.FromResult("response body") : pendingBody.Task;
+        });
 
         HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
 
         page.Raise(p => p.Request += null!, page.Object, request.Object);
         page.Raise(p => p.Response += null!, page.Object, response.Object);
 
-        using CancellationTokenSource cts = new();
-        Task capture = session.CaptureResponseBodiesAsync(
+        Task capture = HtmlBrowser.CaptureResponseBodiesAsync(session,
             100,
             new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch },
             cts.Token);
-        cts.Cancel();
-
         await Assert.ThrowsAsync<OperationCanceledException>(() => capture);
         Assert.Null(HtmlBrowser.GetNetworkLog(session).Single().ResponseBodyError);
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task CaptureResponseBodiesAsync_CanceledEmptyLog_Throws() {
+        var playwright = new Mock<IPlaywright>();
+        var browser = new Mock<IBrowser>();
+        var context = new Mock<IBrowserContext>();
+        var page = new Mock<IPage>();
+        HtmlBrowserSession session = new(playwright.Object, browser.Object, context.Object, page.Object);
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => HtmlBrowser.CaptureResponseBodiesAsync(
+            session, 100, new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch }, cancellation.Token));
+
         await session.DisposeAsync();
     }
 
