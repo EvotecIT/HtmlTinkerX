@@ -190,6 +190,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
                 function: "() => document.querySelector('#result').textContent === '1'",
+                delayMilliseconds: 1000,
                 timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
