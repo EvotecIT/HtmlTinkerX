@@ -5,8 +5,6 @@ $coreAssemblyPath = Join-Path (Split-Path $corpusAssembly) 'HtmlTinkerX.dll'
 $includeBrowser = Get-BenchmarkInput IncludeBrowser $false -Bool
 
 New-BenchmarkSuite 'htmltinkerx-corpus' -OutputRoot (Join-Path $PSScriptRoot '../../Ignore/Benchmarks') {
-    Add-BenchmarkMetadata SourceCommit (Get-BenchmarkInput SourceCommit '')
-    Add-BenchmarkMetadata SourceState (Get-BenchmarkInput SourceState '')
     Add-BenchmarkMetadata CoreAssemblySha256 (Get-FileHash -LiteralPath $coreAssemblyPath).Hash
     Add-BenchmarkMetadata CorpusAssemblySha256 (Get-FileHash -LiteralPath $assembly.Location).Hash
     Add-BenchmarkMetadata Scope 'Current-source correctness and timing; no released-version or cross-machine ranking'

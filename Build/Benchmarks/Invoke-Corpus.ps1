@@ -36,7 +36,6 @@ try {
         Variable = @{
             AssemblyPath = $corpusPath
             IncludeBrowser = [bool]$IncludeBrowser; DomainLabel = $DomainLabel; HostMetadataPath = $HostMetadataPath
-            SourceCommit = (& git -C $repositoryRoot rev-parse HEAD); SourceState = ((& git -C $repositoryRoot status --porcelain) -join "`n")
             Purpose = $Purpose
         }
     }
