@@ -217,6 +217,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                             && Volatile.Read(ref _lastPopupScriptToken) == "popup-token"
                                 ? "popup resources authorized"
                                 : "pending";
+                    } else if (requestTarget.StartsWith("/split-style-status", StringComparison.Ordinal)) {
+                        contentType = "text/plain; charset=utf-8";
+                        body = BlankPopupSourceRequests("split-write-style").ToString(System.Globalization.CultureInfo.InvariantCulture);
                     } else if (requestTarget.StartsWith("/blank-popup-location", StringComparison.Ordinal)) {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         string result = LastPopupToken == "popup-token" ? "popup authorized" : "popup denied";

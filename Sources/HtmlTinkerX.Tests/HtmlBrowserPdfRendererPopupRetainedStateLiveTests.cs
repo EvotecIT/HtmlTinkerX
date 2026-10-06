@@ -180,11 +180,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         string script = $@"const popup = window.open('', '_blank');
             popup.document.write('<style>@imp');
             popup.document.write('ort url({server.BlankPopupResourceUrl}?source=split-write-style)</style>');
+            setInterval(() => fetch('/split-style-status').then(response => response.text()).then(text => {{
+                document.querySelector('#result').textContent = text;
+            }}), 20);
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            readiness: new HtmlBrowserPdfReadiness(
+                skipLoadState: true,
+                function: "() => document.querySelector('#result').textContent === '1'",
+                timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
