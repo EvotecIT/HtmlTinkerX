@@ -54,17 +54,17 @@ jobs:
 
       - name: Run tests for net8.0
         if: matrix.framework == 'net8.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
-        timeout-minutes: 10
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
+        timeout-minutes: 20
 
       - name: Run tests for net10.0
         if: matrix.framework == 'net10.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 20
 
       - name: Run tests for net472
         if: matrix.framework == 'net472'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 20
 
       - name: Summarize failing tests
@@ -106,7 +106,9 @@ jobs:
         if: always()
         with:
           name: test-results-windows-${{ matrix.framework }}
-          path: '**/*.trx'
+          path: |
+            **/*.trx
+            **/Sequence*.xml
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
@@ -143,11 +145,11 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 10
 
       - name: Summarize failing tests
@@ -189,7 +191,9 @@ jobs:
         if: always()
         with:
           name: test-results-ubuntu
-          path: '**/*.trx'
+          path: |
+            **/*.trx
+            **/Sequence*.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -217,11 +221,11 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
         timeout-minutes: 10
 
       - name: Summarize failing tests
@@ -263,7 +267,9 @@ jobs:
         if: always()
         with:
           name: test-results-macos
-          path: '**/*.trx'
+          path: |
+            **/*.trx
+            **/Sequence*.xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
