@@ -32,6 +32,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private string? _lastPopupWorkerToken;
         private string? _lastPopupEventToken;
         private int _blankPopupResourceRequests;
+        private readonly TaskCompletionSource<bool> _blankPopupResourceReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _unauthorizedBlankPopupResourceRequests;
         private int _styleTextResourceRequests;
         private int _removedNamespacedResourceRequests;
@@ -103,6 +104,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastSelfReferer => Volatile.Read(ref _lastSelfReferer);
         internal string? LastExistingContextToken => Volatile.Read(ref _lastExistingContextToken);
         internal int BlankPopupResourceRequests => Volatile.Read(ref _blankPopupResourceRequests);
+        internal async Task<bool> WaitForBlankPopupResourceAsync() =>
+            await Task.WhenAny(_blankPopupResourceReceived.Task, Task.Delay(5000)) == _blankPopupResourceReceived.Task;
         internal int UnauthorizedBlankPopupResourceRequests => Volatile.Read(ref _unauthorizedBlankPopupResourceRequests);
         internal int StyleTextResourceRequests => Volatile.Read(ref _styleTextResourceRequests);
         internal int BlankPopupSourceRequests(string source) => _blankPopupSources.TryGetValue(source, out var request) ? request.Count : 0;
@@ -237,6 +240,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                         if (token != "popup-token") Interlocked.Increment(ref _unauthorizedBlankPopupResourceRequests);
                         Volatile.Write(ref _lastPopupToken, token);
+                        _blankPopupResourceReceived.TrySetResult(true);
                         int bodyOffset = request.IndexOf("\r\n\r\n", StringComparison.Ordinal);
                         bool echoBody = requestTarget.Contains("echo-body", StringComparison.Ordinal); bool imageBody = requestTarget.Contains("source=image-decode", StringComparison.Ordinal);
                         contentType = echoBody ? "text/plain; charset=utf-8" : imageBody ? "image/svg+xml" : "application/javascript; charset=utf-8";
