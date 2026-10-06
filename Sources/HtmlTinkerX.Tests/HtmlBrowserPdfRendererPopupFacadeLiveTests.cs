@@ -204,6 +204,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             beforeCaptureScript: script));
 
         AssertPdfContains(result.PdfBytes, "popup authorized");
+        Assert.True(await server.WaitForBlankPopupResourceAsync());
         Assert.True(server.BlankPopupResourceRequests > 0);
         Assert.Equal(0, server.UnauthorizedBlankPopupResourceRequests);
     }
