@@ -119,7 +119,7 @@ public static partial class HtmlBrowser {
         int actualCount = -1;
         while (stopwatch.ElapsedMilliseconds <= timeout) {
             cancellationToken.ThrowIfCancellationRequested();
-            actualCount = await locator.CountAsync().ConfigureAwait(false);
+            actualCount = await locator.CountAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             if (actualCount == expectedCount) {
                 return;
             }
@@ -156,10 +156,11 @@ public static partial class HtmlBrowser {
             throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be greater than zero.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         ILocator locator = session.Page.Locator(selector);
         await locator.First.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout, State = WaitForSelectorState.Attached }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        int count = Math.Min(await locator.CountAsync().ConfigureAwait(false), limit);
+        int count = Math.Min(await locator.CountAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false), limit);
         List<HtmlBrowserElementInfo> results = new();
 
         for (int i = 0; i < count; i++) {
@@ -170,7 +171,7 @@ public static partial class HtmlBrowser {
                 new {
                     includeAttributes,
                     includeHtml
-                }).ConfigureAwait(false);
+                }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             HtmlBrowserElementInfo info = ParseElementInfo(json);
             if (visibleOnly && !info.Visible) {
                 continue;
@@ -206,7 +207,7 @@ public static partial class HtmlBrowser {
             new {
                 includeAttributes,
                 includeHtml
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(json)) {
             return null;
@@ -301,19 +302,19 @@ public static partial class HtmlBrowser {
     /// <returns>List of interactable element descriptions.</returns>
     public static async Task<List<HtmlInteractableInfo>> GetInteractablesAsync(IPage page, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]");
+        var elements = await page.QuerySelectorAllAsync("a,button,[role=button],input[type=button],input[type=submit]").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         List<HtmlInteractableInfo> list = new();
         int index = 0;
         foreach (var el in elements) {
             cancellationToken.ThrowIfCancellationRequested();
-            string rawText = await el.InnerTextAsync();
+            string rawText = await el.InnerTextAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             string text = Regex.Replace(rawText, "\\s+", " ").Trim();
-            string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
-            string? href = await el.GetAttributeAsync("href");
-            string? id = await el.GetAttributeAsync("id");
-            string? cls = await el.GetAttributeAsync("class");
-            bool visible = await el.IsVisibleAsync();
-            bool enabled = await el.IsEnabledAsync();
+            string tag = await el.EvaluateAsync<string>("el => el.tagName.toLowerCase()").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            string? href = await el.GetAttributeAsync("href").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            string? id = await el.GetAttributeAsync("id").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            string? cls = await el.GetAttributeAsync("class").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            bool visible = await el.IsVisibleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+            bool enabled = await el.IsEnabledAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             bool editable = await el.EvaluateAsync<bool>(@"el => {
                 if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
                 const tag = el.tagName ? el.tagName.toLowerCase() : '';
@@ -324,7 +325,7 @@ public static partial class HtmlBrowser {
                     return !['button','checkbox','color','file','hidden','image','radio','range','reset','submit'].includes(type);
                 }
                 return el.isContentEditable === true || el.getAttribute('contenteditable') === 'true';
-            }");
+            }").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             bool potentiallyHidden = await el.EvaluateAsync<bool>(@"el => {
                 const check = node => {
                     if (!node) return false;
@@ -339,13 +340,13 @@ public static partial class HtmlBrowser {
                     if (check(n)) return true;
                 }
                 return false;
-            }");
+            }").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             HtmlBrowserElementInfo elementInfo = ParseElementInfo(await el.EvaluateAsync<string>(
                 ElementInfoScript,
                 new {
                     includeAttributes = false,
                     includeHtml = false
-                }).ConfigureAwait(false));
+                }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false));
             cancellationToken.ThrowIfCancellationRequested();
             string selector = await el.EvaluateAsync<string>(@"el => {
                 const esc = (CSS && CSS.escape) ? CSS.escape : (s => s);
@@ -356,7 +357,7 @@ public static partial class HtmlBrowser {
                 const cls = el.className;
                 if (cls) return sel + '.' + cls.trim().split(/\s+/).map(esc).join('.');
                 return sel;
-            }");
+            }").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             list.Add(new HtmlInteractableInfo {
                 Index = index++,
                 Text = text,
@@ -388,6 +389,7 @@ public static partial class HtmlBrowser {
         }
 
         string normalizedScope = NormalizeStorageScope(scope);
+        cancellationToken.ThrowIfCancellationRequested();
         string json = await session.Page.EvaluateAsync<string>(
             @"(args) => {
                 const read = (storage, scopeName) => {
@@ -407,7 +409,7 @@ public static partial class HtmlBrowser {
             new {
                 scope = normalizedScope,
                 key
-            }).ConfigureAwait(false);
+            }).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
 
         List<HtmlBrowserStorageItem> items = new();
         using JsonDocument document = JsonDocument.Parse(json);

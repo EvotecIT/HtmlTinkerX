@@ -17,7 +17,7 @@ public static partial class HtmlBrowser {
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static async Task<List<HtmlCookie>> GetCookiesAsync(HtmlBrowserSession session, IEnumerable<string>? domains = null, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        IReadOnlyList<BrowserContextCookiesResult> cookies = await session.Context.CookiesAsync();
+        IReadOnlyList<BrowserContextCookiesResult> cookies = await session.Context.CookiesAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         List<HtmlCookie> result = new();
         foreach (BrowserContextCookiesResult c in cookies) {
             result.Add(new HtmlCookie {

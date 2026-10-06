@@ -240,7 +240,7 @@ public static partial class HtmlBrowser {
         foreach (string selector in selectors) {
             cancellationToken.ThrowIfCancellationRequested();
             try {
-                int count = await session.Page.Locator(selector).CountAsync().ConfigureAwait(false);
+                int count = await session.Page.Locator(selector).CountAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
                 if (count <= 0) {
                     continue;
                 }

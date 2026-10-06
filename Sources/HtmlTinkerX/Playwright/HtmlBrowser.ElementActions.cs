@@ -130,7 +130,7 @@ public static partial class HtmlBrowser {
 
         while (!deadline.HasValue || DateTimeOffset.UtcNow <= deadline.Value) {
             cancellationToken.ThrowIfCancellationRequested();
-            string current = await session.Page.EvaluateAsync<string>("() => document.documentElement.outerHTML").ConfigureAwait(false);
+            string current = await session.Page.EvaluateAsync<string>("() => document.documentElement.outerHTML").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             if (!string.Equals(previous, current, StringComparison.Ordinal)) {
                 previous = current;
                 stableSince = DateTimeOffset.UtcNow;

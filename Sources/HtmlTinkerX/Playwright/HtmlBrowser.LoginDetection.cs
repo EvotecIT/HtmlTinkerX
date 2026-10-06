@@ -22,7 +22,7 @@ public static partial class HtmlBrowser {
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        string html = await page.ContentAsync().ConfigureAwait(false);
+        string html = await page.ContentAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         return HtmlLoginParser.Detect(html, page.Url);
     }
 
