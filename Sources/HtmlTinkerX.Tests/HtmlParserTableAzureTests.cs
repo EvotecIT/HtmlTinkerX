@@ -7,8 +7,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTableAzureTests {
     private static string GetAzureStatusHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "azure_status.html"));
+        var path = TestHelpers.GetDocumentPath("azure_status.html");
         return File.ReadAllText(path);
     }
 

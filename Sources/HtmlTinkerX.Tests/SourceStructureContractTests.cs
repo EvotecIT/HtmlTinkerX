@@ -18,7 +18,7 @@ public class SourceStructureContractTests {
 
     [Fact]
     public void HandAuthoredSourceFiles_DoNotExceedMaintainabilityLimit() {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot = TestHelpers.RepositoryRoot;
         List<string> oversized = Directory
             .EnumerateFiles(repositoryRoot, "*", SearchOption.AllDirectories)
             .Where(IsHandAuthoredSource)
@@ -53,15 +53,4 @@ public class SourceStructureContractTests {
         return count;
     }
 
-    private static string FindRepositoryRoot() {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory != null) {
-            if (File.Exists(Path.Combine(directory.FullName, "PSParseHTML.psd1"))) {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the PSParseHTML repository root.");
-    }
 }

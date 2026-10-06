@@ -6,8 +6,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlOpenGraphTests {
     private static string GetSampleHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "sample_open_graph.html"));
+        var path = TestHelpers.GetDocumentPath("sample_open_graph.html");
         return File.ReadAllText(path);
     }
 

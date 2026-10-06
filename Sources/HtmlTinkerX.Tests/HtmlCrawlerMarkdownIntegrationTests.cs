@@ -430,13 +430,13 @@ public partial class HtmlCrawlerMarkdownTests {
     }
 
     private static string ReadFixture(string fileName) {
-        string path = Path.Combine(GetTestsProjectRoot(), "Fixtures", fileName);
+        string path = Path.Combine(TestHelpers.ProjectRoot, "Fixtures", fileName);
         return File.ReadAllText(path);
     }
 
     // Set HTMLTINKERX_UPDATE_SNAPSHOTS=1 to rewrite checked-in baselines after an intentional renderer change.
     private static void AssertMarkdownSnapshot(string fileName, string actualMarkdown) {
-        string path = Path.Combine(GetTestsProjectRoot(), "Fixtures", "Expected", fileName);
+        string path = Path.Combine(TestHelpers.ProjectRoot, "Fixtures", "Expected", fileName);
         string normalized = NormalizeMarkdown(actualMarkdown);
 
         if (string.Equals(Environment.GetEnvironmentVariable("HTMLTINKERX_UPDATE_SNAPSHOTS"), "1", StringComparison.Ordinal)) {
@@ -458,7 +458,7 @@ public partial class HtmlCrawlerMarkdownTests {
     }
 
     private static void AssertHtmlSnapshot(string fileName, string actualHtml) {
-        string path = Path.Combine(GetTestsProjectRoot(), "Fixtures", "Expected", fileName);
+        string path = Path.Combine(TestHelpers.ProjectRoot, "Fixtures", "Expected", fileName);
         string normalized = NormalizeHtml(actualHtml);
 
         if (string.Equals(Environment.GetEnvironmentVariable("HTMLTINKERX_UPDATE_SNAPSHOTS"), "1", StringComparison.Ordinal)) {
@@ -530,17 +530,4 @@ public partial class HtmlCrawlerMarkdownTests {
             .Trim();
     }
 
-    private static string GetTestsProjectRoot() {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null) {
-            string candidate = Path.Combine(dir.FullName, "HtmlTinkerX.Tests.csproj");
-            if (File.Exists(candidate)) {
-                return dir.FullName;
-            }
-
-            dir = dir.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate HtmlTinkerX.Tests project root from test runtime base directory.");
-    }
 }

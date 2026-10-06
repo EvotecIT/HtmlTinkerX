@@ -6,8 +6,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlParserMetaTests {
     private static string GetSampleMetaHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "sample_meta.html"));
+        var path = TestHelpers.GetDocumentPath("sample_meta.html");
         return File.ReadAllText(path);
     }
 

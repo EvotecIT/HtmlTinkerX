@@ -9,8 +9,7 @@ namespace HtmlTinkerX.Tests;
 /// </summary>
 public class HtmlParserFormTests {
     private static string GetSampleFormHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "sample_form.html"));
+        var path = TestHelpers.GetDocumentPath("sample_form.html");
         return File.ReadAllText(path);
     }
 

@@ -120,7 +120,7 @@ namespace HtmlTinkerX.Tests
         {
             return CreateTestServer(async context =>
             {
-                string html = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Documents", "sample_form.html"));
+                string html = System.IO.File.ReadAllText(TestHelpers.GetDocumentPath("sample_form.html"));
                 await context.Response.WriteAsync(html);
             }, "/form", "GET");
         }
@@ -129,7 +129,7 @@ namespace HtmlTinkerX.Tests
         {
             return CreateTestServer(async context =>
             {
-                string html = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Documents", "sample_lists.html"));
+                string html = System.IO.File.ReadAllText(TestHelpers.GetDocumentPath("sample_lists.html"));
                 await context.Response.WriteAsync(html);
             }, "/lists", "GET");
         }
