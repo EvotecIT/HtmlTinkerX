@@ -4,6 +4,33 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlDiscoveryParserTests {
     [Fact]
+    public void ParseSitemapEntries_PreservesDatesAndExcludesImageExtensionLocations() {
+        const string xml = """
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url><loc>/old</loc><lastmod>2023-01-01</lastmod><image:image><image:loc>https://example.org/photo.jpg</image:loc></image:image></url>
+  <url><loc>/recent</loc><lastmod>2026-10-05T12:30:00+02:00</lastmod></url>
+  <url><loc>/unknown</loc><lastmod>not-a-date</lastmod></url>
+</urlset>
+""";
+        var entries = HtmlDiscoveryParser.ParseSitemapEntries(xml,new Uri("https://example.org/sitemap.xml"));
+        Assert.Equal(3,entries.Count);
+        Assert.Equal("https://example.org/old",entries[0].Url);
+        Assert.Equal(new DateTimeOffset(2026,10,5,10,30,0,TimeSpan.Zero),entries[1].LastModified);
+        Assert.Null(entries[2].LastModified);
+        Assert.All(entries,entry=>Assert.False(entry.IsSitemap));
+        Assert.Equal(3,HtmlDiscoveryParser.ParseSitemapUrls(xml,new Uri("https://example.org/")).Count);
+    }
+
+    [Fact]
+    public void ParseSitemapEntries_IdentifiesChildSitemaps() {
+        var entries = HtmlDiscoveryParser.ParseSitemapEntries("<sitemapindex><sitemap><loc>/part.xml</loc><lastmod>2026-10-05</lastmod></sitemap></sitemapindex>",new Uri("https://example.org/"));
+        var entry=Assert.Single(entries);
+        Assert.True(entry.IsSitemap);
+        Assert.NotNull(entry.LastModified);
+        Assert.Equal("https://example.org/part.xml",entry.Url);
+    }
+
+    [Fact]
     public void ParseLinks_ReturnsResolvedLinkTextAndContext() {
         const string html = """
 <html>

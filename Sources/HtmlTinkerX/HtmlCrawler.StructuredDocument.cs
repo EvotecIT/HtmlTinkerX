@@ -67,6 +67,7 @@ public static partial class HtmlCrawler {
         IDocument document,
         IReadOnlyCollection<HtmlMetaTag> metaTags,
         HtmlOpenGraph openGraph) {
+        HtmlPublicationDates dates = HtmlPublicationDates.ParseDocument(document, Uri.TryCreate(page.Url, UriKind.Absolute, out Uri? pageUrl) ? pageUrl : null);
         return new HtmlCrawlStructuredMetadata {
             Title = page.Title ?? FindOpenGraphValue(openGraph, "title"),
             Description = FindMetaContent(metaTags, "description")
@@ -77,8 +78,8 @@ public static partial class HtmlCrawler {
                 ?? FindMetaContent(metaTags, "application-name"),
             Type = FindOpenGraphValue(openGraph, "type"),
             Author = FindMetaContent(metaTags, "author", "article:author"),
-            PublishedTime = FindMetaContent(metaTags, "article:published_time", "published_time", "pubdate"),
-            ModifiedTime = FindMetaContent(metaTags, "article:modified_time", "last-modified", "modified_time"),
+            PublishedTime = dates.Published?.ToString("O"),
+            ModifiedTime = dates.Modified?.ToString("O"),
             Robots = FindMetaContent(metaTags, "robots"),
             Generator = FindMetaContent(metaTags, "generator"),
             ImageUrl = FindOpenGraphValue(openGraph, "image"),
