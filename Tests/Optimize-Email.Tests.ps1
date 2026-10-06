@@ -1,4 +1,15 @@
-Describe 'Optimize-Email' {    It 'Given HTML content - Should inline CSS and remove style elements' {
+Describe 'Optimize-Email' {
+    It 'inlines CSS when the local error preference is a string' {
+        Set-Variable -Name ErrorActionPreference -Value 'Stop' -Scope Local
+        (Get-Variable ErrorActionPreference -Scope Local).Value.GetType() | Should -Be ([string])
+
+        $html = '<html><head><style>p{color:red}</style></head><body><p>Hi</p></body></html>'
+        $result = Optimize-Email -Body $html -RemoveStyleElements
+
+        $result | Should -Be '<html><head></head><body><p style="color: red">Hi</p></body></html>'
+    }
+
+    It 'Given HTML content - Should inline CSS and remove style elements' {
         $html = '<html><head><style>p{color:red}</style></head><body><p>Hi</p></body></html>'
         $expected = '<html><head></head><body><p style="color: red">Hi</p></body></html>'
         $result = Optimize-Email -Body $html -RemoveStyleElements

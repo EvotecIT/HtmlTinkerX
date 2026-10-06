@@ -103,7 +103,6 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     [Parameter]
     public string? AnalyticsDomain { get; set; }
 
-    private ActionPreference errorAction;
     private InternalLogger? _logger;
     private InternalLogger? _previousLogger;
     private InternalLoggerPowerShell? _loggerBridge;
@@ -111,7 +110,7 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
     private int _processActive;
 
     /// <summary>
-    /// Initializes logging and resolves ErrorActionPreference.
+    /// Initializes logging.
     /// </summary>
     protected override void BeginProcessing() {
         try {
@@ -134,13 +133,6 @@ public sealed class CmdletOptimizeEmail : AsyncPSCmdlet {
             _previousLogger = LoggingMessages.Logger;
             LoggingMessages.Logger = internalLogger;
 
-            errorAction = (ActionPreference)SessionState.PSVariable.GetValue("ErrorActionPreference");
-            if (MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-                string errorActionString = MyInvocation.BoundParameters["ErrorAction"]?.ToString() ?? string.Empty;
-                if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
-                    errorAction = actionPreference;
-                }
-            }
         } catch {
             DetachLogger();
             throw;
