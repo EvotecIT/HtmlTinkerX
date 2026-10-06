@@ -74,7 +74,7 @@ public static partial class HtmlCrawler {
             asset.ContentType = response.Content.Headers.ContentType?.MediaType ?? response.Content.Headers.ContentType?.ToString();
             response.EnsureSuccessStatusCode();
 
-            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumAssetResponseBytes, requestToken).ConfigureAwait(false);
+            byte[] bytes = await HtmlUtilities.ReadResponseBytesAsync(response, options.MaximumAssetResponseBytes, requestToken, options.AssetResponseBudget).ConfigureAwait(false);
             asset.ContentLength = bytes.LongLength;
 
             if (!string.IsNullOrEmpty(assetsDirectory)) {
@@ -82,9 +82,12 @@ public static partial class HtmlCrawler {
                 await WriteBytesAsync(assetPath, bytes, cancellationToken).ConfigureAwait(false);
                 asset.FilePath = assetPath;
             }
+        } catch (HtmlCrawlBudgetExceededException) {
+            throw;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
+            options.AssetResponseBudget?.ThrowIfExceeded();
             asset.Error = ex.Message;
         } finally {
             asset.Finished = DateTimeOffset.UtcNow;

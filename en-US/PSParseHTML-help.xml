@@ -30610,6 +30610,30 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumTotalAssetResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Optional total HTTP body limit for downloaded assets, including nested CSS assets, in this invocation.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaximumTotalPageResponseBytes</maml:name>
+          <maml:description>
+            <maml:para>Optional total HTTP body limit for static pages, robots.txt, and sitemaps in this invocation. Browser traffic is excluded.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxPages</maml:name>
           <maml:description>
             <maml:para>Maximum number of pages to fetch.</maml:para>
@@ -31705,6 +31729,30 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
           <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumTotalAssetResponseBytes</maml:name>
+        <maml:description>
+          <maml:para>Optional total HTTP body limit for downloaded assets, including nested CSS assets, in this invocation.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+        <dev:type>
+          <maml:name>Int64</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaximumTotalPageResponseBytes</maml:name>
+        <maml:description>
+          <maml:para>Optional total HTTP body limit for static pages, robots.txt, and sitemaps in this invocation. Browser traffic is excluded.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+        <dev:type>
+          <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

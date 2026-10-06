@@ -192,7 +192,7 @@ public static class HtmlUtilities {
             throw CreateResponseTooLargeException(maximumBytes, declaredLength);
         }
 
-        byte[] bytes = await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
+        byte[] bytes = await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken, fetchOptions?.ResponseBudget).ConfigureAwait(false);
         return DecodeHtmlResponse(bytes, response.Content.Headers.ContentType?.CharSet);
     }
 
@@ -237,7 +237,8 @@ public static class HtmlUtilities {
     internal static async Task<byte[]> ReadResponseBytesAsync(
         HttpResponseMessage response,
         int maximumBytes,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        HtmlCrawlResponseBudget? responseBudget = null) {
         if (maximumBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maximumBytes), maximumBytes, "Maximum response bytes must be greater than zero.");
         }
@@ -247,13 +248,13 @@ public static class HtmlUtilities {
             throw CreateResponseTooLargeException(maximumBytes, declaredLength);
         }
 
-        return await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken).ConfigureAwait(false);
+        return await ReadBoundedContentAsync(response.Content, maximumBytes, cancellationToken, responseBudget).ConfigureAwait(false);
     }
 
-    private static async Task<byte[]> ReadBoundedContentAsync(HttpContent content, int maximumBytes, CancellationToken cancellationToken) {
+    private static async Task<byte[]> ReadBoundedContentAsync(HttpContent content, int maximumBytes, CancellationToken cancellationToken, HtmlCrawlResponseBudget? responseBudget = null) {
         using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
         using MemoryStream buffer = new(Math.Min(maximumBytes, 81920));
-        await CopyBoundedStreamAsync(stream, buffer, maximumBytes, cancellationToken).ConfigureAwait(false);
+        await CopyBoundedStreamAsync(stream, buffer, maximumBytes, cancellationToken, responseBudget).ConfigureAwait(false);
         return buffer.ToArray();
     }
 
@@ -331,13 +332,15 @@ public static class HtmlUtilities {
         return requestTimeout;
     }
 
-    private static async Task CopyBoundedStreamAsync(Stream source, Stream destination, int maximumBytes, CancellationToken cancellationToken) {
+    private static async Task CopyBoundedStreamAsync(Stream source, Stream destination, int maximumBytes, CancellationToken cancellationToken, HtmlCrawlResponseBudget? responseBudget = null) {
         using CancellationTokenRegistration cancellationRegistration = RegisterResponseStreamCancellation(source, cancellationToken);
         byte[] chunk = new byte[81920];
         int totalBytes = 0;
 
         while (true) {
-            int bytesRead = await ReadResponseStreamAsync(source, chunk, chunk.Length, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            int readSize = responseBudget?.GetReadSize(chunk.Length) ?? chunk.Length;
+            int bytesRead = await ReadResponseStreamAsync(source, chunk, readSize, cancellationToken, responseBudget).ConfigureAwait(false);
             if (bytesRead == 0) {
                 break;
             }
@@ -363,11 +366,13 @@ public static class HtmlUtilities {
             }
         }, stream);
 
-    internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken) {
+    internal static async Task<int> ReadResponseStreamAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken, HtmlCrawlResponseBudget? responseBudget = null) {
         cancellationToken.ThrowIfCancellationRequested();
         try {
             int read = await stream.ReadAsync(buffer, 0, count, cancellationToken).ConfigureAwait(false);
+            responseBudget?.RecordBytes(read);
             cancellationToken.ThrowIfCancellationRequested();
+            responseBudget?.ThrowIfExceeded();
             return read;
         } catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
             (exception is IOException || exception is ObjectDisposedException || exception is HttpRequestException)) {

@@ -55,6 +55,14 @@ For larger trusted responses, set `MaximumResponseBytes` on
 to the .NET overloads. Relay and PreMailer options also accept `FetchOptions`.
 Existing .NET overloads use the same bounded default.
 
+Crawls also accept `MaximumTotalPageResponseBytes` and
+`MaximumTotalAssetResponseBytes` in `HtmlCrawlOptions` or `Invoke-HtmlCrawl`.
+Static pages, robots.txt, and sitemaps share the page budget. Downloaded assets,
+including nested CSS assets, share the asset budget. These optional limits count
+HTTP body bytes read during one invocation; browser traffic and retained result
+memory are outside them. Exceeding a limit throws `HtmlCrawlBudgetExceededException`.
+Use `ResumePath` to continue from the preceding checkpoint with a fresh budget.
+
 `Submit-HtmlForm -Timeout` covers the complete HTTP submission, including the
 response body, in milliseconds; zero disables that deadline. Stopping the
 PowerShell pipeline cancels the request. .NET callers can reuse an `HttpClient`
@@ -200,6 +208,8 @@ await HtmlBrowser.CaptureScreenshotAsync(session.Page, "screenshot.png");
 var crawl = await HtmlCrawler.CrawlAsync("https://example.com/docs", new HtmlCrawlOptions {
     MaxDepth = 1,
     MaxPages = 10,
+    MaximumTotalPageResponseBytes = 128L * 1024 * 1024,
+    MaximumTotalAssetResponseBytes = 256L * 1024 * 1024,
     UseSitemaps = true,
     RespectRobotsTxt = true,
     DeduplicatePages = true,

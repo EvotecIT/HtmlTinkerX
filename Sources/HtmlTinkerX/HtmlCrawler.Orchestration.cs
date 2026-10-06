@@ -60,6 +60,10 @@ public static partial class HtmlCrawler {
             HtmlCrawlProfiles.Apply(resolvedOptions, appliedProfile);
         }
         ValidateOptions(resolvedOptions);
+        resolvedOptions.PageResponseBudget = resolvedOptions.MaximumTotalPageResponseBytes is long pageLimit
+            ? new HtmlCrawlResponseBudget(nameof(HtmlCrawlOptions.MaximumTotalPageResponseBytes), pageLimit) : null;
+        resolvedOptions.AssetResponseBudget = resolvedOptions.MaximumTotalAssetResponseBytes is long assetLimit
+            ? new HtmlCrawlResponseBudget(nameof(HtmlCrawlOptions.MaximumTotalAssetResponseBytes), assetLimit) : null;
         resolvedOptions.CrawlOrigin = startUri;
         Dictionary<string, HtmlCrawlPage> refreshPages = await LoadRefreshPagesAsync(startUri, resolvedOptions, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(resolvedOptions.RefreshPath)) resolvedOptions.CacheResponses = true;
@@ -326,6 +330,12 @@ public static partial class HtmlCrawler {
         if (options.MaximumAssetResponseBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.MaximumAssetResponseBytes), "MaximumAssetResponseBytes must be greater than zero.");
         }
+        if (options.MaximumTotalPageResponseBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.MaximumTotalPageResponseBytes), "MaximumTotalPageResponseBytes must be greater than zero when supplied.");
+        }
+        if (options.MaximumTotalAssetResponseBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(options.MaximumTotalAssetResponseBytes), "MaximumTotalAssetResponseBytes must be greater than zero when supplied.");
+        }
         if (options.Timeout <= 0) {
             throw new ArgumentOutOfRangeException(nameof(options.Timeout), "Timeout must be greater than zero.");
         }
@@ -400,7 +410,8 @@ public static partial class HtmlCrawler {
         }
 
         HtmlHttpFetchOptions sitemapFetchOptions = new() {
-            MaximumResponseBytes = options.MaximumPageResponseBytes
+            MaximumResponseBytes = options.MaximumPageResponseBytes,
+            ResponseBudget = options.PageResponseBudget
         };
 
         while (sitemapQueue.Count > 0) {
@@ -414,9 +425,12 @@ public static partial class HtmlCrawler {
                 HtmlHttpTextResult sitemapResponse = await HtmlUtilities.GetTextWithProperEncodingAsync(client, sitemapUri.AbsoluteUri, sitemapFetchOptions, cancellationToken).ConfigureAwait(false);
                 xml = sitemapResponse.Content;
                 sitemapUri = sitemapResponse.FinalUri ?? sitemapUri;
+            } catch (HtmlCrawlBudgetExceededException) {
+                throw;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch {
+                options.PageResponseBudget?.ThrowIfExceeded();
                 continue;
             }
 

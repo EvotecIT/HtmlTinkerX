@@ -45,6 +45,16 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int MaximumAssetResponseBytes { get; set; } = HtmlCrawlOptions.DefaultMaximumAssetResponseBytes;
 
+    /// <summary>Optional total HTTP body limit for static pages, robots.txt, and sitemaps in this invocation. Browser traffic is excluded.</summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long? MaximumTotalPageResponseBytes { get; set; }
+
+    /// <summary>Optional total HTTP body limit for downloaded assets, including nested CSS assets, in this invocation.</summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long? MaximumTotalAssetResponseBytes { get; set; }
+
     /// <summary>Render pages through Playwright before extraction.</summary>
     [Parameter]
     public SwitchParameter Render { get; set; }
@@ -412,6 +422,8 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             MaxPages = MaxPages,
             MaximumPageResponseBytes = MaximumPageResponseBytes,
             MaximumAssetResponseBytes = MaximumAssetResponseBytes,
+            MaximumTotalPageResponseBytes = MaximumTotalPageResponseBytes,
+            MaximumTotalAssetResponseBytes = MaximumTotalAssetResponseBytes,
             Render = Render.IsPresent,
             AutoRender = AutoRender.IsPresent,
             RestrictToHost = !IncludeExternal.IsPresent,
