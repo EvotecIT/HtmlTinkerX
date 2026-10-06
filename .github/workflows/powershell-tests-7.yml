@@ -130,7 +130,13 @@ jobs:
         run: dotnet build Sources/PSParseHTML.PowerShell/PSParseHTML.PowerShell.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }}
 
       - name: Run PowerShell tests
-        run: .\PSParseHTML.Tests.ps1
+        run: |
+          if ($PSVersionTable.PSEdition -eq 'Desktop') {
+            # Playwright's binary driver pipe must not inherit a UTF-8 BOM.
+            Write-Host "Console input: $([Console]::InputEncoding.CodePage), preamble: $([BitConverter]::ToString([Console]::InputEncoding.GetPreamble()))"
+            [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+          }
+          .\PSParseHTML.Tests.ps1
         timeout-minutes: 10
 
   test-windows-packaged-alc:
