@@ -12,7 +12,7 @@ The first command builds the optional harness and lists the matrix. The second c
 | Family | Sizes | Public operation and validation |
 |---|---|---|
 | Nested | 25 / 250 paragraphs, 24 levels | Readable extraction; every numbered paragraph and Unicode text |
-| Tables | 25 / 250 rows | Detailed table parsing; row IDs, value checksum and labels |
+| Tables | 25 / 2,500 rows | Detailed table parsing; row IDs, value checksum and labels |
 | Cards | 25 / 250 cards | Page reader; headings, links, complete repeated collection and text |
 | Unicode | 25 / 250 paragraphs | DOM parsing; title, paragraph count and multilingual text including emoji |
 | StaticRead | 25 / 250 paragraphs | HTTP fetch and parsing; UTF-8 decoding and complete content |
@@ -31,6 +31,6 @@ pwsh -NoProfile -File ./Build/Benchmarks/Invoke-Corpus.ps1 -IncludeBrowser -Proc
 
 The mask above is an example; verify it against the actual host. `host.json` supplies processor/topology, OS, power-plan and other relevant host details as a JSON object. Check host load before and after the full matrix and retain both observations. Use the same placement, options, fixtures and runtime for each compared revision. Do not use busy-host smoke timings or shared hosted-runner timings as a product ranking.
 
-Results record source commit/state and actual core/harness assembly hashes. Native placement metadata records applied and original settings when requested. Use a clean committed source for comparisons; `-SkipBuild` requires matching existing Release binaries. `-Case Tables-250` selects an individual case. Run each changed revision in a fresh process so cached assemblies cannot carry over.
+Results record source commit/state and actual core/harness assembly hashes. Native placement metadata records applied and original settings when requested. Use a clean committed source for comparisons; `-SkipBuild` requires matching existing Release binaries. `-Case Tables-2500` selects an individual case. Run each changed revision in a fresh process so cached assemblies cannot carry over.
 
 The **Benchmark corpus** GitHub workflow is manual. It uploads seven-day native artifacts and labels runs as correctness smoke because hosted runner load and placement are uncontrolled. It adds no performance threshold to correctness CI. Keep only the compact evidence needed for comparisons and remove obsolete build/results output; the default results folder is ignored.

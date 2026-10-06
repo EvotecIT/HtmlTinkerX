@@ -21,7 +21,7 @@ New-BenchmarkSuite 'htmltinkerx-corpus' -OutputRoot (Join-Path $PSScriptRoot '..
     Set-BenchmarkProfile Current
     Add-BenchmarkCaseSource @(
         foreach ($family in 'Nested', 'Tables', 'Cards', 'Unicode', 'StaticRead', 'WarmBrowser', 'Crawl') {
-            foreach ($size in $(if ($family -eq 'Crawl') { 10, 50 } else { 25, 250 })) {
+            foreach ($size in $(if ($family -eq 'Crawl') { 10, 50 } elseif ($family -eq 'Tables') { 25, 2500 } else { 25, 250 })) {
                 [pscustomobject]@{ Name = "$family-$size"; Family = $family; Size = $size }
             }
         }
