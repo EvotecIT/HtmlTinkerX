@@ -889,11 +889,8 @@ setTimeout(() => {
         $path = Join-Path $PSScriptRoot 'Documents/dynamic.html'
         $uri = [System.Uri]::new($path).AbsoluteUri
 
-        $elapsed = Measure-Command {
-            { Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitAfterLoadMs 50 -Selector '#missing' -AsText -Timeout 500 } | Should -Throw
-        }
-
-        $elapsed.TotalSeconds | Should -BeLessThan 10
+        { Invoke-HTMLRendering -Url $uri -LoadState Commit -WaitAfterLoadMs 50 -Selector '#missing' -AsText -Timeout 500 } |
+            Should -Throw '*Timeout 500ms exceeded*#missing*'
     }
 
     It 'Loads content using Firefox engine' {
