@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Sources/HtmlTinkerX/HtmlTinkerX.csproj" />
+    <!-- Build the existing development bootstrap; its load context isolates dependencies from PowerForge. -->
+    <ProjectReference Include="../../../Sources/PSParseHTML.PowerShell/PSParseHTML.PowerShell.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
