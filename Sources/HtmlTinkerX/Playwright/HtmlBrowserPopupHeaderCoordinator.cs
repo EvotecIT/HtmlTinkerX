@@ -96,10 +96,11 @@ internal sealed class HtmlBrowserPopupHeaderCoordinator : IAsyncDisposable {
         _pending[pending] = 0;
         _ = pending.ContinueWith(
             completed => {
+                if (completed.IsFaulted) {
+                    Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
+                    _cleanupTimedOut();
+                }
                 _pending.TryRemove(completed, out _);
-                if (!completed.IsFaulted) return;
-                Interlocked.CompareExchange(ref _failure, completed.Exception!.GetBaseException(), null);
-                _cleanupTimedOut();
             },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
