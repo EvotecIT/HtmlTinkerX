@@ -63,7 +63,10 @@ public sealed class SnapshotTestServer : IDisposable {
                 client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
             } catch (ObjectDisposedException) {
                 break;
-            } catch (SocketException) when (token.IsCancellationRequested) {
+            } catch (SocketException) {
+                if (!token.IsCancellationRequested) {
+                    throw;
+                }
                 break;
             }
 
@@ -133,8 +136,10 @@ public sealed class SnapshotTestServer : IDisposable {
 
                 if (string.Equals(path, "/assets/app.js", StringComparison.OrdinalIgnoreCase)) {
                     Interlocked.Increment(ref assetRequestCount);
-                    headers.TryGetValue("User-Agent", out string userAgent);
-                    headers.TryGetValue("Cookie", out string cookie);
+                    string userAgent;
+                    string cookie;
+                    headers.TryGetValue("User-Agent", out userAgent);
+                    headers.TryGetValue("Cookie", out cookie);
                     string body = string.Equals(userAgent, "SnapshotAgent", StringComparison.Ordinal)
                         && (cookie ?? string.Empty).IndexOf("assetCookie=1", StringComparison.OrdinalIgnoreCase) >= 0
                         ? "fetch(\"/api/protected\", { method: \"POST\" });"

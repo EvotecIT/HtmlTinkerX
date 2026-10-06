@@ -588,9 +588,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 try {
                     using TcpClient client = await _listener.AcceptTcpClientAsync();
                     using NetworkStream stream = client.GetStream();
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                    if (request == null) continue;
                     string correlation = ReadHeader(request, "X-Correlation-Id") ?? "missing";
                     string cookie = ReadHeader(request, "Cookie") ?? "missing";
                     string body = $"<html><body><h1>URL invoice {System.Net.WebUtility.HtmlEncode(correlation)} {System.Net.WebUtility.HtmlEncode(cookie)}</h1></body></html>";
@@ -663,11 +662,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private async Task HandleConnectionAsync(TcpClient client) {
             using (client)
             using (NetworkStream stream = client.GetStream()) {
-                byte[] buffer = new byte[8192];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
-                if (read == 0) return;
+                string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                if (request == null) return;
                 Interlocked.Increment(ref _requestCount);
-                string request = Encoding.ASCII.GetString(buffer, 0, read);
                 string? token = LoopbackHtmlServer.ReadHeader(request, "X-Render-Token");
                 if (token != null) Volatile.Write(ref _lastRenderToken, token);
                 if (_responseDelay > TimeSpan.Zero) await Task.Delay(_responseDelay, _cancellation.Token);
@@ -714,9 +711,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             try {
                 using TcpClient client = await _listener.AcceptTcpClientAsync();
                 using NetworkStream stream = client.GetStream();
-                byte[] buffer = new byte[8192];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                string request = Encoding.ASCII.GetString(buffer, 0, read);
+                string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                if (request == null) return;
                 string key = LoopbackHtmlServer.ReadHeader(request, "Sec-WebSocket-Key") ?? string.Empty;
                 using SHA1 sha1 = SHA1.Create();
                 string accept = Convert.ToBase64String(sha1.ComputeHash(Encoding.ASCII.GetBytes(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
@@ -762,9 +758,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 try {
                     using TcpClient client = await _listener.AcceptTcpClientAsync();
                     using NetworkStream stream = client.GetStream();
-                    byte[] buffer = new byte[4096];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                    if (request == null) continue;
                     byte[] response;
                     if (request.StartsWith("GET /private", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _privateRequests);
@@ -778,6 +773,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     return;
                 } catch (SocketException) when (_cancellation.IsCancellationRequested) {
                     return;
+                } catch (IOException) {
+                    // A disconnected client must not stop the remaining redirect checks.
                 }
             }
         }
@@ -811,9 +808,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 try {
                     using TcpClient client = await _listener.AcceptTcpClientAsync();
                     using NetworkStream stream = client.GetStream();
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                    if (request == null) continue;
                     string firstLine = request.Split(new[] { "\r\n" }, StringSplitOptions.None)[0];
                     Volatile.Write(ref _lastRequestTarget, firstLine);
                     byte[] body = Encoding.UTF8.GetBytes("<html><body><p>proxy resolved page</p></body></html>");
@@ -869,9 +865,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             using (client)
             using (NetworkStream stream = client.GetStream()) {
                 try {
-                    byte[] buffer = new byte[8192];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    string request = Encoding.ASCII.GetString(buffer, 0, read);
+                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                    if (request == null) return;
                     if (request.StartsWith("GET /events", StringComparison.Ordinal)) {
                         Volatile.Write(ref _eventStreamToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         byte[] headers = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n");
@@ -942,16 +937,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private async Task HandleConnectionAsync(TcpClient client) {
             using (client)
             using (NetworkStream stream = client.GetStream()) {
-                byte[] buffer = new byte[8192];
-                using MemoryStream requestBytes = new();
-                string request;
-                do {
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
-                    if (read == 0) return;
-                    requestBytes.Write(buffer, 0, read);
-                    if (requestBytes.Length > 65536) throw new InvalidDataException("Loopback CORS request headers exceeded 64 KiB.");
-                    request = Encoding.ASCII.GetString(requestBytes.GetBuffer(), 0, checked((int)requestBytes.Length));
-                } while (!request.Contains("\r\n\r\n", StringComparison.Ordinal));
+                string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                if (request == null) return;
                 string? origin = LoopbackHtmlServer.ReadHeader(request, "Origin");
                 bool preflight = request.StartsWith("OPTIONS ", StringComparison.Ordinal);
                 if (!preflight) {

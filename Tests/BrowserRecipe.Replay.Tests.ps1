@@ -591,12 +591,12 @@ Describe 'Browser recipe replay and evidence' {
             Name          = 'ScriptTimeout'
             StartUrl      = [System.Uri]::new($pagePath).AbsoluteUri
             LoadState     = 'DomContentLoaded'
-            Timeout       = 100
             Steps         = @(
                 [ordered]@{
                     Name   = 'Never resolves'
                     Action = 'Script'
                     Script = "() => new Promise(() => {})"
+                    Timeout = 100
                 }
             )
         }
