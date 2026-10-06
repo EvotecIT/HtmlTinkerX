@@ -1,6 +1,7 @@
 # Crawl and export an offline dataset
 
 [Back to the project overview](../README.MD)
+
 ## Retry temporary HTTP failures
 
 Use `HttpRetryCount` to retry static GET responses with status 408, 429, 500, 502, 503 or 504. It accepts zero to ten additional attempts and defaults to zero. The policy applies to pages, robots files, sitemaps and assets. Browser navigation has its own policy.

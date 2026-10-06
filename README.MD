@@ -123,6 +123,9 @@ HtmlPageDocument page = HtmlPageReader.Read(
 Console.WriteLine(page.Headings[0].Text);
 ```
 
+- <a id="c-example"></a>[C# Example](Guides/DotNet.md#c-example)
+- <a id="powershell-example"></a>[PowerShell Example](Guides/Examples.md#powershell-examples)
+
 ## Workflow guides
 
 | Workflow | Guide |
@@ -151,25 +154,95 @@ for the defaults, explicit overrides and decoding order.
 Use the [command reference](Docs/Readme.md) for individual commands and the
 [PowerShell workflow guide](Guides/PowerShell.md) for combinations of commands.
 
+- <a id="htmlcssjavascript-processing"></a>[HTML/CSS/JavaScript Processing](Guides/PowerShell.md#htmlcssjavascript-processing)
+- <a id="browser-automation--interaction"></a>[Browser Automation & Interaction](Guides/PowerShell.md#browser-automation--interaction)
+- <a id="browser-extraction-mode"></a>[Browser Extraction Mode](Guides/PowerShell.md#browser-extraction-mode)
+- <a id="browserless-extraction-mode"></a>[Browserless Extraction Mode](Guides/PowerShell.md#browserless-extraction-mode)
+- <a id="screenshots--media"></a>[Screenshots & Media](Guides/PowerShell.md#screenshots--media)
+- <a id="network--debugging"></a>[Network & Debugging](Guides/PowerShell.md#network--debugging)
+- <a id="cookies--state-management"></a>[Cookies & State Management](Guides/PowerShell.md#cookies--state-management)
+- <a id="content--resources"></a>[Content & Resources](Guides/PowerShell.md#content--resources)
+- <a id="javascript-ast-parsing"></a>[JavaScript AST parsing](Guides/PowerShell.md#javascript-ast-parsing)
+- <a id="css-and-html-workflow-audits"></a>[CSS and HTML workflow audits](Guides/PowerShell.md#css-and-html-workflow-audits)
+- <a id="react-server-component-payload-extraction"></a>[React Server Component payload extraction](Guides/PowerShell.md#react-server-component-payload-extraction)
+- <a id="modern-page-parsing-helpers"></a>[Modern page parsing helpers](Guides/PowerShell.md#modern-page-parsing-helpers)
+
 ## 🎯 C# API Reference
 
 The [.NET guide](Guides/DotNet.md) covers the parsing, extraction, crawl and
 browser APIs with examples.
+
+- <a id="core-classes"></a>[Core Classes](Guides/DotNet.md#core-classes)
+- <a id="htmlparser"></a>[HtmlParser](Guides/DotNet.md#htmlparser)
+- <a id="htmlformatter"></a>[HtmlFormatter](Guides/DotNet.md#htmlformatter)
+- <a id="htmloptimizer"></a>[HtmlOptimizer](Guides/DotNet.md#htmloptimizer)
+- <a id="htmlbrowser-browser-automation"></a>[HtmlBrowser (Browser Automation)](Guides/DotNet.md#htmlbrowser-browser-automation)
+- <a id="htmlutilities"></a>[HtmlUtilities](Guides/DotNet.md#htmlutilities)
+- <a id="premailerclient"></a>[PreMailerClient](Guides/DotNet.md#premailerclient)
+- <a id="extension-methods"></a>[Extension Methods](Guides/DotNet.md#extension-methods)
+- <a id="htmlparserextensions"></a>[HtmlParserExtensions](Guides/DotNet.md#htmlparserextensions)
 
 ## 📚 Examples
 
 See [workflow examples](Guides/Examples.md), [PowerShell scripts](Examples/)
 and the [.NET example project](Sources/HtmlTinkerX.Examples/).
 
+- <a id="powershell-examples"></a>[PowerShell Examples](Guides/Examples.md#powershell-examples)
+- <a id="table-extraction"></a>[Table Extraction](Guides/Examples.md#table-extraction)
+- <a id="resource-optimization"></a>[Resource Optimization](Guides/Examples.md#resource-optimization)
+- <a id="browser-automation"></a>[Browser Automation](Guides/Examples.md#browser-automation)
+- <a id="c-examples"></a>[C# Examples](Guides/Examples.md#c-examples)
+- <a id="document-processing"></a>[Document Processing](Guides/Examples.md#document-processing)
+- <a id="resource-optimization-1"></a>[Resource Optimization](Guides/Examples.md#resource-optimization-1)
+- <a id="browser-automation-1"></a>[Browser Automation](Guides/Examples.md#browser-automation-1)
+
 ## 🧪 Browser Testing & Network Monitoring
 
 The [browser testing guide](Guides/BrowserTesting.md) covers page checks,
 console and network logs, performance metrics, browser setup and troubleshooting.
 
+- <a id="powershell-browser-testing"></a>[PowerShell Browser Testing](Guides/BrowserTesting.md#powershell-browser-testing)
+- <a id="basic-testing"></a>[Basic Testing](Guides/BrowserTesting.md#basic-testing)
+- <a id="testing-local-html-files"></a>[Testing Local HTML Files](Guides/BrowserTesting.md#testing-local-html-files)
+- <a id="testing-for-console-errors"></a>[Testing for Console Errors](Guides/BrowserTesting.md#testing-for-console-errors)
+- <a id="css-resource-testing"></a>[CSS Resource Testing](Guides/BrowserTesting.md#css-resource-testing)
+- <a id="performance-testing"></a>[Performance Testing](Guides/BrowserTesting.md#performance-testing)
+- <a id="advanced-testing-with-proxy"></a>[Advanced Testing with Proxy](Guides/BrowserTesting.md#advanced-testing-with-proxy)
+- <a id="batch-testing-multiple-urls"></a>[Batch Testing Multiple URLs](Guides/BrowserTesting.md#batch-testing-multiple-urls)
+- <a id="integration-with-pester-tests"></a>[Integration with Pester Tests](Guides/BrowserTesting.md#integration-with-pester-tests)
+- <a id="testing-local-html-reports"></a>[Testing Local HTML Reports](Guides/BrowserTesting.md#testing-local-html-reports)
+- <a id="monitoring-and-alerting"></a>[Monitoring and Alerting](Guides/BrowserTesting.md#monitoring-and-alerting)
+- <a id="c-browser-testing"></a>[C# Browser Testing](Guides/BrowserTesting.md#c-browser-testing)
+- <a id="basic-testing-1"></a>[Basic Testing](Guides/BrowserTesting.md#basic-testing-1)
+- <a id="testing-local-html-files-1"></a>[Testing Local HTML Files](Guides/BrowserTesting.md#testing-local-html-files-1)
+- <a id="network-request-analysis"></a>[Network Request Analysis](Guides/BrowserTesting.md#network-request-analysis)
+- <a id="console-error-detection"></a>[Console Error Detection](Guides/BrowserTesting.md#console-error-detection)
+- <a id="performance-analysis"></a>[Performance Analysis](Guides/BrowserTesting.md#performance-analysis)
+- <a id="testing-local-html-files-2"></a>[Testing Local HTML Files](Guides/BrowserTesting.md#testing-local-html-files-2)
+- <a id="integration-testing-examples"></a>[Integration Testing Examples](Guides/BrowserTesting.md#integration-testing-examples)
+- <a id="batch-testing-multiple-pages"></a>[Batch Testing Multiple Pages](Guides/BrowserTesting.md#batch-testing-multiple-pages)
+- <a id="test-result-properties"></a>[Test Result Properties](Guides/BrowserTesting.md#test-result-properties)
+- <a id="htmlbrowsertestresult"></a>[HtmlBrowserTestResult](Guides/BrowserTesting.md#htmlbrowsertestresult)
+- <a id="htmlnetworkentrydetailed"></a>[HtmlNetworkEntryDetailed](Guides/BrowserTesting.md#htmlnetworkentrydetailed)
+- <a id="htmlconsoleentrydetailed"></a>[HtmlConsoleEntryDetailed](Guides/BrowserTesting.md#htmlconsoleentrydetailed)
+- <a id="htmlperformancemetrics"></a>[HtmlPerformanceMetrics](Guides/BrowserTesting.md#htmlperformancemetrics)
+- <a id="playwright-auto-setup"></a>[Playwright Auto-Setup](Guides/BrowserTesting.md#playwright-auto-setup)
+- <a id="how-auto-download-works"></a>[How Auto-Download Works](Guides/BrowserTesting.md#how-auto-download-works)
+- <a id="linux-avoiding-sudo-prompts"></a>[Linux: Avoiding sudo prompts](Guides/BrowserTesting.md#linux-avoiding-sudo-prompts)
+- <a id="cleaning-playwright-cache"></a>[Cleaning Playwright Cache](Guides/BrowserTesting.md#cleaning-playwright-cache)
+- <a id="c-cache-cleaning"></a>[C# Cache Cleaning](Guides/BrowserTesting.md#c-cache-cleaning)
+- <a id="integration-with-test-frameworks"></a>[Integration with Test Frameworks](Guides/BrowserTesting.md#integration-with-test-frameworks)
+- <a id="xunit-example"></a>[xUnit Example](Guides/BrowserTesting.md#xunit-example)
+- <a id="pester-example"></a>[Pester Example](Guides/BrowserTesting.md#pester-example)
+
 ## 🔧 Advanced Features
 
 The [browser session guide](Guides/BrowserSessions.md) covers context settings,
 request interception and saved state.
+
+- <a id="browser-configuration"></a>[Browser Configuration](Guides/BrowserSessions.md#browser-configuration)
+- <a id="request-interception"></a>[Request Interception](Guides/BrowserSessions.md#request-interception)
+- <a id="state-management"></a>[State Management](Guides/BrowserSessions.md#state-management)
 
 ## PowerShell and C# entry points
 
@@ -249,6 +322,12 @@ dotnet add package HtmlTinkerX
 ```
 
 **⚠️ Important**: Always test updates in a development environment before deploying to production. Breaking changes may occur between versions.
+
+## 🔧 Troubleshooting
+
+- <a id="browser-extraction-mode-1"></a>[Browser Extraction Mode](Guides/BrowserTesting.md#browser-extraction-mode)
+- <a id="jint-and-javascript-parser-notes"></a>[Jint and JavaScript Parser Notes](Guides/BrowserTesting.md#jint-and-javascript-parser-notes)
+- <a id="browser-testing-issues"></a>[Browser Testing Issues](Guides/BrowserTesting.md#browser-testing-issues)
 
 ## 📄 License
 
