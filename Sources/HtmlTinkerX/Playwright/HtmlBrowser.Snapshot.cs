@@ -154,7 +154,7 @@ public static partial class HtmlBrowser {
         string html = await GetContentAsync(session.Page, cancellationToken: cancellationToken).ConfigureAwait(false);
         string text = await GetContentAsync(session.Page, asText: true, cancellationToken: cancellationToken).ConfigureAwait(false);
         content ??= asText ? text : html;
-        string title = await session.Page.TitleAsync().ConfigureAwait(false);
+        string title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         Uri? baseUri = Uri.TryCreate(session.Page.Url, UriKind.Absolute, out Uri? parsedUri) ? parsedUri : null;
         IReadOnlyList<HtmlDataItem> data = HtmlParsingToolbox.SelectData(html, baseUri: baseUri);
         IReadOnlyList<HtmlJavaScriptConfigItem> javaScriptConfig = HtmlParsingToolbox.SelectJavaScriptConfig(html);

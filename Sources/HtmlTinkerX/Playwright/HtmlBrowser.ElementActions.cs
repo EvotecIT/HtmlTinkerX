@@ -177,18 +177,18 @@ public static partial class HtmlBrowser {
         HtmlNetworkEntry[] failedRequests = networkEntries
             .Where(static entry => !string.IsNullOrWhiteSpace(entry.FailureText))
             .ToArray();
-        var cookies = await session.Context.CookiesAsync().ConfigureAwait(false);
-        string userAgent = await session.Page.EvaluateAsync<string>("() => navigator.userAgent").ConfigureAwait(false);
-        string language = await session.Page.EvaluateAsync<string>("() => navigator.language || ''").ConfigureAwait(false);
-        string platform = await session.Page.EvaluateAsync<string>("() => navigator.platform || ''").ConfigureAwait(false);
-        bool webDriver = await session.Page.EvaluateAsync<bool>("() => navigator.webdriver === true").ConfigureAwait(false);
-        int viewportWidth = await session.Page.EvaluateAsync<int>("() => window.innerWidth").ConfigureAwait(false);
-        int viewportHeight = await session.Page.EvaluateAsync<int>("() => window.innerHeight").ConfigureAwait(false);
-        double devicePixelRatio = await session.Page.EvaluateAsync<double>("() => window.devicePixelRatio || 1").ConfigureAwait(false);
-        string timezone = await session.Page.EvaluateAsync<string>("() => Intl.DateTimeFormat().resolvedOptions().timeZone || ''").ConfigureAwait(false);
+        var cookies = await session.Context.CookiesAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        string userAgent = await session.Page.EvaluateAsync<string>("() => navigator.userAgent").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        string language = await session.Page.EvaluateAsync<string>("() => navigator.language || ''").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        string platform = await session.Page.EvaluateAsync<string>("() => navigator.platform || ''").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        bool webDriver = await session.Page.EvaluateAsync<bool>("() => navigator.webdriver === true").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        int viewportWidth = await session.Page.EvaluateAsync<int>("() => window.innerWidth").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        int viewportHeight = await session.Page.EvaluateAsync<int>("() => window.innerHeight").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        double devicePixelRatio = await session.Page.EvaluateAsync<double>("() => window.devicePixelRatio || 1").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        string timezone = await session.Page.EvaluateAsync<string>("() => Intl.DateTimeFormat().resolvedOptions().timeZone || ''").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         List<string> storageWarnings = new();
-        string[] localStorageKeys = await GetStorageKeysOrEmptyAsync(session, "localStorage", storageWarnings).ConfigureAwait(false);
-        string[] sessionStorageKeys = await GetStorageKeysOrEmptyAsync(session, "sessionStorage", storageWarnings).ConfigureAwait(false);
+        string[] localStorageKeys = await GetStorageKeysOrEmptyAsync(session, "localStorage", storageWarnings, cancellationToken).ConfigureAwait(false);
+        string[] sessionStorageKeys = await GetStorageKeysOrEmptyAsync(session, "sessionStorage", storageWarnings, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<string> consistencyWarnings = BuildConsistencyWarnings(
             userAgent,
             language,
@@ -205,13 +205,13 @@ public static partial class HtmlBrowser {
 
         return new HtmlBrowserDiagnostics {
             Url = session.Page.Url,
-            Title = await session.Page.TitleAsync().ConfigureAwait(false),
+            Title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false),
             UserAgent = userAgent,
             Language = language,
             Platform = platform,
             WebDriver = webDriver,
-            CookiesEnabled = await session.Page.EvaluateAsync<bool>("() => navigator.cookieEnabled === true").ConfigureAwait(false),
-            Online = await session.Page.EvaluateAsync<bool>("() => navigator.onLine === true").ConfigureAwait(false),
+            CookiesEnabled = await session.Page.EvaluateAsync<bool>("() => navigator.cookieEnabled === true").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false),
+            Online = await session.Page.EvaluateAsync<bool>("() => navigator.onLine === true").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false),
             ViewportWidth = viewportWidth,
             ViewportHeight = viewportHeight,
             DevicePixelRatio = devicePixelRatio,
@@ -233,9 +233,9 @@ public static partial class HtmlBrowser {
         };
     }
 
-    private static async Task<string[]> GetStorageKeysOrEmptyAsync(HtmlBrowserSession session, string storageName, List<string> warnings) {
+    private static async Task<string[]> GetStorageKeysOrEmptyAsync(HtmlBrowserSession session, string storageName, List<string> warnings, CancellationToken cancellationToken) {
         try {
-            return await session.Page.EvaluateAsync<string[]>($"() => Object.keys(window.{storageName} || {{}})").ConfigureAwait(false);
+            return await session.Page.EvaluateAsync<string[]>($"() => Object.keys(window.{storageName} || {{}})").WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         } catch (PlaywrightException ex) when (IsStorageAccessDenied(ex)) {
             warnings.Add($"{storageName} access was denied for this page origin.");
             return Array.Empty<string>();

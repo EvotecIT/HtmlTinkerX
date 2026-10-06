@@ -72,6 +72,7 @@ public static partial class HtmlBrowser {
             throw new ArgumentOutOfRangeException(nameof(recipe.Timeout), "Timeout must be zero or greater.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         bool createdSession = session == null;
         bool previousRecordingSuppression = false;
         if (session == null) {
@@ -108,7 +109,8 @@ public static partial class HtmlBrowser {
             }
 
             result.FinalUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(session.Page.Url ?? string.Empty);
-            result.Title = await session.Page.TitleAsync().ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            result.Title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
             result.Succeeded = result.Steps.TrueForAll(static step => step.Succeeded);
             PopulateRecipeRunFailureSummary(result);
             result.CompletedAtUtc = DateTimeOffset.UtcNow;
@@ -374,7 +376,7 @@ public static partial class HtmlBrowser {
 
         result.PageUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(session.Page.Url ?? string.Empty);
         try {
-            result.PageTitle = await session.Page.TitleAsync().ConfigureAwait(false);
+            result.PageTitle = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
         } catch (Exception ex) when (ex is PlaywrightException || ex is InvalidOperationException) {
             result.PageTitle = string.Empty;
         }
