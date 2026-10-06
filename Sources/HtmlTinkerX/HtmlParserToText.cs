@@ -46,16 +46,16 @@ public static class HtmlParserToText {
         }
 
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        RemoveNoise(document);
+        HtmlReadableTextAnalysis analysis = RemoveNoise(document);
 
         if (!string.IsNullOrWhiteSpace(preferredSelector)) {
             IElement? preferred = document.QuerySelector(preferredSelector!);
-            if (preferred != null && CountWords(preferred.TextContent) > 0) {
-                return BuildReadableTextResult(preferred, document, candidateCount: 1);
+            if (preferred != null && analysis.Get(preferred).Words.Count > 0) {
+                return BuildReadableTextResult(preferred, document, candidateCount: 1, analysis);
             }
         }
 
-        IReadOnlyList<IElement> candidates = BuildReadableCandidates(document).ToArray();
+        IReadOnlyList<IElement> candidates = BuildReadableCandidates(document, analysis).ToArray();
         if (candidates.Count == 0) {
             string fallbackText = NormalizeWhitespace(ConvertToText(document.DocumentElement?.OuterHtml ?? html));
             string? fallbackTitle = FindDocumentTitle(document);
@@ -71,11 +71,11 @@ public static class HtmlParserToText {
             };
         }
 
-        IElement selected = SelectReadableCandidate(candidates);
-        return BuildReadableTextResult(selected, document, candidates.Count);
+        IElement selected = SelectReadableCandidate(candidates, analysis);
+        return BuildReadableTextResult(selected, document, candidates.Count, analysis);
     }
 
-    private static HtmlReadableTextResult BuildReadableTextResult(IElement selected, IDocument document, int candidateCount) {
+    private static HtmlReadableTextResult BuildReadableTextResult(IElement selected, IDocument document, int candidateCount, HtmlReadableTextAnalysis analysis) {
         string selectedHtml = selected.OuterHtml;
         string text = NormalizeWhitespace(ConvertToText(selectedHtml));
         string domText = NormalizeWhitespace(selected.TextContent);
@@ -89,17 +89,17 @@ public static class HtmlParserToText {
             Text = text,
             Title = title,
             SelectorHint = BuildSelectorHint(selected),
-            Score = ScoreReadableCandidate(selected),
+            Score = ScoreReadableCandidate(selected, analysis),
             CandidateCount = candidateCount
         };
     }
 
-    private static IElement SelectReadableCandidate(IReadOnlyList<IElement> candidates) {
+    private static IElement SelectReadableCandidate(IReadOnlyList<IElement> candidates, HtmlReadableTextAnalysis analysis) {
         IElement? strongCandidate = candidates
             .Where(HasStrongReadableContainerSignal)
-            .Select(element => new { Element = element, Score = ScoreReadableCandidate(element) })
+            .Select(element => new { Element = element, Score = ScoreReadableCandidate(element, analysis) })
             .OrderByDescending(candidate => candidate.Score)
-            .ThenByDescending(candidate => CountWords(candidate.Element.TextContent))
+            .ThenByDescending(candidate => analysis.Get(candidate.Element).Words.Count)
             .FirstOrDefault()
             ?.Element;
         if (strongCandidate != null) {
@@ -107,9 +107,9 @@ public static class HtmlParserToText {
         }
 
         return candidates
-            .Select(element => new { Element = element, Score = ScoreReadableCandidate(element) })
+            .Select(element => new { Element = element, Score = ScoreReadableCandidate(element, analysis) })
             .OrderByDescending(candidate => candidate.Score)
-            .ThenByDescending(candidate => CountWords(candidate.Element.TextContent))
+            .ThenByDescending(candidate => analysis.Get(candidate.Element).Words.Count)
             .First()
             .Element;
     }
@@ -133,26 +133,26 @@ public static class HtmlParserToText {
         return ConvertToText(html);
     }
 
-    private static IEnumerable<IElement> BuildReadableCandidates(IDocument document) {
+    private static IEnumerable<IElement> BuildReadableCandidates(IDocument document, HtmlReadableTextAnalysis analysis) {
         List<IElement> candidates = document.QuerySelectorAll("main, article, [role='main'], section, div").ToList();
         if (candidates.Count == 0 && document.Body != null) {
             candidates.Add(document.Body);
         }
 
         return candidates
-            .Where(static element => CountWords(element.TextContent) >= 12 || CountAttachmentSignals(element) > 0)
+            .Where(element => analysis.Get(element).Words.Count >= 12 || analysis.AttachmentCount(element) > 0)
             .Distinct();
     }
 
-    private static double ScoreReadableCandidate(IElement element) {
-        string text = NormalizeWhitespace(element.TextContent);
-        int wordCount = CountWords(text);
-        int linkCount = element.QuerySelectorAll("a[href]").Length;
-        int linkWordCount = CountWords(string.Join(" ", element.QuerySelectorAll("a[href]").Select(static anchor => anchor.TextContent)));
-        int paragraphCount = element.QuerySelectorAll("p").Length;
-        int headingCount = element.QuerySelectorAll("h1, h2, h3").Length;
-        int tableCount = element.QuerySelectorAll("table").Length;
-        int attachmentSignalCount = CountAttachmentSignals(element);
+    private static double ScoreReadableCandidate(IElement element, HtmlReadableTextAnalysis analysis) {
+        HtmlReadableTextAnalysis.Metrics metrics = analysis.Get(element);
+        int wordCount = metrics.Words.Count;
+        int linkCount = metrics.Links - (metrics.OwnLink ? 1 : 0);
+        int linkWordCount = metrics.LinkWords - (metrics.OwnLink ? wordCount : 0);
+        int paragraphCount = metrics.Paragraphs - (element.LocalName == "p" ? 1 : 0);
+        int headingCount = metrics.Headings - (element.LocalName is "h1" or "h2" or "h3" ? 1 : 0);
+        int tableCount = metrics.Tables - (element.LocalName == "table" ? 1 : 0);
+        int attachmentSignalCount = analysis.AttachmentCount(element);
         double linkDensity = (double)linkWordCount / Math.Max(1, wordCount);
 
         double score = Math.Min(wordCount, 900);
@@ -176,30 +176,13 @@ public static class HtmlParserToText {
 
         score -= linkCount * 12;
         score -= linkDensity * 220;
-        score -= CountBoilerplateSignals(element) * 35;
+        score -= analysis.BoilerplateCount(element) * 35;
 
         if (wordCount > 500 && linkCount > 30) {
             score -= 250;
         }
 
         return score;
-    }
-
-    private static int CountAttachmentSignals(IElement element) {
-        string combined = string.Join(" ",
-            element.TextContent,
-            string.Join(" ", element.QuerySelectorAll("a[href]").Select(static anchor => anchor.GetAttribute("href"))));
-        return Regex.Matches(combined, @"\b(attachment|attachments|download|downloads|file|files|pdf|docx|xlsx|pptx|zip|zalacznik|zalaczniki|załącznik|załączniki)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Count;
-    }
-
-    private static int CountBoilerplateSignals(IElement element) {
-        string combined = string.Join(" ",
-            element.Id,
-            element.ClassName,
-            element.GetAttribute("role"),
-            element.GetAttribute("aria-label"),
-            element.TextContent);
-        return Regex.Matches(combined, @"\b(nav|navbar|menu|breadcrumb|breadcrumbs|footer|header|sidebar|search|cookie|cookies|social|share|pagination|strona główna|wyszukaj|hamburger|drukuj|metryczka)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Count;
     }
 
     private static bool HasReadableContainerSignal(IElement element) {
@@ -230,7 +213,7 @@ public static class HtmlParserToText {
                 || combined.Contains("main", StringComparison.Ordinal));
     }
 
-    private static void RemoveNoise(IParentNode container) {
+    private static HtmlReadableTextAnalysis RemoveNoise(IDocument container) {
         foreach (IElement element in container.QuerySelectorAll("script,style,noscript,svg,header,nav,footer,aside,[role='banner'],[role='navigation'],[role='contentinfo'],[role='search'],form[role='search'],.skip-link,.skip-link-screen-reader-text").ToArray()) {
             element.Remove();
         }
@@ -241,11 +224,15 @@ public static class HtmlParserToText {
             }
         }
 
+        var analysis = new HtmlReadableTextAnalysis(container);
+        bool removedConsentElement = false;
         foreach (IElement element in container.QuerySelectorAll("div,section,aside,dialog").ToArray()) {
-            if (LooksLikeCookieOrConsentBanner(element)) {
+            if (LooksLikeCookieOrConsentBanner(element, analysis)) {
                 element.Remove();
+                removedConsentElement = true;
             }
         }
+        return removedConsentElement ? new HtmlReadableTextAnalysis(container) : analysis;
     }
 
     private static bool ShouldRemoveHiddenElement(IElement element) {
@@ -273,24 +260,13 @@ public static class HtmlParserToText {
             || normalizedStyle.Contains("content-visibility:hidden");
     }
 
-    private static bool LooksLikeCookieOrConsentBanner(IElement element) {
-        string combined = NormalizeWhitespace(string.Join(" ",
-            element.Id,
-            element.ClassName,
-            element.GetAttribute("role"),
-            element.GetAttribute("aria-label"),
-            element.TextContent));
-        if (string.IsNullOrWhiteSpace(combined)) {
+    private static bool LooksLikeCookieOrConsentBanner(IElement element, HtmlReadableTextAnalysis analysis) {
+        if (!analysis.HasCookieSignal(element)) {
             return false;
         }
 
-        bool hasCookieSignal = Regex.IsMatch(combined, @"\b(cookie|cookies|consent|privacy|gdpr|rodo|plików cookies|pliki cookies)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (!hasCookieSignal) {
-            return false;
-        }
-
-        int wordCount = CountWords(combined);
-        int linkCount = element.QuerySelectorAll("a[href]").Length;
+        int wordCount = analysis.CookieWordCount(element);
+        int linkCount = analysis.Get(element).Links - (analysis.Get(element).OwnLink ? 1 : 0);
         return wordCount <= 120 || linkCount >= 1;
     }
 
