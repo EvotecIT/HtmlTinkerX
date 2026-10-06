@@ -64,4 +64,8 @@ public sealed class HtmlBrowserlessExtractionRecipe {
     /// <summary>Optional maximum number of items accepted by a DOM recipe.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MaximumItemCount { get; set; }
+
+    /// <summary>Accepted output structure used to detect changes on subsequent runs. Null disables comparison.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HtmlExtractionBaseline? Baseline { get; set; }
 }

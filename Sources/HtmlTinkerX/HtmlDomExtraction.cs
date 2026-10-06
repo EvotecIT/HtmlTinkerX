@@ -300,14 +300,15 @@ public static partial class HtmlDomExtraction {
         return NormalizeWhitespace(element.TextContent);
     }
 
-    private static HtmlDomSelectorFieldCandidate[] DiscoverFields(IReadOnlyList<IElement> items, Uri? baseUri) {
-        int sampleItemCount = Math.Min(items.Count, 20);
+    private static HtmlDomSelectorFieldCandidate[] DiscoverFields(
+        IReadOnlyList<IElement> items, Uri? baseUri, bool completeStructuralEvidence = false) {
+        int sampleItemCount = completeStructuralEvidence ? items.Count : Math.Min(items.Count, 20);
         Dictionary<string, FieldAccumulator> fields = new(StringComparer.Ordinal);
         for (int itemIndex = 0; itemIndex < sampleItemCount; itemIndex++) {
             IElement item = items[itemIndex];
             HashSet<string> seenInItem = new(StringComparer.Ordinal);
             foreach (IElement element in item.QuerySelectorAll("*")) {
-                foreach (FieldObservation observation in CreateFieldObservations(item, element, baseUri)) {
+                foreach (FieldObservation observation in CreateFieldObservations(item, element, baseUri, completeStructuralEvidence)) {
                     string key = observation.Selector + "\n" + observation.Attribute;
                     if (!fields.TryGetValue(key, out FieldAccumulator? accumulator)) {
                         accumulator = new FieldAccumulator(observation.Selector, observation.Attribute, element);
@@ -315,6 +316,7 @@ public static partial class HtmlDomExtraction {
                     }
 
                     accumulator.TotalMatchCount++;
+                    accumulator.AnyElementHasChildren |= element.Children.Length > 0;
                     if (seenInItem.Add(key)) {
                         accumulator.ItemMatchCount++;
                     } else {
@@ -348,9 +350,9 @@ public static partial class HtmlDomExtraction {
             if (ContainsSemanticToken(field.Selector, "price", "amount", "cost", "value")) score += 25;
             if (ContainsSemanticToken(field.Selector, "data-type='sell'", "data-type='buy'")) score += 25;
             if (ContainsSemanticToken(field.Selector, "fraction", "separator", "currency", "whole")) score -= 40;
-            if (field.Element.Children.Length > 0) score -= 25;
+            if (completeStructuralEvidence ? field.AnyElementHasChildren : field.Element.Children.Length > 0) score -= 25;
             if (field.MultiplePerItem) score -= 20;
-            if (field.SampleValues.All(static value => value.Length <= 1)) score -= 20;
+            if (!completeStructuralEvidence && field.SampleValues.All(static value => value.Length <= 1)) score -= 20;
 
             candidates.Add(new HtmlDomSelectorFieldCandidate {
                 Name = BuildPropertyName(field),
@@ -377,7 +379,8 @@ public static partial class HtmlDomExtraction {
     private static IEnumerable<FieldObservation> CreateFieldObservations(
         IElement item,
         IElement element,
-        Uri? baseUri) {
+        Uri? baseUri,
+        bool completeStructuralEvidence = false) {
         bool isLink = element.LocalName.Equals("a", StringComparison.OrdinalIgnoreCase)
             && element.HasAttribute("href");
         string? mediaAttribute = MediaSourceAttributes.FirstOrDefault(attribute =>
@@ -389,7 +392,7 @@ public static partial class HtmlDomExtraction {
         string text = NormalizeWhitespace(element.TextContent);
         bool semanticText = IsSemanticTextElement(element)
             && text.Length > 0
-            && text.Length <= 240;
+            && (completeStructuralEvidence || text.Length <= 240);
 
         if (!isLink && !isMedia && !semanticText) {
             yield break;
@@ -557,8 +560,10 @@ public static partial class HtmlDomExtraction {
         IReadOnlyList<IElement> items,
         IReadOnlyList<HtmlDomSelectorFieldCandidate> fields,
         string query,
-        string candidateSelector) {
-        int score = Math.Min(items.Count * 5, 35) + Math.Min(fields.Count * 8, 48);
+        string candidateSelector,
+        bool structuralOnly = false) {
+        // Saved recipes own count bounds separately from structural confidence.
+        int score = (structuralOnly ? 35 : Math.Min(items.Count * 5, 35)) + Math.Min(fields.Count * 8, 48);
         if (fields.Any(static field => field.Attribute.Equals("href", StringComparison.OrdinalIgnoreCase))) score += 15;
         if (fields.Any(static field => ContainsSemanticToken(field.Selector, "title", "name", "heading"))) score += 15;
         if (fields.Any(static field => ContainsSemanticToken(field.Selector, "price", "amount", "cost"))) score += 15;
@@ -571,7 +576,7 @@ public static partial class HtmlDomExtraction {
         if (candidateSelector.Equals(items[0].LocalName, StringComparison.Ordinal)) score -= 5;
         if (query.Length > 0 && items.Any(item => ElementOrDescendantMatchesQuery(item, query))) score += 20;
         if (items.Any(IsInsideNavigation)) score -= 30;
-        if (items.Count > 100) score -= 20;
+        if (!structuralOnly && items.Count > 100) score -= 20;
         return score;
     }
 
@@ -729,6 +734,7 @@ public static partial class HtmlDomExtraction {
     }
 
     private sealed class FieldAccumulator {
+        internal bool AnyElementHasChildren { get; set; }
         internal FieldAccumulator(string selector, string attribute, IElement element) {
             Selector = selector;
             Attribute = attribute;

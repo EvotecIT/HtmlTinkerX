@@ -19,6 +19,7 @@ namespace PSParseHTML.PowerShell;
 /// $result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html
 /// $result.Success
 /// $result.DomReport.Fields
+/// $result.DriftReport
 ///   </code>
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlExtractionRecipe", DefaultParameterSetName = ParameterSetRecipe)]

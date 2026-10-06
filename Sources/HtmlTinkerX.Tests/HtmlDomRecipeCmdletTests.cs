@@ -51,6 +51,38 @@ public class HtmlDomRecipeCmdletTests {
         }
     }
 
+    [Fact]
+    public void PublicCommands_SaveAcceptedBaselineAndExposeChangedOptionalField() {
+        string recipePath = Path.Combine(Path.GetTempPath(), "baseline-recipe-" + Guid.NewGuid().ToString("N") + ".json");
+        using var runspace = CreateRunspace();
+        using var command = PowerShell.Create();
+        command.Runspace = runspace;
+        try {
+            command.AddCommand("Export-HtmlExtractionRecipe")
+                .AddParameter("ItemSelector", "article")
+                .AddParameter("Property", new Hashtable {
+                    ["Name"] = new Hashtable { ["Selector"] = "h2", ["Required"] = true },
+                    ["Note"] = ".note"
+                }).AddParameter("Path", recipePath)
+                .AddParameter("BaselineContent", "<article><h2>Name</h2><p class='note'>private note</p></article>");
+            Assert.Empty(command.Invoke());
+            Assert.Empty(command.Streams.Error);
+            Assert.DoesNotContain("private note", File.ReadAllText(recipePath));
+
+            command.Commands.Clear();
+            command.AddCommand("Invoke-HtmlExtractionRecipe").AddParameter("Path", recipePath)
+                .AddParameter("Content", "<article><h2>Updated name</h2></article>");
+            var changed = Assert.IsType<HtmlBrowserlessExtractionResult>(Assert.Single(command.Invoke()).BaseObject);
+            Assert.Empty(command.Streams.Error);
+            Assert.False(changed.Success);
+            Assert.True(changed.DomReport!.IsValid);
+            Assert.True(changed.DriftReport!.ShapeChanged);
+            Assert.Empty(changed.Requests);
+        } finally {
+            if (File.Exists(recipePath)) File.Delete(recipePath);
+        }
+    }
+
     private static Runspace CreateRunspace() {
         var state = InitialSessionState.Create();
         state.Commands.Add(new SessionStateCmdletEntry("Export-HtmlExtractionRecipe", typeof(CmdletExportHtmlExtractionRecipe), null));

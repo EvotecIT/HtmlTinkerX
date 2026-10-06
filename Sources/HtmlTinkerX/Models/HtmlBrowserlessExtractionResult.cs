@@ -38,4 +38,12 @@ public sealed class HtmlBrowserlessExtractionResult {
     /// <summary>Field provenance and quality checks when a DOM recipe is evaluated.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public HtmlDomExtractionReport? DomReport { get; set; }
+
+    /// <summary>Comparison with an accepted recipe baseline. Null means no comparison was requested or extraction failed.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HtmlExtractionDriftReport? DriftReport { get; set; }
+
+    // Captured during JSON parsing so accepted endpoint baselines do not require raw-response retention.
+    internal string? ResponseShape { get; set; }
+    internal string? ResponseShapeError { get; set; }
 }

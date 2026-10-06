@@ -11,12 +11,12 @@ Saves a browserless extraction recipe from a discovered data source or DOM field
 ## SYNTAX
 ### Source (Default)
 ```powershell
-Export-HtmlExtractionRecipe [-DataSource] <HtmlBrowserlessDataSource> [-Path] <string> [-IncludeRawContent] [-PassThru] [<CommonParameters>]
+Export-HtmlExtractionRecipe [-DataSource] <HtmlBrowserlessDataSource> [-Path] <string> [-IncludeRawContent] [-AcceptedResult <HtmlBrowserlessExtractionResult>] [-PassThru] [<CommonParameters>]
 ```
 
 ### Dom
 ```powershell
-Export-HtmlExtractionRecipe [-Path] <string> -ItemSelector <string> -Property <IDictionary> [-BaseUrl <uri>] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-PassThru] [<CommonParameters>]
+Export-HtmlExtractionRecipe [-Path] <string> -ItemSelector <string> -Property <IDictionary> [-BaseUrl <uri>] [-MinimumItemCount <Int32>] [-MaximumItemCount <Int32>] [-BaselineContent <string>] [-PassThru] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,7 +39,50 @@ Export-HtmlExtractionRecipe -ItemSelector '.product-card' -Property @{
 ```
 
 
+### EXAMPLE 3
+```powershell
+Export-HtmlExtractionRecipe -ItemSelector '.product' -Property @{
+    Name = @{ Selector = 'h2'; Required = $true }
+    Note = '.note'
+} -BaselineContent $acceptedHtml -Path .\products.json
+$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml
+$result.DriftReport
+```
+
+
 ## PARAMETERS
+
+### -AcceptedResult
+Successful structured-data extraction whose inspected output structure is accepted as a baseline.
+
+```yaml
+Type: HtmlBrowserlessExtractionResult
+Parameter Sets: Source
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -BaselineContent
+Accepted HTML used to capture DOM item structure and collection confidence in the saved recipe.
+
+```yaml
+Type: String
+Parameter Sets: Dom
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -BaseUrl
 Page URL used to resolve relative field URLs when the recipe is evaluated.

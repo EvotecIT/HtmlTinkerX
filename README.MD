@@ -984,6 +984,18 @@ $source | Export-HtmlExtractionRecipe -Path .\product.recipe.json -IncludeRawCon
 Import-HtmlExtractionRecipe -Path .\product.recipe.json | Invoke-HtmlExtractionRecipe
 ```
 
+Saved recipes can compare fresh output with a structure you have inspected and accepted. For DOM recipes,
+pass `-BaselineContent $acceptedHtml` to `Export-HtmlExtractionRecipe`. For a structured-data source, pass
+`-AcceptedResult $result` after its extraction succeeds. Baselines contain field names, value kinds and
+source paths; they do not add extracted values or raw responses to the recipe.
+
+`Invoke-HtmlExtractionRecipe` returns `DriftReport` when comparison runs. Changed item or JSON response structure, or lower
+DOM collection confidence makes `Success` false while preserving the extracted records for inspection.
+Value changes and record order do not cause drift. Count changes are reported; the declared minimum and
+maximum counts decide whether they are allowed. A later run never silently replaces the accepted baseline.
+If current data exceeds the comparison limits (256 distinct item shapes, 4096 shape nodes or depth 32),
+the result preserves its records and reports `DriftReport.ComparisonError` with `Success` false.
+
 Endpoint sources are guarded by default:
 
 ```powershell
