@@ -49,7 +49,7 @@ try {
     $result
 }
 finally {
-    try { if ($corpusType) { $corpusType.GetMethod('DisposeAll').Invoke($null, @()) } }
+    try { if ($corpusType) { [void]$corpusType.GetMethod('DisposeAll').Invoke($null, @()) } }
     finally {
         $env:PSPARSEHTML_USE_DEVELOPMENT_BINARIES = $previousDevelopmentMode
         $env:PSPARSEHTML_DEVELOPMENT_CONFIGURATION = $previousConfiguration
