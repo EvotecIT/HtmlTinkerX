@@ -198,7 +198,8 @@ public class HtmlHttpResponsePolicyTests {
 
     private sealed class BlockingStream : Stream {
         internal TaskCompletionSource<bool> Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<int> closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Let disposal finish the pending read without waiting for a thread-pool worker.
+        private readonly TaskCompletionSource<int> closed = new();
         internal bool Disposed { get; private set; }
         public override bool CanRead => true;
         public override bool CanSeek => false;
