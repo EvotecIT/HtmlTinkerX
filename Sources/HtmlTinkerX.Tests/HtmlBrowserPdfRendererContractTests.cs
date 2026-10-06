@@ -563,6 +563,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public async Task DnsLookupHasAnInternalDeadlineWithoutCallerCancellation() {
         TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using SemaphoreSlim lookupGate = new(1, 1);
         int calls = 0;
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
@@ -571,7 +572,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
                 return pendingLookup.Task;
             },
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50),
-            dnsLookupGate: new SemaphoreSlim(32, 32));
+            dnsLookupGate: lookupGate);
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
@@ -581,13 +582,12 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(1, calls);
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
 
-        bool recovered = false;
-        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
-        while (!recovered && DateTime.UtcNow < deadline) {
-            recovered = await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
-            if (!recovered) await Task.Delay(10);
-        }
-        Assert.True(recovered);
+        // Wait for the resolver to return its permit before observing the cached result.
+        // The lookup deadline is independent of how quickly CI schedules this continuation.
+        using CancellationTokenSource drainDeadline = new(TimeSpan.FromSeconds(10));
+        await lookupGate.WaitAsync(drainDeadline.Token);
+        lookupGate.Release();
+        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
         Assert.Equal(1, calls);
     }
 

@@ -42,7 +42,7 @@ Describe 'Browser action failure evidence' {
         $startupCancellation = [System.Threading.CancellationTokenSource]::new([TimeSpan]::FromMinutes(2))
         $previousDebug = $env:DEBUG
         if ($PSVersionTable.PSEdition -eq 'Desktop') {
-            $env:DEBUG = 'pw:api,pw:browser'
+            $env:DEBUG = 'pw:api,pw:browser,pw:channel:send,pw:channel:recv'
         }
         try {
             $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded -CancellationToken $startupCancellation.Token
