@@ -5,6 +5,8 @@ Ignore/*
 Releases/*
 Artefacts/*
 Build/Artefacts/*
+Build/Benchmarks/Corpus/bin/
+Build/Benchmarks/Corpus/obj/
 Sources/Artefacts/*
 Sources/.vs
 Sources/*/.vs

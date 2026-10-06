@@ -1,0 +1,49 @@
+name: Benchmark corpus
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_browser:
+        description: Include warm Chromium PDF capture
+        type: boolean
+        default: true
+      iterations:
+        description: Measured iterations per case
+        type: choice
+        options: ['1', '10', '20']
+        default: '10'
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.x'
+      - name: Install benchmark runner
+        shell: pwsh
+        run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Install-Module PSPublishModule -MinimumVersion 3.0.156 -Repository PSGallery -Scope CurrentUser -Force -AllowClobber
+      - name: Validate and measure corpus
+        shell: pwsh
+        env:
+          CORPUS_BROWSER: ${{ inputs.include_browser }}
+          CORPUS_ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          ./Build/Benchmarks/Invoke-Corpus.ps1 -IncludeBrowser:([bool]::Parse($env:CORPUS_BROWSER)) -IterationCount ([int]$env:CORPUS_ITERATIONS) -DomainLabel 'hosted-runner' -Purpose correctness-smoke
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-corpus
+          path: Ignore/Benchmarks
+          if-no-files-found: warn
+          retention-days: 7
