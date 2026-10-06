@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -10,6 +11,33 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererLiveTests {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RedirectFixtureRespondsWhileAnotherConnectionHasIncompleteHeaders(bool partialHeaders) {
+        await using LoopbackRedirectServer server = new();
+        int port = new Uri(server.Url).Port;
+        using TcpClient idle = new();
+        await idle.ConnectAsync(IPAddress.Loopback, port);
+        if (partialHeaders) {
+            byte[] incomplete = Encoding.ASCII.GetBytes($"GET /private HTTP/1.1\r\nHost: localhost:{port}\r\n");
+            await idle.GetStream().WriteAsync(incomplete, 0, incomplete.Length);
+        }
+
+        using TcpClient connection = new();
+        await connection.ConnectAsync(IPAddress.Loopback, port);
+        using NetworkStream stream = connection.GetStream();
+        byte[] request = Encoding.ASCII.GetBytes($"GET /private HTTP/1.1\r\nHost: localhost:{port}\r\nX-Render-Secret: supplied\r\n\r\n");
+        await stream.WriteAsync(request, 0, request.Length);
+        byte[] responseBuffer = new byte[256];
+        Task<int> responseRead = stream.ReadAsync(responseBuffer, 0, responseBuffer.Length);
+
+        Assert.Same(responseRead, await Task.WhenAny(responseRead, Task.Delay(5000)));
+        Assert.Contains("HTTP/1.1 200 OK", Encoding.ASCII.GetString(responseBuffer, 0, await responseRead));
+        Assert.Equal("supplied", server.PrivateRenderSecret);
+        Assert.Equal(1, server.PrivateRequests);
+    }
+
     [Fact]
     public async Task RedirectFixtureReadsHeadersSplitAcrossPacketsBeforeCheckingScopedSecrets() {
         await using LoopbackRedirectServer server = new();
@@ -68,4 +96,74 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             if (headers.IndexOf("\r\n\r\n", StringComparison.Ordinal) >= 0) return headers;
         }
     }
+    private sealed class LoopbackRedirectServer : IAsyncDisposable {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly ConcurrentDictionary<Task, byte> _connections = new();
+        private readonly Task _serverTask;
+        private int _privateRequests;
+        private string? _privateRenderSecret;
+
+        internal LoopbackRedirectServer() {
+            _listener.Start();
+            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://localhost:{port}/start";
+            RedirectTarget = $"http://127.0.0.1:{port}/private";
+            _serverTask = ServeAsync();
+        }
+
+        internal string Url { get; }
+        private string RedirectTarget { get; }
+        internal int PrivateRequests => Volatile.Read(ref _privateRequests);
+        internal string? PrivateRenderSecret => Volatile.Read(ref _privateRenderSecret);
+
+        private async Task ServeAsync() {
+            while (!_cancellation.IsCancellationRequested) {
+                try {
+                    Task connection = HandleConnectionAsync(await _listener.AcceptTcpClientAsync());
+                    _connections[connection] = 0;
+                    _ = connection.ContinueWith(completed => {
+                        _connections.TryRemove(completed, out _);
+                        _ = completed.Exception;
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
+                    return;
+                }
+            }
+        }
+
+        private async Task HandleConnectionAsync(TcpClient client) {
+            using (client)
+            using (NetworkStream stream = client.GetStream()) {
+                try {
+                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
+                    if (request == null) return;
+                    byte[] response;
+                    if (request.StartsWith("GET /private", StringComparison.Ordinal)) {
+                        Interlocked.Increment(ref _privateRequests);
+                        Volatile.Write(ref _privateRenderSecret, LoopbackHtmlServer.ReadHeader(request, "X-Render-Secret"));
+                        response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nprivate");
+                    } else {
+                        response = Encoding.ASCII.GetBytes($"HTTP/1.1 302 Found\r\nLocation: {RedirectTarget}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    }
+                    await stream.WriteAsync(response, 0, response.Length, _cancellation.Token);
+                } catch (IOException) {
+                    // A disconnected client must not stop the remaining redirect checks.
+                } catch (Exception error) when (_cancellation.IsCancellationRequested &&
+                    (error is ObjectDisposedException || error is OperationCanceledException || error is SocketException)) {
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync() {
+            _cancellation.Cancel();
+            _listener.Stop();
+            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
+            await Task.WhenAll(_connections.Keys);
+            _cancellation.Dispose();
+        }
+    }
+
 }

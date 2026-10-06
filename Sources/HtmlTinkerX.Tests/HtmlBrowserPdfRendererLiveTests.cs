@@ -733,60 +733,6 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
     }
 
-    private sealed class LoopbackRedirectServer : IAsyncDisposable {
-        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
-        private readonly CancellationTokenSource _cancellation = new();
-        private readonly Task _serverTask;
-        private int _privateRequests;
-        private string? _privateRenderSecret;
-
-        internal LoopbackRedirectServer() {
-            _listener.Start();
-            int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
-            Url = $"http://localhost:{port}/start";
-            RedirectTarget = $"http://127.0.0.1:{port}/private";
-            _serverTask = ServeAsync();
-        }
-
-        internal string Url { get; }
-        private string RedirectTarget { get; }
-        internal int PrivateRequests => Volatile.Read(ref _privateRequests);
-        internal string? PrivateRenderSecret => Volatile.Read(ref _privateRenderSecret);
-
-        private async Task ServeAsync() {
-            while (!_cancellation.IsCancellationRequested) {
-                try {
-                    using TcpClient client = await _listener.AcceptTcpClientAsync();
-                    using NetworkStream stream = client.GetStream();
-                    string? request = await ReadFixtureRequestHeadersAsync(stream, _cancellation.Token);
-                    if (request == null) continue;
-                    byte[] response;
-                    if (request.StartsWith("GET /private", StringComparison.Ordinal)) {
-                        Interlocked.Increment(ref _privateRequests);
-                        Volatile.Write(ref _privateRenderSecret, LoopbackHtmlServer.ReadHeader(request, "X-Render-Secret"));
-                        response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nprivate");
-                    } else {
-                        response = Encoding.ASCII.GetBytes($"HTTP/1.1 302 Found\r\nLocation: {RedirectTarget}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                    }
-                    await stream.WriteAsync(response, 0, response.Length);
-                } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
-                    return;
-                } catch (SocketException) when (_cancellation.IsCancellationRequested) {
-                    return;
-                } catch (IOException) {
-                    // A disconnected client must not stop the remaining redirect checks.
-                }
-            }
-        }
-
-        public async ValueTask DisposeAsync() {
-            _cancellation.Cancel();
-            _listener.Stop();
-            try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
-            _cancellation.Dispose();
-        }
-    }
-
     private sealed class ProxyOnlyHostServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _cancellation = new();
