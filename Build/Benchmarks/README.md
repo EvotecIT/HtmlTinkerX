@@ -1,6 +1,6 @@
 # Benchmark corpus
 
-This optional lane exercises the current source with the existing PSPublishModule/PowerForge runner. It is separate from the product solution and ordinary test workflows. Run it in a fresh PowerShell 7 process with a .NET 8 SDK and PSPublishModule 3.0.156 or later installed.
+This optional lane exercises the current source with the existing PSPublishModule/PowerForge runner. It is separate from the product solution and ordinary test workflows. Run it in a fresh PowerShell 7.4 or later process with a .NET 8 SDK and PSPublishModule 3.0.156 or later installed. The wrapper limits this optional build to `net8.0` without changing the product's framework list.
 
 ```powershell
 pwsh -NoProfile -File ./Build/Benchmarks/Invoke-Corpus.ps1 -Plan

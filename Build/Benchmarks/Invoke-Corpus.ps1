@@ -1,3 +1,4 @@
+#requires -Version 7.4
 [CmdletBinding()]
 param(
     [string] $OutputRoot = (Join-Path $PSScriptRoot '../../Ignore/Benchmarks'),
@@ -14,11 +15,10 @@ param(
     [ValidateSet('measurement', 'correctness-smoke')] [string] $Purpose = 'measurement'
 )
 $ErrorActionPreference = 'Stop'
-if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'The benchmark lane requires PowerShell 7.' }
 Import-Module PSPublishModule -MinimumVersion 3.0.156 -ErrorAction Stop
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (-not $SkipBuild) {
-    & dotnet build (Join-Path $PSScriptRoot 'Corpus/HtmlTinkerX.Benchmarks.csproj') -c Release -p:UseSharedCompilation=false
+    & dotnet build (Join-Path $PSScriptRoot 'Corpus/HtmlTinkerX.Benchmarks.csproj') -c Release -p:TargetFrameworks=net8.0 -p:UseSharedCompilation=false | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Corpus build failed.' }
 }
 $previousDevelopmentMode = $env:PSPARSEHTML_USE_DEVELOPMENT_BINARIES
