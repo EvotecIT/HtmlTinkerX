@@ -257,18 +257,17 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                     continue;
                 }
 
-                Task<string> readTask = response.TextAsync();
-                Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
-                Task cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                Task completed = await Task.WhenAny(readTask, timeoutTask, cancellationTask).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (ReferenceEquals(completed, timeoutTask)) {
+                using CancellationTokenSource readDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                readDeadline.CancelAfter(TimeSpan.FromSeconds(3));
+                string body;
+                try {
+                    body = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                        response.TextAsync, static () => Task.CompletedTask, readDeadline.Token).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && readDeadline.IsCancellationRequested) {
                     item.Entry.ResponseBodyError = "Response body capture timed out.";
                     continue;
                 }
-
-                string body = await readTask.ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (redactSensitiveValues) {
                     body = HtmlSensitiveValueRedactor.RedactSensitiveStructuredText(body);
                     item.Entry.ResponseBodyRedacted = true;
@@ -280,10 +279,15 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 item.Entry.ResponseBody = storedBody;
                 item.Entry.ResponseBodyTruncated = truncated;
                 item.Entry.ResponseBodyError = null;
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
             } catch (Exception ex) when (ex is PlaywrightException || ex is InvalidOperationException) {
+                cancellationToken.ThrowIfCancellationRequested();
                 item.Entry.ResponseBodyError = ex.Message;
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static bool TryGetDeclaredContentLength(HtmlNetworkEntry entry, out long contentLength) {

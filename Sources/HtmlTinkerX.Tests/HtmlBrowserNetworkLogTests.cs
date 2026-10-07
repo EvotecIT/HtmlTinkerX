@@ -139,7 +139,9 @@ public class HtmlBrowserNetworkLogTests {
             100,
             new HashSet<HtmlNetworkResourceType> { HtmlNetworkResourceType.Fetch },
             cts.Token);
-        await Assert.ThrowsAsync<OperationCanceledException>(() => capture);
+        OperationCanceledException failure = await Assert.ThrowsAsync<OperationCanceledException>(() => capture);
+        Assert.Equal(cts.Token, failure.CancellationToken);
+        Assert.Null(HtmlBrowser.GetNetworkLog(session).Single().ResponseBody);
         Assert.Null(HtmlBrowser.GetNetworkLog(session).Single().ResponseBodyError);
         await session.DisposeAsync();
     }
