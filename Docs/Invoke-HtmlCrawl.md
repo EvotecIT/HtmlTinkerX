@@ -31,6 +31,12 @@ Invoke-HtmlCrawl -Url https://example.com/app -Render -WaitForSelector main -Sto
 ```
 
 
+### EXAMPLE 3
+```powershell
+Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success
+```
+
+
 ## PARAMETERS
 
 ### -AllowAnyContentType
@@ -1517,6 +1523,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 - `HtmlTinkerX.HtmlCrawlResult`
+- `HtmlTinkerX.HtmlCrawlPage`
 
 ## RELATED LINKS
 
