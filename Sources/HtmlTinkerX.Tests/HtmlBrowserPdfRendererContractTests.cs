@@ -582,8 +582,9 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
-        await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(2)));
-        Assert.True(allowed.IsCompleted);
+        // This guards against a missing deadline without asserting when a loaded runner schedules
+        // the cancellation continuation. The resolver's configured deadline remains 50 ms.
+        Assert.Same(allowed, await Task.WhenAny(allowed, Task.Delay(TimeSpan.FromSeconds(10))));
         Assert.False(await allowed);
         Assert.False(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
         Assert.Equal(1, calls);
