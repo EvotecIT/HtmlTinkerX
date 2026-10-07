@@ -90,6 +90,19 @@ public sealed class SnapshotTestServer : IDisposable {
 
                 string[] parts = requestLine.Split(' ');
                 string path = parts.Length > 1 ? parts[1] : "/";
+                string contentLengthText;
+                int remaining;
+                if (parts.Length > 0 && string.Equals(parts[0], "POST", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(path, "/login", StringComparison.OrdinalIgnoreCase)
+                    && headers.TryGetValue("Content-Length", out contentLengthText)
+                    && int.TryParse(contentLengthText, out remaining)) {
+                    char[] body = new char[1024];
+                    while (remaining > 0) {
+                        int read = await reader.ReadAsync(body, 0, Math.Min(body.Length, remaining)).ConfigureAwait(false);
+                        if (read == 0) return;
+                        remaining -= read;
+                    }
+                }
                 if (string.Equals(path, "/page", StringComparison.OrdinalIgnoreCase)) {
                     string scriptSrc = externalScriptPort > 0
                         ? "http://127.0.0.1:" + externalScriptPort.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/challenge.js"
