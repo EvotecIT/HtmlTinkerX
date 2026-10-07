@@ -11,8 +11,8 @@ using System.Threading.Tasks;
 
 public sealed class DownloadAttachmentTestHttpServer : IDisposable {
     private sealed class ServerResponse {
-        public string Body { get; set; } = string.Empty;
-        public string ContentType { get; set; } = "text/html; charset=utf-8";
+        public string Body { get; set; }
+        public string ContentType { get; set; }
     }
 
     private readonly HttpListener _listener = new HttpListener();
@@ -24,10 +24,10 @@ public sealed class DownloadAttachmentTestHttpServer : IDisposable {
         Prefix = prefix;
         _listener.Prefixes.Add(prefix);
         _listener.Start();
-        _serverTask = Task.Run(ListenAsync);
+        _serverTask = Task.Run(new Func<Task>(ListenAsync));
     }
 
-    public string Prefix { get; }
+    public string Prefix { get; private set; }
 
     public void AddResponse(string path, string body, string contentType) {
         _responses[path] = new ServerResponse {
@@ -42,14 +42,21 @@ public sealed class DownloadAttachmentTestHttpServer : IDisposable {
 
             try {
                 context = await _listener.GetContextAsync().ConfigureAwait(false);
-            } catch (HttpListenerException) when (_cancellation.IsCancellationRequested || !_listener.IsListening) {
+            } catch (HttpListenerException) {
+                if (!_cancellation.IsCancellationRequested && _listener.IsListening) {
+                    throw;
+                }
                 break;
-            } catch (ObjectDisposedException) when (_cancellation.IsCancellationRequested) {
+            } catch (ObjectDisposedException) {
+                if (!_cancellation.IsCancellationRequested) {
+                    throw;
+                }
                 break;
             }
 
             string rawUrl = string.IsNullOrWhiteSpace(context.Request.RawUrl) ? "/" : context.Request.RawUrl;
-            if (!_responses.TryGetValue(rawUrl, out ServerResponse response)) {
+            ServerResponse response;
+            if (!_responses.TryGetValue(rawUrl, out response)) {
                 context.Response.StatusCode = 404;
                 context.Response.Close();
                 continue;

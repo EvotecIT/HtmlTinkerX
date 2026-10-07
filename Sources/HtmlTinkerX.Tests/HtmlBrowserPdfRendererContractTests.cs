@@ -377,12 +377,18 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
         string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-Subst-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, "asset.css"), "body{}");
-        string? drive = Enumerable.Range('D', 'Z' - 'D' + 1)
-            .Select(value => ((char)value) + ":")
-            .FirstOrDefault(candidate => !Directory.Exists(candidate + Path.DirectorySeparatorChar));
-        Assert.False(string.IsNullOrWhiteSpace(drive));
+        string? drive = null;
         try {
-            Assert.Equal(0, RunSubst($"{drive} \"{root}\""));
+            string[] existingDrives = Directory.GetLogicalDrives();
+            foreach (string candidate in Enumerable.Range('D', 'Z' - 'D' + 1).Select(value => ((char)value) + ":")) {
+                if (!existingDrives.Contains(candidate + Path.DirectorySeparatorChar, StringComparer.OrdinalIgnoreCase)
+                    && RunSubst($"{candidate} \"{root}\"") == 0) {
+                    // Other test processes can claim a letter after the snapshot.
+                    drive = candidate;
+                    break;
+                }
+            }
+            Assert.False(string.IsNullOrWhiteSpace(drive));
             string mappedFile = drive + Path.DirectorySeparatorChar + "asset.css";
             Assert.True(File.Exists(mappedFile));
             Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(mappedFile));
@@ -563,6 +569,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
     [Fact]
     public async Task DnsLookupHasAnInternalDeadlineWithoutCallerCancellation() {
         TaskCompletionSource<IPAddress[]> pendingLookup = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using SemaphoreSlim lookupGate = new(1, 1);
         int calls = 0;
         HtmlBrowserNetworkPolicyEvaluator evaluator = new(
             HtmlBrowserNetworkPolicy.PublicNetworkOnly,
@@ -571,7 +578,7 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
                 return pendingLookup.Task;
             },
             dnsLookupTimeout: TimeSpan.FromMilliseconds(50),
-            dnsLookupGate: new SemaphoreSlim(32, 32));
+            dnsLookupGate: lookupGate);
 
         Task<bool> allowed = evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
 
@@ -581,13 +588,12 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
         Assert.Equal(1, calls);
         pendingLookup.TrySetResult(new[] { IPAddress.Parse("8.8.8.8") });
 
-        bool recovered = false;
-        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
-        while (!recovered && DateTime.UtcNow < deadline) {
-            recovered = await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None);
-            if (!recovered) await Task.Delay(10);
-        }
-        Assert.True(recovered);
+        // Wait for the resolver to return its permit before observing the cached result.
+        // The lookup deadline is independent of how quickly CI schedules this continuation.
+        using CancellationTokenSource drainDeadline = new(TimeSpan.FromSeconds(10));
+        await lookupGate.WaitAsync(drainDeadline.Token);
+        lookupGate.Release();
+        Assert.True(await evaluator.IsAllowedAsync("https://timeout.example/report", null, CancellationToken.None));
         Assert.Equal(1, calls);
     }
 

@@ -38,7 +38,22 @@ Describe 'Browser action failure evidence' {
 '@
         $uri = [System.Uri]::new($pagePath).AbsoluteUri
 
-        $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded
+        Write-Host 'Failure evidence: starting browser session'
+        $startupCancellation = [System.Threading.CancellationTokenSource]::new([TimeSpan]::FromMinutes(2))
+        $previousDebug = $env:DEBUG
+        if ($PSVersionTable.PSEdition -eq 'Desktop') {
+            $env:DEBUG = 'pw:api,pw:browser,pw:channel:send,pw:channel:recv'
+        }
+        try {
+            $session = Start-HtmlBrowserSession -Url $uri -LoadState DomContentLoaded -CancellationToken $startupCancellation.Token
+        } catch {
+            Write-Warning ($_.Exception.ToString())
+            throw
+        } finally {
+            $startupCancellation.Dispose()
+            $env:DEBUG = $previousDebug
+        }
+        Write-Host 'Failure evidence: browser session started'
         try {
             $operations = @(
                 @{
@@ -87,6 +102,7 @@ Describe 'Browser action failure evidence' {
             )
 
             foreach ($operation in $operations) {
+                Write-Host "Failure evidence: exercising $($operation.Name)"
                 $failureRoot = Join-Path $TestDrive "failure-$($operation.Name)"
                 { & $operation.Invoke $session $failureRoot } | Should -Throw
 
@@ -112,7 +128,9 @@ Describe 'Browser action failure evidence' {
                 ($locators.Candidates.Selector -join "`n") | Should -Match 'token=<redacted>'
             }
         } finally {
+            Write-Host 'Failure evidence: closing browser session'
             Close-HtmlBrowserSession -Session $session
+            Write-Host 'Failure evidence: browser session closed'
         }
     }
 }
