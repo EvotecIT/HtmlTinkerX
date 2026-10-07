@@ -38,6 +38,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private int _removedNamespacedResourceRequests;
         private int _popupRequestCount;
         private readonly ConcurrentDictionary<string, (int Count, string Cookie)> _blankPopupSources = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _blankPopupSourceReceived = new(StringComparer.Ordinal);
         private readonly string _namedContextInitialUrl;
         internal LoopbackPopupServer(string? namedContextInitialUrl = null, string? popupRedirectTarget = null) {
             _namedContextInitialUrl = namedContextInitialUrl ?? "/existing-context-initial";
@@ -227,6 +228,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         string result = LastPopupToken == "popup-token" ? "popup authorized" : "popup denied";
                         body = $"<script>opener.postMessage('{result}', '*');</script>";
+                    } else if (requestTarget.StartsWith("/blank-popup-source-wait", StringComparison.Ordinal)) {
+                        string source = ReadQueryValue(requestTarget, "source") ?? string.Empty;
+                        Task observed = _blankPopupSourceReceived.GetOrAdd(source,
+                            _ => new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+                        await Task.WhenAny(observed, Task.Delay(Timeout.Infinite, _cancellation.Token));
+                        contentType = "text/plain; charset=utf-8";
+                        body = BlankPopupSourceRequests(source)
+                            .ToString(System.Globalization.CultureInfo.InvariantCulture);
                     } else if (requestTarget.StartsWith("/blank-popup-resource", StringComparison.Ordinal)) {
                         Interlocked.Increment(ref _blankPopupResourceRequests);
                         int sourceStart = requestTarget.IndexOf("source=", StringComparison.Ordinal);
@@ -234,6 +243,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                             string source = requestTarget.Substring(sourceStart + 7).Split('&')[0];
                             string cookie = LoopbackHtmlServer.ReadHeader(request, "Cookie") ?? string.Empty;
                             _blankPopupSources.AddOrUpdate(source, (1, cookie), (_, previous) => (previous.Count + 1, cookie));
+                            _blankPopupSourceReceived.GetOrAdd(source,
+                                _ => new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult(true);
                         }
                         if (requestTarget.Contains("source=style-text", StringComparison.Ordinal)) Interlocked.Increment(ref _styleTextResourceRequests);
                         if (requestTarget.Contains("source=removed-namespace", StringComparison.Ordinal)) Interlocked.Increment(ref _removedNamespacedResourceRequests);
