@@ -35,6 +35,7 @@ Invoke-HtmlExtractionRecipe -Path .\recipe.json -AllowHttpFetch
 $result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html
 $result.Success
 $result.DomReport.Fields
+$result.DriftReport
 ```
 
 

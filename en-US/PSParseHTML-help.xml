@@ -14111,6 +14111,18 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
     <command:syntax>
       <command:syntaxItem parameterSetName="Source">
         <maml:name>Export-HtmlExtractionRecipe</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AcceptedResult</maml:name>
+          <maml:description>
+            <maml:para>Successful structured-data extraction whose inspected output structure is accepted as a baseline.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">HtmlBrowserlessExtractionResult</command:parameterValue>
+          <dev:type>
+            <maml:name>HtmlBrowserlessExtractionResult</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="0" aliases="None">
           <maml:name>DataSource</maml:name>
           <maml:description>
@@ -14162,6 +14174,18 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Dom">
         <maml:name>Export-HtmlExtractionRecipe</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BaselineContent</maml:name>
+          <maml:description>
+            <maml:para>Accepted HTML used to capture DOM item structure and collection confidence in the saved recipe.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BaseUrl</maml:name>
           <maml:description>
@@ -14249,6 +14273,30 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AcceptedResult</maml:name>
+        <maml:description>
+          <maml:para>Successful structured-data extraction whose inspected output structure is accepted as a baseline.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">HtmlBrowserlessExtractionResult</command:parameterValue>
+        <dev:type>
+          <maml:name>HtmlBrowserlessExtractionResult</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BaselineContent</maml:name>
+        <maml:description>
+          <maml:para>Accepted HTML used to capture DOM item structure and collection confidence in the saved recipe.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BaseUrl</maml:name>
         <maml:description>
@@ -14391,6 +14439,18 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
     Name = @{ Selector = '.product-title'; Required = $true }&#xD;
     Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }&#xD;
 } -MinimumItemCount 1 -Path .\products.json</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Accept a DOM structure and check later extractions for drift</maml:title>
+        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product' -Property @{&#xD;
+    Name = @{ Selector = 'h2'; Required = $true }&#xD;
+    Note = '.note'&#xD;
+} -BaselineContent $acceptedHtml -Path .\products.json&#xD;
+$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml&#xD;
+$result.DriftReport</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -32830,7 +32890,8 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         <maml:title>Check fresh HTML against saved DOM fields and counts</maml:title>
         <dev:code>$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html&#xD;
 $result.Success&#xD;
-$result.DomReport.Fields</dev:code>
+$result.DomReport.Fields&#xD;
+$result.DriftReport</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

@@ -23,6 +23,17 @@ namespace PSParseHTML.PowerShell;
 /// } -MinimumItemCount 1 -Path .\products.json
 ///   </code>
 /// </example>
+/// <example>
+///   <summary>Accept a DOM structure and check later extractions for drift</summary>
+///   <code>
+/// Export-HtmlExtractionRecipe -ItemSelector '.product' -Property @{
+///     Name = @{ Selector = 'h2'; Required = $true }
+///     Note = '.note'
+/// } -BaselineContent $acceptedHtml -Path .\products.json
+/// $result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml
+/// $result.DriftReport
+///   </code>
+/// </example>
 [Cmdlet(VerbsData.Export, "HtmlExtractionRecipe", DefaultParameterSetName = ParameterSetSource)]
 [OutputType(typeof(string))]
 public sealed class CmdletExportHtmlExtractionRecipe : AsyncPSCmdlet {
@@ -65,6 +76,16 @@ public sealed class CmdletExportHtmlExtractionRecipe : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int? MaximumItemCount { get; set; }
 
+    /// <summary>Accepted HTML used to capture DOM item structure and collection confidence in the saved recipe.</summary>
+    [Parameter(ParameterSetName = ParameterSetDom)]
+    [ValidateNotNull]
+    public string? BaselineContent { get; set; }
+
+    /// <summary>Successful structured-data extraction whose inspected output structure is accepted as a baseline.</summary>
+    [Parameter(ParameterSetName = ParameterSetSource)]
+    [ValidateNotNull]
+    public HtmlBrowserlessExtractionResult? AcceptedResult { get; set; }
+
     /// <summary>Writes the recipe path to the pipeline.</summary>
     [Parameter]
     public SwitchParameter PassThru { get; set; }
@@ -77,6 +98,11 @@ public sealed class CmdletExportHtmlExtractionRecipe : AsyncPSCmdlet {
                     MinimumItemCount = MinimumItemCount, MaximumItemCount = MaximumItemCount
                 }, BaseUrl)
             : HtmlBrowserlessExtraction.CreateRecipe(DataSource, IncludeRawContent.IsPresent);
+        if (BaselineContent != null) {
+            recipe = HtmlBrowserlessExtraction.CaptureDomRecipeBaseline(recipe, BaselineContent);
+        } else if (AcceptedResult != null) {
+            recipe = HtmlBrowserlessExtraction.CaptureRecipeBaseline(recipe, AcceptedResult);
+        }
         string json = HtmlBrowserlessExtraction.SerializeRecipe(recipe);
         string fullPath = Path.ToFullPath();
         string? directory = System.IO.Path.GetDirectoryName(fullPath);

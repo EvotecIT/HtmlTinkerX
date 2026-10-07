@@ -50,7 +50,7 @@ public static partial class HtmlBrowserlessExtraction {
             recipe.DomProperties!, new HtmlDomExtractionReportOptions {
                 MinimumItemCount = recipe.MinimumItemCount, MaximumItemCount = recipe.MaximumItemCount
             }, GetDomRecipeBaseUri(recipe));
-        return new HtmlBrowserlessExtractionResult {
+        return ApplyRecipeBaseline(recipe, new HtmlBrowserlessExtractionResult {
             Source = CreateSourceFromRecipe(recipe), DomReport = report,
             Success = report.ItemCount > 0 && report.IsValid, ContentType = "text/html",
             RawContent = includeRawContent ? html : string.Empty,
@@ -60,7 +60,7 @@ public static partial class HtmlBrowserlessExtraction {
             Evidence = new[] { $"Evaluated {report.ItemCount} DOM item(s); {report.InvalidFieldCount} field check(s) failed." },
             Warnings = report.IsValid ? Array.Empty<string>()
                 : new[] { "DOM extraction did not satisfy the saved field or item-count rules. Inspect DomReport before accepting the dataset." }
-        };
+        }, html);
     }
 
     private static bool IsDomRecipe(HtmlBrowserlessExtractionRecipe recipe) =>
@@ -76,9 +76,11 @@ public static partial class HtmlBrowserlessExtraction {
         } else if (recipe.DomProperties != null || recipe.MinimumItemCount.HasValue || recipe.MaximumItemCount.HasValue) {
             throw new ArgumentException("DOM fields and count bounds require SourceKind Dom.", nameof(recipe));
         }
+        ValidateRecipeBaseline(recipe);
     }
 
     private static void ValidateDomRecipeConfiguration(HtmlBrowserlessExtractionRecipe recipe) {
+        ValidateRecipeBaseline(recipe);
         if (recipe.Version != 1) {
             throw new ArgumentException("Unsupported DOM recipe version. Supported version is 1.", nameof(recipe));
         }

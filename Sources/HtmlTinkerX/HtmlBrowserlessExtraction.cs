@@ -108,11 +108,13 @@ public static partial class HtmlBrowserlessExtraction {
         }
 
         string rawContent = source.RawContent ?? string.Empty;
-        IReadOnlyList<HtmlBrowserlessExtractionItem> items = ExtractItemsFromPayload(source.Kind, rawContent);
+        IReadOnlyList<HtmlBrowserlessExtractionItem> items = ExtractItemsFromPayload(source.Kind, rawContent,
+            out string? responseShape, out string? responseShapeError);
         return new HtmlBrowserlessExtractionResult {
             Source = source,
             Success = items.Count > 0,
             Items = items,
+            ResponseShape = responseShape, ResponseShapeError = responseShapeError,
             RawContent = effectiveOptions.IncludeRawContent ? rawContent : string.Empty,
             ContentType = LooksLikeJson(rawContent) ? "application/json" : "text/plain",
             Evidence = Combine(source.Evidence, $"Extracted {items.Count} item(s) from static {source.Kind} payload."),
@@ -186,8 +188,10 @@ public static partial class HtmlBrowserlessExtraction {
         if (IsDomRecipe(recipe)) {
             throw new ArgumentException("DOM recipes require current HTML. Use ExtractDomRecipe with the HTML to evaluate.", nameof(recipe));
         }
+        ValidateRecipeBaseline(recipe);
         HtmlBrowserlessDataSource source = CreateSourceFromRecipe(recipe);
-        return ExtractAsync(source, options, client, cancellationToken);
+        return recipe.Baseline == null ? ExtractAsync(source, options, client, cancellationToken)
+            : ExtractRecipeWithBaselineAsync(recipe, source, options, client, cancellationToken);
     }
 
     private static void AddStaticDataSource(List<HtmlBrowserlessDataSource> sources, HtmlDataItem item, HtmlPageWorkbenchResult workbench) {
@@ -339,13 +343,16 @@ public static partial class HtmlBrowserlessExtraction {
                 Success = response.IsSuccessStatusCode && !truncated
             });
 
+            string? responseShape = null;
+            string? responseShapeError = null;
             IReadOnlyList<HtmlBrowserlessExtractionItem> items = truncated
                 ? Array.Empty<HtmlBrowserlessExtractionItem>()
-                : ExtractItemsFromResponse(source, content, contentType);
+                : ExtractItemsFromResponse(source, content, contentType, out responseShape, out responseShapeError);
             return new HtmlBrowserlessExtractionResult {
                 Source = source,
                 Success = response.IsSuccessStatusCode && !truncated && items.Count > 0,
                 Items = items,
+                ResponseShape = responseShape, ResponseShapeError = responseShapeError,
                 Requests = requests,
                 RawContent = options.IncludeRawContent ? content : string.Empty,
                 ContentType = contentType,
@@ -476,9 +483,12 @@ public static partial class HtmlBrowserlessExtraction {
         }
     }
 
-    private static IReadOnlyList<HtmlBrowserlessExtractionItem> ExtractItemsFromResponse(HtmlBrowserlessDataSource source, string content, string contentType) {
+    private static IReadOnlyList<HtmlBrowserlessExtractionItem> ExtractItemsFromResponse(
+        HtmlBrowserlessDataSource source, string content, string contentType, out string? responseShape, out string? responseShapeError) {
+        responseShape = null;
+        responseShapeError = null;
         if (LooksLikeJson(content) || contentType.IndexOf("json", StringComparison.OrdinalIgnoreCase) >= 0) {
-            return ExtractItemsFromPayload(source.Kind, content);
+            return ExtractItemsFromPayload(source.Kind, content, out responseShape, out responseShapeError);
         }
 
         if (contentType.IndexOf("html", StringComparison.OrdinalIgnoreCase) >= 0 || content.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0) {
@@ -508,7 +518,10 @@ public static partial class HtmlBrowserlessExtraction {
         };
     }
 
-    private static IReadOnlyList<HtmlBrowserlessExtractionItem> ExtractItemsFromPayload(string kind, string rawContent) {
+    private static IReadOnlyList<HtmlBrowserlessExtractionItem> ExtractItemsFromPayload(
+        string kind, string rawContent, out string? responseShape, out string? responseShapeError) {
+        responseShape = null;
+        responseShapeError = null;
         if (string.IsNullOrWhiteSpace(rawContent)) {
             return Array.Empty<HtmlBrowserlessExtractionItem>();
         }
@@ -516,7 +529,7 @@ public static partial class HtmlBrowserlessExtraction {
         try {
             using JsonDocument document = JsonDocument.Parse(rawContent, HtmlModernParserUtilities.JsonOptions);
             List<HtmlBrowserlessExtractionItem> items = new();
-            AddJsonItems(kind, document.RootElement, "$", items);
+            AddJsonItems(kind, document.RootElement, "$", items, out responseShape, out responseShapeError);
             return items;
         } catch (JsonException) {
             return new[] {
@@ -533,9 +546,12 @@ public static partial class HtmlBrowserlessExtraction {
         }
     }
 
-    private static void AddJsonItems(string kind, JsonElement root, string path, List<HtmlBrowserlessExtractionItem> items) {
+    private static void AddJsonItems(string kind, JsonElement root, string path, List<HtmlBrowserlessExtractionItem> items,
+        out string? responseShape, out string? responseShapeError) {
         List<(JsonElement Element, string Path)> recordElements = new();
-        CollectRecordArrays(root, path, recordElements, depth: 0);
+        HashSet<string> recordArrays = new(StringComparer.Ordinal);
+        CollectRecordArrays(root, path, recordElements, recordArrays, depth: 0);
+        responseShape = CaptureResponseShape(root, recordArrays, out responseShapeError);
         if (recordElements.Count == 0) {
             AddJsonItem(kind, root, path, items);
             return;
@@ -546,7 +562,8 @@ public static partial class HtmlBrowserlessExtraction {
         }
     }
 
-    private static void CollectRecordArrays(JsonElement element, string path, List<(JsonElement Element, string Path)> items, int depth) {
+    private static void CollectRecordArrays(JsonElement element, string path, List<(JsonElement Element, string Path)> items,
+        HashSet<string> recordArrays, int depth) {
         if (depth > 6) {
             return;
         }
@@ -564,6 +581,7 @@ public static partial class HtmlBrowserlessExtraction {
             }
 
             if (added) {
+                recordArrays.Add(path);
                 return;
             }
         }
@@ -573,7 +591,7 @@ public static partial class HtmlBrowserlessExtraction {
         }
 
         foreach (JsonProperty property in element.EnumerateObject()) {
-            CollectRecordArrays(property.Value, $"{path}.{property.Name}", items, depth + 1);
+            CollectRecordArrays(property.Value, $"{path}.{property.Name}", items, recordArrays, depth + 1);
         }
     }
 

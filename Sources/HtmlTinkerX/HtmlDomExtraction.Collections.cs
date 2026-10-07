@@ -79,7 +79,7 @@ public static partial class HtmlDomExtraction {
             collections.Add(new HtmlPageCollection {
                 Index = collections.Count,
                 Name = BuildCollectionName(candidate),
-                Confidence = candidate.Score >= 120 ? "High" : candidate.Score >= 80 ? "Medium" : "Low",
+                Confidence = DescribeCollectionConfidence(candidate.Score),
                 Score = candidate.Score,
                 Reason = candidate.Reason,
                 Selector = candidate.Selector,
