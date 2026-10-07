@@ -377,12 +377,18 @@ public sealed partial class HtmlBrowserPdfRendererContractTests {
         string root = Path.Combine(Path.GetTempPath(), "HtmlTinkerX-Subst-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, "asset.css"), "body{}");
-        string? drive = Enumerable.Range('D', 'Z' - 'D' + 1)
-            .Select(value => ((char)value) + ":")
-            .FirstOrDefault(candidate => !Directory.Exists(candidate + Path.DirectorySeparatorChar));
-        Assert.False(string.IsNullOrWhiteSpace(drive));
+        string? drive = null;
         try {
-            Assert.Equal(0, RunSubst($"{drive} \"{root}\""));
+            string[] existingDrives = Directory.GetLogicalDrives();
+            foreach (string candidate in Enumerable.Range('D', 'Z' - 'D' + 1).Select(value => ((char)value) + ":")) {
+                if (!existingDrives.Contains(candidate + Path.DirectorySeparatorChar, StringComparer.OrdinalIgnoreCase)
+                    && RunSubst($"{candidate} \"{root}\"") == 0) {
+                    // Other test processes can claim a letter after the snapshot.
+                    drive = candidate;
+                    break;
+                }
+            }
+            Assert.False(string.IsNullOrWhiteSpace(drive));
             string mappedFile = drive + Path.DirectorySeparatorChar + "asset.css";
             Assert.True(File.Exists(mappedFile));
             Assert.False(HtmlBrowserFileSystemPath.IsSafeLocalPath(mappedFile));
