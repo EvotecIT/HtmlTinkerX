@@ -12,6 +12,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Cancellation timing")]
 public class HtmlHttpResponsePolicyTests {
     private const string Url = "https://example.test/submit";
     private const string Relay = "<form action='/submit' method='post'><input type='hidden' name='SAMLResponse' value='test'></form><script>document.forms[0].submit()</script>";
