@@ -65,9 +65,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             anchor.addEventListener('click', () => window.__htmlTinkerXSyntheticClickCount++);
             if (!anchor.dispatchEvent(new anchorPopup.MouseEvent('click', {{ bubbles: true, cancelable: true }}))) throw new Error('synthetic anchor click was unexpectedly cancelled');
             if (window.__htmlTinkerXSyntheticClickCount !== 3) throw new Error('synthetic listeners were not dispatched synchronously');
-            true";
+            const sources = ['synthetic-click-submit', 'synthetic-click-submit-borrowed', 'synthetic-click-anchor'];
+            (async () => {{
+                const counts = await Promise.all(sources.map(async source =>
+                    Number(await (await fetch('/blank-popup-source-wait?source=' + source)).text())));
+                if (!counts.every(count => count >= 1)) throw new Error('synthetic requests were not received');
+                return true;
+            }})()";
 
-        HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
+        HtmlBrowserPdfResult result;
+        try {
+            result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
             readiness: new HtmlBrowserPdfReadiness(
                 skipLoadState: true,
@@ -75,6 +83,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
+        } catch (System.TimeoutException exception) {
+            throw new System.TimeoutException(
+                $"Synthetic click requests: direct={server.BlankPopupSourceRequests("synthetic-click-submit")}, " +
+                $"borrowed={server.BlankPopupSourceRequests("synthetic-click-submit-borrowed")}, " +
+                $"anchor={server.BlankPopupSourceRequests("synthetic-click-anchor")}, " +
+                $"total={server.BlankPopupResourceRequests}.", exception);
+        }
 
         Assert.NotEmpty(result.PdfBytes);
         Assert.Equal(1, server.BlankPopupSourceRequests("synthetic-click-submit"));
