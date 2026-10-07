@@ -9,14 +9,12 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlParserTableAdvancedTests {
     private static string GetAzureStatusHtmlFromSources() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "azure_status.html"));
+        var path = TestHelpers.GetDocumentPath("azure_status.html");
         return File.ReadAllText(path);
     }
 
     private static string GetAzureStatusHtmlFromTests() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", "Tests", "Documents", "azure_status.html"));
+        var path = Path.Combine(TestHelpers.RepositoryRoot, "Tests", "Documents", "azure_status.html");
         return File.ReadAllText(path);
     }
 
@@ -59,8 +57,7 @@ public class HtmlParserTableAdvancedTests {
     }
 
     private static string GetPolishTableHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "polish_table.html"));
+        var path = TestHelpers.GetDocumentPath("polish_table.html");
         return File.ReadAllText(path, System.Text.Encoding.UTF8);
     }
 

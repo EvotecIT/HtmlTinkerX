@@ -9,13 +9,11 @@ namespace HtmlTinkerX.Tests;
 /// </summary>
 public class HtmlHarViewerTests {
     private static string GetHarPath() {
-        var baseDir = AppContext.BaseDirectory;
-        return Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", "Tests", "Documents", "sample.har"));
+        return Path.Combine(TestHelpers.RepositoryRoot, "Tests", "Documents", "sample.har");
     }
 
     private static string GetMinimalHarPath() {
-        var baseDir = AppContext.BaseDirectory;
-        return Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", "Tests", "Documents", "minimal.har"));
+        return Path.Combine(TestHelpers.RepositoryRoot, "Tests", "Documents", "minimal.har");
     }
 
     [Fact]

@@ -9,8 +9,7 @@ namespace HtmlTinkerX.Tests;
 /// </summary>
 public class HtmlParserListTests {
     private static string GetSampleListHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "sample_lists.html"));
+        var path = TestHelpers.GetDocumentPath("sample_lists.html");
         return File.ReadAllText(path);
     }
 

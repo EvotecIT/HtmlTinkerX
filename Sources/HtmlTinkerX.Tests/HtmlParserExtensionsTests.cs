@@ -1,7 +1,7 @@
 using AngleSharp.Html.Parser;
 using HtmlTinkerX;
+using Microsoft.AspNetCore.Http;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
 using HtmlParserExtensions = HtmlTinkerX.HtmlParserExtensions;
@@ -39,13 +39,17 @@ public class HtmlParserExtensionsTests {
     /// Downloads a page and selects elements by tag.
     /// </summary>
     public async Task GetElements_FromUrl_ByTag() {
-        using var client = new HttpClient();
+        using var server = TestServerCompat.CreateTestServer(async context => {
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.WriteAsync("<html><body><em>Expected emphasis</em><p>Other text</p></body></html>");
+        }, "/element", "GET");
+        using var client = server.CreateClient();
         string html = await HtmlUtilities.GetStringWithProperEncodingAsync(
             client,
-            "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/em");
+            "http://localhost/element");
 
-        var elements = HtmlParserExtensions.GetElements(html, tag: "em");
-        Assert.NotEmpty(elements);
+        var element = Assert.Single(HtmlParserExtensions.GetElements(html, tag: "em"));
+        Assert.Equal("Expected emphasis", element.TextContent);
     }
 
     [Fact]

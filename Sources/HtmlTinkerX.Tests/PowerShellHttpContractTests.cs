@@ -31,7 +31,7 @@ public class PowerShellHttpContractTests {
 
     [Fact]
     public void CmdletUrlReads_UseBoundedHttpUtilityOverloads() {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot = TestHelpers.RepositoryRoot;
         string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
         List<string> unboundedCalls = Directory
             .EnumerateFiles(cmdletRoot, "*.cs", SearchOption.AllDirectories)
@@ -50,7 +50,7 @@ public class PowerShellHttpContractTests {
 
     [Fact]
     public void CmdletResponseReads_StreamBeforeApplyingBodyLimits() {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot = TestHelpers.RepositoryRoot;
         string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
         List<string> bufferedReads = Directory
             .EnumerateFiles(cmdletRoot, "*.cs", SearchOption.AllDirectories)
@@ -67,7 +67,7 @@ public class PowerShellHttpContractTests {
 
     [Fact]
     public void CmdletStreamedUrlReads_PreserveHttpClientTimeouts() {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot = TestHelpers.RepositoryRoot;
         string cmdletRoot = Path.Combine(repositoryRoot, "Sources", "PSParseHTML.PowerShell");
         List<string> unprotectedReads = Directory
             .EnumerateFiles(cmdletRoot, "*.cs", SearchOption.AllDirectories)
@@ -83,15 +83,4 @@ public class PowerShellHttpContractTests {
             $"Streamed PowerShell URL reads must preserve HttpClient timeout coverage for the response body.{Environment.NewLine}{string.Join(Environment.NewLine, unprotectedReads)}");
     }
 
-    private static string FindRepositoryRoot() {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory != null) {
-            if (File.Exists(Path.Combine(directory.FullName, "PSParseHTML.psd1"))) {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the PSParseHTML repository root.");
-    }
 }

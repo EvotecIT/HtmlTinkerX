@@ -6,8 +6,7 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlOutlineBuilderTests {
     private static string GetOutlineHtml() {
-        var baseDir = AppContext.BaseDirectory;
-        var path = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", "outline.html"));
+        var path = TestHelpers.GetDocumentPath("outline.html");
         return File.ReadAllText(path);
     }
 

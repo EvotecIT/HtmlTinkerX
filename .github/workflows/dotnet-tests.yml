@@ -24,6 +24,7 @@ env:
   BUILD_CONFIGURATION: 'Release'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
+  DEBUG: 'pw:api,pw:browser,pw:protocol'
 
 jobs:
   test-windows:
@@ -54,17 +55,17 @@ jobs:
 
       - name: Run tests for net8.0
         if: matrix.framework == 'net8.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
         timeout-minutes: 20
 
       - name: Run tests for net10.0
         if: matrix.framework == 'net10.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net10.log
         timeout-minutes: 20
 
       - name: Run tests for net472
         if: matrix.framework == 'net472'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net472.log
         timeout-minutes: 20
 
       - name: Summarize failing tests
@@ -110,6 +111,14 @@ jobs:
             **/*.trx
             **/Sequence*.xml
 
+      - name: Upload browser diagnostics
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-diagnostics-windows-${{ matrix.framework }}
+          path: TestResults/vstest-*.log
+          retention-days: 7
+
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
         if: always()
@@ -145,11 +154,11 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net10.log
         timeout-minutes: 10
 
       - name: Summarize failing tests
@@ -194,6 +203,14 @@ jobs:
           path: |
             **/*.trx
             **/Sequence*.xml
+
+      - name: Upload browser diagnostics
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-diagnostics-ubuntu
+          path: TestResults/vstest-*.log
+          retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -221,11 +238,11 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
         timeout-minutes: 10
 
       - name: Run tests for net10.0
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net10.log
         timeout-minutes: 10
 
       - name: Summarize failing tests
@@ -270,6 +287,14 @@ jobs:
           path: |
             **/*.trx
             **/Sequence*.xml
+
+      - name: Upload browser diagnostics
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-diagnostics-macos
+          path: TestResults/vstest-*.log
+          retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:

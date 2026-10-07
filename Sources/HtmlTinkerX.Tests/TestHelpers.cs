@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -9,14 +10,21 @@ namespace HtmlTinkerX.Tests;
 /// Helper methods for unit tests.
 /// </summary>
 internal static class TestHelpers {
+    /// <summary>Gets the source project directory independently of the build output location.</summary>
+    public static string ProjectRoot { get; } = Path.GetDirectoryName(GetSourceFilePath())!;
+
+    /// <summary>Gets the repository directory containing the test source project.</summary>
+    public static string RepositoryRoot { get; } = Path.GetFullPath(Path.Combine(ProjectRoot, "..", ".."));
+
+    private static string GetSourceFilePath([CallerFilePath] string sourceFile = "") => sourceFile;
+
     /// <summary>
     /// Gets the full path to a test document file.
     /// </summary>
     /// <param name="name">The name of the document file.</param>
     /// <returns>The full path to the document.</returns>
     public static string GetDocumentPath(string name) {
-        string baseDir = AppContext.BaseDirectory;
-        return Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "Documents", name));
+        return Path.Combine(ProjectRoot, "Documents", name);
     }
 
     /// <summary>
