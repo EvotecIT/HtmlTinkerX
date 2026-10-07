@@ -30332,6 +30332,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>HttpRetryCount</maml:name>
+          <maml:description>
+            <maml:para>Maximum additional attempts for transient static GET responses. Retry-After and backoff share the request timeout.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>IgnoredAssetPathPattern</maml:name>
           <maml:description>
@@ -31452,6 +31464,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>HtmlCrawlHiddenContentMode</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>HttpRetryCount</maml:name>
+        <maml:description>
+          <maml:para>Maximum additional attempts for transient static GET responses. Retry-After and backoff share the request timeout.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

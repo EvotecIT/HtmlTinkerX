@@ -622,6 +622,14 @@ Crawler credentials and custom headers are sent only to the starting origin (sch
 
 `MaxPages` counts fetched page candidates, including duplicate and unsupported responses. `DelayMs` also applies between those requests. URL paths and query values retain their case, and relative links and assets resolve against the response URL and any HTML `<base>` element.
 
+Use `HttpRetryCount` to retry static GET responses with status 408, 429, 500, 502, 503, or 504. It accepts zero to ten additional attempts and defaults to zero. This policy covers pages, robots files, sitemaps, and assets; browser navigation keeps its own policy.
+
+```powershell
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -HttpRetryCount 2 -Timeout 15000 -OutPath './crawl'
+```
+
+Retries honor `Retry-After` as a number of seconds or an HTTP date. Without a valid server delay, backoff starts at 250 ms, doubles after each retry, and stops growing at 30 seconds. Redirects also honor `Retry-After` when the policy is enabled. All attempts, redirects, waits, and body reading share the existing request timeout. A wait longer than that whole budget leaves the response as a failure. Transport errors and canceled requests are not retried.
+
 An active crawl writes an atomic checkpoint to `crawl-result.json` and stores completed records under `crawl-result.json.state/`. Keep both together when moving an interrupted crawl. `ResumePath` and `HtmlCrawler.LoadResultAsync` read these checkpoints as well as existing full manifests. Global datasets, the offline index, and final link rewriting are generated once when the crawl finishes; its final manifest is self-contained and the checkpoint records are removed.
 
 Each page records the HTTP document's `ResponseUrl`, `EntityTag`, and `LastModified` when available. `ResponseUrl` preserves the final response address before HTML base resolution, canonical rewriting, or tracking-query normalization. Static and rendered crawls use the response that supplied the extracted document; rendered interactions that navigate update these values. The fields are retained in saved manifests and page JSONL/CSV exports.

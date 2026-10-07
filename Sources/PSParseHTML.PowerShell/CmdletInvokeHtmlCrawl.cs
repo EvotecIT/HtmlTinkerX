@@ -257,6 +257,11 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
+    /// <summary>Maximum additional attempts for transient static GET responses. Retry-After and backoff share the request timeout.</summary>
+    [Parameter]
+    [ValidateRange(0, 10)]
+    public int HttpRetryCount { get; set; }
+
     /// <summary>User agent used for requests.</summary>
     [Parameter]
     public string? UserAgent { get; set; }
@@ -471,6 +476,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             AutoRenderTextWordThreshold = AutoRenderTextWordThreshold,
             DelayMs = DelayMs,
             Timeout = Timeout,
+            HttpRetryCount = HttpRetryCount,
             UserAgent = UserAgent,
             Proxy = Proxy,
             ProxyUsername = proxyUser,

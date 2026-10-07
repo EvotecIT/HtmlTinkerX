@@ -37,7 +37,9 @@ public static partial class HtmlCrawler {
         IReadOnlyDictionary<string, string> scopedHeaders, string? userAgent, CookieContainer cookies) : HttpMessageHandler {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             Uri uri = request.RequestUri!;
-            for (int hop = 0; ; hop++) {
+            int redirects = 0;
+            int retries = 0;
+            while (true) {
                 if (!IsCrawlHostAllowed(uri, startUri, options)) {
                     throw new HttpRequestException($"Request destination '{uri}' is outside the crawl scope.");
                 }
@@ -65,12 +67,24 @@ public static partial class HtmlCrawler {
                 }
                 HttpResponseMessage response = await transport.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 int status = (int)response.StatusCode;
+                if (request.Method == HttpMethod.Get && retries < options.HttpRetryCount && IsTransientHttpStatus(status)) {
+                    TimeSpan delay = GetHttpRetryDelay(response, retries);
+                    // Keep the failure when the server's minimum wait exceeds the whole request budget.
+                    if (delay.TotalMilliseconds >= options.Timeout) return response;
+                    response.Dispose();
+                    await WaitForHttpRetryDelayAsync(delay, cancellationToken).ConfigureAwait(false);
+                    retries++;
+                    continue;
+                }
                 Uri? location = response.Headers.Location;
                 if (location == null || !(status == 301 || status == 302 || status == 303 || status == 307 || status == 308)) {
                     return response;
                 }
+                TimeSpan redirectDelay = options.HttpRetryCount > 0 ? GetServerRetryDelay(response) ?? TimeSpan.Zero : TimeSpan.Zero;
+                if (redirectDelay.TotalMilliseconds >= options.Timeout) return response;
                 response.Dispose();
-                if (hop >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");
+                if (redirects++ >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");
+                if (redirectDelay > TimeSpan.Zero) await WaitForHttpRetryDelayAsync(redirectDelay, cancellationToken).ConfigureAwait(false);
                 uri = location.IsAbsoluteUri ? location : new Uri(uri, location);
             }
         }
