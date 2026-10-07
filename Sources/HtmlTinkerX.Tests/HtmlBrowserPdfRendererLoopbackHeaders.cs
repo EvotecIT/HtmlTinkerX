@@ -14,6 +14,26 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task RedirectFixtureServesLocalhostOnBothAddressFamilies(bool ipv6) {
+        if (ipv6 && !Socket.OSSupportsIPv6) return;
+        await using LoopbackRedirectServer server = new();
+        using TcpClient connection = new(ipv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork);
+        int port = new Uri(server.Url).Port;
+        await connection.ConnectAsync(ipv6 ? IPAddress.IPv6Loopback : IPAddress.Loopback, port);
+        using NetworkStream stream = connection.GetStream();
+        byte[] request = Encoding.ASCII.GetBytes($"GET /start HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n");
+        await stream.WriteAsync(request, 0, request.Length);
+        byte[] response = new byte[512];
+        Task<int> read = stream.ReadAsync(response, 0, response.Length);
+        Assert.Same(read, await Task.WhenAny(read, Task.Delay(5000)));
+        string headers = Encoding.ASCII.GetString(response, 0, await read);
+        Assert.Contains("HTTP/1.1 302 Found", headers);
+        Assert.Contains("Location: " + server.RedirectTarget, headers);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task RedirectFixtureRespondsWhileAnotherConnectionHasIncompleteHeaders(bool partialHeaders) {
         await using LoopbackRedirectServer server = new();
         int port = new Uri(server.Url).Port;
@@ -98,6 +118,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
     }
     private sealed class LoopbackRedirectServer : IAsyncDisposable {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly TcpListener? _ipv6Listener;
         private readonly CancellationTokenSource _cancellation = new();
         private readonly ConcurrentDictionary<Task, byte> _connections = new();
         private readonly Task _serverTask;
@@ -107,20 +128,27 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal LoopbackRedirectServer() {
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            if (Socket.OSSupportsIPv6) {
+                _ipv6Listener = new TcpListener(IPAddress.IPv6Loopback, port);
+                _ipv6Listener.Server.DualMode = false;
+                _ipv6Listener.Start();
+            }
             Url = $"http://localhost:{port}/start";
             RedirectTarget = $"http://127.0.0.1:{port}/private";
-            _serverTask = ServeAsync();
+            _serverTask = _ipv6Listener == null
+                ? ServeAsync(_listener)
+                : Task.WhenAll(ServeAsync(_listener), ServeAsync(_ipv6Listener));
         }
 
         internal string Url { get; }
-        private string RedirectTarget { get; }
+        internal string RedirectTarget { get; }
         internal int PrivateRequests => Volatile.Read(ref _privateRequests);
         internal string? PrivateRenderSecret => Volatile.Read(ref _privateRenderSecret);
 
-        private async Task ServeAsync() {
+        private async Task ServeAsync(TcpListener listener) {
             while (!_cancellation.IsCancellationRequested) {
                 try {
-                    Task connection = HandleConnectionAsync(await _listener.AcceptTcpClientAsync());
+                    Task connection = HandleConnectionAsync(await listener.AcceptTcpClientAsync());
                     _connections[connection] = 0;
                     _ = connection.ContinueWith(completed => {
                         _connections.TryRemove(completed, out _);
@@ -160,6 +188,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         public async ValueTask DisposeAsync() {
             _cancellation.Cancel();
             _listener.Stop();
+            _ipv6Listener?.Stop();
             try { await _serverTask; } catch (ObjectDisposedException) { } catch (SocketException) { }
             await Task.WhenAll(_connections.Keys);
             _cancellation.Dispose();
