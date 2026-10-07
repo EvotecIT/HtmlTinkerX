@@ -739,7 +739,7 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Close-HtmlBrowserSession** - Dispose browser sessions
 - **Invoke-HtmlBrowserNavigation** - Navigate to different URLs
 - **Invoke-HtmlBrowserScript** - Execute JavaScript in browser context
-- **Invoke-HtmlBrowserDomScript** - Run JavaScript with AngleSharp (no browser required)
+- **Invoke-HtmlBrowserDomScript** - Run JavaScript with AngleSharp using bounded execution (no browser required)
 - **Invoke-HtmlBrowserClick** - Click elements in the browser
 - **Get-HtmlBrowserInteractable** - List clickable elements
 - **Set-HtmlBrowserInput** - Set input field values
@@ -767,6 +767,34 @@ It also exports `graph.json`, which captures fetched pages as nodes and discover
 - **Set-HtmlBrowserSelectOption** - Select dropdown options
 - **Set-HtmlBrowserChecked** - Check/uncheck checkboxes and radio buttons
 - **Submit-HtmlBrowserForm** - Submit forms
+
+#### DOM scripts without a browser
+
+`Invoke-HtmlBrowserDomScript` evaluates JavaScript against an AngleSharp DOM. Its default
+context has no network services. Page scripts run before the requested expression; use
+`-SkipPageScripts` to inspect the supplied markup without running its scripts or event handlers.
+
+```powershell
+Invoke-HtmlBrowserDomScript -Content '<p id="message">Hello</p>' `
+    -Script 'document.getElementById("message").textContent' -SkipPageScripts
+
+Invoke-HtmlBrowserDomScript -Path './page.html' -Script 'document.title' `
+    -Timeout 2000 -MaximumStatements 100000 -MaximumMemoryBytes 16777216
+```
+
+The defaults are a ten-second operation timeout, one million statements per execution,
+64 MiB of managed allocations per execution, 16 Mi characters of HTML, and 1 Mi characters
+in the requested script. The timeout spans page loading, inline scripts, and the requested
+script; stopping the PowerShell pipeline cancels execution. The allocation limit measures
+Jint's script allocations and does not bound the whole process or DOM. File input is bounded
+after decoding, including files with a Unicode BOM.
+
+The equivalent .NET overload accepts `HtmlScriptRunOptions` and a cancellation token. It
+closes its owned browsing context on success or failure. The existing overload taking an
+`IBrowsingContext` retains the caller's services, execution policy, and lifetime; configure
+Jint constraints through an `EngineCreator` service before creating that context.
+The factory receives AngleSharp's Jint options; add constraints to those options and return
+a new `Jint.Engine` so the DOM bindings remain configured for each window.
 
 #### Browser Extraction Mode
 
