@@ -93,10 +93,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             mainFrameId);
         interceptor.Subscribe();
         try {
-            await session.SendAsync("Network.enable", new Dictionary<string, object> {
-                ["maxTotalBufferSize"] = 0,
-                ["maxResourceBufferSize"] = 0
-            }).ConfigureAwait(false);
+            await session.SendAsync("Network.enable", CreateNetworkTrackingArguments()).ConfigureAwait(false);
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
                 ["patterns"] = CreateFetchPatterns()
             }).ConfigureAwait(false);
@@ -129,19 +126,20 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             || !payload.Value.TryGetProperty("requestId", out JsonElement requestId)) return;
         string? networkId = requestId.GetString();
         bool canceled = payload.Value.TryGetProperty("canceled", out JsonElement value) && value.ValueKind == JsonValueKind.True;
-        if (networkId != null) CompleteNetworkRequest(networkId, canceled);
+        if (networkId != null) CompleteNetworkRequest(networkId, sessionKey: null, canceled);
     }
 
     private void OnNetworkLoadingFinished(object? sender, JsonElement? payload) {
         if (payload == null || Volatile.Read(ref _disposed) != 0
             || !payload.Value.TryGetProperty("requestId", out JsonElement requestId)) return;
         string? networkId = requestId.GetString();
-        if (networkId != null) CompleteNetworkRequest(networkId, canceled: false);
+        if (networkId != null) CompleteNetworkRequest(networkId, sessionKey: null, canceled: false);
     }
 
-    private void CompleteNetworkRequest(string networkId, bool canceled) {
+    private void CompleteNetworkRequest(string networkId, string? sessionKey, bool canceled) {
         foreach (PendingNetworkRequest request in _pendingNetworkRequests.Values) {
-            if (string.Equals(request.NetworkId, networkId, StringComparison.Ordinal)) request.Completion.TrySetResult(canceled);
+            if (string.Equals(request.NetworkId, networkId, StringComparison.Ordinal)
+                && string.Equals(request.SessionKey, sessionKey, StringComparison.Ordinal)) request.Completion.TrySetResult(canceled);
         }
     }
 
@@ -218,6 +216,16 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         if (!message.TryGetProperty("method", out JsonElement methodElement)
             || !message.TryGetProperty("params", out JsonElement parameters)) return;
         string? method = methodElement.GetString();
+        if (string.Equals(method, "Network.loadingFailed", StringComparison.Ordinal)
+            || string.Equals(method, "Network.loadingFinished", StringComparison.Ordinal)) {
+            if (!parameters.TryGetProperty("requestId", out JsonElement requestId)) return;
+            string? networkId = requestId.GetString();
+            bool canceled = string.Equals(method, "Network.loadingFailed", StringComparison.Ordinal)
+                && parameters.TryGetProperty("canceled", out JsonElement canceledValue)
+                && canceledValue.ValueKind == JsonValueKind.True;
+            if (networkId != null) CompleteNetworkRequest(networkId, WorkerPathKey(workerPath), canceled);
+            return;
+        }
         if (string.Equals(method, "Fetch.requestPaused", StringComparison.Ordinal)) {
             Track(ContinueRequestAsync(parameters.Clone(), workerPath));
             return;
@@ -249,6 +257,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     }
 
     private void RemoveWorkerAndDescendants(IReadOnlyList<string> workerPath) {
+        string detachedKey = WorkerPathKey(workerPath);
         foreach (KeyValuePair<string, string[]> worker in _workerSessions) {
             if (worker.Value.Length < workerPath.Count) continue;
             bool matches = true;
@@ -259,6 +268,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             }
             if (matches) _workerSessions.TryRemove(worker.Key, out _);
         }
+        foreach (PendingNetworkRequest request in _pendingNetworkRequests.Values) {
+            if (request.SessionKey != null
+                && (string.Equals(request.SessionKey, detachedKey, StringComparison.Ordinal)
+                    || request.SessionKey.StartsWith(detachedKey + "/", StringComparison.Ordinal))) {
+                request.Completion.TrySetResult(true);
+            }
+        }
     }
 
     private async Task ConfigureWorkerAsync(string[] workerPath) {
@@ -266,6 +282,9 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             // The page CDP session owns Fetch interception for document and dedicated-worker
             // requests. Worker targets do not consistently expose the Fetch domain themselves.
             await SendWorkerCommandAsync(workerPath, "Target.setAutoAttach", CreateAutoAttachArguments(enabled: true)).ConfigureAwait(false);
+            // Start Network tracking before releasing the worker, but do not await its response
+            // while the worker is paused waiting for Runtime.runIfWaitingForDebugger.
+            Track(SendWorkerCommandAsync(workerPath, "Network.enable", CreateNetworkTrackingArguments()));
         } finally {
             await SendWorkerCommandAsync(workerPath, "Runtime.runIfWaitingForDebugger", new Dictionary<string, object>()).ConfigureAwait(false);
         }
@@ -281,6 +300,11 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         }
     };
 
+    private static Dictionary<string, object> CreateNetworkTrackingArguments() => new() {
+        ["maxTotalBufferSize"] = 0,
+        ["maxResourceBufferSize"] = 0
+    };
+
     private static object[] CreateFetchPatterns() => new object[] {
         new Dictionary<string, object> { ["urlPattern"] = "http://*/*", ["requestStage"] = "Request" },
         new Dictionary<string, object> { ["urlPattern"] = "https://*/*", ["requestStage"] = "Request" }
@@ -288,14 +312,15 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private async Task ContinueRequestAsync(JsonElement payload, IReadOnlyList<string>? workerSessionPath) {
         string requestId = payload.GetProperty("requestId").GetString()!;
-        string? networkId = workerSessionPath == null && payload.TryGetProperty("networkId", out JsonElement networkIdElement)
+        string? networkId = payload.TryGetProperty("networkId", out JsonElement networkIdElement)
             ? networkIdElement.GetString()
             : null;
         PendingNetworkRequest? canceledRequest = null;
         long pauseId = 0;
         if (networkId != null) {
             pauseId = Interlocked.Increment(ref _nextNetworkPauseId);
-            canceledRequest = new PendingNetworkRequest(networkId);
+            canceledRequest = new PendingNetworkRequest(networkId,
+                workerSessionPath == null ? null : WorkerPathKey(workerSessionPath));
             _pendingNetworkRequests[pauseId] = canceledRequest;
             if (Volatile.Read(ref _disposed) != 0) canceledRequest.Completion.TrySetResult(true);
         }
@@ -495,9 +520,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private sealed class PendingNetworkRequest {
         internal readonly string NetworkId;
+        internal readonly string? SessionKey;
         internal readonly TaskCompletionSource<bool> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal PendingNetworkRequest(string networkId) => NetworkId = networkId;
+        internal PendingNetworkRequest(string networkId, string? sessionKey) {
+            NetworkId = networkId;
+            SessionKey = sessionKey;
+        }
     }
 
     private void Subscribe() {
