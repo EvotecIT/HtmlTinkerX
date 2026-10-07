@@ -42,7 +42,11 @@ public class HtmlBrowserVideoRecordingTests {
             .ReturnsAsync("{}");
 
         var browser = new Mock<IBrowser>();
-        browser.Setup(b => b.NewContextAsync(It.IsAny<BrowserNewContextOptions>())).ReturnsAsync(context.Object);
+        browser.Setup(b => b.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
+            .Callback<BrowserNewContextOptions>(options => {
+                statePath = options.StorageStatePath;
+                if (useSession) Assert.Equal("{}", File.ReadAllText(statePath!));
+            }).ReturnsAsync(context.Object);
         browser.Setup(b => b.CloseAsync(It.IsAny<BrowserCloseOptions>())).Returns(Task.CompletedTask);
         browser.SetupGet(b => b.BrowserType).Returns(new Mock<IBrowserType>().Object);
 
@@ -85,14 +89,7 @@ public class HtmlBrowserVideoRecordingTests {
         page.SetupGet(p => p.Url).Returns("https://example.com");
 
         var context = new Mock<IBrowserContext>();
-        context.Setup(c => c.StorageStateAsync(It.IsAny<BrowserContextStorageStateOptions>()))
-            .Callback<BrowserContextStorageStateOptions>(o => {
-                statePath = o.Path;
-                if (statePath != null) {
-                    File.WriteAllText(statePath, "{}");
-                }
-            })
-            .ReturnsAsync("{}");
+        context.Setup(c => c.StorageStateAsync(It.IsAny<BrowserContextStorageStateOptions>())).ReturnsAsync("{}");
         context.Setup(c => c.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(Task.CompletedTask);
 
         var browserType = new Mock<IBrowserType>();
@@ -107,8 +104,14 @@ public class HtmlBrowserVideoRecordingTests {
         HtmlBrowserSession session = new(existingPlaywright.Object, browser.Object, context.Object, page.Object);
 
         var failingBrowserType = new Mock<IBrowserType>();
+        var failingBrowser = new Mock<IBrowser>();
+        failingBrowser.Setup(b => b.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
+            .Callback<BrowserNewContextOptions>(options => {
+                statePath = options.StorageStatePath;
+                Assert.Equal("{}", File.ReadAllText(statePath!));
+            }).ThrowsAsync(new SerializationException("Context creation failed"));
         failingBrowserType.Setup(bt => bt.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
-            .ThrowsAsync(new SerializationException("Launch failed"));
+            .ReturnsAsync(failingBrowser.Object);
 
         var playwright = new Mock<IPlaywright>();
         playwright.SetupGet(p => p.Chromium).Returns(failingBrowserType.Object);

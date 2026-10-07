@@ -1,7 +1,6 @@
 namespace HtmlTinkerX;
 
-using Microsoft.Playwright;
-using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,17 +11,19 @@ public static partial class HtmlBrowser {
     /// <summary>
     /// Saves cookies and storage state of the provided session to a file.
     /// </summary>
+    /// <remarks>
+    /// The destination is replaced only after the state read and file write complete.
+    /// Cancellation preserves an existing destination and leaves the supplied session open.
+    /// </remarks>
     /// <param name="session">Browser session to export.</param>
     /// <param name="path">File path where the session state should be stored.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public static Task ExportSessionAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
-        string fullPath = path.ToFullPath();
-        string? dir = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(dir)) {
-            Directory.CreateDirectory(dir);
-        }
+    public static async Task ExportSessionAsync(HtmlBrowserSession session, string path, CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        return session.Context.StorageStateAsync(new BrowserContextStorageStateOptions { Path = fullPath });
+        string fullPath = path.ToFullPath();
+        string state = await session.Context.StorageStateAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await HtmlUtilities.WriteBytesAtomicallyAsync(fullPath, new UTF8Encoding(false).GetBytes(state), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
