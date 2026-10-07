@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -40,6 +41,52 @@ public partial class HtmlCrawlerTests {
             Assert.All(result.Pages, page => Assert.Equal(HtmlCrawlPageStatus.Success, page.Status));
             Assert.Contains("Fast page", result.Pages[2].Text);
             Assert.Equal(0, Volatile.Read(ref unusedRequests));
+        } finally {
+            releaseSlow.TrySetResult(true);
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CrawlAsync_ConcurrentObserverReceivesContentBeforeItIsReleased() {
+        var slowEntered = CrawlSignal();
+        var fastSent = CrawlSignal();
+        var releaseSlow = CrawlSignal();
+        await using ConcurrentCrawlServer server = new(async (context, token) => {
+            switch (context.Request.Url!.AbsolutePath) {
+                case "/": await RespondAsync(context, "<a href='/slow'>Slow</a><a href='/fast'>Fast</a>"); break;
+                case "/slow":
+                    slowEntered.TrySetResult(true);
+                    await SendHeldCrawlBodyAsync(context, "<main>Slow body</main>", releaseSlow.Task, token);
+                    break;
+                default:
+                    await AwaitCrawlSignalAsync(slowEntered.Task, token);
+                    await RespondAsync(context, "<main>Fast body</main>");
+                    fastSent.TrySetResult(true);
+                    break;
+            }
+        });
+        string output = Path.Combine(Path.GetTempPath(), "HtmlCrawlerConcurrency", Guid.NewGuid().ToString("N"));
+        List<HtmlCrawlPage> observed = new();
+        try {
+            HtmlCrawlOptions options = ConcurrentOptions(3, 2);
+            options.OutputPath = output;
+            options.RetainPageContent = false;
+            options.PageObserver = new DelegatePageObserver((page, token) => {
+                observed.Add(page.CreateSnapshot());
+                return Task.CompletedTask;
+            });
+            Task<HtmlCrawlResult> crawling = HtmlCrawler.CrawlAsync(server.Url, options);
+            await AwaitCrawlSignalAsync(fastSent.Task);
+            releaseSlow.TrySetResult(true);
+            HtmlCrawlResult result = await crawling;
+            Assert.Equal(new[] { "/", "/slow", "/fast" }, observed.Select(page => new Uri(page.Url).AbsolutePath));
+            Assert.Contains("Slow body", observed[1].Text);
+            Assert.Contains("Fast body", observed[2].Text);
+            Assert.All(result.Pages, page => Assert.Empty(page.Text));
+            HtmlCrawlResult loaded = await HtmlCrawler.LoadResultAsync(output);
+            Assert.Contains("Slow body", loaded.Pages[1].Text);
+            Assert.Contains("Fast body", loaded.Pages[2].Text);
         } finally {
             releaseSlow.TrySetResult(true);
             if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
