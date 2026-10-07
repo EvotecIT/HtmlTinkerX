@@ -615,6 +615,13 @@ public static partial class HtmlParser {
         return HtmlParserFromForm.ParseFormsWithAngleSharp(html);
     }
 
+    /// <summary>Extracts forms and resolves their actions against an absolute document address.</summary>
+    /// <param name="html">HTML content containing forms.</param>
+    /// <param name="sourceUri">Document address, or null when it is unknown.</param>
+    /// <returns>Forms with field inventory, successful values, and address metadata.</returns>
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string html, Uri? sourceUri) =>
+        HtmlParserFromForm.ParseFormsWithAngleSharp(html, sourceUri);
+
     /// <summary>
     /// Extracts form definitions from a web page using AngleSharp.
     /// </summary>

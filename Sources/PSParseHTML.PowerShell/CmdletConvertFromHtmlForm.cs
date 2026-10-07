@@ -13,6 +13,10 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>ConvertFrom-HtmlForm -Url https://example.com</code>
 /// </example>
+/// <example>
+/// <code>ConvertFrom-HtmlForm -Content '&lt;form action="save"&gt;&lt;input name="tag" value="one"&gt;&lt;/form&gt;' -BaseUri https://example.com/settings/ -IncludeMetadata</code>
+/// <para>Returns the field inventory, ordered successful values, and resolved HTTP action.</para>
+/// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlForm", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject))]
 public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
@@ -27,6 +31,10 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetUrl)]
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
+
+    /// <summary>Absolute document address used to resolve relative actions in supplied HTML.</summary>
+    [Parameter(ParameterSetName = ParameterSetContent)]
+    public Uri? BaseUri { get; set; }
 
     /// <summary>Include additional metadata like form index and CSS classes.</summary>
     [Parameter]
@@ -48,7 +56,7 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
             using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
             forms = await HtmlParser.ParseUrlFormsWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
-            forms = HtmlParser.ParseFormsWithAngleSharp(Content);
+            forms = HtmlParser.ParseFormsWithAngleSharp(Content, BaseUri);
         }
 
         var output = new List<PSObject>();
@@ -77,13 +85,18 @@ public sealed class CmdletConvertFromHtmlForm : AsyncPSCmdlet {
             fieldObjects.Add(f);
         }
         obj.Properties.Add(new PSNoteProperty("Fields", fieldObjects.ToArray()));
+        obj.Properties.Add(new PSNoteProperty("SuccessfulFields", result.SuccessfulFields.ToArray()));
         obj.Properties.Add(new PSNoteProperty("Action", result.Metadata.Action));
+        obj.Properties.Add(new PSNoteProperty("ResolvedAction", result.Metadata.ResolvedActionUri?.AbsoluteUri ?? string.Empty));
         obj.Properties.Add(new PSNoteProperty("Method", result.Metadata.Method.ToString().ToUpperInvariant()));
 
         if (IncludeMetadata.IsPresent) {
             obj.Properties.Add(new PSNoteProperty("FormIndex", result.Metadata.FormIndex));
             obj.Properties.Add(new PSNoteProperty("FormId", result.Metadata.Id ?? string.Empty));
             obj.Properties.Add(new PSNoteProperty("FormClasses", result.Metadata.Classes ?? string.Empty));
+            obj.Properties.Add(new PSNoteProperty("SourceUrl", result.Metadata.SourceUri?.AbsoluteUri ?? string.Empty));
+            obj.Properties.Add(new PSNoteProperty("FinalUrl", result.Metadata.FinalUri?.AbsoluteUri ?? string.Empty));
+            obj.Properties.Add(new PSNoteProperty("BaseUrl", result.Metadata.BaseUri?.AbsoluteUri ?? string.Empty));
         }
         return obj;
     }

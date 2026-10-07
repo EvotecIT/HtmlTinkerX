@@ -11,7 +11,7 @@ Extracts HTML form information into PowerShell objects.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-ConvertFrom-HtmlForm -Content <string> [-IncludeMetadata] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+ConvertFrom-HtmlForm -Content <string> [-BaseUri <uri>] [-IncludeMetadata] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
@@ -30,7 +30,30 @@ ConvertFrom-HtmlForm -Url https://example.com
 ```
 
 
+### EXAMPLE 2
+```powershell
+ConvertFrom-HtmlForm -Content '<form action="save"><input name="tag" value="one"></form>' -BaseUri https://example.com/settings/ -IncludeMetadata
+```
+
+Returns the field inventory, ordered successful values, and resolved HTTP action.
+
 ## PARAMETERS
+
+### -BaseUri
+Absolute document address used to resolve relative actions in supplied HTML.
+
+```yaml
+Type: Uri
+Parameter Sets: Content
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -Content
 HTML content containing forms.

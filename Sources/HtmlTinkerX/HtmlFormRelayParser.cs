@@ -33,7 +33,8 @@ public static class HtmlFormRelayParser {
             return false;
         }
 
-        List<HtmlFormResult> forms = HtmlParser.ParseFormsWithAngleSharp(html);
+        List<HtmlFormResult> forms = HtmlParserFromForm.ParseFormsDocument(document, baseUri, baseUri);
+        var controlsByForm = HtmlFormControlUtilities.GetControlsByForm(document);
         if (forms.Count != formElements.Length) {
             return false;
         }
@@ -41,8 +42,10 @@ public static class HtmlFormRelayParser {
         for (int formIndex = 0; formIndex < formElements.Length; formIndex++) {
             IElement formElement = formElements[formIndex];
             HtmlFormResult form = forms[formIndex];
-            List<IElement> successfulControls = GetSuccessfulControls(document, formElement);
-            List<KeyValuePair<string, string>> fieldValues = CreateSubmittedFieldValues(successfulControls);
+            List<IElement> controls = controlsByForm.TryGetValue(formElement, out List<IElement>? associatedControls)
+                ? associatedControls : new List<IElement>();
+            List<IElement> successfulControls = HtmlFormControlUtilities.GetSuccessfulControls(controls);
+            List<KeyValuePair<string, string>> fieldValues = form.SuccessfulFields;
             Dictionary<string, string> fields = fieldValues
                 .GroupBy(static field => field.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(static group => group.Key, static group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
@@ -62,8 +65,8 @@ public static class HtmlFormRelayParser {
 
             Uri effectiveBaseUri = string.IsNullOrWhiteSpace(form.Metadata.Action)
                 ? baseUri
-                : GetEffectiveBaseUri(document, baseUri);
-            if (!TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
+                : HtmlFormUrlUtilities.GetEffectiveBaseUri(document, baseUri) ?? baseUri;
+            if (!HtmlFormUrlUtilities.TryResolveAction(form.Metadata.Action, effectiveBaseUri, out Uri? actionUri)) {
                 continue;
             }
 
@@ -82,64 +85,6 @@ public static class HtmlFormRelayParser {
         return false;
     }
 
-    private static bool TryResolveAction(string action, Uri baseUri, out Uri actionUri) {
-        if (string.IsNullOrWhiteSpace(action)) {
-            actionUri = baseUri;
-            return true;
-        }
-
-        if (HasExplicitScheme(action)) {
-            if (Uri.TryCreate(action, UriKind.Absolute, out Uri? absoluteUri)) {
-                if (IsHttpUri(absoluteUri)) {
-                    actionUri = absoluteUri;
-                    return true;
-                }
-
-                actionUri = null!;
-                return false;
-            }
-
-            actionUri = null!;
-            return false;
-        }
-
-        if (Uri.TryCreate(baseUri, action, out Uri? resolved)) {
-            actionUri = resolved;
-            return true;
-        }
-
-        actionUri = null!;
-        return false;
-    }
-
-    private static bool IsHttpUri(Uri uri) =>
-        uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-        || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-
-    private static bool HasExplicitScheme(string value) {
-        int colonIndex = value.IndexOf(':');
-        if (colonIndex <= 0) {
-            return false;
-        }
-
-        for (int index = 0; index < colonIndex; index++) {
-            char c = value[index];
-            bool valid = char.IsLetterOrDigit(c) || c == '+' || c == '-' || c == '.';
-            if (!valid) {
-                return false;
-            }
-        }
-
-        return char.IsLetter(value[0]);
-    }
-
-    private static Uri GetEffectiveBaseUri(IDocument document, Uri responseUri) {
-        string? href = document.QuerySelector("base[href]")?.GetAttribute("href");
-        return !string.IsNullOrWhiteSpace(href) && Uri.TryCreate(responseUri, href, out Uri? resolved)
-            ? resolved
-            : responseUri;
-    }
-
     private static HtmlFormRelayProtocolHint DetectProtocol(IEnumerable<string> fieldNames) {
         HashSet<string> names = new(fieldNames, StringComparer.OrdinalIgnoreCase);
         if (names.Contains("SAMLRequest") || names.Contains("SAMLResponse") || names.Contains("RelayState")) {
@@ -151,99 +96,6 @@ public static class HtmlFormRelayParser {
         }
 
         return HtmlFormRelayProtocolHint.Generic;
-    }
-
-    private static List<IElement> GetSuccessfulControls(IDocument document, IElement formElement) {
-        string formId = formElement.Id ?? string.Empty;
-        return document.QuerySelectorAll("input,select,textarea,button")
-            .Where(field => IsOwnedByForm(field, formElement, formId))
-            .Where(IsSuccessfulControl)
-            .ToList();
-    }
-
-    private static bool IsOwnedByForm(IElement field, IElement formElement, string formId) {
-        string ownerFormId = field.GetAttribute("form") ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(ownerFormId)) {
-            return !string.IsNullOrWhiteSpace(formId)
-                && string.Equals(ownerFormId, formId, StringComparison.Ordinal);
-        }
-
-        return IsDescendantOf(field, formElement);
-    }
-
-    private static bool IsDescendantOf(IElement field, IElement formElement) {
-        for (IElement? parent = field.ParentElement; parent != null; parent = parent.ParentElement) {
-            if (ReferenceEquals(parent, formElement)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static List<KeyValuePair<string, string>> CreateSubmittedFieldValues(IEnumerable<IElement> controls) {
-        List<KeyValuePair<string, string>> fieldValues = new();
-        foreach (IElement field in controls) {
-            string name = field.GetAttribute("name")!;
-            if (field.NodeName.Equals("select", StringComparison.OrdinalIgnoreCase) && field.HasAttribute("multiple")) {
-                IElement[] selectedOptions = field.QuerySelectorAll("option[selected]").ToArray();
-                foreach (IElement option in selectedOptions) {
-                    fieldValues.Add(new KeyValuePair<string, string>(name, option.GetAttribute("value") ?? option.TextContent ?? string.Empty));
-                }
-
-                continue;
-            }
-
-            fieldValues.Add(new KeyValuePair<string, string>(name, HtmlFormFieldUtilities.GetSubmittedValue(field)));
-        }
-
-        return fieldValues;
-    }
-
-    private static bool IsSuccessfulControl(IElement field) {
-        if (field.HasAttribute("disabled") || IsDisabledByFieldset(field) || string.IsNullOrWhiteSpace(field.GetAttribute("name"))) {
-            return false;
-        }
-
-        string nodeName = field.NodeName;
-        string type = field.GetAttribute("type") ?? string.Empty;
-        if (nodeName.Equals("button", StringComparison.OrdinalIgnoreCase)) {
-            return false;
-        }
-
-        if (nodeName.Equals("input", StringComparison.OrdinalIgnoreCase)) {
-            if (type.Equals("submit", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("button", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("reset", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("image", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("file", StringComparison.OrdinalIgnoreCase)) {
-                return false;
-            }
-
-            if ((type.Equals("checkbox", StringComparison.OrdinalIgnoreCase) || type.Equals("radio", StringComparison.OrdinalIgnoreCase))
-                && !field.HasAttribute("checked")) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsDisabledByFieldset(IElement field) {
-        for (IElement? parent = field.ParentElement; parent != null; parent = parent.ParentElement) {
-            if (!parent.NodeName.Equals("fieldset", StringComparison.OrdinalIgnoreCase) || !parent.HasAttribute("disabled")) {
-                continue;
-            }
-
-            IElement? firstLegend = parent.Children.FirstOrDefault(child => child.NodeName.Equals("legend", StringComparison.OrdinalIgnoreCase));
-            if (firstLegend != null && (ReferenceEquals(field, firstLegend) || IsDescendantOf(field, firstLegend))) {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
     }
 
     private static bool HasAutoSubmitMarker(IDocument document, IElement formElement, int formIndex) {

@@ -53,6 +53,20 @@ public class HtmlFormRelayTests {
         Assert.Equal("https://idp.example.org/sso/continue", request!.ActionUri.AbsoluteUri);
     }
 
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,ignored")]
+    public void TryParse_IgnoresRejectedFirstBaseWhenResolvingTheRelayAction(string href) {
+        string html = "<base href='" + href + "'><base href='https://other.test/'>" +
+            "<form action='save'><input type='hidden' name='token' value='value'></form>" +
+            "<script>document.forms[0].submit()</script>";
+
+        bool parsed = HtmlFormRelayParser.TryParse(html, new Uri("https://example.test/account/page"), out var request);
+
+        Assert.True(parsed);
+        Assert.Equal(new Uri("https://example.test/account/save"), request!.ActionUri);
+    }
+
     [Fact]
     public void TryParse_KeepsEmptyActionOnResponseUrlWhenDocumentBaseIsPresent() {
         string html = """

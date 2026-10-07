@@ -26,11 +26,26 @@ public static partial class HtmlParserFromForm {
             throw new ArgumentNullException(nameof(html));
         }
 
-        return ParseFormsDocument(HtmlParser.ParseWithAngleSharp(html));
+        return ParseFormsWithAngleSharp(html, sourceUri: null);
     }
 
-    internal static List<HtmlFormResult> ParseFormsDocument(IDocument document) {
+    /// <summary>Parses forms using an absolute document address to resolve relative actions.</summary>
+    /// <param name="html">HTML content containing forms.</param>
+    /// <param name="sourceUri">Document address, or null when the address is unknown.</param>
+    /// <returns>Forms, their field inventory, and ordered successful values.</returns>
+    public static List<HtmlFormResult> ParseFormsWithAngleSharp(string? html, Uri? sourceUri) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+        if (sourceUri != null && !sourceUri.IsAbsoluteUri) {
+            throw new ArgumentException("The document address must be absolute.", nameof(sourceUri));
+        }
+        return ParseFormsDocument(HtmlParser.ParseWithAngleSharp(html), sourceUri, sourceUri);
+    }
+
+    internal static List<HtmlFormResult> ParseFormsDocument(IDocument document, Uri? sourceUri = null, Uri? finalUri = null) {
         var forms = document.QuerySelectorAll("form");
+        var controlsByForm = HtmlFormControlUtilities.GetControlsByForm(document);
         List<HtmlFormResult> results = new();
         int index = 0;
         foreach (var form in forms) {
@@ -40,22 +55,34 @@ public static partial class HtmlParserFromForm {
             metadata.Id = form.Id;
             metadata.Classes = form.ClassName;
             metadata.Action = form.GetAttribute("action") ?? string.Empty;
+            metadata.SourceUri = sourceUri;
+            metadata.FinalUri = finalUri;
+            metadata.BaseUri = HtmlFormUrlUtilities.GetEffectiveBaseUri(document, finalUri);
+            Uri? actionBase = string.IsNullOrWhiteSpace(metadata.Action) ? finalUri : metadata.BaseUri;
+            if (actionBase != null && HtmlFormUrlUtilities.TryResolveAction(metadata.Action, actionBase, out Uri actionUri)) {
+                metadata.ResolvedActionUri = actionUri;
+            } else if (Uri.TryCreate(metadata.Action, UriKind.Absolute, out Uri? absoluteAction)
+                && (absoluteAction.Scheme == Uri.UriSchemeHttp || absoluteAction.Scheme == Uri.UriSchemeHttps)) {
+                metadata.ResolvedActionUri = absoluteAction;
+            }
             string m = form.GetAttribute("method")?.ToUpperInvariant() ?? "GET";
             metadata.Method = m == "POST" ? FormMethod.Post : FormMethod.Get;
 
-            foreach (var field in form.QuerySelectorAll("input,select,textarea,button")) {
+            List<IElement> controls = controlsByForm.TryGetValue(form, out List<IElement>? associatedControls)
+                ? associatedControls : new List<IElement>();
+            foreach (var field in controls) {
                 string? name = field.GetAttribute("name");
                 if (name == null || name.Length == 0) {
                     continue;
                 }
                 string nameValue = name;
-                string type = field.GetAttribute("type") ?? field.NodeName.ToLowerInvariant();
                 result.Fields.Add(new HtmlFormField {
                     Name = nameValue,
-                    Type = HtmlFormFieldUtilities.MapType(type),
+                    Type = HtmlFormFieldUtilities.GetFieldType(field),
                     Value = HtmlFormFieldUtilities.GetSubmittedValue(field)
                 });
             }
+            result.SuccessfulFields = HtmlFormControlUtilities.GetSubmittedValues(HtmlFormControlUtilities.GetSuccessfulControls(controls));
             results.Add(result);
         }
         return results;
@@ -79,7 +106,10 @@ public static partial class HtmlParserFromForm {
             throw new ArgumentNullException(nameof(url));
         }
         HttpClient http = client ?? HtmlHttpClientFactory.Shared;
-        string content = await HtmlUtilities.GetStringWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
-        return ParseFormsWithAngleSharp(content);
+        HtmlHttpTextResult response = await HtmlUtilities.GetTextWithProperEncodingAsync(http, url, fetchOptions, cancellationToken).ConfigureAwait(false);
+        Uri? sourceUri = Uri.TryCreate(url, UriKind.Absolute, out Uri? requestedUri)
+            ? requestedUri
+            : http.BaseAddress == null ? null : new Uri(http.BaseAddress, url);
+        return ParseFormsDocument(HtmlParser.ParseWithAngleSharp(response.Content), sourceUri, response.FinalUri ?? sourceUri);
     }
 }
