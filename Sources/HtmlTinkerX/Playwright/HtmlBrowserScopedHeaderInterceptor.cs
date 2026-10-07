@@ -17,7 +17,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
     private readonly ConcurrentDictionary<Task, byte> _pending = new();
     private readonly ConcurrentDictionary<long, PendingNetworkRequest> _pendingNetworkRequests = new();
-    private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> _workerCommandResponses = new();
+    private readonly ConcurrentDictionary<long, PendingWorkerCommand> _workerCommandResponses = new();
     private readonly ConcurrentDictionary<long, long> _workerEnvelopeCommands = new();
     private readonly ConcurrentDictionary<string, string[]> _workerSessions = new(StringComparer.Ordinal);
     private readonly EventHandler<JsonElement?> _handler;
@@ -199,17 +199,17 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             && responseId.TryGetInt64(out long commandId)) {
             if (_workerEnvelopeCommands.TryRemove(commandId, out long innerCommandId)
                 && message.TryGetProperty("error", out JsonElement envelopeError)
-                && _workerCommandResponses.TryRemove(innerCommandId, out TaskCompletionSource<bool>? envelopeResponse)) {
+                && _workerCommandResponses.TryRemove(innerCommandId, out PendingWorkerCommand? envelopeResponse)) {
                 RemoveWorkerEnvelopes(innerCommandId);
-                envelopeResponse.TrySetException(CreateWorkerCommandException(envelopeError));
+                envelopeResponse.Completion.TrySetException(CreateWorkerCommandException(envelopeError));
                 return;
             }
-            if (!_workerCommandResponses.TryRemove(commandId, out TaskCompletionSource<bool>? response)) return;
+            if (!_workerCommandResponses.TryRemove(commandId, out PendingWorkerCommand? response)) return;
             RemoveWorkerEnvelopes(commandId);
             if (message.TryGetProperty("error", out JsonElement error)) {
-                response.TrySetException(CreateWorkerCommandException(error));
+                response.Completion.TrySetException(CreateWorkerCommandException(error));
             } else {
-                response.TrySetResult(true);
+                response.Completion.TrySetResult(true);
             }
             return;
         }
@@ -273,6 +273,14 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                 && (string.Equals(request.SessionKey, detachedKey, StringComparison.Ordinal)
                     || request.SessionKey.StartsWith(detachedKey + "/", StringComparison.Ordinal))) {
                 request.Completion.TrySetResult(true);
+            }
+        }
+        foreach (KeyValuePair<long, PendingWorkerCommand> command in _workerCommandResponses) {
+            if (!string.Equals(command.Value.SessionKey, detachedKey, StringComparison.Ordinal)
+                && !command.Value.SessionKey.StartsWith(detachedKey + "/", StringComparison.Ordinal)) continue;
+            if (_workerCommandResponses.TryRemove(command.Key, out PendingWorkerCommand? removed)) {
+                RemoveWorkerEnvelopes(command.Key);
+                removed.Completion.TrySetResult(true);
             }
         }
     }
@@ -382,7 +390,8 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         try {
             await SendCommandAsync(workerSessionPath, method, arguments).ConfigureAwait(false);
         } catch (PlaywrightException exception) when (canceledRequest != null
-            && exception.Message.IndexOf("Invalid InterceptionId", StringComparison.Ordinal) >= 0) {
+            && (exception.Message.IndexOf("Invalid InterceptionId", StringComparison.Ordinal) >= 0
+                || exception.Message.IndexOf("Target page, context or browser has been closed", StringComparison.Ordinal) >= 0)) {
             if (!await canceledRequest.Completion.Task.ConfigureAwait(false)) {
                 Interlocked.CompareExchange(ref _failure, exception, null);
                 throw;
@@ -401,10 +410,16 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         Dictionary<string, object> arguments,
         bool waitForResponse = true) {
         long commandId = Interlocked.Increment(ref _nextWorkerCommandId);
-        TaskCompletionSource<bool>? response = waitForResponse
-            ? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+        PendingWorkerCommand? response = waitForResponse
+            ? new PendingWorkerCommand(WorkerPathKey(workerPath))
             : null;
-        if (response != null) _workerCommandResponses[commandId] = response;
+        if (response != null) {
+            _workerCommandResponses[commandId] = response;
+            if (!_workerSessions.ContainsKey(response.SessionKey)) {
+                RemoveWorkerCommand(commandId);
+                return;
+            }
+        }
         string message = JsonSerializer.Serialize(new Dictionary<string, object> {
             ["id"] = commandId,
             ["method"] = method,
@@ -427,7 +442,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
                 ["sessionId"] = workerPath[0],
                 ["message"] = message
             }).ConfigureAwait(false);
-            if (response != null) await response.Task.ConfigureAwait(false);
+            if (response != null) await response.Completion.Task.ConfigureAwait(false);
         } catch {
             if (response != null) RemoveWorkerCommand(commandId);
             throw;
@@ -497,14 +512,17 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             } catch (PlaywrightException) { }
         }
         _workerSessions.Clear();
-        foreach (TaskCompletionSource<bool> response in _workerCommandResponses.Values) {
-            response.TrySetException(new PlaywrightException("Worker target detached before the CDP command completed."));
+        foreach (PendingWorkerCommand response in _workerCommandResponses.Values) {
+            response.Completion.TrySetException(new PlaywrightException("Worker target detached before the CDP command completed."));
         }
         _workerCommandResponses.Clear();
         _workerEnvelopeCommands.Clear();
         Task[] pending = _pending.Keys.ToArray();
         if (pending.Length > 0) {
-            try { await Task.WhenAll(pending).ConfigureAwait(false); } catch (PlaywrightException) { }
+            // Capture cancellation may also cancel a request policy while its paused request drains.
+            try { await Task.WhenAll(pending).ConfigureAwait(false); }
+            catch (PlaywrightException) { }
+            catch (OperationCanceledException) { }
         }
         try { await _session.DetachAsync().ConfigureAwait(false); } catch (PlaywrightException) { }
     }
@@ -527,6 +545,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             NetworkId = networkId;
             SessionKey = sessionKey;
         }
+    }
+
+    private sealed class PendingWorkerCommand {
+        internal readonly string SessionKey;
+        internal readonly TaskCompletionSource<bool> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal PendingWorkerCommand(string sessionKey) => SessionKey = sessionKey;
     }
 
     private void Subscribe() {

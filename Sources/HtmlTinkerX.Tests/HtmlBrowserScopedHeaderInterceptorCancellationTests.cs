@@ -2,7 +2,9 @@ using HtmlTinkerX;
 using Microsoft.Playwright;
 using Moq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,11 +15,14 @@ namespace HtmlTinkerX.Tests;
 [Collection("Playwright collection")]
 public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
     [Theory]
-    [InlineData(true, true, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(false, false, false)]
-    public async Task InvalidInterceptionIdIsIgnoredOnlyForAnObservedCanceledRequest(bool canceled, bool terminalEventReceived, bool finished) {
+    [InlineData(true, true, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, false, true)]
+    public async Task StaleInterceptionCommandIsIgnoredOnlyForACanceledRequest(bool canceled, bool terminalEventReceived, bool finished, bool targetClosed) {
         Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
         Mock<ICDPSessionEvent> Event(string name) {
             if (!events.TryGetValue(name, out Mock<ICDPSessionEvent>? value)) {
@@ -56,7 +61,10 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         Event("Fetch.requestPaused").Raise(value => value.OnEvent += null, session.Object,
             ParseJson("{\"requestId\":\"stale\",\"networkId\":\"network-1\",\"resourceType\":\"XHR\",\"request\":{\"url\":\"https://example.test/image\",\"headers\":{}}}"));
         Assert.Same(continueSent.Task, await Task.WhenAny(continueSent.Task, Task.Delay(TimeSpan.FromSeconds(2))));
-        continueResponse.TrySetException(new PlaywrightException("Protocol error (Fetch.continueRequest): Invalid InterceptionId."));
+        string errorText = targetClosed ? "Target page, context or browser has been closed" : "Invalid InterceptionId";
+        continueResponse.TrySetException(new PlaywrightException(targetClosed
+            ? errorText
+            : $"Protocol error (Fetch.continueRequest): {errorText}."));
         await Task.Delay(150);
         if (terminalEventReceived) {
             Event(finished ? "Network.loadingFinished" : "Network.loadingFailed").Raise(value => value.OnEvent += null, session.Object,
@@ -73,7 +81,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
             session.Verify(value => value.SendAsync("Fetch.failRequest", It.IsAny<Dictionary<string, object>>()), Times.Never);
         } else if (terminalEventReceived) {
             Assert.Same(interceptionFailed.Task, await Task.WhenAny(interceptionFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
-            Assert.Contains("Invalid InterceptionId", Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted).InnerException?.Message);
+            Assert.Contains(errorText, Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted).InnerException?.Message);
         } else {
             Assert.False(interceptionFailed.Task.IsCompleted);
             await interceptor.DisposeAsync();
@@ -209,6 +217,68 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
             Assert.Same(interceptionFailed.Task, await Task.WhenAny(interceptionFailed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
             Assert.Contains("Invalid InterceptionId", Assert.Throws<InvalidOperationException>(interceptor.ThrowIfFaulted).InnerException?.Message);
         }
+    }
+
+    [Fact]
+    public async Task DetachingWorkerCompletesItsUnansweredCommand() {
+        Dictionary<string, Mock<ICDPSessionEvent>> events = new(StringComparer.Ordinal);
+        Mock<ICDPSessionEvent> Event(string name) {
+            if (!events.TryGetValue(name, out Mock<ICDPSessionEvent>? value)) {
+                value = new Mock<ICDPSessionEvent>();
+                events.Add(name, value);
+            }
+            return value;
+        }
+        var session = new Mock<ICDPSession>();
+        void RaiseWorkerMessage(object message) => Event("Target.receivedMessageFromTarget").Raise(
+            value => value.OnEvent += null, session.Object,
+            ParseJson(JsonSerializer.Serialize(new { sessionId = "worker-1", message = JsonSerializer.Serialize(message) })));
+        TaskCompletionSource<bool> continueSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
+        session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
+            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+                if (method == "Target.sendMessageToTarget") {
+                    using JsonDocument command = JsonDocument.Parse((string)arguments!["message"]);
+                    JsonElement root = command.RootElement;
+                    if (root.GetProperty("method").GetString() == "Fetch.continueRequest") {
+                        continueSent.TrySetResult(true);
+                    } else {
+                        RaiseWorkerMessage(new { id = root.GetProperty("id").GetInt64(), result = new { } });
+                    }
+                }
+                return Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
+                    ? ParseJson("{\"frameTree\":{\"frame\":{\"id\":\"main\"}}}")
+                    : null);
+            });
+        session.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);
+        var page = new Mock<IPage>();
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.NewCDPSessionAsync(page.Object)).ReturnsAsync(session.Object);
+
+        await using HtmlBrowserScopedHeaderInterceptor interceptor = await HtmlBrowserScopedHeaderInterceptor.CreateAsync(
+            context.Object, page.Object, new Uri("https://example.test"),
+            new Dictionary<string, string> { ["X-Test"] = "value" }, CancellationToken.None);
+        Event("Target.attachedToTarget").Raise(value => value.OnEvent += null, session.Object,
+            ParseJson("{\"sessionId\":\"worker-1\",\"targetInfo\":{\"type\":\"worker\"}}"));
+        RaiseWorkerMessage(new {
+            method = "Fetch.requestPaused",
+            @params = new {
+                requestId = "worker-pause", networkId = "worker-network", resourceType = "XHR",
+                request = new { url = "https://example.test/image", headers = new { } }
+            }
+        });
+        Assert.Same(continueSent.Task, await Task.WhenAny(continueSent.Task, Task.Delay(TimeSpan.FromSeconds(2))));
+        FieldInfo? responsesField = typeof(HtmlBrowserScopedHeaderInterceptor).GetField("_workerCommandResponses", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(responsesField);
+        ICollection responses = Assert.IsAssignableFrom<ICollection>(responsesField.GetValue(interceptor));
+        Assert.Single(responses);
+
+        Event("Target.detachedFromTarget").Raise(value => value.OnEvent += null, session.Object,
+            ParseJson("{\"sessionId\":\"worker-1\"}"));
+        Assert.Empty(responses);
+        interceptor.ThrowIfFaulted();
+        await interceptor.DisposeAsync();
+        session.Verify(value => value.DetachAsync(), Times.Once);
     }
 
     [Fact]
