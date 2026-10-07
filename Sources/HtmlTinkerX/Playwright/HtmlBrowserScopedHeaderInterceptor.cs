@@ -12,17 +12,17 @@ using System.Threading.Tasks;
 /// <summary>Injects capture-scoped Chromium request headers without buffering responses.</summary>
 internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private static readonly TimeSpan DefaultCleanupTimeout = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan CanceledRequestConfirmationTimeout = TimeSpan.FromMilliseconds(100);
     private readonly ICDPSession _session;
     private readonly Uri? _origin;
     private readonly IReadOnlyDictionary<string, string> _captureHeaders;
     private readonly ConcurrentDictionary<Task, byte> _pending = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingNetworkRequests = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<long, PendingNetworkRequest> _pendingNetworkRequests = new();
     private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> _workerCommandResponses = new();
     private readonly ConcurrentDictionary<long, long> _workerEnvelopeCommands = new();
     private readonly ConcurrentDictionary<string, string[]> _workerSessions = new(StringComparer.Ordinal);
     private readonly EventHandler<JsonElement?> _handler;
     private readonly EventHandler<JsonElement?> _networkLoadingFailedHandler;
+    private readonly EventHandler<JsonElement?> _networkLoadingFinishedHandler;
     private readonly EventHandler<JsonElement?> _targetAttachedHandler;
     private readonly EventHandler<JsonElement?> _targetMessageHandler;
     private readonly EventHandler<JsonElement?> _targetDetachedHandler;
@@ -32,7 +32,9 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     private readonly Action<string, bool>? _requestBlocked;
     private readonly string? _mainFrameId;
     private Exception? _failure;
+    private int _failureObserved;
     private long _nextWorkerCommandId;
+    private long _nextNetworkPauseId;
     private int _disposed;
     private int _subscribed;
 
@@ -55,6 +57,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         _mainFrameId = mainFrameId;
         _handler = OnRequestPaused;
         _networkLoadingFailedHandler = OnNetworkLoadingFailed;
+        _networkLoadingFinishedHandler = OnNetworkLoadingFinished;
         _targetAttachedHandler = OnTargetAttached;
         _targetMessageHandler = OnTargetMessage;
         _targetDetachedHandler = OnTargetDetached;
@@ -90,7 +93,10 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             mainFrameId);
         interceptor.Subscribe();
         try {
-            await session.SendAsync("Network.enable").ConfigureAwait(false);
+            await session.SendAsync("Network.enable", new Dictionary<string, object> {
+                ["maxTotalBufferSize"] = 0,
+                ["maxResourceBufferSize"] = 0
+            }).ConfigureAwait(false);
             await session.SendAsync("Fetch.enable", new Dictionary<string, object> {
                 ["patterns"] = CreateFetchPatterns()
             }).ConfigureAwait(false);
@@ -120,12 +126,22 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private void OnNetworkLoadingFailed(object? sender, JsonElement? payload) {
         if (payload == null || Volatile.Read(ref _disposed) != 0
-            || !payload.Value.TryGetProperty("canceled", out JsonElement canceled)
-            || canceled.ValueKind != JsonValueKind.True
             || !payload.Value.TryGetProperty("requestId", out JsonElement requestId)) return;
         string? networkId = requestId.GetString();
-        if (networkId != null && _pendingNetworkRequests.TryGetValue(networkId, out TaskCompletionSource<bool>? request)) {
-            request.TrySetResult(true);
+        bool canceled = payload.Value.TryGetProperty("canceled", out JsonElement value) && value.ValueKind == JsonValueKind.True;
+        if (networkId != null) CompleteNetworkRequest(networkId, canceled);
+    }
+
+    private void OnNetworkLoadingFinished(object? sender, JsonElement? payload) {
+        if (payload == null || Volatile.Read(ref _disposed) != 0
+            || !payload.Value.TryGetProperty("requestId", out JsonElement requestId)) return;
+        string? networkId = requestId.GetString();
+        if (networkId != null) CompleteNetworkRequest(networkId, canceled: false);
+    }
+
+    private void CompleteNetworkRequest(string networkId, bool canceled) {
+        foreach (PendingNetworkRequest request in _pendingNetworkRequests.Values) {
+            if (string.Equals(request.NetworkId, networkId, StringComparison.Ordinal)) request.Completion.TrySetResult(canceled);
         }
     }
 
@@ -169,6 +185,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     internal void ThrowIfFaulted() {
         Exception? failure = Volatile.Read(ref _failure);
         if (failure != null) {
+            Volatile.Write(ref _failureObserved, 1);
             throw new InvalidOperationException("Scoped header interception failed before capture completed.", failure);
         }
     }
@@ -274,10 +291,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         string? networkId = workerSessionPath == null && payload.TryGetProperty("networkId", out JsonElement networkIdElement)
             ? networkIdElement.GetString()
             : null;
-        TaskCompletionSource<bool>? canceledRequest = null;
+        PendingNetworkRequest? canceledRequest = null;
+        long pauseId = 0;
         if (networkId != null) {
-            TaskCompletionSource<bool> signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (_pendingNetworkRequests.TryAdd(networkId, signal)) canceledRequest = signal;
+            pauseId = Interlocked.Increment(ref _nextNetworkPauseId);
+            canceledRequest = new PendingNetworkRequest(networkId);
+            _pendingNetworkRequests[pauseId] = canceledRequest;
+            if (Volatile.Read(ref _disposed) != 0) canceledRequest.Completion.TrySetResult(true);
         }
         try {
             JsonElement request = payload.GetProperty("request");
@@ -325,7 +345,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
             } catch (PlaywrightException) { }
             throw;
         } finally {
-            if (canceledRequest != null) _pendingNetworkRequests.TryRemove(networkId!, out _);
+            if (canceledRequest != null) _pendingNetworkRequests.TryRemove(pauseId, out _);
         }
     }
 
@@ -333,13 +353,15 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         IReadOnlyList<string>? workerSessionPath,
         string method,
         Dictionary<string, object> arguments,
-        TaskCompletionSource<bool>? canceledRequest) {
+        PendingNetworkRequest? canceledRequest) {
         try {
             await SendCommandAsync(workerSessionPath, method, arguments).ConfigureAwait(false);
         } catch (PlaywrightException exception) when (canceledRequest != null
             && exception.Message.IndexOf("Invalid InterceptionId", StringComparison.Ordinal) >= 0) {
-            await Task.WhenAny(canceledRequest.Task, Task.Delay(CanceledRequestConfirmationTimeout)).ConfigureAwait(false);
-            if (canceledRequest.Task.Status != TaskStatus.RanToCompletion) throw;
+            if (!await canceledRequest.Completion.Task.ConfigureAwait(false)) {
+                Interlocked.CompareExchange(ref _failure, exception, null);
+                throw;
+            }
         }
     }
 
@@ -417,9 +439,13 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
     public async ValueTask DisposeAsync() {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Unsubscribe();
+        // Closing the capture invalidates any remaining interception ids. A non-canceled
+        // Network completion observed before teardown has already resolved its own pause.
+        foreach (PendingNetworkRequest request in _pendingNetworkRequests.Values) request.Completion.TrySetResult(true);
         Task cleanup = DisposeCoreAsync();
         if (await Task.WhenAny(cleanup, Task.Delay(_cleanupTimeout)).ConfigureAwait(false) == cleanup) {
             await cleanup.ConfigureAwait(false);
+            if (Volatile.Read(ref _failureObserved) == 0) ThrowIfFaulted();
             return;
         }
         _cleanupTimedOut();
@@ -467,10 +493,18 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
 
     private static void NoOp() { }
 
+    private sealed class PendingNetworkRequest {
+        internal readonly string NetworkId;
+        internal readonly TaskCompletionSource<bool> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal PendingNetworkRequest(string networkId) => NetworkId = networkId;
+    }
+
     private void Subscribe() {
         if (Interlocked.Exchange(ref _subscribed, 1) != 0) return;
         _session.Event("Fetch.requestPaused").OnEvent += _handler;
         _session.Event("Network.loadingFailed").OnEvent += _networkLoadingFailedHandler;
+        _session.Event("Network.loadingFinished").OnEvent += _networkLoadingFinishedHandler;
         _session.Event("Target.attachedToTarget").OnEvent += _targetAttachedHandler;
         _session.Event("Target.receivedMessageFromTarget").OnEvent += _targetMessageHandler;
         _session.Event("Target.detachedFromTarget").OnEvent += _targetDetachedHandler;
@@ -480,6 +514,7 @@ internal sealed class HtmlBrowserScopedHeaderInterceptor : IAsyncDisposable {
         if (Interlocked.Exchange(ref _subscribed, 0) == 0) return;
         _session.Event("Fetch.requestPaused").OnEvent -= _handler;
         _session.Event("Network.loadingFailed").OnEvent -= _networkLoadingFailedHandler;
+        _session.Event("Network.loadingFinished").OnEvent -= _networkLoadingFinishedHandler;
         _session.Event("Target.attachedToTarget").OnEvent -= _targetAttachedHandler;
         _session.Event("Target.receivedMessageFromTarget").OnEvent -= _targetMessageHandler;
         _session.Event("Target.detachedFromTarget").OnEvent -= _targetDetachedHandler;
