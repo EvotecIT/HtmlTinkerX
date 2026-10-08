@@ -97,18 +97,16 @@ public sealed class CmdletSubmitHtmlBrowserForm : AsyncPSCmdlet {
             HtmlBrowserSession session = Session ?? (HtmlBrowserSession?)GetVariableValue("PSParseHTML_DefaultSession")
                 ?? throw new PSInvalidOperationException("No session provided and no default session found.");
 
-            string selector;
             string? id = Form.Properties["FormId"]?.Value as string;
-            if (!string.IsNullOrEmpty(id)) {
-                selector = $"form#{id}";
-            } else if (Form.Properties["FormIndex"]?.Value is int idx) {
-                selector = $"form:nth-of-type({idx + 1})";
-            } else {
-                selector = "form";
-            }
-
             try {
-                await HtmlFormSubmitter.SubmitAsync(session.Page, selector, fields, Timeout, CancelToken).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(id) || Form.Properties["FormIndex"]?.Value is int) {
+                    HtmlFormResult browserForm = new() { Metadata = new() {
+                        Id = id, FormIndex = Form.Properties["FormIndex"]?.Value is int index ? index : 0
+                    } };
+                    await HtmlFormSubmitter.SubmitAsync(session.Page, browserForm, fields, Timeout, CancelToken).ConfigureAwait(false);
+                } else {
+                    await HtmlFormSubmitter.SubmitAsync(session.Page, "form", fields, Timeout, CancelToken).ConfigureAwait(false);
+                }
             } catch (Exception ex) when (ex is PlaywrightException || ex is TimeoutException || ex is InvalidOperationException) {
                 await ExportFailureEvidenceIfRequestedAsync(session, OnFailureEvidence.IsPresent, "SubmitForm", ex, FailureEvidenceFolder, CancelToken).ConfigureAwait(false);
                 throw;
