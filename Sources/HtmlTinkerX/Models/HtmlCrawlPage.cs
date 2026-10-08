@@ -256,12 +256,16 @@ public sealed class HtmlCrawlPage {
     /// The copy keeps the current content strings when the crawler releases them from the original page.
     /// Collections and structured data are shared. Released content is not reloaded,
     /// and the copy does not depend on the source dataset for its content.
+    /// File paths for empty content strings are omitted from the copy.
     /// </remarks>
     /// <returns>A copy that can be retained independently of the original page's content lifetime.</returns>
     public HtmlCrawlPage CreateSnapshot() {
         HtmlCrawlPage snapshot = (HtmlCrawlPage)MemberwiseClone();
         snapshot.StoredContentId = null;
         snapshot.StoredContentPath = null;
+        if (string.IsNullOrEmpty(snapshot.Html)) snapshot.HtmlPath = null;
+        if (string.IsNullOrEmpty(snapshot.Text)) snapshot.TextPath = null;
+        if (string.IsNullOrEmpty(snapshot.Markdown)) snapshot.MarkdownPath = null;
         return snapshot;
     }
 
