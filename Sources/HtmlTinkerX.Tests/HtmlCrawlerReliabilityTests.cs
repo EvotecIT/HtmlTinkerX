@@ -184,11 +184,18 @@ public partial class HtmlCrawlerTests {
             try {
                 while (listener.IsListening) {
                     HttpListenerContext context = await listener.GetContextAsync();
-                    try { await respond(context); } catch (IOException) { } finally { context.Response.Close(); }
+                    _ = RespondAndCloseAsync(context, respond);
                 }
             } catch (HttpListenerException) { } catch (ObjectDisposedException) { } catch (IOException) { }
         });
         return listener;
+    }
+
+    private static async Task RespondAndCloseAsync(HttpListenerContext context, Func<HttpListenerContext, Task> respond) {
+        try { await respond(context); }
+        catch (IOException) { }
+        catch (HttpListenerException) { }
+        finally { context.Response.Close(); }
     }
 
     private static async Task RespondAsync(HttpListenerContext context, string body, string contentType = "text/html") {
