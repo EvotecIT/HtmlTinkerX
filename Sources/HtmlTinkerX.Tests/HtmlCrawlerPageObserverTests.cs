@@ -20,9 +20,14 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.OutputPath = outputPath;
         options.RetainPageContent = false;
+        options.IncludeMarkdown = true;
         try {
             HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root, options);
-            HtmlCrawlPage snapshot = Assert.Single(result.Pages).CreateSnapshot();
+            HtmlCrawlPage original = Assert.Single(result.Pages);
+            Assert.True(File.Exists(original.HtmlPath));
+            Assert.True(File.Exists(original.TextPath));
+            Assert.True(File.Exists(original.MarkdownPath));
+            HtmlCrawlPage snapshot = original.CreateSnapshot();
             Assert.Empty(snapshot.Html);
             Assert.Empty(snapshot.Text);
             Directory.Delete(outputPath, true);
@@ -32,6 +37,10 @@ public partial class HtmlCrawlerTests {
             HtmlCrawlPage saved = Assert.Single((await HtmlCrawler.LoadResultAsync(snapshotPath)).Pages);
             Assert.Empty(saved.Html);
             Assert.Empty(saved.Text);
+            Assert.Empty(saved.Markdown);
+            Assert.Null(saved.HtmlPath);
+            Assert.Null(saved.TextPath);
+            Assert.Null(saved.MarkdownPath);
         } finally {
             if (Directory.Exists(outputPath)) Directory.Delete(outputPath, true);
             if (Directory.Exists(snapshotPath)) Directory.Delete(snapshotPath, true);
