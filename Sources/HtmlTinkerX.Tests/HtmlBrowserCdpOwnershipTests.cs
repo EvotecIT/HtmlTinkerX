@@ -10,7 +10,7 @@ public sealed class HtmlBrowserCdpOwnershipTests {
     [Fact]
     public async Task StalledPageCreationReleasesTheLocalCdpDriverWithinTheCleanupBound() {
         TaskCompletionSource<IPage> pageCreation = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        TaskCompletionSource<bool> disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> disposed = new();
         Mock<IPlaywright> owner = new();
         owner.Setup(instance => instance.Dispose()).Callback(() => disposed.TrySetResult(true));
 
