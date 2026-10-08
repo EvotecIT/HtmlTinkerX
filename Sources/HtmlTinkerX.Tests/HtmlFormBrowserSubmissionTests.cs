@@ -175,6 +175,27 @@ public sealed class HtmlFormBrowserSubmissionTests {
         Assert.Equal(1, await session.Page.EvaluateAsync<int>("() => window.formDataCalls"));
     }
 
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium)]
+    [InlineData(HtmlBrowserEngine.Firefox)]
+    [InlineData(HtmlBrowserEngine.WebKit)]
+    public async Task FragmentSubmission_CompletesWithLegacyEncodedValues(HtmlBrowserEngine browser) {
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        int requests = 0;
+        await session.Page.RouteAsync("https://forms.test/**", async route => {
+            requests++;
+            await route.FulfillAsync(new RouteFulfillOptions {
+                ContentType = "text/html; charset=windows-1252",
+                Body = "<form action='#received' accept-charset='windows-1252'><input name='q' value='&#233;'></form><script>window.documentProof='original'</script>"
+            });
+        });
+        await session.Page.GotoAsync("https://forms.test/start?q=%E9");
+        await HtmlFormSubmitter.SubmitAsync(session.Page, "form", new Dictionary<string, string>(), 5000);
+        Assert.Equal("https://forms.test/start?q=%E9#received", session.Page.Url);
+        Assert.Equal(1, requests);
+        Assert.Equal("original", await session.Page.EvaluateAsync<string>("() => window.documentProof"));
+    }
+
     [Fact]
     public async Task Submission_CancellationWhileNavigatingPreservesCallerTokenAndPage() {
         await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");

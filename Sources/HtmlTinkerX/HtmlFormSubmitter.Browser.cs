@@ -162,6 +162,7 @@ public static partial class HtmlFormSubmitter {
     }
 
     private static async Task RequestBrowserFormSubmissionAsync(IPage page, ILocator form, int timeout, CancellationToken token) {
+        string initialUrl = page.Url;
         string documentMarker = "__htmlTinkerXForm_" + Guid.NewGuid().ToString("N");
         TaskCompletionSource<bool> navigation = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int observing = 1;
@@ -170,9 +171,11 @@ public static partial class HtmlFormSubmitter {
         async Task CheckDocumentAsync() {
             if (Volatile.Read(ref armed) == 0) return;
             try {
-                bool current = await page.EvaluateAsync<bool>("marker => document[marker] === true", documentMarker)
+                bool completed = await page.EvaluateAsync<bool>(
+                    "state => document[state.marker] !== true || location.href !== state.url",
+                    new { marker = documentMarker, url = initialUrl })
                     .WaitWithCancellationAsync(token).ConfigureAwait(false);
-                if (!current) navigation.TrySetResult(true);
+                if (completed) navigation.TrySetResult(true);
             } catch (PlaywrightException ex) when (!page.IsClosed && ex.Message.Contains("Execution context was destroyed", StringComparison.Ordinal)) {
                 // The new document's DOMContentLoaded event checks again after its context is ready.
             } catch (Exception ex) {
