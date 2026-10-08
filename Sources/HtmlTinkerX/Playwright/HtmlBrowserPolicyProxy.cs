@@ -30,6 +30,8 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
     private readonly ConcurrentDictionary<long, Task> _clients = new();
     private readonly ConcurrentDictionary<long, TcpClient> _activeClients = new();
     private readonly Task _acceptLoop;
+    private readonly bool _diagnostics = (Environment.GetEnvironmentVariable("DEBUG") ?? string.Empty)
+        .Split(',').Any(value => value.Trim() == "pw:proxy");
     private long _nextClient;
 
     internal HtmlBrowserPolicyProxy(HtmlBrowserNetworkPolicy policy)
@@ -48,6 +50,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
         _listener.Start();
         IPEndPoint endpoint = (IPEndPoint)_listener.LocalEndpoint;
         Server = $"http://127.0.0.1:{endpoint.Port}";
+        ReportDiagnostic("listening");
         _acceptLoop = AcceptLoopAsync();
     }
 
@@ -64,6 +67,9 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 break;
             } catch (SocketException) when (_lifetime.IsCancellationRequested) {
                 break;
+            } catch (Exception ex) {
+                ReportDiagnostic("accept-failed", ex);
+                throw;
             }
 
             long id = Interlocked.Increment(ref _nextClient);
@@ -116,9 +122,11 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 await HandleHttpAsync(browserClient, browser, requestParts, lines, headerAndRemainder, headerEnd + 4, cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 // Renderer disposal closes active proxy connections.
-            } catch (IOException) {
+            } catch (IOException ex) {
+                ReportDiagnostic("client-io-failed", ex);
                 // Either endpoint closed the connection.
-            } catch (SocketException) {
+            } catch (SocketException ex) {
+                ReportDiagnostic("client-socket-failed", ex);
                 // Either endpoint closed the connection.
             } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
                 // Renderer disposal closes active proxy connections.
@@ -237,12 +245,31 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
                 await WaitAsync(_connect(client, address, port), attemptDeadline.Token, client).ConfigureAwait(false);
                 return client;
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attemptDeadline.IsCancellationRequested) {
+                ReportDiagnostic("connect-timeout", address: address, port: port);
                 client.Dispose();
             } catch (Exception ex) when (ex is SocketException || ex is IOException) {
+                ReportDiagnostic("connect-failed", ex, address, port);
                 client.Dispose();
             }
         }
         return null;
+    }
+
+    private void ReportDiagnostic(string stage, Exception? error = null, IPAddress? address = null, int? port = null) {
+        if (!_diagnostics) return;
+        SocketException? socket = error as SocketException ?? error?.InnerException as SocketException;
+        // Keep credentials, headers, URL paths and exception messages out of native diagnostics.
+        string detail = $"{DateTime.UtcNow:O} pw:proxy {Server} {stage}"
+            + (address == null ? string.Empty : $" remote={address}:{port}")
+            + (error == null ? string.Empty : $" exception={error.GetType().Name} hresult={error.HResult}")
+            + (socket == null ? string.Empty : $" socket={socket.SocketErrorCode} native={socket.NativeErrorCode}");
+        try {
+            Console.Error.WriteLine(detail);
+        } catch (IOException) {
+            // A closed diagnostic stream must not affect request handling.
+        } catch (ObjectDisposedException) {
+            // The host may close its diagnostic stream during shutdown.
+        }
     }
 
     private static async Task RelayAsync(
@@ -349,6 +376,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
 
     public async ValueTask DisposeAsync() {
         if (_lifetime.IsCancellationRequested) return;
+        ReportDiagnostic("disposing");
         _lifetime.Cancel();
         _listener.Stop();
         try { await _acceptLoop.ConfigureAwait(false); } catch (OperationCanceledException) { }
