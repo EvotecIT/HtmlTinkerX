@@ -31042,6 +31042,20 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>StreamPages</maml:name>
+          <maml:description>
+            <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.&#xD;
+Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>StructuredJsonPreset</maml:name>
           <maml:description>
             <maml:para>Optional built-in structured JSON preset used to flatten common page types.</maml:para>
@@ -32178,6 +32192,20 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>StreamPages</maml:name>
+        <maml:description>
+          <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint. Pages are still retained during the crawl.&#xD;
+Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>StructuredJsonPreset</maml:name>
         <maml:description>
           <maml:para>Optional built-in structured JSON preset used to flatten common page types.</maml:para>
@@ -32354,6 +32382,11 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <maml:name>HtmlTinkerX.HtmlCrawlResult</maml:name>
         </dev:type>
       </command:returnValue>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>HtmlTinkerX.HtmlCrawlPage</maml:name>
+        </dev:type>
+      </command:returnValue>
     </command:returnValues>
     <maml:alertSet>
       <maml:alert>
@@ -32371,6 +32404,13 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
         <dev:code>Invoke-HtmlCrawl -Url https://example.com/app -Render -WaitForSelector main -StorageStatePath .\state.json</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

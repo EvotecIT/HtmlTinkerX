@@ -241,3 +241,28 @@ Those per-page manifests now also include lightweight search metadata such as he
 The persisted dataset also exports a global `chunks.jsonl` file with deduplicated text chunks, per-chunk summaries, heading context, normalized keywords, and relative links back to each saved page, text file, and manifest so it is easy to feed into local search or RAG tooling.
 
 It also exports `graph.json`, which captures fetched pages as nodes and discovered page-to-page links as edges, including fetched/skipped/external node categories, edge relation types, in-degree/out-degree counts, and relative paths back to saved HTML and manifest files for offline analysis or navigation tooling. The generated summaries now also break those graph counts down by node category, edge relation, and skipped-node reason.
+## Process completed pages
+
+Use `HtmlCrawlOptions.PageObserver` with an implementation of
+`IHtmlCrawlPageObserver.ObserveAsync` to process each completed page. The crawler
+awaits the callback before committing its checkpoint. Successful and failed pages
+arrive in crawl order; skipped candidates and pages loaded from a resume checkpoint
+are excluded. If a callback fails, resuming retries that uncommitted page, so
+external writes should tolerate retries. Pages remain in the final result; this
+hook does not limit memory use.
+
+PowerShell can emit pages while the crawl runs:
+
+```powershell
+Invoke-HtmlCrawl -Url https://example.com/docs -MaxPages 100 -StreamPages |
+    Where-Object Status -eq Success |
+    Select-Object Url, Title, Text
+```
+
+`-StreamPages` returns `HtmlCrawlPage` objects instead of the final
+`HtmlCrawlResult`. Use `-OutPath` alongside it to keep the normal exports and
+checkpoints.
+
+Pipeline output does not acknowledge that downstream processing completed.
+Export files may be committed after a page is emitted. For a sink that must
+finish its work before the checkpoint advances, use the awaited C# observer.

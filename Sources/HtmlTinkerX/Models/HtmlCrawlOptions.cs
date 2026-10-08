@@ -320,6 +320,12 @@ public sealed class HtmlCrawlOptions {
     [JsonIgnore]
     public IHtmlCrawlRenderedPageObserver? RenderedPageObserver { get; set; }
 
+    /// <summary>Optional observer awaited for each newly fetched result page before its checkpoint is committed.</summary>
+    /// <remarks>Receives static and rendered pages, including fetch failures. This runtime hook is excluded from JSON.
+    /// It does not reduce the pages retained in the result. See <see cref="IHtmlCrawlPageObserver"/> for resume behavior.</remarks>
+    [JsonIgnore]
+    public IHtmlCrawlPageObserver? PageObserver { get; set; }
+
     /// <summary>Optional include patterns using * wildcards.</summary>
     public IList<string> IncludePatterns { get; set; } = new List<string>();
 
@@ -481,6 +487,7 @@ public sealed class HtmlCrawlOptions {
             Headless = Headless,
             CleanBrowserInstall = CleanBrowserInstall,
             RenderedPageObserver = RenderedPageObserver,
+            PageObserver = PageObserver,
             IncludePatterns = new List<string>(IncludePatterns),
             ExcludePatterns = new List<string>(ExcludePatterns),
             SitemapUrls = new List<string>(SitemapUrls),

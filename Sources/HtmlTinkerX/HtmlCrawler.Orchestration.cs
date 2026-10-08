@@ -281,8 +281,9 @@ public static partial class HtmlCrawler {
                         QueueCandidate(link, page.Url, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
                     }
                 }
-
-
+                if (resolvedOptions.PageObserver != null) {
+                    await resolvedOptions.PageObserver.ObserveAsync(page, cancellationToken).ConfigureAwait(false);
+                }
                 if (persistSnapshots) {
                     await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
                 }
