@@ -15,9 +15,12 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             const frame = popup.document.createElement('iframe');
             frame.name = 'reportFrame';
             popup.document.body.append(frame);
-            popup[0].fetch('{server.BlankPopupResourceUrl}?source=indexed-child-window');
-            popup.frames.reportFrame.fetch('{server.BlankPopupResourceUrl}?source=named-child-window');
-            true";
+            (async () => {{
+                await Promise.all([
+                    popup[0].fetch('{server.BlankPopupResourceUrl}?source=indexed-child-window'),
+                    popup.frames.reportFrame.fetch('{server.BlankPopupResourceUrl}?source=named-child-window')]);
+                return true;
+            }})()";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
@@ -44,7 +47,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             range.insertNode(fragment);
             const borrowedFragment = Range.prototype.createContextualFragment.call(range, '<img src=""{server.BlankPopupResourceUrl}?source=range-borrowed"">');
             Range.prototype.insertNode.call(range, borrowedFragment);
-            true";
+            (async () => {{
+                const sources = ['range-fragment', 'range-borrowed'];
+                const counts = await Promise.all(sources.map(async source =>
+                    Number(await (await fetch('/blank-popup-source-wait?source=' + source)).text())));
+                if (!counts.every(count => count >= 1)) throw new Error('range requests were not received');
+                return true;
+            }})()";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
