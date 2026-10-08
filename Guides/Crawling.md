@@ -299,3 +299,21 @@ The snapshot keeps the content available when it is created and shares the
 page's collections. It does not reload released bodies; load the saved result
 first if you need that content. Collecting streamed copies or queuing them for a
 slow consumer still uses memory.
+
+## Download static pages concurrently
+
+Use `-MaxConcurrentPageRequests` to prepare static page downloads concurrently,
+with `-MaxConcurrentPageRequestsPerOrigin` limiting open responses from each
+origin, including redirect destinations. Both default to one. Extraction,
+observer callbacks and checkpoints remain in discovery order.
+
+```powershell
+Invoke-HtmlCrawl -Url 'https://example.com/docs/' -OutPath './crawl' -MaxPages 100 -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2
+```
+
+Parallel downloads require static mode without `-Render`, `-AutoRender` or
+automatic browser profiling. Response caching and conditional refresh require
+sequential requests. Keep the defaults when later requests depend on cookie or
+session changes made by earlier pages. Prefetched requests count toward
+`-MaxPages`, even when an earlier result later makes their URL redundant.
+Robots delays, retry cooldowns and response-byte budgets still apply.
