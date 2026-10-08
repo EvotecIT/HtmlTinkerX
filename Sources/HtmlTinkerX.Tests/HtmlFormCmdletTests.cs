@@ -1,6 +1,11 @@
 #if !NETFRAMEWORK
 using System;
 using System.Linq;
+using System.Collections;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using HtmlTinkerX;
@@ -58,9 +63,64 @@ public class HtmlFormCmdletTests {
             Assert.Single(Assert.IsType<PSObject[]>(form.Properties["Fields"].Value)).Properties["Name"].Value));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DownloadedFormCommandRetainsDefaultsAndReusesTheCallerClient(bool repeatedOverride) {
+        using Runspace runspace = CreateRunspace();
+        using FormHandler handler = new();
+        using HttpClient client = new(handler) { Timeout = TimeSpan.FromSeconds(37) };
+        client.DefaultRequestHeaders.Add("X-Session", "caller");
+        using PowerShell download = PowerShell.Create();
+        download.Runspace = runspace;
+        download.AddCommand("ConvertFrom-HtmlForm")
+            .AddParameter("Url", new Uri("https://example.test/account/"))
+            .AddParameter("HttpClient", client);
+        PSObject form = Assert.Single(download.Invoke());
+        Assert.Empty(download.Streams.Error);
+
+        using PowerShell submit = PowerShell.Create();
+        submit.Runspace = runspace;
+        submit.AddCommand("Submit-HtmlBrowserForm")
+            .AddParameter("Form", form)
+            .AddParameter("HttpClient", client)
+            .AddParameter("FieldValue", new Hashtable {
+                ["tag"] = repeatedOverride ? new[] { "new one", "+two" } : "new one"
+            });
+        Assert.Equal("saved", Assert.Single(submit.Invoke()).BaseObject);
+        Assert.Empty(submit.Streams.Error);
+        Assert.Equal("https://example.test/account/save", handler.Destination);
+        Assert.Equal(repeatedOverride ? "csrf=token&tag=new+one&tag=%2Btwo" : "csrf=token&tag=new+one", handler.Body);
+        Assert.Equal(TimeSpan.FromSeconds(37), client.Timeout);
+        Assert.Equal("caller", Assert.Single(client.DefaultRequestHeaders.GetValues("X-Session")));
+        using HttpResponseMessage response = await client.GetAsync("https://example.test/account/");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(3, handler.Requests);
+    }
+
+    private sealed class FormHandler : HttpMessageHandler {
+        public string? Destination { get; private set; }
+        public string? Body { get; private set; }
+        public int Requests { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            Requests++;
+            Assert.Equal("caller", Assert.Single(request.Headers.GetValues("X-Session")));
+            if (request.Method == HttpMethod.Post) {
+                Destination = request.RequestUri!.AbsoluteUri;
+                Body = await request.Content!.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("saved") };
+            }
+            return new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StringContent("<form action='save' method='post'><input name='csrf' value='token'><input name='tag' value='old one'><input name='tag' value='old two'></form>")
+            };
+        }
+    }
+
     private static Runspace CreateRunspace() {
         InitialSessionState state = InitialSessionState.Create();
         state.Commands.Add(new SessionStateCmdletEntry("ConvertFrom-HtmlForm", typeof(CmdletConvertFromHtmlForm), null));
+        state.Commands.Add(new SessionStateCmdletEntry("Submit-HtmlBrowserForm", typeof(CmdletSubmitHtmlBrowserForm), null));
         Runspace runspace = RunspaceFactory.CreateRunspace(state);
         runspace.Open();
         return runspace;

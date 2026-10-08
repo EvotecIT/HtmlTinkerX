@@ -19,6 +19,11 @@ ConvertFrom-HtmlForm -Content <string> [-BaseUri <uri>] [-IncludeMetadata] [-Pro
 ConvertFrom-HtmlForm -Url <uri> [-IncludeMetadata] [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
+### HttpClient
+```powershell
+ConvertFrom-HtmlForm -Url <uri> -HttpClient <HttpClient> [-IncludeMetadata] [<CommonParameters>]
+```
+
 ## DESCRIPTION
 Extracts HTML form information into PowerShell objects.
 
@@ -36,6 +41,13 @@ ConvertFrom-HtmlForm -Content '<form action="save"><input name="tag" value="one"
 ```
 
 Returns the field inventory, ordered successful values, and resolved HTTP action.
+
+### EXAMPLE 3
+```powershell
+$form = ConvertFrom-HtmlForm -Url https://example.com/settings/ -HttpClient $client
+```
+
+Downloads using a caller-owned, cookie-enabled client that can also submit the form.
 
 ## PARAMETERS
 
@@ -71,12 +83,28 @@ Accept pipeline input: True (ByValue, ByPropertyName)
 Accept wildcard characters: False
 ```
 
+### -HttpClient
+Reusable HTTP client for downloading the form. The caller retains ownership, cookies, and configuration.
+
+```yaml
+Type: HttpClient
+Parameter Sets: HttpClient
+Aliases: None
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -IncludeMetadata
 Include additional metadata like form index and CSS classes.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Content, Url
+Parameter Sets: Content, Url, HttpClient
 Aliases: None
 Possible values:
 
@@ -124,7 +152,7 @@ URL of a page with forms.
 
 ```yaml
 Type: Uri
-Parameter Sets: Url
+Parameter Sets: Url, HttpClient
 Aliases: Uri
 Possible values:
 

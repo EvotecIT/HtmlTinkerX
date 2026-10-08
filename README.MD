@@ -278,6 +278,40 @@ var action = forms[0].Metadata.ResolvedActionUri;
 var values = forms[0].SuccessfulFields;
 ```
 
+`Submit-HtmlBrowserForm` sends the successful defaults and replaces only the
+names in `-FieldValue`. An array supplies repeated values for one name:
+
+```powershell
+Submit-HtmlBrowserForm -Form $form -FieldValue @{ tag = @('first', 'second') }
+```
+
+HTTP submission uses URL-encoded values. GET replaces the action's query with
+the submitted values; POST retains the action query. Supply a document address
+when parsing relative or empty actions. An unresolved or non-HTTP action fails
+before a request is sent. This path does not run browser validation or scripts,
+and it does not upload files.
+
+Reuse a cookie-enabled client when downloading and submitting a session form.
+Both commands borrow the client; its cookies, timeout, and disposal remain under
+the caller's control:
+
+```powershell
+$client = [HtmlTinkerX.HtmlHttpClientFactory]::Create()
+try {
+    $form = ConvertFrom-HtmlForm -Url 'https://example.com/settings/' -HttpClient $client
+    Submit-HtmlBrowserForm -Form $form -HttpClient $client -FieldValue @{ displayName = 'Ada' }
+} finally {
+    $client.Dispose()
+}
+```
+
+The submission command's `-Timeout` covers the request and response body without
+changing a supplied client's timeout. `-Timeout 0` disables the command's
+deadline; the client's own timeout still applies. `-MaximumResponseBytes` bounds
+the response body. .NET callers submit a parsed form with
+`HtmlFormSubmitter.SubmitAsync(form, fieldOverrides, client)`; the ordered-value
+overload also accepts repeated names when supplying an action directly.
+
 ## PowerShell and C# entry points
 
 The PowerShell commands are thin surfaces over HtmlTinkerX. The generated
