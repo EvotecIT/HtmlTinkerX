@@ -40,7 +40,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         private readonly ConcurrentDictionary<string, (int Count, string Cookie)> _blankPopupSources = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _blankPopupSourceReceived = new(StringComparer.Ordinal);
         private readonly string _namedContextInitialUrl;
-        internal LoopbackPopupServer(string? namedContextInitialUrl = null, string? popupRedirectTarget = null) {
+        private readonly bool _waitForBlankPopupResource;
+        internal LoopbackPopupServer(string? namedContextInitialUrl = null, string? popupRedirectTarget = null, bool waitForBlankPopupResource = false) {
+            _waitForBlankPopupResource = waitForBlankPopupResource;
             _namedContextInitialUrl = namedContextInitialUrl ?? "/existing-context-initial";
             _listener.Start();
             int port = ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -167,6 +169,10 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
                         body = "<script>fetch('/protected').then(response => response.text()).then(text => localStorage.setItem('popup-result', text));</script>";
                     } else if (requestTarget.StartsWith("/header-popup", StringComparison.Ordinal)) {
+                        // Keep the initial document alive until its staged request has reached the server.
+                        if (_waitForBlankPopupResource && !await WaitForBlankPopupResourceAsync()) {
+                            throw new TimeoutException("The staged blank-popup resource request was not received.");
+                        }
                         Interlocked.Increment(ref _popupRequestCount);
                         Volatile.Write(ref _lastPopupToken, LoopbackHtmlServer.ReadHeader(request, "X-Render-Token"));
                         Volatile.Write(ref _lastPopupReferer, LoopbackHtmlServer.ReadHeader(request, "Referer"));
