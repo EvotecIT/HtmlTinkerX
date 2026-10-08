@@ -189,7 +189,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
     [Fact]
     public async Task NonblankPopupReferenceStagesRequestsUntilHeaderInterception() {
-        await using LoopbackPopupServer server = new();
+        await using LoopbackPopupServer server = new(waitForBlankPopupResource: true);
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
