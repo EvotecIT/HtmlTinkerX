@@ -153,14 +153,25 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework net10.0 --no-restore
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
-      - name: Install browser runtimes and Linux dependencies
+      - name: Install Chromium runtime and Linux dependencies
         shell: pwsh
         run: |
           Import-Module ./Sources/PSParseHTML.PowerShell/bin/Release/net8.0/PSParseHTML.PowerShell.dll -ErrorAction Stop
-          foreach ($engine in [Enum]::GetValues([HtmlTinkerX.HtmlBrowserEngine])) {
-            Write-Host "Installing $engine browser runtime"
-            [HtmlTinkerX.HtmlBrowser]::EnsureInstalledAsync($engine).GetAwaiter().GetResult()
-          }
+          [HtmlTinkerX.HtmlBrowser]::EnsureInstalledAsync([HtmlTinkerX.HtmlBrowserEngine]::Chromium).GetAwaiter().GetResult()
+        timeout-minutes: 20
+
+      - name: Install Firefox runtime and Linux dependencies
+        shell: pwsh
+        run: |
+          Import-Module ./Sources/PSParseHTML.PowerShell/bin/Release/net8.0/PSParseHTML.PowerShell.dll -ErrorAction Stop
+          [HtmlTinkerX.HtmlBrowser]::EnsureInstalledAsync([HtmlTinkerX.HtmlBrowserEngine]::Firefox).GetAwaiter().GetResult()
+        timeout-minutes: 20
+
+      - name: Install WebKit runtime and Linux dependencies
+        shell: pwsh
+        run: |
+          Import-Module ./Sources/PSParseHTML.PowerShell/bin/Release/net8.0/PSParseHTML.PowerShell.dll -ErrorAction Stop
+          [HtmlTinkerX.HtmlBrowser]::EnsureInstalledAsync([HtmlTinkerX.HtmlBrowserEngine]::WebKit).GetAwaiter().GetResult()
         timeout-minutes: 20
 
       - name: Run tests
