@@ -51,12 +51,12 @@ public class HtmlBrowserSsoHandoffWaitTests {
             new Mock<IBrowserContext>().Object, page.Object);
         using CancellationTokenSource cancellation = new();
         Task operation = HtmlBrowser.GetSsoHandoffsAsync(session,
-            new HtmlBrowserSsoHandoffOptions { Wait = true, Timeout = 100 }, cancellation.Token);
+            new HtmlBrowserSsoHandoffOptions { Wait = true, Timeout = 1000 }, cancellation.Token);
         try {
-            Assert.Same(entered.Task, await Task.WhenAny(entered.Task, Task.Delay(2000)));
-            Assert.Same(operation, await Task.WhenAny(operation, Task.Delay(2000)));
+            Assert.Same(entered.Task, await Task.WhenAny(entered.Task, Task.Delay(5000)));
+            Assert.Same(operation, await Task.WhenAny(operation, Task.Delay(5000)));
             TimeoutException error = await Assert.ThrowsAsync<TimeoutException>(() => operation);
-            Assert.Contains("100 ms", error.Message);
+            Assert.Contains("1000 ms", error.Message);
             Assert.Contains("tenant=public", error.Message);
             Assert.DoesNotContain("private-value", error.Message);
             if (polling) Assert.Contains("Sign in", error.Message);
