@@ -613,6 +613,8 @@ public class HtmlBrowserInstallerTests
         Directory.CreateDirectory(nodeDir);
         Directory.CreateDirectory(Path.Combine(baseDir, "package"));
         File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), string.Empty);
+        string siblingPath = Path.Combine(tempDriver, "application.dll");
+        File.WriteAllText(siblingPath, "caller-owned application");
 
         string[]? captured = null;
         string? runtimeDirectory = null;
@@ -641,6 +643,7 @@ public class HtmlBrowserInstallerTests
             Assert.NotNull(runtimeDirectory);
             Assert.True(Directory.Exists(runtimeDirectory!));
             Assert.True(File.Exists(Path.Combine(runtimeDirectory!, "marker.txt")));
+            Assert.Equal("caller-owned application", File.ReadAllText(siblingPath));
         }
         finally
         {
