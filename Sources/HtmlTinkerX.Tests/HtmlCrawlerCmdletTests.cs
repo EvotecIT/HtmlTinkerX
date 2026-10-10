@@ -17,7 +17,7 @@ public partial class HtmlCrawlerTests {
     [InlineData(true)]
     public async Task InvokeHtmlCrawl_StreamedPagesKeepTheirContentAfterPersistence(bool releaseContent) {
         using HttpListener server = StartServer(new Dictionary<string, string> {
-            ["/"] = "<main>Streamed content</main>"
+            ["/"] = "<main>Streamed content</main><script>cachedOutsideSelection</script>"
         }, out string root);
         string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try {
@@ -35,6 +35,8 @@ public partial class HtmlCrawlerTests {
                 .AddParameter("OutPath", outputPath)
                 .AddParameter("IncludeHtml", true)
                 .AddParameter("IncludeMarkdown", true)
+                .AddParameter("CacheResponses", true)
+                .AddParameter("Selector", "main")
                 .AddParameter("StreamPages", true)
                 .AddParameter("ReleasePageContent", releaseContent);
 
@@ -44,6 +46,9 @@ public partial class HtmlCrawlerTests {
             Assert.Contains("Streamed content", page.Html);
             Assert.Contains("Streamed content", page.Text);
             Assert.Contains("Streamed content", page.Markdown);
+            Assert.DoesNotContain("cachedOutsideSelection", page.Html);
+            if (releaseContent) Assert.Null(page.HttpCache);
+            else Assert.NotNull(page.HttpCache);
             HtmlCrawlPage savedPage = Assert.Single((await HtmlCrawler.LoadResultAsync(outputPath)).Pages);
             Assert.Contains("Streamed content", savedPage.Text);
         } finally {

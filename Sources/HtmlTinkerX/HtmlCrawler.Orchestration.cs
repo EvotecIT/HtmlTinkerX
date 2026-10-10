@@ -75,11 +75,12 @@ public static partial class HtmlCrawler {
             return renderSession.Session;
         }
         try {
-            string persistencePath = resolvedOptions.OutputPath ?? resolvedOptions.ResumePath ?? string.Empty;
-            bool persistSnapshots = !string.IsNullOrEmpty(persistencePath);
+            string persistencePath = !string.IsNullOrWhiteSpace(resolvedOptions.OutputPath)
+                ? resolvedOptions.OutputPath! : resolvedOptions.ResumePath ?? string.Empty;
+            bool persistSnapshots = !string.IsNullOrWhiteSpace(persistencePath);
             if (persistSnapshots) checkpointWriter = new CrawlCheckpointWriter(persistencePath, resolvedOptions.RetainPageContent);
             HtmlCrawlResult result;
-            if (!string.IsNullOrEmpty(resolvedOptions.ResumePath)) {
+            if (!string.IsNullOrWhiteSpace(resolvedOptions.ResumePath)) {
                 result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken, resolvedOptions.RetainPageContent).ConfigureAwait(false);
                 if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.Ordinal)) {
                     throw new InvalidOperationException($"Resume data was created for '{result.StartUrl}', but the current crawl starts from '{startUri.AbsoluteUri}'.");

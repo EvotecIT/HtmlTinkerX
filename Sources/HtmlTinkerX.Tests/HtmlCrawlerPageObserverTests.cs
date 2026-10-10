@@ -50,7 +50,7 @@ public partial class HtmlCrawlerTests {
     [Fact]
     public async Task CrawlAsync_PageObserverCanKeepContentWhileResultReleasesIt() {
         using var server = StartServer(new Dictionary<string, string> {
-            ["/"] = "<main>Observed content</main>"
+            ["/"] = "<main>Observed content</main><script>outsideSelectionSentinel</script>"
         }, out string root);
         string outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var observed = new List<HtmlCrawlPage>();
@@ -58,8 +58,13 @@ public partial class HtmlCrawlerTests {
         options.OutputPath = outputPath;
         options.RetainPageContent = false;
         options.IncludeMarkdown = true;
+        options.CacheResponses = true;
+        options.Selector = "main";
         options.PageObserver = new DelegatePageObserver((page, token) => {
+            Assert.NotNull(page.HttpCache);
+            Assert.Contains("outsideSelectionSentinel", page.HttpCache.Html);
             observed.Add(page.CreateSnapshot());
+            Assert.NotNull(page.HttpCache);
             return Task.CompletedTask;
         });
         try {
@@ -73,6 +78,9 @@ public partial class HtmlCrawlerTests {
             Assert.Contains("Observed content", snapshot.Html);
             Assert.Contains("Observed content", snapshot.Text);
             Assert.Contains("Observed content", snapshot.Markdown);
+            Assert.DoesNotContain("outsideSelectionSentinel", snapshot.Html);
+            Assert.Null(snapshot.HttpCache);
+            Assert.Null(original.HttpCache);
         } finally {
             if (Directory.Exists(outputPath)) Directory.Delete(outputPath, true);
         }

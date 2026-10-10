@@ -52,8 +52,11 @@ public partial class HtmlCrawlerTests {
         } finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
     }
 
-    [Fact]
-    public async Task CrawlAsync_ReleasingContentPreservesInterruptedCheckpointResume() {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CrawlAsync_ReleasingContentPreservesInterruptedCheckpointResume(string? resumedOutputPath) {
         string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         using CancellationTokenSource cancellation = new();
         bool interrupt = true;
@@ -66,7 +69,7 @@ public partial class HtmlCrawlerTests {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => HtmlCrawler.CrawlAsync(root, options, cancellation.Token));
             HtmlCrawlResult checkpoint = await HtmlCrawler.LoadResultAsync(output);
             Assert.Contains("Root", Assert.Single(checkpoint.Pages).Text); Assert.Single(checkpoint.PendingPages);
-            interrupt = false; options.ResumePath = output;
+            interrupt = false; options.ResumePath = output; options.OutputPath = resumedOutputPath;
             HtmlCrawlResult resumed = await HtmlCrawler.CrawlAsync(root, options);
             Assert.Equal(2, resumed.Pages.Count); Assert.All(resumed.Pages, page => Assert.Empty(page.Html));
             Assert.False(Directory.Exists(resumed.ManifestPath + ".state"));
