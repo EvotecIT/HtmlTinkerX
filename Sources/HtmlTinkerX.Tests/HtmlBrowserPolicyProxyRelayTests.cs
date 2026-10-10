@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -21,13 +22,20 @@ public sealed class HtmlBrowserPolicyProxyRelayTests {
             HtmlBrowserNetworkPolicyEvaluator evaluator = new(policy, _ => Task.FromResult(new[] { IPAddress.Loopback }));
             await using HtmlBrowserPolicyProxy proxy = new(evaluator);
             using TcpClient browser = new();
+            TcpClient? remote = null;
+            using CancellationTokenSource setupDeadline = new(TimeSpan.FromSeconds(5));
+            using CancellationTokenRegistration abortSetup = setupDeadline.Token.Register(() => {
+                browser.Dispose();
+                remote?.Dispose();
+                origin.Stop();
+            });
             await browser.ConnectAsync(IPAddress.Loopback, new Uri(proxy.Server).Port);
             using NetworkStream browserStream = browser.GetStream();
             byte[] connect = Encoding.ASCII.GetBytes($"CONNECT render.invalid:{originPort} HTTP/1.1\r\nHost: render.invalid:{originPort}\r\n\r\n");
             await browserStream.WriteAsync(connect, 0, connect.Length);
-            using TcpClient remote = await origin.AcceptTcpClientAsync();
-            using NetworkStream remoteStream = remote.GetStream();
             Assert.Equal("HTTP/1.1 200 Connection Established\r\n\r\n", await ReadConnectResponseAsync(browserStream));
+            using TcpClient accepted = remote = await origin.AcceptTcpClientAsync();
+            using NetworkStream remoteStream = remote.GetStream();
 
             // Observe both relay directions before resetting either socket.
             byte[] payload = { 42 };
@@ -46,6 +54,7 @@ public sealed class HtmlBrowserPolicyProxyRelayTests {
             byte[] interruptedTransfer = new byte[4096];
             await survivingPeer.WriteAsync(interruptedTransfer, 0, interruptedTransfer.Length);
             Assert.Equal(1, await failingStream.ReadAsync(interruptedTransfer, 0, 1));
+            setupDeadline.CancelAfter(Timeout.Infinite);
             failingPeer.Client.LingerState = new LingerOption(true, 0);
             failingPeer.Close();
 
