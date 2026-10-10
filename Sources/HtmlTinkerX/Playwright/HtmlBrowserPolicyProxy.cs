@@ -73,6 +73,7 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             }
 
             long id = Interlocked.Increment(ref _nextClient);
+            ReportDiagnostic("accepted");
             _activeClients[id] = client;
             Task handling = HandleClientAsync(client, _lifetime.Token);
             _clients[id] = handling;
@@ -242,7 +243,9 @@ internal sealed class HtmlBrowserPolicyProxy : IAsyncDisposable {
             IPAddress address = addresses[index];
             TcpClient client = new(address.AddressFamily);
             try {
+                ReportDiagnostic("connect-start", address: address, port: port);
                 await WaitAsync(_connect(client, address, port), attemptDeadline.Token, client).ConfigureAwait(false);
+                ReportDiagnostic("connected", address: address, port: port);
                 return client;
             } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attemptDeadline.IsCancellationRequested) {
                 ReportDiagnostic("connect-timeout", address: address, port: port);

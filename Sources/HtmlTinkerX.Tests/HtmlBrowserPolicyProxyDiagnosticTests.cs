@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -13,6 +14,44 @@ public sealed class ProcessDiagnosticsCollection { }
 
 [Collection("Process diagnostics")]
 public sealed class HtmlBrowserPolicyProxyDiagnosticTests {
+    [Fact]
+    public async Task SuccessfulTunnelReportsTheEstablishedConnection() {
+        string? previousDebug = Environment.GetEnvironmentVariable("DEBUG");
+        TextWriter previousError = Console.Error;
+        using StringWriter output = new();
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+        TcpListener origin = new(IPAddress.Loopback, 0);
+        origin.Start();
+        try {
+            Environment.SetEnvironmentVariable("DEBUG", "pw:proxy");
+            Console.SetError(output);
+            int port = ((IPEndPoint)origin.LocalEndpoint).Port;
+            HtmlBrowserNetworkPolicyEvaluator evaluator = new(
+                new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "render.invalid" }),
+                _ => Task.FromResult(new[] { IPAddress.Loopback }));
+            await using HtmlBrowserPolicyProxy proxy = new(evaluator);
+            using TcpClient browser = new();
+            await browser.ConnectAsync(IPAddress.Loopback, new Uri(proxy.Server).Port)
+                .WaitWithCancellationAsync(timeout.Token);
+            using NetworkStream stream = browser.GetStream();
+            byte[] request = Encoding.ASCII.GetBytes($"CONNECT render.invalid:{port} HTTP/1.1\r\nHost: render.invalid:{port}\r\n\r\n");
+            await stream.WriteAsync(request, 0, request.Length, timeout.Token);
+            using StreamReader response = new(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
+            Assert.Equal("HTTP/1.1 200 Connection Established",
+                await response.ReadLineAsync().WaitWithCancellationAsync(timeout.Token));
+            using TcpClient connectedOrigin = await origin.AcceptTcpClientAsync().WaitWithCancellationAsync(timeout.Token);
+        } finally {
+            Console.SetError(previousError);
+            Environment.SetEnvironmentVariable("DEBUG", previousDebug);
+            origin.Stop();
+        }
+
+        Assert.Contains("accepted", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("connect-start", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains(" connected", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("connect-failed", output.ToString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -34,7 +73,10 @@ public sealed class HtmlBrowserPolicyProxyDiagnosticTests {
             Assert.Equal(string.Empty, diagnostic);
             return;
         }
+        Assert.Contains("accepted", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("connect-start", diagnostic, StringComparison.Ordinal);
         Assert.Contains("connect-failed", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain(" connected", diagnostic, StringComparison.Ordinal);
         Assert.Contains("socket=ConnectionRefused", diagnostic, StringComparison.Ordinal);
         Assert.Contains("disposing", diagnostic, StringComparison.Ordinal);
         Assert.DoesNotContain("private-exception", diagnostic, StringComparison.Ordinal);
