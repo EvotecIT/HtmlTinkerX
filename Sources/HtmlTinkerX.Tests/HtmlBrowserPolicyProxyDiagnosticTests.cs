@@ -34,7 +34,10 @@ public sealed class HtmlBrowserPolicyProxyDiagnosticTests {
             Assert.Equal(string.Empty, diagnostic);
             return;
         }
+        Assert.Contains("accepted", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("connect-start", diagnostic, StringComparison.Ordinal);
         Assert.Contains("connect-failed", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain(" connected", diagnostic, StringComparison.Ordinal);
         Assert.Contains("socket=ConnectionRefused", diagnostic, StringComparison.Ordinal);
         Assert.Contains("disposing", diagnostic, StringComparison.Ordinal);
         Assert.DoesNotContain("private-exception", diagnostic, StringComparison.Ordinal);
