@@ -132,6 +132,10 @@ public sealed class HtmlFormBrowserSubmissionTests {
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => HtmlFormSubmitter.SubmitAsync(session.Page, "form", fields, cancellationToken: canceled.Token));
         Assert.Equal("old", await session.Page.Locator("input").InputValueAsync());
         await Assert.ThrowsAsync<TimeoutException>(() => HtmlFormSubmitter.SubmitAsync(session.Page, "#missing", fields, 100));
+        await session.Page.SetContentAsync("<form></form>");
+        Task<TimeoutException> expired = Assert.ThrowsAsync<TimeoutException>(() => HtmlFormSubmitter.SubmitAsync(session.Page, "form", fields, 1000));
+        Assert.Same(expired, await Task.WhenAny(expired, Task.Delay(TimeSpan.FromSeconds(5))));
+        Assert.Contains("Browser form submission exceeded its 1000 ms timeout.", (await expired).Message);
         using CancellationTokenSource stopping = new();
         Task pending = HtmlFormSubmitter.SubmitAsync(session.Page, "#missing", fields, 1000, stopping.Token);
         stopping.Cancel();
