@@ -6,6 +6,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Cancellation timing")]
 public sealed class HtmlBrowserCdpOwnershipTests {
     [Fact]
     public async Task StalledPageCreationReleasesTheLocalCdpDriverWithinTheCleanupBound() {
