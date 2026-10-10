@@ -19,7 +19,6 @@ public class HtmlBrowserMetadataCancellationTests {
     [InlineData("RecipeTitle")]
     [InlineData("RecipeStepTitle")]
     [InlineData("DiagnosticsTitle")]
-    [InlineData("SsoTimeoutTitle")]
     [InlineData("ContentMarkup")]
     [InlineData("ContentText")]
     [InlineData("ContentOuterHtml")]
@@ -132,7 +131,6 @@ public class HtmlBrowserMetadataCancellationTests {
                 Steps = new List<HtmlBrowserRecipeStep> { new() { Action = HtmlBrowserRecipeAction.WaitMilliseconds, Milliseconds = 0 } }
             }, session, cancellationToken),
             "DiagnosticsTitle" or "DiagnosticsCookies" or "DiagnosticsScript" or "DiagnosticsStorage" => HtmlBrowser.GetDiagnosticsAsync(session, cancellationToken),
-            "SsoTimeoutTitle" => HtmlBrowser.GetSsoHandoffsAsync(session, new HtmlBrowserSsoHandoffOptions { Wait = true, Timeout = 1, PollMilliseconds = 1 }, cancellationToken),
             "SsoScript" => HtmlBrowser.GetSsoHandoffsAsync(session, cancellationToken: cancellationToken),
             "ContentMarkup" => HtmlBrowser.GetContentAsync(session.Page, cancellationToken: cancellationToken),
             "ContentText" => HtmlBrowser.GetContentAsync(session.Page, asText: true, cancellationToken: cancellationToken),

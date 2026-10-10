@@ -111,39 +111,39 @@ public static partial class HtmlBrowser {
             return await WaitForSsoHandoffsAsync(session, options, cancellationToken).ConfigureAwait(false);
         }
 
-        return await ReadSsoHandoffsAsync(session, options, cancellationToken).ConfigureAwait(false);
+        return (await ReadSsoHandoffsAsync(session, options, cancellationToken).ConfigureAwait(false)).Handoffs;
     }
 
     private static async Task<IReadOnlyList<HtmlBrowserSsoHandoff>> WaitForSsoHandoffsAsync(
         HtmlBrowserSession session,
         HtmlBrowserSsoHandoffOptions options,
         CancellationToken cancellationToken) {
-        DateTimeOffset started = DateTimeOffset.UtcNow;
-        while (true) {
-            IReadOnlyList<HtmlBrowserSsoHandoff> handoffs = await ReadSsoHandoffsAsync(session, options, cancellationToken).ConfigureAwait(false);
-            if (handoffs.Count > 0) {
-                return handoffs;
-            }
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (options.Timeout > 0) deadline.CancelAfter(options.Timeout);
+        string title = string.Empty;
+        try {
+            while (true) {
+                var read = await ReadSsoHandoffsAsync(session, options, deadline.Token).ConfigureAwait(false);
+                title = read.Title;
+                deadline.Token.ThrowIfCancellationRequested();
+                if (read.Handoffs.Count > 0) {
+                    return read.Handoffs;
+                }
 
-            if (options.Timeout > 0 && DateTimeOffset.UtcNow - started >= TimeSpan.FromMilliseconds(options.Timeout)) {
-                string context = await GetSsoHandoffWaitContextAsync(session, cancellationToken).ConfigureAwait(false);
-                throw new TimeoutException($"Timed out after {options.Timeout} ms waiting for an SSO handoff form.{context}");
+                await session.Page.WaitForTimeoutAsync(options.PollMilliseconds)
+                    .WaitWithCancellationAsync(deadline.Token).ConfigureAwait(false);
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            await session.Page.WaitForTimeoutAsync(options.PollMilliseconds).WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException(cancellationToken);
+        } catch (OperationCanceledException) when (deadline.IsCancellationRequested) {
+            string context = GetSsoHandoffWaitContext(session, title);
+            throw new TimeoutException($"Timed out after {options.Timeout} ms waiting for an SSO handoff form.{context}");
         }
     }
 
-    private static async Task<string> GetSsoHandoffWaitContextAsync(HtmlBrowserSession session, CancellationToken cancellationToken) {
-        cancellationToken.ThrowIfCancellationRequested();
+    private static string GetSsoHandoffWaitContext(HtmlBrowserSession session, string title) {
+        // Use completed metadata reads; another browser query could outlive the expired deadline.
         string pageUrl = HtmlSensitiveValueRedactor.RedactSensitiveQueryValues(session.Page.Url ?? string.Empty);
-        string title = string.Empty;
-        try {
-            title = await session.Page.TitleAsync().WaitWithCancellationAsync(cancellationToken).ConfigureAwait(false);
-        } catch (Exception ex) when (!(ex is OperationCanceledException)) {
-            title = string.Empty;
-        }
 
         if (!string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(pageUrl)) {
             return $" Current page: '{title}' ({pageUrl}).";
@@ -156,7 +156,7 @@ public static partial class HtmlBrowser {
         return string.Empty;
     }
 
-    private static async Task<IReadOnlyList<HtmlBrowserSsoHandoff>> ReadSsoHandoffsAsync(
+    private static async Task<(IReadOnlyList<HtmlBrowserSsoHandoff> Handoffs, string Title)> ReadSsoHandoffsAsync(
         HtmlBrowserSession session,
         HtmlBrowserSsoHandoffOptions options,
         CancellationToken cancellationToken) {
@@ -199,7 +199,7 @@ public static partial class HtmlBrowser {
             }
         }
 
-        return handoffs;
+        return (handoffs, title);
     }
 
     private static HtmlBrowserSsoHandoff? BuildUrlSsoHandoff(JsonElement location, string pageUrl, string title, HtmlBrowserSsoHandoffOptions options) {
