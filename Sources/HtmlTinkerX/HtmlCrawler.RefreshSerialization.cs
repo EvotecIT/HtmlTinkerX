@@ -26,6 +26,7 @@ public static partial class HtmlCrawler {
         }
 
         public override void Write(Utf8JsonWriter writer, HtmlCrawlPage page, JsonSerializerOptions options) {
+            using PageContentLease content = new(page);
             if (page.HttpCache == null) {
                 JsonSerializer.Serialize(writer, page, pageOptions);
                 return;

@@ -20,7 +20,7 @@ public static partial class HtmlCrawler {
         public int StoredAssetCount { get; set; }
     }
 
-    private sealed class CrawlCheckpointWriter(string path) {
+    private sealed class CrawlCheckpointWriter(string path, bool retainPageContent) {
         private readonly CrawlArtifactPaths _paths = ResolveArtifactPaths(path);
         private readonly string _generation = Guid.NewGuid().ToString("N");
         private int _pages;
@@ -51,15 +51,20 @@ public static partial class HtmlCrawler {
             string directory = CheckpointDirectory(_paths.ManifestPath, _generation);
             while (_pages < result.Pages.Count) {
                 HtmlCrawlPage page = result.Pages[_pages];
-                SetPageArtifactPaths(page, _pages, _paths);
-                if (!string.IsNullOrEmpty(page.Html)) await WriteTextAsync(page.HtmlPath!, page.Html, token).ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(page.Text)) await WriteTextAsync(page.TextPath!, page.Text, token).ConfigureAwait(false);
-                if (!string.IsNullOrEmpty(page.Markdown)) await WriteTextAsync(page.MarkdownPath!, page.Markdown, token).ConfigureAwait(false);
-                await WriteRecordAsync(directory, "page", _pages, page, token).ConfigureAwait(false);
+                using (new PageContentLease(page)) {
+                    SetPageArtifactPaths(page, _pages, _paths);
+                    if (!string.IsNullOrEmpty(page.Html)) await WriteTextAsync(page.HtmlPath!, page.Html, token).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(page.Text)) await WriteTextAsync(page.TextPath!, page.Text, token).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(page.Markdown)) await WriteTextAsync(page.MarkdownPath!, page.Markdown, token).ConfigureAwait(false);
+                    await WriteRecordAsync(directory, "page", _pages, page, token).ConfigureAwait(false);
+                }
+                if (!retainPageContent && HasPageContent(page)) ReleasePageContent(page, RecordPath(directory, "page", _pages));
                 _pages++;
             }
             while (_skipped < result.SkippedPages.Count) {
-                await WriteRecordAsync(directory, "skipped", _skipped, result.SkippedPages[_skipped], token).ConfigureAwait(false);
+                HtmlCrawlPage page = result.SkippedPages[_skipped];
+                await WriteRecordAsync(directory, "skipped", _skipped, page, token).ConfigureAwait(false);
+                if (!retainPageContent && HasPageContent(page)) ReleasePageContent(page, RecordPath(directory, "skipped", _skipped));
                 _skipped++;
             }
             while (_assets < result.Assets.Count) {
@@ -111,11 +116,19 @@ public static partial class HtmlCrawler {
         return checkpoint;
     }
 
-    private static async Task<HtmlCrawlResult> LoadCheckpointAsync(CrawlCheckpoint checkpoint, string manifestPath, CancellationToken token) {
+    private static async Task<HtmlCrawlResult> LoadCheckpointAsync(CrawlCheckpoint checkpoint, string manifestPath, CancellationToken token, bool retainPageContent = true) {
         string directory = CheckpointDirectory(manifestPath, checkpoint.Generation);
         HtmlCrawlResult result = checkpoint.Result;
-        for (int index = 0; index < checkpoint.StoredPageCount; index++) result.Pages.Add(await ReadRecordAsync<HtmlCrawlPage>(directory, "page", index, token).ConfigureAwait(false));
-        for (int index = 0; index < checkpoint.StoredSkippedCount; index++) result.SkippedPages.Add(await ReadRecordAsync<HtmlCrawlPage>(directory, "skipped", index, token).ConfigureAwait(false));
+        for (int index = 0; index < checkpoint.StoredPageCount; index++) {
+            HtmlCrawlPage page = await ReadRecordAsync<HtmlCrawlPage>(directory, "page", index, token).ConfigureAwait(false);
+            if (!retainPageContent && HasPageContent(page)) ReleasePageContent(page, RecordPath(directory, "page", index));
+            result.Pages.Add(page);
+        }
+        for (int index = 0; index < checkpoint.StoredSkippedCount; index++) {
+            HtmlCrawlPage page = await ReadRecordAsync<HtmlCrawlPage>(directory, "skipped", index, token).ConfigureAwait(false);
+            if (!retainPageContent && HasPageContent(page)) ReleasePageContent(page, RecordPath(directory, "skipped", index));
+            result.SkippedPages.Add(page);
+        }
         for (int index = 0; index < checkpoint.StoredAssetCount; index++) result.Assets.Add(await ReadRecordAsync<HtmlCrawlAsset>(directory, "asset", index, token).ConfigureAwait(false));
         UpdateDerivedResultData(result);
         return result;

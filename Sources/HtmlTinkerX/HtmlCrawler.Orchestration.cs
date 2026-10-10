@@ -75,12 +75,13 @@ public static partial class HtmlCrawler {
             return renderSession.Session;
         }
         try {
-            string persistencePath = resolvedOptions.OutputPath ?? resolvedOptions.ResumePath ?? string.Empty;
-            bool persistSnapshots = !string.IsNullOrEmpty(persistencePath);
-            if (persistSnapshots) checkpointWriter = new CrawlCheckpointWriter(persistencePath);
+            string persistencePath = !string.IsNullOrWhiteSpace(resolvedOptions.OutputPath)
+                ? resolvedOptions.OutputPath! : resolvedOptions.ResumePath ?? string.Empty;
+            bool persistSnapshots = !string.IsNullOrWhiteSpace(persistencePath);
+            if (persistSnapshots) checkpointWriter = new CrawlCheckpointWriter(persistencePath, resolvedOptions.RetainPageContent);
             HtmlCrawlResult result;
-            if (!string.IsNullOrEmpty(resolvedOptions.ResumePath)) {
-                result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(resolvedOptions.ResumePath)) {
+                result = await LoadResultAsync(resolvedOptions.ResumePath!, cancellationToken, resolvedOptions.RetainPageContent).ConfigureAwait(false);
                 if (!string.Equals(result.StartUrl, startUri.AbsoluteUri, StringComparison.Ordinal)) {
                     throw new InvalidOperationException($"Resume data was created for '{result.StartUrl}', but the current crawl starts from '{startUri.AbsoluteUri}'.");
                 }
@@ -309,6 +310,9 @@ public static partial class HtmlCrawler {
     }
 
     private static void ValidateOptions(HtmlCrawlOptions options) {
+        if (!options.RetainPageContent && string.IsNullOrWhiteSpace(options.OutputPath) && string.IsNullOrWhiteSpace(options.ResumePath)) {
+            throw new ArgumentException("Releasing page content requires OutputPath or ResumePath.", nameof(options.RetainPageContent));
+        }
         if (!string.IsNullOrWhiteSpace(options.RefreshPath)) {
             if (!string.IsNullOrWhiteSpace(options.ResumePath)) {
                 throw new ArgumentException("RefreshPath and ResumePath select different workflows and cannot be combined.", nameof(options.RefreshPath));

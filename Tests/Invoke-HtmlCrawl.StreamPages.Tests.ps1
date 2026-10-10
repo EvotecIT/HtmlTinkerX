@@ -71,6 +71,21 @@ public sealed class PesterPageStreamServer : IDisposable {
         } finally { $server.Dispose() }
     }
 
+    It 'keeps streamed content when the persisted crawl releases page bodies' {
+        $server = [PesterPageStreamServer]::new()
+        $outputPath = Join-Path $TestDrive 'released-stream'
+        try {
+            $pages = @(Invoke-HtmlCrawl -Url $server.Url -MaxPages 2 -IgnoreRobotsTxt -NoSitemaps -OutPath $outputPath -IncludeHtml -IncludeMarkdown -StreamPages -ReleasePageContent)
+            $pages.Count | Should -Be 2
+            $pages[0].Html | Should -Match 'Home'
+            $pages[0].Text | Should -Match 'Home'
+            $pages[0].Markdown | Should -Match 'Home'
+            $pages[1].Status.ToString() | Should -Be 'Failed'
+            $saved = Get-Content -LiteralPath (Join-Path $outputPath 'crawl-result.json') -Raw | ConvertFrom-Json
+            $saved.Pages[0].Text | Should -Match 'Home'
+        } finally { $server.Dispose() }
+    }
+
     It 'emits the first page while the second response is still pending' {
         $server = [PesterPageStreamServer]::new($true)
         $firstWasIncremental = $false
