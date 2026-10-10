@@ -53,17 +53,18 @@ public static partial class HtmlBrowser {
         : StringComparison.Ordinal;
 
     /// <summary>
-    /// Gets the root directory for the Playwright driver installation.
-    /// This directory is determined based on environment variables and platform-specific paths.
-    /// It is used to store the Playwright driver executable and other related files.
+    /// Gets the parent directory searched for the Playwright driver installation.
+    /// This directory may also contain caller-owned files outside the <c>.playwright</c> child.
     /// </summary>
     private static string GetDriverRoot() {
         string? envRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         if (!string.IsNullOrEmpty(envRoot)) {
-            if (envRoot.EndsWith(".playwright")) {
-                envRoot = Path.GetDirectoryName(envRoot) ?? envRoot;
+            envRoot = Path.GetFullPath(envRoot);
+            string directoryPath = envRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.Equals(Path.GetFileName(directoryPath), ".playwright", FileSystemPathComparison)) {
+                envRoot = Path.GetDirectoryName(directoryPath) ?? envRoot;
             }
-            return Path.GetFullPath(envRoot);
+            return envRoot;
         }
 
         string? browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
@@ -218,19 +219,18 @@ public static partial class HtmlBrowser {
 
 
     /// <summary>
-    /// Removes the Playwright driver installation directory.
-    /// This is typically called when the application is being uninstalled or when
-    /// the driver is no longer needed.
+    /// Removes only the owned <c>.playwright</c> driver directory while preserving
+    /// its caller-owned parent, siblings, and bundled driver assets.
     /// </summary>
     internal static void CleanDriver() {
-        if (IsBundledDriverPath(GetDriverPath())) {
+        string driverPath = GetDriverPath();
+        if (IsBundledDriverPath(driverPath)) {
             return;
         }
 
-        string root = GetDriverRoot();
-        if (Directory.Exists(root)) {
+        if (Directory.Exists(driverPath)) {
             try {
-                Directory.Delete(root, true);
+                Directory.Delete(driverPath, true);
             } catch {
                 // ignore
             }
