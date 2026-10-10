@@ -24,7 +24,7 @@ env:
   BUILD_CONFIGURATION: 'Release'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
-  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy'
+  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy,pw:channel:send,pw:channel:recv'
 
 jobs:
   test-windows:
