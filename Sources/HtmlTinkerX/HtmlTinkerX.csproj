@@ -19,7 +19,7 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <OfficeImoVersion>3.4.4</OfficeImoVersion>
-        <ChartForgeXVersion>1.8.1</ChartForgeXVersion>
+        <ChartForgeXVersion>1.8.2</ChartForgeXVersion>
     </PropertyGroup>
 
     <ItemGroup>
