@@ -54,5 +54,5 @@ public sealed class PlaywrightFixture : IAsyncLifetime {
 /// <summary>
 /// Collection definition for Playwright dependent tests.
 /// </summary>
-[CollectionDefinition("Playwright collection")]
+[CollectionDefinition("Playwright collection", DisableParallelization = true)]
 public sealed class PlaywrightCollection : ICollectionFixture<PlaywrightFixture> { }
