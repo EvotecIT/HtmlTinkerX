@@ -115,4 +115,23 @@ public sealed class PesterRefreshHttpServer : IDisposable {
             $server.Dispose()
         }
     }
+
+    It 'releases page strings while preserving the saved content and conditional refresh' {
+        $server = [PesterRefreshHttpServer]::new()
+        $source = Join-Path $TestDrive 'released'
+        $destination = Join-Path $TestDrive 'released-refresh'
+        try {
+            $original = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -Selector main -CacheResponses -OutPath $source -IncludeMarkdown -ReleasePageContent
+            $original.Pages[0].Html | Should -Be ''
+            $original.Pages[0].Text | Should -Be ''
+            $original.Pages[0].Markdown | Should -Be ''
+            (Get-Content -LiteralPath $original.Pages[0].TextPath -Raw) | Should -Match 'Main body'
+            (Get-Content -LiteralPath $original.ManifestPath -Raw | ConvertFrom-Json).Pages[0].Markdown | Should -Match 'Main body'
+            $result = Invoke-HtmlCrawl -Url $server.Url -MaxPages 1 -IgnoreRobotsTxt -NoSitemaps -Selector '#alternate' -RefreshPath $source -OutPath $destination -ReleasePageContent
+            $result.Pages[0].ResponseRevalidated | Should -BeTrue
+            $result.Pages[0].Text | Should -Be ''
+            (Get-Content -LiteralPath $result.Pages[0].TextPath -Raw) | Should -Match 'Alternate body'
+            $server.Validations | Should -Be 1
+        } finally { $server.Dispose() }
+    }
 }

@@ -266,3 +266,36 @@ checkpoints.
 Pipeline output does not acknowledge that downstream processing completed.
 Export files may be committed after a page is emitted. For a sink that must
 finish its work before the checkpoint advances, use the awaited C# observer.
+## Release saved page content
+
+For larger crawls, use `-ReleasePageContent` in PowerShell or
+`RetainPageContent = false` in `HtmlCrawlOptions`, together with an output or resume
+path. The crawler saves each completed page before clearing its HTML, text,
+Markdown and HTTP cache body from the returned page object. Links, structured
+data and other metadata remain available. Page files, search chunks, the offline
+index and the final manifest still contain the selected content.
+
+```powershell
+$crawl = Invoke-HtmlCrawl -Url 'https://example.com/docs/' -OutPath './crawl-output' -IncludeMarkdown -ReleasePageContent
+```
+
+Completed output contains `pages/*.content.json` files with the selected bodies
+and eligible HTTP cache bodies. Keep these files while using
+`HtmlCrawler.SaveResultAsync` on the returned result; saving reads one page at a
+time and leaves its strings empty afterward. Use `HtmlCrawler.LoadResultAsync`
+to obtain a fully retained result for reading or editing content. The final
+`crawl-result.json` is self-contained and can be moved without those sidecars.
+
+This option reduces retained page bodies. Page metadata, structured data and
+chunk fingerprints still grow with the crawl. Loading an existing final manifest
+or a source for conditional refresh still loads its content before crawling;
+this option does not limit total process memory.
+
+With `-StreamPages -ReleasePageContent`, emitted pages keep their selected HTML,
+text and Markdown while the crawler's retained page records release those bodies.
+The awaited C# observer also receives the content before it is released. Process
+it during the callback or call `page.CreateSnapshot()` to keep it afterward.
+The snapshot keeps the content available when it is created and shares the
+page's collections. It does not reload released bodies; load the saved result
+first if you need that content. Collecting streamed copies or queuing them for a
+slow consumer still uses memory.
