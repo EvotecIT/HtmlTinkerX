@@ -585,7 +585,9 @@ When you first use browser testing, Playwright automatically downloads required 
    - Subsequent runs use cached components - no re-download needed
    - You can manually ensure Chromium is installed using `HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium)`
 
-`PLAYWRIGHT_DRIVER_SEARCH_PATH` can point to the parent that contains `.playwright` or to the `.playwright` directory itself, with or without a trailing separator. Driver repair and cleanup remove only that `.playwright` directory and preserve the parent and its other files. Bundled driver assets are preserved during cleanup.
+`PLAYWRIGHT_DRIVER_SEARCH_PATH` can point to the parent that contains `.playwright` or to the `.playwright` directory itself, with or without a trailing separator. Driver cleanup removes only that `.playwright` directory and preserves the parent, its other files, and bundled driver assets.
+
+Full installation repair and cleanup also remove the entire browser cache directory. Treat `PLAYWRIGHT_BROWSERS_PATH` as disposable storage and keep it separate from caller-owned application files: it must not equal or contain the driver search parent.
 
 #### Linux: Avoiding sudo prompts
 On Linux, Playwright can also install OS-level dependencies when invoked with `--with-deps` (this typically requires root/sudo).

@@ -131,7 +131,7 @@ public class HtmlBrowserDriverPackageTests
         string siblingPath = Path.Combine(tempDriver, "application.dll");
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         var originalFactory = HtmlBrowser.HttpClientFactory;
-        var handler = new FakeHandler(CreateDriverPackage());
+        using var handler = new FakeHandler(CreateDriverPackage());
 
         try
         {
@@ -199,7 +199,7 @@ public class HtmlBrowserDriverPackageTests
         string siblingPath = Path.Combine(tempRoot, "application.dll");
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         var originalFactory = HtmlBrowser.HttpClientFactory;
-        var handler = new FakeHandler(new byte[] { 0, 1, 2 }, statusCode);
+        using var handler = new FakeHandler(new byte[] { 0, 1, 2 }, statusCode);
 
         try
         {
