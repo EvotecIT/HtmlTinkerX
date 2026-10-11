@@ -322,6 +322,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
+            browserArguments: ChromiumNetworkDiagnostics.Arguments(nameof(SanitizedAndNamespacedMarkupWaitForHeaderInterception)),
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"const popup = window.open('', '_blank');
             if (typeof popup.Element.prototype.setHTML === 'function') popup.document.body.setHTML(`<img src='{server.BlankPopupResourceUrl}?source=sanitized-element'>`);
