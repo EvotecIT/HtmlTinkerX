@@ -30735,6 +30735,31 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxConcurrentPageRequests</maml:name>
+          <maml:description>
+            <maml:para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</maml:para>
+            <maml:para>CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxConcurrentPageRequestsPerOrigin</maml:name>
+          <maml:description>
+            <maml:para>The default is one. An origin is the scheme, host and port. Its response slot remains held until the body closes. DelayMs, robots delays and enabled Retry-After waits apply to request starts within that origin.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaxDepth</maml:name>
           <maml:description>
             <maml:para>Maximum depth to follow links from the starting page.</maml:para>
@@ -31898,6 +31923,31 @@ Pipeline output does not acknowledge completion of downstream processing. Export
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaxConcurrentPageRequests</maml:name>
+        <maml:description>
+          <maml:para>The default is one. Downloads can overlap while extraction, discovery and checkpoints keep queue order. Every prefetched page counts toward MaxPages, including URLs made redundant by a preceding canonical URL. Keep one when requests depend on preceding cookie or session changes.</maml:para>
+          <maml:para>CacheResponses and RefreshPath require one so reusable response bodies and conditional requests follow ordered cookie state.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaxConcurrentPageRequestsPerOrigin</maml:name>
+        <maml:description>
+          <maml:para>The default is one. An origin is the scheme, host and port. Its response slot remains held until the body closes. DelayMs, robots delays and enabled Retry-After waits apply to request starts within that origin.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaxDepth</maml:name>
         <maml:description>
           <maml:para>Maximum depth to follow links from the starting page.</maml:para>
@@ -32437,6 +32487,13 @@ Pipeline output does not acknowledge completion of downstream processing. Export
       <command:example>
         <maml:title>EXAMPLE 3</maml:title>
         <dev:code>Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Status -eq Success</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 4</maml:title>
+        <dev:code>Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

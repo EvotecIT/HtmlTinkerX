@@ -22,7 +22,7 @@ using System.Xml.Linq;
 namespace HtmlTinkerX;
 
 public static partial class HtmlCrawler {
-    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken, HtmlCrawlPage? cachedPage = null) {
+    private static async Task<FetchedPageData> FetchHttpPageAsync(HttpClient client, CrawlRequest request, HtmlCrawlOptions options, IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> structuredSchema, CancellationToken cancellationToken, HtmlCrawlPage? cachedPage = null, bool deferExtraction = false) {
         HtmlCrawlPage page = new() {
             Url = NormalizeUrl(request.Uri, options),
             RequestedUrl = request.Uri.AbsoluteUri,
@@ -77,7 +77,7 @@ public static partial class HtmlCrawler {
                 };
             }
 
-            PopulatePageFromHtml(page, html, responseUri, options, structuredSchema);
+            if (!deferExtraction) PopulatePageFromHtml(page, html, responseUri, options, structuredSchema);
             if (options.CacheResponses && (response.StatusCode == HttpStatusCode.OK || page.ResponseRevalidated)
                 && CanStoreResponse(response, message.CacheRequestHeaders)) {
                 page.HttpCache = new HtmlCrawlHttpCacheEntry {
@@ -86,7 +86,8 @@ public static partial class HtmlCrawler {
             }
             return new FetchedPageData {
                 Page = page,
-                RawHtml = html
+                RawHtml = html,
+                DocumentUri = responseUri
             };
         } catch (HtmlCrawlBudgetExceededException) {
             throw;

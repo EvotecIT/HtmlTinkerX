@@ -1,6 +1,33 @@
 Import-Module "$PSScriptRoot/../PSParseHTML.psd1"
 
 Describe 'Invoke-HTMLCrawl' {
+    It 'uses concurrent static page options through the public command' {
+        $server = Start-TestHttpServer -Responses @{
+            '/' = "<a href='/one'>One</a><a href='/two'>Two</a>"
+            '/one' = '<main>First child page</main>'
+            '/two' = '<main>Second child page</main>'
+        }
+        try {
+            $result = Invoke-HtmlCrawl -Url $server.Prefix -MaxPages 3 -IgnoreRobotsTxt -NoSitemaps -MaxConcurrentPageRequests 2 -MaxConcurrentPageRequestsPerOrigin 2
+            $result.Pages.Count | Should -Be 3
+            $result.Pages[1].Url | Should -Be ($server.Prefix + 'one')
+            $result.Pages[2].Url | Should -Be ($server.Prefix + 'two')
+            $result.Pages[1].Text | Should -Match 'First child page'
+            $result.Pages[2].Text | Should -Match 'Second child page'
+            foreach ($page in $result.Pages) { $page.Status | Should -Be 'Success' }
+        } finally {
+            Stop-TestHttpServer $server
+        }
+    }
+
+    It 'rejects concurrent downloads with browser rendering through the public command' {
+        { Invoke-HtmlCrawl -Url 'https://example.test/' -MaxConcurrentPageRequests 2 -Render -ErrorAction Stop } | Should -Throw '*static mode*'
+    }
+
+    It 'rejects concurrent response caching through the public command' {
+        { Invoke-HtmlCrawl -Url 'https://example.test/' -MaxConcurrentPageRequests 2 -CacheResponses -ErrorAction Stop } | Should -Throw '*ordered cookie state*'
+    }
+
     BeforeAll {
         if (-not ('PesterTestHttpServer' -as [type])) {
             Add-Type -TypeDefinition @"

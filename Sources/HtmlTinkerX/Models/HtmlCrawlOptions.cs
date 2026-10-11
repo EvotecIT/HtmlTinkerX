@@ -36,6 +36,21 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Maximum number of pages to fetch during the crawl.</summary>
     public int MaxPages { get; set; } = 25;
 
+    /// <summary>Maximum number of static page downloads to prepare concurrently. One preserves sequential crawling.</summary>
+    /// <remarks>
+    /// Extraction and checkpoint publication remain in discovery order. Parallel downloading requires static mode
+    /// without Render, AutoRender or AutoProfile. Prefetched requests count toward MaxPages even if an earlier page later makes
+    /// their URL redundant. Keep one for sites whose requests depend on preceding cookie or session changes.
+    /// Response caching and RefreshPath require one so cache decisions follow ordered cookie state.
+    /// </remarks>
+    public int MaxConcurrentPageRequests { get; set; } = 1;
+
+    /// <summary>Maximum concurrent static page responses from one origin, including redirected destinations.</summary>
+    /// <remarks>The response holds its origin slot until its body is closed. One is the default.</remarks>
+    public int MaxConcurrentPageRequestsPerOrigin { get; set; } = 1;
+
+    internal HtmlCrawlRequestScheduler? PageRequestScheduler { get; set; }
+
     /// <summary>Maximum static page or robots.txt response size in bytes.</summary>
     public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
 
@@ -413,6 +428,8 @@ public sealed class HtmlCrawlOptions {
         HtmlCrawlOptions clone = new() {
             MaxDepth = MaxDepth,
             MaxPages = MaxPages,
+            MaxConcurrentPageRequests = MaxConcurrentPageRequests,
+            MaxConcurrentPageRequestsPerOrigin = MaxConcurrentPageRequestsPerOrigin,
             MaximumPageResponseBytes = MaximumPageResponseBytes,
             MaximumAssetResponseBytes = MaximumAssetResponseBytes,
             MaximumTotalPageResponseBytes = MaximumTotalPageResponseBytes,
