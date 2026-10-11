@@ -24,7 +24,9 @@ env:
   BUILD_CONFIGURATION: 'Release'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
-  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy,pw:channel:send,pw:channel:recv'
+  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy,pw:channel:send,pw:channel:recv,pw:fixture'
+  MOZ_LOG: 'timestamp,rotate:20,nsHttp:5,nsHostResolver:5'
+  MOZ_LOG_FILE: ${{ github.workspace }}/TestResults/firefox%PID
   HTMLTINKERX_TEST_NETLOG_DIRECTORY: ${{ github.workspace }}/TestResults/chromium-netlog
 
 jobs:
@@ -111,6 +113,7 @@ jobs:
             Sources/HtmlTinkerX.Tests/TestResults/browser-diagnostics/
             Sources/HtmlTinkerX.Tests/TestResults/**/*.dmp
             TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
 
       - name: Upload coverage reports
@@ -236,6 +239,7 @@ jobs:
           path: |
             TestResults/vstest-*.log
             TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -322,6 +326,7 @@ jobs:
           path: |
             TestResults/vstest-*.log
             TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
