@@ -192,16 +192,24 @@ public partial class HtmlCrawlerTests {
     }
 
     private static async Task RespondAndCloseAsync(HttpListenerContext context, Func<HttpListenerContext, Task> respond) {
+        int port = context.Request.LocalEndPoint.Port;
+        HtmlHttpFixtureDiagnostics.Report(context, "handler-start", localPort: port);
         try { await respond(context); }
         catch (IOException) { }
         catch (HttpListenerException) { }
-        finally { context.Response.Close(); }
+        finally {
+            HtmlHttpFixtureDiagnostics.Report(context, "close-start", localPort: port);
+            context.Response.Close();
+            HtmlHttpFixtureDiagnostics.Report(context, "close-complete", localPort: port);
+        }
     }
 
     private static async Task RespondAsync(HttpListenerContext context, string body, string contentType = "text/html") {
         byte[] bytes = Encoding.UTF8.GetBytes(body);
         context.Response.ContentType = contentType + "; charset=utf-8";
         context.Response.ContentLength64 = bytes.Length;
+        HtmlHttpFixtureDiagnostics.Report(context, "write-start", bytes.Length);
         await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
+        HtmlHttpFixtureDiagnostics.Report(context, "write-complete", bytes.Length);
     }
 }
