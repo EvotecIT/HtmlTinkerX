@@ -9,6 +9,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Cancellation timing")]
 public sealed class HtmlFormBrowserOwnershipTests {
     [Theory]
     [InlineData(false)]
