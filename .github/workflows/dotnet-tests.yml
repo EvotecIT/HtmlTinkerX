@@ -25,6 +25,7 @@ env:
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
   DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy,pw:channel:send,pw:channel:recv'
+  HTMLTINKERX_TEST_NETLOG_DIRECTORY: ${{ github.workspace }}/TestResults/chromium-netlog
 
 jobs:
   test-windows:
@@ -109,6 +110,7 @@ jobs:
           path: |
             Sources/HtmlTinkerX.Tests/TestResults/browser-diagnostics/
             Sources/HtmlTinkerX.Tests/TestResults/**/*.dmp
+            TestResults/chromium-netlog/*.json
           retention-days: 7
 
       - name: Upload coverage reports
@@ -231,7 +233,9 @@ jobs:
         if: failure()
         with:
           name: browser-diagnostics-ubuntu
-          path: TestResults/vstest-*.log
+          path: |
+            TestResults/vstest-*.log
+            TestResults/chromium-netlog/*.json
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -315,7 +319,9 @@ jobs:
         if: failure()
         with:
           name: browser-diagnostics-macos
-          path: TestResults/vstest-*.log
+          path: |
+            TestResults/vstest-*.log
+            TestResults/chromium-netlog/*.json
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
