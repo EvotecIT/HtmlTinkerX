@@ -32,7 +32,7 @@ public static class HtmlPageReader {
         if (effective.ConversionOptions == null) conversionOptions.IncludeNormalizedHtml = false;
         HtmlConversionDocument content = HtmlConversionDocument.Parse(html, conversionOptions);
         HtmlSemanticDocument semantic = content.SemanticDocument;
-        HtmlSemanticBlock[] blocks = FlattenBlocks(semantic.Sections.SelectMany(static section => section.Blocks)).ToArray();
+        HtmlSemanticBlock[] blocks = FlattenBlocks(semantic.Sections.SelectMany(EnumerateSectionBlocks)).ToArray();
         HtmlReadableTextResult readableText = effective.IncludeReadableText
             ? HtmlParserToText.ExtractReadableText(html)
             : new HtmlReadableTextResult();
@@ -84,6 +84,11 @@ public static class HtmlPageReader {
             Assets = FilterData(data, "Asset"),
             Collections = collections
         };
+    }
+
+    private static IEnumerable<HtmlSemanticBlock> EnumerateSectionBlocks(HtmlSemanticSection section) {
+        if (section.TitleHeading != null) yield return section.TitleHeading;
+        foreach (HtmlSemanticBlock block in section.Blocks) yield return block;
     }
 
     private static IEnumerable<HtmlSemanticBlock> FlattenBlocks(IEnumerable<HtmlSemanticBlock> blocks) {
