@@ -26,6 +26,12 @@ Measures page load performance for a URL or local HTML file.
 
 ### EXAMPLE 1
 ```powershell
+Measure-HtmlBrowserPerformance -Url 'Value'
+```
+
+
+### EXAMPLE 2
+```powershell
 Measure-HtmlBrowserPerformance -Path 'C:\Path'
 ```
 

@@ -31,7 +31,19 @@ Returns interactive elements from an active browser session.
 
 ### EXAMPLE 1
 ```powershell
+Get-HtmlBrowserInteractable -CancellationToken 'Value'
+```
+
+
+### EXAMPLE 2
+```powershell
 Get-HtmlBrowserInteractable -Path 'C:\Path'
+```
+
+
+### EXAMPLE 3
+```powershell
+Get-HtmlBrowserInteractable -Url 'Value'
 ```
 
 

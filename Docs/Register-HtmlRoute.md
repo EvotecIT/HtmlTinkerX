@@ -21,7 +21,7 @@ Cmdlet that registers a Playwright route handler for an active session.
 
 ### EXAMPLE 1
 ```powershell
-Register-HtmlRoute -CancellationToken 'Value'
+Register-HtmlRoute -Pattern 'Value' -ScriptBlock { }
 ```
 
 

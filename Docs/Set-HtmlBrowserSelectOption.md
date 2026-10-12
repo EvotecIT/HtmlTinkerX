@@ -21,7 +21,7 @@ Cmdlet that selects options from a <select> element.
 
 ### EXAMPLE 1
 ```powershell
-Set-HtmlBrowserSelectOption -CancellationToken 'Value'
+Set-HtmlBrowserSelectOption -Selector 'Value' -Value @('Value')
 ```
 
 

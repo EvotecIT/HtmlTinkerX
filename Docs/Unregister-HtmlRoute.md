@@ -21,7 +21,7 @@ Cmdlet that removes a previously registered Playwright route handler.
 
 ### EXAMPLE 1
 ```powershell
-Unregister-HtmlRoute -CancellationToken 'Value'
+Unregister-HtmlRoute -Pattern 'Value'
 ```
 
 

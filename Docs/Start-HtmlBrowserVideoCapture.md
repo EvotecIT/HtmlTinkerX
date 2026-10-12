@@ -35,6 +35,18 @@ Start-HtmlBrowserVideoCapture -OutFile 'Value'
 ```
 
 
+### EXAMPLE 2
+```powershell
+Start-HtmlBrowserVideoCapture -Path 'C:\Path' -OutFile 'Value'
+```
+
+
+### EXAMPLE 3
+```powershell
+Start-HtmlBrowserVideoCapture -Url 'Value' -OutFile 'Value'
+```
+
+
 ## PARAMETERS
 
 ### -Browser

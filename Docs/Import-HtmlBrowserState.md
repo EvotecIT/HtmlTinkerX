@@ -21,7 +21,7 @@ Cmdlet that restores a browser session from a previously exported state file.
 
 ### EXAMPLE 1
 ```powershell
-Import-HtmlBrowserState -Path 'C:\Path'
+Import-HtmlBrowserState -Path 'C:\Path' -Url 'Value'
 ```
 
 

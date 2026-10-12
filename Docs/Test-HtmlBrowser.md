@@ -30,6 +30,12 @@ Test-HtmlBrowser -Path 'C:\Path'
 ```
 
 
+### EXAMPLE 2
+```powershell
+Test-HtmlBrowser -Url 'Value'
+```
+
+
 ## PARAMETERS
 
 ### -CssResource

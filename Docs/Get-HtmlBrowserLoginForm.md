@@ -31,7 +31,19 @@ Cmdlet that detects a login form and returns the selectors needed for form authe
 
 ### EXAMPLE 1
 ```powershell
+Get-HtmlBrowserLoginForm -CancellationToken 'Value'
+```
+
+
+### EXAMPLE 2
+```powershell
 Get-HtmlBrowserLoginForm -Path 'C:\Path'
+```
+
+
+### EXAMPLE 3
+```powershell
+Get-HtmlBrowserLoginForm -Url 'Value'
 ```
 
 

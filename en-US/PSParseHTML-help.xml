@@ -13554,7 +13554,7 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Export-HtmlBrowserProfile -Path 'C:\Path'</dev:code>
+        <dev:code>Export-HtmlBrowserProfile -Profile 'Value' -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -20974,7 +20974,21 @@ Get-HtmlBrowserElement -Session $session -Selector '.product-card' -VisibleOnly 
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
+        <dev:code>Get-HtmlBrowserInteractable -CancellationToken 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
         <dev:code>Get-HtmlBrowserInteractable -Path 'C:\Path'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>Get-HtmlBrowserInteractable -Url 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -21821,7 +21835,21 @@ Get-HtmlBrowserElement -Session $session -Selector '.product-card' -VisibleOnly 
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
+        <dev:code>Get-HtmlBrowserLoginForm -CancellationToken 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
         <dev:code>Get-HtmlBrowserLoginForm -Path 'C:\Path'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>Get-HtmlBrowserLoginForm -Url 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25250,7 +25278,7 @@ Get-HtmlBrowserStorage -Session $session -Scope All</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Import-HtmlBrowserSession -Path 'C:\Path'</dev:code>
+        <dev:code>Import-HtmlBrowserSession -Path 'C:\Path' -Url 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25693,7 +25721,7 @@ Get-HtmlBrowserStorage -Session $session -Scope All</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Import-HtmlBrowserState -Path 'C:\Path'</dev:code>
+        <dev:code>Import-HtmlBrowserState -Path 'C:\Path' -Url 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -27678,7 +27706,21 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Invoke-HtmlBrowserNavigation -CancellationToken 'Value'</dev:code>
+        <dev:code>Invoke-HtmlBrowserNavigation -Url 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Invoke-HtmlBrowserNavigation -Selector 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>Invoke-HtmlBrowserNavigation -Text 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -36706,6 +36748,13 @@ $result.DriftReport</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
+        <dev:code>Measure-HtmlBrowserPerformance -Url 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
         <dev:code>Measure-HtmlBrowserPerformance -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -37311,7 +37360,7 @@ $result.DriftReport</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>New-HtmlBrowserCookie -Path 'C:\Path'</dev:code>
+        <dev:code>New-HtmlBrowserCookie -Name 'Name' -Value 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -39800,7 +39849,7 @@ Optimize-HtmlBrowserRecipe -Session $session -Path .\browser.recipe.json -OutPat
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Register-HtmlRoute -CancellationToken 'Value'</dev:code>
+        <dev:code>Register-HtmlRoute -Pattern 'Value' -ScriptBlock { }</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -51337,7 +51386,7 @@ Select-JavaScriptVariable -Source $script -Name enabled</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-HtmlBrowserChecked -CancellationToken 'Value'</dev:code>
+        <dev:code>Set-HtmlBrowserChecked -Selector 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -52154,7 +52203,7 @@ Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'Ht
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-HtmlBrowserSelectOption -CancellationToken 'Value'</dev:code>
+        <dev:code>Set-HtmlBrowserSelectOption -Selector 'Value' -Value @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -55954,6 +56003,20 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Start-HtmlBrowserVideoCapture -Path 'C:\Path' -OutFile 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 3</maml:title>
+        <dev:code>Start-HtmlBrowserVideoCapture -Url 'Value' -OutFile 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
     </command:examples>
     <command:relatedLinks />
   </command:command>
@@ -57310,6 +57373,13 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Test-HtmlBrowser -Url 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
     </command:examples>
     <command:relatedLinks />
   </command:command>
@@ -58475,7 +58545,7 @@ $validation.Issues | Format-Table Severity, StepIndex, Action, Property, Message
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Unregister-HtmlRoute -CancellationToken 'Value'</dev:code>
+        <dev:code>Unregister-HtmlRoute -Pattern 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

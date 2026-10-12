@@ -21,7 +21,7 @@ Cmdlet that creates a new HtmlCookie instance.
 
 ### EXAMPLE 1
 ```powershell
-New-HtmlBrowserCookie -Path 'C:\Path'
+New-HtmlBrowserCookie -Name 'Name' -Value 'Value'
 ```
 
 

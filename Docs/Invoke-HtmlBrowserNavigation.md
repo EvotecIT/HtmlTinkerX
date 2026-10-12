@@ -31,7 +31,19 @@ Cmdlet that navigates an existing browser session to a new URL.
 
 ### EXAMPLE 1
 ```powershell
-Invoke-HtmlBrowserNavigation -CancellationToken 'Value'
+Invoke-HtmlBrowserNavigation -Url 'Value'
+```
+
+
+### EXAMPLE 2
+```powershell
+Invoke-HtmlBrowserNavigation -Selector 'Value'
+```
+
+
+### EXAMPLE 3
+```powershell
+Invoke-HtmlBrowserNavigation -Text 'Value'
 ```
 
 

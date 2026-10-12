@@ -21,7 +21,7 @@ Cmdlet that sets the checked state of a checkbox or radio button.
 
 ### EXAMPLE 1
 ```powershell
-Set-HtmlBrowserChecked -CancellationToken 'Value'
+Set-HtmlBrowserChecked -Selector 'Value'
 ```
 
 

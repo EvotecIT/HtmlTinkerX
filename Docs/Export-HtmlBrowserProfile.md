@@ -21,7 +21,7 @@ Exports a reusable browser profile to JSON.
 
 ### EXAMPLE 1
 ```powershell
-Export-HtmlBrowserProfile -Path 'C:\Path'
+Export-HtmlBrowserProfile -Profile 'Value' -Path 'C:\Path'
 ```
 
 
