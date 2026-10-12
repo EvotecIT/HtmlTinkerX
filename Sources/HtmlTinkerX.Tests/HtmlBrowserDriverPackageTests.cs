@@ -115,13 +115,15 @@ public class HtmlBrowserDriverPackageTests
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, true)]
     public async Task EnsureDriverInstalledAsync_DownloadsMatchingOfficialPackageWithinSearchRoot(
-        bool explicitDriverPath, bool trailingSeparator, bool lookalikeRoot)
+        bool explicitDriverPath, bool trailingSeparator, bool lookalikeRoot, bool driverIsFile)
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string tempDriver = Path.Combine(tempRoot, lookalikeRoot ? "application.playwright" : "application");
@@ -137,6 +139,7 @@ public class HtmlBrowserDriverPackageTests
         {
             Directory.CreateDirectory(tempDriver);
             File.WriteAllText(siblingPath, "caller-owned application");
+            if (driverIsFile) File.WriteAllText(driverPath, "corrupt driver obstruction");
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", searchPath);
             HtmlBrowser.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false);
 
@@ -159,9 +162,11 @@ public class HtmlBrowserDriverPackageTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CleanDriver_RemovesOnlyOwnedChild(bool explicitDriverPath)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void CleanDriver_RemovesOnlyOwnedChild(bool explicitDriverPath, bool driverIsFile)
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         string searchRoot = Path.Combine(tempRoot, "application");
@@ -171,20 +176,81 @@ public class HtmlBrowserDriverPackageTests
 
         try
         {
-            Directory.CreateDirectory(driverPath);
+            Directory.CreateDirectory(searchRoot);
+            if (driverIsFile) File.WriteAllText(driverPath, "corrupt driver obstruction");
+            else Directory.CreateDirectory(driverPath);
             Directory.CreateDirectory(Path.GetDirectoryName(siblingPath)!);
-            File.WriteAllText(Path.Combine(driverPath, "corrupted-driver"), "disposable driver");
+            if (!driverIsFile) File.WriteAllText(Path.Combine(driverPath, "corrupted-driver"), "disposable driver");
             File.WriteAllText(siblingPath, "caller-owned settings");
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", explicitDriverPath ? driverPath : searchRoot);
 
             HtmlBrowser.CleanDriver();
 
             Assert.False(Directory.Exists(driverPath));
+            Assert.False(File.Exists(driverPath));
             Assert.True(Directory.Exists(searchRoot));
             Assert.Equal("caller-owned settings", File.ReadAllText(siblingPath));
         }
         finally
         {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task EnsureDriverInstalledAsync_CaseVariantSearchPathPreservesItsParent(
+        bool alreadyExists, bool canonicalEntry)
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string searchPath = Path.Combine(tempRoot, ".PLAYWRIGHT");
+        string lowercasePath = Path.Combine(tempRoot, ".playwright");
+        string siblingPath = Path.Combine(tempRoot, "application.dll");
+        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        var originalFactory = HtmlBrowser.HttpClientFactory;
+        using var handler = new FakeHandler(CreateDriverPackage());
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+            if (alreadyExists) Directory.CreateDirectory(canonicalEntry ? lowercasePath : searchPath);
+            bool existingWindowsAlias = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                alreadyExists && canonicalEntry && Directory.Exists(searchPath);
+            string expectedRoot = existingWindowsAlias ? tempRoot : searchPath;
+            string driverPath = Path.Combine(expectedRoot, ".playwright");
+            string? distinctSibling = null;
+            if (alreadyExists && !existingWindowsAlias)
+            {
+                Directory.CreateDirectory(searchPath);
+                File.WriteAllText(Path.Combine(searchPath, "settings.json"), "caller-owned parent");
+                Directory.CreateDirectory(lowercasePath);
+                distinctSibling = Path.Combine(lowercasePath, "sibling.json");
+                File.WriteAllText(distinctSibling, "caller-owned sibling");
+            }
+            File.WriteAllText(siblingPath, "caller-owned application");
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", searchPath);
+            HtmlBrowser.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false);
+
+            await HtmlBrowser.EnsureDriverInstalledAsync();
+
+            Assert.True(HtmlBrowser.HasDriverLayout(driverPath));
+            Assert.Equal(expectedRoot, Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH"));
+            HtmlBrowser.CleanDriver();
+            Assert.False(Directory.Exists(driverPath));
+            HtmlBrowser.CleanDriver();
+            Assert.True(Directory.Exists(expectedRoot));
+            Assert.Equal("caller-owned application", File.ReadAllText(siblingPath));
+            if (alreadyExists && !existingWindowsAlias)
+                Assert.Equal("caller-owned parent", File.ReadAllText(Path.Combine(searchPath, "settings.json")));
+            if (distinctSibling is not null)
+                Assert.Equal("caller-owned sibling", File.ReadAllText(distinctSibling));
+        }
+        finally
+        {
+            HtmlBrowser.HttpClientFactory = originalFactory;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
         }

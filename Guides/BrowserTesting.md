@@ -585,7 +585,11 @@ When you first use browser testing, Playwright automatically downloads required 
    - Subsequent runs use cached components - no re-download needed
    - You can manually ensure Chromium is installed using `HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium)`
 
-`PLAYWRIGHT_DRIVER_SEARCH_PATH` can point to the parent that contains `.playwright` or to the `.playwright` directory itself, with or without a trailing separator. Driver cleanup removes only that `.playwright` directory and preserves the parent, its other files, and bundled driver assets.
+`PLAYWRIGHT_DRIVER_SEARCH_PATH` can point to the parent that contains `.playwright` or to the `.playwright` directory itself, with or without a trailing separator. Driver cleanup removes only that `.playwright` directory or an obstructing file at the same path and preserves the parent, its other files, and bundled driver assets.
+
+Windows also accepts a verified spelling alias to an existing lowercase `.playwright` entry. An entry actually named `.PLAYWRIGHT` or another case variant remains a search parent across installation and cleanup, even on a case-insensitive filesystem. Ambiguous or unreadable aliases are rejected before driver deletion.
+
+If you previously supplied an uppercase driver-directory path, use its containing directory as the search path or spell the final component exactly `.playwright` to keep selecting the driver directly. On a case-sensitive filesystem, rename the existing driver directory to lowercase first. Supplying the uppercase entry itself now installs a `.playwright` child inside it and preserves its other contents.
 
 Full installation repair and cleanup also remove the entire browser cache directory. Treat `PLAYWRIGHT_BROWSERS_PATH` as disposable storage and keep it separate from caller-owned application files: it must not equal or contain the driver search parent.
 

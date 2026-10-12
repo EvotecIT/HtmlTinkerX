@@ -61,7 +61,11 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrEmpty(envRoot)) {
             envRoot = Path.GetFullPath(envRoot);
             string directoryPath = envRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (string.Equals(Path.GetFileName(directoryPath), ".playwright", FileSystemPathComparison)) {
+            string directoryName = Path.GetFileName(directoryPath);
+            if (string.Equals(directoryName, ".playwright", StringComparison.Ordinal) ||
+                (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                 string.Equals(directoryName, ".playwright", StringComparison.OrdinalIgnoreCase) &&
+                 IsExistingDriverDirectoryAlias(directoryPath))) {
                 envRoot = Path.GetDirectoryName(directoryPath) ?? envRoot;
             }
             return envRoot;
@@ -87,6 +91,36 @@ public static partial class HtmlBrowser {
             return Path.Combine(user, "Library", "Caches", "ms-playwright-driver");
         }
         return Path.Combine(user, ".cache", "ms-playwright-driver");
+    }
+
+    /// <summary>
+    /// Recognizes a Windows case alias only when both spellings resolve to the existing
+    /// lowercase entry. Other entries remain search parents; unverifiable aliases fail closed.
+    /// </summary>
+    private static bool IsExistingDriverDirectoryAlias(string directoryPath) {
+        string? parent = Path.GetDirectoryName(directoryPath);
+        if (parent is null) return false;
+        string canonicalPath = Path.Combine(parent, ".playwright");
+        string? matchingName = null;
+
+        try {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(parent)) {
+                string entryName = Path.GetFileName(entry);
+                if (!string.Equals(entryName, ".playwright", StringComparison.OrdinalIgnoreCase)) continue;
+                if (matchingName is not null) return false;
+                matchingName = entryName;
+            }
+        } catch (DirectoryNotFoundException) {
+            return false;
+        } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                                     ex is System.Security.SecurityException) {
+            throw new IOException("The Playwright driver search path identity could not be verified safely.", ex);
+        }
+
+        if (!string.Equals(matchingName, ".playwright", StringComparison.Ordinal)) return false;
+        if ((Directory.Exists(directoryPath) || File.Exists(directoryPath)) &&
+            (Directory.Exists(canonicalPath) || File.Exists(canonicalPath))) return true;
+        throw new IOException("The Playwright driver search path conflicts with an existing lowercase .playwright entry.");
     }
 
     /// <summary>
@@ -201,7 +235,7 @@ public static partial class HtmlBrowser {
     private static bool IsDriverCorrupted() {
         string baseDir = GetDriverPath();
         if (!Directory.Exists(baseDir))
-            return false;
+            return File.Exists(baseDir);
 
         if (!HasDriverLayout(baseDir))
             return true;
@@ -219,7 +253,7 @@ public static partial class HtmlBrowser {
 
 
     /// <summary>
-    /// Removes only the owned <c>.playwright</c> driver directory while preserving
+    /// Removes only the owned <c>.playwright</c> driver directory or obstructing file while preserving
     /// its caller-owned parent, siblings, and bundled driver assets.
     /// </summary>
     internal static void CleanDriver() {
@@ -228,13 +262,16 @@ public static partial class HtmlBrowser {
             return;
         }
 
-        if (Directory.Exists(driverPath)) {
-            try {
-                Directory.Delete(driverPath, true);
-            } catch {
-                // ignore
-            }
+        try {
+            DeleteDriverPath(driverPath);
+        } catch {
+            // Best-effort cleanup; installation reports an obstruction it cannot replace.
         }
+    }
+
+    private static void DeleteDriverPath(string driverPath) {
+        if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
+        else if (File.Exists(driverPath)) File.Delete(driverPath);
     }
 
     /// <summary>
