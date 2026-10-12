@@ -45,9 +45,7 @@ public static partial class HtmlBrowser {
             await File.WriteAllTextAsync(Path.Combine(stagingDir, ".version"), DriverVersion).ConfigureAwait(false);
 #endif
 
-            if (Directory.Exists(baseDir)) {
-                Directory.Delete(baseDir, true);
-            }
+            DeleteDriverPath(baseDir);
             Directory.Move(stagingDir, baseDir);
             EnsureNodeExecutable(baseDir);
         } catch {

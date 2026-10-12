@@ -128,7 +128,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-ubuntu:
     name: 'Ubuntu'
@@ -235,7 +235,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-macos:
     name: 'macOS'
@@ -319,4 +319,4 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: Sources/HtmlTinkerX.Tests/TestResults

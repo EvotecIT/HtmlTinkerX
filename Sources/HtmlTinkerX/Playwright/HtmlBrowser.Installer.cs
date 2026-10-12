@@ -53,17 +53,22 @@ public static partial class HtmlBrowser {
         : StringComparison.Ordinal;
 
     /// <summary>
-    /// Gets the root directory for the Playwright driver installation.
-    /// This directory is determined based on environment variables and platform-specific paths.
-    /// It is used to store the Playwright driver executable and other related files.
+    /// Gets the parent directory searched for the Playwright driver installation.
+    /// This directory may also contain caller-owned files outside the <c>.playwright</c> child.
     /// </summary>
     private static string GetDriverRoot() {
         string? envRoot = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         if (!string.IsNullOrEmpty(envRoot)) {
-            if (envRoot.EndsWith(".playwright")) {
-                envRoot = Path.GetDirectoryName(envRoot) ?? envRoot;
+            envRoot = Path.GetFullPath(envRoot);
+            string directoryPath = envRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string directoryName = Path.GetFileName(directoryPath);
+            if (string.Equals(directoryName, ".playwright", StringComparison.Ordinal) ||
+                (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+                 string.Equals(directoryName, ".playwright", StringComparison.OrdinalIgnoreCase) &&
+                 IsExistingDriverDirectoryAlias(directoryPath))) {
+                envRoot = Path.GetDirectoryName(directoryPath) ?? envRoot;
             }
-            return Path.GetFullPath(envRoot);
+            return envRoot;
         }
 
         string? browsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
@@ -86,6 +91,36 @@ public static partial class HtmlBrowser {
             return Path.Combine(user, "Library", "Caches", "ms-playwright-driver");
         }
         return Path.Combine(user, ".cache", "ms-playwright-driver");
+    }
+
+    /// <summary>
+    /// Recognizes a Windows case alias only when both spellings resolve to the existing
+    /// lowercase entry. Other entries remain search parents; unverifiable aliases fail closed.
+    /// </summary>
+    private static bool IsExistingDriverDirectoryAlias(string directoryPath) {
+        string? parent = Path.GetDirectoryName(directoryPath);
+        if (parent is null) return false;
+        string canonicalPath = Path.Combine(parent, ".playwright");
+        string? matchingName = null;
+
+        try {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(parent)) {
+                string entryName = Path.GetFileName(entry);
+                if (!string.Equals(entryName, ".playwright", StringComparison.OrdinalIgnoreCase)) continue;
+                if (matchingName is not null) return false;
+                matchingName = entryName;
+            }
+        } catch (DirectoryNotFoundException) {
+            return false;
+        } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                                     ex is System.Security.SecurityException) {
+            throw new IOException("The Playwright driver search path identity could not be verified safely.", ex);
+        }
+
+        if (!string.Equals(matchingName, ".playwright", StringComparison.Ordinal)) return false;
+        if ((Directory.Exists(directoryPath) || File.Exists(directoryPath)) &&
+            (Directory.Exists(canonicalPath) || File.Exists(canonicalPath))) return true;
+        throw new IOException("The Playwright driver search path conflicts with an existing lowercase .playwright entry.");
     }
 
     /// <summary>
@@ -200,7 +235,7 @@ public static partial class HtmlBrowser {
     private static bool IsDriverCorrupted() {
         string baseDir = GetDriverPath();
         if (!Directory.Exists(baseDir))
-            return false;
+            return File.Exists(baseDir);
 
         if (!HasDriverLayout(baseDir))
             return true;
@@ -218,23 +253,27 @@ public static partial class HtmlBrowser {
 
 
     /// <summary>
-    /// Removes the Playwright driver installation directory.
-    /// This is typically called when the application is being uninstalled or when
-    /// the driver is no longer needed.
+    /// Removes only the owned <c>.playwright</c> driver directory or obstructing file while preserving
+    /// its caller-owned parent, siblings, and bundled driver assets.
     /// </summary>
     internal static void CleanDriver() {
-        if (IsBundledDriverPath(GetDriverPath())) {
+        string driverPath = GetDriverPath();
+        if (IsBundledDriverPath(driverPath)) {
             return;
         }
 
-        string root = GetDriverRoot();
-        if (Directory.Exists(root)) {
-            try {
-                Directory.Delete(root, true);
-            } catch {
-                // ignore
-            }
+        try {
+            DeleteDriverPath(driverPath);
+        } catch {
+            // Best-effort cleanup; installation reports an obstruction it cannot replace.
         }
+    }
+
+    private static void DeleteDriverPath(string driverPath) {
+        // Preserve a verified alias's parent before deleting the entry used to resolve it.
+        EnsureDriverSearchPath(driverPath);
+        if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
+        else if (File.Exists(driverPath)) File.Delete(driverPath);
     }
 
     /// <summary>
@@ -646,8 +685,9 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static void EnsureDriverSearchPath() {
-        string driverPath = GetDriverPath();
+    private static void EnsureDriverSearchPath() => EnsureDriverSearchPath(GetDriverPath());
+
+    private static void EnsureDriverSearchPath(string driverPath) {
         string driverRoot = Path.GetDirectoryName(driverPath) ?? GetDriverRoot();
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driverRoot);
     }
