@@ -130,6 +130,7 @@ Console.WriteLine(page.Headings[0].Text);
 
 | Workflow | Guide |
 | --- | --- |
+| Turn an HTML table into a Word/PDF review and Excel workbook | [Office report integration](Guides/OfficeReports.md) |
 | Read semantic objects and inferred collections | [Object workflows](Docs/Examples/07-GetHtmlPageObjectWorkflows/README.MD) |
 | Crawl pages, mirror assets, choose content and resume a dataset | [Crawling and exports](Guides/Crawling.md) |
 | Parse and audit documents or automate a browser in PowerShell | [PowerShell workflows](Guides/PowerShell.md) |

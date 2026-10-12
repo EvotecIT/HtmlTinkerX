@@ -10,6 +10,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
+[Collection("Cancellation timing")]
 public class HtmlBrowserStateTests {
     private const string StateJson = "{\"cookies\":[],\"origins\":[{\"origin\":\"https://example.test\",\"localStorage\":[{\"name\":\"locale\",\"value\":\"zażółć\"}]}]}";
 
