@@ -213,14 +213,22 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         }
     }
 
-    [Fact]
-    public async Task HtmlDocumentRouteOnlyFulfillsTheInitialNavigation() {
-        await using LoopbackContentServer origin = new("server-location-response");
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HtmlDocumentRouteOnlyFulfillsTheInitialNavigation(bool reloadDocument) {
+        string response = reloadDocument
+            ? "<p id='result'>server-location-response</p>"
+            : "document.querySelector('#result').textContent = 'server-location-response';";
+        await using LoopbackContentServer origin = new(response);
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
             networkPolicy: policy));
-        string html = "<p id='result'>pending</p><script>fetch(location.href).then(r => r.text()).then(value => document.querySelector('#result').textContent = value);</script>";
+        // Both follow-up requests begin before DOMContentLoaded removes the temporary route.
+        string html = reloadDocument
+            ? "<p id='result'>pending</p><script>location.reload();</script>"
+            : $"<p id='result'>pending</p><script src='{origin.Url}'></script>";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromHtml(html, new Uri(origin.Url)),
