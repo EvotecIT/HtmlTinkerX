@@ -270,6 +270,8 @@ public static partial class HtmlBrowser {
     }
 
     private static void DeleteDriverPath(string driverPath) {
+        // Preserve a verified alias's parent before deleting the entry used to resolve it.
+        EnsureDriverSearchPath(driverPath);
         if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
         else if (File.Exists(driverPath)) File.Delete(driverPath);
     }
@@ -683,8 +685,9 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static void EnsureDriverSearchPath() {
-        string driverPath = GetDriverPath();
+    private static void EnsureDriverSearchPath() => EnsureDriverSearchPath(GetDriverPath());
+
+    private static void EnsureDriverSearchPath(string driverPath) {
         string driverRoot = Path.GetDirectoryName(driverPath) ?? GetDriverRoot();
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driverRoot);
     }

@@ -188,6 +188,7 @@ public class HtmlBrowserDriverPackageTests
 
             Assert.False(Directory.Exists(driverPath));
             Assert.False(File.Exists(driverPath));
+            Assert.Equal(searchRoot, Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH"));
             Assert.True(Directory.Exists(searchRoot));
             Assert.Equal("caller-owned settings", File.ReadAllText(siblingPath));
         }
@@ -238,9 +239,17 @@ public class HtmlBrowserDriverPackageTests
 
             Assert.True(HtmlBrowser.HasDriverLayout(driverPath));
             Assert.Equal(expectedRoot, Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH"));
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", searchPath);
             HtmlBrowser.CleanDriver();
             Assert.False(Directory.Exists(driverPath));
+            Assert.Equal(expectedRoot, Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH"));
             HtmlBrowser.CleanDriver();
+            Assert.True(Directory.Exists(expectedRoot));
+            await HtmlBrowser.EnsureDriverInstalledAsync();
+            Assert.True(HtmlBrowser.HasDriverLayout(driverPath));
+            Assert.Equal(expectedRoot, Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH"));
+            HtmlBrowser.CleanDriver();
+            Assert.False(Directory.Exists(driverPath));
             Assert.True(Directory.Exists(expectedRoot));
             Assert.Equal("caller-owned application", File.ReadAllText(siblingPath));
             if (alreadyExists && !existingWindowsAlias)
