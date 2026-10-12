@@ -40,8 +40,7 @@ public sealed class HtmlFormBrowserCmdletTests {
         command.AddCommand("Submit-HtmlBrowserForm")
             .AddParameter("Form", form)
             .AddParameter("FieldValue", new Hashtable { ["q"] = "new value" })
-            .AddParameter("PassThru")
-            .AddParameter("Timeout", 2000);
+            .AddParameter("PassThru");
         if (!defaultSession) command.AddParameter("Session", session);
 
         PSObject result = Assert.Single(command.Invoke());
