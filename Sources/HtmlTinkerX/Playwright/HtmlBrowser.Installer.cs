@@ -78,7 +78,8 @@ public static partial class HtmlBrowser {
         }
 
         if (!string.IsNullOrEmpty(browsersPath)) {
-            string parent = Path.GetDirectoryName(Path.GetFullPath(browsersPath)) ?? Path.GetFullPath(browsersPath);
+            string resolvedBrowsersPath = GetBrowserInstallPath();
+            string parent = Path.GetDirectoryName(resolvedBrowsersPath) ?? resolvedBrowsersPath;
             return Path.Combine(parent, "ms-playwright-driver");
         }
 
@@ -200,8 +201,8 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static bool IsBundledDriverPath(string driverPath) {
-        return string.Equals(
+    private static bool IsReadOnlyBundledDriverPath(string driverPath) {
+        return HasDriverLayout(driverPath) && string.Equals(
             Path.GetFullPath(driverPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
             Path.GetFullPath(GetBundledDriverPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
             FileSystemPathComparison);
@@ -221,7 +222,7 @@ public static partial class HtmlBrowser {
         string baseDir = GetDriverPath();
         if (!HasDriverLayout(baseDir))
             return false;
-        if (IsBundledDriverPath(baseDir))
+        if (IsReadOnlyBundledDriverPath(baseDir))
             return true;
         if (!File.Exists(VersionFile))
             return false;
@@ -239,6 +240,9 @@ public static partial class HtmlBrowser {
 
         if (!HasDriverLayout(baseDir))
             return true;
+
+        if (IsReadOnlyBundledDriverPath(baseDir))
+            return false;
 
         if (!File.Exists(VersionFile))
             return true;
@@ -258,18 +262,20 @@ public static partial class HtmlBrowser {
     /// </summary>
     internal static void CleanDriver() {
         string driverPath = GetDriverPath();
-        if (IsBundledDriverPath(driverPath)) {
+        if (IsReadOnlyBundledDriverPath(driverPath)) {
             return;
         }
 
+        ValidateDriverMutationPath(driverPath);
         try {
             DeleteDriverPath(driverPath);
-        } catch {
+        } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) {
             // Best-effort cleanup; installation reports an obstruction it cannot replace.
         }
     }
 
     private static void DeleteDriverPath(string driverPath) {
+        ValidateDriverMutationPath(driverPath);
         // Preserve a verified alias's parent before deleting the entry used to resolve it.
         EnsureDriverSearchPath(driverPath);
         if (Directory.Exists(driverPath)) Directory.Delete(driverPath, true);
@@ -292,6 +298,7 @@ public static partial class HtmlBrowser {
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
             using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
+            ValidateInstallationMutationPaths();
             ValidateExistingInstallation(engine);
 
             if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
@@ -340,13 +347,13 @@ public static partial class HtmlBrowser {
     /// Gets the path where Playwright browsers are installed.
     /// </summary>
     /// <returns></returns>
-    private static string GetBrowserInstallPath() {
+    private static string GetBrowserInstallPath(string? driverPath = null) {
         string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (envDefined == "0") {
-            return Path.Combine(Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location) ?? AppContext.BaseDirectory, ".local-browsers");
+            return Path.Combine(driverPath ?? GetDriverPath(), "package", ".local-browsers");
         }
         if (!string.IsNullOrEmpty(envDefined)) {
-            return Path.GetFullPath(envDefined);
+            return ResolveBrowserEnvironmentPath(envDefined);
         }
         string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
@@ -356,7 +363,18 @@ public static partial class HtmlBrowser {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return Path.Combine(user, "Library", "Caches", "ms-playwright");
         }
-        return Path.Combine(user, ".cache", "ms-playwright");
+        string? xdgCache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        return ResolveBrowserEnvironmentPath(Path.Combine(
+            string.IsNullOrEmpty(xdgCache) ? Path.Combine(user, ".cache") : xdgCache!, "ms-playwright"));
+    }
+
+    private static string ResolveBrowserEnvironmentPath(string path) {
+        // The official CLI resolves relative registry paths against INIT_CWD before its process working directory.
+        if (!Path.IsPathRooted(path)) {
+            string? initialDirectory = Environment.GetEnvironmentVariable("INIT_CWD");
+            if (!string.IsNullOrEmpty(initialDirectory)) path = Path.Combine(initialDirectory, path);
+        }
+        return Path.GetFullPath(path);
     }
 
     private static bool IsBrowserRuntimeInstalled(HtmlBrowserEngine engine) {
@@ -595,7 +613,8 @@ public static partial class HtmlBrowser {
     /// Cleans the browser installation directory and removes the Playwright driver.
     /// </summary>
     private static void CleanInstallDir() {
-        string path = GetBrowserInstallPath();
+        // A rejected configuration must not partially clean either installation.
+        string path = ValidateInstallationMutationPaths();
         if (Directory.Exists(path)) {
             Directory.Delete(path, recursive: true);
         }
@@ -613,7 +632,7 @@ public static partial class HtmlBrowser {
     }
 
     private static void CleanBrowserRuntime(HtmlBrowserEngine engine) {
-        string path = GetBrowserInstallPath();
+        string path = ValidateBrowserMutationPath();
         if (!Directory.Exists(path))
             return;
 
@@ -627,6 +646,9 @@ public static partial class HtmlBrowser {
                 if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     directories.Add(dir);
             }
+        }
+        foreach (string directory in directories) {
+            ValidateInstallationDestination(directory, directory, "PLAYWRIGHT_BROWSERS_PATH");
         }
         foreach (string directory in directories) {
             if (!Directory.Exists(directory))
@@ -695,6 +717,7 @@ public static partial class HtmlBrowser {
     private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
 
     private static void InstallRuntime(HtmlBrowserEngine engine) {
+        ValidateBrowserMutationPath();
         string runtime = engine.ToString().ToLowerInvariant();
 
         try {

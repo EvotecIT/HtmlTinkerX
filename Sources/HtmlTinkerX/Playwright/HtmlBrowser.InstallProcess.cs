@@ -14,6 +14,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     private static void RunPlaywrightInstaller(string[] arguments) {
         string driver = GetDriverPath();
+        string browserRoot = ValidateBrowserMutationPath(driver);
         string preload = Path.Combine(Path.GetTempPath(), "htmltinkerx-install-" + Guid.NewGuid().ToString("N") + ".cjs");
         try {
             using (Stream source = typeof(HtmlBrowser).Assembly.GetManifestResourceStream(
@@ -33,6 +34,11 @@ public static partial class HtmlBrowser {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+#if NETFRAMEWORK
+            start.EnvironmentVariables["PLAYWRIGHT_BROWSERS_PATH"] = browserRoot;
+#else
+            start.Environment["PLAYWRIGHT_BROWSERS_PATH"] = browserRoot;
+#endif
             using Process process = Process.Start(start)
                 ?? throw new InvalidOperationException("The browser installer could not be started.");
             Task<string> output = process.StandardOutput.ReadToEndAsync();

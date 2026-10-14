@@ -23,9 +23,10 @@ public static partial class HtmlBrowser {
     /// PowerShell module, does not preserve the SDK-copied <c>.playwright</c> output directory.
     /// </summary>
     private static async Task DownloadAndInstallDriverAsync() {
+        string baseDir = GetDriverPath();
+        ValidateDriverMutationPath(baseDir);
         string packageUrl = GetDriverPackageUrl();
         string packagePath = Path.Combine(Path.GetTempPath(), "playwright-driver-" + Guid.NewGuid().ToString("N") + ".nupkg");
-        string baseDir = GetDriverPath();
         string driverRoot = Path.GetDirectoryName(baseDir) ?? GetDriverRoot();
         string stagingDir = Path.Combine(driverRoot, ".playwright-install-" + Guid.NewGuid().ToString("N"));
 
@@ -239,6 +240,7 @@ public static partial class HtmlBrowser {
     private static void TryDeleteDirectory(string path) {
         try {
             if (Directory.Exists(path)) {
+                ValidateInstallationDestination(path, path, "PLAYWRIGHT_DRIVER_SEARCH_PATH");
                 Directory.Delete(path, true);
             }
         } catch (IOException) {

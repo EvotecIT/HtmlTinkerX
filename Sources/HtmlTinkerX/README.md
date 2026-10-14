@@ -10,6 +10,15 @@ dotnet add package HtmlTinkerX
 
 Pin a stable HtmlTinkerX version when reproducible restores matter.
 
+For custom Playwright storage, set `PLAYWRIGHT_DRIVER_SEARCH_PATH` and
+`PLAYWRIGHT_BROWSERS_PATH` to dedicated local directories. HtmlTinkerX manages the
+driver root's `.playwright` child. Installation, repair, and cleanup reject paths
+within or containing a NuGet cache, restored package payloads, and source checkout
+roots. Dedicated application output directories beneath a checkout remain supported.
+`PLAYWRIGHT_BROWSERS_PATH=0` stores browsers in the selected driver's
+`package/.local-browsers` directory. Complete bundled drivers are reused without
+modification; browser installation still requires a safe writable destination.
+
 ## Read a page as objects
 
 `HtmlPageReader` uses the canonical `OfficeIMO.Html` semantic document and adds

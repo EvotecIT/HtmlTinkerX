@@ -48,6 +48,59 @@ internal static class HtmlBrowserFileSystemPath {
         }
     }
 
+    /// <summary>
+    /// Resolves physical identity using the nearest existing ancestor, including for a not-yet-created destination.
+    /// This read-only metadata helper does not establish path safety; mutation callers must validate direct local paths first.
+    /// </summary>
+    internal static string GetPathIdentity(string path) {
+        string existing = Path.GetFullPath(path);
+        var suffix = new Stack<string>();
+        while (!Directory.Exists(existing) && !File.Exists(existing)) {
+            string? parent = Path.GetDirectoryName(existing);
+            if (string.IsNullOrEmpty(parent)) throw new IOException("The filesystem path identity could not be resolved.");
+            suffix.Push(Path.GetFileName(existing));
+            existing = parent;
+        }
+        string resolved = Environment.OSVersion.Platform == PlatformID.Win32NT
+            ? ResolveWindowsPath(existing) : ResolveUnixPath(existing);
+        while (suffix.Count > 0) resolved = Path.Combine(resolved, suffix.Pop());
+        return resolved;
+    }
+
+    /// <summary>
+    /// Validates an installation destination while preserving verified filesystem case aliases on macOS.
+    /// File-source validation remains stricter; installation aliases must still contain no mutable reparse components.
+    /// </summary>
+    internal static string GetValidatedInstallationPathIdentity(string path) {
+        string fullPath = Path.GetFullPath(path);
+        string identity;
+        try {
+            _ = GetValidatedLocalPath(fullPath);
+            identity = GetPathIdentity(fullPath);
+        } catch (ArgumentException) when (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && !IsNetworkOrDevicePath(path)) {
+            identity = GetPathIdentity(fullPath);
+            if (!AreEquivalentDirectUnixPaths(fullPath, identity, StringComparison.OrdinalIgnoreCase)) throw;
+            _ = GetValidatedLocalPath(identity);
+        }
+
+        // Inspect the requested entries, not just realpath's final result, so a case-only symlink cannot masquerade as a case alias.
+        string directPath = fullPath;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            && !string.Equals(fullPath, identity, StringComparison.OrdinalIgnoreCase)
+            && AreEquivalentDirectUnixPaths(fullPath, identity, StringComparison.OrdinalIgnoreCase)) {
+            directPath = "/private" + fullPath;
+        }
+        var components = new List<string>();
+        for (string? component = directPath; !string.IsNullOrEmpty(component); component = Path.GetDirectoryName(component)) {
+            components.Add(component!);
+        }
+        components.Reverse();
+        if (ContainsReparsePointBeforeTargetProbe(components, GetExistingPathAttributes)) {
+            throw new ArgumentException("Playwright installation destinations must not contain filesystem links or reparse points.", nameof(path));
+        }
+        return identity;
+    }
+
     /// <summary>Checks path trust boundaries without opening the target or reading its content.</summary>
     internal static bool IsSafeLocalPath(string path) {
         if (IsNetworkOrDevicePath(path)) return false;
@@ -89,10 +142,10 @@ internal static class HtmlBrowserFileSystemPath {
         return false;
     }
 
-    private static bool AreEquivalentDirectUnixPaths(string requested, string resolved) {
+    private static bool AreEquivalentDirectUnixPaths(string requested, string resolved, StringComparison comparison = StringComparison.Ordinal) {
         if (requested.Length > 1) requested = requested.TrimEnd(Path.DirectorySeparatorChar);
         if (resolved.Length > 1) resolved = resolved.TrimEnd(Path.DirectorySeparatorChar);
-        if (string.Equals(requested, resolved, StringComparison.Ordinal)) return true;
+        if (string.Equals(requested, resolved, comparison)) return true;
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return false;
         // Darwin exposes these operating-system-owned compatibility roots through
         // /private. Preserve ordinary temporary/configuration paths while rejecting
@@ -100,7 +153,7 @@ internal static class HtmlBrowserFileSystemPath {
         foreach (string root in new[] { "/etc", "/tmp", "/var" }) {
             if ((string.Equals(requested, root, StringComparison.Ordinal)
                  || requested.StartsWith(root + "/", StringComparison.Ordinal))
-                && string.Equals(resolved, "/private" + requested, StringComparison.Ordinal)) return true;
+                && string.Equals(resolved, "/private" + requested, comparison)) return true;
         }
         return false;
     }
@@ -146,18 +199,20 @@ internal static class HtmlBrowserFileSystemPath {
             current = Path.Combine(current, segment);
             components.Add(current);
         }
-        return ContainsReparsePointBeforeTargetProbe(components, path => {
-            try {
-                return File.GetAttributes(path);
-            } catch (FileNotFoundException) {
-                return null;
-            } catch (DirectoryNotFoundException) {
-                return null;
-            }
-        });
+        return ContainsReparsePointBeforeTargetProbe(components, GetExistingPathAttributes);
     }
 
-    /// <summary>Stops component inspection as soon as a Windows reparse point is observed.</summary>
+    private static FileAttributes? GetExistingPathAttributes(string path) {
+        try {
+            return File.GetAttributes(path);
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
+            return null;
+        }
+    }
+
+    /// <summary>Stops component inspection as soon as a reparse point is observed.</summary>
     internal static bool ContainsReparsePointBeforeTargetProbe(
         IEnumerable<string> pathComponents,
         Func<string, FileAttributes?> getAttributes) {

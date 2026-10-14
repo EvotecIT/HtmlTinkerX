@@ -300,7 +300,7 @@ public class HtmlBrowserDriverPackageTests
         }
     }
 
-    private static byte[] CreateDriverPackage()
+    internal static byte[] CreateDriverPackage(string browsersManifest = "{\"browsers\":[]}")
     {
         using var memory = new MemoryStream();
         using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
@@ -329,14 +329,14 @@ public class HtmlBrowserDriverPackageTests
 
             using (var browsersStream = new StreamWriter(archive.CreateEntry(".playwright/package/browsers.json").Open()))
             {
-                browsersStream.Write("{\"browsers\":[]}");
+                browsersStream.Write(browsersManifest);
             }
         }
 
         return memory.ToArray();
     }
 
-    private sealed class FakeHandler : HttpMessageHandler
+    internal sealed class FakeHandler : HttpMessageHandler
     {
         private readonly byte[] _content;
         private readonly HttpStatusCode _statusCode;

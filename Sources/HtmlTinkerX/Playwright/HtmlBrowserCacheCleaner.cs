@@ -159,7 +159,8 @@ public static class HtmlBrowserCacheCleaner {
 
         foreach (var location in locations) {
             try {
-                Directory.Delete(location.Path, recursive: true);
+                string path = HtmlBrowser.ValidateCacheMutationPath(location.Path);
+                Directory.Delete(path, recursive: true);
                 result.SuccessfullyCleared.Add(location);
             } catch (Exception ex) {
                 result.Failed.Add((location, ex.Message));

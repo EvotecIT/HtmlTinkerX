@@ -64,8 +64,10 @@ public class HtmlBrowserInstallerTests
     public void PlaywrightInstaller_HonorsConfiguredNodeExecutable()
     {
         string? originalNode = Environment.GetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH");
+        string? originalBrowsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         try
         {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", Path.Combine(Path.GetTempPath(), "htmltinkerx-cli-" + Guid.NewGuid().ToString("N")));
             Environment.SetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "unavailable node"));
             Assert.Throws<System.ComponentModel.Win32Exception>(() =>
                 HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "chromium" }));
@@ -73,6 +75,7 @@ public class HtmlBrowserInstallerTests
         finally
         {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH", originalNode);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsers);
         }
     }
 
@@ -80,14 +83,17 @@ public class HtmlBrowserInstallerTests
     public void PlaywrightInstaller_RunsOfficialBrowserPlanWithoutDownloading()
     {
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        string? originalBrowsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         try
         {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", Path.Combine(Path.GetTempPath(), "htmltinkerx-cli-" + Guid.NewGuid().ToString("N")));
             HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "chromium" });
         }
         finally
         {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsers);
         }
     }
 
@@ -95,9 +101,11 @@ public class HtmlBrowserInstallerTests
     public void PlaywrightInstaller_ReportsCliFailureInsteadOfClaimingSuccess()
     {
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        string? originalBrowsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         try
         {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", Path.Combine(Path.GetTempPath(), "htmltinkerx-cli-" + Guid.NewGuid().ToString("N")));
             var failure = Assert.Throws<InvalidOperationException>(() =>
                 HtmlBrowser.PlaywrightInstaller(new[] { "install", "--htmltinkerx-invalid-option" }));
             Assert.Contains("exit code 1", failure.Message);
@@ -106,6 +114,7 @@ public class HtmlBrowserInstallerTests
         finally
         {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsers);
         }
     }
 
@@ -723,13 +732,18 @@ public class HtmlBrowserInstallerTests
         }
     }
 
-    [Fact]
-    public async Task RepairInstallationAsync_ReinstallsDriverAndRuntime()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RepairInstallationAsync_ReinstallsDriverAndRuntime(bool beneathCheckout)
     {
         string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(root);
+        if (beneathCheckout) Directory.CreateDirectory(Path.Combine(root, ".git"));
+        string tempBrowsers = Path.Combine(root, "bin", "browsers");
+        string tempDriver = Path.Combine(root, "bin", "driver");
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
         Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
 
@@ -768,6 +782,7 @@ public class HtmlBrowserInstallerTests
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
             if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
             if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
         }
     }
 
