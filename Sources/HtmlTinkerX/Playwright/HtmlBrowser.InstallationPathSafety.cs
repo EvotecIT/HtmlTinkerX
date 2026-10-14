@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -32,12 +33,6 @@ public static partial class HtmlBrowser {
     private static string ValidateDirectoryMutationPath(string path, string setting) {
         path = Path.GetFullPath(path);
         ValidateInstallationDestination(path, path, setting);
-        if (Directory.Exists(path)) {
-            // Repair/clean can remove the whole root; reject a protected child before either installation changes.
-            foreach (string child in Directory.GetDirectories(path)) {
-                ValidateInstallationDestination(child, child, setting);
-            }
-        }
         return path;
     }
 
@@ -77,7 +72,58 @@ public static partial class HtmlBrowser {
                 throw ProtectedInstallationDestination(searchRoot, setting, "a source checkout root");
             }
         }
+
+        ValidateRecursiveMutationFootprint(path, searchRoot, setting);
     }
+
+    /// <summary>
+    /// Checks the complete existing deletion footprint before mutation. Recursive Directory.Delete removes
+    /// descendant links themselves without following their targets; native browser framework links must remain valid.
+    /// Enumeration and attribute failures propagate so an unreadable subtree cannot authorize partial cleanup.
+    /// </summary>
+    private static void ValidateRecursiveMutationFootprint(string path, string searchRoot, string setting) {
+        if (!Directory.Exists(path)) return;
+        var pending = new Stack<string>();
+        pending.Push(path);
+        while (pending.Count > 0) {
+            string directory = pending.Pop();
+            string git = Path.Combine(directory, ".git");
+            if (File.Exists(git) || Directory.Exists(git) || IsBareGitRepositoryDirectory(directory)) {
+                throw ProtectedInstallationDestination(searchRoot, setting, "a source repository");
+            }
+            if (File.Exists(Path.Combine(directory, ".nupkg.metadata"))) {
+                throw ProtectedInstallationDestination(searchRoot, setting, "a NuGet package payload");
+            }
+
+            bool hasPackageDefinition = false;
+            bool hasPackageHash = false;
+            foreach (string entry in Directory.EnumerateFileSystemEntries(directory)) {
+                string name = Path.GetFileName(entry);
+                FileAttributes attributes = File.GetAttributes(entry);
+                if (string.Equals(name, ".git", FileSystemPathComparison)) {
+                    throw ProtectedInstallationDestination(searchRoot, setting, "a source repository");
+                }
+                if ((attributes & FileAttributes.Directory) == 0) {
+                    if (string.Equals(name, ".nupkg.metadata", FileSystemPathComparison)) {
+                        throw ProtectedInstallationDestination(searchRoot, setting, "a NuGet package payload");
+                    }
+                    hasPackageDefinition |= name.EndsWith(".nuspec", FileSystemPathComparison);
+                    hasPackageHash |= name.EndsWith(".nupkg.sha512", FileSystemPathComparison);
+                }
+                // Inspect each real directory once. Do not traverse framework, external, dangling, or cyclic links.
+                if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == FileAttributes.Directory) {
+                    pending.Push(entry);
+                }
+            }
+            if (hasPackageDefinition && hasPackageHash) {
+                throw ProtectedInstallationDestination(searchRoot, setting, "a NuGet package payload");
+            }
+        }
+    }
+
+    private static bool IsBareGitRepositoryDirectory(string path) =>
+        File.Exists(Path.Combine(path, "HEAD")) && File.Exists(Path.Combine(path, "config"))
+        && Directory.Exists(Path.Combine(path, "objects")) && Directory.Exists(Path.Combine(path, "refs"));
 
     private static bool InstallationPathsOverlap(string path, string protectedPath) =>
         IsWithinInstallationPath(path, protectedPath) || IsWithinInstallationPath(protectedPath, path);
