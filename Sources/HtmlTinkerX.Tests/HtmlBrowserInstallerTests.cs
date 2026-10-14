@@ -13,7 +13,7 @@ using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
-[Collection("Playwright collection")]
+[Collection("Process diagnostics")]
 public class HtmlBrowserInstallerTests
 {
     [Theory]

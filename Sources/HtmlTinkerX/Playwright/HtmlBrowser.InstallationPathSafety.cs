@@ -56,8 +56,14 @@ public static partial class HtmlBrowser {
     }
 
     /// <summary>Applies the installation safety contract to a public cache-cleaner destination.</summary>
-    internal static string ValidateCacheMutationPath(string path) =>
-        ValidateDirectoryMutationPath(path, "CacheLocation.Path");
+    internal static string ValidateCacheMutationPath(string path) {
+        path = ValidateDirectoryMutationPath(path, "CacheLocation.Path");
+        string directory = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(Path.GetFileName(directory), ".playwright", FileSystemPathComparison)) {
+            ValidateDriverMutationPath(path);
+        }
+        return path;
+    }
 
     private static string ValidateDirectoryMutationPath(string path, string setting) {
         path = Path.GetFullPath(path);

@@ -83,6 +83,10 @@ public static partial class HtmlBrowser {
             return Path.Combine(parent, "ms-playwright-driver");
         }
 
+        return GetDefaultDriverRoot();
+    }
+
+    private static string GetDefaultDriverRoot() {
         string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -138,6 +142,13 @@ public static partial class HtmlBrowser {
         }
 
         return Path.Combine(GetDriverRoot(), ".playwright");
+    }
+
+    /// <summary>Discovers owned mutable driver children without including caller-owned search parents or bundled assets.</summary>
+    internal static IEnumerable<string> GetMutableDriverCachePaths() {
+        foreach (string path in new[] { GetDriverPath(), Path.Combine(GetDefaultDriverRoot(), ".playwright") }) {
+            if (!IsReadOnlyBundledDriverPath(path)) yield return path;
+        }
     }
 
     private static string GetBundledDriverPath() {
@@ -355,6 +366,16 @@ public static partial class HtmlBrowser {
         if (!string.IsNullOrEmpty(envDefined)) {
             return ResolveBrowserEnvironmentPath(envDefined);
         }
+        return GetDefaultBrowserInstallPath(useXdgCacheHome: true);
+    }
+
+    /// <summary>Includes the selected browser cache and the legacy OS default for cleanup discovery.</summary>
+    internal static IEnumerable<string> GetBrowserCachePaths() {
+        yield return GetBrowserInstallPath();
+        yield return GetDefaultBrowserInstallPath(useXdgCacheHome: false);
+    }
+
+    private static string GetDefaultBrowserInstallPath(bool useXdgCacheHome) {
         string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -363,7 +384,7 @@ public static partial class HtmlBrowser {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return Path.Combine(user, "Library", "Caches", "ms-playwright");
         }
-        string? xdgCache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        string? xdgCache = useXdgCacheHome ? Environment.GetEnvironmentVariable("XDG_CACHE_HOME") : null;
         return ResolveBrowserEnvironmentPath(Path.Combine(
             string.IsNullOrEmpty(xdgCache) ? Path.Combine(user, ".cache") : xdgCache!, "ms-playwright"));
     }

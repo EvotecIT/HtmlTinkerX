@@ -151,7 +151,7 @@ public sealed class TestHtmlBrowserCommand : AsyncPSCmdlet {
 [Cmdlet(VerbsCommon.Clear, "HtmlBrowserCache", SupportsShouldProcess = true)]
 public sealed class ClearHtmlBrowserCacheCommand : PSCmdlet {
     /// <summary>
-    /// Force cleanup without confirmation.
+    /// Compatibility switch. Cleanup always honors the WhatIf and Confirm common parameters.
     /// </summary>
     [Parameter()]
     public SwitchParameter Force { get; set; }
@@ -183,7 +183,7 @@ public sealed class ClearHtmlBrowserCacheCommand : PSCmdlet {
             return;
         }
         
-        var totalSizeMB = locations.Sum(l => l.SizeMB);
+        var totalSizeMB = HtmlBrowserCacheCleaner.GetEstimatedTotalSize(locations) / (1024.0 * 1024.0);
         
         // Display what will be cleaned
         WriteObject($"Found {locations.Count} location(s) with {totalSizeMB:F2} MB to clean:");
@@ -191,7 +191,7 @@ public sealed class ClearHtmlBrowserCacheCommand : PSCmdlet {
             WriteObject($"  - {location.Description}: {location.SizeMB:F2} MB at {location.Path}");
         }
         
-        if (!Force && !ShouldProcess(
+        if (!ShouldProcess(
             $"Playwright cache and temp files ({totalSizeMB:F2} MB total)",
             "Clear")) {
             return;

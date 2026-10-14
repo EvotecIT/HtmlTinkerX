@@ -25,6 +25,19 @@ markers must not be filesystem links. HtmlTinkerX checks these destinations befo
 installation, repair, or cleanup. Nested native framework links within real browser
 runtime directories remain supported.
 
+`HtmlBrowserCacheCleaner.GetCacheLocations` includes the selected browser cache and
+any existing legacy OS-default browser cache, with duplicate directories reported
+once. Selection honors custom paths, hermetic `0`, and Linux `XDG_CACHE_HOME` using
+the installer’s resolution rules. Reported sizes exclude filesystem-link targets.
+Mutable current and legacy drivers are listed as their owned `.playwright` child;
+their search parents and read-only bundled drivers are preserved. Cleanup keeps
+per-location results and supplied size estimates. When successful locations are
+nested, the total counts the outer estimate once; protected-location failures
+remain visible.
+Use `HtmlBrowserCacheCleaner.GetEstimatedTotalSize(locations)` for the same overlap
+accounting before cleanup. PowerShell `Clear-HtmlBrowserCache` always honors `-WhatIf` and `-Confirm`;
+`-Force` remains accepted for script compatibility and bypasses neither parameter.
+
 NuGet cache overlap checks ignore path casing on Windows and macOS, including
 directories that do not exist yet. On a case-sensitive Mac volume, use storage
 names that differ by more than casing; case-only differences are conservatively

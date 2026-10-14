@@ -19,7 +19,7 @@ public static class HtmlBrowserCacheCleaner {
         /// <summary>Description of what this location contains.</summary>
         public string Description { get; set; } = string.Empty;
         
-        /// <summary>Size of the cache location in bytes.</summary>
+        /// <summary>Estimated size of the cache location in bytes.</summary>
         public long Size { get; set; }
         
         /// <summary>Size in megabytes.</summary>
@@ -30,20 +30,70 @@ public static class HtmlBrowserCacheCleaner {
     /// Result of a cache cleaning operation.
     /// </summary>
     public sealed class CleanResult {
+        private readonly Dictionary<CacheLocation, string> _clearedIdentities = new Dictionary<CacheLocation, string>();
+
         /// <summary>Locations that were successfully cleaned.</summary>
         public List<CacheLocation> SuccessfullyCleared { get; set; } = new List<CacheLocation>();
         
         /// <summary>Locations that failed to clean with error messages.</summary>
         public List<(CacheLocation Location, string Error)> Failed { get; set; } = new List<(CacheLocation, string)>();
         
-        /// <summary>Total size cleared in bytes.</summary>
-        public long TotalSizeCleared => SuccessfullyCleared.Sum(l => l.Size);
+        /// <summary>Estimated bytes cleared, counting each outermost successful footprint once.</summary>
+        public long TotalSizeCleared => GetEstimatedFootprintSize(SuccessfullyCleared, _clearedIdentities);
         
         /// <summary>Total size cleared in megabytes.</summary>
         public double TotalSizeClearedMB => TotalSizeCleared / (1024.0 * 1024.0);
         
         /// <summary>Whether all locations were cleaned successfully.</summary>
         public bool Success => Failed.Count == 0;
+
+        /// <summary>Retains the pre-delete identity for accounting without changing the supplied location or estimate.</summary>
+        internal void RecordCleared(CacheLocation location, string identity) {
+            _clearedIdentities[location] = identity;
+            SuccessfullyCleared.Add(location);
+        }
+    }
+
+    /// <summary>
+    /// Estimates the total bytes represented by the supplied locations, counting outermost physical footprints once.
+    /// Uses the supplied sizes; the first estimate wins for duplicate identities. Path inspection is read-only
+    /// and does not authorize cleanup.
+    /// </summary>
+    /// <param name="locations">Cache locations and their size estimates.</param>
+    /// <returns>The estimated bytes without overlapping descendant or duplicate footprints.</returns>
+    /// <exception cref="ArgumentNullException">The locations collection is null.</exception>
+    /// <exception cref="ArgumentException">A location is null.</exception>
+    public static long GetEstimatedTotalSize(IEnumerable<CacheLocation> locations) {
+        if (locations is null) throw new ArgumentNullException(nameof(locations));
+        var entries = locations.ToList();
+        var identities = new Dictionary<CacheLocation, string>();
+        foreach (CacheLocation location in entries) {
+            if (location is null) throw new ArgumentException("A cache location cannot be null.", nameof(locations));
+            identities[location] = HtmlBrowserFileSystemPath.GetPathIdentity(location.Path);
+        }
+        return GetEstimatedFootprintSize(entries, identities);
+    }
+
+    private static long GetEstimatedFootprintSize(IReadOnlyList<CacheLocation> locations, IReadOnlyDictionary<CacheLocation, string> identities) {
+        StringComparison comparison = Environment.OSVersion.Platform == PlatformID.Win32NT
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var counted = new HashSet<string>(Environment.OSVersion.Platform == PlatformID.Win32NT
+            ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        long total = 0;
+        foreach (CacheLocation location in locations) {
+            // Caller-added result entries retain their original estimate behavior without filesystem inspection.
+            if (!identities.TryGetValue(location, out string? identity)) {
+                total += location.Size;
+                continue;
+            }
+            if (!counted.Add(identity)) continue;
+            bool hasAncestor = locations.Any(other => !ReferenceEquals(location, other)
+                && identities.TryGetValue(other, out string? parent)
+                && identity.StartsWith(parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar, comparison));
+            if (!hasAncestor) total += location.Size;
+        }
+        return total;
     }
     
     /// <summary>
@@ -54,60 +104,16 @@ public static class HtmlBrowserCacheCleaner {
     /// <returns>List of cache locations found.</returns>
     public static List<CacheLocation> GetCacheLocations(bool includeBrowsers = true, bool includeTemp = true) {
         var locations = new List<CacheLocation>();
+        var identities = new HashSet<string>(Environment.OSVersion.Platform == PlatformID.Win32NT
+            ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         
         if (includeBrowsers) {
-            // Get platform-specific paths
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
-                // Windows: ms-playwright in LocalAppData
-                var playwrightPath = Path.Combine(localAppData, "ms-playwright");
-                if (Directory.Exists(playwrightPath)) {
-                    locations.Add(new CacheLocation {
-                        Path = playwrightPath,
-                        Description = "Playwright browsers",
-                        Size = GetDirectorySize(playwrightPath)
-                    });
-                }
-                
-                // Windows: ms-playwright-driver in LocalAppData
-                var driverPath = Path.Combine(localAppData, "ms-playwright-driver");
-                if (Directory.Exists(driverPath)) {
-                    locations.Add(new CacheLocation {
-                        Path = driverPath,
-                        Description = "Playwright driver and Node.js",
-                        Size = GetDirectorySize(driverPath)
-                    });
-                }
-            } else if (Environment.OSVersion.Platform == PlatformID.Unix) {
-                // macOS uses Library/Caches, Linux uses .cache
-                string cacheBase = userProfile;
-                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX)) {
-                    cacheBase = Path.Combine(userProfile, "Library", "Caches");
-                } else {
-                    cacheBase = Path.Combine(userProfile, ".cache");
-                }
-                
-                // ms-playwright browsers
-                var playwrightPath = Path.Combine(cacheBase, "ms-playwright");
-                if (Directory.Exists(playwrightPath)) {
-                    locations.Add(new CacheLocation {
-                        Path = playwrightPath,
-                        Description = "Playwright browsers",
-                        Size = GetDirectorySize(playwrightPath)
-                    });
-                }
-                
-                // ms-playwright-driver
-                var driverPath = Path.Combine(cacheBase, "ms-playwright-driver");
-                if (Directory.Exists(driverPath)) {
-                    locations.Add(new CacheLocation {
-                        Path = driverPath,
-                        Description = "Playwright driver and Node.js",
-                        Size = GetDirectorySize(driverPath)
-                    });
-                }
+            foreach (string browserPath in HtmlBrowser.GetBrowserCachePaths()) {
+                AddCacheLocation(locations, identities, browserPath, "Playwright browsers");
+            }
+
+            foreach (string driverPath in HtmlBrowser.GetMutableDriverCachePaths()) {
+                AddCacheLocation(locations, identities, driverPath, "Playwright driver and Node.js");
             }
         }
         
@@ -118,11 +124,7 @@ public static class HtmlBrowserCacheCleaner {
             try {
                 var playwrightTempDirs = Directory.GetDirectories(tempPath, "playwright*", SearchOption.TopDirectoryOnly);
                 foreach (var dir in playwrightTempDirs) {
-                    locations.Add(new CacheLocation {
-                        Path = dir,
-                        Description = "Playwright temp files",
-                        Size = GetDirectorySize(dir)
-                    });
+                    AddCacheLocation(locations, identities, dir, "Playwright temp files");
                 }
             } catch {
                 // Ignore access errors
@@ -133,11 +135,7 @@ public static class HtmlBrowserCacheCleaner {
                 var traceDirs = Directory.GetDirectories(tempPath, "trace*", SearchOption.TopDirectoryOnly);
                 foreach (var dir in traceDirs) {
                     if (Directory.GetFiles(dir, "*.trace").Length > 0) {
-                        locations.Add(new CacheLocation {
-                            Path = dir,
-                            Description = "Trace files",
-                            Size = GetDirectorySize(dir)
-                        });
+                        AddCacheLocation(locations, identities, dir, "Trace files");
                     }
                 }
             } catch {
@@ -146,6 +144,16 @@ public static class HtmlBrowserCacheCleaner {
         }
         
         return locations;
+    }
+
+    private static void AddCacheLocation(List<CacheLocation> locations, HashSet<string> identities, string path, string description) {
+        path = Path.GetFullPath(path);
+        string root = Path.GetPathRoot(path) ?? string.Empty;
+        if (path.Length > root.Length) path = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!Directory.Exists(path)) return;
+        // Physical identity deduplicates discovery only; CleanCache still authorizes the supplied path separately.
+        if (!identities.Add(HtmlBrowserFileSystemPath.GetPathIdentity(path))) return;
+        locations.Add(new CacheLocation { Path = path, Description = description, Size = GetDirectorySize(path) });
     }
     
     /// <summary>
@@ -160,8 +168,9 @@ public static class HtmlBrowserCacheCleaner {
         foreach (var location in locations) {
             try {
                 string path = HtmlBrowser.ValidateCacheMutationPath(location.Path);
+                string identity = HtmlBrowserFileSystemPath.GetPathIdentity(path);
                 Directory.Delete(path, recursive: true);
-                result.SuccessfullyCleared.Add(location);
+                result.RecordCleared(location, identity);
             } catch (Exception ex) {
                 result.Failed.Add((location, ex.Message));
             }
@@ -183,16 +192,26 @@ public static class HtmlBrowserCacheCleaner {
     
     private static long GetDirectorySize(string path) {
         long size = 0;
-        try {
-            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories)) {
-                try {
-                    size += new FileInfo(file).Length;
-                } catch {
-                    // Ignore individual file access errors
+        var pending = new Stack<string>();
+        pending.Push(path);
+        while (pending.Count > 0) {
+            string directory = pending.Pop();
+            try {
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) continue;
+                foreach (string entry in Directory.EnumerateFileSystemEntries(directory)) {
+                    try {
+                        FileAttributes attributes = File.GetAttributes(entry);
+                        // Match the deletion footprint without counting external targets or looping through native links.
+                        if ((attributes & FileAttributes.ReparsePoint) != 0) continue;
+                        if ((attributes & FileAttributes.Directory) != 0) pending.Push(entry);
+                        else size += new FileInfo(entry).Length;
+                    } catch {
+                        // Ignore individual entry access errors.
+                    }
                 }
+            } catch {
+                // Ignore directory access errors.
             }
-        } catch {
-            // Ignore directory access errors
         }
         return size;
     }

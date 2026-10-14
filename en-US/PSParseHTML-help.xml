@@ -18,7 +18,7 @@
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Force</maml:name>
           <maml:description>
-            <maml:para>Force cleanup without confirmation.</maml:para>
+            <maml:para>Compatibility switch. Cleanup always honors the WhatIf and Confirm common parameters.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -57,7 +57,7 @@
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Force</maml:name>
         <maml:description>
-          <maml:para>Force cleanup without confirmation.</maml:para>
+          <maml:para>Compatibility switch. Cleanup always honors the WhatIf and Confirm common parameters.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
