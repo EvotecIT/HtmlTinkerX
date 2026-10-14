@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -198,25 +197,11 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static bool IsValidBrowserManifest(string manifestPath) {
-        try {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
-            return document.RootElement.TryGetProperty("browsers", out JsonElement browsers) &&
-                   browsers.ValueKind == JsonValueKind.Array;
-        } catch (IOException) {
-            return false;
-        } catch (UnauthorizedAccessException) {
-            return false;
-        } catch (JsonException) {
-            return false;
-        }
-    }
-
     private static bool IsReadOnlyBundledDriverPath(string driverPath) {
-        return HasDriverLayout(driverPath) && string.Equals(
-            Path.GetFullPath(driverPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-            Path.GetFullPath(GetBundledDriverPath()).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-            FileSystemPathComparison);
+        string bundledPath = GetBundledDriverPath();
+        return HasDriverLayout(driverPath) && HasDriverLayout(bundledPath) && string.Equals(
+            HtmlBrowserFileSystemPath.GetPathIdentity(driverPath),
+            HtmlBrowserFileSystemPath.GetPathIdentity(bundledPath), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -415,67 +400,6 @@ public static partial class HtmlBrowser {
         return true;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> GetExpectedRuntimeDirectories(string browserRoot, HtmlBrowserEngine engine) {
-        string manifestPath = Path.Combine(GetDriverPath(), "package", "browsers.json");
-        if (!File.Exists(manifestPath))
-            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-
-        string[] requiredNames = engine == HtmlBrowserEngine.Chromium
-            ? new[] { "chromium", "chromium-headless-shell" }
-            : new[] { engine.ToString().ToLowerInvariant() };
-        var required = new HashSet<string>(requiredNames, StringComparer.OrdinalIgnoreCase);
-        var expected = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-
-        try {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
-            if (!document.RootElement.TryGetProperty("browsers", out JsonElement browsers) || browsers.ValueKind != JsonValueKind.Array)
-                return expected;
-
-            foreach (JsonElement browser in browsers.EnumerateArray()) {
-                if (!browser.TryGetProperty("name", out JsonElement nameElement) || nameElement.ValueKind != JsonValueKind.String ||
-                    !browser.TryGetProperty("revision", out JsonElement revisionElement) || revisionElement.ValueKind != JsonValueKind.String) {
-                    continue;
-                }
-
-                string? name = nameElement.GetString();
-                string? revision = revisionElement.GetString();
-                if (name is null || name.Trim().Length == 0 || revision is null || revision.Trim().Length == 0 || !required.Contains(name))
-                    continue;
-
-                string selectedName = name;
-                string selectedRevision = revision;
-                string hostPlatform = GetCurrentPlaywrightHostPlatform();
-                if (browser.TryGetProperty("revisionOverrides", out JsonElement overrides) &&
-                    overrides.ValueKind == JsonValueKind.Object &&
-                    overrides.TryGetProperty(hostPlatform, out JsonElement revisionOverride) &&
-                    revisionOverride.ValueKind == JsonValueKind.String) {
-                    string? overrideRevision = revisionOverride.GetString();
-                    if (overrideRevision is not null && overrideRevision.Trim().Length > 0) {
-                        selectedName = $"{name}_{hostPlatform}_special";
-                        selectedRevision = overrideRevision;
-                    }
-                }
-
-                expected[name] = new[] { BuildRuntimeDirectory(browserRoot, selectedName, selectedRevision) };
-            }
-        } catch (IOException) {
-            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-        } catch (UnauthorizedAccessException) {
-            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-        } catch (JsonException) {
-            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        return expected.Count == required.Count
-            ? expected
-            : new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string BuildRuntimeDirectory(string browserRoot, string name, string revision) {
-        string directoryName = name.Replace('-', '_') + "-" + revision;
-        return Path.Combine(browserRoot, directoryName);
-    }
-
     private static bool IsCompleteBrowserRuntime(string directory) {
         return Directory.Exists(directory) && File.Exists(Path.Combine(directory, "INSTALLATION_COMPLETE"));
     }
@@ -657,15 +581,15 @@ public static partial class HtmlBrowser {
         if (!Directory.Exists(path))
             return;
 
-        var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var directories = new HashSet<string>(StringComparer.Ordinal);
         foreach (string expectedDirectory in GetExpectedRuntimeDirectories(path, engine).Values.SelectMany(static candidates => candidates)) {
-            directories.Add(expectedDirectory);
+            directories.Add(GetContainedBrowserRuntimeIdentity(path, expectedDirectory));
         }
         var prefixes = GetRuntimePrefixes(engine);
         foreach (string prefix in prefixes) {
             foreach (string dir in Directory.GetDirectories(path)) {
                 if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    directories.Add(dir);
+                    directories.Add(GetContainedBrowserRuntimeIdentity(path, dir));
             }
         }
         foreach (string directory in directories) {

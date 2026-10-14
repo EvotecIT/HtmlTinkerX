@@ -25,6 +25,7 @@ public static partial class HtmlBrowser {
     }
 
     private static string ValidateBrowserMutationPath(string? driverPath = null) {
+        _ = TryReadBrowserManifest(Path.Combine(driverPath ?? GetDriverPath(), "package", "browsers.json"), out _);
         string path = ValidateDirectoryMutationPath(GetBrowserInstallPath(driverPath), "PLAYWRIGHT_BROWSERS_PATH");
         ValidateBrowserCliOwnedPaths(path);
         return path;
@@ -85,6 +86,7 @@ public static partial class HtmlBrowser {
         }
 
         string identity = HtmlBrowserFileSystemPath.GetValidatedInstallationPathIdentity(path);
+        ValidateBundledDriverMutationFootprint(identity, searchRoot, setting);
         foreach (string packageRoot in packageRoots) {
             if (!HtmlBrowserFileSystemPath.IsNetworkOrDevicePath(packageRoot)
                 && InstallationPathsOverlap(identity, HtmlBrowserFileSystemPath.GetPathIdentity(packageRoot))) {
@@ -109,6 +111,26 @@ public static partial class HtmlBrowser {
         }
 
         ValidateRecursiveMutationFootprint(path, searchRoot, setting);
+    }
+
+    /// <summary>
+    /// Keeps the selected bundled driver payload read-only through every mutation entry point.
+    /// The SDK's package/.local-browsers subtree remains the supported hermetic browser cache.
+    /// </summary>
+    private static void ValidateBundledDriverMutationFootprint(string identity, string searchRoot, string setting) {
+        string bundledPath = GetBundledDriverPath();
+        if (!HasDriverLayout(bundledPath)) return;
+        string bundledIdentity = HtmlBrowserFileSystemPath.GetPathIdentity(bundledPath);
+        if (HtmlBrowserFileSystemPath.IsWithinPathIdentity(identity, bundledIdentity)) {
+            // Validate the allowance itself so a .local-browsers link cannot relabel driver assets as a cache.
+            string browsersIdentity = HtmlBrowserFileSystemPath.GetValidatedInstallationPathIdentity(
+                Path.Combine(bundledPath, "package", ".local-browsers"));
+            if (HtmlBrowserFileSystemPath.IsWithinPathIdentity(identity, browsersIdentity)) return;
+        }
+        else if (!HtmlBrowserFileSystemPath.IsWithinPathIdentity(bundledIdentity, identity)) {
+            return;
+        }
+        throw ProtectedInstallationDestination(searchRoot, setting, "a read-only bundled Playwright driver payload");
     }
 
     /// <summary>

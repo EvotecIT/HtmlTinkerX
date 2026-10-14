@@ -68,6 +68,17 @@ internal static class HtmlBrowserFileSystemPath {
     }
 
     /// <summary>
+    /// Compares resolved physical identities without merging distinct case-sensitive filesystem entries.
+    /// This is an identity comparison, not authorization for a supplied mutable path.
+    /// </summary>
+    internal static bool IsWithinPathIdentity(string identity, string rootIdentity) {
+        string root = rootIdentity.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string candidate = identity.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return string.Equals(candidate, root, StringComparison.Ordinal)
+            || candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Validates an installation destination while preserving verified filesystem case aliases on macOS.
     /// File-source validation remains stricter; installation aliases must still contain no mutable reparse components.
     /// </summary>
@@ -151,8 +162,8 @@ internal static class HtmlBrowserFileSystemPath {
         // /private. Preserve ordinary temporary/configuration paths while rejecting
         // mutable symlink components below them.
         foreach (string root in new[] { "/etc", "/tmp", "/var" }) {
-            if ((string.Equals(requested, root, StringComparison.Ordinal)
-                 || requested.StartsWith(root + "/", StringComparison.Ordinal))
+            if ((string.Equals(requested, root, comparison)
+                 || requested.StartsWith(root + "/", comparison))
                 && string.Equals(resolved, "/private" + requested, comparison)) return true;
         }
         return false;

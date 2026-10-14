@@ -75,10 +75,7 @@ public static class HtmlBrowserCacheCleaner {
     }
 
     private static long GetEstimatedFootprintSize(IReadOnlyList<CacheLocation> locations, IReadOnlyDictionary<CacheLocation, string> identities) {
-        StringComparison comparison = Environment.OSVersion.Platform == PlatformID.Win32NT
-            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var counted = new HashSet<string>(Environment.OSVersion.Platform == PlatformID.Win32NT
-            ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var counted = new HashSet<string>(StringComparer.Ordinal);
         long total = 0;
         foreach (CacheLocation location in locations) {
             // Caller-added result entries retain their original estimate behavior without filesystem inspection.
@@ -89,8 +86,8 @@ public static class HtmlBrowserCacheCleaner {
             if (!counted.Add(identity)) continue;
             bool hasAncestor = locations.Any(other => !ReferenceEquals(location, other)
                 && identities.TryGetValue(other, out string? parent)
-                && identity.StartsWith(parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    + Path.DirectorySeparatorChar, comparison));
+                && !string.Equals(identity, parent, StringComparison.Ordinal)
+                && HtmlBrowserFileSystemPath.IsWithinPathIdentity(identity, parent));
             if (!hasAncestor) total += location.Size;
         }
         return total;
@@ -104,8 +101,7 @@ public static class HtmlBrowserCacheCleaner {
     /// <returns>List of cache locations found.</returns>
     public static List<CacheLocation> GetCacheLocations(bool includeBrowsers = true, bool includeTemp = true) {
         var locations = new List<CacheLocation>();
-        var identities = new HashSet<string>(Environment.OSVersion.Platform == PlatformID.Win32NT
-            ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var identities = new HashSet<string>(StringComparer.Ordinal);
         
         if (includeBrowsers) {
             foreach (string browserPath in HtmlBrowser.GetBrowserCachePaths()) {

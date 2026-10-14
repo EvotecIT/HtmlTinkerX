@@ -15,6 +15,9 @@ public static partial class HtmlBrowser {
     private static void RunPlaywrightInstaller(string[] arguments) {
         string driver = GetDriverPath();
         string browserRoot = ValidateBrowserMutationPath(driver);
+        if (!TryReadBrowserManifest(Path.Combine(driver, "package", "browsers.json"), out _)) {
+            throw new InvalidOperationException("The Playwright browser manifest is invalid. Repair the driver before running its installer.");
+        }
         string preload = Path.Combine(Path.GetTempPath(), "htmltinkerx-install-" + Guid.NewGuid().ToString("N") + ".cjs");
         try {
             using (Stream source = typeof(HtmlBrowser).Assembly.GetManifestResourceStream(
