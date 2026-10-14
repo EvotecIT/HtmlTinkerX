@@ -135,12 +135,13 @@ public partial class HtmlBrowserProtectedDriverRootTests
     [InlineData(true)]
     public async Task BundledDriver_RemainsReadOnlyWhenReusedFromAProtectedLocation(bool hermetic)
     {
+        using var fixture = new DriverRootFixture();
         string? driver = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
         string? browsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         string? nuget = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
         var factory = HtmlBrowser.HttpClientFactory;
-        string assemblyRoot = Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location)!;
-        string bundled = Path.Combine(assemblyRoot, ".playwright");
+        string bundled = await GetCanonicalTestHostBundleAsync(fixture);
+        string assemblyRoot = Path.GetDirectoryName(bundled)!;
         string node = Path.Combine(bundled, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId(),
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node");
         string cli = Path.Combine(bundled, "package", "cli.js");
@@ -167,6 +168,28 @@ public partial class HtmlBrowserProtectedDriverRootTests
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", driver);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", browsers);
             Environment.SetEnvironmentVariable("NUGET_PACKAGES", nuget);
+        }
+    }
+
+    private static async Task<string> GetCanonicalTestHostBundleAsync(DriverRootFixture fixture)
+    {
+        string? search = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
+        string? browsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
+        var factory = HtmlBrowser.HttpClientFactory;
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
+            // If the SDK bundle is absent, any fallback stays inside this disposable fixture and cannot download.
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", Path.GetDirectoryName(fixture.BrowserSentinel));
+            HtmlBrowser.HttpClientFactory = () => throw new InvalidOperationException("The canonical test-host SDK bundle must be present; no download is allowed.");
+            await HtmlBrowser.EnsureDriverInstalledAsync();
+            return Path.Combine(Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH")!, ".playwright");
+        }
+        finally
+        {
+            HtmlBrowser.HttpClientFactory = factory;
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", search);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", browsers);
         }
     }
 

@@ -19,6 +19,17 @@ roots. Dedicated application output directories beneath a checkout remain suppor
 `package/.local-browsers` directory. Complete bundled drivers are reused without
 modification; browser installation still requires a safe writable destination.
 
+Browser-cache entries directly beneath the cache root must be direct local paths.
+Records in `.links` must be plain files, and runtime `DEPENDENCIES_VALIDATED`
+markers must not be filesystem links. HtmlTinkerX checks these destinations before
+installation, repair, or cleanup. Nested native framework links within real browser
+runtime directories remain supported.
+
+NuGet cache overlap checks ignore path casing on Windows and macOS, including
+directories that do not exist yet. On a case-sensitive Mac volume, use storage
+names that differ by more than casing; case-only differences are conservatively
+treated as overlapping. Linux comparisons remain case-sensitive.
+
 ## Read a page as objects
 
 `HtmlPageReader` uses the canonical `OfficeIMO.Html` semantic document and adds

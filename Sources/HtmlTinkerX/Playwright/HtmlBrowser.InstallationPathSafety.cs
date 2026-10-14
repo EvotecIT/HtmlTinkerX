@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace HtmlTinkerX;
 
@@ -23,8 +24,36 @@ public static partial class HtmlBrowser {
         return ValidateBrowserMutationPath(driverPath);
     }
 
-    private static string ValidateBrowserMutationPath(string? driverPath = null) =>
-        ValidateDirectoryMutationPath(GetBrowserInstallPath(driverPath), "PLAYWRIGHT_BROWSERS_PATH");
+    private static string ValidateBrowserMutationPath(string? driverPath = null) {
+        string path = ValidateDirectoryMutationPath(GetBrowserInstallPath(driverPath), "PLAYWRIGHT_BROWSERS_PATH");
+        ValidateBrowserCliOwnedPaths(path);
+        return path;
+    }
+
+    /// <summary>
+    /// Checks the SDK CLI's write footprint separately from recursive deletion. The CLI writes cache-root
+    /// entries, flat package-reference records, and runtime validation markers through filesystem links.
+    /// Native framework links below real runtime directories are outside that metadata footprint.
+    /// </summary>
+    private static void ValidateBrowserCliOwnedPaths(string path) {
+        if (!Directory.Exists(path)) return;
+        foreach (string entry in Directory.EnumerateFileSystemEntries(path)) {
+            _ = HtmlBrowserFileSystemPath.GetValidatedInstallationPathIdentity(entry);
+            if (Directory.Exists(entry)) {
+                _ = HtmlBrowserFileSystemPath.GetValidatedInstallationPathIdentity(
+                    Path.Combine(entry, "DEPENDENCIES_VALIDATED"));
+            }
+        }
+
+        string references = Path.Combine(path, ".links");
+        if (!Directory.Exists(references)) return;
+        foreach (string reference in Directory.EnumerateFileSystemEntries(references)) {
+            _ = HtmlBrowserFileSystemPath.GetValidatedInstallationPathIdentity(reference);
+            if (Directory.Exists(reference)) {
+                throw new InvalidOperationException("Playwright package-reference records must be plain files.");
+            }
+        }
+    }
 
     /// <summary>Applies the installation safety contract to a public cache-cleaner destination.</summary>
     internal static string ValidateCacheMutationPath(string path) =>
@@ -131,8 +160,12 @@ public static partial class HtmlBrowser {
     private static bool IsWithinInstallationPath(string path, string protectedPath) {
         string root = Path.GetFullPath(protectedPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         string candidate = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Equals(candidate, root, FileSystemPathComparison)
-            || candidate.StartsWith(root + Path.DirectorySeparatorChar, FileSystemPathComparison);
+        // Missing suffixes have no physical casing to resolve. Keep Mac cache protection conservative,
+        // including on case-sensitive Mac volumes; file-source and direct-path trust policies are unchanged.
+        StringComparison comparison = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            ? StringComparison.OrdinalIgnoreCase : FileSystemPathComparison;
+        return string.Equals(candidate, root, comparison)
+            || candidate.StartsWith(root + Path.DirectorySeparatorChar, comparison);
     }
 
     private static InvalidOperationException ProtectedInstallationDestination(string root, string setting, string kind) => new(

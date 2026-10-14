@@ -18,8 +18,8 @@ public partial class HtmlBrowserProtectedDriverRootTests
     public async Task Remediation_IncompleteAssemblyAdjacentDriverCannotBypassProtectedRoot(string markerName)
     {
         using var fixture = new DriverRootFixture();
-        string output = Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location)!;
-        string bundle = Path.Combine(output, ".playwright");
+        string bundle = await GetCanonicalTestHostBundleAsync(fixture);
+        string output = Path.GetDirectoryName(bundle)!;
         string backup = Path.Combine(output, ".playwright-proof-" + Guid.NewGuid().ToString("N"));
         string marker = Path.Combine(output, markerName);
         Assert.False(File.Exists(marker));
@@ -196,8 +196,8 @@ public partial class HtmlBrowserProtectedDriverRootTests
         string escaped = System.Text.Json.JsonSerializer.Serialize(witness);
         File.WriteAllText(Path.Combine(driver, "package", "cli.js"),
             $"require('fs').writeFileSync({escaped}, process.env.PLAYWRIGHT_BROWSERS_PATH);");
-        string output = Path.GetDirectoryName(typeof(HtmlBrowser).Assembly.Location)!;
-        string node = Path.Combine(output, ".playwright", "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId(),
+        string canonicalBundle = await GetCanonicalTestHostBundleAsync(fixture);
+        string node = Path.Combine(canonicalBundle, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId(),
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node");
         HtmlBrowser.PlaywrightInstaller = installer;
         Environment.SetEnvironmentVariable("PLAYWRIGHT_NODEJS_PATH", node);
