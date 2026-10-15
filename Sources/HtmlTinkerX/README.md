@@ -10,6 +10,39 @@ dotnet add package HtmlTinkerX
 
 Pin a stable HtmlTinkerX version when reproducible restores matter.
 
+For custom Playwright storage, set `PLAYWRIGHT_DRIVER_SEARCH_PATH` and
+`PLAYWRIGHT_BROWSERS_PATH` to dedicated local directories. HtmlTinkerX manages the
+driver root's `.playwright` child. Installation, repair, and cleanup reject paths
+within or containing a NuGet cache, restored package payloads, and source checkout
+roots. Dedicated application output directories beneath a checkout remain supported.
+`PLAYWRIGHT_BROWSERS_PATH=0` stores browsers in the selected driver's
+`package/.local-browsers` directory. Complete bundled drivers are reused without
+modification; browser installation still requires a safe writable destination.
+
+Browser-cache entries directly beneath the cache root must be direct local paths.
+Records in `.links` must be plain files, and runtime `DEPENDENCIES_VALIDATED`
+markers must not be filesystem links. HtmlTinkerX checks these destinations before
+installation, repair, or cleanup. Nested native framework links within real browser
+runtime directories remain supported.
+
+`HtmlBrowserCacheCleaner.GetCacheLocations` includes the selected browser cache and
+any existing legacy OS-default browser cache, with duplicate directories reported
+once. Selection honors custom paths, hermetic `0`, and Linux `XDG_CACHE_HOME` using
+the installer’s resolution rules. Reported sizes exclude filesystem-link targets.
+Mutable current and legacy drivers are listed as their owned `.playwright` child;
+their search parents and read-only bundled drivers are preserved. Cleanup keeps
+per-location results and supplied size estimates. When successful locations are
+nested, the total counts the outer estimate once; protected-location failures
+remain visible.
+Use `HtmlBrowserCacheCleaner.GetEstimatedTotalSize(locations)` for the same overlap
+accounting before cleanup. PowerShell `Clear-HtmlBrowserCache` always honors `-WhatIf` and `-Confirm`;
+`-Force` remains accepted for script compatibility and bypasses neither parameter.
+
+NuGet cache overlap checks ignore path casing on Windows and macOS, including
+directories that do not exist yet. On a case-sensitive Mac volume, use storage
+names that differ by more than casing; case-only differences are conservatively
+treated as overlapping. Linux comparisons remain case-sensitive.
+
 ## Read a page as objects
 
 `HtmlPageReader` uses the canonical `OfficeIMO.Html` semantic document and adds

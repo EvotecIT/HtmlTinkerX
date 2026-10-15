@@ -28,7 +28,7 @@ Clear-HtmlBrowserCache -Force
 ## PARAMETERS
 
 ### -Force
-Force cleanup without confirmation.
+Compatibility switch. Cleanup always honors the WhatIf and Confirm common parameters.
 
 ```yaml
 Type: SwitchParameter
