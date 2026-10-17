@@ -234,6 +234,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         HtmlBrowserNetworkPolicy policy = new(allowedHosts: new[] { "127.0.0.1" });
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
+            browserArguments: ChromiumNetworkDiagnostics.Arguments(nameof(SameOriginPopupRequestsReceiveOriginScopedHeaders)),
             networkPolicy: policy));
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
