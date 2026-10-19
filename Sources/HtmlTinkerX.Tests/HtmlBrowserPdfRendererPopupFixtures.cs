@@ -140,6 +140,8 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                     using NetworkStream stream = client.GetStream();
                     using CancellationTokenRegistration registration = _cancellation.Token.Register(client.Dispose);
                     string request = await LoopbackHttpRequestReader.ReadAsync(stream, _cancellation.Token);
+                    // Browsers may close speculative connections before sending an HTTP request.
+                    if (request.Length == 0) return;
                     string requestTarget = request.Split(' ')[1];
                     string contentType = "text/html; charset=utf-8";
                     string body;
@@ -420,6 +422,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 try {
                     byte[] buffer = new byte[8192];
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cancellation.Token);
+                    if (read == 0) return;
                     string request = Encoding.ASCII.GetString(buffer, 0, read);
                     string requestTarget = request.Split(' ')[1];
                     if (requestTarget.StartsWith("/streaming-popup", StringComparison.Ordinal)) {
