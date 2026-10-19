@@ -186,7 +186,10 @@ public static partial class HtmlBrowser {
             if (overlayText != null && overlayText.Length > 0) {
                 composition.DrawText(10, 10, Math.Max(1, composition.Width - 20), overlayText, 20, ChartColors.Red);
             }
-            File.WriteAllBytes(fullPath, composition.ToRasterImage(ToRasterImageFormat(options.Format), GetRasterImageOptions(options.Quality)));
+            byte[] processed = options.Format == ImageFormat.Gif
+                ? composition.ToImage().ToGif()
+                : composition.ToRasterImage(ToRasterImageFormat(options.Format), GetRasterImageOptions(options.Quality));
+            File.WriteAllBytes(fullPath, processed);
         } else {
             File.WriteAllBytes(fullPath, data);
         }
@@ -195,7 +198,6 @@ public static partial class HtmlBrowser {
     private static RasterImageFormat ToRasterImageFormat(ImageFormat format) => format switch {
         ImageFormat.Jpeg => RasterImageFormat.Jpeg,
         ImageFormat.Bmp => RasterImageFormat.Bmp,
-        ImageFormat.Gif => RasterImageFormat.Gif,
         _ => RasterImageFormat.Png
     };
 

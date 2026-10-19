@@ -151,6 +151,21 @@ public partial class HtmlBrowserProtectedDriverRootTests
             _identityOutput.WriteLine("NotExecuted: this host cannot enable case sensitivity on the owned fixture.");
             return;
         }
+        // fsutil can return zero even when the filesystem rejects the attribute.
+        // Verify the fixture's capability independently of the path-identity code.
+        string lowerProbe = Path.Combine(root, "case-probe");
+        string upperProbe = Path.Combine(root, "CASE-PROBE");
+        File.WriteAllText(lowerProbe, "lower");
+        File.WriteAllText(upperProbe, "upper");
+        bool caseSensitivityEnabled = File.ReadAllText(lowerProbe) == "lower"
+            && File.ReadAllText(upperProbe) == "upper";
+        File.Delete(lowerProbe);
+        File.Delete(upperProbe);
+        if (!caseSensitivityEnabled)
+        {
+            _identityOutput.WriteLine("NotExecuted: the owned fixture remains case insensitive after fsutil.");
+            return;
+        }
         if (mode == "runtime-cleanup")
         {
             fixture.SetSearchRoot(fixture.Root, "root");
