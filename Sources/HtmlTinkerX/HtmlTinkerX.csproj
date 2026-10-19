@@ -20,6 +20,8 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <OfficeImoVersion>3.4.5</OfficeImoVersion>
         <ChartForgeXVersion>2.0.0</ChartForgeXVersion>
+        <ChartForgeXVisualsProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXVisualsProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Visuals\ChartForgeX.Visuals.csproj</ChartForgeXVisualsProjectPath>
+        <ChartForgeXStoriesProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXStoriesProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Stories\ChartForgeX.Stories.csproj</ChartForgeXStoriesProjectPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -39,10 +41,14 @@
 
     <ItemGroup Condition=" '$(ChartForgeXProjectPath)' != '' ">
         <ProjectReference Include="$(ChartForgeXProjectPath)" />
+        <ProjectReference Include="$(ChartForgeXVisualsProjectPath)" />
+        <ProjectReference Include="$(ChartForgeXStoriesProjectPath)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(ChartForgeXProjectPath)' == '' ">
         <PackageReference Include="ChartForgeX" Version="$(ChartForgeXVersion)" />
+        <PackageReference Include="ChartForgeX.Visuals" Version="$(ChartForgeXVersion)" />
+        <PackageReference Include="ChartForgeX.Stories" Version="$(ChartForgeXVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
