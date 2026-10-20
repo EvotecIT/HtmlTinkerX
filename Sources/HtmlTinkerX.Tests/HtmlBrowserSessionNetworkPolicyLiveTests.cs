@@ -17,6 +17,25 @@ namespace HtmlTinkerX.Tests;
 [Collection("Playwright collection")]
 public sealed class HtmlBrowserSessionNetworkPolicyLiveTests {
     [Fact]
+    public async Task CancellingCompletedSessionCreationDoesNotBlockLaterPermittedDnsRequests() {
+        await using NetworkFixture fixture = await NetworkFixture.StartAsync();
+        using CancellationTokenSource setup = new();
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions {
+            ChromiumSandbox = true,
+            LoadState = HtmlBrowserLoadState.DomContentLoaded,
+            NetworkPolicy = new HtmlBrowserNetworkPolicy(new[] { "localhost" }, requireHttps: false, allowPrivateNetworks: true)
+        }, setup.Token);
+        setup.Cancel();
+
+        // The initial blank session did not resolve localhost. This request must
+        // perform its own policy/DNS work after the setup operation has ended.
+        await HtmlBrowser.NavigateAsync(session, fixture.Url.Replace("127.0.0.1", "localhost") + "/after-setup", HtmlBrowserLoadState.DomContentLoaded);
+
+        Assert.Equal("restricted fixture", await session.Page.TitleAsync());
+        Assert.Contains("localhost:/after-setup", fixture.Requests.Keys);
+    }
+
+    [Fact]
     public async Task RestrictedSessionEnforcesRealRedirectSubresourcePopupWorkerAndWebSocketBoundaries() {
         await using NetworkFixture fixture = await NetworkFixture.StartAsync();
         using (System.Net.Http.HttpClient control = new(new System.Net.Http.HttpClientHandler { UseProxy = false })) {
@@ -29,7 +48,9 @@ public sealed class HtmlBrowserSessionNetworkPolicyLiveTests {
         };
         HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(options);
         IBrowser browser = session.Browser!;
-        Uri managedProxy = new(((HtmlBrowserPolicyProxy)session.NetworkPolicyLifetime!).Server);
+        HtmlBrowserSessionNetworkPolicyLifetime policyLifetime = (HtmlBrowserSessionNetworkPolicyLifetime)session.NetworkPolicyLifetime!;
+        Uri managedProxy = new(policyLifetime.Proxy.Server);
+        CancellationToken policyToken = policyLifetime.Token;
         TaskCompletionSource<bool> popupBlocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Context.RequestFailed += (_, request) => {
             if (request.Url.Contains("/forbidden-popup", StringComparison.Ordinal)) popupBlocked.TrySetResult(true);
@@ -69,6 +90,7 @@ public sealed class HtmlBrowserSessionNetworkPolicyLiveTests {
             await session.DisposeAsync();
         }
         Assert.False(browser.IsConnected);
+        Assert.True(policyToken.IsCancellationRequested);
         Assert.Null(session.NetworkPolicyLifetime);
         using (System.Net.Sockets.TcpClient connection = new()) {
             await Assert.ThrowsAsync<System.Net.Sockets.SocketException>(() => connection.ConnectAsync(managedProxy.Host, managedProxy.Port));

@@ -351,6 +351,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
 
     private async Task DisposeCoreAsync() {
         List<Exception> errors = new();
+        if (NetworkPolicyLifetime is HtmlBrowserSessionNetworkPolicyLifetime policyLifetime) policyLifetime.Cancel();
         bool browserAttempted = false;
         if (!_pageClosed && _closePageOnDispose && Page != null && !Page.IsClosed) {
             try {

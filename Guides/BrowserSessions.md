@@ -29,6 +29,8 @@ non-proxied WebRTC UDP, and reject persistent profiles, CDP attachment, external
 proxies, custom launch arguments, and engines other than Chromium. These options
 fail before launch rather than silently losing enforcement. A null `NetworkPolicy`
 preserves the existing session behavior.
+The opening cancellation token controls setup. Later operations use their own
+tokens; destination enforcement remains active until the session is disposed.
 
 The restriction applies to the owned session context. Keep browser automation
 code trusted: creating another context directly through `session.Browser`, changing

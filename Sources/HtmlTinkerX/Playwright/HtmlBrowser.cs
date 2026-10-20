@@ -272,7 +272,8 @@ public static partial class HtmlBrowser {
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken,
         bool closeBrowserOnCancellation = true,
-        Action<Task<IBrowserContext>>? contextCreationCanceled = null) {
+        Action<Task<IBrowserContext>>? contextCreationCanceled = null,
+        CancellationToken policyLifetimeToken = default) {
         BrowserNewContextOptions? contextOptions = null;
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions = new BrowserNewContextOptions {
@@ -308,7 +309,7 @@ public static partial class HtmlBrowser {
         try {
             if (options.NetworkPolicy != null) {
                 await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
-                    () => InstallSessionNetworkPolicyAsync(context, options.NetworkPolicy, cancellationToken),
+                    () => InstallSessionNetworkPolicyAsync(context, options.NetworkPolicy, policyLifetimeToken),
                     () => context.CloseAsync(), cancellationToken).ConfigureAwait(false);
             }
             IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -523,7 +524,7 @@ public static partial class HtmlBrowser {
         IBrowser? browserInstance = null;
         IBrowserContext? context = null;
         IPage? page = null;
-        HtmlBrowserPolicyProxy? policyProxy = null;
+        HtmlBrowserSessionNetworkPolicyLifetime? policyLifetime = null;
         string? resolvedUserDataDirectory = null;
         bool closeContextOnDispose = true;
         bool closeBrowserOnDispose = true;
@@ -537,7 +538,7 @@ public static partial class HtmlBrowser {
             if (closeContextOnDispose && context != null) StartBestEffortClose(() => context.CloseAsync());
             if (closeBrowserOnDispose && browserInstance != null && browserInstance.IsConnected) StartBestEffortClose(() => browserInstance.CloseAsync());
             try { playwright?.Dispose(); } catch (Exception) { }
-            if (policyProxy != null) await policyProxy.DisposeAsync().ConfigureAwait(false);
+            if (policyLifetime != null) await policyLifetime.DisposeAsync().ConfigureAwait(false);
         }
 
         try {
@@ -581,9 +582,10 @@ public static partial class HtmlBrowser {
                 browserInstance = context.Browser;
                 closeBrowserOnDispose = false;
             } else {
-                if (options.NetworkPolicy != null) policyProxy = new HtmlBrowserPolicyProxy(options.NetworkPolicy);
-                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken, policyProxy?.Server).ConfigureAwait(false);
-                (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
+                if (options.NetworkPolicy != null) policyLifetime = new HtmlBrowserSessionNetworkPolicyLifetime(options.NetworkPolicy);
+                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken, policyLifetime?.Proxy.Server).ConfigureAwait(false);
+                (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken,
+                    policyLifetimeToken: policyLifetime?.Token ?? default).ConfigureAwait(false);
             }
 
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -607,7 +609,7 @@ public static partial class HtmlBrowser {
                 closeContextOnDispose,
                 closeBrowserOnDispose,
                 closePageOnDispose);
-            session.NetworkPolicyLifetime = policyProxy;
+            session.NetworkPolicyLifetime = policyLifetime;
 
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => ApplyResourceBlockingAsync(page!, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken),
