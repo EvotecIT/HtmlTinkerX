@@ -8,6 +8,21 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public sealed partial class HtmlBrowserPdfRendererContractTests {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HttpsOnlyPoliciesRetainCertificateValidationAcrossPdfAndSessionBoundaries(bool requireHttps) {
+        HtmlBrowserPdfRendererOptions options = new(
+            ignoreHttpsErrors: true,
+            networkPolicy: new HtmlBrowserNetworkPolicy(new[] { "publisher.example" }, requireHttps: requireHttps));
+        if (requireHttps) {
+            Assert.Throws<ArgumentException>(() => new HtmlBrowserPdfRenderer(options));
+        } else {
+            await using HtmlBrowserPdfRenderer permitted = new(options);
+            Assert.True(permitted.Options.IgnoreHttpsErrors);
+        }
+    }
+
     [Fact]
     public void ReleasedPolicyAndRendererOptionConstructorsRemainAvailable() {
         Assert.NotNull(typeof(HtmlBrowserNetworkPolicy).GetConstructor(new[] {

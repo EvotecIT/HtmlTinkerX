@@ -31,6 +31,8 @@ fail before launch rather than silently losing enforcement. A null `NetworkPolic
 preserves the existing session behavior.
 The opening cancellation token controls setup. Later operations use their own
 tokens; destination enforcement remains active until the session is disposed.
+An HTTPS-only policy also requires certificate validation: combining it with
+`IgnoreHTTPSErrors` (or PDF renderer `IgnoreHttpsErrors`) fails before launch.
 
 The restriction applies to the owned session context. Keep browser automation
 code trusted: creating another context directly through `session.Browser`, changing

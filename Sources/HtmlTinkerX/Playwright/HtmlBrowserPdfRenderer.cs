@@ -41,6 +41,9 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     /// <summary>Initializes a pooled Chromium PDF renderer.</summary>
     public HtmlBrowserPdfRenderer(HtmlBrowserPdfRendererOptions? options = null) {
         _options = options ?? new HtmlBrowserPdfRendererOptions();
+        if (_options.NetworkPolicy.RequireHttps && _options.IgnoreHttpsErrors) {
+            throw new ArgumentException("NetworkPolicy.RequireHttps cannot be combined with IgnoreHttpsErrors.", nameof(options));
+        }
         _networkPolicy = new HtmlBrowserNetworkPolicyEvaluator(_options.NetworkPolicy);
         if ((!_options.NetworkPolicy.AllowNetworkAccess || !_options.NetworkPolicy.AllowPrivateNetworks)
             && !string.IsNullOrWhiteSpace(_options.Proxy)) {

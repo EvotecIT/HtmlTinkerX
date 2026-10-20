@@ -17,8 +17,12 @@ public static partial class HtmlBrowser {
         if (response == null) throw new ArgumentNullException(nameof(response));
         if (maximumBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         cancellationToken.ThrowIfCancellationRequested();
+        // HEAD and 304 Content-Length describe a GET representation, not the
+        // bytes in this response. Still enforce the actual body limit below.
+        bool representationLength = string.Equals(response.Request?.Method, "HEAD", StringComparison.OrdinalIgnoreCase)
+            || response.Status == 304;
         foreach (var header in response.Headers) {
-            if (string.Equals(header.Key, "content-length", StringComparison.OrdinalIgnoreCase)
+            if (!representationLength && string.Equals(header.Key, "content-length", StringComparison.OrdinalIgnoreCase)
                 && long.TryParse(header.Value, NumberStyles.None, CultureInfo.InvariantCulture, out long declared)
                 && declared > maximumBytes) {
                 throw new InvalidDataException($"Response body exceeds the {maximumBytes}-byte acceptance limit.");

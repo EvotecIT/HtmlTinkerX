@@ -43,6 +43,23 @@ public sealed class HtmlBrowserResponseBodyTests {
         pending.SetException(new IOException("late fixture failure"));
     }
 
+    [Theory]
+    [InlineData("HEAD", 200, 0)]
+    [InlineData("HEAD", 200, 5)]
+    [InlineData("GET", 304, 0)]
+    [InlineData("GET", 304, 5)]
+    public async Task RepresentationLengthDoesNotReplaceTheActualBodyLimit(string method, int status, int bodyLength) {
+        Mock<IResponse> response = Response(new byte[bodyLength], new Dictionary<string, string> { ["Content-Length"] = "1000000" });
+        Mock<IRequest> request = new();
+        request.SetupGet(item => item.Method).Returns(method);
+        response.SetupGet(item => item.Request).Returns(request.Object);
+        response.SetupGet(item => item.Status).Returns(status);
+
+        if (bodyLength == 0) Assert.Empty(await HtmlBrowser.ReadResponseBodyAsync(response.Object, 4));
+        else await Assert.ThrowsAsync<InvalidDataException>(() => HtmlBrowser.ReadResponseBodyAsync(response.Object, 4));
+        response.Verify(item => item.BodyAsync(), Times.Once);
+    }
+
     private static Mock<IResponse> Response(byte[] body, Dictionary<string, string>? headers = null) {
         Mock<IResponse> response = new();
         response.SetupGet(item => item.Headers).Returns(headers ?? new Dictionary<string, string>());

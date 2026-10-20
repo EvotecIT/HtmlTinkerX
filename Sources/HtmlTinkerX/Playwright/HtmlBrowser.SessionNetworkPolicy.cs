@@ -8,6 +8,9 @@ namespace HtmlTinkerX;
 public static partial class HtmlBrowser {
     private static void ValidateSessionNetworkPolicy(HtmlBrowserLaunchOptions options) {
         if (options.NetworkPolicy == null) return;
+        if (options.NetworkPolicy.RequireHttps && options.IgnoreHTTPSErrors) {
+            throw new ArgumentException("NetworkPolicy.RequireHttps cannot be combined with IgnoreHTTPSErrors.", nameof(options));
+        }
         if (options.Browser != HtmlBrowserEngine.Chromium
             || !string.IsNullOrWhiteSpace(options.CdpEndpointUrl)
             || !string.IsNullOrWhiteSpace(options.UserDataDirectory)

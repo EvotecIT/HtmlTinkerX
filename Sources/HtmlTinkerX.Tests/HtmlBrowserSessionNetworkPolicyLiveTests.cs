@@ -43,6 +43,7 @@ public sealed class HtmlBrowserSessionNetworkPolicyLiveTests {
         }
         HtmlBrowserLaunchOptions options = new() {
             ChromiumSandbox = true,
+            IgnoreHTTPSErrors = true, // Explicit HTTP fixture mode retains its legacy opt-in.
             LoadState = HtmlBrowserLoadState.DomContentLoaded,
             NetworkPolicy = new HtmlBrowserNetworkPolicy(new[] { "127.0.0.1" }, requireHttps: false, allowPrivateNetworks: true)
         };
