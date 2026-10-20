@@ -16,7 +16,8 @@ public static partial class HtmlBrowser {
 
     internal static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
         HtmlBrowserLaunchOptions options,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken,
+        string? policyProxyServer = null) {
         cancellationToken.ThrowIfCancellationRequested();
         if (options.Clean) {
             await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
@@ -36,6 +37,7 @@ public static partial class HtmlBrowser {
         try {
             IBrowserType type = ResolveBrowserType(playwright, options.Browser);
             BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
+            if (policyProxyServer != null) ApplySessionPolicyLaunchOptions(launchOptions, policyProxyServer);
             Task<IBrowser> launch = type.LaunchAsync(launchOptions);
             IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => launch,
@@ -228,7 +230,7 @@ public static partial class HtmlBrowser {
             contextOptions,
             options,
             setStorageState: false);
-        if (options.BlockServiceWorkers) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
+        if (options.BlockServiceWorkers || options.NetworkPolicy != null) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
 
         if (options.FormLogin == null && !string.IsNullOrEmpty(options.Username) && options.Password != null) {
             contextOptions.HttpCredentials = new HttpCredentials {
@@ -286,7 +288,7 @@ public static partial class HtmlBrowser {
         contextOptions.IgnoreHTTPSErrors = options.IgnoreHTTPSErrors;
 
         ApplySharedContextOptions(contextOptions, options, setStorageState: true);
-        if (options.BlockServiceWorkers) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
+        if (options.BlockServiceWorkers || options.NetworkPolicy != null) contextOptions.ServiceWorkers = ServiceWorkerPolicy.Block;
 
         Task<IBrowserContext> contextCreation = browserInstance.NewContextAsync(contextOptions);
         IBrowserContext context;
@@ -304,6 +306,11 @@ public static partial class HtmlBrowser {
             throw;
         }
         try {
+            if (options.NetworkPolicy != null) {
+                await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    () => InstallSessionNetworkPolicyAsync(context, options.NetworkPolicy, cancellationToken),
+                    () => context.CloseAsync(), cancellationToken).ConfigureAwait(false);
+            }
             IPage page = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 context.NewPageAsync,
                 () => context.CloseAsync(),
@@ -494,6 +501,12 @@ public static partial class HtmlBrowser {
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken = default,
         bool skipInitialNavigation = false) {
+        ValidateSessionNetworkPolicy(options);
+        if (options.NetworkPolicy != null && !skipInitialNavigation
+            && !await new HtmlBrowserNetworkPolicyEvaluator(options.NetworkPolicy)
+                .IsAllowedAsync(url, null, cancellationToken).ConfigureAwait(false)) {
+            throw new UnauthorizedAccessException("The initial browser destination is denied by NetworkPolicy.");
+        }
         if (!string.IsNullOrWhiteSpace(options.UserDataDirectory) && !string.IsNullOrWhiteSpace(options.StorageStatePath)) {
             throw new ArgumentException("Use either UserDataDirectory for a persistent profile or StorageStatePath for imported context state, not both.");
         }
@@ -510,6 +523,7 @@ public static partial class HtmlBrowser {
         IBrowser? browserInstance = null;
         IBrowserContext? context = null;
         IPage? page = null;
+        HtmlBrowserPolicyProxy? policyProxy = null;
         string? resolvedUserDataDirectory = null;
         bool closeContextOnDispose = true;
         bool closeBrowserOnDispose = true;
@@ -517,13 +531,13 @@ public static partial class HtmlBrowser {
         bool pageScopedInitScripts = false;
         int ownershipAborted = 0;
 
-        Task AbortOwnershipAsync() {
-            if (Interlocked.Exchange(ref ownershipAborted, 1) != 0) return Task.CompletedTask;
+        async Task AbortOwnershipAsync() {
+            if (Interlocked.Exchange(ref ownershipAborted, 1) != 0) return;
             if (closePageOnDispose && page != null && !page.IsClosed) StartBestEffortClose(() => page.CloseAsync());
             if (closeContextOnDispose && context != null) StartBestEffortClose(() => context.CloseAsync());
             if (closeBrowserOnDispose && browserInstance != null && browserInstance.IsConnected) StartBestEffortClose(() => browserInstance.CloseAsync());
             try { playwright?.Dispose(); } catch (Exception) { }
-            return Task.CompletedTask;
+            if (policyProxy != null) await policyProxy.DisposeAsync().ConfigureAwait(false);
         }
 
         try {
@@ -567,7 +581,8 @@ public static partial class HtmlBrowser {
                 browserInstance = context.Browser;
                 closeBrowserOnDispose = false;
             } else {
-                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken).ConfigureAwait(false);
+                if (options.NetworkPolicy != null) policyProxy = new HtmlBrowserPolicyProxy(options.NetworkPolicy);
+                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken, policyProxy?.Server).ConfigureAwait(false);
                 (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken).ConfigureAwait(false);
             }
 
@@ -592,6 +607,7 @@ public static partial class HtmlBrowser {
                 closeContextOnDispose,
                 closeBrowserOnDispose,
                 closePageOnDispose);
+            session.NetworkPolicyLifetime = policyProxy;
 
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => ApplyResourceBlockingAsync(page!, options.BlockResourceTypes, options.BlockResourcePatterns, cancellationToken),
@@ -668,7 +684,7 @@ public static partial class HtmlBrowser {
         || options.Permissions.Count > 0;
 
     /// <summary>Creates a session for installing routes before its first destination. Configured form login still runs.</summary>
-    internal static Task<HtmlBrowserSession> OpenSessionForNavigationAsync(HtmlBrowserLaunchOptions options, CancellationToken cancellationToken) =>
+    public static Task<HtmlBrowserSession> OpenSessionForNavigationAsync(HtmlBrowserLaunchOptions options, CancellationToken cancellationToken = default) =>
         CreatePageAsync("about:blank", options, cancellationToken, skipInitialNavigation: true);
 
     /// <summary>

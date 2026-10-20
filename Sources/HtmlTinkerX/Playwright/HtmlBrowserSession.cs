@@ -69,6 +69,7 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
     private readonly bool _closeContextOnDispose;
     private readonly bool _closeBrowserOnDispose;
     private readonly bool _closePageOnDispose;
+    internal IAsyncDisposable? NetworkPolicyLifetime { get; set; }
     private readonly ConcurrentDictionary<IRequest, HtmlNetworkEntry> _network;
     private readonly ConcurrentDictionary<IRequest, IResponse> _responses = new();
     private readonly ConditionalWeakTable<IRequest, object> _observedRequests = new();
@@ -402,6 +403,14 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             try {
                 Playwright.Dispose();
                 _playwrightDisposed = true;
+            } catch (Exception ex) {
+                errors.Add(ex);
+            }
+        }
+        if (NetworkPolicyLifetime != null) {
+            try {
+                await NetworkPolicyLifetime.DisposeAsync().ConfigureAwait(false);
+                NetworkPolicyLifetime = null;
             } catch (Exception ex) {
                 errors.Add(ex);
             }
