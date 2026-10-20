@@ -187,6 +187,8 @@ public sealed class HtmlBrowserPdfRendererOptions {
         && (!NetworkPolicy.AllowNetworkAccess
             || !NetworkPolicy.AllowPrivateNetworks
             || NetworkPolicy.AllowedHosts.Count > 0
+            || NetworkPolicy.StrictDestinationHosts != null
+            || NetworkPolicy.RequireHttps
             || NetworkPolicy.DeniedHosts.Count > 0);
 
     internal bool ProxyOwnsNetworkResolution =>
@@ -194,6 +196,8 @@ public sealed class HtmlBrowserPdfRendererOptions {
         && NetworkPolicy.AllowNetworkAccess
         && NetworkPolicy.AllowPrivateNetworks
         && NetworkPolicy.AllowedHosts.Count == 0
+        && NetworkPolicy.StrictDestinationHosts == null
+        && !NetworkPolicy.RequireHttps
         && NetworkPolicy.DeniedHosts.Count == 0;
 
     internal HtmlBrowserLaunchOptions CreateLaunchOptions() {

@@ -41,13 +41,17 @@ public sealed partial class HtmlBrowserPdfRenderer : IAsyncDisposable {
     /// <summary>Initializes a pooled Chromium PDF renderer.</summary>
     public HtmlBrowserPdfRenderer(HtmlBrowserPdfRendererOptions? options = null) {
         _options = options ?? new HtmlBrowserPdfRendererOptions();
+        if (_options.NetworkPolicy.RequireHttps && _options.IgnoreHttpsErrors) {
+            throw new ArgumentException("NetworkPolicy.RequireHttps cannot be combined with IgnoreHttpsErrors.", nameof(options));
+        }
         _networkPolicy = new HtmlBrowserNetworkPolicyEvaluator(_options.NetworkPolicy);
         if ((!_options.NetworkPolicy.AllowNetworkAccess || !_options.NetworkPolicy.AllowPrivateNetworks)
             && !string.IsNullOrWhiteSpace(_options.Proxy)) {
             throw new ArgumentException("A caller-supplied proxy cannot be combined with offline or public-network-only enforcement because HtmlTinkerX cannot enforce that boundary through the caller's proxy. Enable private-network access explicitly only when the trusted proxy owns network enforcement.", nameof(options));
         }
         if (!string.IsNullOrWhiteSpace(_options.Proxy)
-            && (_options.NetworkPolicy.AllowedHosts.Count > 0 || _options.NetworkPolicy.DeniedHosts.Count > 0)) {
+            && (_options.NetworkPolicy.AllowedHosts.Count > 0 || _options.NetworkPolicy.DeniedHosts.Count > 0
+                || _options.NetworkPolicy.StrictDestinationHosts != null || _options.NetworkPolicy.RequireHttps)) {
             throw new ArgumentException("A caller-supplied proxy cannot be combined with allowed or denied host rules because HtmlTinkerX cannot enforce those rules for WebSocket tunnels through that proxy.", nameof(options));
         }
         _admissionGate = new SemaphoreSlim(
