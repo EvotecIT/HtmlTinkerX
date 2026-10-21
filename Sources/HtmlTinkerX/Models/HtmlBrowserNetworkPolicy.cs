@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 
 /// <summary>
-/// Immutable network and local-resource policy enforced for every request in a PDF capture context.
+/// Immutable network and local-resource policy for PDF capture and explicitly restricted browser sessions.
 /// </summary>
 public sealed class HtmlBrowserNetworkPolicy {
     /// <summary>Initializes a browser resource policy.</summary>
@@ -30,6 +30,27 @@ public sealed class HtmlBrowserNetworkPolicy {
             blockedRequestDiagnosticLimit,
             nat64Prefixes,
             allowNetworkAccess: true) { }
+
+    /// <summary>Creates a host-restricted policy without treating those hosts as private-network exceptions.</summary>
+    /// <param name="strictDestinationHosts">Complete destination host allowlist, including necessary subresource hosts.</param>
+    /// <param name="requireHttps">Require HTTPS (or WSS where a caller supports WebSockets).</param>
+    /// <param name="allowPrivateNetworks">Explicit private-network opt-in, intended for trusted intranet or isolated test fixtures.</param>
+    public HtmlBrowserNetworkPolicy(
+        IEnumerable<string> strictDestinationHosts,
+        bool requireHttps = true,
+        bool allowPrivateNetworks = false)
+        : this(allowPrivateNetworks, false, false, null, null, null, 32, null, true) {
+        if (strictDestinationHosts == null) throw new ArgumentNullException(nameof(strictDestinationHosts));
+        StrictDestinationHosts = SnapshotHosts(strictDestinationHosts);
+        if (StrictDestinationHosts.Count == 0) throw new ArgumentException("At least one destination host is required.", nameof(strictDestinationHosts));
+        foreach (string pattern in StrictDestinationHosts) {
+            string host = pattern.StartsWith("*.", StringComparison.Ordinal) ? pattern.Substring(2) : pattern;
+            if (Uri.CheckHostName(host) == UriHostNameType.Unknown) {
+                throw new ArgumentException("Destination hosts must be DNS names or IP addresses, without a scheme, port, or path.", nameof(strictDestinationHosts));
+            }
+        }
+        RequireHttps = requireHttps;
+    }
 
     private HtmlBrowserNetworkPolicy(
         bool allowPrivateNetworks,
@@ -95,6 +116,10 @@ public sealed class HtmlBrowserNetworkPolicy {
     public bool AllowUriCredentials { get; }
     /// <summary>Gets hosts explicitly allowed, including private hosts.</summary>
     public IReadOnlyList<string> AllowedHosts { get; }
+    /// <summary>Gets the strict destination host allowlist, or <see langword="null"/> when no host restriction was selected. These hosts never grant private-network access.</summary>
+    public IReadOnlyList<string>? StrictDestinationHosts { get; }
+    /// <summary>Gets whether plain HTTP and WS destinations are denied.</summary>
+    public bool RequireHttps { get; }
     /// <summary>Gets hosts explicitly denied.</summary>
     public IReadOnlyList<string> DeniedHosts { get; }
     /// <summary>Gets local directories from which file resources may be loaded.</summary>

@@ -81,6 +81,8 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
         if (!_policy.AllowNetworkAccess
             || !_policy.AllowPrivateNetworks
             || _policy.AllowedHosts.Count > 0
+            || _policy.StrictDestinationHosts != null
+            || _policy.RequireHttps
             || _policy.DeniedHosts.Count > 0) return false;
         return AreUriCredentialsAllowed(uri);
     }
@@ -91,8 +93,10 @@ internal sealed class HtmlBrowserNetworkPolicyEvaluator {
     internal async Task<IPAddress[]> ResolveAllowedAddressesAsync(Uri uri, CancellationToken cancellationToken) {
         if (!_policy.AllowNetworkAccess) return Array.Empty<IPAddress>();
         if (!AreUriCredentialsAllowed(uri)) return Array.Empty<IPAddress>();
+        if (_policy.RequireHttps && uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != "wss") return Array.Empty<IPAddress>();
 
         string host = uri.IdnHost.TrimEnd('.').ToLowerInvariant();
+        if (_policy.StrictDestinationHosts != null && !MatchesHost(host, _policy.StrictDestinationHosts)) return Array.Empty<IPAddress>();
         if (MatchesHost(host, _policy.DeniedHosts)) return Array.Empty<IPAddress>();
         if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)) {
             if (!MatchesHost(host, _policy.AllowedHosts) && !_policy.AllowPrivateNetworks) return Array.Empty<IPAddress>();

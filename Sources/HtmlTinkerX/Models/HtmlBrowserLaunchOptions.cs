@@ -92,6 +92,9 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Enable Chromium sandboxing when supported by the selected browser.</summary>
     public bool? ChromiumSandbox { get; set; }
 
+    /// <summary>Optional enforced destination policy for an owned, non-persistent Chromium session. Restricted sessions block service workers and WebSockets and reject external proxies, custom launch arguments, persistent profiles and CDP attachment. The default preserves unrestricted legacy behavior.</summary>
+    public HtmlBrowserNetworkPolicy? NetworkPolicy { get; set; }
+
     /// <summary>Custom user agent string for the browser context.</summary>
     public string? UserAgent { get; set; }
 
