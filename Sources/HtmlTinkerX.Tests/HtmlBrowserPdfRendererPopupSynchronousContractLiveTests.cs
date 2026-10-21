@@ -214,6 +214,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
+            browserArguments: ChromiumNetworkDiagnostics.Arguments(nameof(BlankPopupCssomResourcesWaitForHeaderInterception)),
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         string script = $@"let openerStyleOwner = HTMLElement.prototype;
             let openerStyleDescriptor;
@@ -382,6 +383,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
+            browserArguments: ChromiumNetworkDiagnostics.Arguments(nameof(BlankPopupLocationAndEventSourceExposeSynchronousState)),
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         const string script = @"const popup = window.open('', '_blank');
             let invalidLocationCaught = false;
