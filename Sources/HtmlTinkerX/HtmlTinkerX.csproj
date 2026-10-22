@@ -55,7 +55,7 @@
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="System.Threading.Channels" Version="10.0.12" />
+        <PackageReference Include="System.Threading.Channels" Version="10.0.13" />
         <!-- Align the existing Desktop JSON and memory dependencies with other current PowerShell modules. -->
         <PackageReference Include="System.Text.Json" Version="10.0.12" />
     </ItemGroup>
