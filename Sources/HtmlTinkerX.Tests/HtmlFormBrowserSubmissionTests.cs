@@ -15,7 +15,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(HtmlBrowserEngine.Firefox)]
     [InlineData(HtmlBrowserEngine.WebKit)]
     public async Task NamedControls_UseTheirTypesAndRespectValidationAndSubmitHandlers(HtmlBrowserEngine browser) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions { Browser = browser });
         int requests = 0;
         await session.Page.RouteAsync("https://forms.test/**", async route => {
             requests++;
@@ -50,7 +50,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(HtmlBrowserEngine.Firefox)]
     [InlineData(HtmlBrowserEngine.WebKit)]
     public async Task ParsedForm_UsesExactIdAndDocumentWideIndex(HtmlBrowserEngine browser) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions { Browser = browser });
         await session.Page.SetContentAsync("<section><form onsubmit='event.preventDefault()'><input name='q' value='first'></form></section>"
             + "<section><form id='sign:in&quot;form' onsubmit=\"event.preventDefault(); window.submitted=new FormData(this).get('q')\"><input name='q' value='second'></form></section>");
         var fields = new Dictionary<string, string> { ["q"] = "by index" };
@@ -73,7 +73,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(HtmlBrowserEngine.WebKit, "get")]
     [InlineData(HtmlBrowserEngine.WebKit, "post")]
     public async Task NativeSubmission_AwaitsCurrentNavigationWithoutRequiringNetworkIdle(HtmlBrowserEngine browser, string method) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions { Browser = browser });
         string? submittedMethod = null;
         string? submittedValues = null;
         await session.Page.RouteAsync("https://forms.test/**", async route => {
@@ -94,7 +94,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(true)]
     [InlineData(false)]
     public async Task Submission_PropagationStopsAndHistoryChangesDoNotCompleteNativeNavigation(bool stopsPropagation) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions());
         TaskCompletionSource<bool> received = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await session.Page.RouteAsync("https://forms.test/**", async route => {
@@ -124,7 +124,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
 
     [Fact]
     public async Task Submission_CancellationAndTimeoutCoverTheWholeOperation() {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions());
         await session.Page.SetContentAsync("<form onsubmit='event.preventDefault()'><input name='q' value='old'></form>");
         var fields = new Dictionary<string, string> { ["q"] = "new" };
         using CancellationTokenSource canceled = new();
@@ -151,7 +151,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(HtmlBrowserEngine.Firefox)]
     [InlineData(HtmlBrowserEngine.WebKit)]
     public async Task NativeSubmission_CompletesFragmentNavigationWithoutReplacingTheDocument(HtmlBrowserEngine browser) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions { Browser = browser });
         int requests = 0;
         await session.Page.RouteAsync("https://forms.test/**", async route => {
             requests++;
@@ -166,7 +166,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
 
     [Fact]
     public async Task FragmentSubmission_UsesTheNativeEntryListAfterFormDataHandlers() {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions());
         int requests = 0;
         await session.Page.RouteAsync("https://forms.test/**", async route => {
             requests++;
@@ -184,7 +184,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
     [InlineData(HtmlBrowserEngine.Firefox)]
     [InlineData(HtmlBrowserEngine.WebKit)]
     public async Task FragmentSubmission_CompletesWithLegacyEncodedValues(HtmlBrowserEngine browser) {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", browser: browser);
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions { Browser = browser });
         int requests = 0;
         await session.Page.RouteAsync("https://forms.test/**", async route => {
             requests++;
@@ -202,7 +202,7 @@ public sealed class HtmlFormBrowserSubmissionTests {
 
     [Fact]
     public async Task Submission_CancellationWhileNavigatingPreservesCallerTokenAndPage() {
-        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank");
+        await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions());
         TaskCompletionSource<bool> received = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await session.Page.RouteAsync("https://forms.test/receive", async route => {
