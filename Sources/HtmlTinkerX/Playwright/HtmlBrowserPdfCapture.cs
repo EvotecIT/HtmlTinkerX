@@ -302,7 +302,7 @@ internal static class HtmlBrowserPdfCapture {
             if (frame.IsDetached) continue;
             try {
                 string markup = await ExecuteWithCancellationAsync(
-                    frame.ContentAsync,
+                    () => frame.ContentAsync(),
                     () => page.CloseAsync(),
                     cancellationToken).ConfigureAwait(false);
                 snapshot.Append(frame.Url).Append('\0').Append(markup).Append('\0');

@@ -17,7 +17,7 @@ public class HtmlBrowserTracingTests {
         string file = Path.Combine(dir, "trace.zip");
         var tracing = new Mock<ITracing>();
         tracing.Setup(t => t.StartAsync(It.IsAny<TracingStartOptions>()))
-               .Returns(Task.CompletedTask)
+               .ReturnsAsync(Mock.Of<IAsyncDisposable>())
                .Verifiable();
         tracing.Setup(t => t.StopAsync(It.Is<TracingStopOptions>(o => o.Path == file)))
                .Returns(Task.CompletedTask)
