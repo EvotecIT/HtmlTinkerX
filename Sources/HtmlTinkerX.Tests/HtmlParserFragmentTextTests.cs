@@ -33,8 +33,11 @@ public class HtmlParserFragmentTextTests {
     public void ActiveAndEmbeddedContentDoesNotBecomeSourceText() {
         const string html = "<p>Before</p><script>scriptPayload()</script><style>.stylePayload{display:block}</style>"
             + "<iframe src='https://example.org/frame'>iframePayload</iframe><embed src='https://example.org/embed' title='embedPayload'>"
-            + "<object>objectPayload</object><template>templatePayload</template><noscript>noscriptPayload</noscript><p>After</p>";
+            + "<object>objectPayload</object><template>templatePayload</template><noscript>noscriptPayload</noscript>"
+            + "<svg><title>svgPayload</title><text>chartPayload</text></svg><math><mi>mathPayload</mi></math>"
+            + "<video>videoPayload</video><audio>audioPayload</audio><canvas>canvasPayload</canvas><applet>appletPayload</applet><p>After</p>";
         Assert.Equal("Before After", HtmlParserToText.ConvertFragmentToText(html));
+        Assert.Equal("Save now", HtmlParserToText.ConvertFragmentToText("<p>Save <svg><title>Close</title></svg> now</p>"));
     }
 
     [Fact]

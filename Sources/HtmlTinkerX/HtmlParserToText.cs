@@ -57,7 +57,7 @@ public static class HtmlParserToText {
         }
 
         using IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        foreach (IElement element in document.QuerySelectorAll("script,style,template,noscript,iframe,object,embed")) {
+        foreach (IElement element in document.QuerySelectorAll("script,style,template,noscript,iframe,object,embed,svg,math,audio,video,canvas,applet")) {
             element.Remove();
         }
 
