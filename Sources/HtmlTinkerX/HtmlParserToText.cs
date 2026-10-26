@@ -35,6 +35,45 @@ public static class HtmlParserToText {
     }
 
     /// <summary>
+    /// Converts an HTML fragment to plain text, separating block elements and line breaks without inserting
+    /// spaces inside inline markup. Scripts, styles and embedded content are omitted; no resources are loaded.
+    /// </summary>
+    /// <param name="html">The untrusted fragment of HTML body content.</param>
+    /// <returns>Whitespace-normalized text from the fragment's body.</returns>
+    /// <exception cref="ArgumentNullException">The fragment is null.</exception>
+    /// <remarks>
+    /// This method parses body content and uses HTML element semantics, not computed CSS layout. Contextual content
+    /// such as table rows and cells needs its enclosing table. Its result is plain text, not sanitized HTML; encode it
+    /// when rendering into an HTML document. <see cref="ConvertToText"/> retains its existing behavior.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// string text = HtmlParserToText.ConvertFragmentToText("&lt;ul&gt;&lt;li&gt;First&lt;/li&gt;&lt;li&gt;Second&lt;/li&gt;&lt;/ul&gt;");
+    /// </code>
+    /// </example>
+    public static string ConvertFragmentToText(string html) {
+        if (html == null) {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        using IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        foreach (IElement element in document.QuerySelectorAll("script,style,template,noscript,iframe,object,embed")) {
+            element.Remove();
+        }
+
+        // Block boundaries are whitespace in text. Inline elements keep the exact adjacency of their text nodes.
+        foreach (IElement element in document.QuerySelectorAll(
+            "address,article,aside,blockquote,br,caption,center,dd,details,dialog,dir,div,dl,dt,fieldset,figcaption,figure,footer,form," +
+            "h1,h2,h3,h4,h5,h6,header,hgroup,hr,legend,li,listing,main,menu,nav,ol,optgroup,option,p,plaintext,pre,search,section," +
+            "summary,table,tbody,td,tfoot,th,thead,tr,ul,xmp")) {
+            element.Parent?.InsertBefore(document.CreateTextNode(" "), element);
+            element.Parent?.InsertBefore(document.CreateTextNode(" "), element.NextSibling);
+        }
+
+        return NormalizeWhitespace(document.Body?.TextContent);
+    }
+
+    /// <summary>
     /// Extracts plain text from the most readable article-like region of an HTML document.
     /// </summary>
     /// <param name="html">HTML string to inspect.</param>
