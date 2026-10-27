@@ -345,8 +345,10 @@ public partial class HtmlBrowserProtectedDriverRootTests
             HtmlBrowser.CacheStageInstaller = (path, engine) => {
                 InstallerCalls++;
                 var entries = JsonDocument.Parse(File.ReadAllText(Path.Combine(Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH")!, ".playwright", "package", "browsers.json"))).RootElement.GetProperty("browsers");
-                string revision = entries.EnumerateArray().First(entry => entry.GetProperty("name").GetString() == engine.ToString().ToLowerInvariant()).GetProperty("revision").GetString()!;
-                return HtmlBrowserCacheResilienceTests.CacheFixture.CreateStageAsync(path, engine, revision);
+                string Revision(string name) => entries.EnumerateArray().First(entry => entry.GetProperty("name").GetString() == name).GetProperty("revision").GetString()!;
+                string revision = Revision(engine.ToString().ToLowerInvariant());
+                string? windowsRevision = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Revision("winldd") : null;
+                return HtmlBrowserCacheResilienceTests.CacheFixture.CreateStageAsync(path, engine, revision, Revision("ffmpeg"), windowsRevision);
             };
             HtmlBrowser.CacheSmokeTest = (_, _) => Task.CompletedTask;
         }

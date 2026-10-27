@@ -92,7 +92,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
     }
 
     [Fact]
-    public async Task RuntimeManifest_CompleteRuntimeLinkRetainsReadOnlyFastReuse()
+    public async Task RuntimeManifest_UnverifiedRuntimeLinkRejectsMutationAndPreservesTarget()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -116,7 +116,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
         try
         {
             // A marker-only external revision cannot be trusted for launch. Refuse linked mutation and preserve it.
-            await Assert.ThrowsAsync<InvalidOperationException>(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox));
+            await Assert.ThrowsAsync<ArgumentException>(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox));
 
             Assert.Equal("owned runtime bytes", File.ReadAllText(Path.Combine(external, "preserve")));
             Assert.NotNull(new DirectoryInfo(runtime).LinkTarget);

@@ -127,7 +127,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
     [Theory]
     [InlineData("discovery")]
     [InlineData("accounting")]
-    [InlineData("runtime-cleanup")]
+    [InlineData("runtime-preservation")]
     public async Task CacheIdentity_WindowsCaseSensitiveDirectoriesPreserveDistinctPhysicalFootprints(string mode)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -166,11 +166,12 @@ public partial class HtmlBrowserProtectedDriverRootTests
             _identityOutput.WriteLine("NotExecuted: the owned fixture remains case insensitive after fsutil.");
             return;
         }
-        if (mode == "runtime-cleanup")
+        if (mode == "runtime-preservation")
         {
             fixture.SetSearchRoot(fixture.Root, "root");
             File.WriteAllText(Path.Combine(fixture.Root, ".playwright", ".version"),
                 typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version!.ToString(3));
+            File.WriteAllText(Path.Combine(fixture.Root, ".playwright", "package", "browsers.json"), FirefoxManifest);
             string first = Path.Combine(root, "firefox-123");
             string second = Path.Combine(root, "FIREFOX-123");
             Directory.CreateDirectory(first);
@@ -180,8 +181,9 @@ public partial class HtmlBrowserProtectedDriverRootTests
 
             await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
 
-            Assert.False(Directory.Exists(first));
-            Assert.False(Directory.Exists(second));
+            Assert.True(Directory.Exists(first));
+            Assert.True(Directory.Exists(second));
+            Assert.True(HtmlBrowser.VerifyCacheSlot(HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox), true, out _));
             Assert.Equal(1, fixture.InstallerCalls);
             Assert.Equal(0, fixture.HttpCalls);
             return;

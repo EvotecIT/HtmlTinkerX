@@ -275,8 +275,18 @@ jobs:
           if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
               Register-PSRepository -Default -ErrorAction Stop
           }
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          foreach ($module in 'Pester', 'PSWriteColor') {
+              for ($attempt = 1; ; $attempt++) {
+                  try {
+                      Install-Module -Name $module -Repository PSGallery -Scope CurrentUser -Force -SkipPublisherCheck -AllowClobber -ErrorAction Stop
+                      break
+                  } catch {
+                      if ($attempt -ge 3) { throw }
+                      Write-Warning "PSGallery installation of $module failed (attempt $attempt/3): $_"
+                      Start-Sleep -Seconds (5 * $attempt)
+                  }
+              }
+          }
 
       - name: Build .NET solution
         run: |
