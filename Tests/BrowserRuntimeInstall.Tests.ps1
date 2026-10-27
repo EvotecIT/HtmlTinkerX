@@ -21,7 +21,8 @@ Describe 'Browser runtime caching' {
         }
         finally {
             $env:PLAYWRIGHT_BROWSERS_PATH = $originalBrowserPath
-            if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -ErrorAction Stop }
+            # The generated cache deliberately contains a hidden .htmltinkerx directory on Unix.
+            if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction Stop }
         }
 
         $count1 | Should -BeGreaterThan 0

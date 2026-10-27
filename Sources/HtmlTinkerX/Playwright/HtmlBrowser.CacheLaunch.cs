@@ -11,14 +11,27 @@ public static partial class HtmlBrowser {
     private static readonly SemaphoreSlim DriverStartSemaphore = new(1, 1);
     private static volatile string? BrowserRootDuringDriverStart;
     private static volatile string? ManagedRootDuringDriverStart;
+    private static readonly AsyncLocal<Action<string>?> CacheLaunchStarting = new();
+
+    // A scoped process-boundary seam reproduces a cache deletion after SDK startup without timing races.
+    internal static IDisposable OverrideCacheLaunchStarting(Action<string> callback) {
+        Action<string>? previous = CacheLaunchStarting.Value;
+        CacheLaunchStarting.Value = callback;
+        return new CacheLaunchScope(() => CacheLaunchStarting.Value = previous);
+    }
+
+    private sealed class CacheLaunchScope : IDisposable {
+        private Action? _restore;
+        internal CacheLaunchScope(Action restore) => _restore = restore;
+        public void Dispose() => Interlocked.Exchange(ref _restore, null)?.Invoke();
+    }
 
     private static string SessionCacheDirectory(HtmlBrowserEngine engine, bool recording) => recording
         ? FindCacheSlot(engine, true) ?? FindCacheSlot(engine, false, compatibleAuxiliary: true)
             ?? throw new InvalidOperationException($"{engine} browser fallback has no FFmpeg revision compatible with the loaded driver. Repair the browser cache before recording video.")
         : GetBrowserRuntimeDirectory(engine);
 
-    private static string GetManagedExecutable(HtmlBrowserEngine engine, bool headless, bool recording = false) {
-        string slot = SessionCacheDirectory(engine, recording);
+    private static string GetManagedExecutable(HtmlBrowserEngine engine, bool headless, string slot) {
         string name = engine == HtmlBrowserEngine.Chromium && headless ? "chromium-headless-shell" : engine.ToString().ToLowerInvariant();
         return CacheFilePath(slot, ReadCacheManifest(slot).Runtimes.Single(runtime => runtime.Name == name).Executable);
     }
@@ -44,20 +57,36 @@ public static partial class HtmlBrowser {
     }
 
     internal static bool IsCacheLaunchFailure(string message) =>
+        string.Equals(message, "Process exited", StringComparison.Ordinal) ||
         message.IndexOf("Invalid file descriptor to ICU data", StringComparison.OrdinalIgnoreCase) >= 0 ||
         message.IndexOf("exitCode=255", StringComparison.OrdinalIgnoreCase) >= 0 ||
         message.IndexOf("exit code 255", StringComparison.OrdinalIgnoreCase) >= 0 ||
         message.IndexOf("Executable doesn't exist", StringComparison.OrdinalIgnoreCase) >= 0 ||
         message.IndexOf("ENOENT", StringComparison.OrdinalIgnoreCase) >= 0;
 
-    private static async Task<T> LaunchWithCacheRepairAsync<T>(HtmlBrowserLaunchOptions options, Func<Task<T>> launch) {
-        try { return await launch().ConfigureAwait(false); }
-        catch (PlaywrightException ex) when (PlaywrightFactory == null && ShouldInstallBundledRuntime(options) && IsCacheLaunchFailure(ex.Message)) {
-            string slot = GetBrowserRuntimeDirectory(options.Browser);
-            Console.Error.WriteLine($"{options.Browser} cache launch failed ({ex.Message}). Repairing the browser cache before retrying.");
-            File.WriteAllText(Path.Combine(slot, "launch-failed.txt"), ex.Message);
-            await RepairInstallationAsync(options.Browser).ConfigureAwait(false);
-            return await launch().ConfigureAwait(false);
+    internal sealed class BrowserCacheRepairedException : Exception {
+        internal BrowserCacheRepairedException(Exception cause) : base("Browser cache repaired; restart the driver before retrying launch.", cause) { }
+    }
+
+    internal static async Task<T> LaunchWithCacheRepairAsync<T>(HtmlBrowserLaunchOptions options, Func<string?, Task<T>> launch, bool allowRepair = true) {
+        bool managed = PlaywrightFactory == null && ShouldInstallBundledRuntime(options);
+        string? slot = managed ? SessionCacheDirectory(options.Browser, !string.IsNullOrWhiteSpace(options.VideoPath)) : null;
+        if (slot != null) CacheLaunchStarting.Value?.Invoke(slot);
+        try { return await launch(slot).ConfigureAwait(false); }
+        catch (PlaywrightException ex) when (allowRepair && managed && IsCacheLaunchFailure(ex.Message)) {
+            if (!await RepairFailedCacheLaunchAsync(options, slot, ex, allowRepair).ConfigureAwait(false)) throw;
+            // The SDK captures FFmpeg's registry root at driver startup. Restart the complete launch owner.
+            throw new BrowserCacheRepairedException(ex);
         }
+    }
+
+    private static async Task<bool> RepairFailedCacheLaunchAsync(HtmlBrowserLaunchOptions options, string? slot, PlaywrightException failure, bool allowRepair) {
+        // Exit 255, ENOENT and a closed driver can also describe a rejected profile, argument or host setup.
+        if (!allowRepair || PlaywrightFactory != null || !ShouldInstallBundledRuntime(options) || !IsCacheLaunchFailure(failure.Message)
+            || slot == null || VerifyCacheSlot(slot, true, out _)) return false;
+        Console.Error.WriteLine($"{options.Browser} cache launch failed ({failure.Message}). Repairing the browser cache before retrying.");
+        await MarkCacheLaunchFailureAsync(slot, failure.Message).ConfigureAwait(false);
+        await RepairInstallationAsync(options.Browser).ConfigureAwait(false);
+        return true;
     }
 }

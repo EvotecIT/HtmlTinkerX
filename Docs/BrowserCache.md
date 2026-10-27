@@ -44,6 +44,13 @@ file. A known ICU, missing executable, or Firefox exit-255 launch error triggers
 one repair and retry. Other launch errors remain available as product or host
 diagnostics.
 
+After a failed repair, ordinary launches reuse a verified same-engine fallback
+for five minutes before retrying the download. The retry marker is specific to
+the loaded Playwright version and browser. Doctor with repair and forced repair
+retry immediately. A generic exit-255 or missing-file error triggers repair only
+when a full integrity check confirms corruption in the generation actually used
+by that launch; host and profile failures leave healthy generations available.
+
 ## Storage and concurrency
 
 `PLAYWRIGHT_BROWSERS_PATH` selects the parent cache. Managed browser generations
@@ -60,7 +67,7 @@ also staged before replacement; the previous payload survives a failed download.
 
 Each generation has an `htmltinkerx-integrity.json` manifest containing its driver
 version, revision directories, launch binaries, file sizes, and SHA-256 hashes.
-The append-only `.htmltinkerx/install.jsonl` log records process identity, process
+The append-only `ManagedRoot/install.jsonl` log records process identity, process
 start time, working directory, Playwright version, added revisions, and outcome.
 Command arguments are omitted so credentials passed to a host cannot enter the
 log. Bulk cache cleanup refuses to delete verified generations and their history.
@@ -79,6 +86,13 @@ handshake permits it to write shared download state. If its .NET host is killed,
 the child exits when that pipe closes. A new lock holder also checks the recorded
 child identity and waits until the actual writer has exited, covering the interval
 between parent death and child shutdown.
+
+An unreadable writer record or an inaccessible process identity stops repair
+immediately with an actionable diagnosis instead of waiting through the install
+timeout. These cases preserve the record: elapsed time does not prove that a
+writer has exited. Verify the previous downloader has stopped before removing
+an invalid record. Doctor reports the coordination problem without starting a
+second writer. Valid dead or reused process identities recover automatically.
 
 Downloads use the loaded Playwright package's platform registry, official URLs,
 fallback hosts where supplied, and proxy handling. Transfers stream in chunks,

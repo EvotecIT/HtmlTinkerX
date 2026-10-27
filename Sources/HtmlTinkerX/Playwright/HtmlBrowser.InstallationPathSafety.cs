@@ -59,7 +59,7 @@ public static partial class HtmlBrowser {
     /// <summary>Applies the installation safety contract to a public cache-cleaner destination.</summary>
     internal static string ValidateCacheMutationPath(string path) {
         path = ValidateDirectoryMutationPath(path, "CacheLocation.Path");
-        if (Directory.Exists(path) && Directory.EnumerateFiles(path, CacheManifestName, SearchOption.AllDirectories).Any()) {
+        if (ContainsBrowserIntegrityManifest(path)) {
             throw new InvalidOperationException("This cache contains verified HtmlTinkerX browser generations. Bulk cleanup is disabled so working revisions and install history are retained.");
         }
         string directory = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -67,6 +67,22 @@ public static partial class HtmlBrowser {
             ValidateDriverMutationPath(path);
         }
         return path;
+    }
+
+    // Match the deletion footprint: inspect real directories, never framework or external link targets.
+    private static bool ContainsBrowserIntegrityManifest(string path) {
+        if (!Directory.Exists(path)) return false;
+        var pending = new Stack<string>();
+        pending.Push(path);
+        while (pending.Count > 0) {
+            foreach (string entry in Directory.EnumerateFileSystemEntries(pending.Pop())) {
+                if (string.Equals(Path.GetFileName(entry), CacheManifestName, FileSystemPathComparison)) return true;
+                FileAttributes attributes = File.GetAttributes(entry);
+                if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == FileAttributes.Directory)
+                    pending.Push(entry);
+            }
+        }
+        return false;
     }
 
     private static string ValidateDirectoryMutationPath(string path, string setting) {

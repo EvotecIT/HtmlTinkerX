@@ -62,6 +62,15 @@ public static partial class HtmlBrowser {
             manifest.Runtimes.Any(runtime => runtime == null || string.IsNullOrWhiteSpace(runtime.Name) ||
                 string.IsNullOrWhiteSpace(runtime.Directory) || string.IsNullOrWhiteSpace(runtime.Executable)))
             throw new InvalidDataException("Browser integrity manifest has invalid file or runtime metadata.");
+        try {
+            foreach (CacheRuntime runtime in manifest.Runtimes) {
+                string directory = CacheFilePath(slot, runtime.Directory);
+                RequireBrowserRuntimeDescendant(CacheFilePath(slot, runtime.Executable), directory);
+            }
+            foreach (CacheFile file in manifest.Files) _ = CacheFilePath(slot, file.Path);
+        } catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is NotSupportedException) {
+            throw new InvalidDataException("Browser integrity manifest contains a path outside its runtime or cache generation.", ex);
+        }
         return manifest;
     }
 

@@ -13,7 +13,7 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 [Collection("Process diagnostics")]
-public sealed class HtmlBrowserCacheResilienceTests {
+public sealed partial class HtmlBrowserCacheResilienceTests {
     [Theory]
     [InlineData("ffmpeg")]
     [InlineData("winldd")]
@@ -92,6 +92,7 @@ public sealed class HtmlBrowserCacheResilienceTests {
             Assert.True(HtmlBrowser.VerifyCacheSlot(previous, true, out _));
             Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(previous))!, "install.jsonl")));
             Assert.Equal(previous, HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox));
+            Assert.Empty(Directory.GetDirectories(Path.Combine(fixture.Root, "driver"), ".playwright-previous-*"));
         } finally { HtmlBrowser.HttpClientFactory = factory; }
     }
 

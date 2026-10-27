@@ -25,14 +25,18 @@ public static partial class HtmlBrowser {
             try { using var probe = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
             catch (IOException) { report.LockHeld = true; report.RetryAfterSeconds = 1; }
         }
-        if (IsInstallationWriterAlive(out HtmlBrowserInstallOwner? writer)) {
+        try { if (IsInstallationWriterAlive(out HtmlBrowserInstallOwner? writer)) {
             report.LockHeld = true;
             report.LockOwner = writer;
             report.RetryAfterSeconds = 1;
+        } } catch (InvalidOperationException ex) {
+            report.LockHeld = true;
+            report.Revisions.Add(new HtmlBrowserCacheRevision { Browser = "installer", State = "incomplete", Message = ex.Message });
         }
         var engines = engine.HasValue ? new[] { engine.Value } : new[] { HtmlBrowserEngine.Chromium, HtmlBrowserEngine.Firefox, HtmlBrowserEngine.WebKit };
         foreach (HtmlBrowserEngine selected in engines) {
             cancellationToken.ThrowIfCancellationRequested();
+            bool canRepair = !report.LockHeld;
             async Task<(bool Exact, bool Any)> InspectAsync() {
                 bool exact = false;
                 bool any = false;
@@ -47,7 +51,17 @@ public static partial class HtmlBrowser {
                     bool verified = VerifyCacheSlot(slot, true, out string diagnosis);
                     if (verified) {
                         try { await SmokeCacheSlotAsync(slot, selected).ConfigureAwait(false); }
-                        catch (Exception ex) { verified = false; diagnosis = ex.Message; }
+                        catch (Exception ex) {
+                            verified = false;
+                            diagnosis = ex.Message;
+                            if (!report.LockHeld) {
+                                try { await MarkCacheLaunchFailureAsync(slot, diagnosis).ConfigureAwait(false); }
+                                catch (Exception failure) when (failure is IOException || failure is UnauthorizedAccessException || failure is InvalidOperationException || failure is ArgumentException) {
+                                    canRepair = false;
+                                    diagnosis += " Failed to record unusable generation; repair stopped to preserve fallback safety: " + failure.Message;
+                                }
+                            }
+                        }
                     }
                     any |= verified;
                     exact |= verified && IsExpectedSlot(slot, manifest, selected);
@@ -60,13 +74,15 @@ public static partial class HtmlBrowser {
             }
             int firstRow = report.Revisions.Count;
             var state = await InspectAsync().ConfigureAwait(false);
-            if (repair && !report.LockHeld && !state.Exact) {
+            if (repair && canRepair && !state.Exact) {
+                string? repairFailure = null;
                 try { await RepairInstallationAsync(selected).ConfigureAwait(false); }
-                catch (InvalidOperationException ex) {
-                    report.Revisions.Add(new HtmlBrowserCacheRevision { Browser = selected.ToString(), State = "missing", Message = ex.Message });
+                catch (Exception ex) when (ex is InvalidOperationException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException) {
+                    repairFailure = "Browser repair stopped: " + ex.Message;
                 }
                 report.Revisions.RemoveRange(firstRow, report.Revisions.Count - firstRow);
                 state = await InspectAsync().ConfigureAwait(false);
+                if (repairFailure != null) report.Revisions.Add(new HtmlBrowserCacheRevision { Browser = selected.ToString(), State = "missing", Message = repairFailure });
             }
             bool foundExpected = state.Exact;
             bool foundVerified = state.Any;
@@ -83,7 +99,10 @@ public static partial class HtmlBrowser {
                 Directory = directory, State = "unverified", Message = "Legacy shared revision has no HtmlTinkerX integrity manifest; retained unchanged." });
         }
         string log = Path.Combine(ManagedCacheRoot, "install.jsonl");
-        if (File.Exists(log)) report.RecentInstalls = File.ReadLines(log).Reverse().Take(20).Reverse().ToList();
+        try { if (File.Exists(log)) report.RecentInstalls = File.ReadLines(ValidateCacheMetadataDestination(log)).Reverse().Take(20).Reverse().ToList(); }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException) {
+            Console.Error.WriteLine($"WARNING: could not read browser cache history ({ex.Message}).");
+        }
         if (report.LockHeld && report.ExitCode != 0) report.ExitCode = 3;
         if (!report.LockHeld) {
             try { report.LockOwner = JsonSerializer.Deserialize<HtmlBrowserInstallOwner>(ReadInstallOwnerText()); }

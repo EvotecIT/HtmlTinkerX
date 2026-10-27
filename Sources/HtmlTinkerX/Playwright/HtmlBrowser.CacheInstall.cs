@@ -18,6 +18,10 @@ public static partial class HtmlBrowser {
             EnsureDriverSearchPath();
             return;
         }
+        if (!force && IsDriverPresent() && TryUseRecentRepairFallback(engine)) {
+            EnsureDriverSearchPath();
+            return;
+        }
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
             using FileStream installLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
@@ -26,14 +30,16 @@ public static partial class HtmlBrowser {
             if (!IsDriverPresent()) await DownloadAndInstallDriverAsync().ConfigureAwait(false);
             EnsureDriverSearchPath();
             if (!force && FindCacheSlot(engine, true) != null) return;
+            if (!force && TryUseRecentRepairFallback(engine)) return;
             Console.Error.WriteLine($"{engine} browser cache requires verification or repair. Installing into staging; existing generations are retained.");
 
             // A repair must not fall back to a generation already known to fail full integrity checks.
             foreach (string slot in CacheSlots().ToArray()) {
-                try {
-                    if (ReadCacheManifest(slot).Engine == engine && !VerifyCacheSlot(slot, true, out string diagnosis))
-                        File.WriteAllText(Path.Combine(slot, "launch-failed.txt"), diagnosis);
-                } catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is JsonException || ex is UnauthorizedAccessException) { }
+                CacheManifest manifest;
+                try { manifest = ReadCacheManifest(slot); }
+                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is JsonException || ex is UnauthorizedAccessException) { continue; }
+                if (manifest.Engine == engine && !VerifyCacheSlot(slot, true, out string diagnosis))
+                    File.WriteAllText(ValidateCacheMetadataDestination(Path.Combine(slot, "launch-failed.txt")), diagnosis);
             }
 
             string? fallback = FindCacheSlot(engine, false);
@@ -61,8 +67,10 @@ public static partial class HtmlBrowser {
                 // Staging and generations share a volume. One rename makes an entirely verified generation visible.
                 Directory.CreateDirectory(Path.GetDirectoryName(generation)!);
                 await MoveVerifiedGenerationAsync(staging, generation).ConfigureAwait(false);
+                ClearRecentRepairFailure(engine);
                 AppendCacheLog(engine, "verified", runtimes.Select(runtime => Path.GetFileName(runtime.Directory)).ToArray(), null);
             } catch (Exception ex) {
+                RecordRecentRepairFailure(engine);
                 AppendCacheLog(engine, "repair-failed", Array.Empty<string>(), ex.Message);
                 if (fallback == null || !VerifyCacheSlot(fallback, false, out _)) {
                     throw new InvalidOperationException($"{engine} browser cache repair failed: {ex.Message} No working revisions were deleted. Run the browser doctor with repair; this is a cache failure, not a product failure.", ex);
@@ -95,21 +103,25 @@ public static partial class HtmlBrowser {
         CacheSmokeTest != null ? CacheSmokeTest(slot, engine) : RunCacheScriptAsync(slot, engine, "smoke");
 
     private static void AppendCacheLog(HtmlBrowserEngine engine, string outcome, string[] added, string? message) {
-        Directory.CreateDirectory(ManagedCacheRoot);
-        using Process current = Process.GetCurrentProcess();
-        File.AppendAllText(Path.Combine(ManagedCacheRoot, "install.jsonl"), JsonSerializer.Serialize(new {
-            TimeUtc = DateTime.UtcNow,
-            ProcessId = current.Id,
-            ProcessStartUtc = current.StartTime.ToUniversalTime(),
-            Command = current.ProcessName,
-            Repository = Environment.CurrentDirectory,
-            PlaywrightVersion = DriverVersion,
-            Browser = engine.ToString(),
-            Added = added,
-            Removed = Array.Empty<string>(),
-            Outcome = outcome,
-            Message = message
-        }) + Environment.NewLine);
+        try {
+            Directory.CreateDirectory(ManagedCacheRoot);
+            using Process current = Process.GetCurrentProcess();
+            File.AppendAllText(ValidateCacheMetadataDestination(Path.Combine(ManagedCacheRoot, "install.jsonl")), JsonSerializer.Serialize(new {
+                TimeUtc = DateTime.UtcNow,
+                ProcessId = current.Id,
+                ProcessStartUtc = current.StartTime.ToUniversalTime(),
+                Command = current.ProcessName,
+                Repository = Environment.CurrentDirectory,
+                PlaywrightVersion = DriverVersion,
+                Browser = engine.ToString(),
+                Added = added,
+                Removed = Array.Empty<string>(),
+                Outcome = outcome,
+                Message = message
+            }) + Environment.NewLine);
+        } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException) {
+            Console.Error.WriteLine($"WARNING: could not record browser cache history ({ex.Message}).");
+        }
     }
 
     private static async Task RunCacheScriptAsync(string root, HtmlBrowserEngine engine, string mode) {

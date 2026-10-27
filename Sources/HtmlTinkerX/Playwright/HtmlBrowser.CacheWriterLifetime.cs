@@ -25,15 +25,23 @@ public static partial class HtmlBrowser {
 
     private static bool IsInstallationWriterAlive(out HtmlBrowserInstallOwner? owner) {
         owner = null;
-        if (!File.Exists(InstallationWriterPath)) return false;
         try {
+            _ = ValidateCacheMetadataDestination(InstallationWriterPath);
             owner = JsonSerializer.Deserialize<HtmlBrowserInstallOwner>(File.ReadAllText(InstallationWriterPath));
             if (owner == null || owner.ProcessId <= 0 || owner.ProcessStartUtc == default)
-                throw new InvalidDataException("Browser install writer metadata is invalid; verify the writer before repairing.");
+                throw new InvalidOperationException("Browser install writer metadata is invalid. Verify that the previous downloader has exited before removing its writer record and retrying repair.");
+        } catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+        catch (Exception ex) when (ex is JsonException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException) {
+            throw new InvalidOperationException("Browser install writer metadata is unreadable. Verify that the previous downloader has exited before removing its writer record and retrying repair.", ex);
+        }
+        try {
             using Process writer = Process.GetProcessById(owner.ProcessId);
             return !writer.HasExited && writer.StartTime.ToUniversalTime() == owner.ProcessStartUtc;
         } catch (ArgumentException) { return false; }
-        catch (System.ComponentModel.Win32Exception) { return true; }
         catch (InvalidOperationException) { return false; }
+        catch (System.ComponentModel.Win32Exception ex) {
+            throw new InvalidOperationException("The previous browser downloader's process identity cannot be inspected. Repair stopped without displacing a potentially active writer; verify process access and retry.", ex);
+        }
     }
 }

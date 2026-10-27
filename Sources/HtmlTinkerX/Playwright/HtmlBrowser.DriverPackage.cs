@@ -61,6 +61,10 @@ public static partial class HtmlBrowser {
                 throw;
             }
             EnsureNodeExecutable(baseDir);
+            // Legacy hermetic runtimes may still live inside the displaced driver. Never GC those revisions.
+            if (previousDirectory && !Directory.Exists(Path.Combine(previous, "package", ".local-browsers")) && !ContainsBrowserIntegrityManifest(previous))
+                TryDeleteDirectory(previous);
+            else if (previousFile) TryDeleteFile(previous);
         } finally {
             TryDeleteFile(packagePath);
             TryDeleteDirectory(stagingDir);
@@ -176,6 +180,7 @@ public static partial class HtmlBrowser {
     /// </summary>
     internal static async Task<FileStream> AcquireInstallationFileLockAsync() {
         string lockPath = GetInstallationLockPath();
+        _ = ValidateCacheMetadataDestination(lockPath);
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         var stopwatch = Stopwatch.StartNew();
 
@@ -192,7 +197,7 @@ public static partial class HtmlBrowser {
                     if (IsInstallationWriterAlive(out _))
                         throw new IOException("The previous Playwright download child is still active after its host exited. Waiting for its verified process identity to exit.");
                     using Process current = Process.GetCurrentProcess();
-                    File.WriteAllText(lockPath + ".owner.json", JsonSerializer.Serialize(new HtmlBrowserInstallOwner {
+                    File.WriteAllText(ValidateCacheMetadataDestination(lockPath + ".owner.json"), JsonSerializer.Serialize(new HtmlBrowserInstallOwner {
                         ProcessId = current.Id, ProcessStartUtc = current.StartTime.ToUniversalTime(),
                         AcquiredUtc = DateTime.UtcNow, Command = current.ProcessName,
                         Repository = Environment.CurrentDirectory, CacheRoot = GetBrowserInstallPath()
