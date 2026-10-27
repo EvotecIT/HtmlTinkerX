@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using System.Text.Json;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -14,6 +15,13 @@ namespace HtmlTinkerX.Tests;
 [Collection("Process diagnostics")]
 public partial class HtmlBrowserProtectedDriverRootTests
 {
+    private static void MoveTestSdkDirectory(string source, string destination) {
+        for (int attempt = 0; ; attempt++) {
+            try { Directory.Move(source, destination); return; }
+            catch (IOException) when (attempt < 20) { System.Threading.Thread.Sleep(250); }
+            catch (UnauthorizedAccessException) when (attempt < 20) { System.Threading.Thread.Sleep(250); }
+        }
+    }
     [Theory]
     [InlineData("metadata", "root")]
     [InlineData("metadata", "child")]
@@ -308,6 +316,8 @@ public partial class HtmlBrowserProtectedDriverRootTests
         private readonly string? _nuget = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
         private readonly Func<HttpClient> _factory = HtmlBrowser.HttpClientFactory;
         private readonly Action<string[]> _installer = HtmlBrowser.PlaywrightInstaller;
+        private readonly Func<string, HtmlBrowserEngine, Task>? _cacheStage = HtmlBrowser.CacheStageInstaller;
+        private readonly Func<string, HtmlBrowserEngine, Task>? _cacheSmoke = HtmlBrowser.CacheSmokeTest;
         private readonly string _container = Path.Combine(Path.GetTempPath(), "protected-driver-" + Guid.NewGuid().ToString("N"));
 
         public string Root { get; }
@@ -332,6 +342,13 @@ public partial class HtmlBrowserProtectedDriverRootTests
                 throw new InvalidOperationException("A rejected driver root must not download a package.");
             };
             HtmlBrowser.PlaywrightInstaller = _ => InstallerCalls++;
+            HtmlBrowser.CacheStageInstaller = (path, engine) => {
+                InstallerCalls++;
+                var entries = JsonDocument.Parse(File.ReadAllText(Path.Combine(Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH")!, ".playwright", "package", "browsers.json"))).RootElement.GetProperty("browsers");
+                string revision = entries.EnumerateArray().First(entry => entry.GetProperty("name").GetString() == engine.ToString().ToLowerInvariant()).GetProperty("revision").GetString()!;
+                return HtmlBrowserCacheResilienceTests.CacheFixture.CreateStageAsync(path, engine, revision);
+            };
+            HtmlBrowser.CacheSmokeTest = (_, _) => Task.CompletedTask;
         }
 
         public void SelectProtectedRoot(string kind, string alias)
@@ -409,6 +426,8 @@ public partial class HtmlBrowserProtectedDriverRootTests
         {
             HtmlBrowser.HttpClientFactory = _factory;
             HtmlBrowser.PlaywrightInstaller = _installer;
+            HtmlBrowser.CacheStageInstaller = _cacheStage;
+            HtmlBrowser.CacheSmokeTest = _cacheSmoke;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", _driver);
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", _browsers);
             Environment.SetEnvironmentVariable("NUGET_PACKAGES", _nuget);

@@ -59,6 +59,9 @@ public static partial class HtmlBrowser {
     /// <summary>Applies the installation safety contract to a public cache-cleaner destination.</summary>
     internal static string ValidateCacheMutationPath(string path) {
         path = ValidateDirectoryMutationPath(path, "CacheLocation.Path");
+        if (Directory.Exists(path) && Directory.EnumerateFiles(path, CacheManifestName, SearchOption.AllDirectories).Any()) {
+            throw new InvalidOperationException("This cache contains verified HtmlTinkerX browser generations. Bulk cleanup is disabled so working revisions and install history are retained.");
+        }
         string directory = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         if (string.Equals(Path.GetFileName(directory), ".playwright", FileSystemPathComparison)) {
             ValidateDriverMutationPath(path);

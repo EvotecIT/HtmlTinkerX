@@ -51,11 +51,10 @@ public partial class HtmlBrowserProtectedDriverRootTests
         }
         else
         {
-            if (mode == "browser-ancestor") await HtmlBrowser.RepairInstallationAsync(HtmlBrowserEngine.Firefox);
-            else await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
+            await HtmlBrowser.EnsureDriverInstalledAsync();
             Assert.True(HtmlBrowser.HasDriverLayout(Path.Combine(driverRoot, ".playwright")));
             Assert.Equal(1, requests);
-            Assert.Equal(1, fixture.InstallerCalls);
+            Assert.Equal(0, fixture.InstallerCalls);
             Assert.False(Directory.Exists(cache));
         }
     }

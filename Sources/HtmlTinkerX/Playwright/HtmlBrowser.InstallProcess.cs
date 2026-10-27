@@ -39,8 +39,10 @@ public static partial class HtmlBrowser {
             };
 #if NETFRAMEWORK
             start.EnvironmentVariables["PLAYWRIGHT_BROWSERS_PATH"] = browserRoot;
+            start.EnvironmentVariables["PLAYWRIGHT_SKIP_BROWSER_GC"] = "1";
 #else
             start.Environment["PLAYWRIGHT_BROWSERS_PATH"] = browserRoot;
+            start.Environment["PLAYWRIGHT_SKIP_BROWSER_GC"] = "1";
 #endif
             using Process process = Process.Start(start)
                 ?? throw new InvalidOperationException("The browser installer could not be started.");

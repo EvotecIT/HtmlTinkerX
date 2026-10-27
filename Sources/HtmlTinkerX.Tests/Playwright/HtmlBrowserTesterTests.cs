@@ -13,7 +13,7 @@ public class HtmlBrowserTesterTests {
     [Fact]
     public async Task TestUrlAsync_ValidUrl_ReturnsTestResult() {
         // Arrange
-        var url = "data:text/html,<html><head><title>Test</title></head><body>Hello World</body></html>";
+        var url = "data:text/html,<html><head><title>Test</title></head><body>Hello World<script>console.log('verified tester session')</script></body></html>";
         
         // Act
         var result = await HtmlBrowserTester.TestUrlAsync(url);
@@ -24,6 +24,8 @@ public class HtmlBrowserTesterTests {
         Assert.NotNull(result.NetworkEntries);
         Assert.NotNull(result.ConsoleEntries);
         Assert.NotNull(result.PageLoadTime);
+        Assert.Contains(result.ConsoleEntries, entry => entry.Text == "verified tester session");
+        Assert.DoesNotContain(result.ConsoleEntries, entry => entry.Type == HtmlConsoleMessageType.Error);
     }
 
     [Fact]

@@ -284,66 +284,17 @@ public static partial class HtmlBrowser {
     /// </summary>
     /// <param name="engine">The browser engine to ensure is installed.</param>
     /// <returns>A task that completes when the installation check/process is finished.</returns>
-    public static async Task EnsureInstalledAsync(HtmlBrowserEngine engine) {
-        // Fast path - check without lock first
-        if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
-            EnsureDriverSearchPath();
-            return;
-        }
+    public static Task EnsureInstalledAsync(HtmlBrowserEngine engine) => EnsureVerifiedBrowserAsync(engine, force: false);
 
-        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
-        try {
-            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
-            ValidateInstallationMutationPaths();
-            ValidateExistingInstallation(engine);
-
-            if (IsDriverPresent() && IsBrowserRuntimeInstalled(engine)) {
-                EnsureDriverSearchPath();
-                return;
-            }
-
-            if (!IsDriverPresent()) {
-                await DownloadAndInstallDriverAsync().ConfigureAwait(false);
-            } else {
-                EnsureDriverSearchPath();
-            }
-
-            // A repaired driver provides the manifest needed to identify an already-installed exact runtime.
-            if (!IsBrowserRuntimeInstalled(engine)) {
-                // Installation can block in the CLI even when all preceding awaits completed synchronously.
-                // Yield so session cancellation can return while this serialized shared-cache operation completes.
-                await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
-            }
-        } finally {
-            InstallationSemaphore.Release();
-        }
-    }
-
-    /// <summary>
-    /// Repairs the Playwright installation by cleaning driver and runtime directories and reinstalling.
-    /// </summary>
-    /// <param name="engine">The browser engine to reinstall.</param>
-    public static async Task RepairInstallationAsync(HtmlBrowserEngine engine) {
-        await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
-        try {
-            using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
-            CleanInstallDir();
-            if (!IsDriverPresent()) {
-                await DownloadAndInstallDriverAsync().ConfigureAwait(false);
-            } else {
-                EnsureDriverSearchPath();
-            }
-            await Task.Run(() => InstallRuntime(engine)).ConfigureAwait(false);
-        } finally {
-            InstallationSemaphore.Release();
-        }
-    }
+    /// <summary>Repairs into a new verified generation while retaining every existing revision.</summary>
+    public static Task RepairInstallationAsync(HtmlBrowserEngine engine) => EnsureVerifiedBrowserAsync(engine, force: true);
 
     /// <summary>
     /// Gets the path where Playwright browsers are installed.
     /// </summary>
     /// <returns></returns>
     private static string GetBrowserInstallPath(string? driverPath = null) {
+        if (BrowserRootDuringDriverStart != null) return BrowserRootDuringDriverStart;
         string? envDefined = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
         if (envDefined == "0") {
             return Path.Combine(driverPath ?? GetDriverPath(), "package", ".local-browsers");
@@ -383,26 +334,9 @@ public static partial class HtmlBrowser {
         return Path.GetFullPath(path);
     }
 
-    private static bool IsBrowserRuntimeInstalled(HtmlBrowserEngine engine) {
-        string path = GetBrowserInstallPath();
-        if (!Directory.Exists(path))
-            return false;
 
-        IReadOnlyDictionary<string, IReadOnlyList<string>> expectedDirectories = GetExpectedRuntimeDirectories(path, engine);
-        if (expectedDirectories.Count == 0)
-            return false;
 
-        foreach (IReadOnlyList<string> candidates in expectedDirectories.Values) {
-            if (!candidates.Any(IsCompleteBrowserRuntime))
-                return false;
-        }
 
-        return true;
-    }
-
-    private static bool IsCompleteBrowserRuntime(string directory) {
-        return Directory.Exists(directory) && File.Exists(Path.Combine(directory, "INSTALLATION_COMPLETE"));
-    }
 
     private static string GetCurrentPlaywrightHostPlatform() {
         string? overridePlatform = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
@@ -519,47 +453,14 @@ public static partial class HtmlBrowser {
         return values;
     }
 
-    private static bool IsBrowserRuntimeCorrupted(HtmlBrowserEngine engine) {
-        string path = GetBrowserInstallPath();
-        if (!Directory.Exists(path))
-            return false;
-        IReadOnlyDictionary<string, IReadOnlyList<string>> expectedDirectories = GetExpectedRuntimeDirectories(path, engine);
-        if (expectedDirectories.Values.SelectMany(static candidates => candidates)
-            .Any(directory => Directory.Exists(directory) && !IsCompleteBrowserRuntime(directory))) {
-            return true;
-        }
-        var prefixes = GetRuntimePrefixes(engine);
-        foreach (string prefix in prefixes) {
-            var candidates = Directory.GetDirectories(path).Where(dir =>
-                Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (candidates.Length == 0)
-                continue;
 
-            bool allEmpty = true;
-            foreach (string dir in candidates) {
-                try {
-                    if (Directory.EnumerateFileSystemEntries(dir).Any()) {
-                        allEmpty = false;
-                        break;
-                    }
-                } catch {
-                    return true;
-                }
-            }
-
-            if (allEmpty)
-                return true;
-        }
-
-        return false;
-    }
 
     /// <summary>
     /// Cleans the browser installation directory and removes the Playwright driver.
     /// </summary>
     private static void CleanInstallDir() {
         // A rejected configuration must not partially clean either installation.
-        string path = ValidateInstallationMutationPaths();
+        string path = ValidateCacheMutationPath(ValidateInstallationMutationPaths());
         if (Directory.Exists(path)) {
             Directory.Delete(path, recursive: true);
         }
@@ -576,35 +477,7 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static void CleanBrowserRuntime(HtmlBrowserEngine engine) {
-        string path = ValidateBrowserMutationPath();
-        if (!Directory.Exists(path))
-            return;
 
-        var directories = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string expectedDirectory in GetExpectedRuntimeDirectories(path, engine).Values.SelectMany(static candidates => candidates)) {
-            directories.Add(GetContainedBrowserRuntimeIdentity(path, expectedDirectory));
-        }
-        var prefixes = GetRuntimePrefixes(engine);
-        foreach (string prefix in prefixes) {
-            foreach (string dir in Directory.GetDirectories(path)) {
-                if (Path.GetFileName(dir).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    directories.Add(GetContainedBrowserRuntimeIdentity(path, dir));
-            }
-        }
-        foreach (string directory in directories) {
-            ValidateInstallationDestination(directory, directory, "PLAYWRIGHT_BROWSERS_PATH");
-        }
-        foreach (string directory in directories) {
-            if (!Directory.Exists(directory))
-                continue;
-            try {
-                Directory.Delete(directory, true);
-            } catch {
-                // Ignore cleanup errors - best effort only.
-            }
-        }
-    }
 
     /// <summary>
     /// Ensures that the Playwright driver is present without installing bundled browser runtimes.
@@ -619,10 +492,6 @@ public static partial class HtmlBrowser {
         await InstallationSemaphore.WaitAsync().ConfigureAwait(false);
         try {
             using FileStream installationLock = await AcquireInstallationFileLockAsync().ConfigureAwait(false);
-            if (IsDriverCorrupted()) {
-                CleanDriver();
-            }
-
             if (IsDriverPresent()) {
                 EnsureDriverSearchPath();
                 return;
@@ -634,23 +503,9 @@ public static partial class HtmlBrowser {
         }
     }
 
-    private static string[] GetRuntimePrefixes(HtmlBrowserEngine engine) {
-        if (engine == HtmlBrowserEngine.Chromium) {
-            return new[] { "chromium-", "chromium_" };
-        }
-        string name = engine.ToString().ToLowerInvariant();
-        return new[] { name + "-", name + "_" };
-    }
 
-    private static void ValidateExistingInstallation(HtmlBrowserEngine engine) {
-        if (IsDriverCorrupted()) {
-            CleanDriver();
-        }
 
-        if (IsBrowserRuntimeCorrupted(engine)) {
-            CleanBrowserRuntime(engine);
-        }
-    }
+
 
     private static void EnsureDriverSearchPath() => EnsureDriverSearchPath(GetDriverPath());
 
@@ -661,21 +516,7 @@ public static partial class HtmlBrowser {
 
     private static Func<HttpClient> DefaultHttpClientFactory => () => new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
 
-    private static void InstallRuntime(HtmlBrowserEngine engine) {
-        ValidateBrowserMutationPath();
-        string runtime = engine.ToString().ToLowerInvariant();
 
-        try {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && ShouldUsePlaywrightWithDepsOnLinux()) {
-                PlaywrightInstaller(new[] { "install", "--with-deps", runtime });
-            } else {
-                PlaywrightInstaller(new[] { "install", runtime });
-            }
-        } catch {
-            CleanBrowserRuntime(engine);
-            throw;
-        }
-    }
 
     private static bool ShouldUsePlaywrightWithDepsOnLinux() {
         bool? overrideValue = ReadBooleanEnvironmentVariable(PlaywrightWithDepsEnvVar);

@@ -58416,6 +58416,120 @@ $validation.Issues | Format-Table Severity, StepIndex, Action, Property, Message
   </command:command>
   <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
     <command:details>
+      <command:name>Test-HtmlTinkerXBrowser</command:name>
+      <command:verb>Test</command:verb>
+      <command:noun>HtmlTinkerXBrowser</command:noun>
+      <maml:description>
+        <maml:para>Checks browser cache hashes, launch readiness, lock ownership, disk space, and install history.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Checks browser cache hashes, launch readiness, lock ownership, disk space, and install history.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem parameterSetName="__AllParameterSets">
+        <maml:name>Test-HtmlTinkerXBrowser</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Browser</maml:name>
+          <maml:description>
+            <maml:para>One browser engine; omit to diagnose all engines.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">HtmlBrowserEngine</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Chromium</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Firefox</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">WebKit</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>HtmlBrowserEngine</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Repair</maml:name>
+          <maml:description>
+            <maml:para>Download verified replacement generations for broken or missing revisions.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Browser</maml:name>
+        <maml:description>
+          <maml:para>One browser engine; omit to diagnose all engines.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">HtmlBrowserEngine</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Chromium</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Firefox</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">WebKit</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>HtmlBrowserEngine</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Repair</maml:name>
+        <maml:description>
+          <maml:para>Download verified replacement generations for broken or missing revisions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>None</maml:name>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>HtmlTinkerX.HtmlBrowserCacheReport</maml:name>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para></maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>Check Chromium and repair its cache when needed.</maml:title>
+        <dev:code>Test-HtmlTinkerXBrowser -Browser Chromium -Repair</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export machine-readable diagnostics for every engine.</maml:title>
+        <dev:code>Test-HtmlTinkerXBrowser | ConvertTo-Json -Depth 8</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks />
+  </command:command>
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
       <command:name>Unregister-HtmlRoute</command:name>
       <command:verb>Unregister</command:verb>
       <command:noun>HtmlRoute</command:noun>

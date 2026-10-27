@@ -92,9 +92,10 @@ public static partial class HtmlBrowser {
         if (!TryReadBrowserManifest(manifestPath, out IReadOnlyList<BrowserManifestEntry> browsers)) return expected;
 
         string[] requiredNames = engine == HtmlBrowserEngine.Chromium
-            ? new[] { "chromium", "chromium-headless-shell" }
-            : new[] { engine.ToString().ToLowerInvariant() };
+            ? new[] { "chromium", "chromium-headless-shell", "ffmpeg" }
+            : new[] { engine.ToString().ToLowerInvariant(), "ffmpeg" };
         var required = new HashSet<string>(requiredNames, StringComparer.OrdinalIgnoreCase);
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)) required.Add("winldd");
         foreach (BrowserManifestEntry browser in browsers) {
             if (!required.Contains(browser.Name)) continue;
             string selectedName = browser.Name;

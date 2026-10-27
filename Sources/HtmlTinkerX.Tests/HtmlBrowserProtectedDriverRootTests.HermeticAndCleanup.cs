@@ -10,7 +10,7 @@ namespace HtmlTinkerX.Tests;
 
 public partial class HtmlBrowserProtectedDriverRootTests
 {
-    private const string FirefoxManifest = "{\"browsers\":[{\"name\":\"firefox\",\"revision\":\"123\",\"installByDefault\":true}]}";
+    private const string FirefoxManifest = "{\"browsers\":[{\"name\":\"firefox\",\"revision\":\"123\",\"installByDefault\":true},{\"name\":\"ffmpeg\",\"revision\":\"123\"},{\"name\":\"winldd\",\"revision\":\"123\"}]}";
 
     [Theory]
     [InlineData(".nupkg.metadata")]
@@ -25,7 +25,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
         Assert.False(File.Exists(marker));
         Assert.False(Directory.Exists(marker));
         Assert.True(HtmlBrowser.HasDriverLayout(bundle));
-        Directory.Move(bundle, backup); // Move only this disposable test host's SDK copy; never a real cache or checkout.
+        MoveTestSdkDirectory(bundle, backup); // Move only this disposable test host's SDK copy; never a real cache or checkout.
         int requests = 0;
         using var handler = new HtmlBrowserDriverPackageTests.FakeHandler(HtmlBrowserDriverPackageTests.CreateDriverPackage());
         try
@@ -54,7 +54,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
         {
             File.Delete(marker);
             if (Directory.Exists(bundle)) Directory.Delete(bundle, true);
-            Directory.Move(backup, bundle);
+            MoveTestSdkDirectory(backup, bundle);
         }
     }
 
@@ -144,11 +144,10 @@ public partial class HtmlBrowserProtectedDriverRootTests
         int installs = 0;
         using var handler = new HtmlBrowserDriverPackageTests.FakeHandler(HtmlBrowserDriverPackageTests.CreateDriverPackage(FirefoxManifest));
         HtmlBrowser.HttpClientFactory = () => { requests++; return new HttpClient(handler, disposeHandler: false); };
-        HtmlBrowser.PlaywrightInstaller = _ =>
+        HtmlBrowser.CacheStageInstaller = (slot, engine) =>
         {
             installs++;
-            Directory.CreateDirectory(runtime);
-            File.WriteAllText(Path.Combine(runtime, "INSTALLATION_COMPLETE"), "fixture runtime");
+            return HtmlBrowserCacheResilienceTests.CacheFixture.CreateStageAsync(slot, engine, "123");
         };
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", "0");
 
@@ -157,7 +156,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
 
         Assert.Equal(download ? 1 : 0, requests);
         Assert.Equal(1, installs);
-        Assert.True(File.Exists(Path.Combine(runtime, "INSTALLATION_COMPLETE")));
+        Assert.StartsWith(Path.Combine(fixture.Root, ".htmltinkerx-browsers"), HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox));
     }
 
     [Fact]
@@ -205,7 +204,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
         Environment.SetEnvironmentVariable("INIT_CWD", fixture.Root);
         try
         {
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
+            HtmlBrowser.PlaywrightInstaller(new[] { "install", "--dry-run", "firefox" });
             string expected = browserSetting == "0" ? Path.Combine(driver, "package", ".local-browsers")
                 : Path.Combine(fixture.Root, browserSetting);
             Assert.Equal(expected, File.ReadAllText(witness));

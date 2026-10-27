@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HtmlTinkerX;
@@ -23,6 +24,8 @@ public static partial class HtmlBrowser {
     /// PowerShell module, does not preserve the SDK-copied <c>.playwright</c> output directory.
     /// </summary>
     private static async Task DownloadAndInstallDriverAsync() {
+        if (ReadBooleanEnvironmentVariable("HTMLTINKERX_BROWSER_OFFLINE") == true)
+            throw new InvalidOperationException("Playwright driver cache is unavailable in offline mode. No network request was made and no working revisions were deleted.");
         string baseDir = GetDriverPath();
         ValidateDriverMutationPath(baseDir);
         string packageUrl = GetDriverPackageUrl();
@@ -46,12 +49,18 @@ public static partial class HtmlBrowser {
             await File.WriteAllTextAsync(Path.Combine(stagingDir, ".version"), DriverVersion).ConfigureAwait(false);
 #endif
 
-            DeleteDriverPath(baseDir);
-            Directory.Move(stagingDir, baseDir);
+            string previous = Path.Combine(driverRoot, ".playwright-previous-" + Guid.NewGuid().ToString("N"));
+            bool previousDirectory = Directory.Exists(baseDir);
+            bool previousFile = File.Exists(baseDir);
+            if (previousDirectory) await MoveVerifiedGenerationAsync(baseDir, previous).ConfigureAwait(false);
+            else if (previousFile) File.Move(baseDir, previous);
+            try { await MoveVerifiedGenerationAsync(stagingDir, baseDir).ConfigureAwait(false); }
+            catch {
+                if (previousDirectory) await MoveVerifiedGenerationAsync(previous, baseDir).ConfigureAwait(false);
+                else if (previousFile) File.Move(previous, baseDir);
+                throw;
+            }
             EnsureNodeExecutable(baseDir);
-        } catch {
-            CleanDriver();
-            throw;
         } finally {
             TryDeleteFile(packagePath);
             TryDeleteDirectory(stagingDir);
@@ -172,14 +181,27 @@ public static partial class HtmlBrowser {
 
         while (true) {
             try {
-                return new FileStream(
+                var handle = new FileStream(
                     lockPath,
                     FileMode.OpenOrCreate,
                     FileAccess.ReadWrite,
                     FileShare.None,
                     bufferSize: 1,
                     useAsync: true);
+                try {
+                    if (IsInstallationWriterAlive(out _))
+                        throw new IOException("The previous Playwright download child is still active after its host exited. Waiting for its verified process identity to exit.");
+                    using Process current = Process.GetCurrentProcess();
+                    File.WriteAllText(lockPath + ".owner.json", JsonSerializer.Serialize(new HtmlBrowserInstallOwner {
+                        ProcessId = current.Id, ProcessStartUtc = current.StartTime.ToUniversalTime(),
+                        AcquiredUtc = DateTime.UtcNow, Command = current.ProcessName,
+                        Repository = Environment.CurrentDirectory, CacheRoot = GetBrowserInstallPath()
+                    }));
+                    return handle;
+                } catch { handle.Dispose(); throw; }
             } catch (IOException exception) {
+                if (stopwatch.ElapsedMilliseconds < 100)
+                    Console.Error.WriteLine("Browser cache repairing in another process; waiting for the machine-wide install lock. Retry in 1 s. Owner: " + ReadInstallOwnerText());
                 if (stopwatch.Elapsed >= InstallationLockTimeout) {
                     throw new TimeoutException(
                         $"Timed out waiting for another HtmlTinkerX Playwright installation to finish after {InstallationLockTimeout.TotalMinutes:F0} minutes.",
@@ -192,6 +214,8 @@ public static partial class HtmlBrowser {
     }
 
     private static string GetInstallationLockPath() {
+        string? isolatedLock = Environment.GetEnvironmentVariable("HTMLTINKERX_INSTALL_LOCK_PATH");
+        if (!string.IsNullOrWhiteSpace(isolatedLock)) return Path.GetFullPath(isolatedLock);
         string user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string cacheRoot;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
@@ -207,6 +231,11 @@ public static partial class HtmlBrowser {
         }
 
         return Path.Combine(cacheRoot, "HtmlTinkerX", "playwright-install.lock");
+    }
+
+    private static string ReadInstallOwnerText() {
+        try { return File.ReadAllText(GetInstallationLockPath() + ".owner.json"); }
+        catch (IOException) { return "metadata not yet available"; }
     }
 
     private static void EnsureNodeExecutable(string driverPath) {

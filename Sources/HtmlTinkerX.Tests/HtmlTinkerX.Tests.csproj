@@ -45,6 +45,7 @@
 
     <ItemGroup>
         <Using Include="Xunit" />
+        <None Update="BrowserCacheDownloader.test.cjs" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">

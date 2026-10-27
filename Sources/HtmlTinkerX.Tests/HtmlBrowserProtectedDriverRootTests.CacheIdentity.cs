@@ -258,7 +258,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
             }
             finally
             {
-                Directory.Move(_backup, Path);
+                MoveTestSdkDirectory(_backup, Path);
                 AssertUnchanged(_canonicalHashes);
                 _output.WriteLine("Canonical test-host SDK copy restored; all pre-move file hashes verified.");
             }

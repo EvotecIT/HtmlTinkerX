@@ -442,6 +442,9 @@ Recommends the most useful PSParseHTML extraction workflow for a page.
 ### [Test-HtmlMicrodata](Test-HtmlMicrodata.md)
 Validates microdata items against built-in schema definitions.
 
+### [Test-HtmlTinkerXBrowser](Test-HtmlTinkerXBrowser.md)
+Checks browser cache hashes, launch readiness, lock ownership, disk space, and install history.
+
 ### [Unregister-HtmlRoute](Unregister-HtmlRoute.md)
 Cmdlet that removes a previously registered Playwright route handler.
 
