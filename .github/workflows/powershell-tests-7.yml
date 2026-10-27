@@ -36,10 +36,11 @@ jobs:
       - name: Setup PowerShell modules
         shell: pwsh
         run: |
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default -ErrorAction Stop
+          Import-Module Microsoft.PowerShell.PSResourceGet -ErrorAction Stop
+          if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
+          Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
 
       - name: Refresh module manifest
         shell: pwsh
@@ -120,11 +121,20 @@ jobs:
       - name: Install PowerShell modules
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default -ErrorAction Stop
+          if ($PSVersionTable.PSEdition -eq 'Core') {
+              Import-Module Microsoft.PowerShell.PSResourceGet -ErrorAction Stop
+              if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+                  Register-PSResourceRepository -PSGallery -ErrorAction Stop
+              }
+              Install-PSResource -Name Pester -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+              Install-PSResource -Name PSWriteColor -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          } else {
+              if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+                  Register-PSRepository -Default -ErrorAction Stop
+              }
+              Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+              Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
           }
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
 
       - name: Build PowerShell module
         run: dotnet build Sources/PSParseHTML.PowerShell/PSParseHTML.PowerShell.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }}
@@ -165,13 +175,14 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default -ErrorAction Stop
+          Import-Module Microsoft.PowerShell.PSResourceGet -ErrorAction Stop
+          if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name TextMate -Repository PSGallery -RequiredVersion 0.2.1 -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name PwshSpectreConsole -Repository PSGallery -RequiredVersion 2.6.3 -Force -SkipPublisherCheck -AllowClobber
+          Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          Install-PSResource -Name Pester -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          Install-PSResource -Name TextMate -Repository PSGallery -Version 0.2.1 -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          Install-PSResource -Name PwshSpectreConsole -Repository PSGallery -Version 2.6.3 -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
 
       - name: Build packaged module
         shell: pwsh
@@ -218,11 +229,12 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default -ErrorAction Stop
+          Import-Module Microsoft.PowerShell.PSResourceGet -ErrorAction Stop
+          if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-PSResource -Name Pester -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          Install-PSResource -Name PSWriteColor -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
 
       - name: Build .NET solution
         run: |
@@ -272,11 +284,12 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-              Register-PSRepository -Default -ErrorAction Stop
+          Import-Module Microsoft.PowerShell.PSResourceGet -ErrorAction Stop
+          if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-PSResource -Name Pester -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          Install-PSResource -Name PSWriteColor -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
 
       - name: Build .NET solution
         run: |
