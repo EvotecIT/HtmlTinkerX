@@ -27,7 +27,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime {
         try {
             // A fresh Firefox profile writes its startup cache while handling the first page.
             // Prepare only that cache; every test still creates its own browser and page state.
-            await using HtmlBrowserSession warmup = await HtmlBrowser.OpenSessionAsync("about:blank",
+            await using HtmlBrowserSession warmup = await HtmlBrowser.OpenSessionForNavigationAsync(
                 new HtmlBrowserLaunchOptions { Browser = HtmlBrowserEngine.Firefox });
             await warmup.Page.EvaluateAsync<bool>("true");
         } catch {
