@@ -67,6 +67,8 @@ public partial class HtmlCrawlerTests {
         }, out string root, "127.0.0.1");
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true; options.Browser = browser;
+        // Match the rendered-response fixtures' CI budget for authentication and redirects.
+        options.Timeout = 30_000;
         options.Username = "test-user"; options.Password = "test-password";
         if (browser == HtmlBrowserEngine.Chromium) options.Headers["X-Crawl-Secret"] = "test-secret";
         HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(root + "redirect", options);
