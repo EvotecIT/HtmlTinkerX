@@ -219,14 +219,16 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             state.textContent = 'pending';
             document.body.appendChild(state);
             let submittedAgain = false;
-            setInterval(() => fetch('/popup-count-status').then(response => response.text()).then(text => {
+            const poll = () => fetch('/popup-count-status').then(response => response.text()).then(text => {
                 const count = Number(text);
                 if (count >= 1 && !submittedAgain && !form.hasAttribute('target')) {
                     submittedAgain = true;
                     form.requestSubmit();
                 }
                 if (count >= 2) state.textContent = form.hasAttribute('target') ? 'target leaked' : 'base target restored';
-            }), 20);
+                setTimeout(poll, 20);
+            });
+            poll();
             form.requestSubmit();
             true";
 

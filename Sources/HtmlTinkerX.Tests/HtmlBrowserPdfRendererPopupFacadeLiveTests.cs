@@ -61,7 +61,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         const string script = @"const popup = window.open('', '_blank');
             popup.document.write('<script>window.open(""/header-popup"", ""_blank"");</script>');
-            setInterval(() => fetch('/popup-status').then(response => response.text()).then(text => document.querySelector('#result').textContent = text), 20);
+            const poll = () => fetch('/popup-status').then(response => response.text()).then(text => { document.querySelector('#result').textContent = text; setTimeout(poll, 20); }); poll();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -223,9 +223,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                 window.open('/header-popup?visit=second', 'reportWindow');
             }, true);
             window.open('/header-popup?visit=first', 'reportWindow');
-            setInterval(() => fetch('/popup-count-status').then(response => response.text()).then(text => {
+            const poll = () => fetch('/popup-count-status').then(response => response.text()).then(text => {
                 document.querySelector('#result').textContent = text;
-            }), 20);
+                setTimeout(poll, 20);
+            });
+            poll();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
@@ -707,9 +709,11 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         const string script = @"const popup = window.open('', '_blank');
             popup.document.write('<base href=""/popup/""><style>@import ""protected.css"";</style><script>const request = new XMLHttpRequest(); request.open(""GET"", ""script-result""); request.send();</script>');
-            setInterval(() => fetch('/popup-resource-status').then(response => response.text()).then(text => {
+            const poll = () => fetch('/popup-resource-status').then(response => response.text()).then(text => {
                 document.querySelector('#result').textContent = text;
-            }), 20);
+                setTimeout(poll, 20);
+            });
+            poll();
             true";
 
         HtmlBrowserPdfResult result = await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
