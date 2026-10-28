@@ -26,6 +26,7 @@ public sealed class HtmlBrowserRecordingRepairTests {
         int launches = 0;
         string? rejected = null;
         string video = Path.Combine(root, "recording.webm");
+        Exception? failure = null;
         try {
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", Path.Combine(root, "cache"));
             Environment.SetEnvironmentVariable("HTMLTINKERX_INSTALL_LOCK_PATH", Path.Combine(root, "install.lock"));
@@ -54,27 +55,45 @@ public sealed class HtmlBrowserRecordingRepairTests {
                     Assert.True(File.Exists(ffmpeg));
                 }
             });
-            await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", new HtmlBrowserLaunchOptions {
+            HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", new HtmlBrowserLaunchOptions {
                 Browser = HtmlBrowserEngine.Firefox, UserDataDirectory = persistent ? Path.Combine(root, "profile") : null, VideoPath = video,
                 ViewportWidth = 160, ViewportHeight = 120
             });
-            await session.Page.SetContentAsync("<body style='background:teal'>Repaired recorder</body>");
-            await session.Page.ScreenshotAsync();
-            await HtmlBrowser.StopVideoRecordingAsync(session);
-            Assert.Equal(corrupt ? 2 : 1, launches);
-            Assert.Equal(corrupt ? 2 : 1, stages);
-            Assert.True(File.Exists(video));
-            Assert.True(new FileInfo(video).Length > 0);
-            if (corrupt) Assert.True(File.Exists(Path.Combine(rejected!, "launch-failed.txt")));
+            Exception? recordingFailure = null;
+            try {
+                await session.Page.SetContentAsync("<body style='background:teal'>Repaired recorder</body>");
+                await session.Page.ScreenshotAsync();
+                await HtmlBrowser.StopVideoRecordingAsync(session);
+                Assert.Equal(corrupt ? 2 : 1, launches);
+                Assert.Equal(corrupt ? 2 : 1, stages);
+                Assert.True(File.Exists(video));
+                Assert.True(new FileInfo(video).Length > 0);
+                if (corrupt) Assert.True(File.Exists(Path.Combine(rejected!, "launch-failed.txt")));
+            } catch (Exception ex) {
+                recordingFailure = ex;
+                throw;
+            } finally {
+                try { await session.DisposeAsync(); }
+                catch (Exception cleanupFailure) when (recordingFailure != null) {
+                    throw new AggregateException("Recording failed before session cleanup also failed.", recordingFailure, cleanupFailure);
+                }
+            }
+        } catch (Exception ex) {
+            failure = ex;
+            throw;
         } finally {
             HtmlBrowser.CacheStageInstaller = originalStage;
             Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalCache);
             Environment.SetEnvironmentVariable("HTMLTINKERX_INSTALL_LOCK_PATH", originalLock);
-            for (int attempt = 0; ; attempt++) {
-                try { Directory.Delete(root, true); break; }
-                catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 20) {
-                    await Task.Delay(250); // Just-closed browser processes can briefly retain executable handles.
+            try {
+                for (int attempt = 0; ; attempt++) {
+                    try { Directory.Delete(root, true); break; }
+                    catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 20) {
+                        await Task.Delay(250); // Just-closed browser processes can briefly retain executable handles.
+                    }
                 }
+            } catch (Exception cleanupFailure) when (failure != null) {
+                throw new AggregateException("Recording failed before temporary directory cleanup also failed.", failure, cleanupFailure);
             }
         }
     }

@@ -53,19 +53,9 @@ jobs:
       - name: Build test project for the selected framework
         run: dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }} --no-restore
 
-      - name: Run tests for net8.0
-        if: matrix.framework == 'net8.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
-        timeout-minutes: 20
-
-      - name: Run tests for net10.0
-        if: matrix.framework == 'net10.0'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net10.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net10.log
-        timeout-minutes: 20
-
-      - name: Run tests for net472
-        if: matrix.framework == 'net472'
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net472 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net472.log
+      - name: Run tests for ${{ matrix.framework }}
+        shell: pwsh
+        run: ./Build/Invoke-WindowsTests.ps1 -Framework '${{ matrix.framework }}' -Configuration '${{ env.BUILD_CONFIGURATION }}' -Verbosity '${{ env.TEST_VERBOSITY }}'
         timeout-minutes: 20
 
       - name: Summarize failing tests
@@ -116,7 +106,9 @@ jobs:
         if: failure()
         with:
           name: browser-diagnostics-windows-${{ matrix.framework }}
-          path: TestResults/vstest-*.log
+          path: |
+            Sources/HtmlTinkerX.Tests/TestResults/browser-diagnostics/
+            Sources/HtmlTinkerX.Tests/TestResults/**/*.dmp
           retention-days: 7
 
       - name: Upload coverage reports
