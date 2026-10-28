@@ -43,6 +43,14 @@ public static class HtmlOptimizer {
             throw new ArgumentNullException(nameof(css));
         }
 
+        // NUglify can change the type of a zero or remove required operator
+        // whitespace inside math functions. Custom properties can be substituted
+        // into those functions later. Preserve the stylesheet when it may contain
+        // either construct, including escaped identifiers, until NUglify fixes this.
+        if (RequiresCssPreservation(css)) {
+            return css;
+        }
+
         var settings = new NUglify.Css.CssSettings { DecodeEscapes = false };
         var result = NUglify.Uglify.Css(css, settings);
         if (result.HasErrors) {
@@ -51,6 +59,10 @@ public static class HtmlOptimizer {
         }
         return result.Code ?? string.Empty;
     }
+
+    private static bool RequiresCssPreservation(string css) =>
+        css.IndexOf('(') >= 0 || css.IndexOf('\\') >= 0 ||
+        css.IndexOf("--", StringComparison.Ordinal) >= 0;
 
     /// <summary>
     /// Asynchronously minifies the provided CSS using NUglify.
@@ -125,6 +137,13 @@ public static class HtmlOptimizer {
         }
 
         HtmlSettings effectiveSettings = CloneHtmlSettings(settings);
+
+        // HTML minification delegates embedded styles and style attributes to
+        // the same CSS minifier. Keep their contents intact under the same guard.
+        if (RequiresCssPreservation(html) || html.IndexOf('&') >= 0) {
+            effectiveSettings.MinifyCss = false;
+            effectiveSettings.MinifyCssAttributes = false;
+        }
 
         bool hasMotw =
             html.IndexOf("<!-- saved from url=(0014)about:internet -->", StringComparison.OrdinalIgnoreCase) >= 0;
