@@ -40,7 +40,16 @@ jobs:
           if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
               Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          for ($attempt = 1; ; $attempt++) {
+              try {
+                  Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+                  break
+              } catch {
+                  if ($attempt -ge 3) { throw }
+                  Write-Warning "PSGallery installation of PSPublishModule failed (attempt $attempt/3): $_"
+                  Start-Sleep -Seconds (5 * $attempt)
+              }
+          }
 
       - name: Refresh module manifest
         shell: pwsh
@@ -179,7 +188,16 @@ jobs:
           if (-not (Get-PSResourceRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
               Register-PSResourceRepository -PSGallery -ErrorAction Stop
           }
-          Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+          for ($attempt = 1; ; $attempt++) {
+              try {
+                  Install-PSResource -Name PSPublishModule -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
+                  break
+              } catch {
+                  if ($attempt -ge 3) { throw }
+                  Write-Warning "PSGallery installation of PSPublishModule failed (attempt $attempt/3): $_"
+                  Start-Sleep -Seconds (5 * $attempt)
+              }
+          }
           Install-PSResource -Name Pester -Repository PSGallery -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
           Install-PSResource -Name TextMate -Repository PSGallery -Version 0.2.1 -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
           Install-PSResource -Name PwshSpectreConsole -Repository PSGallery -Version 2.6.3 -Scope CurrentUser -Reinstall -TrustRepository -AcceptLicense -ErrorAction Stop
