@@ -46,9 +46,26 @@ public class HtmlOptimizerCssMathTests {
 
     [Fact]
     public void OptimizeHtml_PreservesMathInEntityEncodedAttributes() {
-        const string html = "<div style=\"width: clamp&#40;0px, 2px, 3px&#41;\"></div>";
+        const string html = "<div style=\"width: clamp&#40;0px, 2px + 1px, 3px&#41;\"></div>";
         var result = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
 
+        Assert.Contains("0px, 2px + 1px, 3px", result);
+    }
+
+    [Fact]
+    public void OptimizeHtml_MinifiesCssWhenOnlyOtherContentContainsGuardCharacters() {
+        const string html = "<!-- note --><style>body { color: red; }</style><script>f();</script><div>One &amp; two</div>";
+        var result = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
+
+        Assert.Contains("body{color:#f00}", result);
+    }
+
+    [Theory]
+    [InlineData("<tr style=\"width: min(0px, 1px)\"><td>Example</td></tr>")]
+    [InlineData("<td style=\"width: min&#40;0px, 1px&#41;\">Example</td>")]
+    [InlineData("<col style=\"width: min(0px, 1px)\">")]
+    public void OptimizeHtml_PreservesMathInTableFragments(string html) {
+        var result = HtmlOptimizer.OptimizeHtml(html, cssDecodeEscapes: false);
         Assert.Contains("0px", result);
     }
 }

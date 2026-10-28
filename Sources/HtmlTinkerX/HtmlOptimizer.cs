@@ -64,6 +64,40 @@ public static class HtmlOptimizer {
         css.IndexOf('(') >= 0 || css.IndexOf('\\') >= 0 ||
         css.IndexOf("--", StringComparison.Ordinal) >= 0;
 
+    private static bool HtmlRequiresCssPreservation(string html) {
+        // Template content may not be exposed by a document-wide selector.
+        if (html.IndexOf("<template", StringComparison.OrdinalIgnoreCase) >= 0 &&
+            (RequiresCssPreservation(html) || html.IndexOf('&') >= 0)) {
+            return true;
+        }
+
+        // Document parsing can discard table-only elements in standalone fragments.
+        // Preserve CSS when such a fragment could contain protected syntax.
+        if (html.IndexOf("<table", StringComparison.OrdinalIgnoreCase) < 0 &&
+            (html.IndexOf("<tr", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<td", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<th", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<col", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<caption", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<tbody", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             html.IndexOf("<tfoot", StringComparison.OrdinalIgnoreCase) >= 0) &&
+            (RequiresCssPreservation(html) || html.IndexOf('&') >= 0)) {
+            return true;
+        }
+
+        try {
+            using IDocument document = HtmlParser.ParseWithAngleSharp(html);
+            return DocumentRequiresCssPreservation(document);
+        } catch (Exception) {
+            // If inspection fails, avoid modifying CSS we could not inspect.
+            return true;
+        }
+    }
+
+    private static bool DocumentRequiresCssPreservation(IDocument document) =>
+        document.QuerySelectorAll("style").Any(element => RequiresCssPreservation(element.TextContent)) ||
+        document.QuerySelectorAll("[style]").Any(element => RequiresCssPreservation(element.GetAttribute("style") ?? string.Empty));
+
     /// <summary>
     /// Asynchronously minifies the provided CSS using NUglify.
     /// </summary>
@@ -140,7 +174,7 @@ public static class HtmlOptimizer {
 
         // HTML minification delegates embedded styles and style attributes to
         // the same CSS minifier. Keep their contents intact under the same guard.
-        if (RequiresCssPreservation(html) || html.IndexOf('&') >= 0) {
+        if (HtmlRequiresCssPreservation(html)) {
             effectiveSettings.MinifyCss = false;
             effectiveSettings.MinifyCssAttributes = false;
         }
