@@ -43,60 +43,16 @@ public static class HtmlOptimizer {
             throw new ArgumentNullException(nameof(css));
         }
 
-        // NUglify can change the type of a zero or remove required operator
-        // whitespace inside math functions. Custom properties can be substituted
-        // into those functions later. Preserve the stylesheet when it may contain
-        // either construct, including escaped identifiers, until NUglify fixes this.
-        if (RequiresCssPreservation(css)) {
-            return css;
-        }
-
+        var protection = CssMathProtection.Create(css, out string protectedCss);
         var settings = new NUglify.Css.CssSettings { DecodeEscapes = false };
-        var result = NUglify.Uglify.Css(css, settings);
+        var result = NUglify.Uglify.Css(protectedCss, settings);
         if (result.HasErrors) {
             string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
             LoggingMessages.Logger.WriteWarning($"OptimizeCss -Errors: {errors}");
+            return css;
         }
-        return result.Code ?? string.Empty;
+        return result.Code != null && protection.TryRestore(result.Code, out string restored) ? restored : css;
     }
-
-    private static bool RequiresCssPreservation(string css) =>
-        css.IndexOf('(') >= 0 || css.IndexOf('\\') >= 0 ||
-        css.IndexOf("--", StringComparison.Ordinal) >= 0;
-
-    private static bool HtmlRequiresCssPreservation(string html) {
-        // Template content may not be exposed by a document-wide selector.
-        if (html.IndexOf("<template", StringComparison.OrdinalIgnoreCase) >= 0 &&
-            (RequiresCssPreservation(html) || html.IndexOf('&') >= 0)) {
-            return true;
-        }
-
-        // Document parsing can discard table-only elements in standalone fragments.
-        // Preserve CSS when such a fragment could contain protected syntax.
-        if (html.IndexOf("<table", StringComparison.OrdinalIgnoreCase) < 0 &&
-            (html.IndexOf("<tr", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<td", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<th", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<col", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<caption", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<tbody", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             html.IndexOf("<tfoot", StringComparison.OrdinalIgnoreCase) >= 0) &&
-            (RequiresCssPreservation(html) || html.IndexOf('&') >= 0)) {
-            return true;
-        }
-
-        try {
-            using IDocument document = HtmlParser.ParseWithAngleSharp(html);
-            return DocumentRequiresCssPreservation(document);
-        } catch (Exception) {
-            // If inspection fails, avoid modifying CSS we could not inspect.
-            return true;
-        }
-    }
-
-    private static bool DocumentRequiresCssPreservation(IDocument document) =>
-        document.QuerySelectorAll("style").Any(element => RequiresCssPreservation(element.TextContent)) ||
-        document.QuerySelectorAll("[style]").Any(element => RequiresCssPreservation(element.GetAttribute("style") ?? string.Empty));
 
     /// <summary>
     /// Asynchronously minifies the provided CSS using NUglify.
@@ -172,18 +128,18 @@ public static class HtmlOptimizer {
 
         HtmlSettings effectiveSettings = CloneHtmlSettings(settings);
 
-        // HTML minification delegates embedded styles and style attributes to
-        // the same CSS minifier. Keep their contents intact under the same guard.
-        if (HtmlRequiresCssPreservation(html)) {
-            effectiveSettings.MinifyCss = false;
-            effectiveSettings.MinifyCssAttributes = false;
-        }
-
         bool hasMotw =
             html.IndexOf("<!-- saved from url=(0014)about:internet -->", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        UglifyResult result = Uglify.Html(html, effectiveSettings);
-        string output = result.Code ?? string.Empty;
+        string? output = HtmlCssOptimization.Optimize(html, effectiveSettings);
+        if (output == null) {
+            // Continue to honor HTML transformations when a protected CSS span
+            // cannot be restored, while leaving embedded CSS untouched.
+            effectiveSettings.MinifyCss = false;
+            effectiveSettings.MinifyCssAttributes = false;
+            effectiveSettings.PrettyPrint = false;
+            output = Uglify.Html(html, effectiveSettings).Code ?? string.Empty;
+        }
         output = ShortenBooleanAttributesIfRequested(output, effectiveSettings);
 
         if (hasMotw) {
