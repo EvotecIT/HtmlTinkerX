@@ -171,16 +171,18 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
         playwright.Setup(value => value.Dispose()).Callback(() => playwrightDisposed.TrySetResult(true));
         HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        using CancellationTokenSource cancellation = new();
+        HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            minimumBrowserInstances: 1,
+            maximumBrowserInstances: 1,
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
         try {
-            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
-                minimumBrowserInstances: 1,
-                maximumBrowserInstances: 1,
-                setupTimeout: TimeSpan.FromMilliseconds(500),
-                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
-
-            Task prewarm = renderer.PreWarmAsync();
-            await launchStarted.Task;
-            await Assert.ThrowsAsync<TimeoutException>(() => prewarm);
+            Task prewarm = renderer.PreWarmAsync(cancellation.Token);
+            // Cancel the pending launch itself, independently of how long runtime checks take.
+            // A setup failure must finish this wait instead of stranding the test on the signal.
+            Assert.Same(launchStarted.Task, await Task.WhenAny(launchStarted.Task, prewarm));
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => prewarm);
             pendingBrowser.SetResult(browser.Object);
 
             Assert.Same(
@@ -190,8 +192,14 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             browser.Verify(value => value.CloseAsync(It.IsAny<BrowserCloseOptions>()), Times.Once);
             playwright.Verify(value => value.Dispose(), Times.Once);
         } finally {
+            cancellation.Cancel();
+            pendingBrowser.TrySetResult(browser.Object);
             pendingClose.TrySetResult(true);
-            HtmlBrowser.PlaywrightFactory = null;
+            try {
+                await renderer.DisposeAsync();
+            } finally {
+                HtmlBrowser.PlaywrightFactory = null;
+            }
         }
     }
 
