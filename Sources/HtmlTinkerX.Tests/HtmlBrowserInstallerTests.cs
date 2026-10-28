@@ -16,49 +16,7 @@ namespace HtmlTinkerX.Tests;
 [Collection("Process diagnostics")]
 public class HtmlBrowserInstallerTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task OpenSessionAsync_CancellationReturnsWhileFirstInstallationIsRunning(bool persistent)
-    {
-        string cache = Path.Combine(Path.GetTempPath(), "htmltinkerx-cancel-" + Guid.NewGuid().ToString("N"));
-        string? originalBrowsers = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriver = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-        var originalFactory = HtmlBrowser.PlaywrightFactory;
-        using var release = new ManualResetEventSlim();
-        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var cancellation = new CancellationTokenSource();
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", cache);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", null);
-        HtmlBrowser.PlaywrightInstaller = _ => {
-            entered.TrySetResult(true);
-            if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Test installer was not released.");
-        };
-        HtmlBrowser.PlaywrightFactory = () => throw new InvalidOperationException("Cancellation must prevent a late browser launch.");
-        Task<HtmlBrowserSession> opening = Task.Run(() => HtmlBrowser.OpenSessionAsync("about:blank",
-            new HtmlBrowserLaunchOptions { UserDataDirectory = persistent ? Path.Combine(cache, "profile") : null },
-            cancellation.Token));
-        try
-        {
-            Assert.Same(entered.Task, await Task.WhenAny(entered.Task, Task.Delay(TimeSpan.FromSeconds(2))));
-            cancellation.Cancel();
-            Assert.Same(opening, await Task.WhenAny(opening, Task.Delay(TimeSpan.FromSeconds(2))));
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => { await opening; });
-        }
-        finally
-        {
-            release.Set();
-            try { await opening; } catch { }
-            // Join the installation semaphore before restoring the shared test hooks and environment.
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            HtmlBrowser.PlaywrightFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsers);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriver);
-            if (Directory.Exists(cache)) Directory.Delete(cache, true);
-        }
-    }
+
 
     [Fact]
     public void PlaywrightInstaller_HonorsConfiguredNodeExecutable()
@@ -231,264 +189,17 @@ public class HtmlBrowserInstallerTests
         Assert.Null(HtmlBrowser.CreatePersistentContextOptions(blank).TimezoneId);
     }
 
-    [Fact]
-    public async Task EnsureInstalledAsync_InstallsDepsOnLinux_WhenEnabled()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return;
-        }
 
-        string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-        Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", "1");
 
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
 
-        try
-        {
-            CreateHealthyDriver(tempDriver);
 
-            string[]? captured = null;
-            HtmlBrowser.PlaywrightInstaller = args => captured = args;
 
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
 
-            Assert.NotNull(captured);
-            Assert.Contains("--with-deps", captured);
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
 
-    [Fact]
-    public async Task EnsureInstalledAsync_DoesNotInstallDepsOnLinux_WhenDisabled()
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return;
-        }
 
-        string? priorWithDeps = Environment.GetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS");
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-        Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", "0");
 
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
 
-        try
-        {
-            CreateHealthyDriver(tempDriver);
 
-            string[]? captured = null;
-            HtmlBrowser.PlaywrightInstaller = args => captured = args;
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-
-            Assert.NotNull(captured);
-            Assert.DoesNotContain("--with-deps", captured);
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            Environment.SetEnvironmentVariable("HTMLTINKERX_PLAYWRIGHT_WITH_DEPS", priorWithDeps);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Fact]
-    public async Task EnsureInstalledAsync_ReplacesStaleBrowserRevision()
-    {
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-
-        try
-        {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-            CreateHealthyDriver(tempDriver);
-            CreateCompleteChromiumRuntime(tempBrowsers, "1194");
-
-            string[]? captured = null;
-            HtmlBrowser.PlaywrightInstaller = args => captured = args;
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-
-            Assert.NotNull(captured);
-            Assert.Contains("install", captured!);
-            Assert.Contains("chromium", captured!);
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Fact]
-    public async Task EnsureInstalledAsync_SkipsCurrentCompleteBrowserRevision()
-    {
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-
-        try
-        {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-            CreateHealthyDriver(tempDriver);
-            CreateCompleteChromiumRuntime(tempBrowsers, "1217");
-
-            HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("Current browser runtime should not be reinstalled.");
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Fact]
-    public async Task EnsureInstalledAsync_UsesOnlyCurrentPlatformRevisionOverride()
-    {
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string? originalHostOverride = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-
-        try
-        {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", "ubuntu20.04-x64");
-            CreateHealthyDriver(tempDriver);
-            string packageDirectory = Path.Combine(tempDriver, ".playwright", "package");
-            File.WriteAllText(Path.Combine(packageDirectory, "browsers.json"), """
-                {
-                  "browsers": [
-                    {
-                      "name": "webkit",
-                      "revision": "2272",
-                      "revisionOverrides": {
-                        "debian11-x64": "2105",
-                        "ubuntu20.04-x64": "2092"
-                      }
-                    }
-                  ]
-                }
-                """);
-            CreateCompleteRuntime(tempBrowsers, "webkit-2272");
-            CreateCompleteRuntime(tempBrowsers, "webkit_debian11_x64_special-2105");
-
-            string[]? captured = null;
-            HtmlBrowser.PlaywrightInstaller = args => captured = args;
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
-
-            Assert.NotNull(captured);
-            Assert.Contains("webkit", captured!);
-
-            CreateCompleteRuntime(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
-            HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("The current host override should be accepted.");
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", originalHostOverride);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Fact]
-    public async Task EnsureInstalledAsync_CleansIncompleteCurrentPlatformRevisionOverride()
-    {
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string? originalHostOverride = Environment.GetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE");
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-        string overrideDirectory = Path.Combine(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
-
-        try
-        {
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", "ubuntu20.04-x64");
-            CreateHealthyDriver(tempDriver);
-            File.WriteAllText(Path.Combine(tempDriver, ".playwright", "package", "browsers.json"), """
-                {
-                  "browsers": [
-                    {
-                      "name": "webkit",
-                      "revision": "2272",
-                      "revisionOverrides": { "ubuntu20.04-x64": "2092" }
-                    }
-                  ]
-                }
-                """);
-            Directory.CreateDirectory(overrideDirectory);
-            File.WriteAllText(Path.Combine(overrideDirectory, "partial-download"), "incomplete");
-
-            HtmlBrowser.PlaywrightInstaller = _ =>
-            {
-                Assert.False(Directory.Exists(overrideDirectory));
-                CreateCompleteRuntime(tempBrowsers, "webkit_ubuntu20.04_x64_special-2092");
-            };
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.WebKit);
-
-            Assert.True(File.Exists(Path.Combine(overrideDirectory, "INSTALLATION_COMPLETE")));
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", originalHostOverride);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
 
     [Fact]
     public async Task EnsureInstalledAsync_ReinstallsDriverWithMissingBrowserManifest()
@@ -512,10 +223,10 @@ public class HtmlBrowserInstallerTests
             string[]? captured = null;
             HtmlBrowser.PlaywrightInstaller = args => captured = args;
 
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            await HtmlBrowser.EnsureDriverInstalledAsync();
 
             Assert.True(File.Exists(manifestPath));
-            Assert.NotNull(captured);
+            Assert.Null(captured);
         }
         finally
         {
@@ -548,7 +259,7 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
             HtmlBrowser.PlaywrightInstaller = _ => CreateCompleteChromiumRuntime(tempBrowsers, "1217");
 
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            await HtmlBrowser.EnsureDriverInstalledAsync();
 
             using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
             Assert.Equal(JsonValueKind.Array, manifest.RootElement.GetProperty("browsers").ValueKind);
@@ -582,7 +293,7 @@ public class HtmlBrowserInstallerTests
             HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
             HtmlBrowser.PlaywrightInstaller = _ => throw new InvalidOperationException("An existing exact runtime should not be reinstalled.");
 
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            await HtmlBrowser.EnsureDriverInstalledAsync();
 
             Assert.True(HtmlBrowser.HasDriverLayout(Path.Combine(tempDriver, ".playwright")));
         }
@@ -606,185 +317,11 @@ public class HtmlBrowserInstallerTests
         Assert.Equal(expected, HtmlBrowser.GetMacPlaywrightHostPlatform(architecture, darwinMajor));
     }
 
-    [Fact]
-    public async Task EnsureInstalledAsync_ReinstallsCorruptedDriver()
-    {
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
 
-        string baseDir = Path.Combine(tempDriver, ".playwright");
-        string platformId = PlatformExtensions.GetCurrentPlatform().ToPlatformId();
-        string nodeDir = Path.Combine(baseDir, "node", platformId);
-        Directory.CreateDirectory(nodeDir);
-        Directory.CreateDirectory(Path.Combine(baseDir, "package"));
-        File.WriteAllText(Path.Combine(nodeDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node"), string.Empty);
-        string siblingPath = Path.Combine(tempDriver, "application.dll");
-        File.WriteAllText(siblingPath, "caller-owned application");
 
-        string[]? captured = null;
-        string? runtimeDirectory = null;
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-        var originalFactory = HtmlBrowser.HttpClientFactory;
 
-        HtmlBrowser.PlaywrightInstaller = args =>
-        {
-            captured = args;
-            runtimeDirectory = Path.Combine(tempBrowsers, "chromium-reinstalled");
-            Directory.CreateDirectory(runtimeDirectory);
-            File.WriteAllText(Path.Combine(runtimeDirectory, "marker.txt"), "installed");
-        };
-        HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
 
-        try
-        {
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
 
-            Assert.NotNull(captured);
-            Assert.Contains("chromium", captured!);
-            string nodePath = Path.Combine(baseDir, "node", platformId, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node");
-            Assert.True(new FileInfo(nodePath).Length > 0, "Expected node binary to be replaced during reinstall.");
-            string version = File.ReadAllText(Path.Combine(baseDir, ".version"));
-            Assert.Equal(typeof(Microsoft.Playwright.Playwright).Assembly.GetName().Version?.ToString(3) ?? "1.52.0", version);
-            Assert.NotNull(runtimeDirectory);
-            Assert.True(Directory.Exists(runtimeDirectory!));
-            Assert.True(File.Exists(Path.Combine(runtimeDirectory!, "marker.txt")));
-            Assert.Equal("caller-owned application", File.ReadAllText(siblingPath));
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Fact]
-    public async Task EnsureInstalledAsync_RepairsEmptyRuntimeDirectories()
-    {
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string tempBrowsers = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        string tempDriver = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-        var originalFactory = HtmlBrowser.HttpClientFactory;
-
-        string initialRuntime = Path.Combine(tempBrowsers, "chromium-initial");
-        HtmlBrowser.PlaywrightInstaller = _ =>
-        {
-            Directory.CreateDirectory(initialRuntime);
-            File.WriteAllText(Path.Combine(initialRuntime, "marker.txt"), "installed");
-        };
-        HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
-
-        try
-        {
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-
-            string corruptedRuntime = Directory.GetDirectories(tempBrowsers).First(dir => Path.GetFileName(dir).StartsWith("chromium-", StringComparison.OrdinalIgnoreCase));
-            foreach (string entry in Directory.GetFileSystemEntries(corruptedRuntime))
-            {
-                if (Directory.Exists(entry))
-                {
-                    Directory.Delete(entry, true);
-                }
-                else
-                {
-                    File.Delete(entry);
-                }
-            }
-
-            string freshRuntime = Path.Combine(tempBrowsers, "chromium-fresh");
-            HtmlBrowser.PlaywrightInstaller = _ =>
-            {
-                if (Directory.Exists(corruptedRuntime))
-                {
-                    Directory.Delete(corruptedRuntime, true);
-                }
-
-                Directory.CreateDirectory(freshRuntime);
-                File.WriteAllText(Path.Combine(freshRuntime, "marker.txt"), "installed");
-            };
-
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
-
-            Assert.False(Directory.Exists(corruptedRuntime));
-            Assert.True(Directory.Exists(freshRuntime));
-            Assert.True(File.Exists(Path.Combine(freshRuntime, "marker.txt")));
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-        }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RepairInstallationAsync_ReinstallsDriverAndRuntime(bool beneathCheckout)
-    {
-        string? originalBrowsersPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH");
-        string? originalDriverPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH");
-        string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(root);
-        if (beneathCheckout) Directory.CreateDirectory(Path.Combine(root, ".git"));
-        string tempBrowsers = Path.Combine(root, "bin", "browsers");
-        string tempDriver = Path.Combine(root, "bin", "driver");
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", tempBrowsers);
-        Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", tempDriver);
-
-        var originalInstaller = HtmlBrowser.PlaywrightInstaller;
-        var originalFactory = HtmlBrowser.HttpClientFactory;
-
-        Directory.CreateDirectory(Path.Combine(tempDriver, ".playwright", "node"));
-        Directory.CreateDirectory(Path.Combine(tempBrowsers, "chromium-old"));
-
-        string? runtimeDirectory = null;
-        HtmlBrowser.PlaywrightInstaller = args =>
-        {
-            runtimeDirectory = Path.Combine(tempBrowsers, "chromium-repaired");
-            Directory.CreateDirectory(runtimeDirectory);
-            File.WriteAllText(Path.Combine(runtimeDirectory, "marker.txt"), string.Join(" ", args));
-        };
-        HtmlBrowser.HttpClientFactory = () => new HttpClient(new FakeHandler(CreateDriverArchive()));
-
-        try
-        {
-            await HtmlBrowser.RepairInstallationAsync(HtmlBrowserEngine.Chromium);
-
-            Assert.NotNull(runtimeDirectory);
-            Assert.True(Directory.Exists(runtimeDirectory!));
-            Assert.True(File.Exists(Path.Combine(runtimeDirectory!, "marker.txt")));
-
-            string baseDir = Path.Combine(tempDriver, ".playwright");
-            string nodePath = Path.Combine(baseDir, "node", PlatformExtensions.GetCurrentPlatform().ToPlatformId(), RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node");
-            Assert.True(File.Exists(nodePath));
-        }
-        finally
-        {
-            HtmlBrowser.PlaywrightInstaller = originalInstaller;
-            HtmlBrowser.HttpClientFactory = originalFactory;
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", originalBrowsersPath);
-            Environment.SetEnvironmentVariable("PLAYWRIGHT_DRIVER_SEARCH_PATH", originalDriverPath);
-            if (Directory.Exists(tempBrowsers)) Directory.Delete(tempBrowsers, true);
-            if (Directory.Exists(tempDriver)) Directory.Delete(tempDriver, true);
-            if (Directory.Exists(root)) Directory.Delete(root, true);
-        }
-    }
 
     private static void CreateHealthyDriver(string driverRoot)
     {

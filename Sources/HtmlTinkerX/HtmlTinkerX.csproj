@@ -67,6 +67,7 @@
     <ItemGroup>
         <EmbeddedResource Include="Playwright/Scripts/HtmlFormSubmit.js"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlFormSubmit.js" />
+        <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserCache.cjs" LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserCache.cjs" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserInstallNetwork.cjs"
                           LogicalName="HtmlTinkerX.Playwright.Scripts.HtmlBrowserInstallNetwork.cjs" />
         <EmbeddedResource Include="Playwright/Scripts/HtmlBrowserPopupNavigation.js"

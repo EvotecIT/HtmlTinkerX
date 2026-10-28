@@ -10,13 +10,19 @@ dotnet add package HtmlTinkerX
 
 Pin a stable HtmlTinkerX version when reproducible restores matter.
 
+Browser sessions check cache integrity and repair into verified, side-by-side
+generations. `HtmlBrowser.TestBrowserCacheAsync` and `Test-HtmlTinkerXBrowser`
+provide hashes, launch checks, installation history, and optional repair. See the
+[browser cache guide](https://github.com/EvotecIT/HtmlTinkerX/blob/v2-speedygonzales/Docs/BrowserCache.md)
+for CLI usage, fallback behavior, storage, and diagnostic exit codes.
+
 For custom Playwright storage, set `PLAYWRIGHT_DRIVER_SEARCH_PATH` and
 `PLAYWRIGHT_BROWSERS_PATH` to dedicated local directories. HtmlTinkerX manages the
 driver root's `.playwright` child. Installation, repair, and cleanup reject paths
 within or containing a NuGet cache, restored package payloads, and source checkout
 roots. Dedicated application output directories beneath a checkout remain supported.
-`PLAYWRIGHT_BROWSERS_PATH=0` stores browsers in the selected driver's
-`package/.local-browsers` directory. Complete bundled drivers are reused without
+`PLAYWRIGHT_BROWSERS_PATH=0` keeps managed browsers beside the selected driver in
+`.htmltinkerx-browsers`, outside its replaceable payload. Complete bundled drivers are reused without
 modification; browser installation still requires a safe writable destination.
 
 Browser-cache entries directly beneath the cache root must be direct local paths.

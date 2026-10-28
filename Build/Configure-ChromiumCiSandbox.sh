@@ -26,6 +26,10 @@ fi
 command -v apparmor_parser >/dev/null
 [[ ! -e "$profile_path" ]] || { echo "The job profile already exists; refusing to replace it." >&2; exit 1; }
 browser_root="$(realpath -e "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}")"
+search_roots=("$browser_root")
+if [[ -d "$browser_root/.htmltinkerx/versions" ]]; then
+    search_roots+=("$browser_root/.htmltinkerx/versions")
+fi
 temporary="$(mktemp "${RUNNER_TEMP:?}/htmltinkerx-chromium-profile.XXXXXX")"
 trap 'rm -f -- "$temporary"' EXIT
 printf 'abi <abi/4.0>,\ninclude <tunables/global>\n' > "$temporary"
@@ -37,7 +41,7 @@ while IFS= read -r -d '' executable; do
     printf 'profile %s_%s "%s" flags=(unconfined) {\n  userns,\n}\n' \
         "$profile_name" "$count" "$resolved" >> "$temporary"
     count=$((count + 1))
-done < <(find "$browser_root" -maxdepth 3 -type f \
+done < <(find "${search_roots[@]}" -maxdepth 4 -type f \
     \( -path '*/chromium-*/chrome-linux*/chrome' \
        -o -path '*/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell' \) -print0)
 [[ "$count" -gt 0 ]] || { echo "No installed Chromium executables were found." >&2; exit 1; }

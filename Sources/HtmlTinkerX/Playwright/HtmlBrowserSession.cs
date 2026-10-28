@@ -365,6 +365,26 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             }
         }
 
+        // Closing a persistent context can disconnect its driver. Finalize and save its page's video first.
+        bool saveBeforeContext = IsPersistent && _closeContextOnDispose && Video != null && !string.IsNullOrEmpty(VideoPath);
+        Task<Exception?>? pendingPersistentVideoSave = null;
+        if (saveBeforeContext && !_videoSaved && Page != null) {
+            bool pageClosed = Page.IsClosed;
+            try {
+                if (!pageClosed) await Page.CloseAsync().ConfigureAwait(false);
+                _pageClosed = true;
+                pageClosed = true;
+            } catch (Exception ex) { errors.Add(ex); }
+            // Start the save while the driver is connected even if page closure failed.
+            // If the page stayed open, context closure must be allowed to finish its recording.
+            Task<Exception?> save = SaveVideoAsync();
+            if (pageClosed || Page.IsClosed) {
+                Exception? failure = await save.ConfigureAwait(false);
+                if (failure != null) errors.Add(failure);
+            }
+            else pendingPersistentVideoSave = save;
+        }
+
         if (!_contextClosed && _closeContextOnDispose && Context != null) {
             try {
                 await Context.CloseAsync().ConfigureAwait(false);
@@ -379,35 +399,18 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         if (errors.Count > 0) {
             await CloseBrowserAsync().ConfigureAwait(false);
         }
-        if (!_videoSaved && Video != null && !string.IsNullOrEmpty(VideoPath)
-            && (!_closeContextOnDispose || _contextClosed || _browserClosed)) {
-            try {
-                string fullPath = VideoPath!.ToFullPath();
-                await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
-                _videoSaved = true;
-                try {
-                    string tempPath = await Video.PathAsync().ConfigureAwait(false);
-                    if (!string.IsNullOrEmpty(tempPath) &&
-                        !string.Equals(tempPath, fullPath, StringComparison.OrdinalIgnoreCase) &&
-                        System.IO.File.Exists(tempPath)) {
-                        System.IO.File.Delete(tempPath);
-                    }
-                } catch {
-                    // Saving succeeded; deleting the recording's temporary copy is best effort.
-                }
-            } catch (Exception ex) {
-                errors.Add(ex);
-            }
+        if (pendingPersistentVideoSave != null) {
+            // A failed context close cannot leave the save waiting on a live recorder forever.
+            if (!_contextClosed && !_browserClosed) DisposePlaywright();
+            Exception? failure = await pendingPersistentVideoSave.ConfigureAwait(false);
+            if (failure != null) errors.Add(failure);
+        }
+        if (!saveBeforeContext && (!_closeContextOnDispose || _contextClosed || _browserClosed)) {
+            Exception? failure = await SaveVideoAsync().ConfigureAwait(false);
+            if (failure != null) errors.Add(failure);
         }
         await CloseBrowserAsync().ConfigureAwait(false);
-        if (!_playwrightDisposed && Playwright != null) {
-            try {
-                Playwright.Dispose();
-                _playwrightDisposed = true;
-            } catch (Exception ex) {
-                errors.Add(ex);
-            }
-        }
+        DisposePlaywright();
         if (NetworkPolicyLifetime != null) {
             try {
                 await NetworkPolicyLifetime.DisposeAsync().ConfigureAwait(false);
@@ -421,6 +424,33 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         }
         if (errors.Count > 1) {
             throw new AggregateException("Browser session cleanup failed.", errors);
+        }
+
+        void DisposePlaywright() {
+            if (!_playwrightDisposed && Playwright != null) {
+                try {
+                    Playwright.Dispose();
+                    _playwrightDisposed = true;
+                } catch (Exception ex) { errors.Add(ex); }
+            }
+        }
+
+        async Task<Exception?> SaveVideoAsync() {
+            if (_videoSaved || Video == null || string.IsNullOrEmpty(VideoPath)) return null;
+            try {
+                string fullPath = VideoPath!.ToFullPath();
+                await Video.SaveAsAsync(fullPath).ConfigureAwait(false);
+                _videoSaved = true;
+                try {
+                    string tempPath = await Video.PathAsync().ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(tempPath) &&
+                        !string.Equals(tempPath, fullPath, StringComparison.OrdinalIgnoreCase) &&
+                        System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+                } catch {
+                    // Saving succeeded; deleting the recording's temporary copy is best effort.
+                }
+            } catch (Exception ex) { return ex; }
+            return null;
         }
 
         async Task CloseBrowserAsync() {

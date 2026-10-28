@@ -10,6 +10,73 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserSessionDisposeTests {
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    public async Task PersistentRecordingAttemptsSaveBeforeContextCloseAfterPageCloseFailure(bool pageClosedDespiteError, bool contextFails) {
+        string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "htmltinkerx-video-close-" + Guid.NewGuid().ToString("N"));
+        string output = System.IO.Path.Combine(directory, "recording.webm");
+        System.IO.Directory.CreateDirectory(directory);
+        var pageFailure = new PlaywrightException("Page close failed.");
+        var contextFailure = new PlaywrightException("Context close failed.");
+        var videoFailure = new PlaywrightException("Connection disposed.");
+        var finished = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool pageClosed = false, saveStarted = false, contextCloseStarted = false;
+        var page = new Mock<IPage>();
+        page.SetupGet(value => value.IsClosed).Returns(() => pageClosed);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>()))
+            .Callback(() => pageClosed = pageClosedDespiteError).ThrowsAsync(pageFailure);
+        var video = new Mock<IVideo>();
+        video.Setup(value => value.SaveAsAsync(output)).Returns(() => {
+            Assert.False(contextCloseStarted);
+            saveStarted = true;
+            if (pageClosed) {
+                System.IO.File.WriteAllText(output, "finalized recording");
+                return Task.CompletedTask;
+            }
+            return finished.Task;
+        });
+        video.Setup(value => value.PathAsync()).ReturnsAsync(output);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(() => {
+            contextCloseStarted = true;
+            if (contextFails) return Task.FromException(contextFailure);
+            pageClosed = true;
+            if (saveStarted) System.IO.File.WriteAllText(output, "finalized recording");
+            finished.TrySetResult(true);
+            return Task.CompletedTask;
+        });
+        var playwright = new Mock<IPlaywright>();
+        playwright.Setup(value => value.Dispose()).Callback(() => {
+            if (contextFails && saveStarted) finished.TrySetException(videoFailure);
+        });
+        var session = new HtmlBrowserSession(playwright.Object, null, context.Object, page.Object, video.Object, output,
+            userDataDirectory: System.IO.Path.Combine(directory, "profile"), closeBrowserOnDispose: false);
+        try {
+            Task dispose = session.DisposeAsync().AsTask();
+            Assert.Same(dispose, await Task.WhenAny(dispose, Task.Delay(5000)));
+            Exception? failure = await Record.ExceptionAsync(() => dispose);
+            Assert.NotNull(failure);
+            if (contextFails) {
+                var aggregate = Assert.IsType<AggregateException>(failure);
+                Assert.Contains(pageFailure, aggregate.InnerExceptions);
+                Assert.Contains(contextFailure, aggregate.InnerExceptions);
+                Assert.Contains(videoFailure, aggregate.InnerExceptions);
+            } else {
+                Assert.Same(pageFailure, failure);
+                Assert.Equal("finalized recording", System.IO.File.ReadAllText(output));
+            }
+            video.Verify(value => value.SaveAsAsync(output), Times.Once);
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Once);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            finished.TrySetCanceled();
+            if (System.IO.File.Exists(output)) System.IO.File.Delete(output);
+            System.IO.Directory.Delete(directory);
+        }
+    }
+
     [Fact]
     public async Task DisposeAsync_AllowsNullProperties() {
         var session = (HtmlBrowserSession)RuntimeHelpers.GetUninitializedObject(typeof(HtmlBrowserSession));

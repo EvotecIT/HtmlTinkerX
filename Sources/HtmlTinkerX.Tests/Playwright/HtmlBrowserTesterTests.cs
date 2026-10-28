@@ -10,10 +10,26 @@ namespace HtmlTinkerX.Tests.Playwright;
 
 [Collection("Playwright collection")]
 public class HtmlBrowserTesterTests {
+    [Theory]
+    [InlineData(HtmlBrowserEngine.Chromium, false)]
+    [InlineData(HtmlBrowserEngine.Chromium, true)]
+    [InlineData(HtmlBrowserEngine.WebKit, false)]
+    [InlineData(HtmlBrowserEngine.WebKit, true)]
+    public async Task TestConsoleErrorsAsync_CspSelectControlPreservesRealViolations(HtmlBrowserEngine engine, bool inlineStyle) {
+        string html = "<!doctype html><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'\">"
+            + "<select><option>One</option><option>Two</option></select>"
+            + (inlineStyle ? "<p style='color:red'>Blocked style</p>" : "<p>Plain content</p>");
+
+        var errors = await HtmlBrowserTester.TestConsoleErrorsAsync("data:text/html," + Uri.EscapeDataString(html), engine);
+
+        if (inlineStyle) Assert.Contains(errors, error => error.Text.IndexOf("style", StringComparison.OrdinalIgnoreCase) >= 0);
+        else Assert.Empty(errors);
+    }
+
     [Fact]
     public async Task TestUrlAsync_ValidUrl_ReturnsTestResult() {
         // Arrange
-        var url = "data:text/html,<html><head><title>Test</title></head><body>Hello World</body></html>";
+        var url = "data:text/html,<html><head><title>Test</title></head><body>Hello World<script>console.log('verified tester session')</script></body></html>";
         
         // Act
         var result = await HtmlBrowserTester.TestUrlAsync(url);
@@ -24,6 +40,8 @@ public class HtmlBrowserTesterTests {
         Assert.NotNull(result.NetworkEntries);
         Assert.NotNull(result.ConsoleEntries);
         Assert.NotNull(result.PageLoadTime);
+        Assert.Contains(result.ConsoleEntries, entry => entry.Text == "verified tester session");
+        Assert.DoesNotContain(result.ConsoleEntries, entry => entry.Type == HtmlConsoleMessageType.Error);
     }
 
     [Fact]

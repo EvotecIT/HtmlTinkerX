@@ -17,17 +17,23 @@ public static partial class HtmlBrowser {
     internal static async Task<(IPlaywright Playwright, IBrowser Browser)> LaunchBrowserAsync(
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken,
-        string? policyProxyServer = null) {
+        string? policyProxyServer = null, bool allowCacheRepair = true) {
+        var owner = await LaunchBrowserWithCacheDirectoryAsync(options, cancellationToken, policyProxyServer, allowCacheRepair).ConfigureAwait(false);
+        return (owner.Playwright, owner.Browser);
+    }
+
+    private static async Task<(IPlaywright Playwright, IBrowser Browser, string? CacheDirectory, bool AllowRepair)> LaunchBrowserWithCacheDirectoryAsync(
+        HtmlBrowserLaunchOptions options, CancellationToken cancellationToken, string? policyProxyServer = null, bool allowCacheRepair = true) {
         cancellationToken.ThrowIfCancellationRequested();
-        if (options.Clean) {
-            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
+        if (options.Clean && allowCacheRepair) {
+            await ExecuteSetupStageAsync(() => RepairInstallationAsync(options.Browser), cancellationToken).ConfigureAwait(false);
         }
 
         await ExecuteSetupStageAsync(
             () => EnsureBrowserRuntimeAvailableAsync(options),
             cancellationToken).ConfigureAwait(false);
 
-        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken, options).ConfigureAwait(false);
         int playwrightDisposed = 0;
         Task DisposeOwnerAsync() {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
@@ -37,8 +43,14 @@ public static partial class HtmlBrowser {
         try {
             IBrowserType type = ResolveBrowserType(playwright, options.Browser);
             BrowserTypeLaunchOptions launchOptions = CreateLaunchOptions(options);
+            string? cacheDirectory = null;
             if (policyProxyServer != null) ApplySessionPolicyLaunchOptions(launchOptions, policyProxyServer);
-            Task<IBrowser> launch = type.LaunchAsync(launchOptions);
+            Task<IBrowser> launch = LaunchWithCacheRepairAsync(options, async slot => {
+                cacheDirectory = slot;
+                if (slot != null)
+                    launchOptions.ExecutablePath = GetManagedExecutable(options.Browser, options.Headless, slot);
+                return await type.LaunchAsync(launchOptions).ConfigureAwait(false);
+            }, allowCacheRepair);
             IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => launch,
                 () => {
@@ -48,7 +60,10 @@ public static partial class HtmlBrowser {
                     return Task.CompletedTask;
                 },
                 cancellationToken).ConfigureAwait(false);
-            return (playwright, browserInstance);
+            return (playwright, browserInstance, cacheDirectory, allowCacheRepair);
+        } catch (BrowserCacheRepairedException) when (allowCacheRepair) {
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            return await LaunchBrowserWithCacheDirectoryAsync(options, cancellationToken, policyProxyServer, allowCacheRepair: false).ConfigureAwait(false);
         } catch {
             if (Volatile.Read(ref lateLaunchCleanupOwnsPlaywright) == 0) {
                 await DisposeOwnerAsync().ConfigureAwait(false);
@@ -95,10 +110,10 @@ public static partial class HtmlBrowser {
 
     private static async Task<(IPlaywright Playwright, IBrowserContext Context, IPage Page)> LaunchPersistentContextAsync(
         HtmlBrowserLaunchOptions options,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken, bool allowCacheRepair = true) {
         cancellationToken.ThrowIfCancellationRequested();
-        if (options.Clean) {
-            await ExecuteSetupStageAsync(CleanInstallationAsync, cancellationToken).ConfigureAwait(false);
+        if (options.Clean && allowCacheRepair) {
+            await ExecuteSetupStageAsync(() => RepairInstallationAsync(options.Browser), cancellationToken).ConfigureAwait(false);
         }
 
         await ExecuteSetupStageAsync(
@@ -107,7 +122,7 @@ public static partial class HtmlBrowser {
 
         string userDataDirectory = HtmlUtilities.EnsureDirectoryExists(options.UserDataDirectory!);
 
-        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken).ConfigureAwait(false);
+        IPlaywright playwright = await CreatePlaywrightAsync(cancellationToken, options).ConfigureAwait(false);
         int playwrightDisposed = 0;
         Task DisposeOwnerAsync() {
             if (Interlocked.Exchange(ref playwrightDisposed, 1) == 0) playwright.Dispose();
@@ -118,7 +133,11 @@ public static partial class HtmlBrowser {
         try {
             IBrowserType type = ResolveBrowserType(playwright, options.Browser);
             BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
-            Task<IBrowserContext> launch = type.LaunchPersistentContextAsync(userDataDirectory, contextOptions);
+            Task<IBrowserContext> launch = LaunchWithCacheRepairAsync(options, async slot => {
+                if (slot != null)
+                    contextOptions.ExecutablePath = GetManagedExecutable(options.Browser, options.Headless, slot);
+                return await type.LaunchPersistentContextAsync(userDataDirectory, contextOptions).ConfigureAwait(false);
+            }, allowCacheRepair);
             context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => launch,
                 () => {
@@ -136,6 +155,9 @@ public static partial class HtmlBrowser {
                     cancellationToken).ConfigureAwait(false);
 
             return (playwright, context, page);
+        } catch (BrowserCacheRepairedException) when (allowCacheRepair) {
+            await DisposeOwnerAsync().ConfigureAwait(false);
+            return await LaunchPersistentContextAsync(options, cancellationToken, allowCacheRepair: false).ConfigureAwait(false);
         } catch {
             if (context != null) {
                 StartBestEffortClose(() => context.CloseAsync());
@@ -169,11 +191,11 @@ public static partial class HtmlBrowser {
             static () => Task.CompletedTask,
             cancellationToken);
 
-    private static async Task<IPlaywright> CreatePlaywrightAsync(CancellationToken cancellationToken) {
+    private static async Task<IPlaywright> CreatePlaywrightAsync(CancellationToken cancellationToken, HtmlBrowserLaunchOptions? options = null) {
         cancellationToken.ThrowIfCancellationRequested();
         Task<IPlaywright> creation = PlaywrightFactory != null
             ? PlaywrightFactory()
-            : Playwright.CreateAsync();
+            : CreateCachePlaywrightAsync(options);
         int lateCleanupStarted = 0;
         return await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
             () => creation,

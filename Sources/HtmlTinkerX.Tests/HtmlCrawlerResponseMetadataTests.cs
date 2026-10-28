@@ -10,6 +10,9 @@ using Xunit;
 namespace HtmlTinkerX.Tests;
 
 public partial class HtmlCrawlerTests {
+    // These tests assert document identity, not navigation speed on a busy CI browser.
+    private const int RenderedResponseMetadataTimeout = 30_000;
+
     [Theory]
     [InlineData("\"version-two\"")]
     [InlineData("W/\"version-two\"")]
@@ -95,6 +98,7 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
         options.Browser = browser;
+        options.Timeout = RenderedResponseMetadataTimeout;
         options.ClickSelectors.Add("#continue");
 
         HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
@@ -185,6 +189,7 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
         options.Browser = browser;
+        options.Timeout = RenderedResponseMetadataTimeout;
         options.ClickSelectors.Add("#continue");
         HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
         Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
@@ -206,6 +211,7 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
         options.Browser = browser;
+        options.Timeout = RenderedResponseMetadataTimeout;
         options.ClickSelectors.Add("#continue");
         HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
         Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
@@ -269,6 +275,7 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
         options.Browser = browser;
+        options.Timeout = RenderedResponseMetadataTimeout;
         options.ClickSelectors.Add("#continue");
         options.ClickSelectors.Add("#history");
         HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
@@ -298,6 +305,7 @@ public partial class HtmlCrawlerTests {
         HtmlCrawlOptions options = StaticOptions(1);
         options.Render = true;
         options.Browser = browser;
+        options.Timeout = RenderedResponseMetadataTimeout;
         HtmlCrawlPage page = Assert.Single((await HtmlCrawler.CrawlAsync(root, options)).Pages);
         Assert.True(page.Status == HtmlCrawlPageStatus.Success, page.Error);
         Assert.Equal(root + "document?version=two", page.ResponseUrl);

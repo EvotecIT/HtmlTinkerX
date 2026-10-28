@@ -36,86 +36,40 @@ public static class HtmlBrowserTester {
         var result = new HtmlBrowserTestResult { Url = url };
         var startTime = DateTimeOffset.UtcNow;
 
-        IPlaywright? playwright = null;
         try {
-            // Ensure Playwright and browser are installed
-            await HtmlBrowser.EnsureInstalledAsync(engine);
-
-            // Create a browser session without navigating first
-            playwright = await Playwright.CreateAsync();
+            await using HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions {
+                Browser = engine,
+                Headless = headless,
+                Timeout = timeout,
+                Proxy = proxy,
+                ProxyUsername = proxyUsername,
+                ProxyPassword = proxyPassword,
+                IgnoreHTTPSErrors = ignoreHttpsErrors
+            }).ConfigureAwait(false);
+            IPage page = session.Page;
+            page.SetDefaultTimeout(timeout);
+            InitNetworkListeners(page, result);
             try {
-                var browserType = engine switch {
-                    HtmlBrowserEngine.Firefox => playwright.Firefox,
-                    HtmlBrowserEngine.WebKit => playwright.Webkit,
-                    _ => playwright.Chromium
-                };
-
-                var launchOptions = new BrowserTypeLaunchOptions { Headless = headless };
-                if (!string.IsNullOrEmpty(proxy)) {
-                    launchOptions.Proxy = new Proxy {
-                        Server = proxy!,
-                        Username = proxyUsername,
-                        Password = proxyPassword
-                    };
-                }
-
-                var browser = await browserType.LaunchAsync(launchOptions);
-                try {
-                    var contextOptions = new BrowserNewContextOptions { IgnoreHTTPSErrors = ignoreHttpsErrors };
-                    var context = await browser.NewContextAsync(contextOptions);
-                    try {
-                        var page = await context.NewPageAsync();
-
-                        // Set timeout
-                        page.SetDefaultTimeout(timeout);
-
-                        // Enhanced network and console monitoring - set up BEFORE navigation
-                        var networkEntries = InitNetworkListeners(page, result);
-
-                        // Navigate and measure
-                        try {
-                            await page.GotoAsync(url, new PageGotoOptions {
-                                WaitUntil = WaitUntilState.NetworkIdle,
-                                Timeout = timeout
-                            });
-                        } catch (Exception ex) {
-                            result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
-                                Text = ex.Message,
-                                Type = HtmlConsoleMessageType.Error,
-                                Timestamp = DateTimeOffset.UtcNow
-                            });
-                        } finally {
-                            result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
-                        }
-
-                        // Wait a bit for any delayed console messages or network requests
-                        await page.WaitForTimeoutAsync(1000);
-                    } finally {
-                        await context.CloseAsync();
-                    }
-                } finally {
-                    await browser.CloseAsync();
-                }
-        } finally {
-            if (playwright is not null) {
-                await playwright.DisposeAsync();
-            }
+                await page.GotoAsync(url, new PageGotoOptions {
+                    WaitUntil = WaitUntilState.NetworkIdle, Timeout = timeout
+                }).ConfigureAwait(false);
+            } catch (Exception ex) {
+                result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
+                    Text = ex.Message, Type = HtmlConsoleMessageType.Error, Timestamp = DateTimeOffset.UtcNow
+                });
+            } finally { result.PageLoadTime = DateTimeOffset.UtcNow - startTime; }
+            await page.WaitForTimeoutAsync(1000).ConfigureAwait(false);
+        } catch (Exception ex) {
+            result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
+                Text = ex.Message, Type = HtmlConsoleMessageType.Error, Timestamp = DateTimeOffset.UtcNow
+            });
         }
-    } catch (Exception ex) {
-        result.ConsoleEntries.Add(new HtmlConsoleEntryDetailed {
-            Text = ex.Message,
-            Type = HtmlConsoleMessageType.Error,
-            Timestamp = DateTimeOffset.UtcNow
-        });
-    }
+        if (!result.PageLoadTime.HasValue) {
+            result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
+        }
 
-    // Ensure PageLoadTime is always set
-    if (!result.PageLoadTime.HasValue) {
-        result.PageLoadTime = DateTimeOffset.UtcNow - startTime;
+        return result;
     }
-
-    return result;
-}
     
     /// <summary>
     /// Tests if a specific CSS resource is loaded.

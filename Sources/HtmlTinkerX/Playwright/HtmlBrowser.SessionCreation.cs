@@ -18,7 +18,7 @@ public static partial class HtmlBrowser {
         string url,
         HtmlBrowserLaunchOptions options,
         CancellationToken cancellationToken = default,
-        bool skipInitialNavigation = false) {
+        bool skipInitialNavigation = false, bool allowCacheRepair = true) {
         ValidateSessionNetworkPolicy(options);
         if (options.NetworkPolicy != null && !skipInitialNavigation
             && !await new HtmlBrowserNetworkPolicyEvaluator(options.NetworkPolicy)
@@ -100,9 +100,16 @@ public static partial class HtmlBrowser {
                 closeBrowserOnDispose = false;
             } else {
                 if (options.NetworkPolicy != null) policyLifetime = new HtmlBrowserSessionNetworkPolicyLifetime(options.NetworkPolicy);
-                (playwright, browserInstance) = await LaunchBrowserAsync(options, cancellationToken, policyLifetime?.Proxy.Server).ConfigureAwait(false);
-                (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken,
-                    policyLifetimeToken: policyLifetime?.Token ?? default).ConfigureAwait(false);
+                var launch = await LaunchBrowserWithCacheDirectoryAsync(options, cancellationToken, policyLifetime?.Proxy.Server, allowCacheRepair).ConfigureAwait(false);
+                playwright = launch.Playwright;
+                browserInstance = launch.Browser;
+                try {
+                    (context, page) = await CreateBrowserContextAsync(browserInstance, options, cancellationToken,
+                        policyLifetimeToken: policyLifetime?.Token ?? default).ConfigureAwait(false);
+                } catch (PlaywrightException ex) {
+                    if (!await RepairFailedCacheLaunchAsync(options, launch.CacheDirectory, ex, launch.AllowRepair).ConfigureAwait(false)) throw;
+                    throw new BrowserCacheRepairedException(ex);
+                }
             }
 
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -144,6 +151,9 @@ public static partial class HtmlBrowser {
             }
 
             return session;
+        } catch (BrowserCacheRepairedException) when (allowCacheRepair) {
+            await AbortOwnershipAsync().ConfigureAwait(false);
+            return await CreatePageAsync(url, options, cancellationToken, skipInitialNavigation, allowCacheRepair: false).ConfigureAwait(false);
         } catch {
             await AbortOwnershipAsync().ConfigureAwait(false);
             throw;

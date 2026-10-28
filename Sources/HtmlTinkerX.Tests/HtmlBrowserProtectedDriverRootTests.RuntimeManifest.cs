@@ -76,11 +76,11 @@ public partial class HtmlBrowserProtectedDriverRootTests
         HtmlBrowser.HttpClientFactory = () => { requests++; return new HttpClient(handler, disposeHandler: false); };
         try
         {
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
+            await HtmlBrowser.EnsureDriverInstalledAsync();
 
             _identityOutput.WriteLine(JsonSerializer.Serialize(new { json, requests, fixture.InstallerCalls, ManifestAfter = File.ReadAllText(manifest) }));
             Assert.Equal(1, requests);
-            Assert.Equal(1, fixture.InstallerCalls);
+            Assert.Equal(0, fixture.InstallerCalls);
             Assert.True(HtmlBrowser.HasDriverLayout(driver));
             Assert.NotEqual(json, File.ReadAllText(manifest));
             Assert.Equal("browser-owned bytes", File.ReadAllText(fixture.BrowserSentinel));
@@ -92,7 +92,7 @@ public partial class HtmlBrowserProtectedDriverRootTests
     }
 
     [Fact]
-    public async Task RuntimeManifest_CompleteRuntimeLinkRetainsReadOnlyFastReuse()
+    public async Task RuntimeManifest_UnverifiedRuntimeLinkRejectsMutationAndPreservesTarget()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -115,7 +115,8 @@ public partial class HtmlBrowserProtectedDriverRootTests
         Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", browsers);
         try
         {
-            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
+            // A marker-only external revision cannot be trusted for launch. Refuse linked mutation and preserve it.
+            await Assert.ThrowsAsync<ArgumentException>(() => HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox));
 
             Assert.Equal("owned runtime bytes", File.ReadAllText(Path.Combine(external, "preserve")));
             Assert.NotNull(new DirectoryInfo(runtime).LinkTarget);
