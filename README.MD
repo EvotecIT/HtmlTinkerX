@@ -401,3 +401,5 @@ dotnet add package HtmlTinkerX
 
 HtmlTinkerX and PSParseHTML are available under the [MIT License](LICENSE).
 Third-party components remain under their own license terms.
+
+<!-- Temporary documentation-only CI validation. -->
