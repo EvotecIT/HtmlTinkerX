@@ -56,6 +56,10 @@ jobs:
       - name: Build test project for the selected framework
         run: dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }} --no-restore
 
+      - name: Initialize native browser log directories
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path TestResults/chromium-netlog -Force | Out-Null
+
       - name: Run tests for ${{ matrix.framework }}
         shell: pwsh
         run: ./Build/Invoke-WindowsTests.ps1 -Framework '${{ matrix.framework }}' -Configuration '${{ env.BUILD_CONFIGURATION }}' -Verbosity '${{ env.TEST_VERBOSITY }}'
