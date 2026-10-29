@@ -6,16 +6,16 @@ on:
     branches:
       - v1-legacy
       - v2-speedygonzales
-    paths-ignore:
-      - '*.md'
-      - 'Docs/**'
-      - 'Examples/**'
-      - '.gitignore'
   pull_request:
-    branches:
-      - v1-legacy
-      - v2-speedygonzales
   workflow_dispatch:
+
+# Non-PR runs have unique groups, including while they are queued.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 env:
   DOTNET_VERSION: |
@@ -27,7 +27,13 @@ env:
   DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy'
 
 jobs:
+  changes:
+    name: Select test coverage
+    uses: ./.github/workflows/test-changes.yml
+
   test-windows:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     name: 'Windows'
     runs-on: windows-latest
     strategy:
@@ -123,6 +129,8 @@ jobs:
           directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-ubuntu:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     name: 'Ubuntu'
     runs-on: ubuntu-latest
     env:
@@ -239,6 +247,8 @@ jobs:
           directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-macos:
+    needs: changes
+    if: needs.changes.outputs.build == 'true' && github.event_name != 'pull_request'
     name: 'macOS'
     runs-on: macos-latest
     steps:
@@ -321,3 +331,31 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           directory: Sources/HtmlTinkerX.Tests/TestResults
+
+  result:
+    name: Test .NET result
+    needs: [changes, test-windows, test-ubuntu, test-macos]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check selected jobs
+        shell: python
+        env:
+          JOBS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          import json
+          import os
+
+          jobs = json.loads(os.environ['JOBS'])
+          assert jobs['changes']['result'] == 'success', 'Coverage selection failed'
+          build = jobs['changes']['outputs']['build']
+          assert build in ('true', 'false'), 'Coverage selection returned no decision'
+          for name, job in jobs.items():
+              if name == 'changes':
+                  continue
+              skip = build == 'false' or (name == 'test-macos' and os.environ['EVENT_NAME'] == 'pull_request')
+              expected = 'skipped' if skip else 'success'
+              assert job['result'] == expected, f"{name}: expected {expected}, got {job['result']}"
+          print('All selected jobs passed; documentation-only and PR macOS skips verified.')

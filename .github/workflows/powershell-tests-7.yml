@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - v2-speedygonzales
-    paths-ignore:
-      - '*.md'
-      - 'Docs/**'
-      - 'Examples/**'
-      - '.gitignore'
   pull_request:
   workflow_dispatch:
+
+# Non-PR runs have unique groups, including while they are queued.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -22,8 +22,14 @@ env:
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:
+  changes:
+    name: Select test coverage
+    uses: ./.github/workflows/test-changes.yml
+
   refresh-psd1:
     name: 'Refresh PSD1'
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -265,6 +271,7 @@ jobs:
         timeout-minutes: 10
 
   test-macos:
+    if: github.event_name != 'pull_request'
     needs: refresh-psd1
     name: 'macOS PowerShell 7'
     runs-on: macos-latest
@@ -328,3 +335,31 @@ jobs:
         shell: pwsh
         run: ./PSParseHTML.Tests.ps1
         timeout-minutes: 20
+
+  result:
+    name: Test PowerShell result
+    needs: [changes, refresh-psd1, test-windows-ps7, test-windows-packaged-alc, test-ubuntu, test-macos]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check selected jobs
+        shell: python
+        env:
+          JOBS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          import json
+          import os
+
+          jobs = json.loads(os.environ['JOBS'])
+          assert jobs['changes']['result'] == 'success', 'Coverage selection failed'
+          build = jobs['changes']['outputs']['build']
+          assert build in ('true', 'false'), 'Coverage selection returned no decision'
+          for name, job in jobs.items():
+              if name == 'changes':
+                  continue
+              skip = build == 'false' or (name == 'test-macos' and os.environ['EVENT_NAME'] == 'pull_request')
+              expected = 'skipped' if skip else 'success'
+              assert job['result'] == expected, f"{name}: expected {expected}, got {job['result']}"
+          print('All selected jobs passed; documentation-only and PR macOS skips verified.')
