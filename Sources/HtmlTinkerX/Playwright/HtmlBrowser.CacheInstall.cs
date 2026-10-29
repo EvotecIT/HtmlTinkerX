@@ -86,10 +86,11 @@ public static partial class HtmlBrowser {
     }
 
     private static async Task MoveVerifiedGenerationAsync(string staging, string generation) {
-        // Windows scanners and just-closed browser children can briefly retain directory handles.
+        // Windows scanners and just-closed browser children can retain directory handles
+        // beyond five seconds. Keep publication atomic, with a bounded thirty-second wait.
         for (int attempt = 0; ; attempt++) {
             try { Directory.Move(staging, generation); return; }
-            catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 20) {
+            catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 120) {
                 await Task.Delay(250).ConfigureAwait(false);
             }
         }
