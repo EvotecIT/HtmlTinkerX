@@ -265,6 +265,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         await using LoopbackPopupServer server = new();
         await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
             maximumBrowserInstances: 1,
+            browserArguments: ChromiumNetworkDiagnostics.Arguments(nameof(CreatedPopupNodeDocumentRelationsRemainBehindHeaderInterception)),
             networkPolicy: new HtmlBrowserNetworkPolicy(allowedHosts: new[] { "127.0.0.1" })));
         const string script = @"const popup = window.open('', '_blank');
             const node = popup.document.createElement('div');
