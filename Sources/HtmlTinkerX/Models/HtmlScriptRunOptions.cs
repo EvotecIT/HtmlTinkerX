@@ -13,9 +13,13 @@ public sealed class HtmlScriptRunOptions {
     public const int DefaultMaximumHtmlCharacters = 16 * 1024 * 1024;
     /// <summary>Default maximum number of characters in the requested script.</summary>
     public const int DefaultMaximumScriptCharacters = 1024 * 1024;
+    /// <summary>Default native regular-expression timeout in milliseconds.</summary>
+    public const int DefaultRegexTimeoutMilliseconds = 1000;
 
     /// <summary>Whole-operation timeout, including page loading and the requested script. Defaults to ten seconds. Use <see cref="Timeout.InfiniteTimeSpan"/> for cancellation-only timing.</summary>
     public TimeSpan ExecutionTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    /// <summary>Maximum duration of one native regex match. Defaults to one second and also bounds cancellation latency during a match. Must be positive and at most Int32.MaxValue minus one milliseconds.</summary>
+    public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromMilliseconds(DefaultRegexTimeoutMilliseconds);
     /// <summary>Statement limit for each page or requested script execution. Must be positive.</summary>
     public int MaximumStatements { get; set; } = DefaultMaximumStatements;
     /// <summary>Jint's managed allocation limit for each script execution. This is not a process or DOM size limit. Must be positive.</summary>
@@ -33,11 +37,14 @@ public sealed class HtmlScriptRunOptions {
             throw new ArgumentOutOfRangeException(nameof(ExecutionTimeout), "The timeout must be positive and at most Int32.MaxValue milliseconds, or infinite.");
         }
         if (MaximumStatements <= 0) throw new ArgumentOutOfRangeException(nameof(MaximumStatements));
+        if (RegexTimeout <= TimeSpan.Zero || RegexTimeout.TotalMilliseconds > int.MaxValue - 1) {
+            throw new ArgumentOutOfRangeException(nameof(RegexTimeout));
+        }
         if (MaximumMemoryBytes <= 0) throw new ArgumentOutOfRangeException(nameof(MaximumMemoryBytes));
         if (MaximumHtmlCharacters <= 0) throw new ArgumentOutOfRangeException(nameof(MaximumHtmlCharacters));
         if (MaximumScriptCharacters <= 0) throw new ArgumentOutOfRangeException(nameof(MaximumScriptCharacters));
         return new HtmlScriptRunOptions {
-            ExecutionTimeout = ExecutionTimeout, MaximumStatements = MaximumStatements,
+            ExecutionTimeout = ExecutionTimeout, RegexTimeout = RegexTimeout, MaximumStatements = MaximumStatements,
             MaximumMemoryBytes = MaximumMemoryBytes, MaximumHtmlCharacters = MaximumHtmlCharacters,
             MaximumScriptCharacters = MaximumScriptCharacters, ExecutePageScripts = ExecutePageScripts
         };

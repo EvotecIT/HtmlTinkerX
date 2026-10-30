@@ -27,6 +27,11 @@ describe 'Invoke-HTMLDomScript' {
         { Invoke-HtmlBrowserDomScript -Content $html -Script '1' -MaximumStatements 64 -ErrorAction Stop } | Should -Throw '*statements*'
     }
 
+    it 'Passes the native regex timeout to the DOM engine' {
+        $expression = Invoke-HtmlBrowserDomScript -Content '<p>Policy</p>' -Script '/cmdletRegexPolicy/' -RegexTimeout 37
+        $expression.Value.MatchTimeout.TotalMilliseconds | Should -Be 37
+    }
+
     it 'Interrupts unbounded execution at the operation timeout' {
         $failure = { Invoke-HtmlBrowserDomScript -Content '<html></html>' -Script 'while(true){}' -Timeout 100 -MaximumStatements ([int]::MaxValue) -ErrorAction Stop } | Should -Throw -PassThru
         $failure.Exception | Should -BeOfType ([TimeoutException])

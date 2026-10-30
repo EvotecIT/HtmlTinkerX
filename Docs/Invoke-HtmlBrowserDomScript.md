@@ -11,12 +11,12 @@ Cmdlet that executes JavaScript against HTML using AngleSharp.Js.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Invoke-HtmlBrowserDomScript -Content <string> -Script <string> [-Timeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
+Invoke-HtmlBrowserDomScript -Content <string> -Script <string> [-Timeout <int>] [-RegexTimeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Invoke-HtmlBrowserDomScript -Path <string> -Script <string> [-Timeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
+Invoke-HtmlBrowserDomScript -Path <string> -Script <string> [-Timeout <int>] [-RegexTimeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -26,13 +26,7 @@ Cmdlet that executes JavaScript against HTML using AngleSharp.Js.
 
 ### EXAMPLE 1
 ```powershell
-Invoke-HtmlBrowserDomScript -Content 'Value' -Script 'Value'
-```
-
-
-### EXAMPLE 2
-```powershell
-Invoke-HtmlBrowserDomScript -Path 'C:\Path' -Script 'Value'
+Invoke-HtmlBrowserDomScript -Content '<p id="value">Hello</p>' -Script 'document.getElementById("value").textContent' -Timeout 3000 -RegexTimeout 250 -SkipPageScripts
 ```
 
 
@@ -128,6 +122,22 @@ Aliases: File
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RegexTimeout
+Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False

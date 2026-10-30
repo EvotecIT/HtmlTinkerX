@@ -2,15 +2,54 @@ using AngleSharp;
 using AngleSharp.Dom;
 using AngleSharp.Js;
 using Jint.Runtime;
+using Jint.Native;
 using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
 
 public class HtmlScriptRunnerBudgetTests {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_RegexPolicyAppliesBeforeInlineAndExplicitExecution(bool inline) {
+        var timeout = TimeSpan.FromMilliseconds(37);
+        var options = new HtmlScriptRunOptions { RegexTimeout = timeout };
+        JsRegExp? expression = await HtmlScriptRunner.RunAsync<JsRegExp>(
+            inline ? "<script>var configuredRegex = /inlineRegexPolicy/;</script>" : "<html></html>",
+            inline ? "configuredRegex" : "/explicitRegexPolicy/", options, CancellationToken.None);
+
+        Assert.NotNull(expression);
+        Assert.Equal(timeout, expression!.Value.MatchTimeout);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public async Task RunAsync_InvalidRegexPolicyIsRejectedBeforeLoading(int milliseconds) {
+        var options = new HtmlScriptRunOptions { RegexTimeout = TimeSpan.FromMilliseconds(milliseconds) };
+        ArgumentOutOfRangeException failure = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            HtmlScriptRunner.RunAsync<int>("<script>throw new Error('must not run');</script>", "1", options, CancellationToken.None));
+        Assert.Equal(nameof(HtmlScriptRunOptions.RegexTimeout), failure.ParamName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_NativeRegexBudgetRemainsVisibleBeforeOperationDeadline(bool inline) {
+        const string regex = "var subject = 'a'.repeat(40) + '!'; /^(a+)+$/.test(subject)";
+        var options = new HtmlScriptRunOptions { RegexTimeout = TimeSpan.FromMilliseconds(100), MaximumStatements = int.MaxValue };
+        RegexMatchTimeoutException failure = await Assert.ThrowsAsync<RegexMatchTimeoutException>(() =>
+            HtmlScriptRunner.RunAsync<object>(inline ? "<script>" + regex + "</script>" : "<html></html>",
+                inline ? "1" : regex, options, CancellationToken.None));
+        Assert.Equal(options.RegexTimeout, failure.MatchTimeout);
+    }
+
     [Theory]
     [InlineData(true, "page|object|undefined|undefined|undefined")]
     [InlineData(false, "undefined|object|undefined|undefined|undefined")]

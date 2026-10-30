@@ -26383,6 +26383,18 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RegexTimeout</maml:name>
+          <maml:description>
+            <maml:para>Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Script</maml:name>
           <maml:description>
@@ -26478,6 +26490,18 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
           <dev:type>
             <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RegexTimeout</maml:name>
+          <maml:description>
+            <maml:para>Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -26593,6 +26617,18 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>RegexTimeout</maml:name>
+        <maml:description>
+          <maml:para>Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Script</maml:name>
         <maml:description>
@@ -26652,14 +26688,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Invoke-HtmlBrowserDomScript -Content 'Value' -Script 'Value'</dev:code>
-        <dev:remarks>
-          <maml:para></maml:para>
-        </dev:remarks>
-      </command:example>
-      <command:example>
-        <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Invoke-HtmlBrowserDomScript -Path 'C:\Path' -Script 'Value'</dev:code>
+        <dev:code>Invoke-HtmlBrowserDomScript -Content '&lt;p id="value"&gt;Hello&lt;/p&gt;' -Script 'document.getElementById("value").textContent' -Timeout 3000 -RegexTimeout 250 -SkipPageScripts</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

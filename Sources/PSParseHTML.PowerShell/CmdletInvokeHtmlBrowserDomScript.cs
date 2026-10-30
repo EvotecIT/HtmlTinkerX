@@ -8,6 +8,11 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Cmdlet that executes JavaScript against HTML using AngleSharp.Js.
 /// </summary>
+/// <example>
+/// <code>
+/// Invoke-HtmlBrowserDomScript -Content '&lt;p id="value"&gt;Hello&lt;/p&gt;' -Script 'document.getElementById("value").textContent' -Timeout 3000 -RegexTimeout 250 -SkipPageScripts
+/// </code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlBrowserDomScript", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(object))]
 [Alias("Invoke-HtmlDomScript")]
@@ -32,6 +37,11 @@ public sealed class CmdletInvokeHtmlBrowserDomScript : AsyncPSCmdlet {
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
+
+    /// <summary>Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.</summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue - 1)]
+    public int RegexTimeout { get; set; } = HtmlScriptRunOptions.DefaultRegexTimeoutMilliseconds;
 
     /// <summary>Maximum statements per script execution. Defaults to 1000000.</summary>
     [Parameter]
@@ -64,7 +74,8 @@ public sealed class CmdletInvokeHtmlBrowserDomScript : AsyncPSCmdlet {
             : Content;
 
         object? result = await HtmlScriptRunner.RunAsync<object>(html, Script, new HtmlScriptRunOptions {
-            ExecutionTimeout = TimeSpan.FromMilliseconds(Timeout), MaximumStatements = MaximumStatements,
+            ExecutionTimeout = TimeSpan.FromMilliseconds(Timeout), RegexTimeout = TimeSpan.FromMilliseconds(RegexTimeout),
+            MaximumStatements = MaximumStatements,
             MaximumMemoryBytes = MaximumMemoryBytes, MaximumHtmlCharacters = MaximumHtmlCharacters,
             MaximumScriptCharacters = MaximumScriptCharacters, ExecutePageScripts = !SkipPageScripts.IsPresent
         }, CancelToken).ConfigureAwait(false);

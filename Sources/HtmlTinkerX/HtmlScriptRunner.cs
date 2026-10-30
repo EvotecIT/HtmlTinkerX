@@ -8,6 +8,7 @@ using Jint.Constraints;
 using Jint.Runtime;
 using System;
 using System.Runtime.ExceptionServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -60,8 +61,11 @@ public static class HtmlScriptRunner {
         if (policy.ExecutionTimeout != Timeout.InfiniteTimeSpan) operationCancellation.CancelAfter(policy.ExecutionTimeout);
         var deadline = new OperationDeadlineConstraint();
         deadline.Begin(policy.ExecutionTimeout, operationCancellation.Token);
+        TimeSpan regexTimeout = policy.ExecutionTimeout > TimeSpan.Zero && policy.ExecutionTimeout < policy.RegexTimeout
+            ? policy.ExecutionTimeout : policy.RegexTimeout;
         var configuration = Configuration.Default.With(new EngineCreator((window, engineOptions) =>
             new Engine(engineOptions.Constraint(deadline)
+                .RegexTimeoutInterval(regexTimeout)
                 .MaxStatements(policy.MaximumStatements).LimitMemory(policy.MaximumMemoryBytes))));
         // An inert page uses the same native service for the explicitly requested script only.
         var explicitService = policy.ExecutePageScripts ? null : new JsScriptingService();
@@ -77,17 +81,23 @@ public static class HtmlScriptRunner {
         });
 
         try {
-            var document = await context.OpenAsync(request => request.Content(html), operationCancellation.Token)
-                .WaitUntilAvailable().ConfigureAwait(false);
-            Exception? failure = Volatile.Read(ref pageBudgetFailure);
-            if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
-            deadline.Check();
-            object? result = explicitService == null ? document.ExecuteScript(script)
-                : explicitService.EvaluateScript(document, script, "text/javascript", null);
-            failure = Volatile.Read(ref pageBudgetFailure);
-            if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
-            deadline.Check();
-            return result is T value ? value : (T?)Convert.ChangeType(result, typeof(T));
+            try {
+                var document = await context.OpenAsync(request => request.Content(html), operationCancellation.Token)
+                    .WaitUntilAvailable().ConfigureAwait(false);
+                Exception? failure = Volatile.Read(ref pageBudgetFailure);
+                if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
+                deadline.Check();
+                object? result = explicitService == null ? document.ExecuteScript(script)
+                    : explicitService.EvaluateScript(document, script, "text/javascript", null);
+                failure = Volatile.Read(ref pageBudgetFailure);
+                if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
+                deadline.Check();
+                return result is T value ? value : (T?)Convert.ChangeType(result, typeof(T));
+            } catch (RegexMatchTimeoutException) {
+                // Prefer an elapsed operation budget or caller cancellation; otherwise retain the native regex failure.
+                deadline.Check();
+                throw;
+            }
         } catch (OperationCanceledException exception) when (operationCancellation.IsCancellationRequested) {
             if (cancellationToken.IsCancellationRequested) {
                 throw new OperationCanceledException("DOM script execution was canceled.", exception, cancellationToken);
