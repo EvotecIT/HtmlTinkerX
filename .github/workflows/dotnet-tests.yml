@@ -24,7 +24,10 @@ env:
   BUILD_CONFIGURATION: 'Release'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
-  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy'
+  DEBUG: 'pw:api,pw:browser,pw:protocol,pw:proxy,pw:channel:send,pw:channel:recv,pw:fixture'
+  MOZ_LOG: 'timestamp,rotate:20,nsHttp:5,nsHostResolver:5'
+  MOZ_LOG_FILE: ${{ github.workspace }}/TestResults/firefox%PID
+  HTMLTINKERX_TEST_NETLOG_DIRECTORY: ${{ github.workspace }}/TestResults/chromium-netlog
 
 jobs:
   changes:
@@ -58,6 +61,10 @@ jobs:
 
       - name: Build test project for the selected framework
         run: dotnet build Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --framework ${{ matrix.framework }} --no-restore
+
+      - name: Initialize native browser log directories
+        shell: pwsh
+        run: New-Item -ItemType Directory -Path TestResults/chromium-netlog -Force | Out-Null
 
       - name: Run tests for ${{ matrix.framework }}
         shell: pwsh
@@ -115,6 +122,8 @@ jobs:
           path: |
             Sources/HtmlTinkerX.Tests/TestResults/browser-diagnostics/
             Sources/HtmlTinkerX.Tests/TestResults/**/*.dmp
+            TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
 
       - name: Upload coverage reports
@@ -239,7 +248,10 @@ jobs:
         if: failure()
         with:
           name: browser-diagnostics-ubuntu
-          path: TestResults/vstest-*.log
+          path: |
+            TestResults/vstest-*.log
+            TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -326,7 +338,10 @@ jobs:
         if: failure()
         with:
           name: browser-diagnostics-macos
-          path: TestResults/vstest-*.log
+          path: |
+            TestResults/vstest-*.log
+            TestResults/chromium-netlog/*.json
+            TestResults/firefox*.moz_log*
           retention-days: 7
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
