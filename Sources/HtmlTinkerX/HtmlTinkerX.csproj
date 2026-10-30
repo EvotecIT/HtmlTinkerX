@@ -19,7 +19,7 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <OfficeImoVersion>3.5.1</OfficeImoVersion>
-        <ChartForgeXVersion>3.0.0</ChartForgeXVersion>
+        <ChartForgeXVersion>3.0.1</ChartForgeXVersion>
         <ChartForgeXVisualsProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXVisualsProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Visuals\ChartForgeX.Visuals.csproj</ChartForgeXVisualsProjectPath>
         <ChartForgeXStoriesProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXStoriesProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Stories\ChartForgeX.Stories.csproj</ChartForgeXStoriesProjectPath>
     </PropertyGroup>
@@ -28,7 +28,7 @@
         <PackageReference Include="AngleSharp" Version="1.8.5" />
         <PackageReference Include="AngleSharp.Css" Version="1.2.0" />
         <PackageReference Include="AngleSharp.Diffing" Version="1.1.1" />
-        <PackageReference Include="AngleSharp.Io" Version="1.1.0" />
+        <PackageReference Include="AngleSharp.Io" Version="1.2.0" />
         <PackageReference Include="AngleSharp.Js" Version="1.1.1" />
         <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
         <PackageReference Include="Jint" Version="4.17.0" />
