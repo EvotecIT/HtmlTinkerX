@@ -11,6 +11,52 @@ namespace HtmlTinkerX.Tests;
 
 public class HtmlBrowserSessionDisposeTests {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PersistentRecordingSavesVideoWhenClosingTheLastPageDisposesItsArtifact(bool closePageOnDispose) {
+        string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "htmltinkerx-video-last-page-" + Guid.NewGuid().ToString("N"));
+        string output = System.IO.Path.Combine(directory, "recording.webm");
+        System.IO.Directory.CreateDirectory(directory);
+        var finished = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool pageClosed = false, saveStarted = false;
+        var page = new Mock<IPage>();
+        page.SetupGet(value => value.IsClosed).Returns(() => pageClosed);
+        page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>())).Returns(() => {
+            pageClosed = true;
+            if (saveStarted) {
+                System.IO.File.WriteAllText(output, "finalized recording");
+                finished.TrySetResult(true);
+            }
+            return Task.CompletedTask;
+        });
+        var video = new Mock<IVideo>();
+        video.Setup(value => value.SaveAsAsync(output)).Returns(() => {
+            if (pageClosed) return Task.FromException(new PlaywrightException("Target page, context or browser has been closed"));
+            saveStarted = true;
+            return finished.Task;
+        });
+        video.Setup(value => value.PathAsync()).ReturnsAsync(output);
+        var context = new Mock<IBrowserContext>();
+        context.Setup(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(Task.CompletedTask);
+        var playwright = new Mock<IPlaywright>();
+        var session = new HtmlBrowserSession(playwright.Object, null, context.Object, page.Object, video.Object, output,
+            userDataDirectory: System.IO.Path.Combine(directory, "profile"), closeBrowserOnDispose: false,
+            closePageOnDispose: closePageOnDispose);
+        try {
+            Task dispose = session.DisposeAsync().AsTask();
+            Assert.Same(dispose, await Task.WhenAny(dispose, Task.Delay(5000)));
+            await dispose;
+            Assert.Equal("finalized recording", System.IO.File.ReadAllText(output));
+            context.Verify(value => value.CloseAsync(It.IsAny<BrowserContextCloseOptions>()), Times.Once);
+            playwright.Verify(value => value.Dispose(), Times.Once);
+        } finally {
+            finished.TrySetCanceled();
+            if (System.IO.File.Exists(output)) System.IO.File.Delete(output);
+            System.IO.Directory.Delete(directory);
+        }
+    }
+
+    [Theory]
     [InlineData(true, false)]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -26,7 +72,13 @@ public class HtmlBrowserSessionDisposeTests {
         var page = new Mock<IPage>();
         page.SetupGet(value => value.IsClosed).Returns(() => pageClosed);
         page.Setup(value => value.CloseAsync(It.IsAny<PageCloseOptions>()))
-            .Callback(() => pageClosed = pageClosedDespiteError).ThrowsAsync(pageFailure);
+            .Callback(() => {
+                pageClosed = pageClosedDespiteError;
+                if (pageClosed && saveStarted) {
+                    System.IO.File.WriteAllText(output, "finalized recording");
+                    finished.TrySetResult(true);
+                }
+            }).ThrowsAsync(pageFailure);
         var video = new Mock<IVideo>();
         video.Setup(value => value.SaveAsAsync(output)).Returns(() => {
             Assert.False(contextCloseStarted);

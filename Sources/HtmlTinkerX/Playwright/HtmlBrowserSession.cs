@@ -353,7 +353,8 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
         List<Exception> errors = new();
         if (NetworkPolicyLifetime is HtmlBrowserSessionNetworkPolicyLifetime policyLifetime) policyLifetime.Cancel();
         bool browserAttempted = false;
-        if (!_pageClosed && _closePageOnDispose && Page != null && !Page.IsClosed) {
+        bool saveBeforeContext = IsPersistent && _closeContextOnDispose && Video != null && !string.IsNullOrEmpty(VideoPath);
+        if (!saveBeforeContext && !_pageClosed && _closePageOnDispose && Page != null && !Page.IsClosed) {
             try {
                 await Page.CloseAsync().ConfigureAwait(false);
                 _pageClosed = true;
@@ -365,19 +366,18 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
             }
         }
 
-        // Closing a persistent context can disconnect its driver. Finalize and save its page's video first.
-        bool saveBeforeContext = IsPersistent && _closeContextOnDispose && Video != null && !string.IsNullOrEmpty(VideoPath);
+        // Closing the last persistent page can also close Firefox and dispose its video artifact.
+        // Register the save before page closure, then let that closure finalize the recording.
         Task<Exception?>? pendingPersistentVideoSave = null;
         if (saveBeforeContext && !_videoSaved && Page != null) {
+            Task<Exception?> save = SaveVideoAsync();
             bool pageClosed = Page.IsClosed;
             try {
                 if (!pageClosed) await Page.CloseAsync().ConfigureAwait(false);
                 _pageClosed = true;
                 pageClosed = true;
             } catch (Exception ex) { errors.Add(ex); }
-            // Start the save while the driver is connected even if page closure failed.
             // If the page stayed open, context closure must be allowed to finish its recording.
-            Task<Exception?> save = SaveVideoAsync();
             if (pageClosed || Page.IsClosed) {
                 Exception? failure = await save.ConfigureAwait(false);
                 if (failure != null) errors.Add(failure);
