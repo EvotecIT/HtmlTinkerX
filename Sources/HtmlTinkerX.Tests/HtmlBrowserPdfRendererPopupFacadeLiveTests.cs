@@ -170,7 +170,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 750),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true,
+                function: $@"async () => {{
+                    const status = await (await fetch('{server.BlankPopupStatusUrl}')).json();
+                    return status.requests >= 9 && status.popupObserved &&
+                        ['mutation-ordered-base', 'attribute-after-value', 'attribute-after-nodeValue', 'attribute-after-textContent']
+                            .every(source => status.sources[source] >= 1);
+                }}", timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 
@@ -304,7 +310,9 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
 
         await renderer.CaptureAsync(new HtmlBrowserPdfRequest(
             HtmlBrowserPdfSource.FromUrl(server.HeaderUrl),
-            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true, delayMilliseconds: 1000),
+            readiness: new HtmlBrowserPdfReadiness(skipLoadState: true,
+                function: $@"async () => (await (await fetch('{server.BlankPopupStatusUrl}')).json()).requests >= 3",
+                timeout: 10000),
             headers: new Dictionary<string, string> { ["X-Render-Token"] = "popup-token" },
             beforeCaptureScript: script));
 

@@ -79,6 +79,7 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         internal string? LastRedirectToken => Volatile.Read(ref _lastRedirectToken);
         internal int RedirectRequestCount => Volatile.Read(ref _redirectRequestCount);
         internal string BlankPopupResourceUrl { get; }
+        internal string BlankPopupStatusUrl => HeaderUrl.Replace("/header-main", "/blank-popup-status");
         internal string NestedPopupUrl { get; }
         internal string NoOpenerHeaderUrl { get; }
         internal string StorageUrl { get; }
@@ -164,6 +165,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
                         body = LastPopupToken == "popup-token" && LastProtectedToken == "popup-token"
                             ? "nested popup authorized"
                             : "pending";
+                    } else if (requestTarget.StartsWith("/blank-popup-status", StringComparison.Ordinal)) {
+                        contentType = "application/json; charset=utf-8";
+                        body = System.Text.Json.JsonSerializer.Serialize(new {
+                            requests = BlankPopupResourceRequests,
+                            popupObserved = LastPopupToken != null,
+                            sources = _blankPopupSources.ToDictionary(entry => entry.Key, entry => entry.Value.Count)
+                        });
                     } else if (requestTarget.StartsWith("/nested-main", StringComparison.Ordinal)) {
                         body = "<p id='result'>pending</p><script>const poll = () => fetch('/nested-status').then(response => response.text()).then(text => { document.querySelector('#result').textContent = text; setTimeout(poll, 20); }); poll();</script>";
                     } else if (requestTarget.StartsWith("/header-popup-noopener", StringComparison.Ordinal)) {

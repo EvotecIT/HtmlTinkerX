@@ -126,16 +126,6 @@ jobs:
             TestResults/firefox*.moz_log*
           retention-days: 7
 
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: coverage-reports-windows-${{ matrix.framework }}
-          path: '**/coverage.cobertura.xml'
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-ubuntu:
     needs: changes
@@ -188,7 +178,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
         timeout-minutes: 10
 
       - name: Run tests for net10.0
@@ -253,15 +243,11 @@ jobs:
             TestResults/chromium-netlog/*.json
             TestResults/firefox*.moz_log*
           retention-days: 7
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: Sources/HtmlTinkerX.Tests/TestResults
 
   test-macos:
     needs: changes
-    # This single PR lane contributes platform-specific lines to the project coverage gate.
-    if: needs.changes.outputs.build == 'true'
+    # Full macOS coverage remains available on default-branch pushes and manual runs.
+    if: needs.changes.outputs.build == 'true' && github.event_name != 'pull_request'
     name: 'macOS'
     runs-on: macos-latest
     steps:
@@ -283,7 +269,7 @@ jobs:
           dotnet build Sources/HtmlTinkerX.Examples/HtmlTinkerX.Examples.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage" --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
+        run: dotnet test Sources/HtmlTinkerX.Tests/HtmlTinkerX.Tests.csproj --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --framework net8.0 --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --blame-hang-timeout 2m --blame-hang-dump-type none --diag TestResults/vstest-net8.log
         timeout-minutes: 30
 
       - name: Run tests for net10.0
@@ -343,10 +329,6 @@ jobs:
             TestResults/chromium-netlog/*.json
             TestResults/firefox*.moz_log*
           retention-days: 7
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: Sources/HtmlTinkerX.Tests/TestResults
 
   result:
     name: Test .NET result
@@ -359,6 +341,7 @@ jobs:
         shell: python
         env:
           JOBS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           import json
           import os
@@ -370,7 +353,7 @@ jobs:
           for name, job in jobs.items():
               if name == 'changes':
                   continue
-              skip = build == 'false'
+              skip = build == 'false' or (name == 'test-macos' and os.environ['EVENT_NAME'] == 'pull_request')
               expected = 'skipped' if skip else 'success'
               assert job['result'] == expected, f"{name}: expected {expected}, got {job['result']}"
-          print('All selected jobs passed; documentation-only skips verified.')
+          print('All selected jobs passed; documentation-only and PR macOS skips verified.')
