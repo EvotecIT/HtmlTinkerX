@@ -1,0 +1,59 @@
+name: Select test coverage
+
+on:
+  workflow_call:
+    outputs:
+      build:
+        description: Whether the build and test jobs are needed
+        value: ${{ jobs.changes.outputs.build }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.paths.outputs.build }}
+    steps:
+      - name: Checkout PR history
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Select build coverage
+        id: paths
+        shell: python
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          import os
+          import subprocess
+
+          build = True
+          if os.environ['EVENT_NAME'] == 'pull_request':
+              paths = subprocess.check_output([
+                  'git', 'diff', '--name-only', '--no-renames', '-z',
+                  os.environ['BASE_SHA'] + '...' + os.environ['HEAD_SHA'],
+              ]).decode('utf-8').split('\0')
+              paths = [path for path in paths if path]
+
+              def documentation(path):
+                  # Docs contains generated command help consumed by packaging.
+                  # Sources, Examples, schemas and fixtures always need the full tests.
+                  return (
+                      ('/' not in path and path.lower().endswith('.md'))
+                      or (path.startswith('Guides/') and path.lower().endswith('.md'))
+                      or path in ('Docs/BrowserCache.md', 'Docs/Dependencies.md')
+                  )
+
+              build = not paths or not all(documentation(path) for path in paths)
+              print('Changed paths:', *paths, sep='\n')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('build=' + str(build).lower() + '\n')
+          print('Build and test jobs required:', build)

@@ -6,7 +6,8 @@ updates:
   - /Sources/HtmlTinkerX.Tests
   - /Sources/PSParseHTML.PowerShell
   schedule:
-    interval: daily
+    interval: weekly
+    day: monday
   cooldown:
     default-days: 7
     include:
@@ -19,7 +20,8 @@ updates:
 - package-ecosystem: github-actions
   directory: /
   schedule:
-    interval: daily
+    interval: weekly
+    day: monday
   cooldown:
     default-days: 7
     include:
