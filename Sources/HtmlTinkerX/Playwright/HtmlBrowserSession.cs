@@ -376,6 +376,9 @@ public sealed class HtmlBrowserSession : IAsyncDisposable {
                 if (!pageClosed) await Page.CloseAsync().ConfigureAwait(false);
                 _pageClosed = true;
                 pageClosed = true;
+            } catch (PlaywrightException) when (_closePageOnDispose && Page.IsClosed) {
+                _pageClosed = true;
+                pageClosed = true;
             } catch (Exception ex) { errors.Add(ex); }
             // If the page stayed open, context closure must be allowed to finish its recording.
             if (pageClosed || Page.IsClosed) {

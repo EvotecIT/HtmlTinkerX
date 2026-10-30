@@ -57,10 +57,12 @@ public class HtmlBrowserSessionDisposeTests {
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    public async Task PersistentRecordingAttemptsSaveBeforeContextCloseAfterPageCloseFailure(bool pageClosedDespiteError, bool contextFails) {
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, false, true)]
+    public async Task PersistentRecordingAttemptsSaveBeforeContextCloseAfterPageCloseFailure(bool pageClosedDespiteError, bool contextFails, bool closePageOnDispose) {
         string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "htmltinkerx-video-close-" + Guid.NewGuid().ToString("N"));
         string output = System.IO.Path.Combine(directory, "recording.webm");
         System.IO.Directory.CreateDirectory(directory);
@@ -104,13 +106,16 @@ public class HtmlBrowserSessionDisposeTests {
             if (contextFails && saveStarted) finished.TrySetException(videoFailure);
         });
         var session = new HtmlBrowserSession(playwright.Object, null, context.Object, page.Object, video.Object, output,
-            userDataDirectory: System.IO.Path.Combine(directory, "profile"), closeBrowserOnDispose: false);
+            userDataDirectory: System.IO.Path.Combine(directory, "profile"), closeBrowserOnDispose: false,
+            closePageOnDispose: closePageOnDispose);
         try {
             Task dispose = session.DisposeAsync().AsTask();
             Assert.Same(dispose, await Task.WhenAny(dispose, Task.Delay(5000)));
             Exception? failure = await Record.ExceptionAsync(() => dispose);
-            Assert.NotNull(failure);
-            if (contextFails) {
+            if (closePageOnDispose && pageClosedDespiteError && !contextFails) {
+                Assert.Null(failure);
+                Assert.Equal("finalized recording", System.IO.File.ReadAllText(output));
+            } else if (contextFails) {
                 var aggregate = Assert.IsType<AggregateException>(failure);
                 Assert.Contains(pageFailure, aggregate.InnerExceptions);
                 Assert.Contains(contextFailure, aggregate.InnerExceptions);
