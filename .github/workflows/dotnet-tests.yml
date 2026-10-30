@@ -248,7 +248,8 @@ jobs:
 
   test-macos:
     needs: changes
-    if: needs.changes.outputs.build == 'true' && github.event_name != 'pull_request'
+    # This single PR lane contributes platform-specific lines to the project coverage gate.
+    if: needs.changes.outputs.build == 'true'
     name: 'macOS'
     runs-on: macos-latest
     steps:
@@ -343,7 +344,6 @@ jobs:
         shell: python
         env:
           JOBS: ${{ toJSON(needs) }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
           import json
           import os
@@ -355,7 +355,7 @@ jobs:
           for name, job in jobs.items():
               if name == 'changes':
                   continue
-              skip = build == 'false' or (name == 'test-macos' and os.environ['EVENT_NAME'] == 'pull_request')
+              skip = build == 'false'
               expected = 'skipped' if skip else 'success'
               assert job['result'] == expected, f"{name}: expected {expected}, got {job['result']}"
-          print('All selected jobs passed; documentation-only and PR macOS skips verified.')
+          print('All selected jobs passed; documentation-only skips verified.')
