@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace HtmlTinkerX.Tests;
@@ -210,6 +211,34 @@ public sealed partial class HtmlBrowserCacheResilienceTests {
         Assert.True(Directory.Exists(previous));
         Assert.Equal(2, fixture.Installs);
     }
+
+    [Fact]
+    public async Task WindowsPublicationWaitsForReleasedDirectoryHandleAndReusesGeneration() {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+        using var fixture = new CacheFixture();
+        SafeFileHandle? lease = null;
+        Task release = Task.CompletedTask;
+        HtmlBrowser.CacheSmokeTest = (slot, _) => {
+            lease = OpenPromotionDirectory(slot, 1, (uint)(FileShare.Read | FileShare.Write), IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+            if (lease.IsInvalid) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            release = Task.Run(async () => { await Task.Delay(TimeSpan.FromSeconds(8)); lease.Dispose(); });
+            return Task.CompletedTask;
+        };
+        try {
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            string generation = HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Chromium);
+            Assert.True(HtmlBrowser.VerifyCacheSlot(generation, true, out _));
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Chromium);
+            Assert.Equal(generation, HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Chromium));
+            Assert.Equal(1, fixture.Installs);
+        } finally {
+            lease?.Dispose();
+            await release;
+        }
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle OpenPromotionDirectory(string path, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);
 
     [Fact]
     public async Task AtomicPublicationHidesStagingUntilSmokeSucceeds() {
