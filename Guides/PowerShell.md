@@ -46,7 +46,7 @@
 - **Close-HtmlBrowserSession** - Dispose browser sessions
 - **Invoke-HtmlBrowserNavigation** - Navigate to different URLs
 - **Invoke-HtmlBrowserScript** - Execute JavaScript in browser context
-- **Invoke-HtmlBrowserDomScript** - Run JavaScript with AngleSharp (no browser required)
+- **Invoke-HtmlBrowserDomScript** - Run JavaScript with AngleSharp (no browser required). `-Timeout` bounds the whole operation, while `-RegexTimeout` bounds one native regex match and cancellation latency during it; both use milliseconds and default to 10000 and 1000. `-SkipPageScripts` evaluates only the requested script.
 - **Invoke-HtmlBrowserClick** - Click elements in the browser
 - **Get-HtmlBrowserInteractable** - List clickable elements
 - **Set-HtmlBrowserInput** - Set input field values

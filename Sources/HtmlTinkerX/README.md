@@ -49,6 +49,24 @@ directories that do not exist yet. On a case-sensitive Mac volume, use storage
 names that differ by more than casing; case-only differences are conservatively
 treated as overlapping. Linux comparisons remain case-sensitive.
 
+## Run DOM scripts with bounded execution
+
+`HtmlScriptRunner` evaluates JavaScript against an owned AngleSharp document. The default overload does not register network services. Use an explicit caller-owned browsing context when those services are needed; that overload retains the caller's policy and lifetime.
+
+```csharp
+string? value = await HtmlScriptRunner.RunAsync<string>(
+    "<p id='value'>Hello</p>",
+    "document.getElementById('value').textContent",
+    new HtmlScriptRunOptions {
+        ExecutionTimeout = TimeSpan.FromSeconds(3),
+        RegexTimeout = TimeSpan.FromMilliseconds(250),
+        ExecutePageScripts = false
+    },
+    cancellationToken);
+```
+
+The default limits are ten seconds for the operation, one second per native regex match, one million statements and 64 MiB of Jint-managed allocations per execution, 16 Mi characters of HTML, and 1 Mi characters of requested script. The allocation limit does not cover the DOM or process memory. A native regex match can delay cancellation until its regex timeout; the operation deadline is checked again when it returns. A regex timeout raised before the operation deadline remains a `RegexMatchTimeoutException`.
+
 ## Read a page as objects
 
 `HtmlPageReader` uses the canonical `OfficeIMO.Html` semantic document and adds

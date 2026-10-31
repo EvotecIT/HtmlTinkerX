@@ -34,6 +34,8 @@ public sealed class SnapshotTestServer : IDisposable {
     private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
     private Task acceptLoop;
     private int assetRequestCount;
+    private readonly List<TcpClient> clients = new List<TcpClient>();
+    private readonly List<Task> requests = new List<Task>();
 
     public SnapshotTestServer(int port) {
         this.externalScriptPort = 0;
@@ -70,7 +72,15 @@ public sealed class SnapshotTestServer : IDisposable {
                 break;
             }
 
-            await HandleClientAsync(client).ConfigureAwait(false);
+            // Browsers can preconnect without sending a request. Keep accepting navigation connections.
+            lock (clients) {
+                if (token.IsCancellationRequested) {
+                    client.Dispose();
+                    break;
+                }
+                clients.Add(client);
+                requests.Add(HandleClientAsync(client));
+            }
         }
     }
 
@@ -119,7 +129,7 @@ public sealed class SnapshotTestServer : IDisposable {
                     await WriteResponseAsync(
                         stream,
                         "text/html",
-                        "<!doctype html><html><head><script src=\"/assets/challenge.js\"></script></head><body><main>form snapshot</main></body></html>",
+                        "<!doctype html><html><head><script async src=\"/assets/challenge.js\"></script></head><body><main>form snapshot</main></body></html>",
                         null).ConfigureAwait(false);
                     return;
                 }
@@ -203,10 +213,16 @@ public sealed class SnapshotTestServer : IDisposable {
     public void Dispose() {
         cancellation.Cancel();
         listener.Stop();
+        Task[] pending;
+        lock (clients) {
+            foreach (TcpClient client in clients) client.Dispose();
+            pending = requests.ToArray();
+        }
         try {
             if (acceptLoop != null) {
                 acceptLoop.Wait(TimeSpan.FromSeconds(2));
             }
+            Task.WhenAll(pending).Wait(TimeSpan.FromSeconds(2));
         } catch {
         }
         cancellation.Dispose();
@@ -832,6 +848,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 -IncludeLinkedScripts
 
             $snapshot.Content | Should -Be 'form snapshot'
+            $denied = @($snapshot.LinkedJavaScriptEndpoints | Where-Object ScriptUrl -Like '*/assets/challenge.js')
+            $denied.Count | Should -Be 1
+            $denied[0].IsDownloaded | Should -BeFalse
+            $denied[0].Error | Should -Not -BeNullOrEmpty
             $snapshot.LinkedJavaScriptEndpoints.Url | Should -Not -Contain '/api/leaked'
         } finally {
             $server.Dispose()
