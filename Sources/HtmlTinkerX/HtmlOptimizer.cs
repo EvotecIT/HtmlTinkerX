@@ -43,13 +43,15 @@ public static class HtmlOptimizer {
             throw new ArgumentNullException(nameof(css));
         }
 
+        var protection = CssMathProtection.Create(css, out string protectedCss);
         var settings = new NUglify.Css.CssSettings { DecodeEscapes = false };
-        var result = NUglify.Uglify.Css(css, settings);
+        var result = NUglify.Uglify.Css(protectedCss, settings);
         if (result.HasErrors) {
             string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
             LoggingMessages.Logger.WriteWarning($"OptimizeCss -Errors: {errors}");
+            return css;
         }
-        return result.Code ?? string.Empty;
+        return result.Code != null && protection.TryRestore(result.Code, out string restored) ? restored : css;
     }
 
     /// <summary>
@@ -129,8 +131,15 @@ public static class HtmlOptimizer {
         bool hasMotw =
             html.IndexOf("<!-- saved from url=(0014)about:internet -->", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        UglifyResult result = Uglify.Html(html, effectiveSettings);
-        string output = result.Code ?? string.Empty;
+        string? output = HtmlCssOptimization.Optimize(html, effectiveSettings);
+        if (output == null) {
+            // Continue to honor HTML transformations when a protected CSS span
+            // cannot be restored, while leaving embedded CSS untouched.
+            effectiveSettings.MinifyCss = false;
+            effectiveSettings.MinifyCssAttributes = false;
+            effectiveSettings.PrettyPrint = false;
+            output = Uglify.Html(html, effectiveSettings).Code ?? string.Empty;
+        }
         output = ShortenBooleanAttributesIfRequested(output, effectiveSettings);
 
         if (hasMotw) {
