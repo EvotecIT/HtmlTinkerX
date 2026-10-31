@@ -34,6 +34,8 @@ public sealed class SnapshotTestServer : IDisposable {
     private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
     private Task acceptLoop;
     private int assetRequestCount;
+    private readonly List<TcpClient> clients = new List<TcpClient>();
+    private readonly List<Task> requests = new List<Task>();
 
     public SnapshotTestServer(int port) {
         this.externalScriptPort = 0;
@@ -70,7 +72,15 @@ public sealed class SnapshotTestServer : IDisposable {
                 break;
             }
 
-            await HandleClientAsync(client).ConfigureAwait(false);
+            // Browsers can preconnect without sending a request. Keep accepting navigation connections.
+            lock (clients) {
+                if (token.IsCancellationRequested) {
+                    client.Dispose();
+                    break;
+                }
+                clients.Add(client);
+                requests.Add(HandleClientAsync(client));
+            }
         }
     }
 
@@ -203,10 +213,16 @@ public sealed class SnapshotTestServer : IDisposable {
     public void Dispose() {
         cancellation.Cancel();
         listener.Stop();
+        Task[] pending;
+        lock (clients) {
+            foreach (TcpClient client in clients) client.Dispose();
+            pending = requests.ToArray();
+        }
         try {
             if (acceptLoop != null) {
                 acceptLoop.Wait(TimeSpan.FromSeconds(2));
             }
+            Task.WhenAll(pending).Wait(TimeSpan.FromSeconds(2));
         } catch {
         }
         cancellation.Dispose();
