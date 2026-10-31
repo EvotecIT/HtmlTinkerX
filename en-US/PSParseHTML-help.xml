@@ -26345,19 +26345,19 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>16777216</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumMemoryBytes</maml:name>
           <maml:description>
-            <maml:para>Maximum managed bytes allocated by each script execution. This does not bound the DOM or process memory.</maml:para>
+            <maml:para>Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
             <maml:name>Int64</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>([System.Int64]67108864)</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumScriptCharacters</maml:name>
@@ -26369,7 +26369,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1048576</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumStatements</maml:name>
@@ -26381,7 +26381,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1000000</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RegexTimeout</maml:name>
@@ -26393,7 +26393,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1000</dev:defaultValue>
         </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Script</maml:name>
@@ -26429,7 +26429,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>10000</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Path">
@@ -26444,19 +26444,19 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>16777216</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumMemoryBytes</maml:name>
           <maml:description>
-            <maml:para>Maximum managed bytes allocated by each script execution. This does not bound the DOM or process memory.</maml:para>
+            <maml:para>Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
             <maml:name>Int64</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>([System.Int64]67108864)</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumScriptCharacters</maml:name>
@@ -26468,7 +26468,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1048576</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MaximumStatements</maml:name>
@@ -26480,7 +26480,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1000000</dev:defaultValue>
         </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="File">
           <maml:name>Path</maml:name>
@@ -26504,7 +26504,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>1000</dev:defaultValue>
         </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Script</maml:name>
@@ -26540,7 +26540,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
             <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
+          <dev:defaultValue>10000</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
     </command:syntax>
@@ -26567,19 +26567,19 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>16777216</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaximumMemoryBytes</maml:name>
         <maml:description>
-          <maml:para>Maximum managed bytes allocated by each script execution. This does not bound the DOM or process memory.</maml:para>
+          <maml:para>Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
         <dev:type>
           <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>([System.Int64]67108864)</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaximumScriptCharacters</maml:name>
@@ -26591,7 +26591,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>1048576</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MaximumStatements</maml:name>
@@ -26603,7 +26603,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>1000000</dev:defaultValue>
       </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="File">
         <maml:name>Path</maml:name>
@@ -26627,7 +26627,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>1000</dev:defaultValue>
       </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Script</maml:name>
@@ -26663,7 +26663,7 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
           <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
-        <dev:defaultValue>None</dev:defaultValue>
+        <dev:defaultValue>10000</dev:defaultValue>
       </command:parameter>
     </command:parameters>
     <command:inputTypes>

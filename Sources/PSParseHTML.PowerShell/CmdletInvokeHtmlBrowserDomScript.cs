@@ -35,31 +35,37 @@ public sealed class CmdletInvokeHtmlBrowserDomScript : AsyncPSCmdlet {
 
     /// <summary>Whole DOM execution timeout in milliseconds, including inline page scripts. Defaults to 10000.</summary>
     [Parameter]
+    [PSDefaultValue(Value = 10000)]
     [ValidateRange(1, int.MaxValue)]
     public int Timeout { get; set; } = 10000;
 
     /// <summary>Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.</summary>
     [Parameter]
+    [PSDefaultValue(Value = HtmlScriptRunOptions.DefaultRegexTimeoutMilliseconds)]
     [ValidateRange(1, int.MaxValue - 1)]
     public int RegexTimeout { get; set; } = HtmlScriptRunOptions.DefaultRegexTimeoutMilliseconds;
 
     /// <summary>Maximum statements per script execution. Defaults to 1000000.</summary>
     [Parameter]
+    [PSDefaultValue(Value = HtmlScriptRunOptions.DefaultMaximumStatements)]
     [ValidateRange(1, int.MaxValue)]
     public int MaximumStatements { get; set; } = HtmlScriptRunOptions.DefaultMaximumStatements;
 
-    /// <summary>Maximum managed bytes allocated by each script execution. This does not bound the DOM or process memory.</summary>
+    /// <summary>Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.</summary>
     [Parameter]
+    [PSDefaultValue(Value = HtmlScriptRunOptions.DefaultMaximumMemoryBytes)]
     [ValidateRange(1L, long.MaxValue)]
     public long MaximumMemoryBytes { get; set; } = HtmlScriptRunOptions.DefaultMaximumMemoryBytes;
 
     /// <summary>Maximum decoded HTML input length, including file input. Defaults to 16777216 characters.</summary>
     [Parameter]
+    [PSDefaultValue(Value = HtmlScriptRunOptions.DefaultMaximumHtmlCharacters)]
     [ValidateRange(1, int.MaxValue)]
     public int MaximumHtmlCharacters { get; set; } = HtmlScriptRunOptions.DefaultMaximumHtmlCharacters;
 
     /// <summary>Maximum requested script length. Defaults to 1048576 characters.</summary>
     [Parameter]
+    [PSDefaultValue(Value = HtmlScriptRunOptions.DefaultMaximumScriptCharacters)]
     [ValidateRange(1, int.MaxValue)]
     public int MaximumScriptCharacters { get; set; } = HtmlScriptRunOptions.DefaultMaximumScriptCharacters;
 

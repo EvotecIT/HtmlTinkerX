@@ -59,13 +59,13 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: 16777216
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -MaximumMemoryBytes
-Maximum managed bytes allocated by each script execution. This does not bound the DOM or process memory.
+Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.
 
 ```yaml
 Type: Int64
@@ -75,7 +75,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: ([System.Int64]67108864)
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -91,7 +91,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: 1048576
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -107,7 +107,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: 1000000
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -139,7 +139,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: 1000
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -187,7 +187,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: None
+Default value: 10000
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
