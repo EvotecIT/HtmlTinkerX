@@ -61,8 +61,8 @@ public static class HtmlScriptRunner {
         if (policy.ExecutionTimeout != Timeout.InfiniteTimeSpan) operationCancellation.CancelAfter(policy.ExecutionTimeout);
         var deadline = new OperationDeadlineConstraint();
         deadline.Begin(policy.ExecutionTimeout, operationCancellation.Token);
-        TimeSpan regexTimeout = policy.ExecutionTimeout > TimeSpan.Zero && policy.ExecutionTimeout < policy.RegexTimeout
-            ? policy.ExecutionTimeout : policy.RegexTimeout;
+        bool regexUsesOperationTimeout = policy.ExecutionTimeout > TimeSpan.Zero && policy.ExecutionTimeout <= policy.RegexTimeout;
+        TimeSpan regexTimeout = regexUsesOperationTimeout ? policy.ExecutionTimeout : policy.RegexTimeout;
         var configuration = Configuration.Default.With(new EngineCreator((window, engineOptions) =>
             new Engine(engineOptions.Constraint(deadline)
                 .RegexTimeoutInterval(regexTimeout)
@@ -93,9 +93,13 @@ public static class HtmlScriptRunner {
                 if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
                 deadline.Check();
                 return result is T value ? value : (T?)Convert.ChangeType(result, typeof(T));
-            } catch (RegexMatchTimeoutException) {
-                // Prefer an elapsed operation budget or caller cancellation; otherwise retain the native regex failure.
+            } catch (RegexMatchTimeoutException exception) {
+                // Cancellation wins. A match capped by the operation policy still represents that
+                // timeout when the native regex clock reaches its limit before the deadline clock.
                 deadline.Check();
+                if (regexUsesOperationTimeout && exception.MatchTimeout == regexTimeout) {
+                    throw new TimeoutException("DOM script execution exceeded its operation timeout.", exception);
+                }
                 throw;
             }
         } catch (OperationCanceledException exception) when (operationCancellation.IsCancellationRequested) {
