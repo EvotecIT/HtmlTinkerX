@@ -129,7 +129,7 @@ public sealed class SnapshotTestServer : IDisposable {
                     await WriteResponseAsync(
                         stream,
                         "text/html",
-                        "<!doctype html><html><head><script src=\"/assets/challenge.js\"></script></head><body><main>form snapshot</main></body></html>",
+                        "<!doctype html><html><head><script async src=\"/assets/challenge.js\"></script></head><body><main>form snapshot</main></body></html>",
                         null).ConfigureAwait(false);
                     return;
                 }
@@ -848,6 +848,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 -IncludeLinkedScripts
 
             $snapshot.Content | Should -Be 'form snapshot'
+            $denied = @($snapshot.LinkedJavaScriptEndpoints | Where-Object ScriptUrl -Like '*/assets/challenge.js')
+            $denied.Count | Should -Be 1
+            $denied[0].IsDownloaded | Should -BeFalse
+            $denied[0].Error | Should -Not -BeNullOrEmpty
             $snapshot.LinkedJavaScriptEndpoints.Url | Should -Not -Contain '/api/leaked'
         } finally {
             $server.Dispose()
