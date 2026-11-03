@@ -62,7 +62,7 @@ public sealed class HtmlCrawlResult {
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
 
     /// <summary>Controls whether low-value metadata inside repeated listing cards is preserved or suppressed in markdown output.</summary>
-    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+    public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Manifest path used when crawl artifacts were persisted.</summary>
     public string? ManifestPath { get; set; }

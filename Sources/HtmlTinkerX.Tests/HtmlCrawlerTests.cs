@@ -52,7 +52,7 @@ public partial class HtmlCrawlerTests {
         clone.DismissTexts.Add("Dismiss");
         clone.MarkdownImageMode = OfficeIMO.Markdown.MarkdownImageRenderingMode.Html;
         clone.HiddenContentMode = HtmlCrawlHiddenContentMode.IncludeHidden;
-        clone.ListingCardMetadataMode = OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.Preserve;
+        clone.ListingCardMetadataMode = OfficeIMO.Markdown.Html.MarkdownHtmlListingCardMetadataMode.Preserve;
         clone.ClearSensitiveData();
 
         Assert.Equal("secret", options.Password);
@@ -79,10 +79,10 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(2, clone.MaxConcurrentPageRequestsPerOrigin);
         Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown, options.MarkdownImageMode);
         Assert.Equal(HtmlCrawlHiddenContentMode.RespectHidden, options.HiddenContentMode);
-        Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards, options.ListingCardMetadataMode);
+        Assert.Equal(OfficeIMO.Markdown.Html.MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards, options.ListingCardMetadataMode);
         Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.Html, clone.MarkdownImageMode);
         Assert.Equal(HtmlCrawlHiddenContentMode.IncludeHidden, clone.HiddenContentMode);
-        Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.Preserve, clone.ListingCardMetadataMode);
+        Assert.Equal(OfficeIMO.Markdown.Html.MarkdownHtmlListingCardMetadataMode.Preserve, clone.ListingCardMetadataMode);
         Assert.NotSame(options.FormLogin, clone.FormLogin);
         Assert.Same(options.RenderedPageObserver, clone.RenderedPageObserver);
 

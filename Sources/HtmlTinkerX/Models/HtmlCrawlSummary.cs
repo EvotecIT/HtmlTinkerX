@@ -246,7 +246,7 @@ public sealed class HtmlCrawlSummary {
     public MarkdownImageRenderingMode MarkdownImageMode { get; set; } = MarkdownImageRenderingMode.PortableMarkdown;
 
     /// <summary>Controls whether low-value metadata inside repeated listing cards is preserved or suppressed in markdown output.</summary>
-    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+    public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Optional crawl guidance notes derived from the run configuration and observed behavior.</summary>
     public IList<string> GuidanceNotes { get; set; } = new List<string>();
@@ -429,7 +429,7 @@ public sealed class HtmlCrawlSummary {
             summary.GuidanceNotes.Add("Markdown images used portable output. Image size hints stay in HTML/manifests unless a richer markdown mode is selected.");
         }
 
-        if (summary.ListingCardMetadataMode == HtmlListingCardMetadataMode.SuppressInRepeatedCards) {
+        if (summary.ListingCardMetadataMode == MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards) {
             summary.GuidanceNotes.Add("Repeated listing-card chrome like date/time/byline/read-more blocks was suppressed in markdown output. Switch the listing-card metadata mode to Preserve when you want raw teaser metadata retained.");
         }
 

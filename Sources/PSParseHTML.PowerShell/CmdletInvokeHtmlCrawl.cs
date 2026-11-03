@@ -429,7 +429,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
 
     /// <summary>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.</summary>
     [Parameter]
-    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+    public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Include structured JSON-friendly data extracted from each crawled page.</summary>
     [Parameter]

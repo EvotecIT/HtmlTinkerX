@@ -125,7 +125,7 @@
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>This helper tries common visible buttons and selectors such as Accept, I agree, Got it, and Close.&#xD;
+      <maml:para>This helper tries common visible buttons and selectors such as Accept, I agree, Got it, and Close.
 It is intended to remove extraction-blocking overlays in legitimate workflows, not to bypass access controls.</maml:para>
     </maml:description>
     <command:syntax>
@@ -253,8 +253,8 @@ It is intended to remove extraction-blocking overlays in legitimate workflows, n
     <command:examples>
       <command:example>
         <maml:title>Dismiss a cookie banner before reading content</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/article&#xD;
-Close-HtmlBrowserOverlay -Session $session&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/article
+Close-HtmlBrowserOverlay -Session $session
 Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -1378,9 +1378,9 @@ Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Return a JSON response from a route handler</maml:title>
-        <dev:code>Register-HtmlRoute -Session $session -Pattern '**/api/data' -ScriptBlock {&#xD;
-                param($route)&#xD;
-                Complete-HtmlRoute -Route $route -Status 200 -ContentType 'application/json' -Body '{"status":"ok"}'&#xD;
+        <dev:code>Register-HtmlRoute -Session $session -Pattern '**/api/data' -ScriptBlock {
+                param($route)
+                Complete-HtmlRoute -Route $route -Status 200 -ContentType 'application/json' -Body '{"status":"ok"}'
             }</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -1406,7 +1406,7 @@ Get-HtmlBrowserContent -Session $session -Selector 'main' -AsText</dev:code>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>You can provide raw HTML, a local file, or download a page with -Url.&#xD;
+      <maml:para>You can provide raw HTML, a local file, or download a page with -Url.
 When downloading, optional -Proxy and -ProxyCredential can be used.</maml:para>
     </maml:description>
     <command:syntax>
@@ -1429,13 +1429,13 @@ When downloading, optional -Proxy and -ProxyCredential can be used.</maml:para>
           <maml:description>
             <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
           <command:parameterValueGroup>
             <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
-            <maml:name>HtmlListingCardMetadataMode</maml:name>
+            <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1500,7 +1500,7 @@ When downloading, optional -Proxy and -ProxyCredential can be used.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -1530,13 +1530,13 @@ Include the protocol and port if necessary.</maml:para>
           <maml:description>
             <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
           <command:parameterValueGroup>
             <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
-            <maml:name>HtmlListingCardMetadataMode</maml:name>
+            <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1613,7 +1613,7 @@ Include the protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -1643,13 +1643,13 @@ Include the protocol and port if necessary.</maml:para>
           <maml:description>
             <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
           <command:parameterValueGroup>
             <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
-            <maml:name>HtmlListingCardMetadataMode</maml:name>
+            <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -1714,7 +1714,7 @@ Include the protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -1768,13 +1768,13 @@ Include the protocol and port if necessary.</maml:para>
         <maml:description>
           <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
         <command:parameterValueGroup>
           <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
-          <maml:name>HtmlListingCardMetadataMode</maml:name>
+          <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -1851,7 +1851,7 @@ Include the protocol and port if necessary.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Proxy server address used when downloading from Url.&#xD;
+          <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -1933,7 +1933,7 @@ Include the protocol and port if necessary.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>You can provide raw HTML, a local file, or download a page with -Url.&#xD;
+      <maml:para>You can provide raw HTML, a local file, or download a page with -Url.
 When downloading, optional -Proxy and -ProxyCredential can be used.</maml:para>
     </maml:description>
     <command:syntax>
@@ -1978,7 +1978,7 @@ When downloading, optional -Proxy and -ProxyCredential can be used.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2066,7 +2066,7 @@ Include the protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2142,7 +2142,7 @@ Include the protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when downloading from Url.&#xD;
+            <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2254,7 +2254,7 @@ Include the protocol and port if necessary.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Proxy server address used when downloading from Url.&#xD;
+          <maml:para>Proxy server address used when downloading from Url.
 Include the protocol and port if necessary.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2496,8 +2496,8 @@ Include the protocol and port if necessary.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>The cmdlet can read raw HTML or download a web page specified with&#xD;
--Url. When downloading, optional -Proxy and&#xD;
+      <maml:para>The cmdlet can read raw HTML or download a web page specified with
+-Url. When downloading, optional -Proxy and
 -ProxyCredential parameters control the web request.</maml:para>
     </maml:description>
     <command:syntax>
@@ -2534,7 +2534,7 @@ Include the protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Optional proxy server address used when fetching content from Url.&#xD;
+            <maml:para>Optional proxy server address used when fetching content from Url.
 Include the protocol and port number if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2602,7 +2602,7 @@ Include the protocol and port number if required.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Optional proxy server address used when fetching content from Url.&#xD;
+            <maml:para>Optional proxy server address used when fetching content from Url.
 Include the protocol and port number if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -2706,7 +2706,7 @@ Include the protocol and port number if required.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Optional proxy server address used when fetching content from Url.&#xD;
+          <maml:para>Optional proxy server address used when fetching content from Url.
 Include the protocol and port number if required.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -3026,7 +3026,7 @@ Include the protocol and port number if required.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Input can be raw HTML or a page retrieved from -Url. Use&#xD;
+      <maml:para>Input can be raw HTML or a page retrieved from -Url. Use
 -Proxy when the page must be downloaded through a proxy server.</maml:para>
     </maml:description>
     <command:syntax>
@@ -3083,7 +3083,7 @@ Include the protocol and port number if required.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -3183,7 +3183,7 @@ Include protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -3271,7 +3271,7 @@ Include protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if necessary.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -3395,7 +3395,7 @@ Include protocol and port if necessary.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Proxy server address used when Url is specified.&#xD;
+          <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if necessary.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -5737,7 +5737,7 @@ Include protocol and port if necessary.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -5817,7 +5817,7 @@ Include protocol and port if required.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -5921,7 +5921,7 @@ Include protocol and port if required.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Proxy server address used when Url is specified.&#xD;
+          <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -8047,7 +8047,7 @@ Include protocol and port if required.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>The cmdlet accepts raw HTML or downloads a page using -Url. When&#xD;
+      <maml:para>The cmdlet accepts raw HTML or downloads a page using -Url. When
 downloading you can specify -Proxy and -ProxyCredential.</maml:para>
     </maml:description>
     <command:syntax>
@@ -8269,7 +8269,7 @@ downloading you can specify -Proxy and -ProxyCredential.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -8606,7 +8606,7 @@ Include protocol and port if required.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -8931,7 +8931,7 @@ Include protocol and port if required.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Proxy</maml:name>
           <maml:description>
-            <maml:para>Proxy server address used when Url is specified.&#xD;
+            <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -9292,7 +9292,7 @@ Include protocol and port if required.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Proxy</maml:name>
         <maml:description>
-          <maml:para>Proxy server address used when Url is specified.&#xD;
+          <maml:para>Proxy server address used when Url is specified.
 Include protocol and port if required.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
@@ -11664,8 +11664,8 @@ Include protocol and port if required.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>Reuse an attended browser login with Invoke-WebRequest</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://portal.contoso.example -Visible -ManualLogin&#xD;
-$webSession = ConvertTo-HtmlWebRequestSession -Session $session&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://portal.contoso.example -Visible -ManualLogin
+$webSession = ConvertTo-HtmlWebRequestSession -Session $session
 Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSession</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -14524,9 +14524,9 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       </command:example>
       <command:example>
         <maml:title>Save DOM fields and expected counts for reuse on current HTML</maml:title>
-        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product-card' -Property @{&#xD;
-    Name = @{ Selector = '.product-title'; Required = $true }&#xD;
-    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }&#xD;
+        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
 } -MinimumItemCount 1 -Path .\products.json</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -14534,11 +14534,11 @@ Invoke-WebRequest -Uri https://portal.contoso.example/report -WebSession $webSes
       </command:example>
       <command:example>
         <maml:title>Accept a DOM structure and check later extractions for drift</maml:title>
-        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product' -Property @{&#xD;
-    Name = @{ Selector = 'h2'; Required = $true }&#xD;
-    Note = '.note'&#xD;
-} -BaselineContent $acceptedHtml -Path .\products.json&#xD;
-$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml&#xD;
+        <dev:code>Export-HtmlExtractionRecipe -ItemSelector '.product' -Property @{
+    Name = @{ Selector = 'h2'; Required = $true }
+    Note = '.note'
+} -BaselineContent $acceptedHtml -Path .\products.json
+$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $currentHtml
 $result.DriftReport</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -15886,8 +15886,8 @@ $result.DriftReport</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Find locator candidates for a search input</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
-$locator = Find-HtmlBrowserLocator -Session $session -Query Search | Select-Object -First 1&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
+$locator = Find-HtmlBrowserLocator -Session $session -Query Search | Select-Object -First 1
 $locator | Select-Object Strategy, Selector, SuggestedCommand, TestCommand, Warnings</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -18820,8 +18820,8 @@ $locator | Select-Object Strategy, Selector, SuggestedCommand, TestCommand, Warn
     <command:examples>
       <command:example>
         <maml:title>Inspect the element that receives keyboard input</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
-Invoke-HtmlBrowserClick -Session $session -Selector 'input[type=search]'&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
+Invoke-HtmlBrowserClick -Session $session -Selector 'input[type=search]'
 Get-HtmlBrowserActiveElement -Session $session -IncludeAttributes</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -19333,8 +19333,8 @@ Get-HtmlBrowserActiveElement -Session $session -IncludeAttributes</dev:code>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Use this command to understand extraction reliability signals such as viewport, locale, storage keys,&#xD;
-failed requests, console errors, Fetch/XHR calls, and WebSocket activity. It reports diagnostics only;&#xD;
+      <maml:para>Use this command to understand extraction reliability signals such as viewport, locale, storage keys,
+failed requests, console errors, Fetch/XHR calls, and WebSocket activity. It reports diagnostics only;
 it does not attempt to hide automation or bypass site protections.</maml:para>
     </maml:description>
     <command:syntax>
@@ -19414,10 +19414,10 @@ it does not attempt to hide automation or bypass site protections.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>Inspect an active browser extraction session</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
-Wait-HtmlBrowserContent -Session $session -Stable&#xD;
-$diagnostics = Get-HtmlBrowserDiagnostics -Session $session&#xD;
-$diagnostics.ObservedApiCalls&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
+Wait-HtmlBrowserContent -Session $session -Stable
+$diagnostics = Get-HtmlBrowserDiagnostics -Session $session
+$diagnostics.ObservedApiCalls
 $diagnostics.ConsistencyWarnings</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -19659,7 +19659,7 @@ $diagnostics.ConsistencyWarnings</dev:code>
     <command:examples>
       <command:example>
         <maml:title>List visible product cards with attributes and geometry</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/catalog&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/catalog
 Get-HtmlBrowserElement -Session $session -Selector '.product-card' -VisibleOnly -IncludeAttributes</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -23182,15 +23182,15 @@ Get-HtmlBrowserElement -Session $session -Selector '.product-card' -VisibleOnly 
     <command:examples>
       <command:example>
         <maml:title>Capture an Azure SSO/SAML handoff and prepare an Invoke-WebRequest replay</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://portal.contoso.example -Visible -ManualLogin -PreventSsoAutoSubmit&#xD;
-$handoff = Get-HtmlBrowserSsoHandoff -Session $session -Wait -Timeout 60000&#xD;
-$handoff | Select-Object Kind, Action, FormData, SuggestedCommand, Warnings&#xD;
-$analysis = Get-HtmlBrowserSsoHandoff -Session $session -Analyze&#xD;
-$analysis | Select-Object Kind, Action, FieldNames, SamlResponse, JsonWebTokens, Warnings&#xD;
-&#xD;
-# Only reveal assertion values when you intentionally need to replay the handoff.&#xD;
-$handoff = Get-HtmlBrowserSsoHandoff -Session $session -IncludeSensitiveValues&#xD;
-$webSession = ConvertTo-HtmlWebRequestSession -Session $session&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://portal.contoso.example -Visible -ManualLogin -PreventSsoAutoSubmit
+$handoff = Get-HtmlBrowserSsoHandoff -Session $session -Wait -Timeout 60000
+$handoff | Select-Object Kind, Action, FormData, SuggestedCommand, Warnings
+$analysis = Get-HtmlBrowserSsoHandoff -Session $session -Analyze
+$analysis | Select-Object Kind, Action, FieldNames, SamlResponse, JsonWebTokens, Warnings
+
+# Only reveal assertion values when you intentionally need to replay the handoff.
+$handoff = Get-HtmlBrowserSsoHandoff -Session $session -IncludeSensitiveValues
+$webSession = ConvertTo-HtmlWebRequestSession -Session $session
 Invoke-WebRequest -Uri $handoff.Action -Method $handoff.Method -Body $handoff.FormData -WebSession $webSession</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -23346,7 +23346,7 @@ Invoke-WebRequest -Uri $handoff.Action -Method $handoff.Method -Body $handoff.Fo
     <command:examples>
       <command:example>
         <maml:title>List storage entries after rendering</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Get-HtmlBrowserStorage -Session $session -Scope All</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -26290,8 +26290,8 @@ Get-HtmlBrowserStorage -Session $session -Scope All</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Click a selector and keep the session alive</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
-Invoke-HtmlBrowserClick -Session $session -Selector '#loadMore'&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
+Invoke-HtmlBrowserClick -Session $session -Selector '#loadMore'
 Wait-HtmlBrowserContent -Session $session -Text 'More results' -Selector 'main'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -26299,7 +26299,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'More results' -Selector 'main'<
       </command:example>
       <command:example>
         <maml:title>Click by visible text only when the target is present</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -26660,8 +26660,8 @@ Invoke-HtmlBrowserClick -Session $session -Text 'Accept' -IfVisible</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Reveal hover-only content</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/products&#xD;
-Invoke-HtmlBrowserHover -Session $session -Selector '.product-card'&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/products
+Invoke-HtmlBrowserHover -Session $session -Selector '.product-card'
 Wait-HtmlBrowserContent -Session $session -Text 'Quick view' -Selector 'main'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -26903,9 +26903,9 @@ Wait-HtmlBrowserContent -Session $session -Text 'Quick view' -Selector 'main'</d
     <command:examples>
       <command:example>
         <maml:title>Submit a search input with Enter</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
-Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type&#xD;
-Invoke-HtmlBrowserKey -Session $session -Selector 'input[type=search]' -Key Enter&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
+Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type
+Invoke-HtmlBrowserKey -Session $session -Selector 'input[type=search]' -Key Enter
 Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -30124,8 +30124,8 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
     <command:examples>
       <command:example>
         <maml:title>Scroll to lazy-loaded content</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/catalog&#xD;
-Invoke-HtmlBrowserScroll -Session $session -Selector '.product-card:last-child'&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/catalog
+Invoke-HtmlBrowserScroll -Session $session -Selector '.product-card:last-child'
 Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -30756,13 +30756,13 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <maml:description>
             <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
           <command:parameterValueGroup>
             <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
-            <maml:name>HtmlListingCardMetadataMode</maml:name>
+            <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -31176,9 +31176,9 @@ A terminating error in the scriptblock stops the crawl.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>StreamPages</maml:name>
           <maml:description>
-            <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
-Includes failed pages; skips candidates and pages loaded from a resume checkpoint.&#xD;
-With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.&#xD;
+            <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint.
+With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.
 Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
@@ -31961,13 +31961,13 @@ Pipeline output does not acknowledge completion of downstream processing. Export
         <maml:description>
           <maml:para>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">HtmlListingCardMetadataMode</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MarkdownHtmlListingCardMetadataMode</command:parameterValue>
         <command:parameterValueGroup>
           <command:parameterValue required="false" variableLength="false">Preserve</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">SuppressInRepeatedCards</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
-          <maml:name>HtmlListingCardMetadataMode</maml:name>
+          <maml:name>MarkdownHtmlListingCardMetadataMode</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -32381,9 +32381,9 @@ A terminating error in the scriptblock stops the crawl.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>StreamPages</maml:name>
         <maml:description>
-          <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.&#xD;
-Includes failed pages; skips candidates and pages loaded from a resume checkpoint.&#xD;
-With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.&#xD;
+          <maml:para>Writes each newly fetched page to the pipeline instead of returning the final crawl result.
+Includes failed pages; skips candidates and pages loaded from a resume checkpoint.
+With ReleasePageContent, emitted copies keep their content while the crawl releases its retained page bodies.
 Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
@@ -33225,9 +33225,9 @@ Pipeline output does not acknowledge completion of downstream processing. Export
       </command:example>
       <command:example>
         <maml:title>Check fresh HTML against saved DOM fields and counts</maml:title>
-        <dev:code>$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html&#xD;
-$result.Success&#xD;
-$result.DomReport.Fields&#xD;
+        <dev:code>$result = Invoke-HtmlExtractionRecipe -Path .\products.json -Content $html
+$result.Success
+$result.DomReport.Fields
 $result.DriftReport</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -39680,7 +39680,7 @@ $result.DriftReport</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Harden a recorded recipe and save the updated JSON</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Optimize-HtmlBrowserRecipe -Session $session -Path .\browser.recipe.json -OutPath .\browser.hardened.recipe.json</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -41393,7 +41393,7 @@ Optimize-HtmlBrowserRecipe -Session $session -Path .\browser.recipe.json -OutPat
     <command:examples>
       <command:example>
         <maml:title>Save rendered main content to disk</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-main.html</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -43374,7 +43374,7 @@ Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-mai
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Invoke-HtmlRendering -Url https://example.com -Session |&#xD;
+        <dev:code>Invoke-HtmlRendering -Url https://example.com -Session |
               Save-HTMLPdf -OutFile page.pdf</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -46901,12 +46901,12 @@ Save-HtmlBrowserContent -Session $session -Selector main -OutFile .\rendered-mai
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
-            <maml:para>Property-to-selector map used with ItemSelector.&#xD;
-String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
-MinimumValueCount, or MaximumValueCount.&#xD;
-DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
-Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+            <maml:para>Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
@@ -47006,12 +47006,12 @@ Required fields throw when missing. Invalid typed values report the property and
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
-            <maml:para>Property-to-selector map used with ItemSelector.&#xD;
-String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
-MinimumValueCount, or MaximumValueCount.&#xD;
-DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
-Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+            <maml:para>Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
@@ -47111,12 +47111,12 @@ Required fields throw when missing. Invalid typed values report the property and
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
-            <maml:para>Property-to-selector map used with ItemSelector.&#xD;
-String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
-MinimumValueCount, or MaximumValueCount.&#xD;
-DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
-Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+            <maml:para>Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
@@ -47216,12 +47216,12 @@ Required fields throw when missing. Invalid typed values report the property and
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
           <maml:name>Property</maml:name>
           <maml:description>
-            <maml:para>Property-to-selector map used with ItemSelector.&#xD;
-String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
-MinimumValueCount, or MaximumValueCount.&#xD;
-DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
-Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+            <maml:para>Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
@@ -47405,12 +47405,12 @@ Required fields throw when missing. Invalid typed values report the property and
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Properties,Field,Fields">
         <maml:name>Property</maml:name>
         <maml:description>
-          <maml:para>Property-to-selector map used with ItemSelector.&#xD;
-String values read trimmed text. Hashtable values can specify Selector, Attribute,&#xD;
-ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,&#xD;
-MinimumValueCount, or MaximumValueCount.&#xD;
-DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.&#xD;
-Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.&#xD;
+          <maml:para>Property-to-selector map used with ItemSelector.
+String values read trimmed text. Hashtable values can specify Selector, Attribute,
+ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
+MinimumValueCount, or MaximumValueCount.
+DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.
+Conversion uses invariant culture by default; Culture can specify a name such as pl-PL.
 Required fields throw when missing. Invalid typed values report the property and item index.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">IDictionary</command:parameterValue>
@@ -47527,10 +47527,10 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:example>
       <command:example>
         <maml:title>Convert repeated product cards into PowerShell objects with CSS selectors</maml:title>
-        <dev:code>Select-HtmlData -Url https://example.org/products -ItemSelector '.product-card' -Property @{&#xD;
-    Name = '.product-title'&#xD;
-    Price = '.product-price'&#xD;
-    Link = @{ Selector = 'a'; Attribute = 'href' }&#xD;
+        <dev:code>Select-HtmlData -Url https://example.org/products -ItemSelector '.product-card' -Property @{
+    Name = '.product-title'
+    Price = '.product-price'
+    Link = @{ Selector = 'a'; Attribute = 'href' }
 }</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -47538,9 +47538,9 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:example>
       <command:example>
         <maml:title>Extract typed prices and require non-empty product names</maml:title>
-        <dev:code>Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{&#xD;
-    Name = @{ Selector = '.product-title'; Required = $true; TreatEmptyAsMissing = $true }&#xD;
-    Price = @{ Selector = '.product-price'; DataType = [decimal]; Culture = 'pl-PL' }&#xD;
+        <dev:code>Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true; TreatEmptyAsMissing = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; Culture = 'pl-PL' }
 }</dev:code>
         <dev:remarks>
           <maml:para>Price values such as 1234,50 become decimal values. Invalid prices and missing names raise an error identifying the field and item.</maml:para>
@@ -47548,11 +47548,11 @@ Required fields throw when missing. Invalid typed values report the property and
       </command:example>
       <command:example>
         <maml:title>Inspect extraction quality and require a non-empty dataset</maml:title>
-        <dev:code>$report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{&#xD;
-    Name = @{ Selector = '.product-title'; Required = $true }&#xD;
-    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }&#xD;
-} -AsExtractionReport -MinimumItemCount 1&#xD;
-$report.IsValid&#xD;
+        <dev:code>$report = Select-HtmlData -Content $html -ItemSelector '.product-card' -Property @{
+    Name = @{ Selector = '.product-title'; Required = $true }
+    Price = @{ Selector = '.product-price'; DataType = [decimal]; MaximumValueCount = 1 }
+} -AsExtractionReport -MinimumItemCount 1
+$report.IsValid
 $report.Fields</dev:code>
         <dev:remarks>
           <maml:para>Missing required fields, invalid values, and count changes are reported. Inspect IsValid before accepting Records; fields with data errors contain null.</maml:para>
@@ -49179,16 +49179,16 @@ $report.Fields</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Read a JavaScript assignment value from an HTML document</maml:title>
-        <dev:code>$html = @'&#xD;
-&#xD;
-window.$Config = {&#xD;
-    auth: {&#xD;
-        sCtx: "expected-context"&#xD;
-    }&#xD;
-};&#xD;
-&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$html = @'
+
+window.$Config = {
+    auth: {
+        sCtx: "expected-context"
+    }
+};
+
+'@
+
 Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath auth.sCtx</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -49196,16 +49196,16 @@ Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath auth.
       </command:example>
       <command:example>
         <maml:title>Read module scripts with ECMAScript module grammar</maml:title>
-        <dev:code>$html = @'&#xD;
-&#xD;
-import value from "./settings.js";&#xD;
-window.$Config = { sCtx: "from-module" };&#xD;
-&#xD;
-window.$Config = { sCtx: "from-script" };&#xD;
-&#xD;
-'@&#xD;
-&#xD;
-Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx |&#xD;
+        <dev:code>$html = @'
+
+import value from "./settings.js";
+window.$Config = { sCtx: "from-module" };
+
+window.$Config = { sCtx: "from-script" };
+
+'@
+
+Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx |
     Select-Object -First 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -49213,13 +49213,13 @@ Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx 
       </command:example>
       <command:example>
         <maml:title>Ignore non-JavaScript script tags and return each matching assignment</maml:title>
-        <dev:code>$html = @'&#xD;
-{"name":"schema"}&#xD;
-$Config = { sCtx: "first" };&#xD;
-$Config = { sCtx: "second" };&#xD;
-&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$html = @'
+{"name":"schema"}
+$Config = { sCtx: "first" };
+$Config = { sCtx: "second" };
+
+'@
+
 Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -49227,16 +49227,16 @@ Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx<
       </command:example>
       <command:example>
         <maml:title>Return every matching HTML assignment so callers can choose first or last</maml:title>
-        <dev:code>$html = @'&#xD;
-&#xD;
-$Config = { sCtx: "first" };&#xD;
-&#xD;
-$Config = { sCtx: "second" };&#xD;
-&#xD;
-'@&#xD;
-&#xD;
-$values = Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx&#xD;
-$values | Select-Object -First 1&#xD;
+        <dev:code>$html = @'
+
+$Config = { sCtx: "first" };
+
+$Config = { sCtx: "second" };
+
+'@
+
+$values = Select-HtmlJavaScriptVariable -Content $html -Name '$Config' -PropertyPath sCtx
+$values | Select-Object -First 1
 $values | Select-Object -Last 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -50845,13 +50845,13 @@ $values | Select-Object -Last 1</dev:code>
       </command:example>
       <command:example>
         <maml:title>Enumerate descendants and include the root AST node</maml:title>
-        <dev:code>$script = @'&#xD;
-const settings = {&#xD;
-    apiKey: "abc",&#xD;
-    enabled: true&#xD;
-};&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$script = @'
+const settings = {
+    apiKey: "abc",
+    enabled: true
+};
+'@
+
 Select-JavaScriptAstNode -Source $script -Type Script,ObjectExpression -IncludeRoot</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -50859,13 +50859,13 @@ Select-JavaScriptAstNode -Source $script -Type Script,ObjectExpression -IncludeR
       </command:example>
       <command:example>
         <maml:title>Select nodes from ECMAScript module source</maml:title>
-        <dev:code>$module = @'&#xD;
-import value from "./settings.js";&#xD;
-export const settings = {&#xD;
-    enabled: true&#xD;
-};&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$module = @'
+import value from "./settings.js";
+export const settings = {
+    enabled: true
+};
+'@
+
 Select-JavaScriptAstNode -Source $module -Module -Type ImportDeclaration,ExportNamedDeclaration</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -51182,14 +51182,14 @@ Select-JavaScriptAstNode -Source $module -Module -Type ImportDeclaration,ExportN
       </command:example>
       <command:example>
         <maml:title>Read a property from a loose JavaScript assignment</maml:title>
-        <dev:code>$script = @'&#xD;
-$Config = {&#xD;
-    "fShowPersistentCookiesWarning": false,&#xD;
-    "urlMsaLogout": "https://example.com/logout",&#xD;
-    "sCtx": "expected-context"&#xD;
-}&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$script = @'
+$Config = {
+    "fShowPersistentCookiesWarning": false,
+    "urlMsaLogout": "https://example.com/logout",
+    "sCtx": "expected-context"
+}
+'@
+
 Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -51197,12 +51197,12 @@ Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx</de
       </command:example>
       <command:example>
         <maml:title>Return only the final assignment when a value is overwritten</maml:title>
-        <dev:code>$script = @'&#xD;
-$Config = { sCtx: "first" };&#xD;
-$Config = { sCtx: "second" };&#xD;
-'@&#xD;
-&#xD;
-Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx |&#xD;
+        <dev:code>$script = @'
+$Config = { sCtx: "first" };
+$Config = { sCtx: "second" };
+'@
+
+Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx |
     Select-Object -Last 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -51210,16 +51210,16 @@ Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx |&#
       </command:example>
       <command:example>
         <maml:title>Match a member assignment and read a nested property path</maml:title>
-        <dev:code>$script = @'&#xD;
-window.$Config = {&#xD;
-    auth: {&#xD;
-        urls: {&#xD;
-            logout: "https://example.com/logout"&#xD;
-        }&#xD;
-    }&#xD;
-}&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$script = @'
+window.$Config = {
+    auth: {
+        urls: {
+            logout: "https://example.com/logout"
+        }
+    }
+}
+'@
+
 Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath auth.urls.logout</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -51227,11 +51227,11 @@ Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath auth.url
       </command:example>
       <command:example>
         <maml:title>Skip compound assignments whose value depends on previous state</maml:title>
-        <dev:code>$script = @'&#xD;
-$Config += suffix;&#xD;
-$Config = { sCtx: "final" };&#xD;
-'@&#xD;
-&#xD;
+        <dev:code>$script = @'
+$Config += suffix;
+$Config = { sCtx: "final" };
+'@
+
 Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -51239,19 +51239,19 @@ Select-JavaScriptVariable -Source $script -Name '$Config' -PropertyPath sCtx</de
       </command:example>
       <command:example>
         <maml:title>Return unknown values when runtime expressions make a property path dynamic</maml:title>
-        <dev:code>$script = @'&#xD;
-const cfg = {&#xD;
-    [key]: "dynamic",&#xD;
-    token: "old",&#xD;
-    ...override,&#xD;
-    items: ["first", ...extra, "last"],&#xD;
-    safe: "after"&#xD;
-};&#xD;
-&#xD;
-const enabled = !window.disabled;&#xD;
-'@&#xD;
-&#xD;
-Select-JavaScriptVariable -Source $script -Name cfg -PropertyPath key,token,items.0,items.2,safe&#xD;
+        <dev:code>$script = @'
+const cfg = {
+    [key]: "dynamic",
+    token: "old",
+    ...override,
+    items: ["first", ...extra, "last"],
+    safe: "after"
+};
+
+const enabled = !window.disabled;
+'@
+
+Select-JavaScriptVariable -Source $script -Name cfg -PropertyPath key,token,items.0,items.2,safe
 Select-JavaScriptVariable -Source $script -Name enabled</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -52060,7 +52060,7 @@ Select-JavaScriptVariable -Source $script -Name enabled</dev:code>
     <command:examples>
       <command:example>
         <maml:title>Set a search box value in one operation</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
 Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -52068,7 +52068,7 @@ Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'Ht
       </command:example>
       <command:example>
         <maml:title>Type through keyboard events for reactive inputs</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
 Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'HtmlTinkerX' -Type -DelayMs 25</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -52535,7 +52535,7 @@ Set-HtmlBrowserInput -Session $session -Selector 'input[type=search]' -Value 'Ht
     <command:examples>
       <command:example>
         <maml:title>Set a localStorage value before navigating an app</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value enabled</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -57855,7 +57855,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
     <command:examples>
       <command:example>
         <maml:title>Check whether results are visible</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
 Test-HtmlBrowserElement -Session $session -Selector '#results' -Visible</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -58136,9 +58136,9 @@ Test-HtmlBrowserElement -Session $session -Selector '#results' -Visible</dev:cod
     <command:examples>
       <command:example>
         <maml:title>Preflight a recipe JSON file before launching a browser</maml:title>
-        <dev:code>$validation = Test-HtmlBrowserRecipe -Path .\browser.recipe.json -VariablePath .\browser.recipe.variables.json&#xD;
-$validation.RequiredVariables&#xD;
-$validation.VariableTemplate&#xD;
+        <dev:code>$validation = Test-HtmlBrowserRecipe -Path .\browser.recipe.json -VariablePath .\browser.recipe.variables.json
+$validation.RequiredVariables
+$validation.VariableTemplate
 $validation.Issues | Format-Table Severity, StepIndex, Action, Property, Message</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -59349,7 +59349,7 @@ $validation.Issues | Format-Table Severity, StepIndex, Action, Property, Message
     <command:examples>
       <command:example>
         <maml:title>Wait for rendered search results</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/search
 Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
@@ -59357,7 +59357,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
       </command:example>
       <command:example>
         <maml:title>Wait until the DOM stops changing</maml:title>
-        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app&#xD;
+        <dev:code>$session = Start-HtmlBrowserSession -Url https://example.org/app
 Wait-HtmlBrowserContent -Session $session -Stable -StableMilliseconds 500</dev:code>
         <dev:remarks>
           <maml:para></maml:para>

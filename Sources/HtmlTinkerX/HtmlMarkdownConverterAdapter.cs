@@ -6,25 +6,25 @@ using OfficeIMO.Markdown.Html;
 namespace HtmlTinkerX;
 
 internal static class HtmlMarkdownConverterAdapter {
-    public static MarkdownDoc ConvertToMarkdownDocument(
+    public static MarkdownDocument ConvertToMarkdownDocument(
         string html,
         string? pageUrl,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         if (string.IsNullOrWhiteSpace(html)) {
-            return MarkdownDoc.Create();
+            return MarkdownDocument.Create();
         }
 
         var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode, markdownProfile);
-        return CreateDocument(html, options.BaseUri).ToMarkdownDocument(options);
+        return CreateDocument(html, options.BaseUri).ToMarkdown(options);
     }
 
     public static string ConvertToMarkdown(
         string html,
         string? pageUrl,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         if (string.IsNullOrWhiteSpace(html)) {
             return string.Empty;
@@ -42,24 +42,25 @@ internal static class HtmlMarkdownConverterAdapter {
         HtmlConversionDocument document,
         string? pageUrl,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         if (document == null) throw new ArgumentNullException(nameof(document));
         var options = CreateOptions(pageUrl, imageMode, listingCardMetadataMode, markdownProfile);
-        return document.ToMarkdown(options);
+        using MarkdownDocument markdown = document.ToMarkdown(options);
+        return markdown.ToMarkdown(options.MarkdownWriteOptions);
     }
 
-    internal static HtmlToMarkdownOptions CreateOptions(
+    internal static HtmlMarkdownExportOptions CreateOptions(
         string? pageUrl,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         var options = markdownProfile == HtmlMarkdownProfile.OfficeIMO
-            ? HtmlToMarkdownOptions.CreateOfficeIMOProfile()
-            : HtmlToMarkdownOptions.CreatePortableProfile();
+            ? HtmlMarkdownExportOptions.CreateOfficeIMOProfile()
+            : HtmlMarkdownExportOptions.CreatePortableProfile();
         options.MarkdownWriteOptions ??= markdownProfile == HtmlMarkdownProfile.OfficeIMO
-            ? MarkdownWriteOptions.CreateOfficeIMOProfile()
-            : MarkdownWriteOptions.CreatePortableProfile();
+            ? MarkdownSaveOptions.CreateOfficeIMOProfile()
+            : MarkdownSaveOptions.CreatePortableProfile();
         options.MarkdownWriteOptions.ImageRenderingMode = imageMode;
         options.ListingCardMetadataMode = listingCardMetadataMode;
         if (!string.IsNullOrWhiteSpace(pageUrl) && Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri)) {
@@ -70,7 +71,7 @@ internal static class HtmlMarkdownConverterAdapter {
     }
 
     private static HtmlConversionDocument CreateDocument(string html, Uri? baseUri) {
-        HtmlConversionDocumentOptions options = HtmlConversionDocumentOptions.CreateUntrustedProfile();
+        HtmlConversionDocumentOptions options = HtmlConversionDocumentOptions.UntrustedDefaults;
         options.BaseUri = baseUri;
         options.IncludeNormalizedHtml = false;
         return HtmlConversionDocument.Parse(html, options);

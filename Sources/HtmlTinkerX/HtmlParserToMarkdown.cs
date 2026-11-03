@@ -21,7 +21,7 @@ public static class HtmlParserToMarkdown {
         string html,
         string? pageUrl = null,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
@@ -44,11 +44,11 @@ public static class HtmlParserToMarkdown {
     /// <param name="listingCardMetadataMode">Controls whether repeated listing-card metadata is kept.</param>
     /// <param name="markdownProfile">Controls the Markdown dialect profile.</param>
     /// <returns>A Markdown document model converted from the provided HTML.</returns>
-    public static MarkdownDoc ConvertToMarkdownDocument(
+    public static MarkdownDocument ConvertToMarkdownDocument(
         string html,
         string? pageUrl = null,
         MarkdownImageRenderingMode imageMode = MarkdownImageRenderingMode.PortableMarkdown,
-        HtmlListingCardMetadataMode listingCardMetadataMode = HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+        MarkdownHtmlListingCardMetadataMode listingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
         HtmlMarkdownProfile markdownProfile = HtmlMarkdownProfile.Portable) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
