@@ -192,13 +192,17 @@ public sealed class HtmlFetchHandlerTests {
         Assert.Equal(new[] { false, false }, conditional);
     }
 
-    [Fact]
-    public async Task ValidatorCacheIsNotConsultedWhenTheTransportSendsCookiesForTheAddress() {
+    [Theory]
+    [InlineData("cookie")]
+    [InlineData("credentials")]
+    [InlineData("default credentials")]
+    public async Task ValidatorCacheIsNotConsultedWhenTheTransportIdentifiesTheRequester(string identity) {
         List<bool> conditional = new();
         int calls = 0;
-        CookieContainer cookies = new();
-        cookies.Add(new Uri("https://publisher.example/"), new Cookie("session", "first-user"));
-        HttpClientHandler transport = new() { AllowAutoRedirect = false, CookieContainer = cookies };
+        HttpClientHandler transport = new() { AllowAutoRedirect = false };
+        if (identity == "cookie") transport.CookieContainer.Add(new Uri("https://publisher.example/"), new Cookie("session", "first-user"));
+        if (identity == "credentials") transport.Credentials = new NetworkCredential("first-user", "secret");
+        if (identity == "default credentials") transport.UseDefaultCredentials = true;
         using HttpClient client = Client(new Responder(request => {
             conditional.Add(request.Headers.IfNoneMatch.Count > 0);
             if (request.Headers.IfNoneMatch.Count > 0) return new HttpResponseMessage(HttpStatusCode.NotModified) { Headers = { ETag = new EntityTagHeaderValue("\"v1\"") } };

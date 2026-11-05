@@ -44,11 +44,11 @@ public sealed class HtmlFetchPolicy {
 
     /// <summary>
     /// Stores entity tags and Last-Modified dates so repeated GETs revalidate and reuse an unchanged body; null disables
-    /// it. Entries are keyed by address alone, so requests with credentials, cookie or custom headers, requests for which
-    /// an <see cref="HttpClientHandler"/> or <c>SocketsHttpHandler</c> cookie container (also inside
-    /// <see cref="HtmlProxyRotator"/> or <c>HtmlHttpNetworkHandler</c>) holds cookies, and responses that set cookies or
-    /// vary by anything but encoding, are neither read from nor stored. Cookies another kind of primary handler adds are
-    /// not visible here; the publisher's 304 still has to confirm the stored body.
+    /// it. Entries are keyed by address alone, so requests with credentials, cookie or custom headers, requests an
+    /// <see cref="HttpClientHandler"/> or <c>SocketsHttpHandler</c> (also inside <see cref="HtmlProxyRotator"/> or
+    /// <c>HtmlHttpNetworkHandler</c>) identifies with cookies for the address, origin or default credentials or a client
+    /// certificate, and responses that set cookies or vary by anything but encoding, are neither read from nor stored.
+    /// What another kind of primary handler adds is not visible here; the publisher's 304 still has to confirm the stored body.
     /// </summary>
     public IHtmlHttpValidatorCache? ValidatorCache { get; set; }
 

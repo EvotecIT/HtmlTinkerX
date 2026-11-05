@@ -66,7 +66,7 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         Uri uri = request.RequestUri!;
         // Only reads are repeated; a POST might have taken effect before it failed.
         bool idempotent = HtmlFetchRules.IsIdempotent(request.Method);
-        bool cacheable = Policy.ValidatorCache != null && HtmlFetchRules.CanCacheByAddress(request) && !SendsCookies(InnerHandler, uri);
+        bool cacheable = Policy.ValidatorCache != null && HtmlFetchRules.CanCacheByAddress(request) && !SendsRequesterState(InnerHandler, uri);
         HtmlHttpValidatorEntry? cached = cacheable ? await ApplyCachedValidatorsAsync(request, cancellationToken).ConfigureAwait(false) : null;
         for (int attempt = 0; ; ) {
             HttpResponseMessage response;
@@ -261,24 +261,32 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
     /// Whether a primary handler would add cookies from its own container to a request for <paramref name="uri"/>, which
     /// would make a body specific to that session. Handlers whose cookie state cannot be read count as sending none.
     /// </summary>
-    internal static bool SendsCookies(HttpMessageHandler? handler, Uri uri) {
+    /// <summary>
+    /// Whether the transport identifies the requester on its own: cookies it holds for the address, origin credentials
+    /// (including default credentials) or a client certificate. A body fetched that way must not be keyed by address.
+    /// </summary>
+    internal static bool SendsRequesterState(HttpMessageHandler? handler, Uri uri) {
         while (handler is DelegatingHandler next) handler = next.InnerHandler;
         switch (handler) {
             case HtmlProxyRotator rotator:
                 foreach (HttpMessageHandler inner in rotator.Handlers) {
-                    if (SendsCookies(inner, uri)) return true;
+                    if (SendsRequesterState(inner, uri)) return true;
                 }
                 return false;
 #if NET8_0_OR_GREATER
-            // Routed transports share the ordinary transport's container or send no cookies.
+            // Routed transports reuse the ordinary transport's cookies, credentials and TLS options or send none.
             case HtmlHttpNetworkHandler network:
-                return SendsCookies(network.OrdinaryTransport, uri);
+                return SendsRequesterState(network.OrdinaryTransport, uri);
 #endif
-            case HttpClientHandler { UseCookies: true } client:
-                return client.CookieContainer.GetCookies(uri).Count > 0;
+            case HttpClientHandler client:
+                return client.UseDefaultCredentials || client.Credentials != null
+                    || client.ClientCertificateOptions == ClientCertificateOption.Automatic || client.ClientCertificates.Count > 0
+                    || client.UseCookies && client.CookieContainer.GetCookies(uri).Count > 0;
 #if NET5_0_OR_GREATER
-            case SocketsHttpHandler { UseCookies: true, CookieContainer: { } container }:
-                return container.GetCookies(uri).Count > 0;
+            case SocketsHttpHandler sockets:
+                return sockets.Credentials != null || sockets.SslOptions.ClientCertificates is { Count: > 0 }
+                    || sockets.SslOptions.LocalCertificateSelectionCallback != null
+                    || sockets.UseCookies && sockets.CookieContainer is { } container && container.GetCookies(uri).Count > 0;
 #endif
             default:
                 return false;
