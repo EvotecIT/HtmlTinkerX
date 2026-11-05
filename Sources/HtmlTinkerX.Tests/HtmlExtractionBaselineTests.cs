@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -327,6 +328,59 @@ public class HtmlExtractionBaselineTests {
         Assert.False(current.DriftReport.ShapeChanged);
         Assert.False(current.DriftReport.ConfidenceReduced);
         Assert.True(current.Success);
+    }
+
+    private static HtmlBrowserlessExtractionRecipe ReleaseRecipe() => HtmlBrowserlessExtraction.CreateDomRecipe(
+        "div.release-entry", new Dictionary<string, HtmlDomFieldDefinition> {
+            ["Version"] = new() { Selector = "h3", Required = true },
+            ["Date"] = new() { Selector = ".date", Required = true }
+        });
+
+    [Fact]
+    public void FingerprintedDomBaseline_SuggestsRelocatedItemsWhenSelectorStopsMatching() {
+        string before = HtmlSelectorRelocatorTests.Fixture("release-notes-before.html");
+        string after = HtmlSelectorRelocatorTests.Fixture("release-notes-after.html");
+        var accepted = HtmlBrowserlessExtraction.DeserializeRecipe(HtmlBrowserlessExtraction.SerializeRecipe(
+            HtmlBrowserlessExtraction.CaptureDomRecipeBaseline(ReleaseRecipe(), before)));
+
+        var result = HtmlBrowserlessExtraction.ExtractDomRecipe(accepted, after);
+
+        Assert.Equal(2, accepted.Baseline!.Version);
+        Assert.False(result.Success);
+        Assert.Empty(result.Items);
+        HtmlSelectorRelocationCandidate top = result.DriftReport!.RelocationCandidates[0];
+        Assert.Equal("High", top.Confidence);
+        Assert.Contains(result.Warnings, warning => warning.Contains(top.Selector));
+        accepted.Selector = top.Selector;
+        Assert.Equal(3, HtmlBrowserlessExtraction.ExtractDomRecipe(accepted, after).Items.Count);
+    }
+
+    [Fact]
+    public void FingerprintedDomBaseline_RejectsNullClassNameInSavedJson() {
+        string json = HtmlBrowserlessExtraction.SerializeRecipe(HtmlBrowserlessExtraction.CaptureDomRecipeBaseline(
+            ReleaseRecipe(), HtmlSelectorRelocatorTests.Fixture("release-notes-before.html")));
+        string corrupted = new Regex("\"classes\":\\s*\\[").Replace(json, "$0 null,", 1);
+        Assert.NotEqual(json, corrupted);
+
+        Assert.Throws<ArgumentException>(() => HtmlBrowserlessExtraction.DeserializeRecipe(corrupted));
+    }
+
+    [Fact]
+    public void VersionOneDomBaseline_StillAppliesWithoutRelocationCandidates() {
+        string before = HtmlSelectorRelocatorTests.Fixture("release-notes-before.html");
+        var captured = HtmlBrowserlessExtraction.CaptureDomRecipeBaseline(ReleaseRecipe(), before);
+        captured.Baseline!.Version = 1;
+        captured.Baseline.ItemFingerprints = null;
+        var saved = HtmlBrowserlessExtraction.DeserializeRecipe(HtmlBrowserlessExtraction.SerializeRecipe(captured));
+
+        var unchanged = HtmlBrowserlessExtraction.ExtractDomRecipe(saved, before);
+        var moved = HtmlBrowserlessExtraction.ExtractDomRecipe(saved, HtmlSelectorRelocatorTests.Fixture("release-notes-after.html"));
+
+        Assert.True(unchanged.Success);
+        Assert.False(unchanged.DriftReport!.HasChanges);
+        Assert.False(moved.Success);
+        Assert.Empty(moved.Items);
+        Assert.Null(moved.DriftReport);
     }
 
     private sealed class JsonHandler : HttpMessageHandler {

@@ -169,6 +169,9 @@ Discovers static, app-state, and endpoint data sources that can be extracted wit
 ### [Find-HtmlInteractionSurface](Find-HtmlInteractionSurface.md)
 Finds forms, hidden fields, tokens, inline endpoints, and optional linked-script endpoints in HTML.
 
+### [Find-HtmlRelocatedElement](Find-HtmlRelocatedElement.md)
+Suggests where content moved when a saved CSS selector stops matching after a page layout change.
+
 ### [Find-HtmlSelector](Find-HtmlSelector.md)
 Finds repeated static HTML structures, likely fields, links, and replayable extraction commands or secure templates.
 
@@ -222,6 +225,9 @@ Gets localStorage and sessionStorage entries from an active browser session.
 
 ### [Get-HtmlCrawlProfile](Get-HtmlCrawlProfile.md)
 Returns built-in or custom crawl profiles.
+
+### [Get-HtmlElementFingerprint](Get-HtmlElementFingerprint.md)
+Records the structural identity of elements so they can be found again after a page layout change.
 
 ### [Get-HtmlExtractionProfile](Get-HtmlExtractionProfile.md)
 Returns built-in extraction workflow profiles or the profile recommended by an extraction plan.

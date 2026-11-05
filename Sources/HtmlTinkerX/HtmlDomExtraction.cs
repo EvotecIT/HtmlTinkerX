@@ -24,7 +24,8 @@ public static partial class HtmlDomExtraction {
         "srcset", "data-srcset", "data-lazy-srcset", "data-original-srcset"
     };
     private static readonly string[] SemanticAttributes = { "data-type", "itemprop", "name", "role" };
-    private static readonly Regex SafeCssIdentifier = new(@"^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$", RegexOptions.Compiled);
+    internal static readonly Regex SafeCssIdentifier = new(@"^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$", RegexOptions.Compiled);
+    private static readonly char[] UnquotableValueCharacters = { '\'', '\\', '\n', '\r', '\f' };
     private static readonly Regex PropertyTokenSplit = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
 
     /// <summary>
@@ -503,7 +504,7 @@ public static partial class HtmlDomExtraction {
         return null;
     }
 
-    private static string BuildLocalSelector(IElement element, bool includeSemanticAttribute) {
+    internal static string BuildLocalSelector(IElement element, bool includeSemanticAttribute) {
         StringBuilder builder = new(element.LocalName);
         int classCount = 0;
         foreach (string className in element.ClassList) {
@@ -521,7 +522,8 @@ public static partial class HtmlDomExtraction {
         if (includeSemanticAttribute) {
             foreach (string attributeName in SemanticAttributes) {
                 string? value = element.GetAttribute(attributeName);
-                if (string.IsNullOrWhiteSpace(value) || value!.Length > 80 || value.Contains("'")) {
+                // Quotes, backslashes and line breaks would need CSS string escaping; skip them instead.
+                if (string.IsNullOrWhiteSpace(value) || value!.Length > 80 || value.IndexOfAny(UnquotableValueCharacters) >= 0) {
                     continue;
                 }
 
@@ -547,7 +549,7 @@ public static partial class HtmlDomExtraction {
         }
     }
 
-    private static bool IsUnstableClass(string className) =>
+    internal static bool IsUnstableClass(string className) =>
         className.Equals("active", StringComparison.OrdinalIgnoreCase)
         || className.Equals("selected", StringComparison.OrdinalIgnoreCase)
         || className.Equals("current", StringComparison.OrdinalIgnoreCase)
@@ -716,7 +718,7 @@ public static partial class HtmlDomExtraction {
             : normalized;
     }
 
-    private static string NormalizeWhitespace(string? value) =>
+    internal static string NormalizeWhitespace(string? value) =>
         string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : Regex.Replace(value, @"\s+", " ").Trim();
