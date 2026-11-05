@@ -22,11 +22,21 @@ public static class HtmlParserToText {
     /// string text = HtmlParserToText.ConvertToText("<p>Hello</p>");
     /// </code>
     /// </example>
-    public static string ConvertToText(string html) {
+    public static string ConvertToText(string html) => ConvertToText(html, preserveStructure: false);
+
+    /// <summary>
+    /// Converts HTML markup to plain text, optionally retaining line breaks and preformatted indentation.
+    /// </summary>
+    /// <param name="html">HTML string to convert.</param>
+    /// <param name="preserveStructure">Keep document line breaks and preformatted text when true; otherwise collapse whitespace as in the one-argument overload.</param>
+    /// <returns>Plain text extracted from the provided HTML.</returns>
+    /// <exception cref="ArgumentNullException">The HTML string is null.</exception>
+    public static string ConvertToText(string html, bool preserveStructure) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
-        var result = NUglify.Uglify.HtmlToText(html);
+        var result = NUglify.Uglify.HtmlToText(html, preserveStructure
+            ? NUglify.Html.HtmlToTextOptions.KeepStructure : NUglify.Html.HtmlToTextOptions.None);
         if (result.HasErrors) {
             string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
             LoggingMessages.Logger.WriteWarning($"Convert-HTMLToText -Errors: {errors}");
@@ -44,7 +54,7 @@ public static class HtmlParserToText {
     /// <remarks>
     /// This method parses body content and uses HTML element semantics, not computed CSS layout. Contextual content
     /// such as table rows and cells needs its enclosing table. Its result is plain text, not sanitized HTML; encode it
-    /// when rendering into an HTML document. <see cref="ConvertToText"/> retains its existing behavior.
+    /// when rendering into an HTML document. <see cref="ConvertToText(string)"/> retains its existing behavior.
     /// </remarks>
     /// <example>
     /// <code>
