@@ -21,11 +21,13 @@ public class HtmlParserTextTests {
 
         Assert.Contains(commands, structured);
         Assert.Contains(registry, structured);
+        Assert.Contains("Before commands", structured);
         Assert.True(structured.IndexOf("Before commands", System.StringComparison.Ordinal) < structured.IndexOf(commands, System.StringComparison.Ordinal));
         Assert.True(structured.IndexOf(commands, System.StringComparison.Ordinal) < structured.IndexOf(registry, System.StringComparison.Ordinal));
         Assert.True(structured.IndexOf(registry, System.StringComparison.Ordinal) < structured.IndexOf("After registry", System.StringComparison.Ordinal));
         string collapsed = HtmlParserToText.ConvertToText(html);
-        Assert.Equal(collapsed, HtmlParserToText.ConvertToText(html, preserveStructure: false));
+        Assert.Contains("Set-First -Enabled $true Set-Second -Enabled $true", collapsed);
+        Assert.Contains("[HKEY_LOCAL_MACHINE\\Software\\Example] \"Enabled\"=dword:00000001", collapsed);
         Assert.DoesNotContain("\n", collapsed);
         Assert.Throws<System.ArgumentNullException>(() => HtmlParserToText.ConvertToText(null!, preserveStructure: true));
     }
