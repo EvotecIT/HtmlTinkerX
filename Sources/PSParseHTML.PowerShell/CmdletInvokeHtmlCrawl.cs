@@ -3,6 +3,7 @@ using OfficeIMO.Markdown;
 using OfficeIMO.Markdown.Html;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,8 +25,16 @@ namespace PSParseHTML.PowerShell;
 /// <example>
 /// <code>Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2</code>
 /// </example>
+/// <example>
+/// <code>Invoke-HtmlCrawl -Url https://example.com/blog/ -MaxDepth 5 -Process {
+///     foreach ($post in $_.Document.QuerySelectorAll('article h2 a')) { [pscustomobject]@{ Title = $post.TextContent.Trim(); Page = $_.Page.Url } }
+///     $next = $_.Document.QuerySelector('a[rel=next]')
+///     if ($next) { $_.Follow($next.GetAttribute('href')) }
+///     $_.FollowLinks = $false
+/// }</code>
+/// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlCrawl")]
-[OutputType(typeof(HtmlCrawlResult), typeof(HtmlCrawlPage))]
+[OutputType(typeof(HtmlCrawlResult), typeof(HtmlCrawlPage), typeof(PSObject))]
 public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Starting URL for the crawl.</summary>
     [Parameter(Mandatory = true, Position = 0)]
@@ -37,6 +46,14 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// Pipeline output does not acknowledge completion of downstream processing. Export files may not be committed yet.</summary>
     [Parameter]
     public SwitchParameter StreamPages { get; set; }
+
+    /// <summary>Runs a scriptblock on the pipeline thread for each successful page while the crawl runs and writes its output to the pipeline instead of the final crawl result.
+    /// $_ is an HtmlCrawlPageContext with Page, Document (the parsed HTML), Depth and Data.
+    /// Call $_.Follow(url, data, priority, render) to queue follow-up requests; they obey the crawl's scope, MaxDepth, MaxPages, robots and deduplication rules.
+    /// Set $_.FollowLinks = $false to follow only those requests. With StreamPages, each page is written before its items.
+    /// A terminating error in the scriptblock stops the crawl.</summary>
+    [Parameter]
+    public ScriptBlock? Process { get; set; }
 
     /// <summary>Maximum depth to follow links from the starting page.</summary>
     [Parameter]
@@ -605,6 +622,10 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
 
         try {
             using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
+            if (Process != null) {
+                await StreamProcessedCrawlAsync(Process, options, linkedCts.Token).ConfigureAwait(false);
+                return;
+            }
             if (StreamPages.IsPresent) {
                 options.PageObserver = new PipelinePageObserver(page =>
                     WriteObject(ReleasePageContent.IsPresent ? page.CreateSnapshot() : page));
@@ -618,6 +639,26 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
             Password = null;
             Credential = null;
             ProxyCredential = null;
+        }
+    }
+
+    private async Task StreamProcessedCrawlAsync(ScriptBlock process, HtmlCrawlOptions options, CancellationToken cancellationToken) {
+        Task HandlePage(HtmlCrawlPageContext context, CancellationToken token) {
+            token.ThrowIfCancellationRequested();
+            var output = (Collection<PSObject>)InvokeOnPipelineThread(() =>
+                process.InvokeWithContext(null, new List<PSVariable> { new("_", context) }, context))!;
+            foreach (PSObject? value in output) {
+                if (value != null) context.Emit(value);
+            }
+            return Task.CompletedTask;
+        }
+
+        await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync(Url, options, HandlePage, cancellationToken).ConfigureAwait(false)) {
+            if (entry.Kind == HtmlCrawlStreamEntryKind.Item) {
+                WriteObject(entry.Item);
+            } else if (entry.Kind == HtmlCrawlStreamEntryKind.Page && StreamPages.IsPresent) {
+                WriteObject(entry.Page);
+            }
         }
     }
 

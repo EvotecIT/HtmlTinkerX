@@ -11,7 +11,7 @@ Crawls a site offline and returns extracted pages with optional browser renderin
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-MaxDepth <int>] [-MaxPages <int>] [-MaxConcurrentPageRequests <int>] [-MaxConcurrentPageRequestsPerOrigin <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ReleasePageContent] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Invoke-HtmlCrawl [-Url] <string> [-StreamPages] [-Process <scriptblock>] [-MaxDepth <int>] [-MaxPages <int>] [-MaxConcurrentPageRequests <int>] [-MaxConcurrentPageRequestsPerOrigin <int>] [-MaximumPageResponseBytes <int>] [-MaximumAssetResponseBytes <int>] [-MaximumTotalPageResponseBytes <Int64>] [-MaximumTotalAssetResponseBytes <Int64>] [-Render] [-AutoRender] [-IncludeExternal] [-IncludeSubdomains] [-PathPrefix <string>] [-UseCanonicalUrls] [-DeduplicatePages] [-KeepTrackingQueryParameters] [-AllowAnyContentType] [-AllowAssetUrls] [-DownloadAssets] [-KeepRemoteAssetUrls] [-KeepRemotePageUrls] [-NoSitemaps] [-IgnoreRobotsTxt] [-RobotsUserAgent <string>] [-OutPath <string>] [-ReleasePageContent] [-ResumePath <string>] [-RefreshPath <string>] [-CacheResponses] [-Profile <string>] [-ProfilePath <string>] [-AutoProfile] [-Scenario <HtmlCrawlScenario>] [-Selector <string>] [-ContentMode <HtmlCrawlContentMode>] [-CompareContentModes] [-ReaderMinimumWordCount <int>] [-ReaderMinimumScore <double>] [-ExcludeSelector <string[]>] [-ExcludeClass <string[]>] [-ExcludeId <string[]>] [-DisableSmartContentCleanup] [-HiddenContentMode <HtmlCrawlHiddenContentMode>] [-ClickSelector <string[]>] [-ClickText <string[]>] [-DismissSelector <string[]>] [-DismissText <string[]>] [-WaitForSelector <string>] [-WaitAfterLoadMs <int>] [-AutoScroll] [-AutoScrollSteps <int>] [-AutoScrollDelayMs <int>] [-InteractionDelayMs <int>] [-InteractionRepeatCount <int>] [-AutoRenderTextWordThreshold <int>] [-DelayMs <int>] [-Timeout <int>] [-HttpRetryCount <int>] [-UserAgent <string>] [-Header <hashtable>] [-IncludePattern <string[]>] [-ExcludePattern <string[]>] [-BlockResourcePattern <string[]>] [-SitemapUrl <string[]>] [-IgnoredQueryParameterPattern <string[]>] [-AllowedContentTypePattern <string[]>] [-IgnoredAssetPathPattern <string[]>] [-AssetIncludePattern <string[]>] [-AssetExcludePattern <string[]>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-Credential <pscredential>] [-Username <string>] [-Password <string>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-StorageStatePath <string>] [-Browser <HtmlBrowserEngine>] [-Visible] [-Clean] [-IncludeHtml] [-IncludeText] [-IncludeMarkdown] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-IncludeStructuredJson] [-StructuredJsonPreset <HtmlCrawlStructuredJsonPreset>] [-StructuredJsonSchema <string>] [-StructuredJsonSchemaPath <string>] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -40,6 +40,17 @@ Invoke-HtmlCrawl -Url https://example.com/docs -StreamPages | Where-Object Statu
 ### EXAMPLE 4
 ```powershell
 Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2
+```
+
+
+### EXAMPLE 5
+```powershell
+Invoke-HtmlCrawl -Url https://example.com/blog/ -MaxDepth 5 -Process {
+    foreach ($post in $_.Document.QuerySelectorAll('article h2 a')) { [pscustomobject]@{ Title = $post.TextContent.Trim(); Page = $_.Page.Url } }
+    $next = $_.Document.QuerySelector('a[rel=next]')
+    if ($next) { $_.Follow($next.GetAttribute('href')) }
+    $_.FollowLinks = $false
+}
 ```
 
 
@@ -1092,6 +1103,26 @@ Optional path prefix that queued URLs must stay under.
 
 ```yaml
 Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Process
+Runs a scriptblock on the pipeline thread for each successful page while the crawl runs and writes its output to the pipeline instead of the final crawl result.
+$_ is an HtmlCrawlPageContext with Page, Document (the parsed HTML), Depth and Data.
+Call $_.Follow(url, data, priority, render) to queue follow-up requests; they obey the crawl's scope, MaxDepth, MaxPages, robots and deduplication rules.
+Set $_.FollowLinks = $false to follow only those requests. With StreamPages, each page is written before its items.
+A terminating error in the scriptblock stops the crawl.
+
+```yaml
+Type: ScriptBlock
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

@@ -30934,6 +30934,22 @@ Wait-HtmlBrowserContent -Session $session -Text 'Products' -Selector 'main'</dev
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Process</maml:name>
+          <maml:description>
+            <maml:para>Runs a scriptblock on the pipeline thread for each successful page while the crawl runs and writes its output to the pipeline instead of the final crawl result.&#xD;
+$_ is an HtmlCrawlPageContext with Page, Document (the parsed HTML), Depth and Data.&#xD;
+Call $_.Follow(url, data, priority, render) to queue follow-up requests; they obey the crawl's scope, MaxDepth, MaxPages, robots and deduplication rules.&#xD;
+Set $_.FollowLinks = $false to follow only those requests. With StreamPages, each page is written before its items.&#xD;
+A terminating error in the scriptblock stops the crawl.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">ScriptBlock</command:parameterValue>
+          <dev:type>
+            <maml:name>ScriptBlock</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Profile</maml:name>
           <maml:description>
             <maml:para>Optional built-in crawl profile name used to preconfigure crawl behavior.</maml:para>
@@ -32122,6 +32138,22 @@ Pipeline output does not acknowledge completion of downstream processing. Export
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Process</maml:name>
+        <maml:description>
+          <maml:para>Runs a scriptblock on the pipeline thread for each successful page while the crawl runs and writes its output to the pipeline instead of the final crawl result.&#xD;
+$_ is an HtmlCrawlPageContext with Page, Document (the parsed HTML), Depth and Data.&#xD;
+Call $_.Follow(url, data, priority, render) to queue follow-up requests; they obey the crawl's scope, MaxDepth, MaxPages, robots and deduplication rules.&#xD;
+Set $_.FollowLinks = $false to follow only those requests. With StreamPages, each page is written before its items.&#xD;
+A terminating error in the scriptblock stops the crawl.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">ScriptBlock</command:parameterValue>
+        <dev:type>
+          <maml:name>ScriptBlock</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Profile</maml:name>
         <maml:description>
           <maml:para>Optional built-in crawl profile name used to preconfigure crawl behavior.</maml:para>
@@ -32536,6 +32568,18 @@ Pipeline output does not acknowledge completion of downstream processing. Export
       <command:example>
         <maml:title>EXAMPLE 4</maml:title>
         <dev:code>Invoke-HtmlCrawl -Url https://example.com/docs -MaxConcurrentPageRequests 4 -MaxConcurrentPageRequestsPerOrigin 2</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 5</maml:title>
+        <dev:code>Invoke-HtmlCrawl -Url https://example.com/blog/ -MaxDepth 5 -Process {
+    foreach ($post in $_.Document.QuerySelectorAll('article h2 a')) { [pscustomobject]@{ Title = $post.TextContent.Trim(); Page = $_.Page.Url } }
+    $next = $_.Document.QuerySelector('a[rel=next]')
+    if ($next) { $_.Follow($next.GetAttribute('href')) }
+    $_.FollowLinks = $false
+}</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

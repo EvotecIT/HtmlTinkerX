@@ -231,7 +231,10 @@ public static partial class HtmlCrawler {
             snapshot.Add(new HtmlCrawlPendingItem {
                 Url = item.Uri.AbsoluteUri,
                 ParentUrl = item.ParentUrl,
-                Depth = item.Depth
+                Depth = item.Depth,
+                Data = item.Data,
+                Priority = item.Priority,
+                Render = item.Render
             });
         }
 

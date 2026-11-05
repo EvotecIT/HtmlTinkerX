@@ -85,6 +85,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         ShouldContinueSecurity,
         PromptForCredential,
         PromptForCredentialOptions,
+        Invoke,
         DirectAccessBarrier,
         HookCompleted
     }
@@ -520,6 +521,28 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         yesToAll = reply.YesToAll;
         noToAll = reply.NoToAll;
         return reply.Result;
+    }
+
+    /// <summary>
+    /// Runs a callback on the PowerShell pipeline thread and returns its result, for work such as invoking a user scriptblock.
+    /// </summary>
+    /// <remarks>
+    /// The calling thread waits for the reply, as it does for ShouldProcess. Exceptions thrown by the callback are rethrown here.
+    /// Output written by the callback is delivered before later pipeline items.
+    /// </remarks>
+    protected object? InvokeOnPipelineThread(Func<object?> callback)
+    {
+        if (callback is null)
+            throw new ArgumentNullException(nameof(callback));
+
+        ThrowIfStopped();
+        if (CanAccessPipelineDirectly)
+        {
+            using var pipelineContext = EnterDirectPipelineInteraction();
+            return callback();
+        }
+
+        return RequestPipelineReply(callback, PipelineType.Invoke);
     }
 
     /// <summary>Thread-safe credential prompt bridge for asynchronous cmdlet code.</summary>

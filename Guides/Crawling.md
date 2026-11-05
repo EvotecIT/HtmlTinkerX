@@ -266,6 +266,57 @@ checkpoints.
 Pipeline output does not acknowledge that downstream processing completed.
 Export files may be committed after a page is emitted. For a sink that must
 finish its work before the checkpoint advances, use the awaited C# observer.
+
+## Write crawl logic in code
+
+A page handler runs for each successful page while the crawl runs. It gets the
+page and its parsed HTML, can emit items of any type and can queue follow-up
+requests with optional data, a priority and a render flag. Follow-up requests
+obey the crawl's scope, `MaxDepth`, `MaxPages`, robots.txt and URL
+deduplication, exactly like discovered links. Discovered links are still
+followed unless the handler sets `FollowLinks` to false.
+
+`HtmlCrawler.StreamAsync` returns page entries, item entries and a final entry
+with the crawl result, so you can use items before the crawl finishes:
+
+```csharp
+var options = new HtmlCrawlOptions { MaxDepth = 10, MaxPages = 200 };
+await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync("https://example.com/blog/", options, (page, token) => {
+    foreach (IElement post in page.Document.QuerySelectorAll("article h2 a")) {
+        page.Emit(new { Title = post.TextContent.Trim(), Url = post.GetAttribute("href") });
+    }
+    string? next = page.Document.QuerySelector("a[rel=next]")?.GetAttribute("href");
+    if (next != null) page.Follow(next, new Dictionary<string, string> { ["source"] = "pagination" }, priority: 10);
+    page.FollowLinks = false;
+    return Task.CompletedTask;
+})) {
+    if (entry.Kind == HtmlCrawlStreamEntryKind.Item) Console.WriteLine(entry.Item);
+}
+```
+
+In PowerShell, `-Process` runs a scriptblock on the pipeline thread with the
+page context in `$_`. Its output goes to the pipeline as the crawl runs:
+
+```powershell
+Invoke-HtmlCrawl -Url 'https://example.com/blog/' -MaxDepth 10 -MaxPages 200 -Process {
+    foreach ($post in $_.Document.QuerySelectorAll('article h2 a')) {
+        [pscustomobject]@{ Title = $post.TextContent.Trim(); Url = $post.GetAttribute('href') }
+    }
+    $next = $_.Document.QuerySelector('a[rel=next]')
+    if ($next) { $_.Follow($next.GetAttribute('href'), @{ source = 'pagination' }, 10) }
+    $_.FollowLinks = $false
+} | Export-Csv -Path './posts.csv' -NoTypeInformation
+```
+
+The followed page sees the attached values in `Data` (`$_.Data['source']`).
+They are stored as strings, so pending requests keep them in checkpoints and a
+resumed crawl continues with them. Items are not saved in the result or in
+checkpoints, and a resumed crawl does not run the handler again for pages it
+already committed. A handler failure stops the crawl and keeps the last
+checkpoint, as an observer failure does. The crawl waits while the consumer
+handles each entry, and ending the enumeration early cancels the crawl.
+Rendered follow-ups (`render: true`) need `MaxConcurrentPageRequests` set to one.
+
 ## Release saved page content
 
 For larger crawls, use `-ReleasePageContent` in PowerShell or

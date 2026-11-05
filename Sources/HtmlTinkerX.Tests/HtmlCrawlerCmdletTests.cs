@@ -95,5 +95,39 @@ public partial class HtmlCrawlerTests {
         Assert.Equal(HtmlCrawlPageStatus.Failed, pages[1].Status);
         Assert.Equal(404, pages[1].StatusCode);
     }
+
+    [Fact]
+    public void InvokeHtmlCrawl_ProcessWritesScriptOutputAndFollowsItsRequests() {
+        var requested = new List<string>();
+        using HttpListener server = StartServer(new Dictionary<string, string> {
+            ["/"] = "<main><h1>Home</h1><a href='/linked'>Linked</a></main>",
+            ["/next"] = "<main><h1>Next</h1></main>"
+        }, out string root, onRequest: path => { lock (requested) requested.Add(path); });
+        InitialSessionState state = InitialSessionState.Create();
+        state.LanguageMode = PSLanguageMode.FullLanguage;
+        state.Commands.Add(new SessionStateCmdletEntry("Invoke-HtmlCrawl", typeof(CmdletInvokeHtmlCrawl), null));
+        using Runspace runspace = RunspaceFactory.CreateRunspace(state);
+        runspace.Open();
+        using PowerShell command = PowerShell.Create();
+        command.Runspace = runspace;
+        command.AddCommand("Invoke-HtmlCrawl")
+            .AddParameter("Url", root)
+            .AddParameter("MaxPages", 5)
+            .AddParameter("NoSitemaps", true)
+            .AddParameter("IgnoreRobotsTxt", true)
+            .AddParameter("Process", ScriptBlock.Create("""
+                [pscustomobject]@{ Heading = $_.Document.QuerySelector('h1').TextContent; From = $_.Data['from'] }
+                if ($_.Depth -eq 0) { $_.Follow('/next', @{ from = 'home' }) }
+                $_.FollowLinks = $false
+                """));
+
+        var output = command.Invoke();
+
+        Assert.Empty(command.Streams.Error);
+        Assert.Equal(new[] { "Home", "Next" }, output.Select(item => (string)item.Properties["Heading"].Value));
+        Assert.Null(output[0].Properties["From"].Value);
+        Assert.Equal("home", output[1].Properties["From"].Value);
+        lock (requested) Assert.DoesNotContain("/linked", requested);
+    }
 }
 #endif
