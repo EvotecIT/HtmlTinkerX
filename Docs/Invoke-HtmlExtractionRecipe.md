@@ -39,6 +39,13 @@ $result.DriftReport
 ```
 
 
+### EXAMPLE 3
+```powershell
+$result = Invoke-HtmlExtractionRecipe -Path .\releases.json -Content $html
+$result.DriftReport.RelocationCandidates | Format-Table Selector, Confidence, MatchCount, Reasons
+```
+
+
 ## PARAMETERS
 
 ### -AllowExternalEndpoint

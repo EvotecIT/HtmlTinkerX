@@ -13,6 +13,7 @@ namespace HtmlTinkerX;
 
 public static partial class HtmlBrowserlessExtraction {
     private const int MaximumBaselineShapes = 256;
+    private const int MaximumItemFingerprints = 3;
     private const int MaximumShapeNodes = 4096;
     private const int MaximumShapeDepth = 32;
     // Object descriptors add containers around each source level; keep serialization
@@ -40,7 +41,9 @@ public static partial class HtmlBrowserlessExtraction {
     /// <param name="html">HTML whose extracted dataset has been inspected and accepted.</param>
     /// <returns>A detached recipe containing metadata only. Existing count and field rules remain in force.</returns>
     /// <remarks>Ordinary values and record ordering are ignored. Baselines accept up to 256 distinct shapes,
-    /// with at most 4096 nodes and depth 32 per item. Capturing a new baseline is an explicit acceptance action.</remarks>
+    /// with at most 4096 nodes and depth 32 per item. Capturing a new baseline is an explicit acceptance action.
+    /// The baseline is version 2 and stores fingerprints of the first three items, so a later layout change can
+    /// report relocation candidates. Fingerprints keep only a hash of item text.</remarks>
     public static HtmlBrowserlessExtractionRecipe CaptureDomRecipeBaseline(
         HtmlBrowserlessExtractionRecipe recipe, string html) {
         if (recipe == null) throw new ArgumentNullException(nameof(recipe));
@@ -50,6 +53,11 @@ public static partial class HtmlBrowserlessExtraction {
         copy.Baseline = null;
         copy.Baseline = CreateExtractionBaseline(copy, ExtractDomRecipe(copy, html));
         copy.Baseline.CollectionConfidence = HtmlDomExtraction.GetSelectorConfidence(html, copy.Selector);
+        using (AngleSharp.Dom.IDocument document = HtmlParser.ParseWithAngleSharp(html)) {
+            copy.Baseline.ItemFingerprints = document.QuerySelectorAll(copy.Selector).Take(MaximumItemFingerprints)
+                .Select(HtmlElementFingerprint.Capture).ToArray();
+        }
+        copy.Baseline.Version = 2;
         return copy;
     }
 
@@ -81,7 +89,10 @@ public static partial class HtmlBrowserlessExtraction {
         HtmlBrowserlessExtractionRecipe recipe, HtmlBrowserlessExtractionResult result, string? html = null,
         CancellationToken cancellationToken = default) {
         HtmlExtractionBaseline? baseline = recipe.Baseline;
-        if (baseline == null || !result.Success) return result;
+        // A selector that matches nothing is the clearest layout-change signal; fingerprinted baselines compare it
+        // so they can suggest where the items went. Version 1 baselines keep their original behaviour.
+        bool emptyDom = html != null && baseline?.ItemFingerprints != null && result.Items.Count == 0;
+        if (baseline == null || (!result.Success && !emptyDom)) return result;
         string[] shapes;
         try {
             if (result.ResponseShapeError != null) throw new InvalidDataException(result.ResponseShapeError);
@@ -110,17 +121,45 @@ public static partial class HtmlBrowserlessExtraction {
         result.DriftReport = drift;
         if (!drift.IsCompatible) {
             result.Success = false;
-            result.Warnings = result.Warnings.Concat(new[] {
+            List<string> warnings = new(result.Warnings) {
                 "Extraction structure or collection confidence changed from the accepted baseline. Inspect DriftReport before accepting the dataset."
-            }).ToArray();
+            };
+            if (baseline.ItemFingerprints != null) {
+                drift.RelocationCandidates = FindRelocationCandidates(recipe.Selector, baseline.ItemFingerprints, html!);
+                if (drift.RelocationCandidates.Count > 0) {
+                    HtmlSelectorRelocationCandidate top = drift.RelocationCandidates[0];
+                    warnings.Add($"Items may have moved: '{top.Selector}' matches {top.MatchCount} element(s) with {top.Confidence} confidence. "
+                        + "Review DriftReport.RelocationCandidates before updating the recipe.");
+                }
+            }
+            result.Warnings = warnings.ToArray();
         }
         return result;
+    }
+
+    private static IReadOnlyList<HtmlSelectorRelocationCandidate> FindRelocationCandidates(
+        string selector, IReadOnlyList<HtmlElementFingerprint> fingerprints, string html) {
+        using AngleSharp.Dom.IDocument document = HtmlParser.ParseWithAngleSharp(html);
+        // Each accepted item votes; a selector keeps the best score any of them gave it.
+        return fingerprints
+            .SelectMany(fingerprint => HtmlSelectorRelocator.FindCandidates(document, selector, fingerprint))
+            .GroupBy(static candidate => candidate.Selector, StringComparer.Ordinal)
+            .Select(static group => group.OrderByDescending(static candidate => candidate.Score).First())
+            .OrderByDescending(static candidate => candidate.Score)
+            .ThenBy(static candidate => candidate.MatchCount)
+            .ThenBy(static candidate => candidate.Selector, StringComparer.Ordinal)
+            .Take(5)
+            .Select((candidate, index) => {
+                candidate.Index = index;
+                return candidate;
+            })
+            .ToArray();
     }
 
     private static void ValidateRecipeBaseline(HtmlBrowserlessExtractionRecipe recipe) {
         HtmlExtractionBaseline? baseline = recipe.Baseline;
         if (baseline == null) return;
-        if (baseline.Version != 1 || baseline.ItemCount <= 0 || baseline.ItemShapes == null
+        if (baseline.Version is not (1 or 2) || baseline.ItemCount <= 0 || baseline.ItemShapes == null
             || baseline.ItemShapes.Count == 0 || baseline.ItemShapes.Count > MaximumBaselineShapes
             || baseline.ItemShapes.Any(string.IsNullOrWhiteSpace)
             || !string.Equals(baseline.SourceKind, recipe.SourceKind, StringComparison.OrdinalIgnoreCase)) {
@@ -129,6 +168,17 @@ public static partial class HtmlBrowserlessExtraction {
         if (baseline.CollectionConfidence != null
             && (!IsDomRecipe(recipe) || ConfidenceRank(baseline.CollectionConfidence) == 0)) {
             throw new ArgumentException("Collection confidence is High, Medium or Low and applies only to DOM recipes.", nameof(recipe));
+        }
+        IReadOnlyList<HtmlElementFingerprint>? fingerprints = baseline.ItemFingerprints;
+        if ((baseline.Version == 2) != (fingerprints != null)) {
+            throw new ArgumentException("Version 2 baselines store item fingerprints; version 1 baselines do not.", nameof(recipe));
+        }
+        if (fingerprints != null && (!IsDomRecipe(recipe) || fingerprints.Count == 0 || fingerprints.Count > MaximumItemFingerprints
+            || fingerprints.Any(static fingerprint => fingerprint == null || string.IsNullOrWhiteSpace(fingerprint.TagName)
+                || fingerprint.TagPath == null || fingerprint.TagPath.Count > HtmlElementFingerprint.MaximumPathLength
+                || fingerprint.ChildTags == null || fingerprint.ChildTags.Count > HtmlElementFingerprint.MaximumChildTags
+                || fingerprint.Classes == null || fingerprint.Attributes == null || fingerprint.TextHash == null))) {
+            throw new ArgumentException($"Item fingerprints apply only to DOM recipes, with one to {MaximumItemFingerprints} complete bounded fingerprints.", nameof(recipe));
         }
     }
 

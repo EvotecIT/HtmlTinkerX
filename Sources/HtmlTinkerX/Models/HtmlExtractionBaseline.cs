@@ -6,7 +6,7 @@ namespace HtmlTinkerX;
 
 /// <summary>Accepted extraction structure saved with a recipe, without extracted values or raw content.</summary>
 public sealed class HtmlExtractionBaseline {
-    /// <summary>Baseline schema version.</summary>
+    /// <summary>Baseline schema version: 1 for structure only, 2 when DOM item fingerprints are stored.</summary>
     public int Version { get; set; } = 1;
     /// <summary>Source kind to which this baseline belongs.</summary>
     public string SourceKind { get; set; } = string.Empty;
@@ -20,6 +20,9 @@ public sealed class HtmlExtractionBaseline {
     /// <summary>Accepted High, Medium or Low structure confidence for a DOM recipe.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CollectionConfidence { get; set; }
+    /// <summary>Fingerprints of up to three accepted DOM items, used to suggest relocated selectors on drift. Requires version 2.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<HtmlElementFingerprint>? ItemFingerprints { get; set; }
 }
 
 /// <summary>Comparison with a recipe's accepted structure. Ordinary value changes are ignored.</summary>
@@ -36,6 +39,9 @@ public sealed class HtmlExtractionDriftReport {
     public string? BaselineConfidence { get; set; }
     /// <summary>Current collection discovery confidence, when applicable.</summary>
     public string? CurrentConfidence { get; set; }
+    /// <summary>Elements that may be the accepted items after a layout change, when the baseline has fingerprints.
+    /// These are suggestions to review; the recipe is not changed.</summary>
+    public IReadOnlyList<HtmlSelectorRelocationCandidate> RelocationCandidates { get; set; } = Array.Empty<HtmlSelectorRelocationCandidate>();
     /// <summary>Whether the item count changed. Declared count bounds remain authoritative.</summary>
     public bool ItemCountChanged => BaselineItemCount != CurrentItemCount;
     /// <summary>Whether the set of item structures changed.</summary>

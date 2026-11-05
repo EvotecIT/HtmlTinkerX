@@ -9,6 +9,9 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Executes a browserless extraction recipe.
 /// </summary>
+/// <remarks>When a DOM recipe's baseline stores item fingerprints and the items no longer match, the result's
+/// DriftReport.RelocationCandidates suggests where they moved and each candidate is written as a warning.
+/// The recipe is not changed.</remarks>
 /// <example>
 ///   <summary>Run a recipe from disk</summary>
 ///   <code>Invoke-HtmlExtractionRecipe -Path .\recipe.json -AllowHttpFetch</code>
@@ -20,6 +23,13 @@ namespace PSParseHTML.PowerShell;
 /// $result.Success
 /// $result.DomReport.Fields
 /// $result.DriftReport
+///   </code>
+/// </example>
+/// <example>
+///   <summary>Review where items moved after a layout change broke the saved selector</summary>
+///   <code>
+/// $result = Invoke-HtmlExtractionRecipe -Path .\releases.json -Content $html
+/// $result.DriftReport.RelocationCandidates | Format-Table Selector, Confidence, MatchCount, Reasons
 ///   </code>
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlExtractionRecipe", DefaultParameterSetName = ParameterSetRecipe)]
@@ -70,7 +80,12 @@ public sealed class CmdletInvokeHtmlExtractionRecipe : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         HtmlBrowserlessExtractionRecipe recipe = await GetRecipeAsync().ConfigureAwait(false);
         if (Content != null) {
-            WriteObject(HtmlBrowserlessExtraction.ExtractDomRecipe(recipe, Content, IncludeRawContent.IsPresent));
+            HtmlBrowserlessExtractionResult domResult = HtmlBrowserlessExtraction.ExtractDomRecipe(recipe, Content, IncludeRawContent.IsPresent);
+            foreach (HtmlSelectorRelocationCandidate candidate in domResult.DriftReport?.RelocationCandidates ?? []) {
+                WriteWarning($"Items may have moved to '{candidate.Selector}' ({candidate.Confidence} confidence, "
+                    + $"{candidate.MatchCount} match(es)): {string.Join("; ", candidate.Reasons)}.");
+            }
+            WriteObject(domResult);
             return;
         }
         ValidateProxy(Proxy, ProxyCredential);
