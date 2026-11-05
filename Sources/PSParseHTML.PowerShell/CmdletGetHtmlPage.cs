@@ -16,6 +16,14 @@ namespace PSParseHTML.PowerShell;
 ///   <code>$page = Get-HtmlPage -Url https://example.org; $page.Headings; $page.Collections</code>
 /// </example>
 /// <example>
+///   <summary>Read a page behind a CDN, rendering it in a browser only when the CDN blocks the request</summary>
+///   <code>Get-HtmlPage -Url https://support.microsoft.com/kb/5127692 -BrowserHeaders -RetryCount 2 -RenderWhenBlocked</code>
+/// </example>
+/// <example>
+///   <summary>Report why a page was refused</summary>
+///   <code>try { Get-HtmlPage -Url $url } catch { $_.TargetObject.Kind; $_.TargetObject.Provider; $_.TargetObject.Excerpt }</code>
+/// </example>
+/// <example>
 ///   <summary>Inspect the best inferred repeated collection as PowerShell objects</summary>
 ///   <code>$page = Get-HtmlPage -Content $html; $page.Collections[0].Items</code>
 /// </example>
@@ -82,9 +90,9 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = ParameterSetSnapshot, Position = 0)]
     public HtmlRenderedPageSnapshot? RenderedSnapshot { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
+    /// <summary>Proxy server address used when downloading by URL. Give several to send each attempt through the next one.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
+    public string[]? Proxy { get; set; }
 
     /// <summary>Credentials used with the proxy server.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
@@ -99,9 +107,27 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
     [Alias("Headers")]
     public Hashtable? Header { get; set; }
 
+    /// <summary>Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    [ValidateRange(0, 10)]
+    public int RetryCount { get; set; }
+
+    /// <summary>Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    public SwitchParameter BrowserHeaders { get; set; }
+
+    /// <summary>Renders the page in a headless browser when a Cloudflare challenge or a recognised CDN block page is returned.</summary>
+    [Parameter(ParameterSetName = ParameterSetUrl)]
+    public SwitchParameter RenderWhenBlocked { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateProxy(Proxy?.FirstOrDefault(static proxy => !string.IsNullOrWhiteSpace(proxy)), ProxyCredential);
+        if (BrowserHeaders.IsPresent && !string.IsNullOrWhiteSpace(UserAgent)) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentException("BrowserHeaders sets its own consistent User-Agent; do not combine it with UserAgent."),
+                "BrowserHeadersWithUserAgent", ErrorCategory.InvalidArgument, UserAgent));
+        }
         string staticHtml = await ReadHtmlAsync().ConfigureAwait(false);
         if (ParameterSetName == ParameterSetSnapshot && string.IsNullOrWhiteSpace(RenderedSnapshot?.Html)) {
             throw new ArgumentException("RenderedSnapshot must contain HTML.", nameof(RenderedSnapshot));
@@ -146,18 +172,52 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
         }
 
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, UserAgent, Header);
-            HtmlHttpTextResult result = await HtmlUtilities.GetTextWithProperEncodingAsync(
-                client,
-                Url.ToString(),
-                fetchOptions: null,
-                cancellationToken: CancelToken).ConfigureAwait(false);
+            using HttpClient client = CreateUrlClient();
+            HtmlHttpTextResult result;
+            try {
+                result = await HtmlUtilities.GetTextWithProperEncodingAsync(
+                    client,
+                    Url.ToString(),
+                    fetchOptions: null,
+                    cancellationToken: CancelToken).ConfigureAwait(false);
+            } catch (HtmlHttpException exception) {
+                ThrowTerminatingError(new ErrorRecord(exception, "HtmlHttp" + exception.Kind, GetErrorCategory(exception.Kind), exception.Failure));
+                throw;
+            }
             _effectiveUrl = result.FinalUri ?? Url;
             return result.Content;
         }
 
         return Content;
     }
+
+    private HttpClient CreateUrlClient() {
+        bool fetchPolicy = MyInvocation.BoundParameters.ContainsKey(nameof(RetryCount)) || BrowserHeaders.IsPresent
+            || RenderWhenBlocked.IsPresent || Proxy?.Length > 1;
+        if (!fetchPolicy) return HttpClientHelper.Create(Proxy?.FirstOrDefault(), ProxyCredential, UserAgent, Header);
+
+        HtmlFetchPolicy policy = new() {
+            RetryCount = MyInvocation.BoundParameters.ContainsKey(nameof(RetryCount)) ? RetryCount : 1,
+            BrowserHeaders = BrowserHeaders.IsPresent ? HtmlBrowserHeaderProfile.Chrome() : null,
+            OnRetry = (host, reason) => WriteVerbose($"Retrying {host}: {reason}")
+        };
+        if (RenderWhenBlocked.IsPresent) {
+            policy.Renderer = HtmlBrowser.CreateFetchRenderer();
+            policy.OnBlocked = (_, failure, _) => {
+                bool render = failure.Kind is HtmlHttpFailureKind.Challenge or HtmlHttpFailureKind.BlockPage;
+                WriteVerbose(render ? $"Rendering in a browser after {failure.Provider ?? failure.Kind.ToString()} blocked the request." : failure.ToString());
+                return Task.FromResult(render ? HtmlBlockedAction.Render : HtmlBlockedAction.Fail);
+            };
+        }
+        return HttpClientHelper.CreateFetchClient(policy, Proxy, ProxyCredential, UserAgent, Header);
+    }
+
+    private static ErrorCategory GetErrorCategory(HtmlHttpFailureKind kind) => kind switch {
+        HtmlHttpFailureKind.AuthenticationRequired => ErrorCategory.AuthenticationError,
+        HtmlHttpFailureKind.RateLimited => ErrorCategory.LimitsExceeded,
+        HtmlHttpFailureKind.HttpError => ErrorCategory.ConnectionError,
+        _ => ErrorCategory.PermissionDenied
+    };
 
     private static PSObject ProjectDocument(HtmlPageDocument document) {
         PSObject result = NewObject("PSParseHTML.HtmlPageDocument");

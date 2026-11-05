@@ -21,7 +21,7 @@ Get-HtmlPage [-Path] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-Mini
 
 ### Url
 ```powershell
-Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [<CommonParameters>]
+Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [<CommonParameters>]
 ```
 
 ### Snapshot
@@ -42,6 +42,20 @@ $page = Get-HtmlPage -Url https://example.org; $page.Headings; $page.Collections
 
 ### EXAMPLE 2
 ```powershell
+Get-HtmlPage -Url https://support.microsoft.com/kb/5127692 -BrowserHeaders -RetryCount 2 -RenderWhenBlocked
+```
+
+Reads a page behind a CDN, rendering it in a browser only when the CDN blocks the request.
+
+### EXAMPLE 3
+```powershell
+try { Get-HtmlPage -Url $url } catch { $_.TargetObject.Kind; $_.TargetObject.Provider; $_.TargetObject.Excerpt }
+```
+
+Reports why a page was refused.
+
+### EXAMPLE 4
+```powershell
 $page = Get-HtmlPage -Content $html; $page.Collections[0].Items
 ```
 
@@ -54,6 +68,22 @@ Base URL used to resolve relative links and resources.
 ```yaml
 Type: Uri
 Parameter Sets: Content, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -BrowserHeaders
+Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
 Aliases: None
 Possible values:
 
@@ -225,10 +255,10 @@ Accept wildcard characters: False
 ```
 
 ### -Proxy
-Proxy server address used when downloading by URL.
+Proxy server address used when downloading by URL. Give several to send each attempt through the next one.
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: Url
 Aliases: None
 Possible values:
@@ -256,6 +286,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -RenderWhenBlocked
+Renders the page in a headless browser when a Cloudflare challenge or a recognised CDN block page is returned.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -RenderedSnapshot
 Rendered browser snapshot to read instead of the static source HTML.
 
@@ -268,6 +314,22 @@ Possible values:
 Required: True
 Position: 0
 Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RetryCount
+Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds.
+
+```yaml
+Type: Int32
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 0
 Accept pipeline input: False
 Accept wildcard characters: False
 ```

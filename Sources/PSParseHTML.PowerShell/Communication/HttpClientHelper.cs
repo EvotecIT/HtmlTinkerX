@@ -29,8 +29,10 @@ internal static class HttpClientHelper {
     /// <param name="userAgent">Optional user agent override.</param>
     /// <param name="headers">Optional request header overrides.</param>
     /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
-    internal static HttpClient Create(string? proxy, PSCredential? credential, string? userAgent, IDictionary? headers) {
-        HttpClient client = Create(proxy, credential);
+    internal static HttpClient Create(string? proxy, PSCredential? credential, string? userAgent, IDictionary? headers) =>
+        ApplyHeaders(Create(proxy, credential), userAgent, headers);
+
+    private static HttpClient ApplyHeaders(HttpClient client, string? userAgent, IDictionary? headers) {
         if (headers != null) {
             foreach (DictionaryEntry entry in headers) {
                 if (entry.Key == null || entry.Value == null) {
@@ -49,6 +51,22 @@ internal static class HttpClientHelper {
         }
 
         return client;
+    }
+
+    /// <summary>
+    /// Creates a client that reads through <see cref="HtmlFetchHandler"/>, rotating through the proxies when several are given.
+    /// </summary>
+    /// <param name="policy">Retry, header and blocked-page policy.</param>
+    /// <param name="proxies">Proxy addresses; null or empty uses <see cref="HtmlHttpClientFactory.DefaultProxy"/>.</param>
+    /// <param name="credential">Credentials for every proxy.</param>
+    /// <param name="userAgent">Optional user agent override.</param>
+    /// <param name="headers">Optional request header overrides.</param>
+    /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
+    internal static HttpClient CreateFetchClient(HtmlFetchPolicy policy, string[]? proxies, PSCredential? credential, string? userAgent, IDictionary? headers) {
+        HttpMessageHandler? inner = proxies is { Length: > 0 }
+            ? HtmlProxyRotator.Create(proxies, credential?.GetNetworkCredential())
+            : null;
+        return ApplyHeaders(HtmlHttpClientFactory.Create(policy, inner), userAgent, headers);
     }
 
     /// <summary>
