@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 namespace HtmlTinkerX;
 
 public static partial class HtmlCrawler {
+    private static readonly TimeSpan HttpRetryBaseDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan HttpRetryMaximumDelay = TimeSpan.FromSeconds(30);
+
     private static HttpClient CreateClient(HtmlCrawlOptions options, Uri startUri) {
         NetworkCredential? proxyCredential = string.IsNullOrEmpty(options.ProxyUsername) && string.IsNullOrEmpty(options.ProxyPassword)
             ? null : new NetworkCredential(options.ProxyUsername, options.ProxyPassword);
@@ -57,52 +60,50 @@ public static partial class HtmlCrawler {
                     pageRequest.CacheRequestHeaders = GetCacheRequestHeaders(outgoing, cookies.GetCookieHeader(uri));
                     if (CanValidateCachedPage(pageRequest.CachedPage, uri, options, pageRequest.CacheRequestHeaders)) {
                         HtmlCrawlPage cached = pageRequest.CachedPage!;
-                        if (EntityTagHeaderValue.TryParse(cached.EntityTag, out EntityTagHeaderValue? tag) && tag.Tag != "*") {
-                            outgoing.Headers.IfNoneMatch.Add(tag);
-                        } else {
-                            outgoing.Headers.IfModifiedSince = cached.LastModified;
-                        }
-                        pageRequest.CacheValidated = true;
+                        pageRequest.CacheValidated = HtmlFetchRules.ApplyValidators(outgoing, cached.EntityTag, cached.LastModified);
                     }
                 }
-                HtmlCrawlRequestScheduler? scheduler = request is CrawlHttpRequest ? options.PageRequestScheduler : null;
-                IDisposable? originLease = scheduler == null ? null : await scheduler.EnterAsync(uri, cancellationToken).ConfigureAwait(false);
+                HtmlHostRequestGate? gate = request is CrawlHttpRequest ? options.PageRequestGate : null;
+                IDisposable? originLease = null;
+                if (gate != null) {
+                    int spacing = options.PageRequestDelay == null ? 0 : await options.PageRequestDelay(uri, cancellationToken).ConfigureAwait(false);
+                    originLease = await gate.EnterAsync(uri, TimeSpan.FromMilliseconds(spacing), cancellationToken).ConfigureAwait(false);
+                }
                 HttpResponseMessage response;
                 try {
                     response = await transport.SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                     if (originLease != null) {
-                        response.Content = new HtmlCrawlScheduledContent(response.Content, originLease);
+                        response.Content = new HtmlLeasedContent(response.Content, originLease);
                         originLease = null;
                     }
                 } finally {
                     originLease?.Dispose();
                 }
                 int status = (int)response.StatusCode;
-                if (options.HttpRetryCount > 0 && IsTransientHttpStatus(status)) {
+                if (options.HttpRetryCount > 0 && HtmlFetchRules.IsTransientStatus(status)) {
                     // A terminal response can still ask other queued pages to wait.
-                    scheduler?.Defer(uri, GetServerRetryDelay(response) ?? TimeSpan.Zero);
+                    gate?.Defer(uri, HtmlFetchRules.GetServerRetryDelay(response) ?? TimeSpan.Zero);
                 }
-                if (request.Method == HttpMethod.Get && retries < options.HttpRetryCount && IsTransientHttpStatus(status)) {
-                    TimeSpan delay = GetHttpRetryDelay(response, retries);
-                    scheduler?.Defer(uri, delay);
+                if (request.Method == HttpMethod.Get && retries < options.HttpRetryCount && HtmlFetchRules.IsTransientStatus(status)) {
+                    TimeSpan delay = HtmlFetchRules.GetRetryDelay(response, retries, HttpRetryBaseDelay, HttpRetryMaximumDelay);
+                    gate?.Defer(uri, delay);
                     // Keep the failure when the server's minimum wait exceeds the whole request budget.
                     if (delay.TotalMilliseconds >= options.Timeout) return response;
                     response.Dispose();
-                    await WaitForHttpRetryDelayAsync(delay, cancellationToken).ConfigureAwait(false);
+                    await HtmlFetchRules.WaitAsync(delay, cancellationToken).ConfigureAwait(false);
                     retries++;
                     continue;
                 }
-                Uri? location = response.Headers.Location;
-                if (location == null || !(status == 301 || status == 302 || status == 303 || status == 307 || status == 308)) {
+                if (!HtmlFetchRules.TryGetRedirectTarget(response, uri, out Uri? target)) {
                     return response;
                 }
-                TimeSpan redirectDelay = options.HttpRetryCount > 0 ? GetServerRetryDelay(response) ?? TimeSpan.Zero : TimeSpan.Zero;
-                scheduler?.Defer(uri, redirectDelay);
+                TimeSpan redirectDelay = options.HttpRetryCount > 0 ? HtmlFetchRules.GetServerRetryDelay(response) ?? TimeSpan.Zero : TimeSpan.Zero;
+                gate?.Defer(uri, redirectDelay);
                 if (redirectDelay.TotalMilliseconds >= options.Timeout) return response;
                 response.Dispose();
                 if (redirects++ >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");
-                if (redirectDelay > TimeSpan.Zero) await WaitForHttpRetryDelayAsync(redirectDelay, cancellationToken).ConfigureAwait(false);
-                uri = location.IsAbsoluteUri ? location : new Uri(uri, location);
+                if (redirectDelay > TimeSpan.Zero) await HtmlFetchRules.WaitAsync(redirectDelay, cancellationToken).ConfigureAwait(false);
+                uri = target!;
             }
         }
 

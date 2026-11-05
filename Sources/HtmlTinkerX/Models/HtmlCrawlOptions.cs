@@ -49,7 +49,10 @@ public sealed class HtmlCrawlOptions {
     /// <remarks>The response holds its origin slot until its body is closed. One is the default.</remarks>
     public int MaxConcurrentPageRequestsPerOrigin { get; set; } = 1;
 
-    internal HtmlCrawlRequestScheduler? PageRequestScheduler { get; set; }
+    internal HtmlHostRequestGate? PageRequestGate { get; set; }
+
+    /// <summary>Per-origin start spacing in milliseconds (crawl delay and robots.txt) for gated page requests.</summary>
+    internal System.Func<System.Uri, System.Threading.CancellationToken, System.Threading.Tasks.Task<int>>? PageRequestDelay { get; set; }
 
     /// <summary>Maximum static page or robots.txt response size in bytes.</summary>
     public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
@@ -406,16 +409,7 @@ public sealed class HtmlCrawlOptions {
     public IList<string> AssetExcludePatterns { get; set; } = new List<string>();
 
     /// <summary>Query-parameter patterns to remove during URL normalization when tracking cleanup is enabled.</summary>
-    public IList<string> IgnoredQueryParameterPatterns { get; set; } = new List<string> {
-        "utm_*",
-        "fbclid",
-        "gclid",
-        "msclkid",
-        "mc_*",
-        "_hs*",
-        "vero_*",
-        "yclid"
-    };
+    public IList<string> IgnoredQueryParameterPatterns { get; set; } = new List<string>(HtmlUrlNormalizer.TrackingParameterPatterns);
 
     /// <summary>Optional Playwright route patterns to block when rendering.</summary>
     public IList<string> BlockResourcePatterns { get; set; } = new List<string>();

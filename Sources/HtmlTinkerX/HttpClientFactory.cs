@@ -37,11 +37,7 @@ public static class HtmlHttpClientFactory {
     /// <param name="credential">Optional proxy credentials. When omitted, <see cref="DefaultProxyCredential"/> is used.</param>
     /// <param name="allowAutoRedirect">Whether the handler should automatically follow redirects.</param>
     public static HttpClient Create(string? proxy = null, ICredentials? credential = null, bool allowAutoRedirect = true) {
-        HttpClientHandler handler = new() {
-            AllowAutoRedirect = allowAutoRedirect
-        };
-        ConfigureProxy(handler, proxy, credential);
-        HttpClient client = new HttpClient(handler, disposeHandler: true);
+        HttpClient client = new HttpClient(CreateHandler(proxy, credential, allowAutoRedirect), disposeHandler: true);
         ApplyDefaults(client);
         return client;
     }
@@ -135,6 +131,31 @@ public static class HtmlHttpClientFactory {
         HttpClient client = new HttpClient(handler, disposeHandler: true);
         ApplyDefaults(client);
         return client;
+    }
+
+    /// <summary>
+    /// Creates a client that reads through an <see cref="HtmlFetchHandler"/> with the given policy: host pacing,
+    /// retries, checked redirects, conditional GETs, browser headers and blocked-page handling.
+    /// </summary>
+    /// <param name="policy">How requests are paced, retried, redirected and handled when blocked.</param>
+    /// <param name="innerHandler">
+    /// Optional handler that sends requests, such as an <see cref="HtmlProxyRotator"/>; it must not follow redirects
+    /// automatically. When omitted, a handler using <see cref="DefaultProxy"/> is created.
+    /// </param>
+    public static HttpClient Create(HtmlFetchPolicy policy, HttpMessageHandler? innerHandler = null) {
+        if (policy == null) throw new ArgumentNullException(nameof(policy));
+        HttpMessageHandler inner = innerHandler ?? CreateHandler(proxy: null, credential: null, allowAutoRedirect: false);
+        HttpClient client = new(new HtmlFetchHandler(policy, inner), disposeHandler: true);
+        ApplyDefaults(client);
+        return client;
+    }
+
+    internal static HttpClientHandler CreateHandler(string? proxy, ICredentials? credential, bool allowAutoRedirect) {
+        HttpClientHandler handler = new() {
+            AllowAutoRedirect = allowAutoRedirect
+        };
+        ConfigureProxy(handler, proxy, credential);
+        return handler;
     }
 
     /// <summary>

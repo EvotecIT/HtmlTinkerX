@@ -364,49 +364,12 @@ public static partial class HtmlCrawler {
         };
 
         if (options?.IgnoreTrackingQueryParameters == true && !string.IsNullOrEmpty(builder.Query)) {
-            builder.Query = FilterIgnoredQueryParameters(builder.Query, options.IgnoredQueryParameterPatterns);
+            builder.Query = HtmlUrlNormalizer.RemoveQueryParameters(builder.Query, options.IgnoredQueryParameterPatterns);
         }
 
         return builder.Uri.AbsoluteUri;
     }
 
-    private static string FilterIgnoredQueryParameters(string query, IEnumerable<string> patterns) {
-        string rawQuery = query.StartsWith("?", StringComparison.Ordinal) ? query.Substring(1) : query;
-        if (string.IsNullOrWhiteSpace(rawQuery)) {
-            return string.Empty;
-        }
-
-        List<string> kept = new();
-        foreach (string part in rawQuery.Split('&')) {
-            if (string.IsNullOrWhiteSpace(part)) {
-                continue;
-            }
-
-            int separatorIndex = part.IndexOf('=');
-            string rawName = separatorIndex >= 0 ? part.Substring(0, separatorIndex) : part;
-            string parameterName = Uri.UnescapeDataString(rawName.Replace("+", "%20"));
-            if (MatchesParameterPattern(parameterName, patterns)) {
-                continue;
-            }
-
-            kept.Add(part);
-        }
-
-        return string.Join("&", kept);
-    }
-
-    private static bool MatchesParameterPattern(string parameterName, IEnumerable<string> patterns) {
-        foreach (string pattern in patterns) {
-            if (string.IsNullOrWhiteSpace(pattern)) {
-                continue;
-            }
-
-            string regexPattern = "^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$";
-            if (Regex.IsMatch(parameterName, regexPattern, RegexOptions.IgnoreCase)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    private static bool MatchesParameterPattern(string value, IEnumerable<string> patterns) =>
+        HtmlUrlNormalizer.MatchesPattern(value, patterns);
 }

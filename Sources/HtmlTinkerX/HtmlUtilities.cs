@@ -136,6 +136,10 @@ public static class HtmlUtilities {
     /// <param name="fetchOptions">Optional response-size policy.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Decoded content and final response URL.</returns>
+    /// <exception cref="HtmlHttpException">
+    /// The publisher refused the request or returned a challenge or block page; <see cref="HtmlHttpException.Failure"/>
+    /// says which. It derives from <see cref="HttpRequestException"/>.
+    /// </exception>
     public static async Task<HtmlHttpTextResult> GetTextWithProperEncodingAsync(
         HttpClient client,
         string url,
@@ -154,7 +158,8 @@ public static class HtmlUtilities {
         using HttpResponseMessage response = await client
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        HtmlHttpFailure? failure = await HtmlResponseClassifier.ClassifyAsync(response, HtmlResponseClassifier.DefaultMaximumBodyBytes, requestToken).ConfigureAwait(false);
+        if (failure != null) throw new HtmlHttpException(HtmlResponseClassifier.Describe(failure, null, response.Content?.Headers.ContentType?.MediaType), failure);
         string content = await ReadResponseContentWithProperEncodingAsync(response, fetchOptions, requestToken).ConfigureAwait(false);
         return new HtmlHttpTextResult {
             Content = content,
@@ -322,7 +327,15 @@ public static class HtmlUtilities {
         else File.Move(temporaryPath, filePath);
     }
 
-    internal static CancellationTokenSource CreateRequestTimeoutTokenSource(HttpClient client, CancellationToken cancellationToken) {
+    /// <summary>
+    /// Creates a deadline linked to caller cancellation and the client's timeout. Pass its token to the request and to
+    /// every body read when reading headers separately, so the client's timeout also bounds a stalled body. Dispose it
+    /// after the response has been consumed. An infinite client timeout keeps caller cancellation without a timer.
+    /// </summary>
+    /// <param name="client">The client whose configured timeout bounds the whole read.</param>
+    /// <param name="cancellationToken">Cancellation of the owning operation.</param>
+    /// <returns>A caller-owned cancellation source for one request and its response body.</returns>
+    public static CancellationTokenSource CreateRequestTimeoutTokenSource(HttpClient client, CancellationToken cancellationToken = default) {
         if (client == null) {
             throw new ArgumentNullException(nameof(client));
         }
