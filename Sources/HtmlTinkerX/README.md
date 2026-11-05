@@ -103,6 +103,27 @@ IDocument document = HtmlParser.ParseWithAngleSharp("""
 string title = document.QuerySelector("h1")?.TextContent ?? string.Empty;
 ```
 
+## Select text, attributes, and elements by text or shape
+
+A CSS selector that ends in `::text` returns each element's own text, and
+`::attr(name)` returns attribute values. URL attributes such as `href` and `src`
+are resolved against the page's `<base href>` or the `baseUri` argument.
+
+```csharp
+IReadOnlyList<string> titles = HtmlDomExtraction.SelectValues(document, "article h1::text");
+IReadOnlyList<string> links = HtmlDomExtraction.SelectValues(
+    document, "article a::attr(href)", new Uri("https://status.example/"));
+
+IElement incident = HtmlDomExtraction.FindByText(document, "current incident", selector: "a")[0];
+IReadOnlyList<IElement> otherArticles = HtmlDomExtraction.FindSimilar(document.QuerySelector("article")!);
+```
+
+`FindByText` compares the element's own text (`Exact`, `Contains`, or `Regex`),
+ignoring case by default. `FindSimilar` returns the other elements with the same
+tag and ancestor path whose classes and children resemble the given element.
+Field selectors used by `HtmlDomExtraction.Extract` accept the same `::text` and
+`::attr(name)` endings, for example `Selector = "a::attr(href)"`.
+
 ## Extract typed fields from repeated items
 
 Use `HtmlDomExtraction.Extract` when you know the selectors for a repeated card

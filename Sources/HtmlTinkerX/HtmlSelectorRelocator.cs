@@ -70,7 +70,7 @@ public static class HtmlSelectorRelocator {
             .ToArray();
     }
 
-    private static int Score(HtmlElementFingerprint expected, HtmlElementFingerprint current, List<string> reasons) {
+    internal static int Score(HtmlElementFingerprint expected, HtmlElementFingerprint current, List<string> reasons) {
         int score = 0;
         if (string.Equals(expected.TagName, current.TagName, StringComparison.Ordinal)) {
             score += 20;
