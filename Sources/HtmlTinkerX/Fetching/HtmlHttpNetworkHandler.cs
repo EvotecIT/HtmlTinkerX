@@ -60,7 +60,8 @@ public sealed record HtmlHttpNetworkConnection(string Host, HtmlHttpAddressFamil
 /// inner handler of <see cref="HtmlFetchHandler"/>, which still owns redirects, retries and pacing. .NET 8 and later only.
 /// </summary>
 /// <remarks>
-/// Routed hosts connect directly, never through a proxy. When the ordinary transport is a <see cref="SocketsHttpHandler"/>,
+/// Routed hosts connect directly. When a proxy (including the process default) applies to a routed host, the request
+/// fails before connecting rather than silently bypassing that proxy. When the ordinary transport is a <see cref="SocketsHttpHandler"/>,
 /// routed hosts reuse its TLS options (certificate validation, client certificates, protocols), credentials, cookie
 /// container, decompression and pooling limits. Any other transport's settings cannot be read, so routed hosts then use
 /// a default transport: system certificate validation, no credentials, client certificates or cookies.
@@ -110,8 +111,9 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
 
     private static SocketsHttpHandler CreateTransport(HtmlHttpNetworkPolicy policy, SocketsHttpHandler? template,
         Action<HtmlHttpNetworkConnection>? onConnected) {
-        // The connect callback opens the publisher's socket itself, so a proxy could never be used.
-        SocketsHttpHandler handler = new() { AllowAutoRedirect = false, UseProxy = false, UseCookies = false };
+        // The connect callback opens the publisher's socket itself. A proxy that applies is left in place on purpose: the
+        // callback then refuses the proxy endpoint, so a routed request fails instead of quietly going around the proxy.
+        SocketsHttpHandler handler = new() { AllowAutoRedirect = false, UseCookies = false };
         if (template is not null) {
             handler.SslOptions = template.SslOptions;
             handler.Credentials = template.Credentials;
