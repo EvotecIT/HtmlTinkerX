@@ -71,7 +71,7 @@ Accept wildcard characters: False
 ```
 
 ### -Limit
-Maximum number of ranked candidates to return.
+Maximum number of ranked candidates to return. Defaults to 5.
 
 ```yaml
 Type: Int32

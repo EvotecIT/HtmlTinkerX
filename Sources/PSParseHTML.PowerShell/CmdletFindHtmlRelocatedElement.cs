@@ -40,7 +40,7 @@ public sealed class CmdletFindHtmlRelocatedElement : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     public HtmlElementFingerprint Fingerprint { get; set; } = null!;
 
-    /// <summary>Maximum number of ranked candidates to return.</summary>
+    /// <summary>Maximum number of ranked candidates to return. Defaults to 5.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
     public int Limit { get; set; } = 5;

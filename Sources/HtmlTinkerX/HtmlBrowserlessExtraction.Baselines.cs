@@ -128,7 +128,9 @@ public static partial class HtmlBrowserlessExtraction {
                 drift.RelocationCandidates = FindRelocationCandidates(recipe.Selector, baseline.ItemFingerprints, html!);
                 if (drift.RelocationCandidates.Count > 0) {
                     HtmlSelectorRelocationCandidate top = drift.RelocationCandidates[0];
-                    warnings.Add($"Items may have moved: '{top.Selector}' matches {top.MatchCount} element(s) with {top.Confidence} confidence. "
+                    string coverage = top.MatchCount < baseline.ItemCount
+                        ? $" It covers fewer than the {baseline.ItemCount} accepted item(s)." : string.Empty;
+                    warnings.Add($"Items may have moved: '{top.Selector}' matches {top.MatchCount} element(s) with {top.Confidence} confidence.{coverage} "
                         + "Review DriftReport.RelocationCandidates before updating the recipe.");
                 }
             }
@@ -177,7 +179,7 @@ public static partial class HtmlBrowserlessExtraction {
             || fingerprints.Any(static fingerprint => fingerprint == null || string.IsNullOrWhiteSpace(fingerprint.TagName)
                 || fingerprint.TagPath == null || fingerprint.TagPath.Count > HtmlElementFingerprint.MaximumPathLength
                 || fingerprint.ChildTags == null || fingerprint.ChildTags.Count > HtmlElementFingerprint.MaximumChildTags
-                || fingerprint.Classes == null || fingerprint.Attributes == null || fingerprint.TextHash == null))) {
+                || fingerprint.Classes == null || fingerprint.Classes.Any(static name => name == null) || fingerprint.Attributes == null || fingerprint.TextHash == null))) {
             throw new ArgumentException($"Item fingerprints apply only to DOM recipes, with one to {MaximumItemFingerprints} complete bounded fingerprints.", nameof(recipe));
         }
     }

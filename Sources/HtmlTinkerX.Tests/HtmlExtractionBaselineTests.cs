@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -352,6 +353,16 @@ public class HtmlExtractionBaselineTests {
         Assert.Contains(result.Warnings, warning => warning.Contains(top.Selector));
         accepted.Selector = top.Selector;
         Assert.Equal(3, HtmlBrowserlessExtraction.ExtractDomRecipe(accepted, after).Items.Count);
+    }
+
+    [Fact]
+    public void FingerprintedDomBaseline_RejectsNullClassNameInSavedJson() {
+        string json = HtmlBrowserlessExtraction.SerializeRecipe(HtmlBrowserlessExtraction.CaptureDomRecipeBaseline(
+            ReleaseRecipe(), HtmlSelectorRelocatorTests.Fixture("release-notes-before.html")));
+        string corrupted = new Regex("\"classes\":\\s*\\[").Replace(json, "$0 null,", 1);
+        Assert.NotEqual(json, corrupted);
+
+        Assert.Throws<ArgumentException>(() => HtmlBrowserlessExtraction.DeserializeRecipe(corrupted));
     }
 
     [Fact]

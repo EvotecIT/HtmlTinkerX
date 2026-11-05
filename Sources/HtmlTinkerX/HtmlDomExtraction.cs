@@ -25,6 +25,7 @@ public static partial class HtmlDomExtraction {
     };
     private static readonly string[] SemanticAttributes = { "data-type", "itemprop", "name", "role" };
     internal static readonly Regex SafeCssIdentifier = new(@"^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$", RegexOptions.Compiled);
+    private static readonly char[] UnquotableValueCharacters = { '\'', '\\', '\n', '\r', '\f' };
     private static readonly Regex PropertyTokenSplit = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
 
     /// <summary>
@@ -521,7 +522,8 @@ public static partial class HtmlDomExtraction {
         if (includeSemanticAttribute) {
             foreach (string attributeName in SemanticAttributes) {
                 string? value = element.GetAttribute(attributeName);
-                if (string.IsNullOrWhiteSpace(value) || value!.Length > 80 || value.Contains("'")) {
+                // Quotes, backslashes and line breaks would need CSS string escaping; skip them instead.
+                if (string.IsNullOrWhiteSpace(value) || value!.Length > 80 || value.IndexOfAny(UnquotableValueCharacters) >= 0) {
                     continue;
                 }
 

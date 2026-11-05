@@ -17,7 +17,6 @@ public static class HtmlSelectorRelocator {
         "html", "head", "body", "script", "style", "template", "noscript", "meta", "link", "title"
     };
     private static readonly Regex ClassTokenSplit = new(@"[^a-zA-Z0-9]+", RegexOptions.Compiled);
-    private static readonly Regex GeneratedId = new(@"\d{4,}", RegexOptions.Compiled);
 
     /// <summary>Ranks elements in the current document that resemble a fingerprinted element.</summary>
     /// <param name="document">Current document, for example after the page layout changed.</param>
@@ -120,17 +119,19 @@ public static class HtmlSelectorRelocator {
 
     private static string BuildSelector(IDocument document, IElement element, out int matchCount) {
         // Widen to ancestors only while the selector also matches elements outside the element's sibling group.
-        int groupSize = HtmlElementFingerprint.CountSameTagSiblings(element);
+        IElement? parent = element.ParentElement;
         string selector = BuildElementSelector(element);
-        IElement? ancestor = element.ParentElement;
+        IElement? ancestor = parent;
         for (int depth = 0; ; depth++) {
+            IHtmlCollection<IElement> matches;
             try {
-                matchCount = document.QuerySelectorAll(selector).Length;
+                matches = document.QuerySelectorAll(selector);
             } catch {
                 matchCount = 0;
                 return string.Empty;
             }
-            if (matchCount <= groupSize || ancestor == null || depth == MaximumAncestorScope || SkippedTags.Contains(ancestor.LocalName)) {
+            matchCount = matches.Length;
+            if (matches.All(match => match.ParentElement == parent) || ancestor == null || depth == MaximumAncestorScope || SkippedTags.Contains(ancestor.LocalName)) {
                 return selector;
             }
             selector = BuildElementSelector(ancestor) + " > " + selector;
@@ -140,7 +141,7 @@ public static class HtmlSelectorRelocator {
 
     private static string BuildElementSelector(IElement element) {
         string? id = element.Id;
-        if (!string.IsNullOrEmpty(id) && HtmlDomExtraction.SafeCssIdentifier.IsMatch(id!) && !GeneratedId.IsMatch(id!)) {
+        if (!string.IsNullOrEmpty(id) && HtmlDomExtraction.SafeCssIdentifier.IsMatch(id!) && !HtmlElementFingerprint.GeneratedValue.IsMatch(id!)) {
             return element.LocalName + "#" + id;
         }
         return HtmlDomExtraction.BuildLocalSelector(element, includeSemanticAttribute: true);

@@ -20,7 +20,7 @@ public sealed class HtmlElementFingerprint {
         "id", "name", "role", "itemprop", "itemtype", "data-type", "data-testid", "aria-label", "type"
     };
     // Generated ids and counters change between deployments; they would make a fingerprint brittle.
-    private static readonly Regex GeneratedValue = new(@"\d{4,}|^[0-9a-f]{8}-[0-9a-f]{4}-", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    internal static readonly Regex GeneratedValue = new(@"\d{4,}|^[0-9a-f]{8}-[0-9a-f]{4}-", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>Lowercase tag name of the element.</summary>
     public string TagName { get; set; } = string.Empty;

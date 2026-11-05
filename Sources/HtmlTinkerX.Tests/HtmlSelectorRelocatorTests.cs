@@ -27,6 +27,23 @@ public class HtmlSelectorRelocatorTests {
     }
 
     [Fact]
+    public void FindCandidates_WidensSelectorThatAlsoMatchesUnrelatedElements() {
+        using IDocument before = HtmlParser.ParseWithAngleSharp(
+            "<main><ul class='releases'><li class='release'>Version 2.4.0</li><li class='release'>Version 2.3.1</li></ul></main>");
+        // The renamed class also appears outside the moved list, and a sibling with another class keeps the
+        // same-tag sibling count above the number of renamed items.
+        using IDocument after = HtmlParser.ParseWithAngleSharp(
+            "<main><section class='notes'><ul><li class='entry'>Version 2.4.0</li><li class='entry'>Version 2.3.1</li>"
+            + "<li class='promo'>Subscribe</li></ul></section><aside><ul><li class='entry'>Unrelated</li></ul></aside></main>");
+        HtmlElementFingerprint fingerprint = HtmlElementFingerprint.Capture(before.QuerySelector("li.release")!);
+
+        HtmlSelectorRelocationCandidate top = HtmlSelectorRelocator.FindCandidates(after, "ul.releases > li.release", fingerprint)[0];
+
+        Assert.Equal(2, top.MatchCount);
+        Assert.All(after.QuerySelectorAll(top.Selector), match => Assert.NotNull(match.Closest("section.notes")));
+    }
+
+    [Fact]
     public void FindCandidates_ReportsNoHighConfidenceCandidateOnUnrelatedPage() {
         using IDocument before = HtmlParser.ParseWithAngleSharp(Fixture("release-notes-before.html"));
         using IDocument unrelated = HtmlParser.ParseWithAngleSharp(Fixture("publisher-linked-picture-article.html"));
