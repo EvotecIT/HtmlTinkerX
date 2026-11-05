@@ -30,7 +30,10 @@ public sealed class HtmlProxyRotator : HttpMessageHandler {
         _selector = selector;
     }
 
-    /// <summary>Creates a rotator with one handler per proxy address, using the factory's proxy configuration.</summary>
+    /// <summary>
+    /// Creates a rotator with one handler per proxy address, using the factory's proxy configuration. The handlers
+    /// share one cookie container, so a session cookie set through one proxy is sent through the next.
+    /// </summary>
     /// <param name="proxies">Proxy addresses, for example <c>http://proxy1:8080</c>.</param>
     /// <param name="credential">Optional credentials for every proxy.</param>
     /// <param name="selector">Optional choice of proxy index from the request and the pool size; cyclic when null.</param>
@@ -38,7 +41,12 @@ public sealed class HtmlProxyRotator : HttpMessageHandler {
         if (proxies == null) throw new ArgumentNullException(nameof(proxies));
         string[] addresses = proxies.Where(static proxy => !string.IsNullOrWhiteSpace(proxy)).ToArray();
         if (addresses.Length == 0) throw new ArgumentException("At least one proxy is required.", nameof(proxies));
-        return new HtmlProxyRotator(addresses.Select(proxy => HtmlHttpClientFactory.CreateHandler(proxy, credential, allowAutoRedirect: false)), selector);
+        CookieContainer cookies = new();
+        return new HtmlProxyRotator(addresses.Select(proxy => {
+            HttpClientHandler handler = HtmlHttpClientFactory.CreateHandler(proxy, credential, allowAutoRedirect: false);
+            handler.CookieContainer = cookies;
+            return handler;
+        }), selector);
     }
 
     /// <summary>Number of handlers in the pool.</summary>

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -107,26 +108,31 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
     [Alias("Headers")]
     public Hashtable? Header { get; set; }
 
-    /// <summary>Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds.</summary>
+    /// <summary>Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds. Defaults to 1 with BrowserHeaders, RenderWhenBlocked or several proxies, otherwise 0.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     [ValidateRange(0, 10)]
     public int RetryCount { get; set; }
 
-    /// <summary>Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent.</summary>
+    /// <summary>Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent, or with Header values for the headers it sets.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public SwitchParameter BrowserHeaders { get; set; }
 
-    /// <summary>Renders the page in a headless browser when a Cloudflare challenge or a recognised CDN block page is returned.</summary>
+    /// <summary>Renders the page in a headless browser, through the first proxy, when a Cloudflare challenge or a recognised CDN block page is returned.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public SwitchParameter RenderWhenBlocked { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy?.FirstOrDefault(static proxy => !string.IsNullOrWhiteSpace(proxy)), ProxyCredential);
+        ValidateProxy(FirstProxy, ProxyCredential);
         if (BrowserHeaders.IsPresent && !string.IsNullOrWhiteSpace(UserAgent)) {
             ThrowTerminatingError(new ErrorRecord(
                 new PSArgumentException("BrowserHeaders sets its own consistent User-Agent; do not combine it with UserAgent."),
                 "BrowserHeadersWithUserAgent", ErrorCategory.InvalidArgument, UserAgent));
+        }
+        if (BrowserHeaders.IsPresent && Header?.Keys.Cast<object>().Select(static key => key?.ToString()).FirstOrDefault(IsBrowserProfileHeader) is { } header) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentException($"BrowserHeaders sets its own consistent {header} and client hints; do not override them with Header."),
+                "BrowserHeadersWithHeader", ErrorCategory.InvalidArgument, header));
         }
         string staticHtml = await ReadHtmlAsync().ConfigureAwait(false);
         if (ParameterSetName == ParameterSetSnapshot && string.IsNullOrWhiteSpace(RenderedSnapshot?.Html)) {
@@ -191,6 +197,13 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
         return Content;
     }
 
+    private string? FirstProxy => Proxy?.FirstOrDefault(static proxy => !string.IsNullOrWhiteSpace(proxy));
+
+    // Headers the browser profile keeps consistent with each other, including client hints it does not send.
+    private static bool IsBrowserProfileHeader(string? name) => name != null
+        && (HtmlBrowserHeaderProfile.Chrome().Headers.Any(header => header.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            || name.StartsWith("sec-ch-ua", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Sec-Fetch-", StringComparison.OrdinalIgnoreCase));
+
     private HttpClient CreateUrlClient() {
         bool fetchPolicy = MyInvocation.BoundParameters.ContainsKey(nameof(RetryCount)) || BrowserHeaders.IsPresent
             || RenderWhenBlocked.IsPresent || Proxy?.Length > 1;
@@ -202,7 +215,15 @@ public sealed class CmdletGetHtmlPage : AsyncPSCmdlet {
             OnRetry = (host, reason) => WriteVerbose($"Retrying {host}: {reason}")
         };
         if (RenderWhenBlocked.IsPresent) {
-            policy.Renderer = HtmlBrowser.CreateFetchRenderer();
+            // The browser leaves through the same proxy as the request it replaces, never directly.
+            NetworkCredential? proxyCredential = FirstProxy != null
+                ? ProxyCredential?.GetNetworkCredential()
+                : HtmlHttpClientFactory.DefaultProxyCredential as NetworkCredential;
+            policy.Renderer = HtmlBrowser.CreateFetchRenderer(new HtmlBrowserLaunchOptions {
+                Proxy = FirstProxy ?? HtmlHttpClientFactory.DefaultProxy,
+                ProxyUsername = proxyCredential?.UserName,
+                ProxyPassword = proxyCredential?.Password
+            });
             policy.OnBlocked = (_, failure, _) => {
                 bool render = failure.Kind is HtmlHttpFailureKind.Challenge or HtmlHttpFailureKind.BlockPage;
                 WriteVerbose(render ? $"Rendering in a browser after {failure.Provider ?? failure.Kind.ToString()} blocked the request." : failure.ToString());

@@ -42,7 +42,12 @@ public sealed class HtmlFetchPolicy {
     /// </summary>
     public Func<Uri, Uri, bool>? RedirectPolicy { get; set; }
 
-    /// <summary>Stores entity tags and Last-Modified dates so repeated GETs revalidate and reuse an unchanged body; null disables it.</summary>
+    /// <summary>
+    /// Stores entity tags and Last-Modified dates so repeated GETs revalidate and reuse an unchanged body; null disables
+    /// it. Entries are keyed by address alone, so requests with credentials, cookie or custom headers, and responses
+    /// that vary by anything but encoding, are neither read from nor stored. Cookies a primary handler adds from its own
+    /// container are not visible here; the publisher's 304 still has to confirm the stored body.
+    /// </summary>
     public IHtmlHttpValidatorCache? ValidatorCache { get; set; }
 
     /// <summary>Consistent browser request headers applied to every request; null keeps the client's own headers.</summary>
@@ -53,16 +58,18 @@ public sealed class HtmlFetchPolicy {
 
     /// <summary>
     /// Decides what happens when a publisher challenges or blocks a request (a Cloudflare challenge, a recognised CDN
-    /// block page, or another 403). Without it a challenge throws <see cref="HtmlHttpException"/> before its body is
-    /// read and other refusals are returned as they are.
+    /// block page at any failing status, or another 403). A retry is not waited for when the publisher's Retry-After
+    /// exceeds <see cref="MaximumRetryDelay"/>; the request fails instead. Without it a challenge throws
+    /// <see cref="HtmlHttpException"/> before its body is read and other refusals are returned as they are.
     /// </summary>
     public Func<Uri, HtmlHttpFailure, CancellationToken, Task<HtmlBlockedAction>>? OnBlocked { get; set; }
 
     /// <summary>
-    /// Produces a page's HTML some other way, normally a real browser, when <see cref="OnBlocked"/> returns
-    /// <see cref="HtmlBlockedAction.Render"/>. <see cref="HtmlBrowser.CreateFetchRenderer"/> provides one.
+    /// Produces a page some other way, normally a real browser, when <see cref="OnBlocked"/> returns
+    /// <see cref="HtmlBlockedAction.Render"/>. Its final address becomes the response's request address, so relative
+    /// links resolve against it. <see cref="HtmlBrowser.CreateFetchRenderer"/> provides one.
     /// </summary>
-    public Func<Uri, CancellationToken, Task<string>>? Renderer { get; set; }
+    public Func<Uri, CancellationToken, Task<HtmlRenderedPage>>? Renderer { get; set; }
 
     /// <summary>
     /// A <see cref="RedirectPolicy"/> that follows redirects only to the given hosts, compared without case, and to

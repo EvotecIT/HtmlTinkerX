@@ -6,8 +6,9 @@ namespace HtmlTinkerX;
 /// <summary>
 /// Response facts that explain why a page could not be read. They never hold the request URL, cookies, credentials or
 /// the response body; a block page keeps only a short, redacted title and excerpt so it can be retained in reports.
+/// Two failures with the same facts are equal.
 /// </summary>
-public sealed class HtmlHttpFailure {
+public sealed class HtmlHttpFailure : IEquatable<HtmlHttpFailure> {
     /// <summary>Creates failure facts, for example when restoring them from a stored report.</summary>
     /// <param name="kind">The publisher's explicit challenge, block page or unsuccessful status category.</param>
     /// <param name="statusCode">The original response status, including a successful status on an explicit challenge.</param>
@@ -45,6 +46,27 @@ public sealed class HtmlHttpFailure {
 
     /// <summary>The block page's redacted, whitespace-collapsed visible text, without scripts or styles, or null.</summary>
     public string? Excerpt { get; }
+
+    /// <inheritdoc />
+    public bool Equals(HtmlHttpFailure? other) => other is not null && (ReferenceEquals(this, other)
+        || Kind == other.Kind && StatusCode == other.StatusCode && RetryAt == other.RetryAt
+        && string.Equals(Provider, other.Provider, StringComparison.Ordinal)
+        && string.Equals(Title, other.Title, StringComparison.Ordinal)
+        && string.Equals(Excerpt, other.Excerpt, StringComparison.Ordinal));
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => Equals(obj as HtmlHttpFailure);
+
+    /// <inheritdoc />
+    public override int GetHashCode() {
+        unchecked {
+            int hash = ((int)Kind * 397) ^ (int)StatusCode;
+            hash = (hash * 397) ^ RetryAt.GetHashCode();
+            hash = (hash * 397) ^ (Provider == null ? 0 : StringComparer.Ordinal.GetHashCode(Provider));
+            hash = (hash * 397) ^ (Title == null ? 0 : StringComparer.Ordinal.GetHashCode(Title));
+            return (hash * 397) ^ (Excerpt == null ? 0 : StringComparer.Ordinal.GetHashCode(Excerpt));
+        }
+    }
 
     /// <inheritdoc />
     public override string ToString() => HtmlResponseClassifier.Describe(this, expectedContent: null);

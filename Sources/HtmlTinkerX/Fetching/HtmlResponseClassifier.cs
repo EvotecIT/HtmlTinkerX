@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -23,10 +24,13 @@ public static class HtmlResponseClassifier {
     private const int ExcerptLimit = 400;
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex AbsoluteUrl = new(@"(?i)\b(?:https?|ftp)://[^\s""'<>]+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex IpAddress = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{1,4}\b",
+    // IPv4, compressed IPv6 (2001:db8::1) and full IPv6.
+    private static readonly Regex IpAddress = new(@"\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[0-9a-f]{1,4}:){1,7}(?::[0-9a-f]{1,4}){1,7}\b|\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{1,4}\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     // Azure Front Door prints a tracking reference under its block message: "Ref A: ..." or "20261025T101010Z-abc123...".
     private static readonly Regex AzureReference = new(@"(?i)\bRef [A-C]:|\b\d{8}T\d{6}Z-[0-9a-z]{6,}",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex CloudflareChallengeOptions = new(@"\b_cf_chl_opt\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -61,7 +65,10 @@ public static class HtmlResponseClassifier {
     /// <param name="response">A caller-owned response.</param>
     /// <param name="maximumBytes">Most body bytes inspected for a block page.</param>
     /// <param name="cancellationToken">Cancels the bounded body read.</param>
-    /// <returns>The failure, or null when the response is successful and not challenged.</returns>
+    /// <returns>
+    /// The failure, or null when the response is successful and not challenged. When the body cannot be read, the
+    /// failure the headers describe.
+    /// </returns>
     public static async Task<HtmlHttpFailure?> ClassifyAsync(HttpResponseMessage response, int maximumBytes = DefaultMaximumBodyBytes,
         CancellationToken cancellationToken = default) {
         if (response == null) throw new ArgumentNullException(nameof(response));
@@ -69,8 +76,33 @@ public static class HtmlResponseClassifier {
         HtmlHttpFailure? failure = ClassifyHeaders(response);
         if (failure == null || failure.Kind == HtmlHttpFailureKind.Challenge || !MayBeHtml(response)) return failure;
 
-        (byte[] head, _) = await HtmlReplayContent.BufferAsync(response, maximumBytes, cancellationToken).ConfigureAwait(false);
+        byte[] head;
+        try {
+            (head, _) = await HtmlReplayContent.BufferAsync(response, maximumBytes, cancellationToken).ConfigureAwait(false);
+        } catch (Exception exception) when (exception is IOException || exception is HttpRequestException) {
+            // A refusal whose body breaks off is still that refusal.
+            return failure;
+        }
         return ClassifyBlockPage(response, head) ?? failure;
+    }
+
+    /// <summary>
+    /// Classifies a page a browser rendered: a refusing navigation status, a recognised block page, or a Cloudflare
+    /// challenge that did not complete. Null when the page is the publisher's content.
+    /// </summary>
+    /// <param name="response">The final navigation's status and headers, with the rendered HTML as its content.</param>
+    /// <param name="html">The rendered HTML.</param>
+    internal static HtmlHttpFailure? ClassifyRendered(HttpResponseMessage response, string html) {
+        HtmlHttpFailure? failure = ClassifyHeaders(response);
+        if (failure?.Kind == HtmlHttpFailureKind.Challenge) return failure;
+        HtmlHttpFailure? block = ClassifyBlockPage(response, System.Text.Encoding.UTF8.GetBytes(html));
+        if (block != null) return block;
+        // Cloudflare's interstitial configures its challenge in _cf_chl_opt; ordinary pages on Cloudflare can still load
+        // challenge-platform scripts, so the path alone is not a signal.
+        if (CloudflareChallengeOptions.IsMatch(html)) {
+            return new HtmlHttpFailure(HtmlHttpFailureKind.Challenge, response.StatusCode, "Cloudflare", RetryAt(response));
+        }
+        return failure;
     }
 
     internal static HtmlHttpFailure? ClassifyHeaders(HttpResponseMessage response) {
@@ -111,7 +143,7 @@ public static class HtmlResponseClassifier {
             Shorten(Redact(title), TitleLimit), Shorten(Redact(text), ExcerptLimit));
     }
 
-    private static bool MayBeHtml(HttpResponseMessage response) {
+    internal static bool MayBeHtml(HttpResponseMessage response) {
         if (response.Content == null) return false;
         string? mediaType = response.Content.Headers.ContentType?.MediaType;
         return mediaType == null || mediaType.IndexOf("html", StringComparison.OrdinalIgnoreCase) >= 0

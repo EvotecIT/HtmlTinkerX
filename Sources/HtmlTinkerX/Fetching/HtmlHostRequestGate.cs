@@ -1,6 +1,7 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +16,9 @@ namespace HtmlTinkerX;
 /// <remarks>
 /// Pacing adapts to the site: a 429 or 503 response, or any refusal with Retry-After, defers that origin and grows its
 /// delay (doubling on repeated throttling, up to <see cref="MaximumDelay"/>); each later success halves it again until
-/// only <see cref="MinimumDelay"/> remains. <see cref="HtmlFetchHandler"/> reports responses automatically.
+/// only <see cref="MinimumDelay"/> remains. <see cref="HtmlFetchHandler"/> reports responses automatically. Set
+/// <see cref="AdaptivePacing"/> to false to keep only the fixed limits and <see cref="MinimumDelay"/>. An origin with
+/// no request in flight and no pending delay is forgotten.
 /// </remarks>
 public sealed class HtmlHostRequestGate : IDisposable {
     /// <summary>Requests one origin may have in flight at a time, unless configured otherwise.</summary>
@@ -30,24 +33,28 @@ public sealed class HtmlHostRequestGate : IDisposable {
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan NegligibleBackoff = TimeSpan.FromMilliseconds(50);
 
-    private sealed class Origin(int concurrency) {
+    private sealed class Origin(string key, int concurrency) {
+        internal readonly string Key = key;
         internal readonly SemaphoreSlim Responses = new(concurrency, concurrency);
         internal readonly SemaphoreSlim Starts = new(1, 1);
         internal readonly object Clock = new();
         internal long NextStart;
         internal TimeSpan Backoff;
+        // Callers waiting for or holding a slot; guarded by the gate's _origins lock.
+        internal int Users;
     }
 
-    private sealed class Lease(SemaphoreSlim local, SemaphoreSlim? total) : IDisposable {
+    private sealed class Lease(HtmlHostRequestGate gate, Origin origin) : IDisposable {
         private int _released;
         public void Dispose() {
             if (Interlocked.Exchange(ref _released, 1) != 0) return;
-            total?.Release();
-            local.Release();
+            gate._total?.Release();
+            origin.Responses.Release();
+            gate.Leave(origin);
         }
     }
 
-    private readonly ConcurrentDictionary<string, Origin> _origins = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Origin> _origins = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim? _total;
     private TimeSpan _minimumDelay;
     private TimeSpan _maximumDelay = DefaultMaximumDelay;
@@ -75,6 +82,12 @@ public sealed class HtmlHostRequestGate : IDisposable {
         set => _minimumDelay = value >= TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
     }
 
+    /// <summary>
+    /// Whether throttling responses defer and slow their origin; true by default. When false,
+    /// <see cref="ReportResponse"/> changes nothing and only the fixed limits and <see cref="MinimumDelay"/> apply.
+    /// </summary>
+    public bool AdaptivePacing { get; set; } = true;
+
     /// <summary>Longest adaptive delay after throttling; a longer Retry-After is capped to it.</summary>
     public TimeSpan MaximumDelay {
         get => _maximumDelay;
@@ -91,33 +104,51 @@ public sealed class HtmlHostRequestGate : IDisposable {
         EnterAsync(uri, MinimumDelay, cancellationToken);
 
     internal async Task<IDisposable> EnterAsync(Uri uri, TimeSpan spacing, CancellationToken cancellationToken) {
-        Origin origin = GetOrigin(uri);
-        // A queue for one busy origin must not occupy the whole process budget while waiting for its local slot.
-        await origin.Responses.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Origin origin = Join(uri);
         try {
+            // A queue for one busy origin must not occupy the whole process budget while waiting for its local slot.
+            await origin.Responses.WaitAsync(cancellationToken).ConfigureAwait(false);
+        } catch {
+            Leave(origin);
+            throw;
+        }
+        try {
+            // One caller per origin reserves a start at a time, so the spacing is measured from actual starts.
             await origin.Starts.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
                 while (true) {
-                    double remainingMs;
+                    await WaitForStartAsync(origin, cancellationToken).ConfigureAwait(false);
+                    if (_total != null) await _total.WaitAsync(cancellationToken).ConfigureAwait(false);
                     lock (origin.Clock) {
                         long now = Stopwatch.GetTimestamp();
-                        remainingMs = (origin.NextStart - now) * 1000d / Stopwatch.Frequency;
-                        if (remainingMs <= 0) {
-                            cancellationToken.ThrowIfCancellationRequested();
+                        // Throttling reported while this caller waited for the process budget defers it again.
+                        if (origin.NextStart <= now) {
                             origin.NextStart = now + Ticks(spacing + origin.Backoff);
                             break;
                         }
                     }
-                    await Task.Delay(TimeSpan.FromMilliseconds(Math.Ceiling(remainingMs)), cancellationToken).ConfigureAwait(false);
+                    _total?.Release();
                 }
             } finally {
                 origin.Starts.Release();
             }
-            if (_total != null) await _total.WaitAsync(cancellationToken).ConfigureAwait(false);
-            return new Lease(origin.Responses, _total);
+            return new Lease(this, origin);
         } catch {
             origin.Responses.Release();
+            Leave(origin);
             throw;
+        }
+    }
+
+    private static async Task WaitForStartAsync(Origin origin, CancellationToken cancellationToken) {
+        while (true) {
+            double remainingMs;
+            lock (origin.Clock) remainingMs = (origin.NextStart - Stopwatch.GetTimestamp()) * 1000d / Stopwatch.Frequency;
+            if (remainingMs <= 0) {
+                cancellationToken.ThrowIfCancellationRequested();
+                return;
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Ceiling(remainingMs)), cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -127,8 +158,10 @@ public sealed class HtmlHostRequestGate : IDisposable {
     public void Defer(Uri uri, TimeSpan delay) {
         if (uri == null) throw new ArgumentNullException(nameof(uri));
         if (delay <= TimeSpan.Zero) return;
-        Origin origin = GetOrigin(uri);
-        lock (origin.Clock) origin.NextStart = Math.Max(origin.NextStart, Stopwatch.GetTimestamp() + Ticks(delay));
+        lock (_origins) {
+            Origin origin = GetOrigin(uri);
+            lock (origin.Clock) origin.NextStart = Math.Max(origin.NextStart, Stopwatch.GetTimestamp() + Ticks(delay));
+        }
     }
 
     /// <summary>
@@ -140,26 +173,63 @@ public sealed class HtmlHostRequestGate : IDisposable {
     public void ReportResponse(Uri uri, HttpResponseMessage response) {
         if (uri == null) throw new ArgumentNullException(nameof(uri));
         if (response == null) throw new ArgumentNullException(nameof(response));
+        if (!AdaptivePacing) return;
         int status = (int)response.StatusCode;
         TimeSpan? retryAfter = status >= 400 ? HtmlFetchRules.GetServerRetryDelay(response) : null;
-        Origin origin = GetOrigin(uri);
-        lock (origin.Clock) {
-            if (status == 429 || status == (int)HttpStatusCode.ServiceUnavailable || retryAfter != null) {
-                TimeSpan grown = origin.Backoff > TimeSpan.Zero ? Double(origin.Backoff) : retryAfter ?? InitialBackoff;
-                if (retryAfter > grown) grown = retryAfter.Value;
-                origin.Backoff = grown > MaximumDelay ? MaximumDelay : grown;
-                origin.NextStart = Math.Max(origin.NextStart, Stopwatch.GetTimestamp() + Ticks(origin.Backoff));
-            } else if (status < 400) {
-                TimeSpan relaxed = TimeSpan.FromTicks(origin.Backoff.Ticks / 2);
-                origin.Backoff = relaxed < NegligibleBackoff ? TimeSpan.Zero : relaxed;
-            }
+        lock (_origins) {
+            Origin origin = GetOrigin(uri);
+            lock (origin.Clock) Adapt(origin, status, retryAfter);
+            Forget(origin);
         }
     }
 
+    private void Adapt(Origin origin, int status, TimeSpan? retryAfter) {
+        if (status == 429 || status == (int)HttpStatusCode.ServiceUnavailable || retryAfter != null) {
+            TimeSpan grown = origin.Backoff > TimeSpan.Zero ? Double(origin.Backoff) : retryAfter ?? InitialBackoff;
+            if (retryAfter > grown) grown = retryAfter.Value;
+            origin.Backoff = grown > MaximumDelay ? MaximumDelay : grown;
+            origin.NextStart = Math.Max(origin.NextStart, Stopwatch.GetTimestamp() + Ticks(origin.Backoff));
+        } else if (status < 400) {
+            TimeSpan relaxed = TimeSpan.FromTicks(origin.Backoff.Ticks / 2);
+            origin.Backoff = relaxed < NegligibleBackoff ? TimeSpan.Zero : relaxed;
+        }
+    }
+
+    private Origin Join(Uri uri) {
+        lock (_origins) {
+            Origin origin = GetOrigin(uri);
+            origin.Users++;
+            return origin;
+        }
+    }
+
+    private void Leave(Origin origin) {
+        lock (_origins) {
+            origin.Users--;
+            Forget(origin);
+        }
+    }
+
+    // Called under the _origins lock.
     private Origin GetOrigin(Uri uri) {
         if (uri == null) throw new ArgumentNullException(nameof(uri));
         if (!uri.IsAbsoluteUri) throw new ArgumentException("An absolute address is required.", nameof(uri));
-        return _origins.GetOrAdd(uri.Scheme + "://" + uri.IdnHost + ":" + uri.Port, _ => new Origin(PerHost));
+        string key = uri.Scheme + "://" + uri.IdnHost + ":" + uri.Port;
+        if (_origins.TryGetValue(key, out Origin? origin)) return origin;
+        // Origins released inside their pacing window are only revisited here.
+        foreach (Origin idle in _origins.Values.ToArray()) Forget(idle);
+        origin = new Origin(key, PerHost);
+        _origins.Add(key, origin);
+        return origin;
+    }
+
+    // Called under the _origins lock. An origin still pacing or backing off keeps its state until that has passed.
+    private void Forget(Origin origin) {
+        if (origin.Users > 0) return;
+        lock (origin.Clock) {
+            if (origin.Backoff > TimeSpan.Zero || origin.NextStart > Stopwatch.GetTimestamp()) return;
+        }
+        _origins.Remove(origin.Key);
     }
 
     private static TimeSpan Double(TimeSpan value) => value.Ticks > long.MaxValue / 2 ? TimeSpan.MaxValue : TimeSpan.FromTicks(value.Ticks * 2);
@@ -171,7 +241,9 @@ public sealed class HtmlHostRequestGate : IDisposable {
 
     /// <summary>Releases the gate's semaphores. Do not dispose a gate other handlers still use.</summary>
     public void Dispose() {
-        foreach (Origin origin in _origins.Values) {
+        Origin[] origins;
+        lock (_origins) origins = _origins.Values.ToArray();
+        foreach (Origin origin in origins) {
             origin.Responses.Dispose();
             origin.Starts.Dispose();
         }

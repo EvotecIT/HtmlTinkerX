@@ -75,14 +75,17 @@ internal static class HtmlFetchRules {
         return true;
     }
 
-    /// <summary>Whether a 304 authenticates the stored representation; a mismatched entity tag does not.</summary>
+    /// <summary>
+    /// Whether a 304 authenticates the stored representation. A mismatched entity tag does not, nor does one sent for a
+    /// stored body that had none (RFC 9111 section 4.3.4).
+    /// </summary>
     internal static bool CanReuseNotModified(string? storedEntityTag, HttpResponseMessage response) {
         if (response.StatusCode != HttpStatusCode.NotModified) return false;
         if (!response.Headers.TryGetValues("ETag", out IEnumerable<string>? values)) return true;
         if (!EntityTagHeaderValue.TryParse(string.Join(", ", values), out EntityTagHeaderValue? responseTag)
             || responseTag.Tag == "*") return false;
-        return !EntityTagHeaderValue.TryParse(storedEntityTag, out EntityTagHeaderValue? storedTag)
-            || string.Equals(storedTag.Tag, responseTag.Tag, StringComparison.Ordinal);
+        return EntityTagHeaderValue.TryParse(storedEntityTag, out EntityTagHeaderValue? storedTag)
+            && string.Equals(storedTag.Tag, responseTag.Tag, StringComparison.Ordinal);
     }
 
     /// <summary>Whether a response is safe to keep for revalidation: no session cookie, no-store or unknown Vary.</summary>
@@ -92,4 +95,28 @@ internal static class HtmlFetchRules {
         && response.Headers.CacheControl?.NoStore != true
         && (!response.Headers.TryGetValues("Vary", out IEnumerable<string>? vary)
             || vary.SelectMany(value => value.Split(',')).All(name => CacheHeaderNames.Contains(name.Trim())));
+
+    /// <summary>
+    /// Whether a request may use a cache keyed by address alone. Credentials, cookies and custom headers can make a
+    /// body specific to the requester, as in the crawler's cache; the browser identity a
+    /// <see cref="HtmlBrowserHeaderProfile"/> sends and validators do not.
+    /// </summary>
+    internal static bool CanCacheByAddress(HttpRequestMessage request) =>
+        request.Method == HttpMethod.Get && request.Headers.CacheControl?.NoStore != true
+        && request.Headers.All(static header => CacheHeaderNames.Contains(header.Key) || AddressCacheHeaderNames.Contains(header.Key)
+            || header.Key.StartsWith("sec-ch-ua", StringComparison.OrdinalIgnoreCase)
+            || header.Key.StartsWith("Sec-Fetch-", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether a response may be kept in a cache keyed by address alone: storable, and varying at most by encoding of a
+    /// body that has already been decoded. Another Vary header would replay one requester's variant to another.
+    /// </summary>
+    internal static bool CanStoreByAddress(HttpResponseMessage response) =>
+        CanStoreResponse(response) && response.Content?.Headers.ContentEncoding.Count == 0
+        && (!response.Headers.TryGetValues("Vary", out IEnumerable<string>? vary)
+            || vary.SelectMany(value => value.Split(',')).All(name => name.Trim().Equals("Accept-Encoding", StringComparison.OrdinalIgnoreCase)));
+
+    private static readonly HashSet<string> AddressCacheHeaderNames = new(StringComparer.OrdinalIgnoreCase) {
+        "Upgrade-Insecure-Requests", "If-None-Match", "If-Modified-Since"
+    };
 }

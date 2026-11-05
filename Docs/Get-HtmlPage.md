@@ -79,7 +79,7 @@ Accept wildcard characters: False
 ```
 
 ### -BrowserHeaders
-Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent.
+Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent, or with Header values for the headers it sets.
 
 ```yaml
 Type: SwitchParameter
@@ -287,7 +287,7 @@ Accept wildcard characters: False
 ```
 
 ### -RenderWhenBlocked
-Renders the page in a headless browser when a Cloudflare challenge or a recognised CDN block page is returned.
+Renders the page in a headless browser, through the first proxy, when a Cloudflare challenge or a recognised CDN block page is returned.
 
 ```yaml
 Type: SwitchParameter
@@ -319,7 +319,7 @@ Accept wildcard characters: False
 ```
 
 ### -RetryCount
-Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds.
+Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds. Defaults to 1 with BrowserHeaders, RenderWhenBlocked or several proxies, otherwise 0.
 
 ```yaml
 Type: Int32
@@ -329,7 +329,7 @@ Possible values:
 
 Required: False
 Position: named
-Default value: 0
+Default value: 0, or 1 with -BrowserHeaders, -RenderWhenBlocked or several -Proxy values
 Accept pipeline input: False
 Accept wildcard characters: False
 ```

@@ -66,7 +66,8 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         Uri uri = request.RequestUri!;
         // Only reads are repeated; a POST might have taken effect before it failed.
         bool idempotent = HtmlFetchRules.IsIdempotent(request.Method);
-        HtmlHttpValidatorEntry? cached = await ApplyCachedValidatorsAsync(request, cancellationToken).ConfigureAwait(false);
+        bool cacheable = Policy.ValidatorCache != null && HtmlFetchRules.CanCacheByAddress(request);
+        HtmlHttpValidatorEntry? cached = cacheable ? await ApplyCachedValidatorsAsync(request, cancellationToken).ConfigureAwait(false) : null;
         for (int attempt = 0; ; ) {
             HttpResponseMessage response;
             try {
@@ -77,8 +78,8 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
             }
 
             int status = (int)response.StatusCode;
-            bool challenge = HtmlResponseClassifier.IsChallenge(response);
-            if (!challenge && idempotent && attempt < Policy.RetryCount && HtmlFetchRules.IsTransientStatus(status)) {
+            HtmlHttpFailure? blocked = await ClassifyBlockedAsync(response, cancellationToken).ConfigureAwait(false);
+            if (blocked == null && idempotent && attempt < Policy.RetryCount && HtmlFetchRules.IsTransientStatus(status)) {
                 if (HtmlFetchRules.GetServerRetryDelay(response) > Policy.MaximumRetryDelay) return response;
                 TimeSpan delay = NextDelay(response, attempt++);
                 response.Dispose();
@@ -86,24 +87,17 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
                 continue;
             }
 
-            if (challenge || (status == (int)HttpStatusCode.Forbidden && Policy.OnBlocked != null)) {
-                HtmlHttpFailure failure;
-                try {
-                    failure = challenge
-                        ? HtmlResponseClassifier.ClassifyHeaders(response)!
-                        : (await HtmlResponseClassifier.ClassifyAsync(response, HtmlResponseClassifier.DefaultMaximumBodyBytes, cancellationToken).ConfigureAwait(false))!;
-                } catch {
-                    response.Dispose();
-                    throw;
-                }
+            if (blocked is { } failure) {
                 string? contentType = response.Content?.Headers.ContentType?.MediaType;
+                // A publisher asking for a longer pause than the policy allows is not waited for, as with transient statuses.
+                bool waitable = !(HtmlFetchRules.GetServerRetryDelay(response) > Policy.MaximumRetryDelay);
                 TimeSpan delay = NextDelay(response, attempt);
                 // A challenge body is never read; disposing releases its host slot before any decision runs.
                 response.Dispose();
                 HtmlBlockedAction action = Policy.OnBlocked == null
                     ? HtmlBlockedAction.Fail
                     : await Policy.OnBlocked(uri, failure, cancellationToken).ConfigureAwait(false);
-                if (action == HtmlBlockedAction.Retry && idempotent && attempt < Policy.RetryCount) {
+                if (action == HtmlBlockedAction.Retry && waitable && idempotent && attempt < Policy.RetryCount) {
                     attempt++;
                     await PauseAsync(uri, delay, failure.Provider ?? failure.Kind.ToString(), cancellationToken).ConfigureAwait(false);
                     continue;
@@ -121,8 +115,26 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
                 cached = null;
                 continue;
             }
-            return await StoreAsync(request, response, cancellationToken).ConfigureAwait(false);
+            return cacheable ? Store(request, response) : response;
         }
+    }
+
+    /// <summary>
+    /// The failure to put to <see cref="HtmlFetchPolicy.OnBlocked"/>, or null to handle the response normally: a
+    /// challenge, recognised from headers alone, and with a decision to make, a 403 or a recognised block page at any
+    /// failing status. Reading a bounded part of a failing body happens only when there is a decision to make.
+    /// </summary>
+    private async Task<HtmlHttpFailure?> ClassifyBlockedAsync(HttpResponseMessage response, CancellationToken cancellationToken) {
+        if (HtmlResponseClassifier.IsChallenge(response)) return HtmlResponseClassifier.ClassifyHeaders(response);
+        if (Policy.OnBlocked == null || (int)response.StatusCode < 400) return null;
+        HtmlHttpFailure failure;
+        try {
+            failure = (await HtmlResponseClassifier.ClassifyAsync(response, HtmlResponseClassifier.DefaultMaximumBodyBytes, cancellationToken).ConfigureAwait(false))!;
+        } catch {
+            response.Dispose();
+            throw;
+        }
+        return response.StatusCode == HttpStatusCode.Forbidden || failure.Kind == HtmlHttpFailureKind.BlockPage ? failure : null;
     }
 
     private TimeSpan NextDelay(HttpResponseMessage? response, int attempt) {
@@ -157,26 +169,28 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
     }
 
     private async Task<HttpResponseMessage> RenderAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
-        Func<Uri, CancellationToken, Task<string>> renderer = Policy.Renderer
+        Func<Uri, CancellationToken, Task<HtmlRenderedPage>> renderer = Policy.Renderer
             ?? throw new InvalidOperationException("OnBlocked returned Render, but HtmlFetchPolicy.Renderer is not set.");
         Uri uri = request.RequestUri!;
         IDisposable? lease = Policy.Gate == null ? null : await Policy.Gate.EnterAsync(uri, cancellationToken).ConfigureAwait(false);
-        string html;
+        HtmlRenderedPage page;
         try {
-            html = await renderer(uri, cancellationToken).ConfigureAwait(false);
+            page = await renderer(uri, cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("HtmlFetchPolicy.Renderer returned no page.");
         } finally {
             lease?.Dispose();
         }
+        // Callers resolve relative links against the response's request address, so it is where the browser ended up.
+        Uri final = page.FinalUri ?? uri;
         return new HttpResponseMessage(HttpStatusCode.OK) {
-            RequestMessage = request,
-            Content = new StringContent(html ?? string.Empty, Encoding.UTF8, "text/html")
+            RequestMessage = final == uri ? request : new HttpRequestMessage(request.Method, final),
+            Content = new StringContent(page.Html, Encoding.UTF8, "text/html")
         };
     }
 
     private async Task<HtmlHttpValidatorEntry?> ApplyCachedValidatorsAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
-        if (Policy.ValidatorCache == null || request.Method != HttpMethod.Get
-            || request.Headers.IfNoneMatch.Count > 0 || request.Headers.IfModifiedSince != null) return null;
-        HtmlHttpValidatorEntry? entry = await Policy.ValidatorCache.GetAsync(request.RequestUri!, cancellationToken).ConfigureAwait(false);
+        if (request.Headers.IfNoneMatch.Count > 0 || request.Headers.IfModifiedSince != null) return null;
+        HtmlHttpValidatorEntry? entry = await Policy.ValidatorCache!.GetAsync(request.RequestUri!, cancellationToken).ConfigureAwait(false);
         return entry != null && HtmlFetchRules.ApplyValidators(request, entry.EntityTag, entry.LastModified) ? entry : null;
     }
 
@@ -192,24 +206,18 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         return response;
     }
 
-    private async Task<HttpResponseMessage> StoreAsync(HttpRequestMessage request, HttpResponseMessage response, CancellationToken cancellationToken) {
-        IHtmlHttpValidatorCache? cache = Policy.ValidatorCache;
-        if (cache == null || request.Method != HttpMethod.Get || response.StatusCode != HttpStatusCode.OK || response.Content == null
-            || !HtmlFetchRules.CanStoreResponse(response)) return response;
+    /// <summary>Stores the body with its validators once the caller has read all of it; the headers are returned at once.</summary>
+    private HttpResponseMessage Store(HttpRequestMessage request, HttpResponseMessage response) {
+        IHtmlHttpValidatorCache cache = Policy.ValidatorCache!;
+        if (response.StatusCode != HttpStatusCode.OK || response.Content == null || !HtmlFetchRules.CanStoreByAddress(response)) return response;
         string? entityTag = response.Headers.ETag?.ToString();
         DateTimeOffset? lastModified = response.Content.Headers.LastModified;
         if (string.IsNullOrEmpty(entityTag) && lastModified == null) return response;
-        try {
-            (byte[] bytes, bool complete) = await HtmlReplayContent.BufferAsync(response, HtmlHttpFetchOptions.DefaultMaximumResponseBytes, cancellationToken).ConfigureAwait(false);
-            if (complete) {
-                await cache.SetAsync(request.RequestUri!, new HtmlHttpValidatorEntry(entityTag, lastModified, bytes,
-                    response.Content.Headers.ContentType?.ToString()), cancellationToken).ConfigureAwait(false);
-            }
-            return response;
-        } catch {
-            response.Dispose();
-            throw;
-        }
+        Uri uri = request.RequestUri!;
+        string? contentType = response.Content.Headers.ContentType?.ToString();
+        response.Content = new HtmlStoringContent(response.Content, HtmlHttpFetchOptions.DefaultMaximumResponseBytes,
+            (body, token) => cache.SetAsync(uri, new HtmlHttpValidatorEntry(entityTag, lastModified, body, contentType), token));
+        return response;
     }
 
     private static bool CanRedirect(HttpRequestMessage request, HttpResponseMessage response, out Uri? target) {

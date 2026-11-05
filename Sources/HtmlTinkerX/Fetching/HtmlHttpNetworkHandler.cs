@@ -59,6 +59,12 @@ public sealed record HtmlHttpNetworkConnection(string Host, HtmlHttpAddressFamil
 /// the caller's ordinary transport for other hosts. Each routed host keeps a separate connection pool. Use it as the
 /// inner handler of <see cref="HtmlFetchHandler"/>, which still owns redirects, retries and pacing. .NET 8 and later only.
 /// </summary>
+/// <remarks>
+/// Routed hosts connect directly, never through a proxy. When the ordinary transport is a <see cref="SocketsHttpHandler"/>,
+/// routed hosts reuse its TLS options (certificate validation, client certificates, protocols), credentials, cookie
+/// container, decompression and pooling limits. Any other transport's settings cannot be read, so routed hosts then use
+/// a default transport: system certificate validation, no credentials, client certificates or cookies.
+/// </remarks>
 public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
     private readonly HttpMessageInvoker _ordinary;
     private readonly IReadOnlyDictionary<string, HttpMessageInvoker> _routes;
@@ -80,7 +86,8 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
         }
         _ordinary = new(ordinaryTransport, disposeHandler: true);
         _routes = policies.ToDictionary(pair => pair.Key,
-            pair => new HttpMessageInvoker(CreateTransport(pair.Value, onConnected), disposeHandler: true), StringComparer.OrdinalIgnoreCase);
+            pair => new HttpMessageInvoker(CreateTransport(pair.Value, ordinaryTransport as SocketsHttpHandler, onConnected), disposeHandler: true),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>Checks host routes before work starts, without opening sockets or allocating transport pools.</summary>
@@ -101,8 +108,22 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
         (_routes.TryGetValue(Normalize(request.RequestUri!.IdnHost), out var route) ? route : _ordinary).SendAsync(request, cancellationToken);
 
-    private static SocketsHttpHandler CreateTransport(HtmlHttpNetworkPolicy policy, Action<HtmlHttpNetworkConnection>? onConnected) {
-        SocketsHttpHandler handler = new() { AllowAutoRedirect = false, UseCookies = false };
+    private static SocketsHttpHandler CreateTransport(HtmlHttpNetworkPolicy policy, SocketsHttpHandler? template,
+        Action<HtmlHttpNetworkConnection>? onConnected) {
+        // The connect callback opens the publisher's socket itself, so a proxy could never be used.
+        SocketsHttpHandler handler = new() { AllowAutoRedirect = false, UseProxy = false, UseCookies = false };
+        if (template is not null) {
+            handler.SslOptions = template.SslOptions;
+            handler.Credentials = template.Credentials;
+            handler.PreAuthenticate = template.PreAuthenticate;
+            handler.UseCookies = template.UseCookies;
+            if (template.UseCookies) handler.CookieContainer = template.CookieContainer;
+            handler.AutomaticDecompression = template.AutomaticDecompression;
+            handler.MaxConnectionsPerServer = template.MaxConnectionsPerServer;
+            handler.MaxResponseHeadersLength = template.MaxResponseHeadersLength;
+            handler.PooledConnectionLifetime = template.PooledConnectionLifetime;
+            handler.PooledConnectionIdleTimeout = template.PooledConnectionIdleTimeout;
+        }
         if (policy.AddressFamily == HtmlHttpAddressFamily.Automatic && policy.LocalAddress is null) return handler;
         handler.ConnectCallback = (context, token) => ConnectAsync(context, policy, onConnected, token);
         return handler;

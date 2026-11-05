@@ -16,7 +16,7 @@ namespace HtmlTinkerX.Tests;
 public sealed class HtmlFetchHandlerTests {
     private const string AkamaiBlockPage = "<HTML><HEAD><TITLE>Access Denied</TITLE></HEAD><BODY><H1>Access Denied</H1>"
         + "You don't have permission to access \"http&#58;&#47;&#47;www&#46;example&#46;com&#47;kb&#63;session&#61;abc\" on this server.<P>"
-        + "Your address is 203.0.113.7.<P>Reference&#32;&#35;18&#46;8f6d1402&#46;1730812345&#46;1a2b3c</BODY></HTML>";
+        + "Your address is 203.0.113.7 or 2001:db8::7.<P>Reference&#32;&#35;18&#46;8f6d1402&#46;1730812345&#46;1a2b3c</BODY></HTML>";
 
     [Theory]
     [InlineData("azure", HtmlHttpFailureKind.BlockPage, "Azure Front Door")]
@@ -51,6 +51,7 @@ public sealed class HtmlFetchHandlerTests {
             Assert.Contains("Reference #18.8f6d1402", failure.Failure.Excerpt);
             Assert.DoesNotContain("example", failure.Failure.Excerpt);
             Assert.DoesNotContain("203.0.113.7", failure.Failure.Excerpt);
+            Assert.DoesNotContain("2001:db8", failure.Failure.Excerpt);
         } else {
             Assert.Null(failure.Failure.Excerpt);
         }
@@ -129,6 +130,25 @@ public sealed class HtmlFetchHandlerTests {
         Assert.False(privateHeaderLeft);
     }
 
+#if NET5_0_OR_GREATER
+    [Fact]
+    public async Task StalledBodyReturnsItsHeadersAndACancelledReadReleasesTheHostSlot() {
+        using HttpClient client = Client(new Callback(request => request.RequestUri!.AbsolutePath == "/slow"
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Headers = { ETag = new EntityTagHeaderValue("\"v1\"") }, Content = new StreamContent(new StalledStream()) }
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ready") }),
+            new HtmlFetchPolicy { Gate = new HtmlHostRequestGate(1, 1), ValidatorCache = new HtmlMemoryValidatorCache() });
+
+        // A cacheable body is stored as the caller reads it, so its headers arrive before the stalled body ends.
+        using (HttpResponseMessage slow = await WithTimeout(client.GetAsync("https://publisher.example/slow", HttpCompletionOption.ResponseHeadersRead))) {
+            using CancellationTokenSource deadline = new(TimeSpan.FromMilliseconds(100));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WithTimeout(slow.Content.ReadAsStringAsync(deadline.Token)));
+        }
+        using HttpResponseMessage next = await WithTimeout(client.GetAsync("https://publisher.example/next"));
+
+        Assert.Equal("ready", await next.Content.ReadAsStringAsync());
+    }
+#endif
+
     [Fact]
     public async Task ValidatorCacheRevalidatesAndReusesAnUnchangedBody() {
         List<string?> conditions = new();
@@ -148,6 +168,54 @@ public sealed class HtmlFetchHandlerTests {
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         Assert.Equal(first, await second.Content.ReadAsStringAsync());
         Assert.Equal("text/html", second.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Theory]
+    [InlineData("Authorization")]
+    [InlineData("Vary: Accept-Language")]
+    public async Task ValidatorCacheNeitherStoresNorReplaysRequesterSpecificBodies(string specific) {
+        List<bool> conditional = new();
+        using HttpClient client = Client(new Callback(request => {
+            conditional.Add(request.Headers.IfNoneMatch.Count > 0);
+            HttpResponseMessage response = new(HttpStatusCode.OK) {
+                Headers = { ETag = new EntityTagHeaderValue("\"v1\"") },
+                Content = new StringContent("<p>body</p>", Encoding.UTF8, "text/html")
+            };
+            if (specific.StartsWith("Vary")) response.Headers.Vary.Add("Accept-Language");
+            return response;
+        }), new HtmlFetchPolicy { ValidatorCache = new HtmlMemoryValidatorCache() });
+        if (specific == "Authorization") client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "private-token");
+
+        await client.GetStringAsync("https://publisher.example/page");
+        await client.GetStringAsync("https://publisher.example/page");
+
+        Assert.Equal(new[] { false, false }, conditional);
+    }
+
+    [Fact]
+    public async Task NotModifiedWithAnEntityTagCannotConfirmABodyStoredWithoutOne() {
+        int calls = 0;
+        using HttpClient client = Client(new Callback(request => {
+            if (request.Headers.IfModifiedSince != null) return new HttpResponseMessage(HttpStatusCode.NotModified) { Headers = { ETag = new EntityTagHeaderValue("\"v2\"") } };
+            HttpResponseMessage response = new(HttpStatusCode.OK) { Content = new StringContent(++calls == 1 ? "old" : "new") };
+            response.Content.Headers.LastModified = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+            return response;
+        }), new HtmlFetchPolicy { ValidatorCache = new HtmlMemoryValidatorCache() });
+
+        await client.GetStringAsync("https://publisher.example/page");
+        string second = await client.GetStringAsync("https://publisher.example/page");
+
+        Assert.Equal("new", second);
+    }
+
+    [Fact]
+    public async Task ClassifyKeepsTheStatusFailureWhenTheBodyBreaksOff() {
+        using HttpResponseMessage response = new(HttpStatusCode.Forbidden) { Content = new StreamContent(new BrokenStream()) };
+        response.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+
+        HtmlHttpFailure? failure = await HtmlResponseClassifier.ClassifyAsync(response);
+
+        Assert.Equal(HtmlHttpFailureKind.AccessDenied, failure?.Kind);
     }
 
     [Fact]
@@ -172,20 +240,25 @@ public sealed class HtmlFetchHandlerTests {
         Assert.Equal(new[] { 1, 0 }, used);
     }
 
-    [Fact]
-    public async Task OnBlockedRenderReturnsTheRenderedPageInsteadOfTheBlockPage() {
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task OnBlockedRenderReturnsTheRenderedPageAndItsAddressInsteadOfTheBlockPage(HttpStatusCode status) {
         List<HtmlHttpFailure> blocked = new();
         List<Uri> rendered = new();
-        using HttpClient client = Client(new Callback(_ => new HttpResponseMessage(HttpStatusCode.Forbidden) {
+        Uri moved = new("https://publisher.example/articles/1");
+        using HttpClient client = Client(new Callback(_ => new HttpResponseMessage(status) {
             Content = new StringContent(AkamaiBlockPage, Encoding.UTF8, "text/html")
         }), new HtmlFetchPolicy {
+            RetryDelay = TimeSpan.Zero,
             OnBlocked = (_, failure, _) => { blocked.Add(failure); return Task.FromResult(HtmlBlockedAction.Render); },
-            Renderer = (uri, _) => { rendered.Add(uri); return Task.FromResult("<main>Rendered article</main>"); }
+            Renderer = (uri, _) => { rendered.Add(uri); return Task.FromResult(new HtmlRenderedPage("<main>Rendered article</main>", moved)); }
         });
 
         HtmlHttpTextResult result = await HtmlUtilities.GetTextWithProperEncodingAsync(client, "https://publisher.example/article", null);
 
         Assert.Equal("<main>Rendered article</main>", result.Content);
+        Assert.Equal(moved, result.FinalUri);
         HtmlHttpFailure failure = Assert.Single(blocked);
         Assert.Equal(HtmlHttpFailureKind.BlockPage, failure.Kind);
         Assert.Equal("Akamai", failure.Provider);
@@ -203,8 +276,12 @@ public sealed class HtmlFetchHandlerTests {
         gate.ReportResponse(host, throttled);
         TimeSpan deferred = await TimeEnterAsync(gate, host);
         gate.ReportResponse(host, unavailable);
-        TimeSpan backedOff = await TimeEnterAsync(gate, host);
-        TimeSpan otherHost = await TimeEnterAsync(gate, new Uri("https://other.example/"));
+        Stopwatch backingOff = Stopwatch.StartNew();
+        Task<IDisposable> backedOffEntry = gate.EnterAsync(host);
+        // Another origin is admitted while the throttled one is still held back.
+        using (await WithTimeout(gate.EnterAsync(new Uri("https://other.example/")))) Assert.False(backedOffEntry.IsCompleted);
+        (await WithTimeout(backedOffEntry)).Dispose();
+        TimeSpan backedOff = backingOff.Elapsed;
         for (int success = 0; success < 6; success++) {
             gate.ReportResponse(host, ok);
             await TimeEnterAsync(gate, host);
@@ -213,8 +290,25 @@ public sealed class HtmlFetchHandlerTests {
 
         Assert.True(deferred >= TimeSpan.FromMilliseconds(280), $"Deferred {deferred}.");
         Assert.True(backedOff >= TimeSpan.FromMilliseconds(560), $"Backed off {backedOff}.");
-        Assert.True(otherHost < TimeSpan.FromMilliseconds(100), $"Other host waited {otherHost}.");
         Assert.True(decayed < TimeSpan.FromMilliseconds(100), $"Decayed delay {decayed}.");
+    }
+
+    [Fact]
+    public async Task SameOriginSpacingIsMeasuredFromActualStartsWhenTheProcessBudgetWasFull() {
+        using HtmlHostRequestGate gate = new(perHost: 2, maxConcurrentRequests: 1) { MinimumDelay = TimeSpan.FromMilliseconds(300) };
+        Uri host = new("https://publisher.example/page");
+        IDisposable busy = await gate.EnterAsync(new Uri("https://other.example/"));
+        Task<IDisposable> first = gate.EnterAsync(host);
+        Task<IDisposable> second = gate.EnterAsync(host);
+        // Long enough for both starts to have been due while every slot was taken.
+        await Task.Delay(500);
+
+        busy.Dispose();
+        (await WithTimeout(first)).Dispose();
+        Stopwatch gap = Stopwatch.StartNew();
+        (await WithTimeout(second)).Dispose();
+
+        Assert.True(gap.Elapsed >= TimeSpan.FromMilliseconds(280), $"Second start followed after {gap.Elapsed}.");
     }
 
     private static async Task<TimeSpan> TimeEnterAsync(HtmlHostRequestGate gate, Uri uri) {
@@ -239,6 +333,29 @@ public sealed class HtmlFetchHandlerTests {
     private sealed class Callback(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(respond(request));
+    }
+
+    private sealed class StalledStream : MemoryStream {
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+#if NET5_0_OR_GREATER
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+#endif
+    }
+
+    private sealed class BrokenStream : MemoryStream {
+        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("The connection was reset.");
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            throw new IOException("The connection was reset.");
+#if NET5_0_OR_GREATER
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new IOException("The connection was reset.");
+#endif
     }
 
     private sealed class UnreadableContent : HttpContent {

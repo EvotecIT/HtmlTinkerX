@@ -46,7 +46,8 @@ try { Get-HtmlPage -Url $url } catch { $_.TargetObject | Format-List Kind, Provi
 `Get-HtmlPage` also accepts `-RetryCount`, `-BrowserHeaders` for a
 consistent desktop Chrome header set, several `-Proxy` addresses to rotate
 through, and `-RenderWhenBlocked` to render a challenged or blocked page in a
-headless browser instead. HtmlTinkerX does not solve CAPTCHAs.
+headless browser instead. A page the browser is refused too still fails with
+`HtmlHttpException`. HtmlTinkerX does not solve CAPTCHAs.
 
 .NET callers get the same behaviour from `HtmlHttpClientFactory.Create(HtmlFetchPolicy)`:
 
@@ -66,4 +67,4 @@ using HttpClient client = HtmlHttpClientFactory.Create(policy, HtmlProxyRotator.
 Share one `HtmlHostRequestGate` across clients that read for the same
 process. A 429 or 503, or a refusal with Retry-After, defers that host and
 doubles its delay on repeated throttling up to `MaximumDelay`; successes halve
-it again. `HtmlResponseClassifier` classifies responses you read yourself.
+it again. Set `AdaptivePacing = false` to keep only the fixed limits. `HtmlResponseClassifier` classifies responses you read yourself.
