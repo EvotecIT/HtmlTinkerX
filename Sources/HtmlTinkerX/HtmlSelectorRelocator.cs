@@ -39,13 +39,22 @@ public static class HtmlSelectorRelocator {
             List<string> reasons = new();
             int score = Score(fingerprint, HtmlElementFingerprint.Capture(element), reasons);
             if (score < MinimumScore) continue;
-            string candidateSelector = BuildSelector(document, element, out int matchCount);
+            string candidateSelector = BuildSelector(document, element, out IElement[] matches);
             if (candidateSelector.Length == 0 || string.Equals(candidateSelector, original, StringComparison.Ordinal)) continue;
             if (bySelector.TryGetValue(candidateSelector, out HtmlSelectorRelocationCandidate? existing) && existing.Score >= score) continue;
+            // The selector returns every match, so confidence cannot exceed what its least similar matches support.
+            int unlike = matches.Count(match => match != element
+                && Score(fingerprint, HtmlElementFingerprint.Capture(match), new List<string>()) < HtmlDomExtraction.MediumConfidenceScore);
+            int confidenceScore = score;
+            if (unlike > 0) {
+                reasons.Add($"{unlike} of {matches.Length} matched element(s) do not resemble the saved element");
+                confidenceScore = Math.Min(score, unlike * 2 >= matches.Length
+                    ? HtmlDomExtraction.MediumConfidenceScore - 1 : HtmlDomExtraction.HighConfidenceScore - 1);
+            }
             string sample = HtmlDomExtraction.NormalizeWhitespace(element.TextContent);
             bySelector[candidateSelector] = new HtmlSelectorRelocationCandidate {
-                Selector = candidateSelector, Score = score, MatchCount = matchCount, Reasons = reasons,
-                Confidence = HtmlDomExtraction.DescribeCollectionConfidence(score),
+                Selector = candidateSelector, Score = score, MatchCount = matches.Length, Reasons = reasons,
+                Confidence = HtmlDomExtraction.DescribeCollectionConfidence(confidenceScore),
                 SampleText = sample.Length > 240 ? sample.Substring(0, 237) + "..." : sample
             };
         }
@@ -117,20 +126,18 @@ public static class HtmlSelectorRelocator {
         return score;
     }
 
-    private static string BuildSelector(IDocument document, IElement element, out int matchCount) {
+    private static string BuildSelector(IDocument document, IElement element, out IElement[] matches) {
         // Widen to ancestors only while the selector also matches elements outside the element's sibling group.
         IElement? parent = element.ParentElement;
         string selector = BuildElementSelector(element);
         IElement? ancestor = parent;
         for (int depth = 0; ; depth++) {
-            IHtmlCollection<IElement> matches;
             try {
-                matches = document.QuerySelectorAll(selector);
+                matches = document.QuerySelectorAll(selector).ToArray();
             } catch {
-                matchCount = 0;
+                matches = Array.Empty<IElement>();
                 return string.Empty;
             }
-            matchCount = matches.Length;
             if (matches.All(match => match.ParentElement == parent) || ancestor == null || depth == MaximumAncestorScope || SkippedTags.Contains(ancestor.LocalName)) {
                 return selector;
             }

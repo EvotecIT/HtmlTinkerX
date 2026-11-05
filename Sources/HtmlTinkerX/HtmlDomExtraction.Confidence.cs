@@ -12,5 +12,9 @@ public static partial class HtmlDomExtraction {
         return DescribeCollectionConfidence(ScoreCollection(items, fields, string.Empty, selector, structuralOnly: true));
     }
 
-    internal static string DescribeCollectionConfidence(int score) => score >= 120 ? "High" : score >= 80 ? "Medium" : "Low";
+    internal const int HighConfidenceScore = 120;
+    internal const int MediumConfidenceScore = 80;
+
+    internal static string DescribeCollectionConfidence(int score) =>
+        score >= HighConfidenceScore ? "High" : score >= MediumConfidenceScore ? "Medium" : "Low";
 }

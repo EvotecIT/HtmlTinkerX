@@ -44,6 +44,24 @@ public class HtmlSelectorRelocatorTests {
     }
 
     [Fact]
+    public void FindCandidates_DoesNotRateHighWhenSelectorAlsoMatchesUnlikeSibling() {
+        const string Release = "<li class='release' role='listitem'><h3>Version {0}</h3><p>Notes</p></li>";
+        using IDocument before = HtmlParser.ParseWithAngleSharp("<main><ul>"
+            + string.Format(Release, "2.4.0") + string.Format(Release, "2.3.1") + string.Format(Release, "2.3.0") + "</ul></main>");
+        // The class was dropped, so the role attribute is the only hook, and a promotion item shares it.
+        using IDocument after = HtmlParser.ParseWithAngleSharp("<main><ul>"
+            + "<li role='listitem'><h3>Version 2.4.0</h3><p>Notes</p></li><li role='listitem'><h3>Version 2.3.1</h3><p>Notes</p></li>"
+            + "<li role='listitem'><a href='/subscribe'>Subscribe</a></li></ul></main>");
+        HtmlElementFingerprint fingerprint = HtmlElementFingerprint.Capture(before.QuerySelector("li")!);
+
+        HtmlSelectorRelocationCandidate top = HtmlSelectorRelocator.FindCandidates(after, "li.release", fingerprint)[0];
+
+        Assert.Equal("li[role='listitem']", top.Selector);
+        Assert.NotEqual("High", top.Confidence);
+        Assert.Contains("1 of 3 matched element(s) do not resemble the saved element", top.Reasons);
+    }
+
+    [Fact]
     public void FindCandidates_ReportsNoHighConfidenceCandidateOnUnrelatedPage() {
         using IDocument before = HtmlParser.ParseWithAngleSharp(Fixture("release-notes-before.html"));
         using IDocument unrelated = HtmlParser.ParseWithAngleSharp(Fixture("publisher-linked-picture-article.html"));
