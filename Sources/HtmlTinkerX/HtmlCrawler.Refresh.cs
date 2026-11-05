@@ -11,10 +11,6 @@ using System.Threading.Tasks;
 namespace HtmlTinkerX;
 
 public static partial class HtmlCrawler {
-    private static readonly HashSet<string> CacheHeaderNames = new(StringComparer.OrdinalIgnoreCase) {
-        "Accept", "Accept-Language", "Accept-Encoding", "User-Agent", "Cache-Control", "Pragma"
-    };
-
     private sealed class CrawlHttpRequest(Uri uri, HtmlCrawlPage? cachedPage) : HttpRequestMessage(HttpMethod.Get, uri) {
         public HtmlCrawlPage? CachedPage { get; } = cachedPage;
         public Dictionary<string, string>? CacheRequestHeaders { get; set; }
@@ -24,7 +20,7 @@ public static partial class HtmlCrawler {
     private static Dictionary<string, string>? GetCacheRequestHeaders(HttpRequestMessage request, string cookieHeader) {
         // Avoid storing credentials, custom tokens, or session-specific bodies in a reusable cache.
         if (cookieHeader.Length > 0 || request.Headers.CacheControl?.NoStore == true
-            || request.Headers.Any(header => !CacheHeaderNames.Contains(header.Key))) return null;
+            || request.Headers.Any(header => !HtmlFetchRules.CacheHeaderNames.Contains(header.Key))) return null;
         return request.Headers.ToDictionary(header => header.Key.ToLowerInvariant(),
             header => string.Join(", ", header.Value), StringComparer.Ordinal);
     }
@@ -43,14 +39,8 @@ public static partial class HtmlCrawler {
             || cached.LastModified.HasValue;
     }
 
-    private static bool CanReuseValidatedResponse(CrawlHttpRequest request, HttpResponseMessage response) {
-        if (!request.CacheValidated || response.StatusCode != HttpStatusCode.NotModified) return false;
-        if (!response.Headers.TryGetValues("ETag", out IEnumerable<string>? values)) return true;
-        if (!EntityTagHeaderValue.TryParse(string.Join(", ", values), out EntityTagHeaderValue? responseTag)
-            || responseTag.Tag == "*") return false;
-        return !EntityTagHeaderValue.TryParse(request.CachedPage?.EntityTag, out EntityTagHeaderValue? storedTag)
-            || string.Equals(storedTag.Tag, responseTag.Tag, StringComparison.Ordinal);
-    }
+    private static bool CanReuseValidatedResponse(CrawlHttpRequest request, HttpResponseMessage response) =>
+        request.CacheValidated && HtmlFetchRules.CanReuseNotModified(request.CachedPage?.EntityTag, response);
 
     private static async Task<HttpResponseMessage> SendPageRequestAsync(HttpClient client, CrawlHttpRequest request,
         CancellationToken token) {
@@ -67,11 +57,7 @@ public static partial class HtmlCrawler {
     }
 
     private static bool CanStoreResponse(HttpResponseMessage response, Dictionary<string, string>? requestHeaders) =>
-        requestHeaders != null && !response.Headers.Contains("Set-Cookie")
-        && (!response.Headers.Contains("Cache-Control") || response.Headers.CacheControl != null)
-        && response.Headers.CacheControl?.NoStore != true
-        && (!response.Headers.TryGetValues("Vary", out IEnumerable<string>? vary)
-            || vary.SelectMany(value => value.Split(',')).All(name => CacheHeaderNames.Contains(name.Trim())));
+        requestHeaders != null && HtmlFetchRules.CanStoreResponse(response);
 
     private static string ComputeResponseHash(byte[] bytes) {
         using SHA256 hash = SHA256.Create();

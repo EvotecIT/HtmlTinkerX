@@ -71,7 +71,7 @@ public static partial class HtmlCrawler {
         CrawlRenderSession? renderSession = null;
         CrawlCheckpointWriter? checkpointWriter = null;
         CrawlPrefetchWindow? prefetchWindow = null;
-        HtmlCrawlRequestScheduler? requestScheduler = null;
+        HtmlHostRequestGate? requestGate = null;
         SemaphoreSlim? robotsAccess = null;
         async Task<HtmlBrowserSession> GetRenderSessionAsync() {
             renderSession ??= await CreateRenderSessionAsync(resolvedOptions, startUri, cancellationToken).ConfigureAwait(false);
@@ -169,12 +169,14 @@ public static partial class HtmlCrawler {
             if (resolvedOptions.MaxConcurrentPageRequests > 1) {
                 robotsAccess = new SemaphoreSlim(1, 1);
                 prefetchWindow = new CrawlPrefetchWindow(cancellationToken);
-                requestScheduler = new HtmlCrawlRequestScheduler(resolvedOptions.MaxConcurrentPageRequestsPerOrigin, async (uri, token) => {
+                // Page responses are limited per origin only; the prefetch window bounds the crawl as a whole.
+                requestGate = new HtmlHostRequestGate(resolvedOptions.MaxConcurrentPageRequestsPerOrigin, int.MaxValue);
+                resolvedOptions.PageRequestGate = requestGate;
+                resolvedOptions.PageRequestDelay = async (uri, token) => {
                     await robotsAccess.WaitAsync(token).ConfigureAwait(false);
                     try { return await GetEffectiveDelayAsync(uri, client, resolvedOptions, robotsCache, token).ConfigureAwait(false); }
                     finally { robotsAccess.Release(); }
-                });
-                resolvedOptions.PageRequestScheduler = requestScheduler;
+                };
             }
             async Task<RobotsDocument?> ReadRobotsAsync(Uri uri) {
                 if (robotsAccess != null) await robotsAccess.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -359,7 +361,7 @@ public static partial class HtmlCrawler {
             throw new OperationCanceledException(error.Message, error, cancellationToken);
         } finally {
             if (prefetchWindow != null) await prefetchWindow.StopAsync().ConfigureAwait(false);
-            requestScheduler?.Dispose();
+            requestGate?.Dispose();
             robotsAccess?.Dispose();
             checkpointWriter?.RemoveUnpublished();
             try {
