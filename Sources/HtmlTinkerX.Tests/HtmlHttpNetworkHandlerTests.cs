@@ -42,5 +42,17 @@ public sealed class HtmlHttpNetworkHandlerTests {
             try { (await contacted).Dispose(); } catch (OperationCanceledException) { }
         }
     }
+
+    [Theory]
+    [InlineData(HttpVersionPolicy.RequestVersionExact)]
+    [InlineData(HttpVersionPolicy.RequestVersionOrHigher)]
+    public async Task RoutedHostRefusesARequestThatRequiresHttp3(HttpVersionPolicy versionPolicy) {
+        // HTTP/3 runs over QUIC, which never reaches the route's connect callback.
+        using HttpMessageInvoker client = new(new HtmlHttpNetworkHandler(new SocketsHttpHandler { AllowAutoRedirect = false },
+            new Dictionary<string, HtmlHttpNetworkPolicy> { ["publisher.example"] = new() { AddressFamily = HtmlHttpAddressFamily.IPv4Only } }));
+        using HttpRequestMessage request = new(HttpMethod.Get, "https://publisher.example/feed") { Version = HttpVersion.Version30, VersionPolicy = versionPolicy };
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => client.SendAsync(request, CancellationToken.None));
+    }
 }
 #endif

@@ -66,7 +66,7 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         Uri uri = request.RequestUri!;
         // Only reads are repeated; a POST might have taken effect before it failed.
         bool idempotent = HtmlFetchRules.IsIdempotent(request.Method);
-        bool cacheable = Policy.ValidatorCache != null && HtmlFetchRules.CanCacheByAddress(request);
+        bool cacheable = Policy.ValidatorCache != null && HtmlFetchRules.CanCacheByAddress(request) && !SendsCookies(InnerHandler, uri);
         HtmlHttpValidatorEntry? cached = cacheable ? await ApplyCachedValidatorsAsync(request, cancellationToken).ConfigureAwait(false) : null;
         for (int attempt = 0; ; ) {
             HttpResponseMessage response;
@@ -182,6 +182,9 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         }
         // Callers resolve relative links against the response's request address, so it is where the browser ended up.
         Uri final = page.FinalUri ?? uri;
+        // The browser followed its own redirects; its final address must be one this handler would have followed to.
+        if (final != uri && (!IsRedirectTarget(uri, final) || Policy.RedirectPolicy is { } policy && !policy(uri, final)))
+            throw new HttpRequestException("The rendered page ended at an address the redirect policy does not allow.");
         return new HttpResponseMessage(HttpStatusCode.OK) {
             RequestMessage = final == uri ? request : new HttpRequestMessage(request.Method, final),
             Content = new StringContent(page.Html, Encoding.UTF8, "text/html")
@@ -224,10 +227,13 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         target = null;
         if (!HtmlFetchRules.IsIdempotent(request.Method) || request.RequestUri is not Uri source
             || !HtmlFetchRules.TryGetRedirectTarget(response, source, out Uri? resolved)) return false;
-        if (resolved!.Scheme is not ("http" or "https") || source.Scheme == "https" && resolved.Scheme == "http") return false;
+        if (!IsRedirectTarget(source, resolved!)) return false;
         target = resolved;
         return true;
     }
+
+    private static bool IsRedirectTarget(Uri source, Uri target) =>
+        target.Scheme is "http" or "https" && !(source.Scheme == "https" && target.Scheme == "http");
 
     private static HttpRequestMessage CreateRedirect(HttpRequestMessage current, Uri target) {
         HttpRequestMessage next = new(current.Method, target) { Version = current.Version };
@@ -250,6 +256,34 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
     private static bool IsPortableHeader(string name) =>
         name.Equals("User-Agent", StringComparison.OrdinalIgnoreCase) || name.Equals("Accept", StringComparison.OrdinalIgnoreCase)
         || name.Equals("Accept-Language", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether a primary handler would add cookies from its own container to a request for <paramref name="uri"/>, which
+    /// would make a body specific to that session. Handlers whose cookie state cannot be read count as sending none.
+    /// </summary>
+    internal static bool SendsCookies(HttpMessageHandler? handler, Uri uri) {
+        while (handler is DelegatingHandler next) handler = next.InnerHandler;
+        switch (handler) {
+            case HtmlProxyRotator rotator:
+                foreach (HttpMessageHandler inner in rotator.Handlers) {
+                    if (SendsCookies(inner, uri)) return true;
+                }
+                return false;
+#if NET8_0_OR_GREATER
+            // Routed transports share the ordinary transport's container or send no cookies.
+            case HtmlHttpNetworkHandler network:
+                return SendsCookies(network.OrdinaryTransport, uri);
+#endif
+            case HttpClientHandler { UseCookies: true } client:
+                return client.CookieContainer.GetCookies(uri).Count > 0;
+#if NET5_0_OR_GREATER
+            case SocketsHttpHandler { UseCookies: true, CookieContainer: { } container }:
+                return container.GetCookies(uri).Count > 0;
+#endif
+            default:
+                return false;
+        }
+    }
 
     /// <summary>Rejects a primary handler that would follow redirects before this handler can gate and check them.</summary>
     internal static void RequireManualRedirects(HttpMessageHandler? handler) {

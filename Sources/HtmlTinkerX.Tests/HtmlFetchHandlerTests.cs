@@ -193,6 +193,46 @@ public sealed class HtmlFetchHandlerTests {
     }
 
     [Fact]
+    public async Task ValidatorCacheIsNotConsultedWhenTheTransportSendsCookiesForTheAddress() {
+        List<bool> conditional = new();
+        int calls = 0;
+        CookieContainer cookies = new();
+        cookies.Add(new Uri("https://publisher.example/"), new Cookie("session", "first-user"));
+        HttpClientHandler transport = new() { AllowAutoRedirect = false, CookieContainer = cookies };
+        using HttpClient client = Client(new Responder(request => {
+            conditional.Add(request.Headers.IfNoneMatch.Count > 0);
+            if (request.Headers.IfNoneMatch.Count > 0) return new HttpResponseMessage(HttpStatusCode.NotModified) { Headers = { ETag = new EntityTagHeaderValue("\"v1\"") } };
+            return new HttpResponseMessage(HttpStatusCode.OK) {
+                Headers = { ETag = new EntityTagHeaderValue("\"v1\"") },
+                Content = new StringContent(++calls == 1 ? "first user's page" : "second user's page")
+            };
+        }, transport), new HtmlFetchPolicy { ValidatorCache = new HtmlMemoryValidatorCache() });
+
+        await client.GetStringAsync("https://publisher.example/account");
+        string second = await client.GetStringAsync("https://publisher.example/account");
+
+        Assert.Equal(new[] { false, false }, conditional);
+        Assert.Equal("second user's page", second);
+    }
+
+    [Theory]
+    [InlineData("https://elsewhere.example/article")]
+    [InlineData("http://publisher.example/article")]
+    public async Task OnBlockedRenderRejectsAFinalAddressARedirectCouldNotReach(string final) {
+        using HttpClient client = Client(new Callback(_ => new HttpResponseMessage(HttpStatusCode.Forbidden) {
+            Content = new StringContent(AkamaiBlockPage, Encoding.UTF8, "text/html")
+        }), new HtmlFetchPolicy {
+            RedirectPolicy = HtmlFetchPolicy.AllowHosts(new[] { "publisher.example" }),
+            OnBlocked = (_, _, _) => Task.FromResult(HtmlBlockedAction.Render),
+            Renderer = (_, _) => Task.FromResult(new HtmlRenderedPage("<main>Elsewhere</main>", new Uri(final)))
+        });
+
+        HttpRequestException refused = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("https://publisher.example/article"));
+
+        Assert.IsNotType<HtmlHttpException>(refused);
+    }
+
+    [Fact]
     public async Task NotModifiedWithAnEntityTagCannotConfirmABodyStoredWithoutOne() {
         int calls = 0;
         using HttpClient client = Client(new Callback(request => {
@@ -331,6 +371,12 @@ public sealed class HtmlFetchHandlerTests {
     }
 
     private sealed class Callback(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(respond(request));
+    }
+
+    /// <summary>Answers in place of the network while a real primary handler, with its cookie container, sits below it.</summary>
+    private sealed class Responder(Func<HttpRequestMessage, HttpResponseMessage> respond, HttpMessageHandler transport) : DelegatingHandler(transport) {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(respond(request));
     }

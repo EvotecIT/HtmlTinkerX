@@ -181,7 +181,15 @@ internal sealed class HtmlStoringContent : HttpContent {
             byte[] body = _copy.ToArray();
             _copy.Dispose();
             _copy = null;
-            return store(body, cancellationToken);
+            return StoreAsync(body, cancellationToken);
+        }
+
+        // The cache only saves a later download; failing to store must not fail the caller's read of a complete body.
+        private async Task StoreAsync(byte[] body, CancellationToken cancellationToken) {
+            try {
+                await store(body, cancellationToken).ConfigureAwait(false);
+            } catch (Exception error) when (error is not OperationCanceledException) {
+            }
         }
 
         public override void Flush() { }

@@ -64,11 +64,16 @@ public sealed record HtmlHttpNetworkConnection(string Host, HtmlHttpAddressFamil
 /// fails before connecting rather than silently bypassing that proxy. When the ordinary transport is a <see cref="SocketsHttpHandler"/>,
 /// routed hosts reuse its TLS options (certificate validation, client certificates, protocols), credentials, cookie
 /// container, decompression and pooling limits. Any other transport's settings cannot be read, so routed hosts then use
-/// a default transport: system certificate validation, no credentials, client certificates or cookies.
+/// a default transport: system certificate validation, no credentials, client certificates or cookies. Routes apply to
+/// TCP connections, so routed requests never use HTTP/3: a request that allows a lower version is sent at HTTP/2 or
+/// below, and one that requires HTTP/3 fails with <see cref="NotSupportedException"/>.
 /// </remarks>
 public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
     private readonly HttpMessageInvoker _ordinary;
     private readonly IReadOnlyDictionary<string, HttpMessageInvoker> _routes;
+
+    /// <summary>The transport for hosts without a route; routed transports share its cookie container or send no cookies.</summary>
+    internal HttpMessageHandler OrdinaryTransport { get; }
 
     /// <summary>Owns <paramref name="ordinaryTransport"/> and the routed transports until disposal. Host keys are exact, without ports.</summary>
     /// <param name="ordinaryTransport">Transport for hosts without a route; it must not follow redirects automatically.</param>
@@ -85,6 +90,7 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
             if (policy.AddressFamily != HtmlHttpAddressFamily.Automatic || policy.LocalAddress is not null)
                 policies.Add(Normalize(host), policy);
         }
+        OrdinaryTransport = ordinaryTransport;
         _ordinary = new(ordinaryTransport, disposeHandler: true);
         _routes = policies.ToDictionary(pair => pair.Key,
             pair => new HttpMessageInvoker(CreateTransport(pair.Value, ordinaryTransport as SocketsHttpHandler, onConnected), disposeHandler: true),
@@ -106,8 +112,30 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
     }
 
     /// <inheritdoc />
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-        (_routes.TryGetValue(Normalize(request.RequestUri!.IdnHost), out var route) ? route : _ordinary).SendAsync(request, cancellationToken);
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+        if (!_routes.TryGetValue(Normalize(request.RequestUri!.IdnHost), out var route)) return _ordinary.SendAsync(request, cancellationToken);
+        KeepOnTcp(request);
+        return route.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// HTTP/3 runs over QUIC, which never calls the connect callback, so a routed request must not use it. A request
+    /// allowing a higher version could also move to HTTP/3 after an Alt-Svc advertisement; it is capped at HTTP/2.
+    /// </summary>
+    private static void KeepOnTcp(HttpRequestMessage request) {
+        if (request.Version.Major >= 3) {
+            if (request.VersionPolicy != HttpVersionPolicy.RequestVersionOrLower)
+                throw new NotSupportedException("Explicit network routes connect over TCP and cannot send a request that requires HTTP/3.");
+            request.Version = HttpVersion.Version20;
+        } else if (request.VersionPolicy == HttpVersionPolicy.RequestVersionOrHigher) {
+            if (request.Version.Major == 2) {
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionExact;
+            } else {
+                request.Version = HttpVersion.Version20;
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+            }
+        }
+    }
 
     private static SocketsHttpHandler CreateTransport(HtmlHttpNetworkPolicy policy, SocketsHttpHandler? template,
         Action<HtmlHttpNetworkConnection>? onConnected) {
