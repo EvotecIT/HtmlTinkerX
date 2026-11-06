@@ -11,12 +11,12 @@ Cmdlet that executes JavaScript against HTML using AngleSharp.Js.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Invoke-HtmlBrowserDomScript -Content <string> -Script <string> [<CommonParameters>]
+Invoke-HtmlBrowserDomScript -Content <string> -Script <string> [-Timeout <int>] [-RegexTimeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
 ```
 
 ### Path
 ```powershell
-Invoke-HtmlBrowserDomScript -Path <string> -Script <string> [<CommonParameters>]
+Invoke-HtmlBrowserDomScript -Path <string> -Script <string> [-Timeout <int>] [-RegexTimeout <int>] [-MaximumStatements <int>] [-MaximumMemoryBytes <long>] [-MaximumHtmlCharacters <int>] [-MaximumScriptCharacters <int>] [-SkipPageScripts] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -26,13 +26,7 @@ Cmdlet that executes JavaScript against HTML using AngleSharp.Js.
 
 ### EXAMPLE 1
 ```powershell
-Invoke-HtmlBrowserDomScript -Content 'Value' -Script 'Value'
-```
-
-
-### EXAMPLE 2
-```powershell
-Invoke-HtmlBrowserDomScript -Path 'C:\Path' -Script 'Value'
+Invoke-HtmlBrowserDomScript -Content '<p id="value">Hello</p>' -Script 'document.getElementById("value").textContent' -Timeout 3000 -RegexTimeout 250 -SkipPageScripts
 ```
 
 
@@ -54,6 +48,70 @@ Accept pipeline input: True (ByValue, ByPropertyName)
 Accept wildcard characters: False
 ```
 
+### -MaximumHtmlCharacters
+Maximum decoded HTML input length, including file input. Defaults to 16777216 characters.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 16777216
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumMemoryBytes
+Maximum managed bytes allocated by each script execution. Defaults to 67108864 bytes. This does not bound the DOM or process memory.
+
+```yaml
+Type: Int64
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: ([System.Int64]67108864)
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumScriptCharacters
+Maximum requested script length. Defaults to 1048576 characters.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 1048576
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaximumStatements
+Maximum statements per script execution. Defaults to 1000000.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 1000000
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Path
 Path to a HTML file.
 
@@ -70,6 +128,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -RegexTimeout
+Maximum native regex match duration in milliseconds. Defaults to 1000 and bounds cancellation latency during a match.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 1000
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Script
 JavaScript code to run.
 
@@ -82,6 +156,38 @@ Possible values:
 Required: True
 Position: named
 Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SkipPageScripts
+Skip scripts and event handlers in the HTML and evaluate only the requested script.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Timeout
+Whole DOM execution timeout in milliseconds, including inline page scripts. Defaults to 10000.
+
+```yaml
+Type: Int32
+Parameter Sets: Content, Path
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: 10000
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
