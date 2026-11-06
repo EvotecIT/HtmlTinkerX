@@ -96,7 +96,7 @@ public class HtmlDomValueSelectorTests {
 
     [Fact]
     public void FindSimilar_DoesNotTreatMatchingTextAsMatchingShape() {
-        IDocument document = HtmlParser.ParseWithAngleSharp("<div><p>Sale</p><p><b>x</b><i>y</i>Sale</p></div>");
+        IDocument document = HtmlParser.ParseWithAngleSharp("<div><p>Sale</p><p><b>Sale</b></p></div>");
 
         Assert.Empty(HtmlDomExtraction.FindSimilar(document.QuerySelector("p")!));
     }
