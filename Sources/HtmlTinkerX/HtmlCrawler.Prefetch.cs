@@ -14,6 +14,8 @@ public static partial class HtmlCrawler {
         private readonly Dictionary<string, Task<FetchedPageData>> _downloads = new(StringComparer.Ordinal);
         internal int Count => _downloads.Count;
 
+        internal bool Contains(string key) => _downloads.ContainsKey(key);
+
         internal void Add(string key, CrawlRequest request, HttpClient client, HtmlCrawlOptions options,
             IReadOnlyDictionary<string, HtmlCrawlJsonSchemaField> schema, HtmlCrawlPage? cached) {
             HtmlCrawlOptions downloadOptions = options.Clone();

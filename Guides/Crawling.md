@@ -286,7 +286,7 @@ await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync("https://ex
         page.Emit(new { Title = post.TextContent.Trim(), Url = post.GetAttribute("href") });
     }
     string? next = page.Document.QuerySelector("a[rel=next]")?.GetAttribute("href");
-    if (next != null) page.Follow(next, new Dictionary<string, string> { ["source"] = "pagination" }, priority: 10);
+    if (!string.IsNullOrWhiteSpace(next)) page.Follow(next, new Dictionary<string, string> { ["source"] = "pagination" }, priority: 10);
     page.FollowLinks = false;
     return Task.CompletedTask;
 })) {
@@ -303,7 +303,8 @@ Invoke-HtmlCrawl -Url 'https://example.com/blog/' -MaxDepth 10 -MaxPages 200 -Pr
         [pscustomobject]@{ Title = $post.TextContent.Trim(); Url = $post.GetAttribute('href') }
     }
     $next = $_.Document.QuerySelector('a[rel=next]')
-    if ($next) { $_.Follow($next.GetAttribute('href'), @{ source = 'pagination' }, 10) }
+    $href = if ($next) { $next.GetAttribute('href') }
+    if (-not [string]::IsNullOrWhiteSpace($href)) { $_.Follow($href, @{ source = 'pagination' }, 10) }
     $_.FollowLinks = $false
 } | Export-Csv -Path './posts.csv' -NoTypeInformation
 ```

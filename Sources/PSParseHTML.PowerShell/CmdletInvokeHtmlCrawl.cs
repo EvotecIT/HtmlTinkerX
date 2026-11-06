@@ -29,7 +29,8 @@ namespace PSParseHTML.PowerShell;
 /// <code>Invoke-HtmlCrawl -Url https://example.com/blog/ -MaxDepth 5 -Process {
 ///     foreach ($post in $_.Document.QuerySelectorAll('article h2 a')) { [pscustomobject]@{ Title = $post.TextContent.Trim(); Page = $_.Page.Url } }
 ///     $next = $_.Document.QuerySelector('a[rel=next]')
-///     if ($next) { $_.Follow($next.GetAttribute('href')) }
+///     $href = if ($next) { $next.GetAttribute('href') }
+///     if (-not [string]::IsNullOrWhiteSpace($href)) { $_.Follow($href) }
 ///     $_.FollowLinks = $false
 /// }</code>
 /// </example>
@@ -50,6 +51,7 @@ public sealed class CmdletInvokeHtmlCrawl : AsyncPSCmdlet {
     /// <summary>Runs a scriptblock on the pipeline thread for each successful page while the crawl runs and writes its output to the pipeline instead of the final crawl result.
     /// $_ is an HtmlCrawlPageContext with Page, Document (the parsed HTML), Depth and Data.
     /// Call $_.Follow(url, data, priority, render) to queue follow-up requests; they obey the crawl's scope, MaxDepth, MaxPages, robots and deduplication rules.
+    /// Rendered follow-ups ($_.Follow(url, $null, 0, $true)) need MaxConcurrentPageRequests set to 1; otherwise the crawl stops with an error.
     /// Set $_.FollowLinks = $false to follow only those requests. With StreamPages, each page is written before its items.
     /// A terminating error in the scriptblock stops the crawl.</summary>
     [Parameter]

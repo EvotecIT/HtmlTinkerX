@@ -54,7 +54,7 @@ public sealed class HtmlCrawlOptions {
     /// <summary>Per-origin start spacing in milliseconds (crawl delay and robots.txt) for gated page requests.</summary>
     internal System.Func<System.Uri, System.Threading.CancellationToken, System.Threading.Tasks.Task<int>>? PageRequestDelay { get; set; }
     internal System.Func<HtmlCrawlPageContext, System.Threading.CancellationToken, System.Threading.Tasks.Task>? PageHandler { get; set; }
-    internal System.Threading.Channels.ChannelWriter<HtmlCrawlStreamEntry>? StreamWriter { get; set; }
+    internal System.Func<HtmlCrawlStreamEntry, System.Threading.CancellationToken, System.Threading.Tasks.Task>? StreamSink { get; set; }
 
     /// <summary>Maximum static page or robots.txt response size in bytes.</summary>
     public int MaximumPageResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
@@ -510,7 +510,7 @@ public sealed class HtmlCrawlOptions {
             RenderedPageObserver = RenderedPageObserver,
             PageObserver = PageObserver,
             PageHandler = PageHandler,
-            StreamWriter = StreamWriter,
+            StreamSink = StreamSink,
             IncludePatterns = new List<string>(IncludePatterns),
             ExcludePatterns = new List<string>(ExcludePatterns),
             SitemapUrls = new List<string>(SitemapUrls),

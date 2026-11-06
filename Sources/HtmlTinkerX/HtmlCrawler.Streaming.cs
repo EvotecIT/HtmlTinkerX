@@ -33,10 +33,18 @@ public static partial class HtmlCrawler {
         Func<HtmlCrawlPageContext, CancellationToken, Task>? pageHandler = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         HtmlCrawlOptions streamOptions = options?.Clone() ?? new HtmlCrawlOptions();
-        Channel<HtmlCrawlStreamEntry> channel = Channel.CreateBounded<HtmlCrawlStreamEntry>(
-            new BoundedChannelOptions(1) { SingleReader = true, SingleWriter = true });
+        Channel<StreamDelivery> channel = Channel.CreateUnbounded<StreamDelivery>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
         streamOptions.PageHandler = pageHandler;
-        streamOptions.StreamWriter = channel.Writer;
+        // Each entry waits until the consumer asks for the next one, so the crawler commits a page's
+        // checkpoint only after the consumer has finished with that page and its items.
+        streamOptions.StreamSink = async (entry, token) => {
+            StreamDelivery delivery = new(entry);
+            using (token.Register(() => delivery.Processed.TrySetCanceled())) {
+                await channel.Writer.WriteAsync(delivery, token).ConfigureAwait(false);
+                await delivery.Processed.Task.ConfigureAwait(false);
+            }
+        };
         using CancellationTokenSource crawlCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<HtmlCrawlResult> crawl = RunAsync();
         async Task<HtmlCrawlResult> RunAsync() {
@@ -49,8 +57,9 @@ public static partial class HtmlCrawler {
 
         try {
             while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)) {
-                while (channel.Reader.TryRead(out HtmlCrawlStreamEntry? entry)) {
-                    yield return entry;
+                while (channel.Reader.TryRead(out StreamDelivery? delivery)) {
+                    yield return delivery.Entry;
+                    delivery.Processed.TrySetResult(true);
                 }
             }
             yield return HtmlCrawlStreamEntry.ForResult(await crawl.ConfigureAwait(false));
@@ -62,5 +71,11 @@ public static partial class HtmlCrawler {
                 // A crawl failure was already rethrown by the final await, or the consumer stopped early and cancelled the crawl.
             }
         }
+    }
+
+    private sealed class StreamDelivery(HtmlCrawlStreamEntry entry) {
+        internal HtmlCrawlStreamEntry Entry { get; } = entry;
+
+        internal TaskCompletionSource<bool> Processed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

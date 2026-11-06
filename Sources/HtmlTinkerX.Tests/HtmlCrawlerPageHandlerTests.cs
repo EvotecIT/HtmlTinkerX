@@ -50,6 +50,61 @@ public partial class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task StreamAsync_CommitsAPageCheckpointOnlyAfterTheConsumerFinishesIt() {
+        string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        using HttpListener server = StartServer(new Dictionary<string, string> { ["/"] = "<main>Home</main>" }, out string root);
+        HtmlCrawlOptions options = StaticOptions(1);
+        options.OutputPath = output;
+        try {
+            int committedWhileConsumerBusy = -1;
+            await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync(root, options)) {
+                if (entry.Kind != HtmlCrawlStreamEntryKind.Page) continue;
+                await Task.Delay(500);
+                committedWhileConsumerBusy = (await HtmlCrawler.LoadResultAsync(output)).Pages.Count;
+            }
+
+            Assert.Equal(0, committedWhileConsumerBusy);
+            Assert.Single((await HtmlCrawler.LoadResultAsync(output)).Pages);
+        } finally { if (Directory.Exists(output)) Directory.Delete(output, true); }
+    }
+
+    [Fact]
+    public async Task StreamAsync_HigherPriorityFollowUpsDoNotExceedThePageBudgetWhilePrefetching() {
+        using HttpListener server = StartFlexibleServer(context => RespondAsync(context, "<main><a href='/a'>A</a><a href='/b'>B</a></main>"), out string root);
+        HtmlCrawlOptions options = StaticOptions(3);
+        options.MaxDepth = 3;
+        options.MaxConcurrentPageRequests = 2;
+
+        HtmlCrawlResult? result = null;
+        await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync(root, options, (page, token) => {
+            string path = new Uri(page.Page.Url).AbsolutePath;
+            if (path == "/") page.Follow("/high", priority: 5);
+            if (path == "/high") page.Follow("/higher", priority: 10);
+            return Task.CompletedTask;
+        })) {
+            result = entry.Result ?? result;
+        }
+
+        Assert.Equal(3, result!.Pages.Count);
+    }
+
+    [Fact]
+    public async Task StreamAsync_FollowUpsResolveAgainstTheDocumentBase() {
+        var requested = new ConcurrentQueue<string>();
+        using HttpListener server = StartFlexibleServer(context => {
+            requested.Enqueue(context.Request.Url!.AbsolutePath);
+            return RespondAsync(context, "<head><base href='/docs/'></head><main>Page</main>");
+        }, out string root);
+
+        await foreach (HtmlCrawlStreamEntry entry in HtmlCrawler.StreamAsync(root, StaticOptions(2), (page, token) => {
+            page.Follow("next");
+            return Task.CompletedTask;
+        })) { }
+
+        Assert.Equal(new[] { "/", "/docs/next" }, requested);
+    }
+
+    [Fact]
     public async Task StreamAsync_FollowUpsObeyScopeRobotsDedupeAndPageBudget() {
         var requested = new ConcurrentQueue<string>();
         using HttpListener server = StartFlexibleServer(async context => {
