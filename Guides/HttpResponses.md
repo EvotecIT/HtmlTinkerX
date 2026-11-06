@@ -43,11 +43,14 @@ failure:
 try { Get-HtmlPage -Url $url } catch { $_.TargetObject | Format-List Kind, Provider, Excerpt }
 ```
 
-`Get-HtmlPage` also accepts `-RetryCount`, `-BrowserHeaders` for a
-consistent desktop Chrome header set, several `-Proxy` addresses to rotate
-through, and `-RenderWhenBlocked` to render a challenged or blocked page in a
-headless browser instead. A page the browser is refused too still fails with
-`HtmlHttpException`. HtmlTinkerX does not solve CAPTCHAs.
+Cmdlets that download with `-Url` also accept `-RetryCount`, `-BrowserHeaders`
+for a consistent browser header set, several `-Proxy` addresses to rotate
+through, `-RenderWhenBlocked` to render a challenged or blocked page in a
+headless browser instead, `-ResumeInBrowser` to finish a site's check yourself
+and continue with its cookies, and `-ReplayCache` to replay stored responses
+while you develop. A page the browser is refused too still fails with
+`HtmlHttpException`. HtmlTinkerX does not solve CAPTCHAs; see
+[Read sites that challenge or block requests](BlockedPages.md).
 
 .NET callers get the same behaviour from `HtmlHttpClientFactory.Create(HtmlFetchPolicy)`:
 
@@ -55,11 +58,11 @@ headless browser instead. A page the browser is refused too still fails with
 var policy = new HtmlFetchPolicy {
     Gate = sharedGate,                     // HtmlHostRequestGate: per-host limits and adaptive pacing
     RetryCount = 2,
-    BrowserHeaders = HtmlBrowserHeaderProfile.Chrome(),
+    BrowserHeaders = identity,             // HtmlBrowser.GetHeaderProfileAsync(): the renderer's own browser
     ValidatorCache = new HtmlMemoryValidatorCache(),
     OnBlocked = (uri, failure, token) => Task.FromResult(
         failure.Kind == HtmlHttpFailureKind.BlockPage ? HtmlBlockedAction.Render : HtmlBlockedAction.Fail),
-    Renderer = HtmlBrowser.CreateFetchRenderer(new HtmlBrowserLaunchOptions { CdpEndpointUrl = "http://127.0.0.1:9222" })
+    Renderer = HtmlBrowser.CreateFetchRenderer(new HtmlBrowserLaunchOptions { CdpEndpointUrl = "http://127.0.0.1:9222", HeaderProfile = identity })
 };
 using HttpClient client = HtmlHttpClientFactory.Create(policy, HtmlProxyRotator.Create(proxies));
 ```

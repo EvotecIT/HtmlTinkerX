@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Find, "HtmlInteractionSurface", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlInteractionSurfaceItem))]
-public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
+public sealed class CmdletFindHtmlInteractionSurface : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
@@ -67,18 +67,10 @@ public sealed class CmdletFindHtmlInteractionSurface : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int MaximumResponseBytes { get; set; } = HtmlHttpFetchOptions.DefaultMaximumResponseBytes;
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        ValidateUrlParameters();
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         HtmlHttpFetchOptions fetchOptions = new() { MaximumResponseBytes = MaximumResponseBytes };
         string html = await ReadHtmlAsync(client, fetchOptions).ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);

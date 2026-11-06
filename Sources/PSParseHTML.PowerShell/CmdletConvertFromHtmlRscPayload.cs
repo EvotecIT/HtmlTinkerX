@@ -18,7 +18,7 @@ namespace PSParseHTML.PowerShell;
 [OutputType(typeof(HtmlReactFlightRow))]
 [OutputType(typeof(HtmlReactFlightPayload))]
 [OutputType(typeof(HtmlReactFlightDocument))]
-public sealed class CmdletConvertFromHtmlRscPayload : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlRscPayload : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -40,14 +40,6 @@ public sealed class CmdletConvertFromHtmlRscPayload : AsyncPSCmdlet {
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <summary>Returns raw Next.js inline payload instructions instead of decoded rows.</summary>
     [Parameter]
     public SwitchParameter RawPayload { get; set; }
@@ -58,7 +50,7 @@ public sealed class CmdletConvertFromHtmlRscPayload : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         HtmlReactFlightDocument document = await ReadDocumentAsync().ConfigureAwait(false);
 
         if (AsDocument.IsPresent) {
@@ -80,7 +72,7 @@ public sealed class CmdletConvertFromHtmlRscPayload : AsyncPSCmdlet {
                 string html = await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
                 return HtmlReactFlightParser.Parse(html);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlReactFlightParser.ParseUrlAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:

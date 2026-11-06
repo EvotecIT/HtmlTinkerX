@@ -26,7 +26,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.ConvertFrom, "Html", DefaultParameterSetName = ParameterSetContent)]
 [Alias("cfhtml")]
 [OutputType(typeof(object))]
-public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtml : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -43,19 +43,6 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
     [Parameter]
     public HtmlParserEngine Engine { get; set; } = HtmlParserEngine.AgilityPack;
 
-    /// <summary>
-    /// Optional proxy server address used when fetching content from <see cref="Url"/>.
-    /// Include the protocol and port number if required.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>
-    /// Credentials used to authenticate against the <see cref="Proxy"/> server.
-    /// </summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <summary>User-Agent header used when downloading <see cref="Url"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public string? UserAgent { get; set; }
@@ -71,9 +58,9 @@ public sealed class CmdletConvertFromHtml : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters(UserAgent, Header);
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, UserAgent, Header);
+            using HttpClient client = await CreateUrlClientAsync(UserAgent, Header).ConfigureAwait(false);
             if (Engine == HtmlParserEngine.AngleSharp) {
                 IDocument doc = await HtmlParser.ParseUrlWithAngleSharpAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
                 WriteObject(Raw.IsPresent ? doc : doc.DocumentElement);

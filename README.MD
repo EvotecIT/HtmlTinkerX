@@ -137,6 +137,7 @@ Console.WriteLine(page.Headings[0].Text);
 | Check page errors, network requests, media and browser installation | [Browser testing](Guides/BrowserTesting.md) |
 | Configure request interception, profiles and saved state | [Browser sessions](Guides/BrowserSessions.md) |
 | Set HTTP response limits and understand encoding or cancellation | [HTTP response controls](Guides/HttpResponses.md) |
+| Read sites that challenge or block requests, without solving checks automatically | [Blocked pages](Guides/BlockedPages.md) |
 
 The [generated command reference](Docs/Readme.md) contains the complete
 PowerShell parameter and pipeline documentation. See [MIGRATION.md](MIGRATION.md)

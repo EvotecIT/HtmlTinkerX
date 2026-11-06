@@ -84,8 +84,9 @@ fetch("/api/session?token=abc123");
 
     It 'binds proxy parameters with content when linked scripts are inspected' {
         $command = Get-Command Find-HtmlApiEndpoint
-        $command.Parameters['Proxy'].ParameterSets.Keys | Should -Contain 'Content'
-        $command.Parameters['ProxyCredential'].ParameterSets.Keys | Should -Contain 'Content'
+        $contentParameters = ($command.ParameterSets | Where-Object Name -eq 'Content').Parameters.Name
+        $contentParameters | Should -Contain 'Proxy'
+        $contentParameters | Should -Contain 'ProxyCredential'
 
         $html = '<html><body><main>Proxy binding check</main></body></html>'
         $credential = [pscredential]::new('proxy-user', (ConvertTo-SecureString 'proxy-pass' -AsPlainText -Force))

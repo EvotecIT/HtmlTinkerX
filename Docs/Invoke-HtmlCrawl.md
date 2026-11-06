@@ -1614,6 +1614,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 - `HtmlTinkerX.HtmlCrawlResult`
 - `HtmlTinkerX.HtmlCrawlPage`
+- `System.Management.Automation.PSObject`
 
 ## RELATED LINKS
 

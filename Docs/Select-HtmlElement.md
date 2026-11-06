@@ -30,17 +30,13 @@ Select-HtmlElement [[-Selector] <string>] -Url <uri> [-Text <string>] [-TextMatc
 ```
 
 ## DESCRIPTION
-Selects elements, text or attribute values from static HTML with a CSS selector or by text.
-
-A selector that ends in `::text` returns each element's own text, and one that ends in `::attr(name)` returns attribute values.
-`li *::text` (or `li ::text`) returns the own text of every element inside `li`.
-URL attributes such as `href` and `src` are resolved against `-BaseUrl`, the downloaded `-Url`, or the page's `<base href>`.
+A selector that ends in ::text returns each element's own text, and one that ends in ::attr(name) returns attribute values.
+URL attributes such as href and src are resolved against -BaseUrl, the downloaded -Url, or the page's <base href>.
 Elements without own text or without the attribute are skipped.
-`::text` and `::attr(name)` must be the last part of the selector and cannot be used in a selector list.
 
-`-Text` finds elements by their own text, ignoring case unless `-CaseSensitive` is used. With `-Selector`, only matching elements are searched.
+-Text finds elements by their own text, ignoring case unless -CaseSensitive is used. With -Selector, only matching elements are searched.
 
-`-Similar` takes the first match and returns the other elements shaped like it (same tag and ancestor path, similar classes and children), for example the remaining items of a list. Piping an element from an earlier `Select-HtmlElement` with just `-Similar` finds its look-alikes on the same page.
+-Similar takes the first match and returns the other elements shaped like it, for example the remaining items of a list. A piped element with just -Similar is compared with the rest of its own page.
 
 ## EXAMPLES
 
@@ -59,32 +55,28 @@ Select-HtmlElement -Url https://example.org -Selector 'h1' -First
 ### EXAMPLE 3
 ```powershell
 Select-HtmlElement -Url https://example.org/news -Selector 'article a::attr(href)'
-Select-HtmlElement -Path .\page.html -Selector 'h2::text'
+            Select-HtmlElement -Path .\page.html -Selector 'h2::text'
 ```
 
-Return absolute link targets and headline text.
 
 ### EXAMPLE 4
 ```powershell
 Select-HtmlElement -Content $html -Text 'next' -Selector 'a::attr(href)' -BaseUrl https://example.org/list
 ```
 
-Find the link labelled Next and return its target.
 
 ### EXAMPLE 5
 ```powershell
 Select-HtmlElement -Path .\shop.html -Selector 'li.featured' -Similar
-Select-HtmlElement -Path .\shop.html -Text 'Gold One' -Selector 'h2::text' -Similar
+            Select-HtmlElement -Path .\shop.html -Text 'Gold One' -Selector 'h2::text' -Similar
 ```
 
-Return the other list items shaped like the featured one, then the titles of the items shaped like the one titled Gold One.
 
 ### EXAMPLE 6
 ```powershell
 Select-HtmlElement -Content $html -Text '^v\d+\.\d+' -TextMatch Regex -Selector 'li'
 ```
 
-Find list items by a regular expression.
 
 ## PARAMETERS
 
@@ -265,7 +257,7 @@ Accept wildcard characters: False
 ```
 
 ### -Similar
-Return the elements shaped like the first match (same tag and ancestor path, similar classes and children) instead of the match itself. A piped element without -Selector or -Text is compared with the rest of its own page.
+Return the elements shaped like the first match (same tag and ancestor path, similar classes and children) instead of the match itself.
 
 ```yaml
 Type: SwitchParameter

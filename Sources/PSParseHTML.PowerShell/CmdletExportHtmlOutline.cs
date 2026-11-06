@@ -14,7 +14,7 @@ namespace PSParseHTML.PowerShell;
 /// <code>Export-HTMLOutline -Url https://example.com -Path outline.json</code>
 /// </example>
 [Cmdlet(VerbsData.Export, "HtmlOutline", DefaultParameterSetName = ParameterSetContent)]
-public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
+public sealed class CmdletExportHtmlOutline : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -35,20 +35,12 @@ public sealed class CmdletExportHtmlOutline : AsyncPSCmdlet {
     [Parameter]
     public HtmlParserEngine Engine { get; set; } = HtmlParserEngine.AgilityPack;
 
-    /// <summary>Proxy server address used when <see cref="Url"/> is specified.</summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the specified <see cref="Proxy"/>.</summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         List<HtmlOutlineItem> outline;
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             outline = await HtmlOutlineBuilder.BuildFromUrlAsync(Url.ToString(), Engine, client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else {
             outline = HtmlOutlineBuilder.Build(Content, Engine);

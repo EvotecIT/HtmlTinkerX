@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsDiagnostic.Test, "HtmlExtractionPlan", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlExtractionPlan))]
-public sealed class CmdletTestHtmlExtractionPlan : AsyncPSCmdlet {
+public sealed class CmdletTestHtmlExtractionPlan : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetPath = "Path";
@@ -34,17 +34,9 @@ public sealed class CmdletTestHtmlExtractionPlan : AsyncPSCmdlet {
     [Alias("File")]
     public string? Path { get; set; }
 
-    /// <summary>Proxy server address used when downloading Url.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used for the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await GetHtmlAsync().ConfigureAwait(false);
         Uri? sourceUri = ParameterSetName == ParameterSetUrl ? Url : null;
         WriteObject(HtmlExtractionPlanner.Analyze(html, sourceUri));
@@ -52,7 +44,7 @@ public sealed class CmdletTestHtmlExtractionPlan : AsyncPSCmdlet {
 
     private async Task<string> GetHtmlAsync() {
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
         }
 

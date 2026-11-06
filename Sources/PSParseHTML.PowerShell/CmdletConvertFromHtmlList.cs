@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlList", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]))]
-public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlList : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
 
@@ -44,25 +44,12 @@ public sealed class CmdletConvertFromHtmlList : AsyncPSCmdlet {
     [Parameter]
     public string TagPlaceholder { get; set; } = " ";
 
-    /// <summary>
-    /// Proxy server address used when <see cref="Url"/> is specified.
-    /// Include protocol and port if required.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>
-    /// Credentials used for authenticating with the specified <see cref="Proxy"/> server.
-    /// </summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         List<HtmlListResult> results;
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             if (Engine == HtmlParserEngine.AngleSharp) {
                 results = await HtmlParser.ParseUrlListsWithAngleSharpDetailedAsync(Url.ToString(), TagPlaceholder, client, cancellationToken: CancelToken).ConfigureAwait(false);
             } else {

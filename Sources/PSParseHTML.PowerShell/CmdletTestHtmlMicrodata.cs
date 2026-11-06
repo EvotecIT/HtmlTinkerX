@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsDiagnostic.Test, "HtmlMicrodata", DefaultParameterSetName = ParameterSetItems)]
 [OutputType(typeof(MicrodataSchemaMismatch))]
-public sealed class CmdletTestHtmlMicrodata : AsyncPSCmdlet {
+public sealed class CmdletTestHtmlMicrodata : AsyncUrlCmdlet {
     private const string ParameterSetItems = "Items";
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
@@ -33,23 +33,15 @@ public sealed class CmdletTestHtmlMicrodata : AsyncPSCmdlet {
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
 
-    /// <summary>Proxy server address when downloading by URL.</summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials for the proxy server.</summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     private readonly List<HtmlMicrodataItem> _items = new();
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         if (ParameterSetName == ParameterSetContent) {
             _items.AddRange(HtmlParser.ParseMicrodataItems(Content));
         } else if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             var list = await HtmlParser.ParseUrlMicrodataItemsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
             _items.AddRange(list);
         } else {

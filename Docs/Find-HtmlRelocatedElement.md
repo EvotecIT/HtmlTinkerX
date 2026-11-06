@@ -20,7 +20,8 @@ Find-HtmlRelocatedElement [-Path] <string> [-Selector] <string> -Fingerprint <Ht
 ```
 
 ## DESCRIPTION
-Suggests where content moved when a saved CSS selector stops matching after a page layout change.
+Candidates are ranked by similarity to a fingerprint from Get-HtmlElementFingerprint and carry a High, Medium or
+Low confidence with the reasons behind it. They are suggestions to review; no selector or recipe is changed.
 
 ## EXAMPLES
 

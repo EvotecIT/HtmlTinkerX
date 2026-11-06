@@ -1,4 +1,5 @@
 #if !FRAMEWORK
+using System.Collections.Concurrent;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
@@ -33,6 +34,37 @@ public partial class HtmlCrawlerTests {
         HtmlHttpFailure failure = Assert.IsType<HtmlHttpFailure>(error.ErrorRecord.TargetObject);
         Assert.Equal("Akamai", failure.Provider);
         Assert.IsType<HtmlHttpException>(error.ErrorRecord.Exception);
+    }
+
+    [Fact]
+    public void UrlCmdletsTakeTheFetchParametersAndReplayFromTheCacheOnceTheSiteIsGone() {
+        ConcurrentQueue<string?> userAgents = new();
+        HttpListener server = StartFlexibleServer(context => {
+            userAgents.Enqueue(context.Request.UserAgent);
+            return RespondAsync(context, "<html><head><meta name=\"description\" content=\"Stored\"></head></html>");
+        }, out string root);
+        string directory = Path.Combine(Path.GetTempPath(), "htmltinkerx-replay-" + Guid.NewGuid().ToString("N"));
+        var state = InitialSessionState.CreateDefault2();
+        state.Commands.Add(new SessionStateCmdletEntry("ConvertFrom-HtmlMeta", typeof(CmdletConvertFromHtmlMeta), null));
+        using var runspace = RunspaceFactory.CreateRunspace(state);
+        runspace.Open();
+        string? Describe() {
+            using var command = PowerShell.Create();
+            command.Runspace = runspace;
+            command.AddCommand("ConvertFrom-HtmlMeta").AddParameter("Url", root).AddParameter("BrowserHeaders").AddParameter("RetryCount", 0)
+                .AddParameter("ReplayCache", directory);
+            return command.Invoke().Single(meta => (string)meta.Properties["Name"].Value == "description").Properties["Content"].Value as string;
+        }
+        try {
+            Assert.Equal("Stored", Describe());
+            server.Close();
+
+            Assert.Equal("Stored", Describe());
+            Assert.Equal(HtmlBrowserHeaderProfile.Chrome().UserAgent, Assert.Single(userAgents));
+        } finally {
+            server.Close();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
     }
 }
 #endif

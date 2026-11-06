@@ -20,7 +20,9 @@ Invoke-HtmlExtractionRecipe [-Path] <string> [-Content <string>] [-AllowHttpFetc
 ```
 
 ## DESCRIPTION
-Executes a browserless extraction recipe.
+When a DOM recipe's baseline stores item fingerprints and the items no longer match, the result's
+DriftReport.RelocationCandidates suggests where they moved and each candidate is written as a warning.
+The recipe is not changed.
 
 ## EXAMPLES
 

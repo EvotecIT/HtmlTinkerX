@@ -15,7 +15,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsLifecycle.Invoke, "HtmlPageWorkbench", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlPageWorkbenchResult))]
-public sealed class CmdletInvokeHtmlPageWorkbench : AsyncPSCmdlet {
+public sealed class CmdletInvokeHtmlPageWorkbench : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";
     private const string ParameterSetUrl = "Url";
@@ -60,22 +60,10 @@ public sealed class CmdletInvokeHtmlPageWorkbench : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter NoHtml { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL or inspecting linked scripts.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    [Parameter(ParameterSetName = ParameterSetContent)]
-    [Parameter(ParameterSetName = ParameterSetPath)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    [Parameter(ParameterSetName = ParameterSetContent)]
-    [Parameter(ParameterSetName = ParameterSetPath)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        ValidateUrlParameters();
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         string html = await ReadHtmlAsync(client).ConfigureAwait(false);
         Uri? baseUri = ParameterSetName == ParameterSetUrl ? downloadedResponseUri ?? Url : BaseUrl;
         HtmlPageWorkbenchResult result = await HtmlPageWorkbench.AnalyzeAsync(

@@ -25,7 +25,8 @@ Get-HtmlElementFingerprint [-Path] <string> [-Selector] <string> [<CommonParamet
 ```
 
 ## DESCRIPTION
-Records the structural identity of elements so they can be found again after a page layout change.
+A fingerprint keeps the tag path, identity attributes, stable classes, child and sibling shape, and a hash of
+the element's text. Save it next to the selector and pass it to Find-HtmlRelocatedElement when the selector stops matching.
 
 ## EXAMPLES
 
