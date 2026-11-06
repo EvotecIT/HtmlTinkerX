@@ -70,6 +70,10 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ChromiumSandbox { get; set; }
 
+    /// <summary>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</summary>
+    [Parameter]
+    public SwitchParameter BlockPopups { get; set; }
+
     /// <summary>Force browser runtime reinstall before launch.</summary>
     [Parameter]
     public SwitchParameter Clean { get; set; }
@@ -268,6 +272,7 @@ public sealed class CmdletStartHtmlBrowserSession : AsyncPSCmdlet {
             CdpEndpointUrl = CdpEndpointUrl,
             BrowserArgument = BrowserArgument,
             ChromiumSandbox = ChromiumSandbox,
+            BlockPopups = BlockPopups,
             Proxy = Proxy,
             ProxyCredential = ProxyCredential,
             UserAgent = UserAgent,

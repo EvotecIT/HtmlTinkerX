@@ -89,6 +89,10 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PreventSsoAutoSubmit { get; set; }
 
+    /// <summary>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</summary>
+    [Parameter]
+    public SwitchParameter BlockPopups { get; set; }
+
     /// <summary>Additional browser command-line arguments.</summary>
     [Parameter]
     public string[] BrowserArgument { get; set; } = System.Array.Empty<string>();
@@ -133,7 +137,8 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
             UserAgent = UserAgent,
             LoadState = MyInvocation.BoundParameters.ContainsKey(nameof(LoadState)) ? LoadState : null,
             Timeout = Timeout,
-            PreventSsoAutoSubmit = MyInvocation.BoundParameters.ContainsKey(nameof(PreventSsoAutoSubmit)) ? PreventSsoAutoSubmit.IsPresent : null
+            PreventSsoAutoSubmit = MyInvocation.BoundParameters.ContainsKey(nameof(PreventSsoAutoSubmit)) ? PreventSsoAutoSubmit.IsPresent : null,
+            BlockPopups = MyInvocation.BoundParameters.ContainsKey(nameof(BlockPopups)) ? BlockPopups.IsPresent : null
         };
 
         profile.BrowserArguments.AddRange(BrowserArgument);

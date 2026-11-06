@@ -61,6 +61,17 @@ $session = Start-HtmlBrowserSession -Url 'https://example.com' `
     -SlowMo 1000
 ```
 
+Pages can open pop-up windows by default, because Playwright launches the browser with
+its pop-up blocker off. Add `-BlockPopups` (`BlockPopups = true` in .NET) when a page
+should behave as it does in a normal browser, where `window.open` without a click is
+blocked. Site exceptions saved in a reused profile still apply. This works on Chromium and Firefox. Headless Chromium then runs the full
+Chromium build, because its lightweight headless shell has no pop-up blocker. WebKit
+and `-CdpEndpointUrl` reject it.
+
+```powershell
+$session = Start-HtmlBrowserSession -Url 'https://example.com' -BlockPopups
+```
+
 ### Request Interception
 ```powershell
 # Mock API responses

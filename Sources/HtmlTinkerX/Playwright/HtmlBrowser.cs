@@ -48,7 +48,7 @@ public static partial class HtmlBrowser {
             Task<IBrowser> launch = LaunchWithCacheRepairAsync(options, async slot => {
                 cacheDirectory = slot;
                 if (slot != null)
-                    launchOptions.ExecutablePath = GetManagedExecutable(options.Browser, options.Headless, slot);
+                    launchOptions.ExecutablePath = GetManagedExecutable(options.Browser, UsesHeadlessShell(options), slot);
                 return await type.LaunchAsync(launchOptions).ConfigureAwait(false);
             }, allowCacheRepair);
             IBrowser browserInstance = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -135,7 +135,7 @@ public static partial class HtmlBrowser {
             BrowserTypeLaunchPersistentContextOptions contextOptions = CreatePersistentContextOptions(options);
             Task<IBrowserContext> launch = LaunchWithCacheRepairAsync(options, async slot => {
                 if (slot != null)
-                    contextOptions.ExecutablePath = GetManagedExecutable(options.Browser, options.Headless, slot);
+                    contextOptions.ExecutablePath = GetManagedExecutable(options.Browser, UsesHeadlessShell(options), slot);
                 return await type.LaunchPersistentContextAsync(userDataDirectory, contextOptions).ConfigureAwait(false);
             }, allowCacheRepair);
             context = await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
@@ -208,6 +208,28 @@ public static partial class HtmlBrowser {
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Playwright launches Chromium with --disable-popup-blocking and Firefox with dom.disable_open_during_load off.
+    // WebKit allows pop-ups through an internal setting that a launch option can't change.
+    private static IEnumerable<string>? PopupBlockingIgnoredArguments(HtmlBrowserEngine browser) => browser switch {
+        HtmlBrowserEngine.Chromium => new[] { "--disable-popup-blocking" },
+        HtmlBrowserEngine.Firefox => null,
+        _ => throw new ArgumentException("BlockPopups is supported on Chromium and Firefox, not " + browser + ".")
+    };
+
+    // chrome-headless-shell has no pop-up blocker, so a headless Chromium session that blocks pop-ups runs full
+    // Chromium in its new headless mode instead.
+    private static bool UsesHeadlessShell(HtmlBrowserLaunchOptions options) => options.Headless && !options.BlockPopups;
+
+    private static string? FullChromiumChannel(HtmlBrowserLaunchOptions options) =>
+        options.Browser == HtmlBrowserEngine.Chromium && options.Headless && string.IsNullOrWhiteSpace(options.BrowserExecutablePath)
+            ? "chromium"
+            : null;
+
+    private static IEnumerable<KeyValuePair<string, object>>? PopupBlockingFirefoxPreferences(HtmlBrowserEngine browser) =>
+        browser == HtmlBrowserEngine.Firefox
+            ? new Dictionary<string, object> { ["dom.disable_open_during_load"] = true }
+            : null;
+
     internal static BrowserTypeLaunchOptions CreateLaunchOptions(HtmlBrowserLaunchOptions options) {
         var launchOptions = new BrowserTypeLaunchOptions {
             Headless = options.Headless,
@@ -228,6 +250,12 @@ public static partial class HtmlBrowser {
 
         if (options.ChromiumSandbox.HasValue) {
             launchOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
+        }
+
+        if (options.BlockPopups) {
+            launchOptions.IgnoreDefaultArgs = PopupBlockingIgnoredArguments(options.Browser);
+            launchOptions.FirefoxUserPrefs = PopupBlockingFirefoxPreferences(options.Browser);
+            launchOptions.Channel ??= FullChromiumChannel(options);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Proxy)) {
@@ -276,6 +304,12 @@ public static partial class HtmlBrowser {
 
         if (options.ChromiumSandbox.HasValue) {
             contextOptions.ChromiumSandbox = options.ChromiumSandbox.Value;
+        }
+
+        if (options.BlockPopups) {
+            contextOptions.IgnoreDefaultArgs = PopupBlockingIgnoredArguments(options.Browser);
+            contextOptions.FirefoxUserPrefs = PopupBlockingFirefoxPreferences(options.Browser);
+            contextOptions.Channel ??= FullChromiumChannel(options);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Proxy)) {

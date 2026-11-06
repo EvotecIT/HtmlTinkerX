@@ -11,12 +11,12 @@ Starts a browser session for rendered web automation, extraction, and evidence w
 ## SYNTAX
 ### Url (Default)
 ```powershell
-Start-HtmlBrowserSession [-Url] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-IgnoreHttpsErrors] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Start-HtmlBrowserSession [-Url] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-BlockPopups] [-Clean] [-Visible] [-IgnoreHttpsErrors] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Start-HtmlBrowserSession [-Path] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-Clean] [-Visible] [-IgnoreHttpsErrors] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
+Start-HtmlBrowserSession [-Path] <string> [-ProfilePath <string>] [-UserDataDirectory <string>] [-StatePath <string>] [-Browser <HtmlBrowserEngine>] [-Scenario <HtmlBrowserScenario>] [-BrowserChannel <string>] [-BrowserExecutablePath <string>] [-CdpEndpointUrl <string>] [-BrowserArgument <string[]>] [-ChromiumSandbox] [-BlockPopups] [-Clean] [-Visible] [-IgnoreHttpsErrors] [-SlowMo <int>] [-Timeout <int>] [-Credential <pscredential>] [-LoginUrl <string>] [-UsernameSelector <string>] [-PasswordSelector <string>] [-SubmitSelector <string>] [-ManualLogin] [-LoginSuccessSelector <string>] [-LoginTimeout <int>] [-PreventSsoAutoSubmit] [-Username <string>] [-Password <string>] [-Proxy <string>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Locale <string>] [-ViewportWidth <Int32>] [-ViewportHeight <Int32>] [-ScreenWidth <Int32>] [-ScreenHeight <Int32>] [-DeviceScaleFactor <Double>] [-Mobile] [-Touch] [-GeoLatitude <Double>] [-GeoLongitude <Double>] [-Timezone <string>] [-Permission <string[]>] [-InitScript <string[]>] [-InitScriptPath <string[]>] [-BlockResourceType <HtmlNetworkResourceType[]>] [-BlockResourcePattern <string[]>] [-LoadState <HtmlBrowserLoadState>] [-NoDefault] [-CancellationToken <CancellationToken>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,6 +31,22 @@ Start-HtmlBrowserSession -Url https://example.org -UserDataDirectory .\.profiles
 
 
 ## PARAMETERS
+
+### -BlockPopups
+Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url, File
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -BlockResourcePattern
 Playwright URL glob patterns to abort before navigation, such as **/analytics/**.

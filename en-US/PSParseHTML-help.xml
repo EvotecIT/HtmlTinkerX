@@ -27743,6 +27743,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
     <command:syntax>
       <command:syntaxItem parameterSetName="Recipe">
         <maml:name>Invoke-HtmlBrowserRecipe</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BlockPopups</maml:name>
+          <maml:description>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockResourcePattern</maml:name>
           <maml:description>
@@ -28400,6 +28412,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="Path">
         <maml:name>Invoke-HtmlBrowserRecipe</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BlockPopups</maml:name>
+          <maml:description>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockResourcePattern</maml:name>
           <maml:description>
@@ -29057,6 +29081,18 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BlockPopups</maml:name>
+        <maml:description>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockResourcePattern</maml:name>
         <maml:description>
@@ -37383,6 +37419,18 @@ $result.DriftReport</dev:code>
     <command:syntax>
       <command:syntaxItem parameterSetName="__AllParameterSets">
         <maml:name>New-HtmlBrowserProfile</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BlockPopups</maml:name>
+          <maml:description>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockResourcePattern</maml:name>
           <maml:description>
@@ -37710,6 +37758,18 @@ $result.DriftReport</dev:code>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BlockPopups</maml:name>
+        <maml:description>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockResourcePattern</maml:name>
         <maml:description>
@@ -52832,6 +52892,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
     <command:syntax>
       <command:syntaxItem parameterSetName="Url">
         <maml:name>Start-HtmlBrowserSession</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BlockPopups</maml:name>
+          <maml:description>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockResourcePattern</maml:name>
           <maml:description>
@@ -53459,6 +53531,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
       </command:syntaxItem>
       <command:syntaxItem parameterSetName="File">
         <maml:name>Start-HtmlBrowserSession</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>BlockPopups</maml:name>
+          <maml:description>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockResourcePattern</maml:name>
           <maml:description>
@@ -54086,6 +54170,18 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>BlockPopups</maml:name>
+        <maml:description>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockResourcePattern</maml:name>
         <maml:description>

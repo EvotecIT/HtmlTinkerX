@@ -173,8 +173,9 @@ public static partial class HtmlBrowser {
             || !string.IsNullOrWhiteSpace(options.BrowserExecutablePath)
             || options.BrowserArguments.Count > 0
             || options.ChromiumSandbox.HasValue
+            || options.BlockPopups
             || options.Clean) {
-            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used. BrowserArguments and ChromiumSandbox are not used either.");
+            throw new ArgumentException("CdpEndpointUrl attaches to an already-running browser, so BrowserChannel, BrowserExecutablePath, and Clean are not used. BrowserArguments, ChromiumSandbox and BlockPopups are not used either.");
         }
 
         if (HasCdpContextOnlyOptions(options)) {
