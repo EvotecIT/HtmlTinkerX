@@ -18,7 +18,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <OfficeImoVersion>3.5.1</OfficeImoVersion>
+        <OfficeImoVersion>3.6.0</OfficeImoVersion>
         <ChartForgeXVersion>3.0.1</ChartForgeXVersion>
         <ChartForgeXVisualsProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXVisualsProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Visuals\ChartForgeX.Visuals.csproj</ChartForgeXVisualsProjectPath>
         <ChartForgeXStoriesProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXStoriesProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Stories\ChartForgeX.Stories.csproj</ChartForgeXStoriesProjectPath>
