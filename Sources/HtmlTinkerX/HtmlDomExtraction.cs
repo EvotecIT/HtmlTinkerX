@@ -44,6 +44,12 @@ public static partial class HtmlDomExtraction {
             throw new ArgumentException("CSS selector cannot be empty.", nameof(selector));
         }
 
+        if (ParseValueSelector(selector) is HtmlValueSelector valueSelector) {
+            throw new ArgumentException(
+                $"CSS selector '{selector}' ends with {valueSelector.PseudoElement} and selects strings, not elements. Use SelectValues instead.",
+                nameof(selector));
+        }
+
         IDocument document = HtmlParser.ParseWithAngleSharp(html);
         try {
             if (first) {
@@ -251,11 +257,13 @@ public static partial class HtmlDomExtraction {
 
     private static object?[] ReadFieldValues(
         IElement item, HtmlDomFieldDefinition definition, string propertyName, Uri? baseUri, out int matchCount) {
+        HtmlValueSelector? valueSelector = ParseFieldValueSelector(definition, propertyName);
+        string elementSelector = valueSelector?.ElementSelector ?? definition.Selector;
         IElement[] matches;
         try {
-            matches = string.IsNullOrWhiteSpace(definition.Selector)
+            matches = string.IsNullOrWhiteSpace(elementSelector)
                 ? new[] { item }
-                : item.QuerySelectorAll(definition.Selector).ToArray();
+                : item.QuerySelectorAll(elementSelector).ToArray();
         } catch (Exception exception) {
             throw new ArgumentException(
                 $"Selector '{definition.Selector}' for property '{propertyName}' is invalid: {exception.Message}",
@@ -265,7 +273,9 @@ public static partial class HtmlDomExtraction {
 
         matchCount = matches.Length;
         return matches
-            .Select(match => ReadElementValue(match, definition, baseUri))
+            .Select(match => valueSelector == null
+                ? ReadElementValue(match, definition, baseUri)
+                : valueSelector.Read(match, definition.ResolveUrl, baseUri))
             .Where(value => value != null
                 && (!definition.TreatEmptyAsMissing || !string.IsNullOrWhiteSpace(value as string)))
             .ToArray();
@@ -273,19 +283,7 @@ public static partial class HtmlDomExtraction {
 
     private static object? ReadElementValue(IElement element, HtmlDomFieldDefinition definition, Uri? baseUri) {
         if (!string.IsNullOrWhiteSpace(definition.Attribute)) {
-            string attributeName = definition.Attribute!;
-            string? value = element.GetAttribute(attributeName);
-            if (value == null) {
-                return null;
-            }
-
-            if (SourceSetAttributes.Contains(attributeName, StringComparer.OrdinalIgnoreCase)) {
-                value = HtmlImageCandidateParser.GetBestSourceSetSource(value);
-            }
-
-            bool shouldResolve = definition.ResolveUrl
-                || UriAttributes.Contains(attributeName, StringComparer.OrdinalIgnoreCase);
-            return shouldResolve ? ResolveUrl(value, baseUri) : value;
+            return ReadAttributeValue(element, definition.Attribute!, definition.ResolveUrl, baseUri);
         }
 
         if (definition.ValueKind.Equals("Html", StringComparison.OrdinalIgnoreCase)) {

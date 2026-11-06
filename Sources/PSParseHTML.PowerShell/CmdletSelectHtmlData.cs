@@ -29,7 +29,7 @@ namespace PSParseHTML.PowerShell;
 /// Select-HtmlData -Url https://example.org/products -ItemSelector '.product-card' -Property @{
 ///     Name = '.product-title'
 ///     Price = '.product-price'
-///     Link = @{ Selector = 'a'; Attribute = 'href' }
+///     Link = 'a::attr(href)'
 /// }
 ///   </code>
 /// </example>
@@ -96,7 +96,8 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
 
     /// <summary>
     /// Property-to-selector map used with <see cref="ItemSelector"/>.
-    /// String values read trimmed text. Hashtable values can specify Selector, Attribute,
+    /// String values read trimmed text; a selector ending in ::text reads the element's own text and
+    /// ::attr(name) reads an attribute, for example 'a::attr(href)'. Hashtable values can specify Selector, Attribute,
     /// ValueKind, All, Required, DefaultValue, ResolveUrl, DataType, Culture, TreatEmptyAsMissing,
     /// MinimumValueCount, or MaximumValueCount.
     /// DataType accepts [string], [int], [long], [decimal], [bool], [DateTimeOffset], or an enum type.

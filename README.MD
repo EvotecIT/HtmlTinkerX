@@ -320,6 +320,8 @@ The PowerShell commands are thin surfaces over HtmlTinkerX. The generated
 | --- | --- | --- |
 | Read a page as objects without selectors | `Get-HtmlPage` | `HtmlPageReader.Read` |
 | Parse a document | `ConvertFrom-Html` | `HtmlParser.ParseWithAngleSharp`, `HtmlParser.ParseWithHtmlAgilityPack` |
+| Select elements, text or attributes with CSS (`h2::text`, `a::attr(href)`) | `Select-HtmlElement` | `HtmlDomExtraction.SelectElements`, `HtmlDomExtraction.SelectValues` |
+| Find elements by text or by shape | `Select-HtmlElement -Text`, `Select-HtmlElement -Similar` | `HtmlDomExtraction.FindByText`, `HtmlDomExtraction.FindSimilar` |
 | Extract tables | `ConvertFrom-HtmlTable` | `HtmlParser.ParseTablesWithAngleSharpDetailed`, `HtmlParser.ParseTablesWithHtmlAgilityPackDetailed` |
 | Extract lists | `ConvertFrom-HtmlList` | `HtmlParser.ParseListsWithAngleSharpDetailed`, `HtmlParser.ParseListsWithHtmlAgilityPackDetailed` |
 | Extract forms | `ConvertFrom-HtmlForm` | `HtmlParser.ParseFormsWithAngleSharp` |

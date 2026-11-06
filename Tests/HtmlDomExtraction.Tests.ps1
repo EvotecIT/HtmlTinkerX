@@ -35,6 +35,19 @@ Describe 'Static HTML selector discovery and object extraction' {
         ($link | Select-HtmlAttributeValue -AttributeName href) | Should -Be 'one'
     }
 
+    It 'returns text and attribute values from short selectors and finds elements by text or shape' {
+        Select-HtmlElement -Content $script:Html -Selector '.product-title::text' |
+            Should -Be @('Gold One', 'Gold Two')
+        Select-HtmlElement -Content '<nav><a href="?page=1">Previous</a> <a href="?page=3">next</a></nav>' `
+            -Text 'NEXT' -Selector 'a::attr(href)' -BaseUrl 'https://shop.example/catalog?page=2' |
+            Should -Be 'https://shop.example/catalog?page=3'
+        Select-HtmlElement -Content $script:Html -Text 'gold one' -Selector '.product-title::text' -Similar |
+            Should -Be 'Gold Two'
+        { Select-HtmlElement -Content $script:Html -Selector 'a::text span' } | Should -Throw '*last part*'
+        $card = Select-HtmlElement -Content $script:Html -Selector 'article' -First
+        ($card | Select-HtmlElement -Similar | Select-HtmlElement -Selector '.product-title::text') | Should -Be 'Gold Two'
+    }
+
     It 'converts repeated items into ordinary PowerShell objects' {
         $items = Select-HtmlData -Content $script:Html -BaseUrl 'https://shop.example/catalog' `
             -ItemSelector '.product-card' `
@@ -87,6 +100,7 @@ Describe 'Static HTML selector discovery and object extraction' {
                 Link = @{ Selector = 'a'; Attribute = 'href' }
             }
             $direct[1].Link | Should -Be ($server.Url + 'final/catalog/two')
+            Select-HtmlElement -Url $startUrl -Selector 'a::attr(href)' -First | Should -Be ($server.Url + 'final/catalog/one')
         } finally {
             $server.Dispose()
         }

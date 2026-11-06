@@ -359,7 +359,7 @@ Returns an HTML attribute value from AngleSharp or HtmlAgilityPack elements, att
 Selects normalized structured data, links, assets, tokens, forms, and app state from HTML.
 
 ### [Select-HtmlElement](Select-HtmlElement.md)
-Selects elements from static HTML with a CSS selector.
+Selects elements, text or attribute values from static HTML with a CSS selector or by text.
 
 ### [Select-HtmlInnerText](Select-HtmlInnerText.md)
 Returns inner text from AngleSharp or HtmlAgilityPack elements and documents.
