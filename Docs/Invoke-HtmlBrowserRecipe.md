@@ -57,7 +57,7 @@ Invoke-HtmlBrowserRecipe -Path .\browser.recipe.json -StrictPreflight
 ## PARAMETERS
 
 ### -BlockPopups
-Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.
+Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.
 
 ```yaml
 Type: SwitchParameter

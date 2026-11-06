@@ -27746,7 +27746,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockPopups</maml:name>
           <maml:description>
-            <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -28415,7 +28415,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockPopups</maml:name>
           <maml:description>
-            <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -29084,7 +29084,7 @@ Wait-HtmlBrowserContent -Session $session -Text 'Results' -Selector 'main'</dev:
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockPopups</maml:name>
         <maml:description>
-          <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with. With -Session, set it on Start-HtmlBrowserSession instead.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -37422,7 +37422,7 @@ $result.DriftReport</dev:code>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockPopups</maml:name>
           <maml:description>
-            <maml:para>Keep the browser's pop-up blocker on. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -37761,7 +37761,7 @@ $result.DriftReport</dev:code>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockPopups</maml:name>
         <maml:description>
-          <maml:para>Keep the browser's pop-up blocker on. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -52895,7 +52895,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockPopups</maml:name>
           <maml:description>
-            <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -53534,7 +53534,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>BlockPopups</maml:name>
           <maml:description>
-            <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+            <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -54173,7 +54173,7 @@ Set-HtmlBrowserStorage -Session $session -Scope Local -Key featureFlag -Value en
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>BlockPopups</maml:name>
         <maml:description>
-          <maml:para>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
+          <maml:para>Turn on the browser's pop-up blocker, so pages normally need a user gesture to open a window. Site exceptions saved in a reused profile still apply. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
