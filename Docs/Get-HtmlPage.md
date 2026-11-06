@@ -11,22 +11,22 @@ Reads an HTML page as headings, paragraphs, tables, links, resources, and inferr
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Get-HtmlPage [-Content] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
+Get-HtmlPage [-Content] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Get-HtmlPage [-Path] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
+Get-HtmlPage [-Path] <string> [-BaseUrl <uri>] [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-UserAgent <string>] [-Header <hashtable>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [<CommonParameters>]
+Get-HtmlPage [-Url] <uri> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-UserAgent <string>] [-Header <hashtable>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
 ```
 
 ### Snapshot
 ```powershell
-Get-HtmlPage [-RenderedSnapshot] <HtmlRenderedPageSnapshot> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [<CommonParameters>]
+Get-HtmlPage [-RenderedSnapshot] <HtmlRenderedPageSnapshot> [-CollectionHint <string>] [-MinimumRepeatCount <int>] [-CollectionLimit <int>] [-NoCollections] [-NoReadableText] [-NoMarkdown] [-NoWebData] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -45,16 +45,26 @@ $page = Get-HtmlPage -Url https://example.org; $page.Headings; $page.Collections
 Get-HtmlPage -Url https://support.microsoft.com/kb/5127692 -BrowserHeaders -RetryCount 2 -RenderWhenBlocked
 ```
 
-Reads a page behind a CDN, rendering it in a browser only when the CDN blocks the request.
 
 ### EXAMPLE 3
+```powershell
+Get-HtmlPage -Url https://example.org/protected -BrowserHeaders -ResumeInBrowser
+```
+
+
+### EXAMPLE 4
+```powershell
+Get-HtmlPage -Url https://example.org/list -ReplayCache ./replay
+```
+
+
+### EXAMPLE 5
 ```powershell
 try { Get-HtmlPage -Url $url } catch { $_.TargetObject.Kind; $_.TargetObject.Provider; $_.TargetObject.Excerpt }
 ```
 
-Reports why a page was refused.
 
-### EXAMPLE 4
+### EXAMPLE 6
 ```powershell
 $page = Get-HtmlPage -Content $html; $page.Collections[0].Items
 ```
@@ -79,12 +89,28 @@ Accept wildcard characters: False
 ```
 
 ### -BrowserHeaders
-Sends a consistent set of desktop Chrome headers: User-Agent, Accept, Accept-Language and client hints. Cannot be combined with UserAgent, or with Header values for the headers it sets.
+Sends a consistent set of browser headers: User-Agent, Accept, Accept-Language and client hints. With RenderWhenBlocked or ResumeInBrowser they are read from that browser, so the HTTP requests and the browser present one identity; otherwise they describe an ordinary desktop Chrome. Cannot be combined with UserAgent, or with Header values for the headers it sets.
 
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Url
 Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -CdpEndpointUrl
+Chrome DevTools Protocol endpoint of your own running Chrome, used by RenderWhenBlocked and ResumeInBrowser instead of a launched browser.
+
+```yaml
+Type: String
+Parameter Sets: Url
+Aliases: CdpEndpoint, RemoteDebuggingUrl
 Possible values:
 
 Required: False
@@ -259,7 +285,7 @@ Proxy server address used when downloading by URL. Give several to send each att
 
 ```yaml
 Type: String[]
-Parameter Sets: Url
+Parameter Sets: Content, File, Url, Snapshot
 Aliases: None
 Possible values:
 
@@ -275,23 +301,7 @@ Credentials used with the proxy server.
 
 ```yaml
 Type: PSCredential
-Parameter Sets: Url
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -RenderWhenBlocked
-Renders the page in a headless browser, through the first proxy, when a Cloudflare challenge or a recognised CDN block page is returned.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: Url
+Parameter Sets: Content, File, Url, Snapshot
 Aliases: None
 Possible values:
 
@@ -318,8 +328,56 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -RetryCount
-Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds. Defaults to 1 with BrowserHeaders, RenderWhenBlocked or several proxies, otherwise 0.
+### -RenderWhenBlocked
+Renders the page in a headless browser, through the first proxy, when a Cloudflare challenge or a recognised CDN block page is returned.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ReplayCache
+Directory of a development cache that stores whole responses and replays them without fetching the site again. Requests with cookies, credentials or custom headers are not cached. Not for production reads: stored responses never expire.
+
+```yaml
+Type: String
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ResumeInBrowser
+When the site challenges or blocks the request, opens the page in a visible browser so you can complete what the site asks, then continues with that browser's cookies for the site. Nothing is solved automatically. Combine with BrowserHeaders so the cookies are used with the browser's own identity.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ResumeTimeoutSeconds
+Seconds ResumeInBrowser waits for you before the request fails as blocked.
 
 ```yaml
 Type: Int32
@@ -329,7 +387,23 @@ Possible values:
 
 Required: False
 Position: named
-Default value: 0, or 1 with -BrowserHeaders, -RenderWhenBlocked or several -Proxy values
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RetryCount
+Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds. Defaults to 1 with BrowserHeaders, RenderWhenBlocked, ResumeInBrowser or several proxies, otherwise 0.
+
+```yaml
+Type: Int32
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```

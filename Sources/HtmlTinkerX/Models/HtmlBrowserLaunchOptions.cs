@@ -104,6 +104,15 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Locale used by the browser context, for example en-US or pl-PL.</summary>
     public string? Locale { get; set; }
 
+    /// <summary>
+    /// Browser identity shared with HTTP requests: the context uses its User-Agent and locale and sends its
+    /// Accept-Language and client hints. Use the profile <see cref="HtmlBrowser.GetHeaderProfileAsync"/> read from this
+    /// browser, so the identity is the browser's own. Cannot be combined with <see cref="UserAgent"/> or
+    /// <see cref="Locale"/>. A browser attached through <see cref="CdpEndpointUrl"/> keeps its own User-Agent and must
+    /// report the profile's.
+    /// </summary>
+    public HtmlBrowserHeaderProfile? HeaderProfile { get; set; }
+
     /// <summary>Viewport width in pixels.</summary>
     public int? ViewportWidth { get; set; }
 

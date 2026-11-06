@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlStyleUsage", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlStyleUsageItem))]
-public sealed class CmdletSelectHtmlStyleUsage : AsyncPSCmdlet {
+public sealed class CmdletSelectHtmlStyleUsage : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
@@ -69,21 +69,13 @@ public sealed class CmdletSelectHtmlStyleUsage : AsyncPSCmdlet {
     [ValidateRange(0, int.MaxValue)]
     public int MaxMatchedElements { get; set; } = 10;
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (!string.IsNullOrEmpty(CssContent) && !string.IsNullOrEmpty(CssPath)) {
             throw new PSArgumentException("Use either -CssContent or -CssPath, not both.");
         }
 
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         string? css = string.IsNullOrEmpty(CssPath)
             ? CssContent
@@ -96,7 +88,7 @@ public sealed class CmdletSelectHtmlStyleUsage : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             case ParameterSetNode:

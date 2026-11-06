@@ -79,7 +79,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Select, "HtmlJavaScriptVariable", DefaultParameterSetName = ParameterSetContent)]
 [Alias("Select-HtmlJSVariable")]
 [OutputType(typeof(PSObject))]
-public sealed class CmdletSelectHtmlJavaScriptVariable : AsyncPSCmdlet {
+public sealed class CmdletSelectHtmlJavaScriptVariable : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -126,21 +126,13 @@ public sealed class CmdletSelectHtmlJavaScriptVariable : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Tolerant { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (Contains.IsPresent && StartsWith.IsPresent) {
             throw new PSArgumentException("Use either -Contains or -StartsWith, not both.");
         }
 
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         foreach (HtmlJavaScriptVariableMatch match in HtmlJavaScriptVariableSelector.SelectHtml(
             html,
@@ -160,7 +152,7 @@ public sealed class CmdletSelectHtmlJavaScriptVariable : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:

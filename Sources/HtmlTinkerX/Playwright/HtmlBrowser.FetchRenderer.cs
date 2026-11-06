@@ -12,7 +12,8 @@ public static partial class HtmlBrowser {
     /// Creates an <see cref="HtmlFetchPolicy.Renderer"/> that loads a blocked page in a browser and returns its rendered
     /// HTML and final address. Each call opens and closes one session. Set
     /// <see cref="HtmlBrowserLaunchOptions.CdpEndpointUrl"/> to read through the operator's own running Chrome, whose
-    /// profile and reputation a CDN may already trust.
+    /// profile and reputation a CDN may already trust. Set <see cref="HtmlBrowserLaunchOptions.HeaderProfile"/> to the
+    /// policy's <see cref="HtmlFetchPolicy.BrowserHeaders"/> so the browser presents the same identity as the HTTP requests.
     /// </summary>
     /// <remarks>
     /// A page the browser was refused too (a 401, 403, 429 or 5xx navigation, a recognised block page or an unsolved

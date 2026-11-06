@@ -1,5 +1,6 @@
 using HtmlTinkerX;
 using System.Collections;
+using System.Linq;
 using System.Management.Automation;
 using System.Net;
 using System.Net.Http;
@@ -61,11 +62,17 @@ internal static class HttpClientHelper {
     /// <param name="credential">Credentials for every proxy.</param>
     /// <param name="userAgent">Optional user agent override.</param>
     /// <param name="headers">Optional request header overrides.</param>
+    /// <param name="cookies">Cookie container the transport sends, so cookies handed over by a browser resume reach later requests.</param>
     /// <returns>A configured <see cref="HttpClient"/> instance.</returns>
-    internal static HttpClient CreateFetchClient(HtmlFetchPolicy policy, string[]? proxies, PSCredential? credential, string? userAgent, IDictionary? headers) {
-        HttpMessageHandler? inner = proxies is { Length: > 0 }
-            ? HtmlProxyRotator.Create(proxies, credential?.GetNetworkCredential())
-            : null;
+    internal static HttpClient CreateFetchClient(HtmlFetchPolicy policy, string[]? proxies, PSCredential? credential, string? userAgent, IDictionary? headers, CookieContainer cookies) {
+        HttpMessageHandler inner;
+        if (proxies != null && proxies.Any(static proxy => !string.IsNullOrWhiteSpace(proxy))) {
+            inner = HtmlProxyRotator.Create(proxies, credential?.GetNetworkCredential(), cookies: cookies);
+        } else {
+            HttpClientHandler handler = HtmlHttpClientFactory.CreateHandler(proxy: null, credential: null, allowAutoRedirect: false);
+            handler.CookieContainer = cookies;
+            inner = handler;
+        }
         return ApplyHeaders(HtmlHttpClientFactory.Create(policy, inner), userAgent, headers);
     }
 

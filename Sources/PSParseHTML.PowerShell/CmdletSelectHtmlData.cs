@@ -57,7 +57,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Select, "HtmlData", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(HtmlDataItem), typeof(PSObject), typeof(HtmlDomExtractionReport))]
-public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
+public sealed class CmdletSelectHtmlData : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
@@ -126,14 +126,6 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
     [Parameter]
     public Uri? BaseUrl { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <summary>User-Agent header used when downloading <see cref="Url"/>.</summary>
     [Parameter(ParameterSetName = ParameterSetUrl)]
     public string? UserAgent { get; set; }
@@ -151,7 +143,7 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
         if (AsExtractionReport && (string.IsNullOrWhiteSpace(ItemSelector) || Property == null)) {
             throw new PSArgumentException("AsExtractionReport requires ItemSelector and Property.");
         }
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters(UserAgent, Header);
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? _effectiveUrl ?? Url : null);
         bool extractionRequested = !string.IsNullOrWhiteSpace(ItemSelector) || Property != null;
@@ -198,7 +190,7 @@ public sealed class CmdletSelectHtmlData : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, UserAgent, Header)) {
+                using (HttpClient client = await CreateUrlClientAsync(UserAgent, Header).ConfigureAwait(false)) {
                     HtmlHttpTextResult result = await HtmlUtilities.GetTextWithProperEncodingAsync(
                         client,
                         Url.ToString(),

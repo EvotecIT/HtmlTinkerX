@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.ConvertFrom, "HtmlLinkedJavaScriptEndpoint", DefaultParameterSetName = ParameterSetContent)]
 [Alias("ConvertFrom-HtmlLinkedJSEndpoint")]
 [OutputType(typeof(HtmlLinkedJavaScriptEndpoint))]
-public sealed class CmdletConvertFromHtmlLinkedJavaScriptEndpoint : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlLinkedJavaScriptEndpoint : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -40,18 +40,10 @@ public sealed class CmdletConvertFromHtmlLinkedJavaScriptEndpoint : AsyncPSCmdle
     [Parameter]
     public SwitchParameter IncludeExternal { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
-        using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+        ValidateUrlParameters();
+        using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
             string html = await ReadHtmlAsync(client).ConfigureAwait(false);
             Uri baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : throw new InvalidOperationException("BaseUrl is required when parsing linked scripts from Content or Path."));
             var endpoints = await HtmlLinkedJavaScriptEndpointParser.ParseAsync(html, baseUri, IncludeExternal.IsPresent, client).ConfigureAwait(false);

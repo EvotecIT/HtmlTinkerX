@@ -22,7 +22,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.ConvertFrom, "HtmlAttributes", DefaultParameterSetName = ParameterSetContent)]
 [Alias("ConvertFrom-HtmlTag", "ConvertFrom-HtmlClass")]
 [OutputType(typeof(string), typeof(IElement))]
-public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlAttributes : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetUrl = "Url";
     private const string ParameterSetFile = "File";
@@ -57,26 +57,13 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
     [Parameter]
     public string? Name { get; set; }
 
-    /// <summary>
-    /// Proxy server address used when <see cref="Url"/> is specified.
-    /// Include protocol and port if necessary.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>
-    /// Credentials used with the <see cref="Proxy"/> server.
-    /// </summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <summary>Return matching <see cref="IElement"/> objects instead of text.</summary>
     [Parameter]
     public SwitchParameter ReturnObject { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         IEnumerable<IElement> elements = ParameterSetName switch {
             ParameterSetUrl => HtmlParserExtensions.GetElements(
                 await DownloadHtmlAsync().ConfigureAwait(false),
@@ -105,7 +92,7 @@ public sealed class CmdletConvertFromHtmlAttributes : AsyncPSCmdlet {
     }
 
     private async Task<string> DownloadHtmlAsync() {
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
     }
 }

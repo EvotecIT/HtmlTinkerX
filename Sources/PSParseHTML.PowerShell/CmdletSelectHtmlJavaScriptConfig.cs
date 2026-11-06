@@ -24,7 +24,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsCommon.Select, "HtmlJavaScriptConfig", DefaultParameterSetName = ParameterSetNode)]
 [Alias("Select-HtmlJSConfig")]
 [OutputType(typeof(HtmlJavaScriptConfigItem))]
-public sealed class CmdletSelectHtmlJavaScriptConfig : AsyncPSCmdlet {
+public sealed class CmdletSelectHtmlJavaScriptConfig : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetNode = "Node";
@@ -77,21 +77,13 @@ public sealed class CmdletSelectHtmlJavaScriptConfig : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Tolerant { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (Contains.IsPresent && StartsWith.IsPresent) {
             throw new PSArgumentException("Use either -Contains or -StartsWith, not both.");
         }
 
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         WriteObject(HtmlParsingToolbox.SelectJavaScriptConfig(
             html,
@@ -108,7 +100,7 @@ public sealed class CmdletSelectHtmlJavaScriptConfig : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             case ParameterSetNode:
