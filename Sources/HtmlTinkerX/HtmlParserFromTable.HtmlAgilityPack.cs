@@ -294,7 +294,7 @@ public static partial class HtmlParserFromTable {
                         }
                         if (linkHeaderNames != null && rowSpanLinks.TryGetValue(col, out var linkSpan)) {
                             if (!string.IsNullOrWhiteSpace(linkSpan.Value)) {
-                                SetLinkValue(linkValues, linkHeaderNames[col], linkSpan.Value, headers.Count, budget);
+                                SetLinkValue(linkValues, linkHeaderNames[col], linkSpan.Value!, headers.Count, budget);
                             }
                             if (--linkSpan.Remaining == 0) {
                                 rowSpanLinks.Remove(col);

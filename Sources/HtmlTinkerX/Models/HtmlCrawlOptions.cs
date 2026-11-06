@@ -188,7 +188,7 @@ public sealed class HtmlCrawlOptions {
     /// <summary>
     /// Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed in markdown output.
     /// </summary>
-    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+    public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <summary>Stores structured JSON-friendly page data extracted from the crawl.</summary>
     public bool IncludeStructuredJson {

@@ -2,6 +2,27 @@
 
 HtmlTinkerX 3.0 replaces the browser PDF parameter-list APIs with request and options objects. The PowerShell `Save-HtmlBrowserPdf` command keeps its existing parameters.
 
+## OfficeIMO HTML and Markdown types
+
+Update explicit C# type references to the OfficeIMO names:
+
+| Previous type | Current type |
+| --- | --- |
+| `MarkdownDoc` | `MarkdownDocument` |
+| `HtmlListingCardMetadataMode` | `MarkdownHtmlListingCardMetadataMode` |
+
+`HtmlParserToMarkdown.ConvertToMarkdownDocument` returns an owned `MarkdownDocument`. Dispose it when finished:
+
+```csharp
+using OfficeIMO.Markdown;
+using HtmlTinkerX;
+
+using MarkdownDocument document = HtmlParserToMarkdown.ConvertToMarkdownDocument("<h1>Title</h1>");
+string markdown = document.ToMarkdown();
+```
+
+The PowerShell `ListingCardMetadataMode` parameter keeps the `Preserve` and `SuppressInRepeatedCards` values.
+
 ## URL, HTML string, and file capture
 
 Use `HtmlBrowserPdfRenderer` for capture that owns the browser lifecycle. It reuses bounded Chromium processes and creates an isolated browser context for each request.

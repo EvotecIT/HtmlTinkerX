@@ -209,13 +209,13 @@ public partial class HtmlCrawlerTests {
                 OutputPath = outputPath,
                 HiddenContentMode = HtmlCrawlHiddenContentMode.RespectHidden,
                 MarkdownImageMode = OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown,
-                ListingCardMetadataMode = OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards
+                ListingCardMetadataMode = OfficeIMO.Markdown.Html.MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards
             });
 
             HtmlCrawlSummary summary = result.Summary;
             Assert.Equal(HtmlCrawlHiddenContentMode.RespectHidden, summary.HiddenContentMode);
             Assert.Equal(OfficeIMO.Markdown.MarkdownImageRenderingMode.PortableMarkdown, summary.MarkdownImageMode);
-            Assert.Equal(OfficeIMO.Markdown.Html.HtmlListingCardMetadataMode.SuppressInRepeatedCards, summary.ListingCardMetadataMode);
+            Assert.Equal(OfficeIMO.Markdown.Html.MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards, summary.ListingCardMetadataMode);
             Assert.Contains(summary.GuidanceNotes, note => note.Contains("static mode", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(summary.GuidanceNotes, note => note.Contains("portable output", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(summary.GuidanceNotes, note => note.Contains("listing-card", StringComparison.OrdinalIgnoreCase));

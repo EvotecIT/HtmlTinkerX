@@ -129,7 +129,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </main>
 """;
 
-        MarkdownDoc document = HtmlParserToMarkdown.ConvertToMarkdownDocument(html, "https://example.com/app/page.html");
+        using MarkdownDocument document = HtmlParserToMarkdown.ConvertToMarkdownDocument(html, "https://example.com/app/page.html");
         string markdown = document.ToMarkdown();
 
         Assert.Contains("## Details", markdown, StringComparison.Ordinal);
@@ -190,7 +190,7 @@ public partial class HtmlCrawlerMarkdownTests {
             html,
             "https://example.com/docs/start",
             MarkdownImageRenderingMode.PortableMarkdown,
-            HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+            MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
             markdownProfile);
 
         if (markdownProfile == HtmlMarkdownProfile.OfficeIMO) {
@@ -365,7 +365,7 @@ public partial class HtmlCrawlerMarkdownTests {
             html,
             "https://example.com/",
             MarkdownImageRenderingMode.PortableMarkdown,
-            HtmlListingCardMetadataMode.SuppressInRepeatedCards);
+            MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards);
 
         Assert.DoesNotContain("15 June", markdown, StringComparison.Ordinal);
         Assert.DoesNotContain("21:52", markdown, StringComparison.Ordinal);
@@ -416,7 +416,7 @@ public partial class HtmlCrawlerMarkdownTests {
             });
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
-            Assert.Equal(HtmlListingCardMetadataMode.SuppressInRepeatedCards, result.ListingCardMetadataMode);
+            Assert.Equal(MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards, result.ListingCardMetadataMode);
             Assert.DoesNotContain("15 June", page.Markdown, StringComparison.Ordinal);
             Assert.DoesNotContain("21:52", page.Markdown, StringComparison.Ordinal);
             Assert.DoesNotContain("By Przemyslaw Klys", page.Markdown, StringComparison.Ordinal);
@@ -466,11 +466,11 @@ public partial class HtmlCrawlerMarkdownTests {
                 MaxPages = 1,
                 Selector = "main",
                 IncludeMarkdown = true,
-                ListingCardMetadataMode = HtmlListingCardMetadataMode.Preserve
+                ListingCardMetadataMode = MarkdownHtmlListingCardMetadataMode.Preserve
             });
 
             HtmlCrawlPage page = Assert.Single(result.Pages);
-            Assert.Equal(HtmlListingCardMetadataMode.Preserve, result.ListingCardMetadataMode);
+            Assert.Equal(MarkdownHtmlListingCardMetadataMode.Preserve, result.ListingCardMetadataMode);
             Assert.Contains("15 June", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("21:52", page.Markdown, StringComparison.Ordinal);
             Assert.Contains("By Przemyslaw Klys", page.Markdown, StringComparison.Ordinal);
@@ -494,7 +494,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </main>
 """;
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
 
         var image = Assert.IsType<ImageBlock>(Assert.Single(document.Blocks));
         Assert.Equal("https://example.com/img/hero.webp", image.Path);
@@ -515,7 +515,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </main>
 """;
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
 
         var image = Assert.IsType<ImageBlock>(Assert.Single(document.Blocks));
         Assert.Equal("https://example.com/img/hero.png", image.Path);
@@ -527,7 +527,7 @@ public partial class HtmlCrawlerMarkdownTests {
         Assert.Equal("nofollow sponsored", image.LinkRel);
         Assert.Equal("Hero image", image.Caption);
 
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         Assert.Contains("<a href=\"https://example.com/docs/hero\" title=\"Hero page\" target=\"_blank\" rel=\"", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("nofollow", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("sponsored", renderedHtml, StringComparison.Ordinal);
@@ -543,7 +543,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </main>
 """;
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
 
         var paragraph = Assert.IsType<ParagraphBlock>(Assert.Single(document.Blocks));
         var link = Assert.IsType<LinkInline>(Assert.Single(paragraph.Inlines.Nodes));
@@ -553,7 +553,7 @@ public partial class HtmlCrawlerMarkdownTests {
         Assert.Equal("_blank", link.LinkTarget);
         Assert.Equal("nofollow sponsored", link.LinkRel);
 
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         Assert.Contains("<a href=\"https://example.com/docs/hero\" title=\"Hero docs\" target=\"_blank\" rel=\"", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("nofollow", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("sponsored", renderedHtml, StringComparison.Ordinal);
@@ -565,7 +565,7 @@ public partial class HtmlCrawlerMarkdownTests {
     public void ConvertToMarkdownDocument_PreservesArtDirectedPictureSourcesInTypedAst() {
         string html = ReadFixture("publisher-art-direction-picture-article.html");
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
 
         Assert.Collection(document.Blocks,
             block => Assert.Equal("Storm Update", Assert.IsType<HeadingBlock>(block).Text),
@@ -590,7 +590,7 @@ public partial class HtmlCrawlerMarkdownTests {
                     });
             });
 
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         Assert.Contains("<picture>", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("storm-fallback.jpg", renderedHtml, StringComparison.Ordinal);
     }
@@ -599,7 +599,7 @@ public partial class HtmlCrawlerMarkdownTests {
     public void ConvertToMarkdownDocument_PreservesCdnLazyPictureSourcesInTypedAst() {
         string html = ReadFixture("publisher-cdn-lazy-picture-article.html");
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
 
         Assert.Collection(document.Blocks,
             block => Assert.Equal("Storm Update", Assert.IsType<HeadingBlock>(block).Text),
@@ -624,7 +624,7 @@ public partial class HtmlCrawlerMarkdownTests {
                     });
             });
 
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         Assert.Contains("https://cdn.example.net/images/storm-wide.avif", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("storm-fallback.jpg", renderedHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("data:image/gif", renderedHtml, StringComparison.Ordinal);
@@ -634,7 +634,7 @@ public partial class HtmlCrawlerMarkdownTests {
     public void ConvertToMarkdownDocument_PreservesWidthDescriptorPictureSourcesInTypedAst() {
         string html = ReadFixture("publisher-width-descriptor-picture-article.html");
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
 
         Assert.Collection(document.Blocks,
             block => Assert.Equal("Storm Update", Assert.IsType<HeadingBlock>(block).Text),
@@ -659,7 +659,7 @@ public partial class HtmlCrawlerMarkdownTests {
                     });
             });
 
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         Assert.Contains("<source srcset=\"https://example.com/news/2026/media/storm-wide.webp?fit=cover&amp;crop=10,20,300,400 640w, https://example.com/news/2026/media/storm-wide.webp?fit=cover&amp;crop=20,40,600,800 1280w\" media=\"(min-width: 960px)\" type=\"image/webp\" sizes=\"(min-width: 960px) 90vw, 100vw\" />", renderedHtml, StringComparison.Ordinal);
         Assert.Contains("<source srcset=\"https://example.com/news/2026/media/storm-mobile.webp?fit=cover&amp;crop=5,10,200,250 320w, https://example.com/news/2026/media/storm-mobile.webp?fit=cover&amp;crop=10,20,400,500 640w\" media=\"(max-width: 959px)\" type=\"image/webp\" sizes=\"100vw\" />", renderedHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("%20", renderedHtml, StringComparison.Ordinal);
@@ -688,7 +688,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </html>
 """;
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/app/page.html");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/app/page.html");
 
         var paragraph = Assert.IsType<ParagraphBlock>(document.Blocks[0]);
         string markdown = document.ToMarkdown();
@@ -713,7 +713,7 @@ public partial class HtmlCrawlerMarkdownTests {
 </main>
 """;
 
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/docs/start");
 
         var image = Assert.IsType<ImageBlock>(Assert.Single(document.Blocks));
         Assert.Equal("https://example.com/img/hero.webp", image.Path);
