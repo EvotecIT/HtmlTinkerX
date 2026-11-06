@@ -11,7 +11,7 @@ public static partial class HtmlDomExtraction {
     /// <param name="element">Element to compare with, typically one item of a repeated list.</param>
     /// <returns>Similar elements in document order, without <paramref name="element"/> itself.</returns>
     /// <remarks>Candidates must have the same tag and the same ancestor tag path. They are then scored with the
-    /// <see cref="HtmlSelectorRelocator"/> fingerprint rules (classes, identity attributes, child structure and sibling count)
+    /// <see cref="HtmlSelectorRelocator"/> fingerprint rules (classes, identity attributes, child structure and sibling count, but not text)
     /// and kept at Medium confidence or better.</remarks>
     public static IReadOnlyList<IElement> FindSimilar(IElement element) {
         if (element == null) {
@@ -21,7 +21,9 @@ public static partial class HtmlDomExtraction {
         IDocument document = element.Owner
             ?? throw new ArgumentException("The element must belong to a document.", nameof(element));
         // Same tag and ancestor path alone score 40, so Medium confidence also needs matching classes or children.
+        // Text is left out so a shared label cannot stand in for shape.
         HtmlElementFingerprint expected = HtmlElementFingerprint.Capture(element);
+        expected.TextHash = string.Empty;
         List<IElement> similar = new();
         foreach (IElement candidate in document.GetElementsByTagName(element.LocalName)) {
             if (candidate == element || !HasSameTagPath(element, candidate)) {

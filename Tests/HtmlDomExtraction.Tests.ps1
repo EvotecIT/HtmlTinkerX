@@ -44,6 +44,8 @@ Describe 'Static HTML selector discovery and object extraction' {
         Select-HtmlElement -Content $script:Html -Text 'gold one' -Selector '.product-title::text' -Similar |
             Should -Be 'Gold Two'
         { Select-HtmlElement -Content $script:Html -Selector 'a::text span' } | Should -Throw '*last part*'
+        $card = Select-HtmlElement -Content $script:Html -Selector 'article' -First
+        ($card | Select-HtmlElement -Similar | Select-HtmlElement -Selector '.product-title::text') | Should -Be 'Gold Two'
     }
 
     It 'converts repeated items into ordinary PowerShell objects' {
@@ -98,6 +100,7 @@ Describe 'Static HTML selector discovery and object extraction' {
                 Link = @{ Selector = 'a'; Attribute = 'href' }
             }
             $direct[1].Link | Should -Be ($server.Url + 'final/catalog/two')
+            Select-HtmlElement -Url $startUrl -Selector 'a::attr(href)' -First | Should -Be ($server.Url + 'final/catalog/one')
         } finally {
             $server.Dispose()
         }

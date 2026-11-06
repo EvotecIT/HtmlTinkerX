@@ -17,7 +17,7 @@ namespace PSParseHTML.PowerShell;
 /// URL attributes such as <c>href</c> and <c>src</c> are resolved against <c>-BaseUrl</c>, the downloaded <c>-Url</c>, or the page's <c>&lt;base href&gt;</c>.
 /// Elements without own text or without the attribute are skipped.</para>
 /// <para><c>-Text</c> finds elements by their own text, ignoring case unless <c>-CaseSensitive</c> is used. With <c>-Selector</c>, only matching elements are searched.</para>
-/// <para><c>-Similar</c> takes the first match and returns the other elements shaped like it, for example the remaining items of a list.</para>
+/// <para><c>-Similar</c> takes the first match and returns the other elements shaped like it, for example the remaining items of a list. A piped element with just <c>-Similar</c> is compared with the rest of its own page.</para>
 /// </remarks>
 /// <example>
 ///   <summary>Select product cards from downloaded HTML</summary>
@@ -123,15 +123,21 @@ public sealed class CmdletSelectHtmlElement : AsyncPSCmdlet {
     [Alias("Headers")]
     public Hashtable? Header { get; set; }
 
+    private Uri? _effectiveUrl;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateProxy(Proxy, ProxyCredential);
-        if (string.IsNullOrWhiteSpace(Selector) && string.IsNullOrWhiteSpace(Text)) {
+        // -Similar compares against the rest of the page, so a piped element keeps its own document.
+        IElement? pipedElement = Similar.IsPresent && ParameterSetName == ParameterSetInput
+            && HtmlPipelineInput.Unwrap(Input) is IElement { Owner: not null } element ? element : null;
+        if (string.IsNullOrWhiteSpace(Selector) && string.IsNullOrWhiteSpace(Text) && pipedElement == null) {
             throw new PSArgumentException("Use -Selector, -Text, or both.");
         }
 
-        string html = await ReadHtmlAsync().ConfigureAwait(false);
-        IReadOnlyList<object> results = Select(HtmlParser.ParseWithAngleSharp(html));
+        IParentNode root = pipedElement
+            ?? (IParentNode)HtmlParser.ParseWithAngleSharp(await ReadHtmlAsync().ConfigureAwait(false));
+        IReadOnlyList<object> results = Select(root);
         if (Required.IsPresent && results.Count == 0) {
             string query = string.IsNullOrWhiteSpace(Text) ? $"CSS selector '{Selector}'" : $"Text '{Text}'";
             ThrowTerminatingError(new ErrorRecord(
@@ -145,7 +151,7 @@ public sealed class CmdletSelectHtmlElement : AsyncPSCmdlet {
         WriteObject(results, true);
     }
 
-    private IReadOnlyList<object> Select(IDocument document) {
+    private IReadOnlyList<object> Select(IParentNode document) {
         HtmlDomExtraction.HtmlValueSelector? valueSelector = string.IsNullOrWhiteSpace(Selector)
             ? null
             : HtmlDomExtraction.ParseValueSelector(Selector!);
@@ -155,8 +161,16 @@ public sealed class CmdletSelectHtmlElement : AsyncPSCmdlet {
             elements = HtmlDomExtraction.FindByText(document, Text!, TextMatch, elementSelector, CaseSensitive.IsPresent);
         } else if (valueSelector != null && (!Similar.IsPresent || valueSelector.ElementSelector.Length == 0)) {
             return HtmlDomExtraction.SelectValues(document, Selector!, GetBaseUrl(), First.IsPresent).ToArray<object>();
+        } else if (string.IsNullOrEmpty(elementSelector)) {
+            elements = Array.Empty<IElement>();
         } else {
             elements = HtmlDomExtraction.QueryElements(document, elementSelector!, nameof(Selector)).ToArray();
+        }
+
+        // A piped element is its own anchor when it matches, as it would after reparsing its markup.
+        if (document is IElement piped && string.IsNullOrWhiteSpace(Text)
+            && (string.IsNullOrEmpty(elementSelector) || piped.Matches(elementSelector!))) {
+            elements = new[] { piped };
         }
 
         if (Similar.IsPresent) {
@@ -171,7 +185,7 @@ public sealed class CmdletSelectHtmlElement : AsyncPSCmdlet {
         return (First.IsPresent ? elements.Take(1) : elements).ToArray<object>();
     }
 
-    private Uri? GetBaseUrl() => BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);
+    private Uri? GetBaseUrl() => BaseUrl ?? (ParameterSetName == ParameterSetUrl ? _effectiveUrl ?? Url : null);
 
     private async Task<string> ReadHtmlAsync() {
         switch (ParameterSetName) {
@@ -181,7 +195,13 @@ public sealed class CmdletSelectHtmlElement : AsyncPSCmdlet {
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
                 using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential, UserAgent, Header)) {
-                    return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
+                    HtmlHttpTextResult result = await HtmlUtilities.GetTextWithProperEncodingAsync(
+                        client,
+                        Url.ToString(),
+                        fetchOptions: null,
+                        cancellationToken: CancelToken).ConfigureAwait(false);
+                    _effectiveUrl = result.FinalUri ?? Url;
+                    return result.Content;
                 }
             default:
                 return HtmlPipelineInput.ToHtmlMarkup(Input);

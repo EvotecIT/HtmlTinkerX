@@ -40,7 +40,7 @@ Elements without own text or without the attribute are skipped.
 
 `-Text` finds elements by their own text, ignoring case unless `-CaseSensitive` is used. With `-Selector`, only matching elements are searched.
 
-`-Similar` takes the first match and returns the other elements shaped like it (same tag and ancestor path, similar classes and children), for example the remaining items of a list.
+`-Similar` takes the first match and returns the other elements shaped like it (same tag and ancestor path, similar classes and children), for example the remaining items of a list. Piping an element from an earlier `Select-HtmlElement` with just `-Similar` finds its look-alikes on the same page.
 
 ## EXAMPLES
 
@@ -265,7 +265,7 @@ Accept wildcard characters: False
 ```
 
 ### -Similar
-Return the elements shaped like the first match (same tag and ancestor path, similar classes and children) instead of the match itself.
+Return the elements shaped like the first match (same tag and ancestor path, similar classes and children) instead of the match itself. A piped element without -Selector or -Text is compared with the rest of its own page.
 
 ```yaml
 Type: SwitchParameter

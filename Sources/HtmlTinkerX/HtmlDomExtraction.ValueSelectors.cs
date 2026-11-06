@@ -308,6 +308,16 @@ public static partial class HtmlDomExtraction {
     // "li *::text", "li ::text" and "li > ::text" all mean the descendants of li, as in Scrapy.
     private static string ToElementSelector(string prefix) {
         string trimmed = prefix.TrimEnd();
+        int backslashes = 0;
+        while (backslashes < trimmed.Length && trimmed[trimmed.Length - 1 - backslashes] == '\\') {
+            backslashes++;
+        }
+
+        if (backslashes % 2 == 1) {
+            // "#a\ ::text": the whitespace is part of the identifier, not a combinator.
+            trimmed = prefix.Substring(0, trimmed.Length + 1);
+        }
+
         if (trimmed.Length == 0) {
             return string.Empty;
         }

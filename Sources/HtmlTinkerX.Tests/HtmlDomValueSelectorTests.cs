@@ -34,6 +34,7 @@ public class HtmlDomValueSelectorTests {
             HtmlDomExtraction.SelectValues(PageHtml, "a.more::attr(href)"));
         Assert.Equal(new[] { "Gold one", "" }, HtmlDomExtraction.SelectValues(PageHtml, "img::attr(alt)"));
         Assert.Equal(new[] { "1" }, HtmlDomExtraction.SelectValues(PageHtml, "li::attr(data-id)", first: true));
+        Assert.Equal(new[] { "Spaced" }, HtmlDomExtraction.SelectValues("<p id=\"a \">Spaced</p><p id=\"a\"><b>Other</b></p>", @"#a\ ::text"));
     }
 
     [Theory]
@@ -91,5 +92,12 @@ public class HtmlDomValueSelectorTests {
         IReadOnlyList<IElement> similar = HtmlDomExtraction.FindSimilar(document.QuerySelector("li.product")!);
 
         Assert.Equal(new[] { "2", "3" }, similar.Select(static element => element.GetAttribute("data-id")));
+    }
+
+    [Fact]
+    public void FindSimilar_DoesNotTreatMatchingTextAsMatchingShape() {
+        IDocument document = HtmlParser.ParseWithAngleSharp("<div><p>Sale</p><p><b>x</b><i>y</i>Sale</p></div>");
+
+        Assert.Empty(HtmlDomExtraction.FindSimilar(document.QuerySelector("p")!));
     }
 }
