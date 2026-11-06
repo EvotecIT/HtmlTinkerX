@@ -456,6 +456,11 @@ public static partial class HtmlBrowser {
             contextOptions.Locale = options.Locale;
         }
 
+        if (options.HeaderProfile is { } profile) {
+            contextOptions.UserAgent = profile.UserAgent;
+            contextOptions.Locale = profile.Locale;
+        }
+
         if (options.ViewportWidth.HasValue && options.ViewportHeight.HasValue) {
             contextOptions.ViewportSize = new ViewportSize { Width = options.ViewportWidth.Value, Height = options.ViewportHeight.Value };
         }
@@ -509,6 +514,11 @@ public static partial class HtmlBrowser {
 
         if (!string.IsNullOrWhiteSpace(options.Locale)) {
             contextOptions.Locale = options.Locale;
+        }
+
+        if (options.HeaderProfile is { } profile) {
+            contextOptions.UserAgent = profile.UserAgent;
+            contextOptions.Locale = profile.Locale;
         }
 
         if (options.ViewportWidth.HasValue && options.ViewportHeight.HasValue) {

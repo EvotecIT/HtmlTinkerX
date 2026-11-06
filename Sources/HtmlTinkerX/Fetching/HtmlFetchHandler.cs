@@ -40,14 +40,21 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
         if (request?.RequestUri == null) throw new ArgumentNullException(nameof(request));
         RequireManualRedirects(InnerHandler);
+        Policy.BrowserHeaders?.Apply(request);
+        HtmlReplayCache? replay = Policy.ReplayCache is { } cache && cache.Accepts(request, SendsRequesterState(InnerHandler, request.RequestUri)) ? cache : null;
+        if (replay?.TryReplay(request) is { } replayed) return replayed;
         HttpRequestMessage current = request;
         for (int redirects = 0; ; redirects++) {
             Policy.BrowserHeaders?.Apply(current);
-            HttpResponseMessage response = await SendHopAsync(current, cancellationToken).ConfigureAwait(false);
+            // Every hop must qualify; the answer to one that carried requester state is not stored.
+            if (replay != null && !replay.Accepts(current, SendsRequesterState(InnerHandler, current.RequestUri!))) replay = null;
+            HttpResponseMessage response = await SendHopAsync(current, () => replay = null, cancellationToken).ConfigureAwait(false);
             Uri? target;
             try {
                 if (redirects >= HtmlFetchPolicy.MaxRedirects || !CanRedirect(current, response, out target)
-                    || Policy.RedirectPolicy is { } policy && !policy(current.RequestUri!, target!)) return response;
+                    || Policy.RedirectPolicy is { } policy && !policy(current.RequestUri!, target!)) {
+                    return replay != null ? replay.Record(request, response) : response;
+                }
             } catch {
                 // The response owns its host slot until disposed; a failing policy cannot hand it to the caller.
                 response.Dispose();
@@ -62,7 +69,10 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         }
     }
 
-    private async Task<HttpResponseMessage> SendHopAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+    /// <param name="request">The hop to send.</param>
+    /// <param name="resumed">Called when a resume hands requester state to the transport before the hop is sent again.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    private async Task<HttpResponseMessage> SendHopAsync(HttpRequestMessage request, Action resumed, CancellationToken cancellationToken) {
         Uri uri = request.RequestUri!;
         // Only reads are repeated; a POST might have taken effect before it failed.
         bool idempotent = HtmlFetchRules.IsIdempotent(request.Method);
@@ -100,6 +110,14 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
                 if (action == HtmlBlockedAction.Retry && waitable && idempotent && attempt < Policy.RetryCount) {
                     attempt++;
                     await PauseAsync(uri, delay, failure.Provider ?? failure.Kind.ToString(), cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+                if (action == HtmlBlockedAction.Resumed && idempotent && attempt < Policy.RetryCount) {
+                    attempt++;
+                    // The handed-over cookies make the answer the requester's own, so it no longer belongs in an address-keyed cache.
+                    cacheable = false;
+                    resumed();
+                    Policy.OnRetry?.Invoke(uri.Host, "resumed after " + (failure.Provider ?? failure.Kind.ToString()));
                     continue;
                 }
                 if (action == HtmlBlockedAction.Render) return await RenderAsync(request, cancellationToken).ConfigureAwait(false);

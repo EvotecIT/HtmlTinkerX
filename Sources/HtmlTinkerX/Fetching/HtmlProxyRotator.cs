@@ -37,11 +37,12 @@ public sealed class HtmlProxyRotator : HttpMessageHandler {
     /// <param name="proxies">Proxy addresses, for example <c>http://proxy1:8080</c>.</param>
     /// <param name="credential">Optional credentials for every proxy.</param>
     /// <param name="selector">Optional choice of proxy index from the request and the pool size; cyclic when null.</param>
-    public static HtmlProxyRotator Create(IEnumerable<string> proxies, ICredentials? credential = null, Func<HttpRequestMessage, int, int>? selector = null) {
+    /// <param name="cookies">The shared cookie container, for example one that browser cookies are handed into; a new one when null.</param>
+    public static HtmlProxyRotator Create(IEnumerable<string> proxies, ICredentials? credential = null, Func<HttpRequestMessage, int, int>? selector = null, CookieContainer? cookies = null) {
         if (proxies == null) throw new ArgumentNullException(nameof(proxies));
         string[] addresses = proxies.Where(static proxy => !string.IsNullOrWhiteSpace(proxy)).ToArray();
         if (addresses.Length == 0) throw new ArgumentException("At least one proxy is required.", nameof(proxies));
-        CookieContainer cookies = new();
+        cookies ??= new CookieContainer();
         return new HtmlProxyRotator(addresses.Select(proxy => {
             HttpClientHandler handler = HtmlHttpClientFactory.CreateHandler(proxy, credential, allowAutoRedirect: false);
             handler.CookieContainer = cookies;

@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -31,6 +32,10 @@ public static partial class HtmlBrowser {
 
         if (!string.IsNullOrWhiteSpace(options.CdpEndpointUrl)) {
             ValidateCdpAttachOptions(options);
+        }
+
+        if (options.HeaderProfile != null && (!string.IsNullOrWhiteSpace(options.UserAgent) || !string.IsNullOrWhiteSpace(options.Locale))) {
+            throw new ArgumentException("HeaderProfile sets the User-Agent and locale; do not combine it with UserAgent or Locale.");
         }
 
         if (options.ManualLogin) {
@@ -112,6 +117,13 @@ public static partial class HtmlBrowser {
                 }
             }
 
+            if (options.HeaderProfile != null) {
+                await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
+                    () => ApplyHeaderProfileAsync(page!, options, attached: pageScopedInitScripts),
+                    AbortOwnershipAsync,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             await HtmlBrowserPdfCapture.ExecuteWithCancellationAsync(
                 () => pageScopedInitScripts
                     ? ApplyInitScriptsAsync(page!, options, cancellationToken)
@@ -158,6 +170,39 @@ public static partial class HtmlBrowser {
             await AbortOwnershipAsync().ConfigureAwait(false);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Makes the page send the profile's identity. Chromium takes the User-Agent, Accept-Language and client hints
+    /// together through its user-agent override, which also keeps navigator.userAgentData consistent; other engines
+    /// use the context's User-Agent and locale and send no client hints. An attached browser keeps its own identity,
+    /// so the profile must be the one it reports.
+    /// </summary>
+    private static async Task ApplyHeaderProfileAsync(IPage page, HtmlBrowserLaunchOptions options, bool attached) {
+        HtmlBrowserHeaderProfile profile = options.HeaderProfile!;
+        if (attached) {
+            string userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent").ConfigureAwait(false);
+            if (!string.Equals(userAgent.Replace("HeadlessChrome/", "Chrome/"), profile.UserAgent, StringComparison.Ordinal)) {
+                throw new ArgumentException("HeaderProfile describes a different browser than the one at CdpEndpointUrl. Read it from that browser with HtmlBrowser.GetHeaderProfileAsync.");
+            }
+        }
+        if (options.Browser != HtmlBrowserEngine.Chromium) return;
+        Dictionary<string, object> metadata = new() {
+            ["brands"] = (profile.Brands ?? Array.Empty<KeyValuePair<string, string>>())
+                .Select(static brand => new Dictionary<string, string> { ["brand"] = brand.Key, ["version"] = brand.Value }).ToArray(),
+            ["platform"] = profile.Platform ?? string.Empty,
+            ["platformVersion"] = string.Empty,
+            ["architecture"] = string.Empty,
+            ["model"] = string.Empty,
+            ["mobile"] = profile.Mobile
+        };
+        ICDPSession cdp = await page.Context.NewCDPSessionAsync(page).ConfigureAwait(false);
+        await cdp.SendAsync("Emulation.setUserAgentOverride", new Dictionary<string, object> {
+            ["userAgent"] = profile.UserAgent,
+            // Chromium weighs the tags itself, the way a derived profile's Accept-Language is weighed.
+            ["acceptLanguage"] = string.Join(",", LanguageTags(profile.AcceptLanguage)),
+            ["userAgentMetadata"] = metadata
+        }).ConfigureAwait(false);
     }
 
     private static void ValidateCdpAttachOptions(HtmlBrowserLaunchOptions options) {
