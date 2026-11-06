@@ -403,7 +403,7 @@ public static partial class HtmlCrawler {
             html,
             pageUrl,
             options?.MarkdownImageMode ?? MarkdownImageRenderingMode.PortableMarkdown,
-            options?.ListingCardMetadataMode ?? HtmlListingCardMetadataMode.SuppressInRepeatedCards,
+            options?.ListingCardMetadataMode ?? MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards,
             options?.MarkdownProfile ?? HtmlMarkdownProfile.Portable);
     }
 

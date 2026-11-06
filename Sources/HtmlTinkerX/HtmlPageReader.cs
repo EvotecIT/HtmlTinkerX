@@ -27,7 +27,7 @@ public static class HtmlPageReader {
         }
 
         HtmlConversionDocumentOptions conversionOptions =
-            (effective.ConversionOptions ?? HtmlConversionDocumentOptions.CreateUntrustedProfile()).Clone();
+            (effective.ConversionOptions ?? HtmlConversionDocumentOptions.UntrustedDefaults).Clone();
         conversionOptions.BaseUri ??= effective.BaseUri ?? effective.FinalUri ?? effective.SourceUri;
         if (effective.ConversionOptions == null) conversionOptions.IncludeNormalizedHtml = false;
         HtmlConversionDocument content = HtmlConversionDocument.Parse(html, conversionOptions);

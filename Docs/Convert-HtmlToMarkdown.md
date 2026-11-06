@@ -11,17 +11,17 @@ Converts HTML content to Markdown.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Convert-HtmlToMarkdown -Content <string> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Convert-HtmlToMarkdown -Content <string> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <MarkdownHtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Convert-HtmlToMarkdown -Path <string> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Convert-HtmlToMarkdown -Path <string> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <MarkdownHtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Convert-HtmlToMarkdown -Url <uri> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <HtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
+Convert-HtmlToMarkdown -Url <uri> [-PageUrl <string>] [-OutputFile <string>] [-MarkdownProfile <HtmlMarkdownProfile>] [-MarkdownImageMode <MarkdownImageRenderingMode>] [-ListingCardMetadataMode <MarkdownHtmlListingCardMetadataMode>] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -96,7 +96,7 @@ Accept wildcard characters: False
 Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.
 
 ```yaml
-Type: HtmlListingCardMetadataMode
+Type: MarkdownHtmlListingCardMetadataMode
 Parameter Sets: Content, File, Url
 Aliases: None
 Possible values: Preserve, SuppressInRepeatedCards

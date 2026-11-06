@@ -452,8 +452,8 @@ public partial class HtmlCrawlerMarkdownTests {
     // HTML snapshots use the same update switch so markdown and rendered-output baselines stay in sync.
     private static void AssertRenderedHtmlSnapshot(string fixtureFileName, string snapshotFileName) {
         string html = ReadFixture(fixtureFileName);
-        MarkdownDoc document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
-        string renderedHtml = document.ToHtmlFragment(new HtmlOptions { Style = HtmlStyle.Plain, CssDelivery = CssDelivery.None, BodyClass = null });
+        using MarkdownDocument document = HtmlMarkdownConverterAdapter.ConvertToMarkdownDocument(html, "https://example.com/world/live/storm-update.html");
+        string renderedHtml = document.ToHtml(new MarkdownHtmlExportOptions { Kind = MarkdownHtmlKind.Fragment, Style = MarkdownHtmlStyle.Plain, CssDelivery = MarkdownCssDelivery.None, BodyClass = null });
         AssertHtmlSnapshot(snapshotFileName, renderedHtml);
     }
 

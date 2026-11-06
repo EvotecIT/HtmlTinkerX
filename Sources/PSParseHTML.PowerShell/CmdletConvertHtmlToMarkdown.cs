@@ -60,7 +60,7 @@ public sealed class CmdletConvertHtmlToMarkdown : AsyncUrlCmdlet {
 
     /// <summary>Controls whether low-value metadata inside repeated listing cards should be preserved or suppressed.</summary>
     [Parameter]
-    public HtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = HtmlListingCardMetadataMode.SuppressInRepeatedCards;
+    public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
