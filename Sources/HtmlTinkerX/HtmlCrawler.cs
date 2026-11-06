@@ -108,6 +108,9 @@ public static partial class HtmlCrawler {
         public Uri Uri { get; set; } = null!;
         public string? ParentUrl { get; set; }
         public int Depth { get; set; }
+        public Dictionary<string, string>? Data { get; set; }
+        public int Priority { get; set; }
+        public bool Render { get; set; }
     }
 
     private sealed class FetchedPageData {

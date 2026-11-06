@@ -208,6 +208,9 @@ public abstract partial class AsyncPSCmdlet
                                 promptOptions.AllowedCredentialTypes,
                                 promptOptions.Options));
                         break;
+                    case PipelineType.Invoke:
+                        item.ReplyPipe!.Publish((Func<object?>)item.Value!);
+                        break;
                     case PipelineType.DirectAccessBarrier:
                     case PipelineType.HookCompleted:
                         break;

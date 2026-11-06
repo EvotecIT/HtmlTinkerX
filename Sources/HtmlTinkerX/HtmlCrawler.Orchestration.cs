@@ -159,9 +159,12 @@ public static partial class HtmlCrawler {
                 }
             }
 
+            if (resolvedOptions.MaxConcurrentPageRequests > 1 && result.PendingPages.Any(item => item.Render)) {
+                throw new InvalidOperationException(RenderedFollowUpConcurrencyError);
+            }
             foreach (HtmlCrawlPendingItem item in result.PendingPages) {
                 if (TryResolveAbsoluteUri(startUri, item.Url, out Uri? pendingUri)) {
-                    EnqueuePage(pendingUri!, item.ParentUrl, item.Depth, pending, queued, resolvedOptions);
+                    EnqueuePage(pendingUri!, item.ParentUrl, item.Depth, pending, queued, resolvedOptions, item.Data, item.Priority, item.Render);
                 }
             }
 
@@ -192,6 +195,7 @@ public static partial class HtmlCrawler {
             }
 
             await DiscoverSitemapCandidatesAsync(startUri, client, resolvedOptions, robotsCache, result, pending, queued, visited, cancellationToken).ConfigureAwait(false);
+            if (pending.Any(request => request.Priority != 0)) OrderByPriority(pending, prefetchWindow, resolvedOptions);
             if (persistSnapshots) {
                 await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
             }
@@ -203,7 +207,7 @@ public static partial class HtmlCrawler {
                     int windowSize = Math.Min(resolvedOptions.MaxConcurrentPageRequests, resolvedOptions.MaxPages - fetchedCount);
                     foreach (CrawlRequest candidate in pending.Take(windowSize)) {
                         string key = NormalizeUrl(candidate.Uri, resolvedOptions);
-                        if (visited.Contains(key)) continue;
+                        if (visited.Contains(key) || candidate.Render) continue;
                         if (resolvedOptions.RespectRobotsTxt) {
                             RobotsDocument? candidateRobots = await ReadRobotsAsync(candidate.Uri).ConfigureAwait(false);
                             if (candidateRobots != null && !IsAllowedByRobots(candidateRobots, candidate.Uri)) continue;
@@ -251,12 +255,14 @@ public static partial class HtmlCrawler {
                 fetchedCount++;
                 HtmlCrawlPage page;
                 FetchedPageData fetchedPage;
-                if (resolvedOptions.Render) {
+                if (resolvedOptions.Render || next.Render) {
                     fetchedPage = await FetchRenderedPageAsync(await GetRenderSessionAsync().ConfigureAwait(false), next, resolvedOptions, structuredSchema, cancellationToken).ConfigureAwait(false);
                     page = fetchedPage.Page;
                     page.RenderMode = HtmlCrawlRenderMode.Rendered;
                     page.RenderReasonCode = HtmlCrawlRenderReasonCode.ExplicitRender;
-                    page.RenderReason = "Rendered because browser mode was explicitly requested.";
+                    page.RenderReason = resolvedOptions.Render
+                        ? "Rendered because browser mode was explicitly requested."
+                        : "Rendered because the page handler requested browser mode for this URL.";
                 } else {
                     refreshPages.TryGetValue(next.Uri.AbsoluteUri, out HtmlCrawlPage? cachedPage);
                     Task<FetchedPageData>? prefetched = null;
@@ -333,14 +339,35 @@ public static partial class HtmlCrawler {
                     await DownloadAssetsForPageAsync(client, page, resolvedOptions, result, downloadedAssets, assetsDirectory, cancellationToken).ConfigureAwait(false);
                 }
 
+                HtmlCrawlPageContext? handlerContext = null;
+                if (page.Status == HtmlCrawlPageStatus.Success && resolvedOptions.PageHandler != null) {
+                    handlerContext = new HtmlCrawlPageContext(page, fetchedPage.RawHtml, next.Depth, next.Data);
+                    await resolvedOptions.PageHandler(handlerContext, cancellationToken).ConfigureAwait(false);
+                }
+
                 if (page.Status == HtmlCrawlPageStatus.Success && next.Depth < resolvedOptions.MaxDepth) {
-                    foreach (string link in page.Links) {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        QueueCandidate(link, page.Url, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
+                    if (handlerContext != null) {
+                        QueueFollowRequests(handlerContext, page, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
                     }
+                    if (handlerContext?.FollowLinks != false) {
+                        foreach (string link in page.Links) {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            QueueCandidate(link, page.Url, next.Depth + 1, startUri, resolvedOptions, pending, queued, visited, result);
+                        }
+                    }
+                    if (pending.Any(request => request.Priority != 0)) OrderByPriority(pending, prefetchWindow, resolvedOptions);
                 }
                 if (resolvedOptions.PageObserver != null) {
                     await resolvedOptions.PageObserver.ObserveAsync(page, cancellationToken).ConfigureAwait(false);
+                }
+                if (resolvedOptions.StreamSink != null) {
+                    HtmlCrawlPage streamedPage = resolvedOptions.RetainPageContent ? page : page.CreateSnapshot();
+                    await resolvedOptions.StreamSink(HtmlCrawlStreamEntry.ForPage(streamedPage), cancellationToken).ConfigureAwait(false);
+                    if (handlerContext != null) {
+                        foreach (object item in handlerContext.Items) {
+                            await resolvedOptions.StreamSink(HtmlCrawlStreamEntry.ForItem(streamedPage, item), cancellationToken).ConfigureAwait(false);
+                        }
+                    }
                 }
                 if (persistSnapshots) {
                     await checkpointWriter!.SaveAsync(result, pending, cancellationToken).ConfigureAwait(false);
@@ -563,7 +590,10 @@ public static partial class HtmlCrawler {
         Queue<CrawlRequest> pending,
         HashSet<string> queued,
         HashSet<string> visited,
-        HtmlCrawlResult result) {
+        HtmlCrawlResult result,
+        Dictionary<string, string>? data = null,
+        int priority = 0,
+        bool render = false) {
         if (!TryResolveAbsoluteUri(startUri, candidateUrl, out Uri? candidateUri)) {
             result.SkippedPages.Add(CreateSkippedPage(candidateUrl, parentUrl, depth, HtmlCrawlSkipReason.InvalidUrl));
             return;
@@ -580,17 +610,62 @@ public static partial class HtmlCrawler {
             return;
         }
 
-        EnqueuePage(candidateUri!, parentUrl, depth, pending, queued, options);
+        EnqueuePage(candidateUri!, parentUrl, depth, pending, queued, options, data, priority, render);
     }
 
-    private static void EnqueuePage(Uri uri, string? parentUrl, int depth, Queue<CrawlRequest> pending, HashSet<string> queued, HtmlCrawlOptions options) {
+    private static void EnqueuePage(
+        Uri uri,
+        string? parentUrl,
+        int depth,
+        Queue<CrawlRequest> pending,
+        HashSet<string> queued,
+        HtmlCrawlOptions options,
+        Dictionary<string, string>? data = null,
+        int priority = 0,
+        bool render = false) {
         string normalized = NormalizeUrl(uri, options);
         pending.Enqueue(new CrawlRequest {
             Uri = uri,
             ParentUrl = parentUrl,
-            Depth = depth
+            Depth = depth,
+            Data = data,
+            Priority = priority,
+            Render = render
         });
         queued.Add(normalized);
+    }
+
+    private static void QueueFollowRequests(
+        HtmlCrawlPageContext context,
+        HtmlCrawlPage page,
+        int depth,
+        Uri startUri,
+        HtmlCrawlOptions options,
+        Queue<CrawlRequest> pending,
+        HashSet<string> queued,
+        HashSet<string> visited,
+        HtmlCrawlResult result) {
+        Uri baseUri = new(page.ResolutionBaseUrl ?? page.Url);
+        foreach (HtmlCrawlPageContext.FollowRequest request in context.Requests) {
+            if (request.Render && options.MaxConcurrentPageRequests > 1) {
+                throw new InvalidOperationException(RenderedFollowUpConcurrencyError);
+            }
+            string candidate = Uri.TryCreate(baseUri, request.Url, out Uri? resolved) ? resolved.AbsoluteUri : request.Url;
+            QueueCandidate(candidate, page.Url, depth, startUri, options, pending, queued, visited, result, request.Data, request.Priority, request.Render);
+        }
+    }
+
+    private const string RenderedFollowUpConcurrencyError = "Rendered follow-up requests require MaxConcurrentPageRequests to be one.";
+
+    private static void OrderByPriority(Queue<CrawlRequest> pending, CrawlPrefetchWindow? prefetchWindow, HtmlCrawlOptions options) {
+        // Downloads already in the prefetch window stay first so the page budget counts them before anything they would overtake.
+        // OrderByDescending is stable, so equal priorities keep their queue order.
+        CrawlRequest[] ordered = pending
+            .OrderByDescending(request => prefetchWindow?.Contains(NormalizeUrl(request.Uri, options)) == true)
+            .ThenByDescending(request => request.Priority)
+            .ToArray();
+        pending.Clear();
+        foreach (CrawlRequest request in ordered) pending.Enqueue(request);
     }
 
     private static HtmlCrawlSkipReason GetSkipReasonForCandidate(Uri candidate, Uri startUri, HtmlCrawlOptions options) {
