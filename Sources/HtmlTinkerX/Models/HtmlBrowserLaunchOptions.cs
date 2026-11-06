@@ -92,6 +92,9 @@ public sealed class HtmlBrowserLaunchOptions {
     /// <summary>Enable Chromium sandboxing when supported by the selected browser.</summary>
     public bool? ChromiumSandbox { get; set; }
 
+    /// <summary>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Playwright turns it off by default. Supported on Chromium and Firefox when HtmlTinkerX launches the browser. Headless Chromium then runs the full Chromium build, because the headless shell has no pop-up blocker.</summary>
+    public bool BlockPopups { get; set; }
+
     /// <summary>Optional enforced destination policy for an owned, non-persistent Chromium session. Restricted sessions block service workers and WebSockets and reject external proxies, custom launch arguments, persistent profiles and CDP attachment. The default preserves unrestricted legacy behavior.</summary>
     public HtmlBrowserNetworkPolicy? NetworkPolicy { get; set; }
 
@@ -255,6 +258,7 @@ public sealed class HtmlBrowserLaunchOptions {
         ApplyIfSet(profile.GeoLatitude, value => GeoLatitude = value);
         ApplyIfSet(profile.GeoLongitude, value => GeoLongitude = value);
         ApplyIfSet(profile.ChromiumSandbox, value => ChromiumSandbox = value);
+        ApplyIfSet(profile.BlockPopups, value => BlockPopups = value);
         ApplyIfSet(profile.IgnoreHttpsErrors, value => IgnoreHTTPSErrors = value);
         ApplyIfSet(profile.PreventSsoAutoSubmit, value => PreventSsoAutoSubmit = value);
 

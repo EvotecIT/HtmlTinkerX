@@ -89,6 +89,10 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter PreventSsoAutoSubmit { get; set; }
 
+    /// <summary>Keep the browser's pop-up blocker on. Chromium and Firefox only.</summary>
+    [Parameter]
+    public SwitchParameter BlockPopups { get; set; }
+
     /// <summary>Additional browser command-line arguments.</summary>
     [Parameter]
     public string[] BrowserArgument { get; set; } = System.Array.Empty<string>();
@@ -133,7 +137,8 @@ public sealed class CmdletNewHtmlBrowserProfile : AsyncPSCmdlet {
             UserAgent = UserAgent,
             LoadState = MyInvocation.BoundParameters.ContainsKey(nameof(LoadState)) ? LoadState : null,
             Timeout = Timeout,
-            PreventSsoAutoSubmit = MyInvocation.BoundParameters.ContainsKey(nameof(PreventSsoAutoSubmit)) ? PreventSsoAutoSubmit.IsPresent : null
+            PreventSsoAutoSubmit = MyInvocation.BoundParameters.ContainsKey(nameof(PreventSsoAutoSubmit)) ? PreventSsoAutoSubmit.IsPresent : null,
+            BlockPopups = MyInvocation.BoundParameters.ContainsKey(nameof(BlockPopups)) ? BlockPopups.IsPresent : null
         };
 
         profile.BrowserArguments.AddRange(BrowserArgument);

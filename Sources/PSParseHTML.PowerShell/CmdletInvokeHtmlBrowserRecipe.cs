@@ -89,6 +89,10 @@ public sealed class CmdletInvokeHtmlBrowserRecipe : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ChromiumSandbox { get; set; }
 
+    /// <summary>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only.</summary>
+    [Parameter]
+    public SwitchParameter BlockPopups { get; set; }
+
     /// <summary>Force browser runtime reinstall before launch.</summary>
     [Parameter]
     public SwitchParameter Clean { get; set; }
@@ -340,6 +344,7 @@ public sealed class CmdletInvokeHtmlBrowserRecipe : AsyncPSCmdlet {
             BrowserExecutablePath = BrowserExecutablePath,
             BrowserArgument = BrowserArgument,
             ChromiumSandbox = ChromiumSandbox,
+            BlockPopups = BlockPopups,
             Proxy = Proxy,
             ProxyCredential = ProxyCredential,
             UserAgent = UserAgent,

@@ -65,6 +65,9 @@ internal sealed class HtmlBrowserLaunchOptionRequest {
     /// <summary>Enable Chromium sandboxing when supported.</summary>
     public SwitchParameter ChromiumSandbox { get; set; }
 
+    /// <summary>Keep the browser's pop-up blocker on.</summary>
+    public SwitchParameter BlockPopups { get; set; }
+
     /// <summary>Proxy server address used when launching the browser.</summary>
     public string? Proxy { get; set; }
 
