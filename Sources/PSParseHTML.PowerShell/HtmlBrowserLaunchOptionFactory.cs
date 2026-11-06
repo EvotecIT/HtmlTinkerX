@@ -139,8 +139,8 @@ internal static class HtmlBrowserLaunchOptionFactory {
             options.ChromiumSandbox = true;
         }
 
-        if (IsBound(request.BoundParameters, nameof(request.BlockPopups)) && request.BlockPopups.IsPresent) {
-            options.BlockPopups = true;
+        if (IsBound(request.BoundParameters, nameof(request.BlockPopups))) {
+            options.BlockPopups = request.BlockPopups.IsPresent;
         }
 
         if (IsBound(request.BoundParameters, nameof(request.Mobile)) && request.Mobile.IsPresent) {

@@ -28,7 +28,7 @@ New-HtmlBrowserProfile -Path 'C:\Path'
 ## PARAMETERS
 
 ### -BlockPopups
-Keep the browser's pop-up blocker on. Chromium and Firefox only.
+Keep the browser's pop-up blocker on. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.
 
 ```yaml
 Type: SwitchParameter

@@ -89,7 +89,7 @@ public sealed class CmdletInvokeHtmlBrowserRecipe : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ChromiumSandbox { get; set; }
 
-    /// <summary>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only.</summary>
+    /// <summary>Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.</summary>
     [Parameter]
     public SwitchParameter BlockPopups { get; set; }
 
@@ -267,6 +267,9 @@ public sealed class CmdletInvokeHtmlBrowserRecipe : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        if (Session != null && BlockPopups.IsPresent) {
+            throw new PSArgumentException("BlockPopups applies when the browser is launched. Use Start-HtmlBrowserSession -BlockPopups and pass that session instead.");
+        }
         HtmlBrowserRecipe recipe = await GetRecipeAsync().ConfigureAwait(false);
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, CancellationToken);
         HtmlBrowserRecipeRunOptions options = await CreateRunOptionsAsync(recipe, linkedCts.Token, createLaunchOptions: false).ConfigureAwait(false);

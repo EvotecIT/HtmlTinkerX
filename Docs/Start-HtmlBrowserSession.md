@@ -33,7 +33,7 @@ Start-HtmlBrowserSession -Url https://example.org -UserDataDirectory .\.profiles
 ## PARAMETERS
 
 ### -BlockPopups
-Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only.
+Keep the browser's pop-up blocker on, so pages can't open windows without a user gesture. Chromium and Firefox only. Not supported with -CdpEndpointUrl, because an attached browser keeps the settings it was started with.
 
 ```yaml
 Type: SwitchParameter
