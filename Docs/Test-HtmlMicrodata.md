@@ -11,17 +11,17 @@ Validates microdata items against built-in schema definitions.
 ## SYNTAX
 ### Items (Default)
 ```powershell
-Test-HtmlMicrodata -Items <HtmlMicrodataItem[]> [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Test-HtmlMicrodata -Items <HtmlMicrodataItem[]> [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Content
 ```powershell
-Test-HtmlMicrodata -Content <string> [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Test-HtmlMicrodata -Content <string> [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Test-HtmlMicrodata -Url <uri> [-Proxy <string>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Test-HtmlMicrodata -Url <uri> [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -36,6 +36,38 @@ Test-HtmlMicrodata -Content $html
 
 
 ## PARAMETERS
+
+### -BrowserHeaders
+Sends a consistent set of browser headers: User-Agent, Accept, Accept-Language and client hints. With RenderWhenBlocked or ResumeInBrowser they are read from that browser, so the HTTP requests and the browser present one identity; otherwise they describe an ordinary desktop Chrome. Cannot be combined with UserAgent, or with Header values for the headers it sets.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -CdpEndpointUrl
+Chrome DevTools Protocol endpoint of your own running Chrome, used by RenderWhenBlocked and ResumeInBrowser instead of a launched browser.
+
+```yaml
+Type: String
+Parameter Sets: Url
+Aliases: CdpEndpoint, RemoteDebuggingUrl
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -Content
 HTML markup containing microdata.
@@ -70,10 +102,10 @@ Accept wildcard characters: False
 ```
 
 ### -Proxy
-Proxy server address when downloading by URL.
+Proxy server address used when downloading by URL. Give several to send each attempt through the next one.
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: Items, Content, Url
 Aliases: None
 Possible values:
@@ -86,11 +118,91 @@ Accept wildcard characters: False
 ```
 
 ### -ProxyCredential
-Credentials for the proxy server.
+Credentials used with the proxy server.
 
 ```yaml
 Type: PSCredential
 Parameter Sets: Items, Content, Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RenderWhenBlocked
+Renders the page in a headless browser, through the first proxy, when a Cloudflare challenge or a recognised CDN block page is returned.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ReplayCache
+Directory of a development cache that stores whole responses and replays them without fetching the site again. Requests with cookies, credentials or custom headers are not cached. Not for production reads: stored responses never expire.
+
+```yaml
+Type: String
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ResumeInBrowser
+When the site challenges or blocks the request, opens the page in a visible browser so you can complete what the site asks, then continues with that browser's cookies for the site. Nothing is solved automatically. Combine with BrowserHeaders so the cookies are used with the browser's own identity.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ResumeTimeoutSeconds
+Seconds ResumeInBrowser waits for you before the request fails as blocked.
+
+```yaml
+Type: Int32
+Parameter Sets: Url
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -RetryCount
+Retries after a transient status (408, 429, 500, 502, 503, 504) or a dropped connection, honouring Retry-After up to 30 seconds. Defaults to 1 with BrowserHeaders, RenderWhenBlocked, ResumeInBrowser or several proxies, otherwise 0.
+
+```yaml
+Type: Int32
+Parameter Sets: Url
 Aliases: None
 Possible values:
 

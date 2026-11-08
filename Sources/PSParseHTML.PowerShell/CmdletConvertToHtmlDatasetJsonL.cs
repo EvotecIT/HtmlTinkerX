@@ -16,7 +16,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertTo, "HtmlDatasetJsonL", DefaultParameterSetName = ParameterSetWorkbench)]
 [OutputType(typeof(string), typeof(HtmlPageDatasetChunk))]
-public sealed class CmdletConvertToHtmlDatasetJsonL : AsyncPSCmdlet {
+public sealed class CmdletConvertToHtmlDatasetJsonL : AsyncUrlCmdlet {
     private const string ParameterSetWorkbench = "Workbench";
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";
@@ -67,17 +67,9 @@ public sealed class CmdletConvertToHtmlDatasetJsonL : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter AsObject { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         HtmlPageWorkbenchResult workbench = await GetWorkbenchAsync().ConfigureAwait(false);
         var chunks = HtmlPageDatasetBuilder.Build(workbench, new HtmlPageDatasetOptions {
             MaxChunkWords = MaxChunkWords,
@@ -99,7 +91,7 @@ public sealed class CmdletConvertToHtmlDatasetJsonL : AsyncPSCmdlet {
             return Workbench!;
         }
 
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         string html = await ReadHtmlAsync(client).ConfigureAwait(false);
         Uri? baseUri = ParameterSetName == ParameterSetUrl ? downloadedResponseUri ?? Url : BaseUrl;
         return await HtmlPageWorkbench.AnalyzeAsync(

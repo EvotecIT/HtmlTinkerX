@@ -20,7 +20,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsCommon.Find, "HtmlDataSource", DefaultParameterSetName = ParameterSetWorkbench)]
 [OutputType(typeof(HtmlBrowserlessDataSource))]
-public sealed class CmdletFindHtmlDataSource : AsyncPSCmdlet {
+public sealed class CmdletFindHtmlDataSource : AsyncUrlCmdlet {
     private const string ParameterSetWorkbench = "Workbench";
     private const string ParameterSetContent = "Content";
     private const string ParameterSetPath = "Path";
@@ -70,21 +70,9 @@ public sealed class CmdletFindHtmlDataSource : AsyncPSCmdlet {
     [Parameter]
     public int MaxSources { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL or inspecting linked scripts.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    [Parameter(ParameterSetName = ParameterSetContent)]
-    [Parameter(ParameterSetName = ParameterSetPath)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    [Parameter(ParameterSetName = ParameterSetContent)]
-    [Parameter(ParameterSetName = ParameterSetPath)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         HtmlBrowserlessDiscoveryOptions options = new() {
             DirectOnly = DirectOnly.IsPresent,
             MaxSources = MaxSources,
@@ -97,7 +85,7 @@ public sealed class CmdletFindHtmlDataSource : AsyncPSCmdlet {
             return;
         }
 
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         string html = await ReadHtmlAsync(client).ConfigureAwait(false);
         options.BaseUri = ParameterSetName == ParameterSetUrl ? downloadedResponseUri ?? Url : BaseUrl;
         WriteObject((await HtmlBrowserlessExtraction.DiscoverAsync(html, options, client, CancelToken).ConfigureAwait(false)), true);

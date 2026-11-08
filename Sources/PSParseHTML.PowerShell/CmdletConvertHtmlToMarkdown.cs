@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.Convert, "HtmlToMarkdown", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
-public sealed class CmdletConvertHtmlToMarkdown : AsyncPSCmdlet {
+public sealed class CmdletConvertHtmlToMarkdown : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -62,20 +62,9 @@ public sealed class CmdletConvertHtmlToMarkdown : AsyncPSCmdlet {
     [Parameter]
     public MarkdownHtmlListingCardMetadataMode ListingCardMetadataMode { get; set; } = MarkdownHtmlListingCardMetadataMode.SuppressInRepeatedCards;
 
-    /// <summary>
-    /// Proxy server address used when downloading from <see cref="Url"/>.
-    /// Include the protocol and port if necessary.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used for the <see cref="Proxy"/> server.</summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = ParameterSetName switch {
             ParameterSetFile => HtmlUtilities.ReadFileChecked(Path.ToFullPath()),
             ParameterSetUrl => await GetUrlContentAsync().ConfigureAwait(false),
@@ -95,7 +84,7 @@ public sealed class CmdletConvertHtmlToMarkdown : AsyncPSCmdlet {
     }
 
     private async Task<string> GetUrlContentAsync() {
-        using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+        using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
         return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
     }
 

@@ -52,7 +52,17 @@ public sealed class HtmlFetchPolicy {
     /// </summary>
     public IHtmlHttpValidatorCache? ValidatorCache { get; set; }
 
-    /// <summary>Consistent browser request headers applied to every request; null keeps the client's own headers.</summary>
+    /// <summary>
+    /// Development cache that replays whole stored responses without any network request; null, the default, disables
+    /// it. A replayed response skips the gate, retries, redirects and <see cref="OnBlocked"/>.
+    /// </summary>
+    public HtmlReplayCache? ReplayCache { get; set; }
+
+    /// <summary>
+    /// Consistent browser request headers applied to every request; null keeps the client's own headers. Give a browser
+    /// fallback the same profile through <see cref="HtmlBrowserLaunchOptions.HeaderProfile"/>, ideally one
+    /// <see cref="HtmlBrowser.GetHeaderProfileAsync"/> read from that browser, so both present one identity.
+    /// </summary>
     public HtmlBrowserHeaderProfile? BrowserHeaders { get; set; }
 
     /// <summary>Called with the host and the reason before each retry, for logging.</summary>

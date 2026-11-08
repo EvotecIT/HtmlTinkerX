@@ -23,5 +23,11 @@ public enum HtmlBlockedAction {
     /// <summary>Send the request again after the retry delay, within <see cref="HtmlFetchPolicy.RetryCount"/>; GET and HEAD only.</summary>
     Retry,
     /// <summary>Return HTML produced by <see cref="HtmlFetchPolicy.Renderer"/> as a successful response.</summary>
-    Render
+    Render,
+    /// <summary>
+    /// The block was cleared another way, for example a person finished the site's check in a browser and its cookies
+    /// were handed to the handler, so the request is sent again at once. Counts as a retry within
+    /// <see cref="HtmlFetchPolicy.RetryCount"/>; GET and HEAD only. <see cref="HtmlBrowser.CreateBlockedResume"/> returns it.
+    /// </summary>
+    Resumed
 }

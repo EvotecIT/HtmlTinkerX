@@ -23,7 +23,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.Convert, "HtmlToText", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
-public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
+public sealed class CmdletConvertHtmlToText : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -66,22 +66,9 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter IncludeMetadata { get; set; }
 
-    /// <summary>
-    /// Proxy server address used when downloading from <see cref="Url"/>.
-    /// Include the protocol and port if necessary.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>
-    /// Credentials used for the <see cref="Proxy"/> server.
-    /// </summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await ReadInputHtmlAsync().ConfigureAwait(false);
 
         if (Readable.IsPresent || IncludeMetadata.IsPresent || !string.IsNullOrWhiteSpace(Selector)) {
@@ -105,7 +92,7 @@ public sealed class CmdletConvertHtmlToText : AsyncPSCmdlet {
         }
 
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
         }
 

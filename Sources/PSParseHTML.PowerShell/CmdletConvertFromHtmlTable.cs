@@ -25,7 +25,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlTable", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(PSObject[]), typeof(DataTable), typeof(DataSet))]
-public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlTable : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -143,22 +143,9 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     [ValidateSet("Compact", "Lines", "Markdown")]
     public string CellTextFormat { get; set; } = nameof(HtmlCellTextFormat.Compact);
 
-    /// <summary>
-    /// Proxy server address used when <see cref="Url"/> is specified.
-    /// Include protocol and port if required.
-    /// </summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>
-    /// Credentials used for authenticating with the specified <see cref="Proxy"/> server.
-    /// </summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         if (AsDataTable.IsPresent && AsDataSet.IsPresent) {
             throw new PSArgumentException("Specify either -AsDataTable or -AsDataSet, but not both.");
         }
@@ -215,7 +202,7 @@ public sealed class CmdletConvertFromHtmlTable : AsyncPSCmdlet {
     private async Task<List<HtmlTableResult>> GetTablesDetailedAsync() {
         string content = Content;
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             content = await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: new HtmlHttpFetchOptions(), cancellationToken: CancelToken).ConfigureAwait(false);
         }
         else if (ParameterSetName == ParameterSetFile) {

@@ -11,7 +11,7 @@ namespace PSParseHTML.PowerShell;
 [Cmdlet(VerbsData.ConvertFrom, "JavaScriptEndpoint", DefaultParameterSetName = ParameterSetContent)]
 [Alias("ConvertFrom-JSEndpoint")]
 [OutputType(typeof(HtmlJavaScriptEndpoint))]
-public sealed class CmdletConvertFromJavaScriptEndpoint : AsyncPSCmdlet {
+public sealed class CmdletConvertFromJavaScriptEndpoint : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -36,17 +36,9 @@ public sealed class CmdletConvertFromJavaScriptEndpoint : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Html { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string content = await ReadContentAsync().ConfigureAwait(false);
         object[] endpoints = Html.IsPresent
             ? HtmlJavaScriptEndpointParser.ParseHtml(content).Cast<object>().ToArray()
@@ -59,7 +51,7 @@ public sealed class CmdletConvertFromJavaScriptEndpoint : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:

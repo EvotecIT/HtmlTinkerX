@@ -9,7 +9,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>Parses a web app manifest JSON document.</summary>
 [Cmdlet(VerbsData.ConvertFrom, "WebManifest", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlWebManifestDocument))]
-public sealed class CmdletConvertFromWebManifest : AsyncPSCmdlet {
+public sealed class CmdletConvertFromWebManifest : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -34,17 +34,9 @@ public sealed class CmdletConvertFromWebManifest : AsyncPSCmdlet {
     [Parameter]
     public Uri? BaseUrl { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string json = await ReadContentAsync().ConfigureAwait(false);
         Uri? baseUri = BaseUrl ?? (ParameterSetName == ParameterSetUrl ? Url : null);
         WriteObject(HtmlWebManifestParser.Parse(json, baseUri));
@@ -55,7 +47,7 @@ public sealed class CmdletConvertFromWebManifest : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:

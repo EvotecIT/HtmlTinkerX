@@ -20,7 +20,7 @@ namespace PSParseHTML.PowerShell;
 /// </example>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlMeta", DefaultParameterSetName = ParameterSetNode)]
 [OutputType(typeof(PSObject))]
-public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
+public sealed class CmdletConvertFromHtmlMeta : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetNode = "Node";
     private const string ParameterSetUrl = "Url";
@@ -39,20 +39,12 @@ public sealed class CmdletConvertFromHtmlMeta : AsyncPSCmdlet {
     [Alias("Uri")]
     public Uri Url { get; set; } = null!;
 
-    /// <summary>Proxy server address to use when downloading by URL.</summary>
-    [Parameter]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials for the specified proxy server.</summary>
-    [Parameter]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         List<HtmlMetaTag> tags;
         if (ParameterSetName == ParameterSetUrl) {
-            using HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential);
+            using HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false);
             tags = await HtmlParser.ParseUrlMetaTagsAsync(Url.ToString(), client, cancellationToken: CancelToken).ConfigureAwait(false);
         } else if (ParameterSetName == ParameterSetNode) {
             tags = HtmlParser.ParseMetaTags(HtmlPipelineInput.ToHtmlMarkup(HtmlNode));

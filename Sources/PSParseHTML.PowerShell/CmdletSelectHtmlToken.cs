@@ -10,7 +10,7 @@ namespace PSParseHTML.PowerShell;
 /// <summary>Selects likely CSRF, anti-forgery, nonce, and auth tokens from HTML.</summary>
 [Cmdlet(VerbsCommon.Select, "HtmlToken", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlToken))]
-public sealed class CmdletSelectHtmlToken : AsyncPSCmdlet {
+public sealed class CmdletSelectHtmlToken : AsyncUrlCmdlet {
     private const string ParameterSetContent = "Content";
     private const string ParameterSetFile = "File";
     private const string ParameterSetUrl = "Url";
@@ -36,17 +36,9 @@ public sealed class CmdletSelectHtmlToken : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string[]? Name { get; set; }
 
-    /// <summary>Proxy server address used when downloading by URL.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public string? Proxy { get; set; }
-
-    /// <summary>Credentials used with the proxy server.</summary>
-    [Parameter(ParameterSetName = ParameterSetUrl)]
-    public PSCredential? ProxyCredential { get; set; }
-
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        ValidateProxy(Proxy, ProxyCredential);
+        ValidateUrlParameters();
         string html = await ReadHtmlAsync().ConfigureAwait(false);
         WriteObject(HtmlTokenParser.Parse(html, Name).ToArray(), true);
     }
@@ -56,7 +48,7 @@ public sealed class CmdletSelectHtmlToken : AsyncPSCmdlet {
             case ParameterSetFile:
                 return await HtmlUtilities.ReadFileCheckedAsync(Path.ToFullPath()).ConfigureAwait(false);
             case ParameterSetUrl:
-                using (HttpClient client = HttpClientHelper.Create(Proxy, ProxyCredential)) {
+                using (HttpClient client = await CreateUrlClientAsync().ConfigureAwait(false)) {
                     return await HtmlUtilities.GetStringWithProperEncodingAsync(client, Url.ToString(), fetchOptions: null, cancellationToken: CancelToken).ConfigureAwait(false);
                 }
             default:
