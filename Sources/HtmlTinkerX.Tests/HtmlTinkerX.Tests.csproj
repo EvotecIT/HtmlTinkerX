@@ -49,6 +49,7 @@
     </PropertyGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+        <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.3.14" />
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
