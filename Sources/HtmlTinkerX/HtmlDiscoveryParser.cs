@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 using AngleSharp.Dom;
 using AngleSharpHtmlParser = AngleSharp.Html.Parser.HtmlParser;
@@ -58,6 +59,9 @@ public static class HtmlDiscoveryParser {
     /// <summary>
     /// Extracts URLs from a sitemap urlset or sitemap index document.
     /// </summary>
+    /// <remarks>A document with a DOCTYPE is rejected; see <see cref="ParseSitemapEntries"/>.</remarks>
+    /// <exception cref="ArgumentNullException">The XML is null.</exception>
+    /// <exception cref="System.Xml.XmlException">The XML is malformed or contains a DOCTYPE.</exception>
     public static IReadOnlyList<string> ParseSitemapUrls(string xml, Uri? baseUri = null) {
         return ParseSitemapEntries(xml, baseUri)
             .Select(static entry => entry.Url)
@@ -70,12 +74,18 @@ public static class HtmlDiscoveryParser {
     /// Entries retain document order; callers can prioritize recent entries before applying a crawl limit.
     /// Extension locations such as image URLs are excluded. Missing or invalid dates remain null.
     /// </summary>
+    /// <remarks>
+    /// Sitemaps never need a document type declaration, so a document with a DOCTYPE is rejected like malformed XML.
+    /// A well-formed document whose root is not <c>urlset</c> or <c>sitemapindex</c> returns no entries.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">The XML is null.</exception>
+    /// <exception cref="System.Xml.XmlException">The XML is malformed or contains a DOCTYPE.</exception>
     public static IReadOnlyList<HtmlSitemapEntry> ParseSitemapEntries(string xml, Uri? baseUri = null) {
         if (xml == null) {
             throw new ArgumentNullException(nameof(xml));
         }
 
-        XDocument document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
+        XDocument document = HtmlXmlLoader.Load(xml, DtdProcessing.Prohibit, LoadOptions.PreserveWhitespace);
         XElement? root = document.Root;
         if (root == null || (root.Name.LocalName != "urlset" && root.Name.LocalName != "sitemapindex")) {
             return Array.Empty<HtmlSitemapEntry>();
@@ -95,18 +105,25 @@ public static class HtmlDiscoveryParser {
     /// <summary>
     /// Extracts normalized items from an RSS or Atom feed document.
     /// </summary>
+    /// <remarks>A DOCTYPE is skipped; see <see cref="ParseSyndicationFeed"/>.</remarks>
     public static IReadOnlyList<HtmlSyndicationItem> ParseSyndicationItems(string xml, Uri? baseUri = null, string? sourceFeedUrl = null) =>
         ParseSyndicationFeed(xml, baseUri, sourceFeedUrl).Items;
 
     /// <summary>
     /// Extracts an RSS or Atom feed document: its channel-level title, link and last-updated time, and its normalized items.
     /// </summary>
+    /// <remarks>
+    /// A DOCTYPE is skipped rather than rejected, because RSS 0.91 feeds commonly declare one. Its entity
+    /// declarations are not read, so a feed that uses an entity defined only in its DTD is rejected as malformed XML.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">The XML is null.</exception>
+    /// <exception cref="System.Xml.XmlException">The XML is malformed or uses an entity it does not define.</exception>
     public static HtmlSyndicationFeed ParseSyndicationFeed(string xml, Uri? baseUri = null, string? sourceFeedUrl = null) {
         if (xml == null) {
             throw new ArgumentNullException(nameof(xml));
         }
 
-        XDocument document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
+        XDocument document = HtmlXmlLoader.Load(xml, DtdProcessing.Ignore, LoadOptions.PreserveWhitespace);
         XElement? root = document.Root;
         if (root == null) {
             return new HtmlSyndicationFeed { SourceFeedUrl = sourceFeedUrl };

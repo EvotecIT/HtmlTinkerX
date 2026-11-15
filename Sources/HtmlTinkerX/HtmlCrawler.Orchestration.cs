@@ -546,7 +546,8 @@ public static partial class HtmlCrawler {
 
             XDocument document;
             try {
-                document = XDocument.Parse(xml);
+                // Sitemaps never need a DTD; one is refused like any other unreadable sitemap and the sitemap is skipped.
+                document = HtmlXmlLoader.Load(xml, System.Xml.DtdProcessing.Prohibit);
             } catch {
                 continue;
             }

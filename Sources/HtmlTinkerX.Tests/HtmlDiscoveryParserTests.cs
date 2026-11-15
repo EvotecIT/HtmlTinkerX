@@ -429,4 +429,31 @@ Affected components: API, Batch</description>
         Assert.Equal(new DateTimeOffset(2026, 9, 29, 10, 0, 0, TimeSpan.Zero), items[1].Published);
         Assert.Null(items[2].Published);
     }
+
+    [Theory]
+    [InlineData("<!DOCTYPE urlset [<!ENTITY host \"https://example.org\">]><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>&host;/page</loc></url></urlset>")]
+    [InlineData("<!DOCTYPE sitemapindex SYSTEM \"https://example.org/sitemap.dtd\"><sitemapindex><sitemap><loc>/part.xml</loc></sitemap></sitemapindex>")]
+    public void SitemapParsingRejectsAnyDoctype(string xml) {
+        Assert.Throws<System.Xml.XmlException>(() => HtmlDiscoveryParser.ParseSitemapEntries(xml, new Uri("https://example.org/")));
+        Assert.Throws<System.Xml.XmlException>(() => HtmlDiscoveryParser.ParseSitemapUrls(xml, new Uri("https://example.org/")));
+    }
+
+    [Fact]
+    public void SyndicationParsingSkipsRss091DoctypeWithoutDefiningItsEntities() {
+        const string rss091 = """
+<?xml version="1.0"?>
+<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//EN" "http://my.netscape.com/publish/formats/rss-0.91.dtd">
+<rss version="0.91"><channel><title>News</title><link>https://example.org/</link>
+<item><title>Release notes</title><link>https://example.org/notes</link></item></channel></rss>
+""";
+        HtmlSyndicationFeed feed = HtmlDiscoveryParser.ParseSyndicationFeed(rss091);
+        Assert.Equal("News", feed.Title);
+        Assert.Equal("https://example.org/notes", Assert.Single(feed.Items).Url);
+
+        const string internalEntity = """
+<!DOCTYPE rss [<!ENTITY name "Expanded">]>
+<rss version="2.0"><channel><item><title>&name;</title><link>https://example.org/a</link></item></channel></rss>
+""";
+        Assert.Throws<System.Xml.XmlException>(() => HtmlDiscoveryParser.ParseSyndicationItems(internalEntity));
+    }
 }
