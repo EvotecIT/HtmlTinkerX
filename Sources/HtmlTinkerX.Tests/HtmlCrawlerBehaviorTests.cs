@@ -277,6 +277,36 @@ public partial class HtmlCrawlerTests {
     }
 
     [Fact]
+    public async Task CrawlAsync_SkipsSitemapsThatDeclareADoctype() {
+        Dictionary<string, string> responses = new();
+        HttpListener server = StartServer(responses, out string rootUrl);
+        try {
+            responses["/"] = "<html><head><title>Home</title></head><body>Home</body></html>";
+            responses["/robots.txt"] = $"User-agent: *\nSitemap: {rootUrl}dtd.xml\nSitemap: {rootUrl}sitemap.xml\n";
+            responses["/dtd.xml"] =
+                $"<!DOCTYPE urlset [<!ENTITY page \"{rootUrl}from-dtd\">]>" +
+                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>&page;</loc></url></urlset>";
+            responses["/sitemap.xml"] =
+                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" +
+                $"<url><loc>{rootUrl}from-sitemap</loc></url>" +
+                "</urlset>";
+            responses["/from-dtd"] = "<html><head><title>Entity</title></head><body>Entity page</body></html>";
+            responses["/from-sitemap"] = "<html><head><title>Mapped</title></head><body>Mapped page</body></html>";
+
+            HtmlCrawlResult result = await HtmlCrawler.CrawlAsync(rootUrl, new HtmlCrawlOptions {
+                MaxDepth = 0,
+                MaxPages = 10,
+                UseSitemaps = true
+            });
+
+            Assert.Contains(result.Pages, page => page.Url == rootUrl + "from-sitemap");
+            Assert.DoesNotContain(result.Pages, page => page.Url == rootUrl + "from-dtd");
+        } finally {
+            DisposeListenerSafely(server);
+        }
+    }
+
+    [Fact]
     public async Task CrawlAsync_IgnoreRobotsTxt_AllowsDisallowedSitemapPage() {
         Dictionary<string, string> responses = new();
         HttpListener server = StartServer(responses, out string rootUrl);

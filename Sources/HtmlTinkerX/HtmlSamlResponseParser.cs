@@ -43,7 +43,7 @@ public static class HtmlSamlResponseParser {
 
         XDocument? document;
         try {
-            document = LoadSafeXml(xml);
+            document = HtmlXmlLoader.Load(xml, DtdProcessing.Prohibit, LoadOptions.PreserveWhitespace);
         } catch (Exception ex) when (ex is XmlException || ex is InvalidOperationException) {
             summary.ErrorMessage = $"Decoded SAMLResponse is not valid XML: {ex.Message}";
             return summary;
@@ -210,17 +210,6 @@ public static class HtmlSamlResponseParser {
             yield return plusRestored;
             yield return new string(plusRestored.Where(static c => !char.IsWhiteSpace(c)).ToArray());
         }
-    }
-
-    private static XDocument LoadSafeXml(string xml) {
-        XmlReaderSettings settings = new() {
-            DtdProcessing = DtdProcessing.Prohibit,
-            XmlResolver = null
-        };
-
-        using StringReader stringReader = new(xml);
-        using XmlReader xmlReader = XmlReader.Create(stringReader, settings);
-        return XDocument.Load(xmlReader, LoadOptions.PreserveWhitespace);
     }
 
     private static string RedactSamlXml(XDocument document) {

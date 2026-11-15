@@ -25,7 +25,8 @@ ConvertFrom-HtmlSyndication -Url <uri> [-BaseUrl <uri>] [-SourceFeedUrl <string>
 ```
 
 ## DESCRIPTION
-Extracts normalized items from RSS or Atom feed XML.
+Extracts normalized items from RSS or Atom feed XML. A DOCTYPE, as older RSS 0.91 feeds carry, is skipped rather than read. A feed that uses an entity defined only in its
+DTD is rejected as malformed XML.
 
 ## EXAMPLES
 

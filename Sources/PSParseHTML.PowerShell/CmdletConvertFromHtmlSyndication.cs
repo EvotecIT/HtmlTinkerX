@@ -10,6 +10,10 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Extracts normalized items from RSS or Atom feed XML.
 /// </summary>
+/// <para>
+/// Extracts normalized items from RSS or Atom feed XML. A DOCTYPE, as older RSS 0.91 feeds carry, is skipped rather than read. A feed that uses an entity defined only in its
+/// DTD is rejected as malformed XML.
+/// </para>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlSyndication", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(HtmlSyndicationItem))]
 public sealed class CmdletConvertFromHtmlSyndication : AsyncUrlCmdlet {
