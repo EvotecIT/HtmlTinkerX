@@ -35,13 +35,56 @@ public static class HtmlParserToText {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
-        var result = NUglify.Uglify.HtmlToText(html, preserveStructure
-            ? NUglify.Html.HtmlToTextOptions.KeepStructure : NUglify.Html.HtmlToTextOptions.None);
+        NUglify.Html.HtmlToTextOptions options = preserveStructure
+            ? NUglify.Html.HtmlToTextOptions.KeepStructure : NUglify.Html.HtmlToTextOptions.None;
+        var result = HasDocumentSectionTag(html)
+            ? NUglify.Uglify.HtmlToText(html, options)
+            : ConvertMarkupWithoutDocumentSectionsToText(html, options);
         if (result.HasErrors) {
             string errors = string.Join(", ", result.Errors.Select(e => e.ToString()));
             LoggingMessages.Logger.WriteWarning($"Convert-HTMLToText -Errors: {errors}");
         }
         return result.Code ?? string.Empty;
+    }
+
+    private static readonly Regex DocumentSectionTag = new(@"<(?:html|head|body)(?:[\s/>]|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool HasDocumentSectionTag(string html) => DocumentSectionTag.IsMatch(html);
+
+    // NUglify's document parser opens an implicit head for leading script, style, title, meta or link
+    // elements and never leaves it, so all following content is dropped from the text. Markup without
+    // html, head or body tags is parsed as a fragment instead, with the same settings NUglify uses for
+    // HtmlToText. A leading title is document metadata, not content, so it stays out of the text.
+    private static NUglify.UglifyResult ConvertMarkupWithoutDocumentSectionsToText(string html, NUglify.Html.HtmlToTextOptions options) {
+        var settings = new NUglify.Html.HtmlSettings {
+            IsFragmentOnly = true,
+            RemoveOptionalTags = false,
+            RemoveEmptyAttributes = false,
+            RemoveAttributeQuotes = false,
+            RemoveScriptStyleTypeAttribute = false,
+            ShortBooleanAttribute = false,
+            MinifyJs = false,
+            MinifyJsAttributes = false,
+            MinifyCss = false,
+            MinifyCssAttributes = false,
+            DecodeEntityCharacters = true
+        };
+        var parser = new NUglify.Html.HtmlParser(html, null, settings);
+        NUglify.Html.HtmlDocument document = parser.Parse();
+        List<NUglify.UglifyError> errors = new(parser.Errors);
+        foreach (NUglify.Html.HtmlNode node in document.Children.ToArray()) {
+            if (node is NUglify.Html.HtmlElement element && string.Equals(element.Name, "title", StringComparison.OrdinalIgnoreCase)) {
+                node.Remove();
+            }
+        }
+
+        var minifier = new NUglify.Html.HtmlMinifier(document, settings);
+        minifier.Minify();
+        errors.AddRange(minifier.Errors);
+
+        using var writer = new StringWriter();
+        new NUglify.Html.HtmlWriterToText(writer, options).Write(document);
+        return new NUglify.UglifyResult(writer.ToString(), errors);
     }
 
     /// <summary>
