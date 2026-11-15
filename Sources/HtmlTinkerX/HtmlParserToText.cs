@@ -47,9 +47,23 @@ public static class HtmlParserToText {
         return result.Code ?? string.Empty;
     }
 
-    private static readonly Regex DocumentSectionTag = new(@"<(?:html|head|body)(?:[\s/>]|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-    private static bool HasDocumentSectionTag(string html) => DocumentSectionTag.IsMatch(html);
+    // Only start tags the HTML tokenizer reads as markup count. Tag-like text in comments, attribute values,
+    // script, style and other raw-text elements is not a document section.
+    private static bool HasDocumentSectionTag(string html) {
+        bool found = false;
+        var options = new AngleSharp.Html.Parser.HtmlParserOptions {
+            OnToken = (token, _) => {
+                if (!found && token.Type == AngleSharp.Html.Parser.HtmlTokenType.StartTag
+                    && (string.Equals(token.Name, "html", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(token.Name, "head", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(token.Name, "body", StringComparison.OrdinalIgnoreCase))) {
+                    found = true;
+                }
+            }
+        };
+        using IDocument document = new AngleSharp.Html.Parser.HtmlParser(options).ParseDocument(html);
+        return found;
+    }
 
     // NUglify's document parser opens an implicit head for leading script, style, title, meta or link
     // elements and never leaves it, so all following content is dropped from the text. Markup without

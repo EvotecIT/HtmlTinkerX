@@ -36,6 +36,8 @@ public class HtmlParserTextTests {
     [InlineData("<script>track()</script>Kept text", "Kept text")]
     [InlineData("<style>p{color:red}</style><p>Kept text</p>", "Kept text")]
     [InlineData("<!DOCTYPE html><title>Page</title><p>Kept text</p>", "Kept text")]
+    [InlineData("<script>const x = '<body>';</script>Kept text", "Kept text")]
+    [InlineData("<!-- <html> --><style>/* <head> */</style><p title=\"<body>\">Kept text</p>", "Kept text")]
     public void TextAfterLeadingHeadContentIsKept(string html, string expected) {
         Assert.Equal(expected, HtmlParserToText.ConvertToText(html).Trim());
         Assert.Equal(expected, HtmlParserToText.ConvertToText(html, preserveStructure: true).Trim());
