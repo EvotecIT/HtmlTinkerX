@@ -104,26 +104,189 @@ public static class HtmlParserToText {
     /// string text = HtmlParserToText.ConvertFragmentToText("&lt;ul&gt;&lt;li&gt;First&lt;/li&gt;&lt;li&gt;Second&lt;/li&gt;&lt;/ul&gt;");
     /// </code>
     /// </example>
-    public static string ConvertFragmentToText(string html) {
+    public static string ConvertFragmentToText(string html) => ConvertFragmentToText(html, preserveLineBreaks: false);
+
+    /// <summary>
+    /// Converts an HTML fragment to plain text, optionally keeping line and paragraph boundaries as newlines.
+    /// </summary>
+    /// <param name="html">The untrusted fragment of HTML body content.</param>
+    /// <param name="preserveLineBreaks">
+    /// When true, <c>&lt;br&gt;</c> and block elements such as paragraphs, list items, headings and table rows end a
+    /// line, and newlines in text stay line breaks. When false, every boundary becomes one space, as in the
+    /// one-argument overload.
+    /// </param>
+    /// <returns>Text from the fragment's body.</returns>
+    /// <exception cref="ArgumentNullException">The fragment is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// With <paramref name="preserveLineBreaks"/> the result uses <c>\n</c> line endings. Inline elements join their
+    /// text without a separator, so <c>Re&lt;b&gt;port&lt;/b&gt;</c> stays <c>Report</c>. Spaces and tabs collapse
+    /// to one space, lines are trimmed, and table cells in a row are separated by a space. Each <c>&lt;br&gt;</c>
+    /// adds a line break and a blank line needs two; longer runs of breaks collapse to one blank line, and leading
+    /// and trailing blank lines are removed.
+    /// </para>
+    /// <para>
+    /// Newlines in text separate lines only where no markup boundary does: the source formatting between
+    /// <c>&lt;/p&gt;</c> and <c>&lt;p&gt;</c>, or after <c>&lt;br&gt;</c>, does not add blank lines. Preformatted
+    /// text keeps its spacing and indentation. Scripts, styles, templates, noscript and embedded content are
+    /// omitted, and the text after them is kept. Entities are decoded and the result is not HTML-encoded.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// string text = HtmlParserToText.ConvertFragmentToText("&lt;p&gt;Re&lt;b&gt;port&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Line 1&lt;br&gt;Line 2&lt;/p&gt;", preserveLineBreaks: true);
+    /// // "Report\nLine 1\nLine 2"
+    /// </code>
+    /// </example>
+    public static string ConvertFragmentToText(string html, bool preserveLineBreaks) {
         if (html == null) {
             throw new ArgumentNullException(nameof(html));
         }
 
         using IDocument document = HtmlParser.ParseWithAngleSharp(html);
-        foreach (IElement element in document.QuerySelectorAll("script,style,template,noscript,iframe,object,embed,svg,math,audio,video,canvas,applet")) {
+        foreach (IElement element in document.QuerySelectorAll(NonTextContentSelector)) {
             element.Remove();
         }
 
+        if (preserveLineBreaks) {
+            if (document.Body == null) {
+                return string.Empty;
+            }
+
+            var writer = new LineTextWriter();
+            writer.WriteChildren(document.Body);
+            return writer.ToString();
+        }
+
         // Block boundaries are whitespace in text. Inline elements keep the exact adjacency of their text nodes.
-        foreach (IElement element in document.QuerySelectorAll(
-            "address,article,aside,blockquote,br,caption,center,dd,details,dialog,dir,div,dl,dt,fieldset,figcaption,figure,footer,form," +
-            "h1,h2,h3,h4,h5,h6,header,hgroup,hr,legend,li,listing,main,menu,nav,ol,optgroup,option,p,plaintext,pre,search,section," +
-            "summary,table,tbody,td,tfoot,th,thead,tr,ul,xmp")) {
+        foreach (IElement element in document.QuerySelectorAll(BlockBoundarySelector)) {
             element.Parent?.InsertBefore(document.CreateTextNode(" "), element);
             element.Parent?.InsertBefore(document.CreateTextNode(" "), element.NextSibling);
         }
 
         return NormalizeWhitespace(document.Body?.TextContent);
+    }
+
+    private const string NonTextContentSelector = "script,style,template,noscript,iframe,object,embed,svg,math,audio,video,canvas,applet";
+
+    private const string BlockBoundarySelector =
+        "address,article,aside,blockquote,br,caption,center,dd,details,dialog,dir,div,dl,dt,fieldset,figcaption,figure,footer,form," +
+        "h1,h2,h3,h4,h5,h6,header,hgroup,hr,legend,li,listing,main,menu,nav,ol,optgroup,option,p,plaintext,pre,search,section," +
+        "summary,table,tbody,td,tfoot,th,thead,tr,ul,xmp";
+
+    private static readonly HashSet<string> LineBlockElements = new(StringComparer.OrdinalIgnoreCase) {
+        "address", "article", "aside", "blockquote", "caption", "center", "dd", "details", "dialog", "dir", "div", "dl", "dt",
+        "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr",
+        "legend", "li", "listing", "main", "menu", "nav", "ol", "optgroup", "option", "p", "plaintext", "pre", "search",
+        "section", "summary", "table", "tbody", "tfoot", "thead", "tr", "ul", "xmp"
+    };
+
+    private static readonly HashSet<string> PreformattedElements = new(StringComparer.OrdinalIgnoreCase) {
+        "pre", "listing", "xmp", "plaintext", "textarea"
+    };
+
+    /// <summary>
+    /// Writes text with line boundaries. Breaks requested by markup (block edges and br) take precedence over newlines
+    /// in the whitespace between the same two pieces of text, which are treated as source formatting.
+    /// </summary>
+    private sealed class LineTextWriter {
+        private readonly StringBuilder _builder = new();
+        private bool _hasText;
+        private bool _pendingSpace;
+        private int _markupBreaks;
+        private int _textBreaks;
+
+        public void WriteChildren(INode parent) {
+            foreach (INode child in parent.ChildNodes) {
+                WriteNode(child, preformatted: false);
+            }
+        }
+
+        private void WriteNode(INode node, bool preformatted) {
+            if (node is IText text) {
+                WriteText(text.Data, preformatted);
+                return;
+            }
+
+            if (node is not IElement element) {
+                return;
+            }
+
+            string name = element.LocalName;
+            if (string.Equals(name, "br", StringComparison.OrdinalIgnoreCase)) {
+                _markupBreaks++;
+                return;
+            }
+
+            bool block = LineBlockElements.Contains(name);
+            bool cell = string.Equals(name, "td", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "th", StringComparison.OrdinalIgnoreCase);
+            bool childPreformatted = preformatted || PreformattedElements.Contains(name);
+            if (block) {
+                BlockBoundary();
+            } else if (cell) {
+                _pendingSpace = true;
+            }
+
+            foreach (INode child in element.ChildNodes) {
+                WriteNode(child, childPreformatted);
+            }
+
+            if (block) {
+                BlockBoundary();
+            } else if (cell) {
+                _pendingSpace = true;
+            }
+        }
+
+        private void BlockBoundary() => _markupBreaks = Math.Max(_markupBreaks, 1);
+
+        private void WriteText(string data, bool preformatted) {
+            for (int i = 0; i < data.Length; i++) {
+                char c = data[i];
+                if (c == '\r' || c == '\n') {
+                    if (c == '\r' && i + 1 < data.Length && data[i + 1] == '\n') {
+                        i++;
+                    }
+                    _textBreaks++;
+                    _pendingSpace = false;
+                } else if (!preformatted && (char.IsWhiteSpace(c) || c == '\u00A0')) {
+                    _pendingSpace = true;
+                } else {
+                    Append(c);
+                }
+            }
+        }
+
+        private void Append(char c) {
+            if (_hasText) {
+                int breaks = Math.Min(_markupBreaks > 0 ? _markupBreaks : _textBreaks, 2);
+                if (breaks > 0) {
+                    TrimTrailingSpaces();
+                    _builder.Append('\n', breaks);
+                } else if (_pendingSpace) {
+                    _builder.Append(' ');
+                }
+            }
+
+            _hasText = true;
+            _pendingSpace = false;
+            _markupBreaks = 0;
+            _textBreaks = 0;
+            _builder.Append(c);
+        }
+
+        private void TrimTrailingSpaces() {
+            int length = _builder.Length;
+            while (length > 0 && (_builder[length - 1] == ' ' || _builder[length - 1] == '\t')) {
+                length--;
+            }
+            _builder.Length = length;
+        }
+
+        public override string ToString() {
+            TrimTrailingSpaces();
+            return _builder.ToString();
+        }
     }
 
     /// <summary>

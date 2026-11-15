@@ -54,4 +54,50 @@ public class HtmlParserFragmentTextTests {
         Assert.Equal(string.Empty, HtmlParserToText.ConvertFragmentToText("<div></div>"));
         Assert.Throws<ArgumentNullException>(() => HtmlParserToText.ConvertFragmentToText(null!));
     }
+
+    [Fact]
+    public void LineBreaksAndBlockElementsBecomeLinesWhileInlineMarkupJoinsWords() {
+        const string html = "<h2>Re<b>port</b> status</h2><p>First line<br>Second line</p>"
+            + "<ul><li>One</li><li>T<i>wo</i></li></ul>"
+            + "<table><tr><th>Ring</th><th>State</th></tr><tr><td>Pilot</td><td>Ready</td></tr></table><div>Done</div>";
+
+        Assert.Equal("Report status\nFirst line\nSecond line\nOne\nTwo\nRing State\nPilot Ready\nDone",
+            HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
+    }
+
+    [Theory]
+    [InlineData("Line one\nLine two\r\nLine three", "Line one\nLine two\nLine three")]
+    [InlineData("First\n\n\n\nSecond", "First\n\nSecond")]
+    [InlineData("A<br><br>B<br><br><br><br>C", "A\n\nB\n\nC")]
+    [InlineData("<p>\n  One\n</p>\n\n<p>Two</p>\n", "One\nTwo")]
+    [InlineData("A<br>\nB", "A\nB")]
+    [InlineData("  Spaced \t  out  \n  text  ", "Spaced out\ntext")]
+    public void TextNewlinesKeepTheirMeaningAndBlankLineRunsCollapse(string html, string expected) {
+        Assert.Equal(expected, HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
+    }
+
+    [Fact]
+    public void LineModeDropsScriptStyleNoscriptAndTemplateButKeepsFollowingText() {
+        const string html = "<script>alert('a')</script>Lead<style>p{color:red}</style> text"
+            + "<noscript><p>Enable scripts</p></noscript><template><p>Hidden</p></template>\nNext line<script>x()</script>";
+
+        Assert.Equal("Lead text\nNext line", HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
+    }
+
+    [Fact]
+    public void LineModeDecodesEntitiesKeepsLiteralLessThanAndPreformattedIndentation() {
+        const string html = "<p>A &amp; B &lt;tag&gt; if a < b&nbsp;then</p><pre>code\n    indented</pre>";
+
+        Assert.Equal("A & B <tag> if a < b then\ncode\n    indented",
+            HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
+    }
+
+    [Fact]
+    public void DefaultFragmentConversionStillJoinsLinesWithSpaces() {
+        const string html = "<p>First line<br>Second line</p>Third\nFourth";
+
+        Assert.Equal("First line Second line Third Fourth", HtmlParserToText.ConvertFragmentToText(html));
+        Assert.Equal("First line Second line Third Fourth", HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: false));
+        Assert.Throws<ArgumentNullException>(() => HtmlParserToText.ConvertFragmentToText(null!, preserveLineBreaks: true));
+    }
 }
