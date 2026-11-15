@@ -81,14 +81,17 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
         var playwright = new Mock<IPlaywright>();
         playwright.SetupGet(value => value.Chromium).Returns(browserType.Object);
         playwright.Setup(value => value.Dispose()).Callback(() => playwrightDisposed.TrySetResult(true));
+        Func<Task<IPlaywright>>? originalFactory = HtmlBrowser.PlaywrightFactory;
         HtmlBrowser.PlaywrightFactory = () => Task.FromResult(playwright.Object);
+        HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
+            minimumBrowserInstances: 1,
+            maximumBrowserInstances: 1,
+            maximumBrowserAge: TimeSpan.FromMilliseconds(1),
+            setupTimeout: TimeSpan.FromMilliseconds(250),
+            // This mocked launch tests pool cleanup, independently of real cache verification.
+            browserExecutablePath: "mock-chromium",
+            networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
         try {
-            await using HtmlBrowserPdfRenderer renderer = new(new HtmlBrowserPdfRendererOptions(
-                minimumBrowserInstances: 1,
-                maximumBrowserInstances: 1,
-                maximumBrowserAge: TimeSpan.FromMilliseconds(1),
-                setupTimeout: TimeSpan.FromMilliseconds(250),
-                networkPolicy: HtmlBrowserNetworkPolicy.CreatePrivateNetworkAllowed()));
             await renderer.PreWarmAsync();
             await Task.Delay(20);
 
@@ -102,11 +105,13 @@ public sealed partial class HtmlBrowserPdfRendererLiveTests {
             Assert.False(pendingClose.Task.IsCompleted);
         } finally {
             pendingClose.TrySetResult(true);
-            Assert.Same(
-                playwrightDisposed.Task,
-                await Task.WhenAny(playwrightDisposed.Task, Task.Delay(TimeSpan.FromSeconds(2))));
-            HtmlBrowser.PlaywrightFactory = null;
+            try {
+                await renderer.DisposeAsync();
+            } finally {
+                HtmlBrowser.PlaywrightFactory = originalFactory;
+            }
         }
+        Assert.True(playwrightDisposed.Task.IsCompleted);
     }
 
     [Fact]
