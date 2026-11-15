@@ -18,6 +18,11 @@ namespace PSParseHTML.PowerShell;
 ///   <code>Convert-HtmlToText -Content "&lt;p&gt;Hello&lt;/p&gt;"</code>
 /// </example>
 /// <example>
+///   <summary>Keep paragraph and line boundaries</summary>
+///   <code>Convert-HtmlToText -Content "&lt;p&gt;Re&lt;b&gt;port&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Line 1&lt;br&gt;Line 2&lt;/p&gt;" -PreserveLineBreaks</code>
+///   <para>Returns three lines: Report, Line 1 and Line 2. Inline elements do not split words.</para>
+/// </example>
+/// <example>
 ///   <summary>Download through a proxy</summary>
 ///   <code>Convert-HtmlToText -Url https://example.com -Proxy http://proxy:8080</code>
 /// </example>
@@ -66,12 +71,33 @@ public sealed class CmdletConvertHtmlToText : AsyncUrlCmdlet {
     [Parameter]
     public SwitchParameter IncludeMetadata { get; set; }
 
+    /// <summary>
+    /// Keep line and paragraph boundaries: br and block elements such as paragraphs, list items, headings and table rows
+    /// end a line, newlines in text stay line breaks, and inline elements join their text. Scripts, styles, templates
+    /// and noscript content are omitted. Lines are separated by a line feed. Cannot be combined with Readable,
+    /// Selector or IncludeMetadata.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter PreserveLineBreaks { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         ValidateUrlParameters();
+        bool readable = Readable.IsPresent || IncludeMetadata.IsPresent || !string.IsNullOrWhiteSpace(Selector);
+        if (PreserveLineBreaks.IsPresent && readable) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentException("-PreserveLineBreaks cannot be combined with -Readable, -Selector or -IncludeMetadata."),
+                "PreserveLineBreaksWithReadable", ErrorCategory.InvalidArgument, null));
+        }
+
         string html = await ReadInputHtmlAsync().ConfigureAwait(false);
 
-        if (Readable.IsPresent || IncludeMetadata.IsPresent || !string.IsNullOrWhiteSpace(Selector)) {
+        if (PreserveLineBreaks.IsPresent) {
+            await WriteOutputAsync(HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true)).ConfigureAwait(false);
+            return;
+        }
+
+        if (readable) {
             HtmlReadableTextResult result = HtmlParserToText.ExtractReadableText(html, Selector);
             if (IncludeMetadata.IsPresent) {
                 WriteObject(result);

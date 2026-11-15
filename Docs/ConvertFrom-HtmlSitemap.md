@@ -25,7 +25,8 @@ ConvertFrom-HtmlSitemap -Url <uri> [-BaseUrl <uri>] [-Proxy <string[]>] [-ProxyC
 ```
 
 ## DESCRIPTION
-Extracts URLs from sitemap urlset or sitemap index XML.
+Extracts URLs from sitemap urlset or sitemap index XML. Sitemaps never need a document type declaration, so XML with
+a DOCTYPE is rejected with an error, as malformed XML is.
 
 ## EXAMPLES
 

@@ -396,10 +396,33 @@ The renderer validates HTTPS and blocks private-network HTTP(S)/WS(S) and arbitr
 // Convert HTML to plain text
 string plainText = HtmlParserToText.ConvertToText(html);
 
+// Keep paragraph and line boundaries: "Report\nLine 1\nLine 2"
+string lines = HtmlParserToText.ConvertFragmentToText("<p>Re<b>port</b></p><p>Line 1<br>Line 2</p>", preserveLineBreaks: true);
+
 // HTTP client operations
 HttpClient httpClient = HtmlHttpClientFactory.Shared;
 string content = await httpClient.GetStringAsync("https://example.com");
 ```
+
+`ConvertFragmentToText(html)` returns one line of text, with a space at every block boundary. With
+`preserveLineBreaks: true`, `<br>` and block elements such as paragraphs, list items, headings and table rows end a
+line, and newlines in the text stay line breaks. Inline elements join their text without a separator, cells in a table
+row are separated by a space, and runs of blank lines collapse to one. Source formatting between block elements, such
+as the newline after `</p>` or `<br>`, does not add blank lines. Preformatted text keeps its indentation. Scripts,
+styles, templates, noscript and embedded content are dropped, and the text that follows them is kept. Entities are
+decoded; the result is plain text, so encode it before writing it into HTML. Lines end with `\n`.
+
+#### HtmlDiscoveryParser
+```csharp
+IReadOnlyList<HtmlSitemapEntry> entries = HtmlDiscoveryParser.ParseSitemapEntries(sitemapXml, new Uri("https://example.org/"));
+HtmlSyndicationFeed feed = HtmlDiscoveryParser.ParseSyndicationFeed(feedXml, new Uri("https://example.org/feed/"));
+```
+
+XML parsing never resolves external resources. Sitemaps and sitemap indexes never need a document type declaration,
+so `ParseSitemapEntries` and `ParseSitemapUrls` throw `XmlException` for a document with a DOCTYPE, as they do for
+malformed XML, and the crawler skips such a sitemap. RSS and Atom parsing skips a DOCTYPE instead of refusing the feed,
+because older RSS 0.91 feeds carry one. The DTD's entity declarations are not read, so a feed that uses an entity it
+defines only there fails as malformed XML.
 
 #### PreMailerClient
 ```csharp

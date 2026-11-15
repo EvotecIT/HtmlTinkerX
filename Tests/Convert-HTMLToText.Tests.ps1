@@ -58,4 +58,18 @@
         $Output = Convert-HTMLToText -Content $HTMLContentFormatted
         $Output.Trim() | Should -Be 'Name Id HandleCount WorkingSet 1Password 22268 1007 87146496 aesm_service 25340 189 3948544'
     }
+
+    It 'Given -PreserveLineBreaks - Should return one line per paragraph, list item and line break' {
+        $html = '<p>Re<b>port</b> ready</p><ul><li>First</li><li>Second</li></ul><script>track()</script>Line 1<br>Line 2'
+
+        $output = Convert-HTMLToText -Content $html -PreserveLineBreaks
+
+        $output | Should -BeOfType ([string])
+        $output.Split("`n") | Should -Be @('Report ready', 'First', 'Second', 'Line 1', 'Line 2')
+    }
+
+    It 'Given -PreserveLineBreaks with -Readable - Should refuse the combination' {
+        { Convert-HTMLToText -Content '<p>Text</p>' -PreserveLineBreaks -Readable -ErrorAction Stop } |
+            Should -Throw -ErrorId 'PreserveLineBreaksWithReadable,PSParseHTML.PowerShell.CmdletConvertHtmlToText'
+    }
 }

@@ -10,6 +10,10 @@ namespace PSParseHTML.PowerShell;
 /// <summary>
 /// Extracts URLs from sitemap urlset or sitemap index XML.
 /// </summary>
+/// <para>
+/// Extracts URLs from sitemap urlset or sitemap index XML. Sitemaps never need a document type declaration, so XML with
+/// a DOCTYPE is rejected with an error, as malformed XML is.
+/// </para>
 [Cmdlet(VerbsData.ConvertFrom, "HtmlSitemap", DefaultParameterSetName = ParameterSetContent)]
 [OutputType(typeof(string))]
 public sealed class CmdletConvertFromHtmlSitemap : AsyncUrlCmdlet {

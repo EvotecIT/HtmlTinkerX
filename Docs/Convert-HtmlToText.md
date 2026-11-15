@@ -11,17 +11,17 @@ Converts HTML content to plain text.
 ## SYNTAX
 ### Content (Default)
 ```powershell
-Convert-HtmlToText -Content <string> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Convert-HtmlToText -Content <string> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-PreserveLineBreaks] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### File
 ```powershell
-Convert-HtmlToText -Path <string> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
+Convert-HtmlToText -Path <string> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-PreserveLineBreaks] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [<CommonParameters>]
 ```
 
 ### Url
 ```powershell
-Convert-HtmlToText -Url <uri> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
+Convert-HtmlToText -Url <uri> [-OutputFile <string>] [-Readable] [-Selector <string>] [-IncludeMetadata] [-PreserveLineBreaks] [-Proxy <string[]>] [-ProxyCredential <pscredential>] [-RetryCount <int>] [-BrowserHeaders] [-RenderWhenBlocked] [-ResumeInBrowser] [-ResumeTimeoutSeconds <int>] [-CdpEndpointUrl <string>] [-ReplayCache <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -37,6 +37,13 @@ Convert-HtmlToText -Content "<p>Hello</p>"
 
 
 ### EXAMPLE 2
+```powershell
+Convert-HtmlToText -Content "<p>Re<b>port</b></p><p>Line 1<br>Line 2</p>" -PreserveLineBreaks
+```
+
+Returns three lines: Report, Line 1 and Line 2. Inline elements do not split words.
+
+### EXAMPLE 3
 ```powershell
 Convert-HtmlToText -Url https://example.com -Proxy http://proxy:8080
 ```
@@ -134,6 +141,25 @@ Aliases: File
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PreserveLineBreaks
+Keep line and paragraph boundaries: br and block elements such as paragraphs, list items, headings and table rows
+end a line, newlines in text stay line breaks, and inline elements join their text. Scripts, styles, templates
+and noscript content are omitted. Lines are separated by a line feed. Cannot be combined with Readable,
+Selector or IncludeMetadata.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Content, File, Url
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
