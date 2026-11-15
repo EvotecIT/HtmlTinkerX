@@ -55,7 +55,7 @@ public sealed class HtmlBrowserRecordingRepairTests {
                     Assert.True(File.Exists(ffmpeg));
                 }
             });
-            HtmlBrowserSession session = await HtmlBrowser.OpenSessionAsync("about:blank", new HtmlBrowserLaunchOptions {
+            HtmlBrowserSession session = await HtmlBrowser.OpenSessionForNavigationAsync(new HtmlBrowserLaunchOptions {
                 Browser = HtmlBrowserEngine.Firefox, UserDataDirectory = persistent ? Path.Combine(root, "profile") : null, VideoPath = video,
                 ViewportWidth = 160, ViewportHeight = 120
             });
