@@ -205,6 +205,7 @@ public static class HtmlParserToText {
     /// </summary>
     private sealed class LineTextWriter {
         private readonly StringBuilder _builder = new();
+        private readonly StringBuilder _pendingIndent = new();
         private bool _hasText;
         private bool _pendingSpace;
         private int _markupBreaks;
@@ -229,6 +230,7 @@ public static class HtmlParserToText {
             string name = element.LocalName;
             if (string.Equals(name, "br", StringComparison.OrdinalIgnoreCase)) {
                 _markupBreaks++;
+                _pendingIndent.Length = 0;
                 return;
             }
 
@@ -252,7 +254,10 @@ public static class HtmlParserToText {
             }
         }
 
-        private void BlockBoundary() => _markupBreaks = Math.Max(_markupBreaks, 1);
+        private void BlockBoundary() {
+            _markupBreaks = Math.Max(_markupBreaks, 1);
+            _pendingIndent.Length = 0;
+        }
 
         private void WriteText(string data, bool preformatted) {
             for (int i = 0; i < data.Length; i++) {
@@ -263,8 +268,13 @@ public static class HtmlParserToText {
                     }
                     _textBreaks++;
                     _pendingSpace = false;
+                    _pendingIndent.Length = 0;
                 } else if (!preformatted && (char.IsWhiteSpace(c) || c == '\u00A0')) {
                     _pendingSpace = true;
+                } else if (preformatted && (c == ' ' || c == '\t') && (!_hasText || _markupBreaks > 0 || _textBreaks > 0)) {
+                    // Indentation at the start of a line is kept only when text follows on that line, so
+                    // whitespace-only lines stay blank lines and count toward the blank-line limit.
+                    _pendingIndent.Append(c);
                 } else {
                     Append(c);
                 }
@@ -286,6 +296,8 @@ public static class HtmlParserToText {
             _pendingSpace = false;
             _markupBreaks = 0;
             _textBreaks = 0;
+            _builder.Append(_pendingIndent);
+            _pendingIndent.Length = 0;
             _builder.Append(c);
         }
 

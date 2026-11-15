@@ -92,6 +92,14 @@ public class HtmlParserFragmentTextTests {
             HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
     }
 
+    [Theory]
+    [InlineData("<pre>A\n \n \n B</pre>", "A\n\n B")]
+    [InlineData("<pre>A\n </pre>", "A")]
+    [InlineData("<pre>A\n\t\n  </pre>B", "A\nB")]
+    public void WhitespaceOnlyPreformattedLinesAreBlankLinesWithinTheLimit(string html, string expected) {
+        Assert.Equal(expected, HtmlParserToText.ConvertFragmentToText(html, preserveLineBreaks: true));
+    }
+
     [Fact]
     public void DefaultFragmentConversionStillJoinsLinesWithSpaces() {
         const string html = "<p>First line<br>Second line</p>Third\nFourth";
