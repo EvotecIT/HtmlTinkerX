@@ -33,17 +33,36 @@ public sealed class HtmlPublicNetworkTransportTests {
     [InlineData("fd00::1")]
     [InlineData("::ffff:192.168.1.1")]
     public async Task PrivateAndSpecialPurposeLiteralsAreRefused(string literal) =>
-        await Assert.ThrowsAsync<HttpRequestException>(() => HtmlPublicNetworkTransport.PublicAddressesAsync(literal, NoResolver, default));
+        await Assert.ThrowsAsync<HttpRequestException>(() => HtmlPublicNetworkTransport.PublicAddressesAsync(literal, [], NoResolver, default));
 
     [Fact]
     public async Task ANameIsRefusedWhenAnyAddressIsPrivateAndKeptWhenAllArePublic() {
-        await Assert.ThrowsAsync<HttpRequestException>(() => HtmlPublicNetworkTransport.PublicAddressesAsync("mixed.example",
+        await Assert.ThrowsAsync<HttpRequestException>(() => HtmlPublicNetworkTransport.PublicAddressesAsync("mixed.example", [],
             (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34"), IPAddress.Parse("192.168.0.10") }), default));
 
-        var addresses = await HtmlPublicNetworkTransport.PublicAddressesAsync("public.example",
+        var addresses = await HtmlPublicNetworkTransport.PublicAddressesAsync("public.example", [],
             (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34"), IPAddress.Parse("2606:2800:220:1::1") }), default);
 
         Assert.Equal(2, addresses.Count);
+    }
+
+    [Theory]
+    [InlineData("64:ff9b::a00:1")]
+    [InlineData("2001:4860:64::a9fe:a9fe")]
+    public async Task Nat64AddressesAreCheckedByTheIpv4AddressTheyEmbed(string literal) {
+        HtmlBrowserNat64Prefix[] configured = [HtmlBrowserNat64Prefix.Parse("2001:4860:64::/96")];
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => HtmlPublicNetworkTransport.PublicAddressesAsync(literal, configured, NoResolver, default));
+    }
+
+    [Fact]
+    public async Task ARequestThatRequiresHttp3IsRefusedBecauseQuicSkipsTheAddressCheck() {
+        using HttpClient client = new(HtmlPublicNetworkTransport.Create());
+        using HttpRequestMessage request = new(HttpMethod.Get, "https://public.example/license") {
+            Version = HttpVersion.Version30, VersionPolicy = HttpVersionPolicy.RequestVersionExact
+        };
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => client.SendAsync(request));
     }
 
     [Fact]

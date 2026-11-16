@@ -122,7 +122,7 @@ public sealed class HtmlHttpNetworkHandler : HttpMessageHandler {
     /// HTTP/3 runs over QUIC, which never calls the connect callback, so a routed request must not use it. A request
     /// allowing a higher version could also move to HTTP/3 after an Alt-Svc advertisement; it is capped at HTTP/2.
     /// </summary>
-    private static void KeepOnTcp(HttpRequestMessage request) {
+    internal static void KeepOnTcp(HttpRequestMessage request) {
         if (request.Version.Major >= 3) {
             if (request.VersionPolicy != HttpVersionPolicy.RequestVersionOrLower)
                 throw new NotSupportedException("Explicit network routes connect over TCP and cannot send a request that requires HTTP/3.");
