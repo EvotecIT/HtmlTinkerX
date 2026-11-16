@@ -86,11 +86,12 @@ public static partial class HtmlCrawler {
                 }
                 if (request.Method == HttpMethod.Get && retries < options.HttpRetryCount && HtmlFetchRules.IsTransientStatus(status)) {
                     TimeSpan delay = HtmlFetchRules.GetRetryDelay(response, retries, HttpRetryBaseDelay, HttpRetryMaximumDelay);
+                    DateTimeOffset? retryAt = response.Headers.RetryAfter?.Date;
                     gate?.Defer(uri, delay);
                     // Keep the failure when the server's minimum wait exceeds the whole request budget.
                     if (delay.TotalMilliseconds >= options.Timeout) return response;
                     response.Dispose();
-                    await HtmlFetchRules.WaitAsync(delay, cancellationToken).ConfigureAwait(false);
+                    await HtmlFetchRules.WaitAsync(delay, cancellationToken, retryAt).ConfigureAwait(false);
                     retries++;
                     continue;
                 }
@@ -98,11 +99,13 @@ public static partial class HtmlCrawler {
                     return response;
                 }
                 TimeSpan redirectDelay = options.HttpRetryCount > 0 ? HtmlFetchRules.GetServerRetryDelay(response) ?? TimeSpan.Zero : TimeSpan.Zero;
+                DateTimeOffset? redirectRetryAt = options.HttpRetryCount > 0 ? response.Headers.RetryAfter?.Date : null;
                 gate?.Defer(uri, redirectDelay);
                 if (redirectDelay.TotalMilliseconds >= options.Timeout) return response;
                 response.Dispose();
                 if (redirects++ >= 49) throw new HttpRequestException("The crawl request exceeded 50 redirects.");
-                if (redirectDelay > TimeSpan.Zero) await HtmlFetchRules.WaitAsync(redirectDelay, cancellationToken).ConfigureAwait(false);
+                if (redirectDelay > TimeSpan.Zero || redirectRetryAt != null)
+                    await HtmlFetchRules.WaitAsync(redirectDelay, cancellationToken, redirectRetryAt).ConfigureAwait(false);
                 uri = target!;
             }
         }

@@ -92,8 +92,9 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
             if (blocked == null && idempotent && attempt < Policy.RetryCount && HtmlFetchRules.IsTransientStatus(status)) {
                 if (HtmlFetchRules.GetServerRetryDelay(response) > Policy.MaximumRetryDelay) return response;
                 TimeSpan delay = NextDelay(response, attempt++);
+                DateTimeOffset? retryAt = response.Headers.RetryAfter?.Date;
                 response.Dispose();
-                await PauseAsync(uri, delay, $"HTTP {status}", cancellationToken).ConfigureAwait(false);
+                await PauseAsync(uri, delay, $"HTTP {status}", cancellationToken, retryAt).ConfigureAwait(false);
                 continue;
             }
 
@@ -102,6 +103,7 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
                 // A publisher asking for a longer pause than the policy allows is not waited for, as with transient statuses.
                 bool waitable = !(HtmlFetchRules.GetServerRetryDelay(response) > Policy.MaximumRetryDelay);
                 TimeSpan delay = NextDelay(response, attempt);
+                DateTimeOffset? retryAt = response.Headers.RetryAfter?.Date;
                 // A challenge body is never read; disposing releases its host slot before any decision runs.
                 response.Dispose();
                 HtmlBlockedAction action = Policy.OnBlocked == null
@@ -109,7 +111,7 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
                     : await Policy.OnBlocked(uri, failure, cancellationToken).ConfigureAwait(false);
                 if (action == HtmlBlockedAction.Retry && waitable && idempotent && attempt < Policy.RetryCount) {
                     attempt++;
-                    await PauseAsync(uri, delay, failure.Provider ?? failure.Kind.ToString(), cancellationToken).ConfigureAwait(false);
+                    await PauseAsync(uri, delay, failure.Provider ?? failure.Kind.ToString(), cancellationToken, retryAt).ConfigureAwait(false);
                     continue;
                 }
                 if (action == HtmlBlockedAction.Resumed && idempotent && attempt < Policy.RetryCount) {
@@ -160,9 +162,9 @@ public sealed class HtmlFetchHandler : DelegatingHandler {
         return delay > Policy.MaximumRetryDelay ? Policy.MaximumRetryDelay : delay;
     }
 
-    private async Task PauseAsync(Uri uri, TimeSpan delay, string reason, CancellationToken cancellationToken) {
+    private async Task PauseAsync(Uri uri, TimeSpan delay, string reason, CancellationToken cancellationToken, DateTimeOffset? notBefore = null) {
         Policy.OnRetry?.Invoke(uri.Host, reason);
-        await HtmlFetchRules.WaitAsync(delay, cancellationToken).ConfigureAwait(false);
+        await HtmlFetchRules.WaitAsync(delay, cancellationToken, notBefore).ConfigureAwait(false);
     }
 
     /// <summary>
