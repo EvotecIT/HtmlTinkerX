@@ -20,7 +20,7 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <OfficeImoVersion>3.6.0</OfficeImoVersion>
-        <ChartForgeXVersion>3.2.0</ChartForgeXVersion>
+        <ChartForgeXVersion>4.0.2</ChartForgeXVersion>
         <ChartForgeXVisualsProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXVisualsProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Visuals\ChartForgeX.Visuals.csproj</ChartForgeXVisualsProjectPath>
         <ChartForgeXStoriesProjectPath Condition=" '$(ChartForgeXProjectPath)' != '' and '$(ChartForgeXStoriesProjectPath)' == '' ">$([System.IO.Path]::GetDirectoryName('$(ChartForgeXProjectPath)'))\..\ChartForgeX.Stories\ChartForgeX.Stories.csproj</ChartForgeXStoriesProjectPath>
     </PropertyGroup>
