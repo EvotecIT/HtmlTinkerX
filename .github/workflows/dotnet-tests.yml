@@ -107,9 +107,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-windows-${{ matrix.framework }}
+          retention-days: 1
           path: |
             **/*.trx
             **/Sequence*.xml
@@ -226,9 +228,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-ubuntu
+          retention-days: 1
           path: |
             **/*.trx
             **/Sequence*.xml
@@ -312,9 +316,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-macos
+          retention-days: 1
           path: |
             **/*.trx
             **/Sequence*.xml

@@ -90,6 +90,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: module-entry
+          retention-days: 1
           path: |
             PSParseHTML.psd1
             PSParseHTML.psm1
