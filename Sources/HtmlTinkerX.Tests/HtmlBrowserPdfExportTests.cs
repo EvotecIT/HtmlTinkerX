@@ -49,7 +49,7 @@ public class HtmlBrowserPdfExportTests {
         string? autoAttachMessage = null;
         string? resumeMessage = null;
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => {
                 if (method == "Target.sendMessageToTarget" && arguments != null) {
                     string sentMessage = arguments["message"].ToString()!;
                     if (sentMessage.Contains("\"method\":\"Target.setAutoAttach\"", StringComparison.Ordinal)) autoAttachMessage = sentMessage;
@@ -110,7 +110,7 @@ public class HtmlBrowserPdfExportTests {
         var session = new Mock<ICDPSession>();
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => {
                 if (method == "Target.sendMessageToTarget" && arguments != null) sentMessages.Add(arguments["message"].ToString()!);
                 return Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
                     ? ParseJson(@"{""frameTree"":{""frame"":{""id"":""main-frame""}}}")
@@ -177,7 +177,7 @@ public class HtmlBrowserPdfExportTests {
         session.Setup(value => value.Event(It.IsAny<string>()))
             .Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) =>
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) =>
                 Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
                     ? ParseJson(@"{""frameTree"":{""frame"":{""id"":""main-frame""}}}")
                     : null));
@@ -632,7 +632,7 @@ public class HtmlBrowserPdfExportTests {
         bool closed = false;
         var cdp = new Mock<ICDPSession>();
         cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => method switch {
                 "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
                 "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
                 "Runtime.evaluate" when arguments != null
@@ -667,7 +667,7 @@ public class HtmlBrowserPdfExportTests {
         TaskCompletionSource<JsonElement?> pendingMask = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var cdp = new Mock<ICDPSession>();
         cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, _) => method switch {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, _, _) => method switch {
                 "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
                 "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
                 "Runtime.evaluate" => pendingMask.Task,
@@ -698,7 +698,7 @@ public class HtmlBrowserPdfExportTests {
         int frameTreeReads = 0;
         var cdp = new Mock<ICDPSession>();
         cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => method switch {
                 "Page.getFrameTree" when Interlocked.Increment(ref frameTreeReads) == 1 =>
                     Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""},""childFrames"":[{""frame"":{""id"":""detached""}}]}}")),
                 "Page.getFrameTree" =>
@@ -732,7 +732,7 @@ public class HtmlBrowserPdfExportTests {
         int frameTreeReads = 0;
         var cdp = new Mock<ICDPSession>();
         cdp.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => method switch {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => method switch {
                 "Page.getFrameTree" => Task.FromResult<JsonElement?>(ParseJson(@"{""frameTree"":{""frame"":{""id"":""main""}}}")),
                 "Page.createIsolatedWorld" => Task.FromResult<JsonElement?>(ParseJson(@"{""executionContextId"":1}")),
                 "Runtime.evaluate" when arguments != null
@@ -741,7 +741,7 @@ public class HtmlBrowserPdfExportTests {
                         Task.FromException<JsonElement?>(new PlaywrightException("Transient CDP restore failure")),
                 _ => Task.FromResult<JsonElement?>(null)
             })
-            .Callback<string, Dictionary<string, object>?>((method, _) => {
+            .Callback<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, _, _) => {
                 if (method == "Page.getFrameTree") Interlocked.Increment(ref frameTreeReads);
             });
         cdp.Setup(value => value.DetachAsync()).Returns(Task.CompletedTask);

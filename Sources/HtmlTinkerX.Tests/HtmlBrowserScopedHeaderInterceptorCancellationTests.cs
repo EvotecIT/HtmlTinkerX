@@ -38,7 +38,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         var session = new Mock<ICDPSession>();
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, _) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, _, _) => {
                 if (method == "Fetch.continueRequest") {
                     continueSent.TrySetResult(true);
                     return continueResponse.Task;
@@ -105,7 +105,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         var session = new Mock<ICDPSession>();
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => {
                 if (method == "Fetch.continueRequest") {
                     string id = (string)arguments!["requestId"];
                     TaskCompletionSource<JsonElement?> response = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -163,7 +163,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         TaskCompletionSource<bool> workerNetworkTrackingEnabled = new(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => {
                 if (method == "Target.sendMessageToTarget") {
                     using JsonDocument command = JsonDocument.Parse((string)arguments!["message"]);
                     JsonElement root = command.RootElement;
@@ -236,7 +236,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         TaskCompletionSource<bool> continueSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, arguments) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, arguments, _) => {
                 if (method == "Target.sendMessageToTarget") {
                     using JsonDocument command = JsonDocument.Parse((string)arguments!["message"]);
                     JsonElement root = command.RootElement;
@@ -298,7 +298,7 @@ public sealed class HtmlBrowserScopedHeaderInterceptorCancellationTests {
         var session = new Mock<ICDPSession>();
         session.Setup(value => value.Event(It.IsAny<string>())).Returns<string>(name => Event(name).Object);
         session.Setup(value => value.SendAsync(It.IsAny<string>(), It.IsAny<Dictionary<string, object>>()))
-            .Returns<string, Dictionary<string, object>?>((method, _) => {
+            .Returns<string, Dictionary<string, object>?, CDPSessionSendOptions?>((method, _, _) => {
                 if (method == "Fetch.failRequest") failedRequestSent.TrySetResult(true);
                 return Task.FromResult<JsonElement?>(method == "Page.getFrameTree"
                     ? ParseJson("{\"frameTree\":{\"frame\":{\"id\":\"main\"}}}")
