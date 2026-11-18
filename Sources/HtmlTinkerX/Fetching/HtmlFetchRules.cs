@@ -42,14 +42,19 @@ internal static class HtmlFetchRules {
         return TimeSpan.FromMilliseconds(milliseconds);
     }
 
-    internal static async Task WaitAsync(TimeSpan delay, CancellationToken token) {
+    internal static async Task WaitAsync(TimeSpan delay, CancellationToken token, DateTimeOffset? notBefore = null) {
         token.ThrowIfCancellationRequested();
         Stopwatch elapsed = Stopwatch.StartNew();
-        TimeSpan remaining = delay;
-        while (remaining > TimeSpan.Zero) {
+        while (true) {
+            TimeSpan remaining = delay - elapsed.Elapsed;
+            // Only absolute Retry-After dates follow UTC corrections; duration backoffs stay monotonic.
+            if (notBefore is DateTimeOffset deadline) {
+                TimeSpan clockRemaining = deadline - DateTimeOffset.UtcNow;
+                if (clockRemaining > remaining) remaining = clockRemaining;
+            }
+            if (remaining <= TimeSpan.Zero) return;
             // Timers can wake slightly early. Keep the minimum delay before another request.
             await Task.Delay(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), token).ConfigureAwait(false);
-            remaining = delay - elapsed.Elapsed;
         }
     }
 

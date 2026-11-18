@@ -48,6 +48,7 @@ public static partial class HtmlBrowser {
             string staging = Path.Combine(root, "staging-" + Guid.NewGuid().ToString("N"));
             string generation = Path.Combine(root, "versions", engine.ToString().ToLowerInvariant() + "-" + Guid.NewGuid().ToString("N"));
             AppendCacheLog(engine, "install-started", Array.Empty<string>(), null);
+            bool committed = false;
             try {
                 if (ReadBooleanEnvironmentVariable("HTMLTINKERX_BROWSER_OFFLINE") == true)
                     throw new IOException("Browser cache repair is offline (HTMLTINKERX_BROWSER_OFFLINE=1). No installed revision was removed.");
@@ -63,10 +64,14 @@ public static partial class HtmlBrowser {
                 WriteCacheManifest(staging, engine, runtimes);
                 if (!IsExpectedSlot(staging, ReadCacheManifest(staging), engine) || !VerifyCacheSlot(staging, true, out _))
                     throw new InvalidDataException("Downloaded browser cache is incomplete or has invalid integrity metadata.");
-                await SmokeCacheSlotAsync(staging, engine).ConfigureAwait(false);
-                // Staging and generations share a volume. One rename makes an entirely verified generation visible.
+                // Browser children can retain their working directory after smoke. Move bytes before launch;
+                // keep the manifest hidden until smoke succeeds so readers cannot discover an unverified generation.
+                File.Move(CacheFilePath(staging, CacheManifestName), CacheFilePath(staging, CacheManifestName + ".pending"));
                 Directory.CreateDirectory(Path.GetDirectoryName(generation)!);
                 await MoveVerifiedGenerationAsync(staging, generation).ConfigureAwait(false);
+                await SmokeCacheSlotAsync(generation, engine).ConfigureAwait(false);
+                File.Move(CacheFilePath(generation, CacheManifestName + ".pending"), CacheFilePath(generation, CacheManifestName));
+                committed = true;
                 ClearRecentRepairFailure(engine);
                 AppendCacheLog(engine, "verified", runtimes.Select(runtime => Path.GetFileName(runtime.Directory)).ToArray(), null);
             } catch (Exception ex) {
@@ -77,8 +82,9 @@ public static partial class HtmlBrowser {
                 }
                 Console.Error.WriteLine($"WARNING: {engine} cache repair failed ({ex.Message}). Using verified fallback {fallback}; browser and driver versions may differ.");
             } finally {
-                // Only this invocation's uncommitted staging tree is disposable; previous generations are retained.
+                // Only this invocation's uncommitted trees are disposable; previous generations are retained.
                 TryDeleteDirectory(staging);
+                if (!committed) TryDeleteDirectory(generation);
             }
         } finally {
             InstallationSemaphore.Release();
@@ -86,7 +92,7 @@ public static partial class HtmlBrowser {
     }
 
     private static async Task MoveVerifiedGenerationAsync(string staging, string generation) {
-        // Windows scanners and just-closed browser children can briefly retain directory handles.
+        // Windows scanners and installer children can briefly retain directory handles.
         for (int attempt = 0; ; attempt++) {
             try { Directory.Move(staging, generation); return; }
             catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 20) {

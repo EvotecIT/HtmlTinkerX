@@ -212,6 +212,25 @@ public sealed partial class HtmlBrowserCacheResilienceTests {
     }
 
     [Fact]
+    public async Task InstallationPublishesVerifiedBytesWhileSmokeRetainsItsWorkingDirectory() {
+        using var fixture = new CacheFixture();
+        string previousDirectory = Environment.CurrentDirectory;
+        HtmlBrowser.CacheSmokeTest = (slot, _) => {
+            Environment.CurrentDirectory = slot;
+            return Task.CompletedTask;
+        };
+        try {
+            await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
+
+            string runtime = HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox);
+            Assert.Equal("good", File.ReadAllText(Path.Combine(runtime, "firefox-100", "browser.exe")));
+            Assert.Equal(0, (await HtmlBrowser.TestBrowserCacheAsync(HtmlBrowserEngine.Firefox)).ExitCode);
+        } finally {
+            Environment.CurrentDirectory = previousDirectory;
+        }
+    }
+
+    [Fact]
     public async Task AtomicPublicationHidesStagingUntilSmokeSucceeds() {
         using var fixture = new CacheFixture();
         await HtmlBrowser.EnsureInstalledAsync(HtmlBrowserEngine.Firefox);
@@ -220,11 +239,16 @@ public sealed partial class HtmlBrowserCacheResilienceTests {
         var finish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         HtmlBrowser.CacheSmokeTest = async (_, _) => { entered.SetResult(true); await finish.Task; };
         Task repair = HtmlBrowser.RepairInstallationAsync(HtmlBrowserEngine.Firefox);
-        await entered.Task;
-        Assert.Equal(previous, HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox));
-        Assert.Single(Directory.GetDirectories(Path.Combine(fixture.Cache, ".htmltinkerx", "versions")));
-        finish.SetResult(true);
-        await repair;
+        try {
+            await entered.Task;
+            Assert.Equal(previous, HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox));
+            string published = Assert.Single(Directory.GetFiles(Path.Combine(fixture.Cache, ".htmltinkerx", "versions"),
+                HtmlBrowser.CacheManifestName, SearchOption.AllDirectories));
+            Assert.Equal(Path.Combine(previous, HtmlBrowser.CacheManifestName), published);
+        } finally {
+            finish.TrySetResult(true);
+            await repair;
+        }
         Assert.NotEqual(previous, HtmlBrowser.GetBrowserRuntimeDirectory(HtmlBrowserEngine.Firefox));
         Assert.True(Directory.Exists(previous));
     }
